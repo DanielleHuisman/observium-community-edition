@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -30,29 +29,14 @@ echo('<td class="strong">');
   }
   ksort($vlan_ports);
 
-foreach ($vlan_ports as $port)
-{
+foreach ($vlan_ports as $port) {
   humanize_port($port);
-  if ($vars['view'] == "graphs")
-  {
-    echo '<div class="box box-solid" style="display: block; padding: 2px; margin: 2px; min-width: 139px; max-width:139px; height:85px; height:85px; text-align: center; float: left;">
-    <div style="font-weight: bold;"><h4>'.$port['port_label_short']."</h4></div>
-    <a href='".generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'port', 'port' => $port['port_id']))."' onmouseover=\"return overlib('\
-    <div style=\'font-size: 16px; padding:5px; font-weight: bold; color: #e5e5e5;\'>".$device['hostname']." - ".$port['ifDescr']."</div>\
-    ".$port['ifAlias']." \
-    <img src=\'graph.php?type=$graph_type&amp;id=".$port['port_id']."&amp;from=" .$config['time']['twoday']."&amp;to=".$config['time']['now']."&amp;width=450&amp;height=150\'>\
-    ', CENTER, LEFT, FGCOLOR, '#e5e5e5', BGCOLOR, '#e5e5e5', WIDTH, 400, HEIGHT, 150);\" onmouseout=\"return nd();\"  >".
-    "<img src='graph.php?type=$graph_type&amp;id=".$port['port_id']."&amp;from=".$config['time']['twoday']."&amp;to=".$config['time']['now']."&amp;width=132&amp;height=40&amp;legend=no'>
-    </a>
-    <div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
-   </div>";
-  }
-  else
-  {
+  if ($vars['view'] === "graphs") {
+    print_port_minigraph($port, $graph_type, 'twoday');
+  } else {
     echo($vlan['port_sep'] . generate_port_link_short($port));
     $vlan['port_sep'] = ", ";
     if ($port['untagged']) { echo("(U)"); }
-
   }
 }
 

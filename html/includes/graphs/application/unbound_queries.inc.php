@@ -30,7 +30,7 @@ while (1)
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr']    = "Queries handled by thread$thread";
     $rrd_list[$i]['ds']       = "numQueries";
-    $rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % count($config['graph_colours'][$colours])];
+    $rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % safe_count($config['graph_colours'][$colours])];
     $i++;
 
     $thread++;

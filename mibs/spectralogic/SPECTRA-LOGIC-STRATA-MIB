@@ -1,0 +1,2567 @@
+SPECTRA-LOGIC-STRATA-MIB DEFINITIONS ::= BEGIN
+IMPORTS
+    Integer32,Counter32,MODULE-IDENTITY,OBJECT-TYPE,OBJECT-IDENTITY,
+    IpAddress,NOTIFICATION-TYPE,TimeTicks,enterprises,Counter64
+                                                  FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION,DateAndTime,DisplayString,RowStatus,TruthValue
+                                                  FROM SNMPv2-TC
+    MODULE-COMPLIANCE,OBJECT-GROUP,NOTIFICATION-GROUP
+                                                  FROM SNMPv2-CONF;
+spectralogic MODULE-IDENTITY
+    LAST-UPDATED  "201405050000Z"
+    ORGANIZATION  "Spectra Logic"
+    CONTACT-INFO
+           "
+           Postal: Spectra Logic
+                   6285 Lookout Road
+                   Boulder, CO  80301
+                   USA
+           Phone:  +1-303-449-6400
+           Fax:    +1-303-939-8844
+           Email:  info@spectralogic.com"
+    DESCRIPTION
+           "The Strata System MIB."
+    REVISION       "201610310000Z"
+    DESCRIPTION
+           "Add sTapeDriveTable and pTapeDriveStatisticsTable."
+    REVISION       "201603040000Z"
+    DESCRIPTION
+           "Fix contact info so it lists the correct fax number."
+    REVISION       "201502040000Z"
+    DESCRIPTION
+           "Remove sIPMISensorTable and nIPMISensorStatus."
+    REVISION       "201405050000Z"
+    DESCRIPTION
+           "Rename cAccount* to cUser*.  Prefix *Statistics with p so they all
+            start with a lower-case letter.  Define strata at
+            spectralogic.6 instead of spectralogic.1 in order to not conflict
+            with the tape library MIBs."
+    REVISION       "201211050000Z"
+    DESCRIPTION
+           "Initial revision"
+    ::= { enterprises 3478 }
+
+-- SpectraLogic Strata SNMP Agent enterprise specific management objects
+
+strata OBJECT IDENTIFIER ::= { spectralogic 6 }
+
+notification OBJECT IDENTIFIER ::= { strata 4 }
+
+--
+-- general object attachment root for event notification
+--
+nStrataEvent OBJECT IDENTIFIER ::= { notification 1 }
+nStrataEvents OBJECT IDENTIFIER ::= { notification 2 }
+
+
+-- Textual convention
+
+KBytes ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Storage size, expressed in units of 1024 bytes."
+    SYNTAX Integer32 (0..2147483647)
+
+MBytes ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Storage size, expressed in units of 1048576 bytes."
+    SYNTAX Integer32 (0..2147483647)
+
+GBytes ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Storage size, expressed in units of 1073741824 bytes."
+    SYNTAX Integer32 (0..2147483647)
+
+SpectraLogicStrataEventSeverity ::= TEXTUAL-CONVENTION
+    STATUS     current
+    DESCRIPTION
+           "This is the event severity, which specify the significance
+            of the event. The severity with the value, error and warning,
+            are alarms.
+
+            Unknown: An unidentified event or an internal event. The unknown
+            event will not forward to any other destination.
+
+            Ok: The indicated object is operating normally. No user intervention
+            is required.
+
+            Info: An informational message only.  No user intervention is
+            required.
+
+            Warning: An error condition that cannot be corrected, but data is
+            still accessible. High availability may be compromised. System
+            performance has been affected or data reliability may be in
+            jeopardy. A disk drive may have failed or the system may be
+            degraded.
+
+            Error: Some system element has been compromised. Data access has 
+            been lost to some degree. The system software cannot recover the
+            failed component. User intervention required. Data loss and data
+            corruption are other causes for a critical condition."
+            
+    SYNTAX     INTEGER
+               {
+                  unknown       (0),
+                  ok            (1),
+                  info          (2),
+                  warning       (3),
+                  error         (4)
+                }
+
+eventSeverity OBJECT-TYPE
+    SYNTAX     SpectraLogicStrataEventSeverity
+    MAX-ACCESS accessible-for-notify
+    STATUS     current
+    DESCRIPTION
+           "This is the message severity."
+    ::= { nStrataEvent 1 }
+
+eventTimestamp OBJECT-TYPE
+    SYNTAX         DateAndTime
+    MAX-ACCESS     accessible-for-notify
+    STATUS         current
+    DESCRIPTION
+       "This is the system timestamp when the message occured."
+    ::= { nStrataEvent 2 }
+
+
+--
+configuration OBJECT IDENTIFIER ::= { strata 1 }
+
+-- system configuration
+system OBJECT IDENTIFIER ::= { configuration 1 }
+
+
+cUsers OBJECT IDENTIFIER ::= { system 1 }
+    -- from GET URI/users response
+    cUserTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CUserEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the system users information."
+        ::= { cUsers 1 }
+
+    CUserEntry ::=
+        SEQUENCE {
+        cUserIndex            Integer32,
+        cUserID               DisplayString,
+        cUserUsername         DisplayString,
+        cUserFullname         DisplayString,
+        cUserRole             DisplayString
+        }
+
+    cUserEntry OBJECT-TYPE
+        SYNTAX     CUserEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cUserIndex }
+        ::= { cUserTable 1 }
+
+    cUserIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cUserEntry 1 }
+
+    cUserID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the account ID."
+        ::= { cUserEntry 2 }
+
+    cUserUsername OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the account user name."
+        ::= { cUserEntry 3 }
+
+    cUserFullname OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the account full name."
+        ::= { cUserEntry 4 }
+
+    cUserRole OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the account role."
+        ::= { cUserEntry 5 }
+
+
+--
+
+cNetworkInterfaces OBJECT IDENTIFIER ::= { system 2 }
+    -- from GET URI/data_interfaces
+    cNetworkInterfaceTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CNetworkInterfaceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the management interface information."
+        ::= { cNetworkInterfaces 1 }
+
+    CNetworkInterfaceEntry ::=
+        SEQUENCE {
+        cNetworkInterfaceIndex                  Integer32,
+        cNetworkInterfaceID                     DisplayString,
+        cNetworkInterfaceName                   DisplayString,
+        cNetworkInterfaceLinkStatus             DisplayString,
+        cNetworkInterfaceIPAddress              DisplayString,
+        cNetworkInterfaceNetmask                DisplayString,
+        cNetworkInterfaceDefaultGateway         DisplayString,
+        cNetworkInterfaceDHCP                   DisplayString,
+        cNetworkInterfaceMACAddress             DisplayString,
+        cNetworkInterfaceMTU                    INTEGER
+        }
+
+    cNetworkInterfaceEntry OBJECT-TYPE
+        SYNTAX     CNetworkInterfaceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cNetworkInterfaceIndex }
+        ::= { cNetworkInterfaceTable 1 }
+
+    cNetworkInterfaceIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cNetworkInterfaceEntry 1 }
+
+    cNetworkInterfaceID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the ID of the interface."
+        ::= { cNetworkInterfaceEntry 2 }
+
+    cNetworkInterfaceName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the interface name."
+        ::= { cNetworkInterfaceEntry 3 }
+
+    cNetworkInterfaceLinkStatus OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the link status of the interface."
+        ::= { cNetworkInterfaceEntry 4 }
+
+    cNetworkInterfaceIPAddress OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the interface IP address."
+        ::= { cNetworkInterfaceEntry 5 }
+
+    cNetworkInterfaceNetmask OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the interface netmask."
+        ::= { cNetworkInterfaceEntry 6 }
+
+    cNetworkInterfaceDefaultGateway OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the default gateway for the interface."
+        ::= { cNetworkInterfaceEntry 7 }
+
+    cNetworkInterfaceDHCP OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Whether or not the interface was configured via DHCP."
+        ::= { cNetworkInterfaceEntry 8 }
+
+    cNetworkInterfaceMACAddress OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the interface MAC address."
+        ::= { cNetworkInterfaceEntry 10 }
+
+    cNetworkInterfaceMTU OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the interface MTU size."
+        ::= { cNetworkInterfaceEntry 11 }
+
+--
+cTimeManagement OBJECT IDENTIFIER ::= { system 3 }
+    -- from GET URI/ntp_servers
+
+    cNTPTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CNTPEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the ntp setting information."
+        ::= { cTimeManagement 1 }
+
+    CNTPEntry ::=
+        SEQUENCE {
+        cNTPIndex         Integer32,
+        cNTPEnabled       TruthValue,
+        cNTPAddress1      DisplayString,
+        cNTPAddress2      DisplayString,
+        cNTPSynchronized  DisplayString
+        }
+
+    cNTPEntry OBJECT-TYPE
+        SYNTAX     CNTPEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cNTPIndex }
+        ::= { cNTPTable 1 }
+
+    cNTPIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cNTPEntry 1 }
+
+    cNTPEnabled OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Whether or not NTP is enabled."
+        ::= { cNTPEntry 2 }
+
+    cNTPAddress1 OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the system NTP server address 1."
+        ::= { cNTPEntry 3 }
+
+    cNTPAddress2 OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the system NTP server address 2."
+        ::= { cNTPEntry 4 }
+
+    cNTPSynchronized OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Whether or not the system is synchronized to the NTP server."
+        ::= { cNTPEntry 5 }
+
+
+
+-- from GET URI/logs
+cLogs OBJECT IDENTIFIER ::= { system 4 }
+    cLogTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CLogEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the system information file information."
+        ::= { cLogs 1 }
+
+    CLogEntry ::=
+        SEQUENCE {
+        cLogIndex         Integer32,
+        cLogID            DisplayString,
+        cLogCreationDate  DateAndTime,
+        cLogSize          KBytes
+        }
+
+    cLogEntry OBJECT-TYPE
+        SYNTAX     CLogEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cLogIndex }
+        ::= { cLogTable 1 }
+
+    cLogIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cLogEntry 1 }
+
+    cLogID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the logset ID."
+        ::= { cLogEntry 2 }
+   
+    cLogCreationDate OBJECT-TYPE
+        SYNTAX     DateAndTime
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the logs creation date."
+        ::= { cLogEntry 3 }
+
+    cLogSize OBJECT-TYPE
+        SYNTAX     KBytes
+        UNITS      "KBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the log's size."
+        ::= { cLogEntry 4 }
+
+
+-- storage configuration
+storage OBJECT IDENTIFIER   ::= { configuration 2 }
+
+
+--
+cPools OBJECT IDENTIFIER ::= { storage 1 }
+    -- from GET URI/pools
+    cPoolTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CPoolEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the pools information."
+        ::= { cPools 1 }
+
+    CPoolEntry ::=
+        SEQUENCE {
+        cPoolIndex                      Integer32,
+        cPoolID                         DisplayString,
+        cPoolName                       DisplayString,
+        cPoolCreationDate               DateAndTime,
+        cPoolRawSize                    GBytes,
+        cPoolAvailableSize              GBytes,
+        cPoolUsedSize                   GBytes,
+        cPoolOverheadSize               GBytes,
+        cPoolProtectionLevel            DisplayString,
+        cPoolNumberOfDiskArrays         INTEGER,
+        cPoolStatus                     DisplayString,
+        cPoolHighWaterMark              INTEGER
+        }
+
+    cPoolEntry OBJECT-TYPE
+        SYNTAX     CPoolEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cPoolIndex }
+        ::= { cPoolTable 1 }
+
+    cPoolIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cPoolEntry 1 }
+
+    cPoolID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool ID."
+        ::= { cPoolEntry 2 }
+
+    cPoolName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool name."
+        ::= { cPoolEntry 3 }
+
+    cPoolCreationDate OBJECT-TYPE
+        SYNTAX     DateAndTime
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool creation date."
+        ::= { cPoolEntry 4 }
+
+    cPoolRawSize OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool raw space allocated."
+        ::= { cPoolEntry 5 }
+
+    cPoolAvailableSize OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool available space."
+        ::= { cPoolEntry 6 }
+
+    cPoolUsedSize OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool used space."
+        ::= { cPoolEntry 7 } 
+        
+    cPoolOverheadSize OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool overhead size."
+        ::= { cPoolEntry 8 }
+
+    cPoolProtectionLevel OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool parity level."
+        ::= { cPoolEntry 9 }
+
+    cPoolNumberOfDiskArrays OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool number of disk arrays which dictates performance.  More
+                arrays higher performance."
+        ::= { cPoolEntry 10 }
+
+    cPoolStatus OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool status"
+        ::= { cPoolEntry 11 }
+ 
+    cPoolHighWaterMark OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "The high water mark of the pool."
+        ::= { cPoolEntry 12 }
+
+
+cVolumes OBJECT IDENTIFIER ::= { storage 2 }
+    -- from GET URI/volumes
+    cVolumeTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CVolumeEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the volume information."
+        ::= { cVolumes 1 }
+
+    CVolumeEntry ::=
+        SEQUENCE {
+        cVolumeIndex                      Integer32,
+        cVolumeID                         DisplayString,
+        cVolumeName                       DisplayString,
+        cVolumePoolID                     DisplayString,
+        cVolumePoolName                   DisplayString,
+        cVolumeCreationDate               DateAndTime,
+        cVolumeMaximumSize                GBytes,
+        cVolumeMinimumSize                GBytes,
+        cVolumeUsedSpace                  GBytes,
+        cVolumeCompressionEnabled         TruthValue,
+        cVolumeReadOnly                   TruthValue,
+        cVolumeAtimeEnabled               TruthValue
+        }
+
+    cVolumeEntry OBJECT-TYPE
+        SYNTAX     CVolumeEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cVolumeIndex }
+        ::= { cVolumeTable 1 }
+
+    cVolumeIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cVolumeEntry 1 }
+
+    cVolumeID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume ID."
+        ::= { cVolumeEntry 2 }
+
+    cVolumeName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume FQN."
+        ::= { cVolumeEntry 3 }
+
+    cVolumePoolID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume pool ID."
+        ::= { cVolumeEntry 4 }
+
+    cVolumePoolName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume pool name."
+        ::= { cVolumeEntry 5 }
+
+    cVolumeCreationDate OBJECT-TYPE
+        SYNTAX     DateAndTime
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume creation date."
+        ::= { cVolumeEntry 6 }
+
+    cVolumeMaximumSize OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume max space allocated."
+        ::= { cVolumeEntry 7 }
+
+    cVolumeMinimumSize OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume minimum size allocated."
+        ::= { cVolumeEntry 8 }
+
+    cVolumeUsedSpace OBJECT-TYPE
+        SYNTAX     GBytes
+        UNITS      "GBytes"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume used space."
+        ::= { cVolumeEntry 9 }
+
+    cVolumeCompressionEnabled OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume compression enabled."
+        ::= { cVolumeEntry 10 }
+
+    cVolumeReadOnly OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume read only."
+        ::= { cVolumeEntry 11 }
+
+    cVolumeAtimeEnabled OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Volume atime enabled."
+        ::= { cVolumeEntry 12 }
+
+-- from GET URI/snapshots
+    cSnapshotTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CSnapshotEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the volume snapshot information."
+        ::= { cVolumes 2 }
+
+    CSnapshotEntry ::=
+        SEQUENCE {
+        cSnapshotIndex                      Integer32,
+        cSnapshotID                         DisplayString,
+        cSnapshotName                       DisplayString,
+        cSnapshotVolumeID                   DisplayString,
+        cSnapshotCreationDate               DateAndTime,
+        cSnapshotSize                       INTEGER
+        }
+
+    cSnapshotEntry OBJECT-TYPE
+        SYNTAX     CSnapshotEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cSnapshotIndex }
+        ::= { cSnapshotTable 1 }
+
+    cSnapshotIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cSnapshotEntry 1 }
+
+    cSnapshotID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "snapshot ID."
+        ::= { cSnapshotEntry 2 }
+
+    cSnapshotName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "snapshot name."
+        ::= { cSnapshotEntry 3 }
+
+    cSnapshotVolumeID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "volume id for referenced snapshot."
+        ::= { cSnapshotEntry 4 }
+
+    cSnapshotCreationDate OBJECT-TYPE
+        SYNTAX     DateAndTime
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Filesystem creation date."
+        ::= { cSnapshotEntry 5 }
+
+    cSnapshotSize OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Filesystem number of snapshots."
+        ::= { cSnapshotEntry 6 }
+
+
+-- GET URI/snapshot_schedules
+    cSnapshotScheduleTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CSnapshotScheduleEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the volume snapshot schedules information."
+        ::= { cVolumes 3 }
+
+    CSnapshotScheduleEntry ::=
+        SEQUENCE {
+        cSnapshotScheduleIndex                              Integer32,
+        cSnapshotScheduleID                                 DisplayString,
+        cSnapshotScheduleName                               DisplayString,
+        cSnapshotScheduleVolumeID                           DisplayString,
+        cSnapshotScheduleMaximumNumberOfSnapshots           DisplayString,
+        cSnapshotScheduleCronString                         DisplayString,
+        cSnapshotScheduleStartTime                          DisplayString,
+        cSnapshotScheduleFrequency                          DisplayString,
+        cSnapshotScheduleRepeatInterval                     DisplayString
+        }
+
+    cSnapshotScheduleEntry OBJECT-TYPE
+        SYNTAX     CSnapshotScheduleEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cSnapshotScheduleIndex }
+        ::= { cSnapshotScheduleTable 1 }
+
+    cSnapshotScheduleIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cSnapshotScheduleEntry 1 }
+
+    cSnapshotScheduleID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the SnapshotSchedules ID."
+        ::= { cSnapshotScheduleEntry 2 }
+
+    cSnapshotScheduleName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the SnapshotSchedules name."
+        ::= { cSnapshotScheduleEntry 3 }
+
+    cSnapshotScheduleVolumeID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the SnapshotSchedules volume ID."
+        ::= { cSnapshotScheduleEntry 4 }
+
+    cSnapshotScheduleMaximumNumberOfSnapshots OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the maximum number of snapshots."
+        ::= { cSnapshotScheduleEntry 5 }
+
+    cSnapshotScheduleCronString OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the cron string."
+        ::= { cSnapshotScheduleEntry 6 }
+
+    cSnapshotScheduleStartTime OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the SnapshotSchedules start time."
+        ::= { cSnapshotScheduleEntry 7 }
+
+    cSnapshotScheduleFrequency OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the SnapshotSchedule frequency - hourly, daily, weekly."
+        ::= { cSnapshotScheduleEntry 8 }
+
+    cSnapshotScheduleRepeatInterval OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the SnapshotSchedule repeat interval."
+        ::= { cSnapshotScheduleEntry 9 }
+
+
+-- from GET URI/cifs_shares
+cCIFSShareTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF CCIFSShareEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This table contains the CIFS share information."
+    ::= { cVolumes 4 }
+
+CCIFSShareEntry ::=
+    SEQUENCE {
+    cCIFSShareIndex             Integer32,
+    cCIFSShareID                DisplayString,
+    cCIFSShareName              DisplayString,
+    cCIFSSharePath              DisplayString,
+    cCIFSShareReadOnly          DisplayString
+    }
+
+cCIFSShareEntry OBJECT-TYPE
+    SYNTAX     CCIFSShareEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This is the table row entry point."
+    INDEX { cCIFSShareIndex }
+    ::= { cCIFSShareTable 1 }
+
+cCIFSShareIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This is the table row index."
+    ::= { cCIFSShareEntry 1 }
+
+cCIFSShareID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the cifs share ID"
+        ::= { cCIFSShareEntry 2 }
+
+cCIFSShareName OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "CIFS share name."
+    ::= { cCIFSShareEntry 3 }
+
+cCIFSSharePath OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "CIFS share path."
+    ::= { cCIFSShareEntry 4 }
+
+cCIFSShareReadOnly OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "CIFS share read only setting."
+    ::= { cCIFSShareEntry 5 }
+
+--
+
+
+-- from GET URI/nfs_shares
+cNFSShareTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF CNFSShareEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This table contains the NFS share information."
+    ::= { cVolumes 5 }
+
+CNFSShareEntry ::=
+    SEQUENCE {
+    cNFSShareIndex            Integer32,
+    cNFSShareID               DisplayString,
+    cNFSShareMountPoint       DisplayString,
+    cNFSSharePath             DisplayString,
+    cNFSShareAccessControl    DisplayString,
+    cNFSShareAnonymousUUID    DisplayString,
+    cNFSShareComment          DisplayString
+    }
+
+cNFSShareEntry OBJECT-TYPE
+    SYNTAX     CNFSShareEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This is the table row entry point."
+    INDEX { cNFSShareIndex }
+    ::= { cNFSShareTable 1 }
+
+cNFSShareIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This is the table row index."
+    ::= { cNFSShareEntry 1 }
+
+cNFSShareID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the cifs share ID"
+        ::= { cNFSShareEntry 2 }
+
+cNFSShareMountPoint OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "NFS share mount point."
+    ::= { cNFSShareEntry 3 }
+
+cNFSSharePath OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "NFS share path."
+    ::= { cNFSShareEntry 4 }
+
+cNFSShareAccessControl OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "NFS share access control settings."
+    ::= { cNFSShareEntry 5 }
+
+cNFSShareAnonymousUUID OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "NFS share anonymous UUID."
+    ::= { cNFSShareEntry 6 }
+
+cNFSShareComment OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "NFS share comment."
+    ::= { cNFSShareEntry 7 }
+
+-- services configuration from GET URI/services
+services OBJECT IDENTIFIER   ::= { configuration 3 }
+
+    cNFSServiceTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CNFSServiceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the NFS service information."
+        ::= { services 1 }
+
+    CNFSServiceEntry ::=
+        SEQUENCE {
+        cNFSServiceIndex            Integer32,
+        cNFSServiceID               DisplayString,
+        cNFSServiceStatus           DisplayString,
+        cNFSServiceTcpEnabled       DisplayString,
+        cNFSServiceUdpEnabled       DisplayString,
+        cNFSServiceThreads          INTEGER
+        }
+
+    cNFSServiceEntry OBJECT-TYPE
+        SYNTAX     CNFSServiceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cNFSServiceIndex }
+        ::= { cNFSServiceTable 1 }
+
+    cNFSServiceIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cNFSServiceEntry 1 }
+
+    cNFSServiceID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the nfs service ID"
+        ::= { cNFSServiceEntry 2 }
+
+    cNFSServiceStatus OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "nfs service status."
+        ::= { cNFSServiceEntry 3 }
+
+    cNFSServiceTcpEnabled OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tcp enabled."
+        ::= { cNFSServiceEntry 4 }
+
+    cNFSServiceUdpEnabled OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "udp enabled."
+        ::= { cNFSServiceEntry 5 }
+
+    cNFSServiceThreads OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "number of threads to use for nfs service."
+        ::= { cNFSServiceEntry 6 }
+
+
+    cADServiceTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF CADServiceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the cifs service information."
+        ::= { services 2 }
+
+    CADServiceEntry ::=
+        SEQUENCE {
+        cADServiceIndex                   Integer32,
+        cADServiceID                      DisplayString,
+        cADServiceStatus                  DisplayString,
+        cADServiceActiveDirectoryJoined   TruthValue,
+        cADServiceHostname                DisplayString,
+        cADServiceDnsDomainName           DisplayString
+        }
+
+    cADServiceEntry OBJECT-TYPE
+        SYNTAX     CADServiceEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { cADServiceIndex }
+        ::= { cADServiceTable 1 }
+
+    cADServiceIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { cADServiceEntry 1 }
+
+    cADServiceID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "This is the cifs service ID"
+        ::= { cADServiceEntry 2 }
+
+    cADServiceStatus OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "cifs service status."
+        ::= { cADServiceEntry 3 }
+
+    cADServiceActiveDirectoryJoined OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "is the server joined to active directory."
+        ::= { cADServiceEntry 4 }
+
+    cADServiceHostname OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "hostname of server"
+        ::= { cADServiceEntry 5 }
+
+    cADServiceDnsDomainName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Dns domain name for server lookup."
+        ::= { cADServiceEntry 6 }
+ 
+
+    cSNMPService OBJECT IDENTIFIER ::= { services 3 }
+        -- from GET URI/SNMP_settings
+        cSNMPClientTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF CSNMPClientEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the SNMP client configuration
+                    information."
+            ::= { cSNMPService 1 }
+    
+        CSNMPClientEntry ::=
+            SEQUENCE {
+            cSNMPClientIndex                Integer32,
+            cSNMPClientHost                 DisplayString,
+            cSNMPClientNotifications        TruthValue,
+            cSNMPClientPort                 INTEGER,
+            cSNMPClientCommunityString      DisplayString
+            }
+    
+        cSNMPClientEntry OBJECT-TYPE
+            SYNTAX     CSNMPClientEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { cSNMPClientIndex }
+            ::= { cSNMPClientTable 1 }
+    
+        cSNMPClientIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row index."
+            ::= { cSNMPClientEntry 1 }
+    
+        cSNMPClientHost OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the SNMP host name or IP address."
+            ::= { cSNMPClientEntry 2 }
+    
+        cSNMPClientNotifications OBJECT-TYPE
+            SYNTAX     TruthValue
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "Whether or not this client is to receive notifications."
+
+            ::= { cSNMPClientEntry 3 }
+    
+        cSNMPClientPort OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "The UDP port that the client is set to receive
+                    notifications on.  Only applicable for clients that are
+                    set to receive notifications."
+            ::= { cSNMPClientEntry 4 }
+    
+        cSNMPClientCommunityString OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "The community string that the client accepts for
+                    incoming notifications.  Only applicable for clients that
+                    are set to receive notifications."
+            ::= { cSNMPClientEntry 5 }
+
+
+--
+status OBJECT IDENTIFIER ::= { strata 2 }
+
+hardware OBJECT IDENTIFIER ::= { status 1 }
+
+-- GET URI/{hardware_item}
+sChassisTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF SChassisEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This table contains information about all hardware chassis."
+    ::= { hardware 1 }
+
+SChassisEntry ::=
+    SEQUENCE {
+    sChassisIndex               Integer32,
+    sChassisID                  DisplayString,
+    sChassisType                DisplayString,
+    sChassisStatus              DisplayString,
+    sChassisModel               DisplayString,
+    sChassisSerialNumber        DisplayString,
+    sChassisMemory              GBytes,
+    sChassisRawCapacity         GBytes
+    }
+
+sChassisEntry OBJECT-TYPE
+    SYNTAX     SChassisEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This is the table row entry point."
+    INDEX { sChassisIndex }
+    ::= { sChassisTable 1 }
+
+sChassisIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This is the chassis table row index."
+    ::= { sChassisEntry 1 }
+
+sChassisID OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the chassis ID."
+    ::= { sChassisEntry 2 }
+    
+sChassisType OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the chassis type."
+    ::= { sChassisEntry 3 }
+
+sChassisStatus OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the chassis status."
+    ::= { sChassisEntry 4 }
+
+sChassisModel OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the chassis model number."
+    ::= { sChassisEntry 5 }
+
+sChassisSerialNumber OBJECT-TYPE
+    SYNTAX     DisplayString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the chassis serial number."
+    ::= { sChassisEntry 6 }
+
+sChassisMemory OBJECT-TYPE
+    SYNTAX     GBytes
+    UNITS      "GBytes"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the amount of RAM installed in the chassis."
+    ::= { sChassisEntry 7 }
+
+sChassisRawCapacity OBJECT-TYPE
+    SYNTAX     GBytes
+    UNITS      "GBytes"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "This is the theoretical raw capacity of the chassis."
+    ::= { sChassisEntry 8 }
+
+
+--
+        sCPUTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF SCPUEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the motherboard CPU information."
+            ::= { hardware 2 }
+
+        SCPUEntry ::=
+            SEQUENCE {
+            sCPUIndex                Integer32,
+            sCPUChassisID            DisplayString,
+            sCPUSlot                 INTEGER,
+            sCPUStatus               DisplayString,
+            sCPUTemperature          INTEGER
+            }
+
+        sCPUEntry OBJECT-TYPE
+            SYNTAX     SCPUEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { sCPUIndex }
+            ::= { sCPUTable 1 }
+
+        sCPUIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                  "This is the table row index."
+            ::= { sCPUEntry 1 }
+
+        sCPUChassisID OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the ID of the chassis that this CPU is in."
+            ::= { sCPUEntry 2 }
+
+        sCPUSlot OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the CPU slot number in the chassis."
+            ::= { sCPUEntry 3 }
+
+        sCPUStatus OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the CPU status."
+            ::= { sCPUEntry 4 }
+
+        sCPUTemperature OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the cpu temperature reading in degrees Celcius."
+            ::= { sCPUEntry 5 }
+
+--
+        sBootDriveTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF SBootDriveEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the system boot drive details
+                    information."
+            ::= { hardware 3 }
+
+        SBootDriveEntry ::=
+            SEQUENCE {
+            sBootDriveIndex            Integer32,
+            sBootDriveChassisID        DisplayString,
+            sBootDriveSlot             INTEGER,
+            sBootDriveStatus           DisplayString,
+            sBootDriveManufacturer     DisplayString,
+            sBootDriveModel            DisplayString,
+            sBootDriveSize             GBytes,
+            sBootDriveSerialNumber     DisplayString
+            }
+
+        sBootDriveEntry OBJECT-TYPE
+            SYNTAX     SBootDriveEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { sBootDriveIndex }
+            ::= { sBootDriveTable 1 }
+
+        sBootDriveIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                  "This is the table row index."
+            ::= { sBootDriveEntry 1 }
+
+        sBootDriveChassisID OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the ID of the chassis that this drive is in."
+            ::= { sBootDriveEntry 2 }
+
+        sBootDriveSlot OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the slot that the boot drive is in."
+            ::= { sBootDriveEntry 3 }
+
+        sBootDriveStatus OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the boot drive status."
+            ::= { sBootDriveEntry 4 }
+
+        sBootDriveManufacturer OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the boot drive manufacturer."
+            ::= { sBootDriveEntry 5 }
+
+        sBootDriveModel OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the boot drive model."
+            ::= { sBootDriveEntry 6 }
+
+        sBootDriveSize OBJECT-TYPE
+            SYNTAX     GBytes
+            UNITS      "GBytes"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the boot drive size."
+            ::= { sBootDriveEntry 7 }
+
+        sBootDriveSerialNumber OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the boot drive size."
+            ::= { sBootDriveEntry 8 }
+
+--
+        sDataDriveTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF SDataDriveEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the system data drive details
+                    information."
+            ::= { hardware 4 }
+
+        SDataDriveEntry ::=
+            SEQUENCE {
+            sDataDriveIndex                Integer32,
+            sDataDriveChassis              DisplayString,
+            sDataDriveSlot                 INTEGER,
+            sDataDriveStatus               DisplayString,
+            sDataDriveSize                 GBytes,
+            sDataDriveSerialNumber         DisplayString,
+            sDataDrivePoolID               DisplayString,
+            sDataDrivePoolName             DisplayString
+            }
+
+        sDataDriveEntry OBJECT-TYPE
+            SYNTAX     SDataDriveEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { sDataDriveIndex }
+            ::= { sDataDriveTable 1 }
+
+        sDataDriveIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                  "This is the table row index."
+            ::= { sDataDriveEntry 1 }
+
+        sDataDriveChassis OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the chassis that this drive is in."
+            ::= { sDataDriveEntry 2 }
+
+        sDataDriveSlot OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive slot number in the chassis."
+            ::= { sDataDriveEntry 3 }
+
+        sDataDriveStatus OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive status."
+            ::= { sDataDriveEntry 4 }
+
+        sDataDriveSize OBJECT-TYPE
+            SYNTAX     GBytes
+            UNITS      "GBytes"
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive size."
+            ::= { sDataDriveEntry 5 }
+
+        sDataDriveSerialNumber OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive serial number."
+            ::= { sDataDriveEntry 6 }
+
+        sDataDrivePoolID OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive pool ID."
+            ::= { sDataDriveEntry 7 }
+
+        sDataDrivePoolName OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive pool name."
+            ::= { sDataDriveEntry 8 }
+
+--
+        sFanTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF SFanEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the fan details
+                    information."
+            ::= { hardware 5 }
+
+        SFanEntry ::=
+            SEQUENCE {
+            sFanIndex          Integer32,
+            sFanChassisID      DisplayString,
+            sFanSlot           INTEGER,
+            sFanStatus         DisplayString,
+            sFanSpeed          INTEGER
+            }
+
+        sFanEntry OBJECT-TYPE
+            SYNTAX     SFanEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { sFanIndex }
+            ::= { sFanTable 1 }
+
+        sFanIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                  "This is the table row index."
+            ::= { sFanEntry 1 }
+
+        sFanChassisID OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the fan slot number in the chassis."
+            ::= { sFanEntry 2 }
+
+        sFanSlot OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the fan slot number in the chassis."
+            ::= { sFanEntry 3 }
+
+        sFanStatus OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the fan status."
+            ::= { sFanEntry 4 }
+
+        sFanSpeed OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the fan speed in RPMs."
+            ::= { sFanEntry 5 }
+--
+        sPowerSupplyTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF SPowerSupplyEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the power supply information."
+            ::= { hardware 7 }
+
+        SPowerSupplyEntry ::=
+            SEQUENCE {
+            sPowerSupplyIndex        Integer32,
+            sPowerSupplyChassisID    DisplayString,
+            sPowerSupplySlot         INTEGER,
+            sPowerSupplyStatus       DisplayString,
+            sPowerSupplyWatts        INTEGER
+            }
+
+        sPowerSupplyEntry OBJECT-TYPE
+            SYNTAX     SPowerSupplyEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { sPowerSupplyIndex }
+            ::= { sPowerSupplyTable 1 }
+
+        sPowerSupplyIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                  "This is the table row index."
+            ::= { sPowerSupplyEntry 1 }
+
+        sPowerSupplyChassisID OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the ID of the chassis that this power supply is in."
+            ::= { sPowerSupplyEntry 2 }
+
+        sPowerSupplySlot OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the power supply slot number in the chassis."
+            ::= { sPowerSupplyEntry 3 }
+
+        sPowerSupplyStatus OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the power supply status."
+            ::= { sPowerSupplyEntry 4 }
+
+        sPowerSupplyWatts OBJECT-TYPE
+            SYNTAX     INTEGER
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the power supply watts."
+            ::= { sPowerSupplyEntry 5 }
+
+
+--
+        sTapeDriveTable OBJECT-TYPE
+            SYNTAX     SEQUENCE OF STapeDriveEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This table contains the tape drive details information."
+            ::= { hardware 8 }
+
+        STapeDriveEntry ::=
+            SEQUENCE {
+            sTapeDriveIndex                Integer32,
+            sTapeDrivePartition            DisplayString,
+            sTapeDriveStatus               DisplayString,
+            sTapeDriveType                 DisplayString,
+            sTapeDriveSerialNumber         DisplayString,
+            sTapeDriveTapeBarcode          DisplayString,
+            sTapeDriveErrorMessage         DisplayString
+            }
+
+        sTapeDriveEntry OBJECT-TYPE
+            SYNTAX     STapeDriveEntry
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                   "This is the table row entry point."
+            INDEX { sTapeDriveIndex }
+            ::= { sTapeDriveTable 1 }
+
+        sTapeDriveIndex OBJECT-TYPE
+            SYNTAX     Integer32 (1..2147483647)
+            MAX-ACCESS not-accessible
+            STATUS     current
+            DESCRIPTION
+                  "This is the table row index."
+            ::= { sTapeDriveEntry 1 }
+
+        sTapeDrivePartition OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the partition that this drive is in."
+            ::= { sTapeDriveEntry 2 }
+
+        sTapeDriveStatus OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive status."
+            ::= { sTapeDriveEntry 3 }
+
+        sTapeDriveType OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the tape drive type."
+            ::= { sTapeDriveEntry 4 }
+
+        sTapeDriveSerialNumber OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the data drive serial number."
+            ::= { sTapeDriveEntry 5 }
+
+        sTapeDriveTapeBarcode OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the barcode of the tape currently in the tape
+                    drive."
+            ::= { sTapeDriveEntry 6 }
+
+        sTapeDriveErrorMesssage OBJECT-TYPE
+            SYNTAX     DisplayString
+            MAX-ACCESS read-only
+            STATUS     current
+            DESCRIPTION
+                   "This is the latest tape drive error message."
+            ::= { sTapeDriveEntry 7 }
+
+
+--
+performance OBJECT IDENTIFIER ::= { strata 3 }
+
+--
+pPoolStatistics OBJECT IDENTIFIER   ::= { performance 1 }
+
+    pPoolStatisticsTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF PPoolStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the pool statistics information."
+        ::= { pPoolStatistics 1 }
+
+    PPoolStatisticsEntry ::=
+        SEQUENCE {
+        pPoolStatisticsIndex                       Integer32,
+        pPoolStatisticsPoolID                      DisplayString,
+        pPoolStatisticsPoolName                    DisplayString,
+        pPoolStatisticsCollectionTime              DisplayString,
+        pPoolStatisticsReadIOPs                    DisplayString,
+        pPoolStatisticsWriteIOPs                   DisplayString,
+        pPoolStatisticsReadBytesPerSecond          DisplayString,
+        pPoolStatisticsWriteBytesPerSecond         DisplayString
+        }
+
+    pPoolStatisticsEntry OBJECT-TYPE
+        SYNTAX     PPoolStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { pPoolStatisticsIndex }
+        ::= { pPoolStatisticsTable 1 }
+
+    pPoolStatisticsIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { pPoolStatisticsEntry 1 }
+
+    pPoolStatisticsPoolID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool statistics pool ID."
+        ::= { pPoolStatisticsEntry 2 }
+
+    pPoolStatisticsPoolName OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool statistics pool name."
+        ::= { pPoolStatisticsEntry 3 }
+
+    pPoolStatisticsCollectionTime OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Collection time of stats."
+        ::= { pPoolStatisticsEntry 4 }
+
+    pPoolStatisticsReadIOPs OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool statistics read IOs per second."
+        ::= { pPoolStatisticsEntry 5 }
+
+    pPoolStatisticsWriteIOPs OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool statistics write IOs per second."
+        ::= { pPoolStatisticsEntry 6 }
+
+    pPoolStatisticsReadBytesPerSecond OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool statistics read bytes per second."
+        ::= { pPoolStatisticsEntry 7 }
+
+    pPoolStatisticsWriteBytesPerSecond OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Pool statistics write bytes per second."
+        ::= { pPoolStatisticsEntry 8 }
+
+--
+pDataDriveStatistics OBJECT IDENTIFIER ::= { performance 2 }
+
+    pDataDriveStatisticsTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF PDataDriveStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the data drive statistics information."
+        ::= { pDataDriveStatistics 1 }
+
+    PDataDriveStatisticsEntry ::=
+        SEQUENCE {
+        pDataDriveStatisticsIndex                       Integer32,
+        pDataDriveStatisticsCaseID                      DisplayString,
+        pDataDriveStatisticsCaseSerialNumber                  DisplayString,
+        pDataDriveStatisticsCaseType                    DisplayString,
+        pDataDriveStatisticsDataDriveID                 DisplayString,
+        pDataDriveStatisticsDataDriveSlot               INTEGER,
+        pDataDriveStatisticsCollectionTime              DisplayString,
+        pDataDriveStatisticsReadMBPerSecond             DisplayString,
+        pDataDriveStatisticsWriteMBPerSecond            DisplayString,
+        pDataDriveStatisticsReadLatencyInMilliseconds   DisplayString,
+        pDataDriveStatisticsWriteLatencyInMilliseconds  DisplayString
+        }
+
+    pDataDriveStatisticsEntry OBJECT-TYPE
+        SYNTAX     PDataDriveStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { pDataDriveStatisticsIndex }
+        ::= { pDataDriveStatisticsTable 1 }
+
+    pDataDriveStatisticsIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { pDataDriveStatisticsEntry 1 }
+
+    pDataDriveStatisticsCaseID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Case ID where drive resides."
+        ::= { pDataDriveStatisticsEntry 2 }
+
+    pDataDriveStatisticsCaseSerialNumber OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Case serial number where drive resides."
+        ::= { pDataDriveStatisticsEntry 3 }
+
+    pDataDriveStatisticsCaseType OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Type of enclosure where drive resides."
+        ::= { pDataDriveStatisticsEntry 4 }
+
+    pDataDriveStatisticsDataDriveID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Data drive ID."
+        ::= { pDataDriveStatisticsEntry 5 }
+
+    pDataDriveStatisticsDataDriveSlot OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Data drive slot."
+        ::= { pDataDriveStatisticsEntry 6 }
+
+    pDataDriveStatisticsCollectionTime OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Collection time of stats."
+        ::= { pDataDriveStatisticsEntry 7 }
+
+    pDataDriveStatisticsReadMBPerSecond OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Data Drive statistics read MB per second."
+        ::= { pDataDriveStatisticsEntry 8 }
+
+    pDataDriveStatisticsWriteMBPerSecond OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Data Drive statistics write MB per second."
+        ::= { pDataDriveStatisticsEntry 9 }
+
+    pDataDriveStatisticsReadLatencyInMilliseconds OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Data Drive statistics read latency in ms."
+        ::= { pDataDriveStatisticsEntry 10 }
+
+    pDataDriveStatisticsWriteLatencyInMilliseconds OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Data Drive statistics write latency in ms."
+        ::= { pDataDriveStatisticsEntry 11 }
+
+--
+pCPUStatistics OBJECT IDENTIFIER ::= { performance 3 }
+
+    pCPUStatisticsTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF PCPUStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the CPU statistics information."
+        ::= { pCPUStatistics 1 }
+
+    PCPUStatisticsEntry ::=
+        SEQUENCE {
+        pCPUStatisticsIndex               Integer32,
+        pCPUStatisticsServerID            DisplayString,
+        pCPUStatisticsServerSerialNumber  DisplayString,
+        pCPUStatisticsCollectionTime      DisplayString,
+        pCPUStatisticsIdlePercent         DisplayString,
+        pCPUStatisticsUtilizationPercent  DisplayString
+        }
+
+    pCPUStatisticsEntry OBJECT-TYPE
+        SYNTAX     PCPUStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { pCPUStatisticsIndex }
+        ::= { pCPUStatisticsTable 1 }
+
+    pCPUStatisticsIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { pCPUStatisticsEntry 1 }
+
+    pCPUStatisticsServerID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Server ID where CPU resides."
+        ::= { pCPUStatisticsEntry 2 }
+
+    pCPUStatisticsServerSerialNumber OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Server serial number where CPU resides."
+        ::= { pCPUStatisticsEntry 3 }
+
+    pCPUStatisticsCollectionTime OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Collection time of stats."
+        ::= { pCPUStatisticsEntry 4 }
+
+    pCPUStatisticsIdlePercent OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "CPU idle percent."
+        ::= { pCPUStatisticsEntry 5 }
+
+    pCPUStatisticsUtilizationPercent OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "CPU utilization percent."
+        ::= { pCPUStatisticsEntry 6 }
+
+--
+pNetworkStatistics OBJECT IDENTIFIER ::= { performance 4 }
+
+    pNetworkStatisticsTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF PNetworkStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the network interfaces statistics information."
+        ::= { pNetworkStatistics 1 }
+
+    PNetworkStatisticsEntry ::=
+        SEQUENCE {
+        pNetworkStatisticsIndex            Integer32,
+        pNetworkStatisticsInterfaceID      DisplayString,
+        pNetworkStatisticsLinkStatus       DisplayString,
+        pNetworkStatisticsCollectionTime   DisplayString,
+        pNetworkStatisticsBytesIn          DisplayString,
+        pNetworkStatisticsBytesOut         DisplayString,
+        pNetworkStatisticsPacketsIn        DisplayString,
+        pNetworkStatisticsPacketsOut       DisplayString,
+        pNetworkStatisticsErrorsIn         DisplayString,
+        pNetworkStatisticsErrorsOut        DisplayString,
+        pNetworkStatisticsDropsIn          DisplayString,
+        pNetworkStatisticsCollisions       DisplayString
+        }
+
+    pNetworkStatisticsEntry OBJECT-TYPE
+        SYNTAX     PNetworkStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { pNetworkStatisticsIndex }
+        ::= { pNetworkStatisticsTable 1 }
+
+    pNetworkStatisticsIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { pNetworkStatisticsEntry 1 }
+
+    pNetworkStatisticsInterfaceID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Network interface id/name."
+        ::= { pNetworkStatisticsEntry 2 }
+
+    pNetworkStatisticsLinkStatus OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Network interface link status."
+        ::= { pNetworkStatisticsEntry 3 }
+
+    pNetworkStatisticsCollectionTime OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Collection time of stats."
+        ::= { pNetworkStatisticsEntry 4 }
+
+    pNetworkStatisticsBytesIn OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Inbound bytes per second."
+        ::= { pNetworkStatisticsEntry 5 }
+
+    pNetworkStatisticsBytesOut OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Outbound bytes per second."
+        ::= { pNetworkStatisticsEntry 6 }
+
+    pNetworkStatisticsPacketsIn OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Inbound packets per second."
+        ::= { pNetworkStatisticsEntry 7 }
+
+    pNetworkStatisticsPacketsOut OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Outbound packets per second."
+        ::= { pNetworkStatisticsEntry 8 }
+
+    pNetworkStatisticsErrorsIn OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Inbound errors per second."
+        ::= { pNetworkStatisticsEntry 9 }
+
+    pNetworkStatisticsErrorsOut OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Outbound errors per second."
+        ::= { pNetworkStatisticsEntry 10 }
+
+    pNetworkStatisticsDropsIn OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Inbound drops per second."
+        ::= { pNetworkStatisticsEntry 11 }
+
+    pNetworkStatisticsCollisions OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "Collisions per second."
+        ::= { pNetworkStatisticsEntry 12 }
+
+
+--
+pTapeDriveStatistics OBJECT IDENTIFIER ::= { performance 5 }
+
+    pTapeDriveStatisticsTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF PTapeDriveStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This table contains the tape drive statistics information."
+        ::= { pTapeDriveStatistics 1 }
+
+    PTapeDriveStatisticsEntry ::=
+        SEQUENCE {
+        pTapeDriveStatisticsIndex                       Integer32,
+        pTapeDriveStatisticsTapeDriveID                 DisplayString,
+        pTapeDriveStatisticsTapeDriveSerialNumber       DisplayString,
+        pTapeDriveStatisticsCollectionTime              DisplayString,
+        pTapeDriveStatisticsReadMBPerSecond             DisplayString,
+        pTapeDriveStatisticsWriteMBPerSecond            DisplayString,
+        pTapeDriveStatisticsReadLatencyInMilliseconds   DisplayString,
+        pTapeDriveStatisticsWriteLatencyInMilliseconds  DisplayString
+        }
+
+    pTapeDriveStatisticsEntry OBJECT-TYPE
+        SYNTAX     PTapeDriveStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row entry point."
+        INDEX { pTapeDriveStatisticsIndex }
+        ::= { pTapeDriveStatisticsTable 1 }
+
+    pTapeDriveStatisticsIndex OBJECT-TYPE
+        SYNTAX     Integer32 (1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "This is the table row index."
+        ::= { pTapeDriveStatisticsEntry 1 }
+
+    pTapeDriveStatisticsTapeDriveID OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tape drive ID."
+        ::= { pTapeDriveStatisticsEntry 2 }
+
+    pTapeDriveStatisticsTapeDriveSerialNumber OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tape drive serial number."
+        ::= { pTapeDriveStatisticsEntry 3 }
+
+    pTapeDriveStatisticsCollectionTime OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Collection time of stats."
+        ::= { pTapeDriveStatisticsEntry 4 }
+
+    pTapeDriveStatisticsReadMBPerSecond OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tape Drive statistics read MB per second."
+        ::= { pTapeDriveStatisticsEntry 5 }
+
+    pTapeDriveStatisticsWriteMBPerSecond OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tape Drive statistics write MB per second."
+        ::= { pTapeDriveStatisticsEntry 6 }
+
+    pTapeDriveStatisticsReadLatencyInMilliseconds OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tape Drive statistics read latency in ms."
+        ::= { pTapeDriveStatisticsEntry 7 }
+
+    pTapeDriveStatisticsWriteLatencyInMilliseconds OBJECT-TYPE
+        SYNTAX     DisplayString
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+               "Tape Drive statistics write latency in ms."
+        ::= { pTapeDriveStatisticsEntry 8 }
+
+
+-- Event Definitions
+
+nCPUStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               sCPUChassisID,
+               sCPUSlot,
+               sCPUTemperature
+            }
+    STATUS  current
+    DESCRIPTION
+          "The status of a CPU has changed.  This indicates that a CPU's
+           temperature has raised to a warning or error level or that it has
+           dropped from a warning/error level back to a normal level."
+    ::= { nStrataEvents 1 }
+
+nBootDriveStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               sBootDriveChassisID,
+               sBootDriveSlot,
+               sBootDriveSerialNumber
+            }
+    STATUS  current
+    DESCRIPTION
+          "The status of a boot drive has changed.  This indicates that a system
+           boot drive's status has changed from good to bad or bad to good.
+           This could indicate that the drive needs to be replaced."
+    ::= { nStrataEvents 2 }
+
+nDataDriveStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               sDataDriveChassis,
+               sDataDriveSlot,
+               sDataDriveSerialNumber
+            }
+    STATUS  current
+    DESCRIPTION
+          "The status of a data drive has changed.  This indicates that a data
+           drive's status has changed from good to bad or bad to good.
+           This could indicate that the drive needs to be replaced."
+    ::= { nStrataEvents 3 }
+
+nFanStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               sFanChassisID,
+               sFanSlot
+            }
+    STATUS  current
+    DESCRIPTION
+          "The status of a fan has changed.  This indicates that a fan's
+           status has changed from good to bad or bad to good.
+           This could indicate that the fan needs to be replaced."
+    ::= { nStrataEvents 4 }
+
+nPoolStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               cPoolID,
+               cPoolName
+            }
+    STATUS  current
+    DESCRIPTION
+           "The status of a storage pool has changed.  This indicates that
+            the status has changed from good to bad (e.g. a pool that is now
+            degraded), bad from not as bad (e.g. a pool that has had a failed
+            drive replaced and is now rebuilding) or bad to good (e.g. a pool
+            has finished rebuilding)."
+    ::= { nStrataEvents 6 }
+
+nPowerSupplyStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               sPowerSupplyChassisID,
+               sPowerSupplySlot,
+               sPowerSupplyWatts
+            }
+    STATUS  current
+    DESCRIPTION
+          "The status of a power supply has changed.  This indicates that a
+           powers supply's status has changed from good to bad or bad to good."
+    ::= { nStrataEvents 7 }
+
+nScheduledASLSent NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp
+            }
+    STATUS  current
+    DESCRIPTION
+           "A scheduled Auto Support Log (ASL) has been sent."
+    ::= { nStrataEvents 8 }
+
+nHighWaterMarkStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               cPoolID,
+               cPoolName
+            }
+    STATUS  current
+    DESCRIPTION
+           "The high water mark threshold of a pool has been crossed.  This
+           indicates that the high water mark has either exceeded (bad), or
+           fallen below (good) the user set high water mark."
+    ::= { nStrataEvents 9 }
+
+nUsbStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp
+            }
+    STATUS  current
+    DESCRIPTION
+           "A USB key status change has been detected"
+    ::= { nStrataEvents 10 }
+
+nBootDriveLifespan NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               sBootDriveChassisID,
+               sBootDriveSlot,
+               sBootDriveSerialNumber
+            }
+    STATUS  current
+    DESCRIPTION
+          "According to drive diagnostics, a boot drive may need to be replaced,
+           as it is nearing the end of its lifespan."
+    ::= { nStrataEvents 11 }
+
+nNetworkInterfaceStatus NOTIFICATION-TYPE
+    OBJECTS {
+               eventSeverity,
+               eventTimestamp,
+               cNetworkInterfaceName,
+               cNetworkInterfaceLinkStatus
+            }
+    STATUS  current
+    DESCRIPTION
+           "The status of a network interface has changed.  This indicates that
+            the status has changed from good to bad (e.g. from active to
+            no carrier) or bad from to good (e.g. from no carrier to active).
+            This could be caused by a faulty port on the switch or on the
+            server, a bad cable, an unplugged cable, or some other issue."
+            
+    ::= { nStrataEvents 13 }
+--
+
+
+END

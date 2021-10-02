@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -93,7 +92,9 @@ foreach($groups as $id => $group)
     $colour_iter++;
   }
 
- $rrd_options .= " CDEF:" . $group_ds . "=" . rrd_aggregate_dses($group['ds_list']);
+  if (!is_array($group['ds_list'])) { continue; }
+
+  $rrd_options .= " CDEF:" . $group_ds . "=" . rrd_aggregate_dses($group['ds_list']);
 
 
  if ($rrd['invert'])
@@ -120,7 +121,7 @@ foreach($groups as $id => $group)
 if ($vars['previous'] == "yes")
 {
   $thingX  = implode(',', $rrd_multi['thingX']);
-  $plusesX = str_repeat(',ADDNAN', count($rrd_multi['thingX']) - 1);
+  $plusesX = str_repeat(',ADDNAN', safe_count($rrd_multi['thingX']) - 1);
   if (is_numeric($multiplier))
   {
     $rrd_options .= " CDEF:X=" . $thingX . $plusesX.",".$multiplier. ",*";
@@ -144,7 +145,7 @@ $rrd_options .= $rrd_optionsb;
 /*
 if($show_aggregate == TRUE)
 {
-  $rrd_options .= " CDEF:aggregate=" . implode(',', $rrd_multi['aggregate']) . str_repeat(',+', count($rrd_multi['aggregate']) - 1);
+  $rrd_options .= " CDEF:aggregate=" . implode(',', $rrd_multi['aggregate']) . str_repeat(',+', safe_count($rrd_multi['aggregate']) - 1);
   $rrd_options .= " LINE1.5:aggregate#000000:'".rrdtool_escape("Aggregate", $descr_len)."'";
   $rrd_options .= " GPRINT:aggregate:LAST:%5.1lf%s GPRINT:aggregate:MIN:%5.1lf%s";
   $rrd_options .= " GPRINT:aggregate:MAX:%5.1lf%s GPRINT:aggregate:AVERAGE:%5.1lf%s";

@@ -21,6 +21,6 @@
 // DNOS-ISDP-MIB::agentIsdpCacheProtocolVersion.50.1 = STRING: "2"
 // DNOS-ISDP-MIB::agentIsdpCacheHoldtime.50.1 = INTEGER: -83 seconds
 
-include("isdp-mib.inc.php");
+include(__DIR__ . "/isdp-mib.inc.php");
 
 // EOF

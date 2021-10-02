@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,6 +24,7 @@ foreach ($device['graphs'] as $entry)
   if (isset($entry['enabled']) && !$entry['enabled']) { continue; } // Skip disabled graphs
 
   $section = $config['graph_types']['device'][$entry['graph']]['section'];
+
   if (in_array($section, $config['graph_sections']))
   {
     // Collect only enabled and exists graphs
@@ -43,8 +43,7 @@ foreach ($device['graphs'] as $entry)
   }
 }
 
-if (OBSERVIUM_EDITION != 'community')
-{
+if (OBSERVIUM_EDITION !== 'community') {
   // Custom OIDs
   $sql  = "SELECT * FROM `oids_entries`";
   $sql .= " LEFT JOIN `oids` USING(`oid_id`)";
@@ -92,7 +91,7 @@ print_navbar($navbar);
 echo generate_box_open();
 echo('<table class="table table-condensed table-striped table-hover ">');
 
-if ($vars['group'] == "custom" && $graphs_sections['custom'])
+if ($vars['group'] === "custom" && $graphs_sections['custom'])
 {
   foreach ($custom_graphs as $graph)
   {
@@ -111,8 +110,7 @@ if ($vars['group'] == "custom" && $graphs_sections['custom'])
 
   }
 
-} else {
-
+} elseif (isset($graphs_sections[$vars['group']])) {
   ksort($graphs_sections[$vars['group']], SORT_NUMERIC);
   $graph_enable = $graphs_sections[$vars['group']];
 

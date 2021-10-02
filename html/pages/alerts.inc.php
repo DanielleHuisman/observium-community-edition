@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -21,12 +20,11 @@ $navbar['brand'] = "Alert Types";
 
 $types = dbFetchRows("SELECT DISTINCT `entity_type` FROM `alert_table` WHERE 1" . generate_query_permitted(array('alert')));
 
-$types_count = count($types);
+$types_count = safe_count($types);
 
 $navbar['options']['all']['url'] = generate_url($vars, array('page' => 'alerts', 'entity_type' => 'all'));
 $navbar['options']['all']['text'] = escape_html(nicecase('all'));
-if ($vars['entity_type'] == 'all')
-{
+if ($vars['entity_type'] === 'all') {
   $navbar['options']['all']['class'] = "active";
   $navbar['options']['all']['url'] = generate_url($vars, array('page' => 'alerts', 'entity_type' => NULL));
 }
@@ -57,7 +55,7 @@ $filters = array('all'     => array('url'   => generate_url($vars, array('page' 
 
                  'failed_delayed' => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'failed_delayed')),
                                        'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['error'],
+                                       'icon'  => $config['icon']['important'],
                                        'text'  => 'Failed & Delayed'),
 
                  'failed'     => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'failed')),
@@ -67,7 +65,7 @@ $filters = array('all'     => array('url'   => generate_url($vars, array('page' 
 
                  'suppressed' => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'suppressed')),
                                        'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['exclamation'],
+                                       'icon'  => $config['icon']['shutdown'],
                                        'text'  => 'Suppressed')
 );
 
@@ -99,8 +97,7 @@ print_navbar($navbar);
 $alert_rules = cache_alert_rules($vars);
 
 // Print out a table of alerts matching $vars
-if ($vars['status'] != 'failed')
-{
+if ($vars['status'] !== 'failed') {
   $vars['pagination'] = TRUE;
 }
 

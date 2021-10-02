@@ -73,6 +73,7 @@ if ($ports['total'])
   // Custom order for port types. See human type names here: $rewrite_iftype
   $port_types = array(
     'Ethernet',
+    'GigabitEthernet', 'FastEthernet', 'StarLAN', // Obsolete types same as Ethernet
     '802.3ad LAg',
     'L2 VLAN (802.1Q)',
     'L3 VLAN (IP)',

@@ -83,7 +83,7 @@ foreach(array('', 'b', 'c') as $trio)
   
   $$in_name  = implode(',', $rrd_multi[$in_name]);
   $$out_name = implode(',', $rrd_multi[$out_name]);
-  $$pluses_name = str_repeat(',ADDNAN', count($rrd_multi[$in_name]) - 1);
+  $$pluses_name = str_repeat(',ADDNAN', safe_count($rrd_multi[$in_name]) - 1);
   unset($in_name, $out_name, $pluses_name);
 }
 

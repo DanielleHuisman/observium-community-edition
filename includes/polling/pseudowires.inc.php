@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -30,14 +29,13 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $entry)
   $pseudowires_db[$entry['mib']][$index] = $entry;
 }
 
-if (count($pseudowires_db) == 0) { return; } // Pseudowires not exist, exit
+if (!safe_count($pseudowires_db)) { return; } // Pseudowires not exist, exit
 
 $table_rows = array();
 
 print_cli_data_field("MIBs", 2);
 
-foreach (array_keys($pseudowires_db) as $mib)
-{
+foreach (array_keys($pseudowires_db) as $mib) {
   // NOTE. Multiple pseudoware MIBs on single device theoretically impossible, but keep this common logic
   echo(" $mib ");
   $mib_lower = strtolower($mib);
@@ -45,11 +43,9 @@ foreach (array_keys($pseudowires_db) as $mib)
 
   // Cache SNMP data
   $cache_pseudowires[$mib_lower] = array();
-  foreach ($oids as $oid_type => $oid_entry)
-  {
-    $cache_pseudowires[$mib_lower] = snmpwalk_cache_multi_oid($device, $oid_entry['oid'], $cache_pseudowires[$mib_lower], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-    if ($oid_type == 'Uptime' && $GLOBALS['snmp_status'] === FALSE)
-    {
+  foreach ($oids as $oid_type => $oid_entry) {
+    $cache_pseudowires[$mib_lower] = snmpwalk_cache_oid($device, $oid_entry['oid'], $cache_pseudowires[$mib_lower], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+    if ($oid_type === 'OperStatus' && !snmp_status()) {
       break;
     }
   }

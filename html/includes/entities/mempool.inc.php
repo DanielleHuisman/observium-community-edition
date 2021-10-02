@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -18,8 +18,7 @@ function build_mempool_query($vars)
   $sql = 'SELECT *, `mempools`.`mempool_id` AS `mempool_id` FROM `mempools`';
   //$sql .= ' LEFT JOIN `mempools-state` USING(`mempool_id`)';
 
-  if($vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id')
-  {
+  if ($vars['sort'] === 'hostname' || $vars['sort'] === 'device' || $vars['sort'] === 'device_id') {
     $sql .= ' LEFT JOIN `devices` USING(`device_id`)';
   }
 
@@ -34,6 +33,11 @@ function build_mempool_query($vars)
       case "group_id":
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'mempools.mempool_id');
+        break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'mempools.device_id');
         break;
       case "device":
       case "device_id":
@@ -131,7 +135,7 @@ function print_mempool_table($vars)
 
 function print_mempool_table_header($vars)
 {
-  if ($vars['view'] == "graphs")
+  if ($vars['view'] === "graphs")
   {
     $table_class = OBS_CLASS_TABLE_STRIPED_TWO;
   } else {
@@ -148,7 +152,7 @@ function print_mempool_table_header($vars)
     'used'      => array('Used', 'style="width: 50px;"'),
   );
 
-  if ($vars['page'] == "device")
+  if ($vars['page'] === "device")
   {
     unset($cols['device']);
   }
@@ -168,7 +172,7 @@ function generate_mempool_row($mempool, $vars)
   global $config;
 
   $table_cols = 7;
-  if ($vars['page'] != "device" && $vars['popup'] != TRUE)  { $table_cols++; } // Add a column for device.
+  if ($vars['page'] !== "device" && $vars['popup'] != TRUE)  { $table_cols++; } // Add a column for device.
 
   $graph_array = array();
   $graph_array['to'] = $config['time']['now'];
@@ -211,7 +215,7 @@ function generate_mempool_row($mempool, $vars)
 
   $row .= '<tr class="' . $mempool['html_row_class'] . '">
             <td class="state-marker"></td>';
-  if ($vars['page'] != "device" && $vars['popup'] != TRUE)
+  if ($vars['page'] !== "device" && $vars['popup'] != TRUE)
   {
     $row .= '<td class="entity">' . generate_device_link($mempool) . '</td>';
   }
@@ -226,7 +230,7 @@ function generate_mempool_row($mempool, $vars)
       </tr>
    ';
 
-  if ($vars['view'] == "graphs")
+  if ($vars['view'] === "graphs")
   {
     $vars['graph'] = "usage";
   }
@@ -327,14 +331,12 @@ function print_mempool_form($vars, $single_device = FALSE)
                       'url'   => generate_url($vars));
 
   // Clean grids
-  foreach (array_keys($form['row'][0]) as $param)
-  {
-    unset($form['row'][0][$param]['grid']);
+  foreach ($form['row'] as $row => $rows) {
+    foreach (array_keys($rows) as $param) {
+      if (isset($form['row'][$row][$param]['grid'])) { unset($form['row'][$row][$param]['grid']); }
+    }
   }
-  foreach (array_keys($form['row'][1]) as $param)
-  {
-    unset($form['row'][1][$param]['grid']);
-  }
+
   // Copy forms
   $panel_form['row'][0]['device_id']      = $form['row'][0]['device_id'];
   $panel_form['row'][0]['group']          = $form['row'][0]['group'];

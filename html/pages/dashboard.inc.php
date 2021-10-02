@@ -16,7 +16,8 @@ register_html_resource('js', 'jquery-ui.min.js');
 register_html_resource('js', 'gridstack.all.js');
 
 // Load map stuff so that it's available to widgets.
-register_html_resource('css', 'leaflet.css');
+// included in base css to control styles
+//register_html_resource('css', 'leaflet.css');
 register_html_resource('js', 'leaflet.js');
 // IE (pre Edge) js fetch fix
 $ua = detect_browser();
@@ -49,12 +50,9 @@ if (!isset($vars['dash']))
 
   $dashboard = dbFetchRow("SELECT * FROM `dashboards` WHERE `dash_id` = ?", array($vars['dash']));
 
-  $blank = '{}';
-
   if (!$dashboard) {
-
+      //No dashboard, so generate a standard one
       include("includes/dashboard-generate.inc.php");
-
   }
 }
 
@@ -83,7 +81,10 @@ if (is_array($dashboard))
                      'old_status_boxes'    => "Status Boxes (Old)",
                      //'status_donuts'  => "Status Donuts",  // broke
                      'syslog'              => 'Syslog',
+                     'syslog_alerts'       => 'Syslog Alerts',
+                     //'weathermap'          => 'Network Weathermap',
                      'eventlog'            => 'Eventlog')];
+
       $form = array('id' => 'add_widget',
                     'type'  => 'rows',
                     'space' => '5px');

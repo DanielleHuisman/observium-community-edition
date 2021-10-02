@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,9 +6,11 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
- *
+ */
+
+/**
  * AIRESPACE-WIRELESS-MIB
  *
  * Discovery SysObjectID has to start either with 1.3.6.1.4.1.14179. or 1.3.6.1.4.1.9. and SysDescription contains the string "Cisco Controller".
@@ -112,7 +113,7 @@
 
 		if (OBS_DEBUG) { print_r($aps); }
 
-		if($aps['bsnAPAdminStatus'] == 'enable')
+		if($aps['bsnAPAdminStatus'] === 'enable')
 		{
 			switch($aps['bsnAPOperationStatus'])
 			{
@@ -146,15 +147,15 @@
 		}else {
 			//echo("New AP Index: $index\n");
 			dbInsert(array('device_id'   => $device['device_id'],
-				       'ap_mib'      => $ap_mib,
-				       'ap_index'    => $index,
-  				       'ap_number'   => $aps['bsnAPNumOfSlots'],
-				       'ap_name'     => $aps['bsnAPName'],
-                                       'ap_address'  => $aps['bsnApIpAddress'],
-				       'ap_serial'   => $aps['bsnAPSerialNumber'],
-				       'ap_model'    => $aps['bsnAPModel'],
-				       'ap_location' => $aps['bsnAPLocation'],
-				       'ap_status'   => $apstatus,
+                     'ap_mib'      => $ap_mib,
+				             'ap_index'    => $index,
+                     'ap_number'   => $aps['bsnAPNumOfSlots'],
+                     'ap_name'     => $aps['bsnAPName'],
+                     'ap_address'  => $aps['bsnApIpAddress'],
+				             'ap_serial'   => $aps['bsnAPSerialNumber'],
+				             'ap_model'    => $aps['bsnAPModel'],
+                     'ap_location' => $aps['bsnAPLocation'],
+                     'ap_status'   => $apstatus,
 				       'ap_admin_status'   => $aps['bsnAPAdminStatus'],
 				      ), 'wifi_aps');
 		}
@@ -181,10 +182,10 @@
 
 	foreach ($APs_exist as $ap_index => $wifi_ap_id)
 	{
-	  if($ap_index['deleted'] == 1){
+	  if (isset($APs_db[$ap_index]) && $APs_db[$ap_index]['deleted'] == 1) {
 	       echo("AP will delete AP:$ap_index with id:$wifi_ap_id");
 	       dbDelete('wifi_aps', '`wifi_ap_id` =  ?', array($wifi_ap_id));
-	  }else{
+	  } else {
           	echo("AP don't exists in WLC anymore, but it's not marked to be deleted (considering Down): $ap_index with id:$wifi_ap_id\n");
                 dbUpdate(array('ap_status'   => "down",
                                ),'wifi_aps', '`device_id` = ? AND `wifi_ap_id` = ?',

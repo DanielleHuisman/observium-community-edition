@@ -1,23 +1,20 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage cli
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage scripts
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]).'/..');
-$scriptname = basename($argv[0]);
 
 $options = getopt("d");
-if (isset($options['d'])) { array_shift($argv); } // for compatability
+if (isset($options['d'])) { array_shift($argv); } // for compatibility
 
 include_once("includes/sql-config.inc.php");
 

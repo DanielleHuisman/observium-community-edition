@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -67,7 +67,11 @@ function print_syslogs($vars)
           $where .= generate_query_values($value, $var);
           break;
         case 'message':
-          $where .= generate_query_values($value, 'msg', '%LIKE%');
+          if (preg_match('/^!(=)?\s*(?<msg>.+)/', $value, $matches)) {
+            $where .= generate_query_values($matches['msg'], 'msg', '%!=LIKE%');
+          } else {
+            $where .= generate_query_values($value, 'msg', '%LIKE%');
+          }
           break;
         case 'timestamp_from':
           $where .= ' AND `timestamp` > ?';
@@ -291,24 +295,27 @@ function generate_syslog_row($entry, $vars, $list = NULL)
   }
 
   // Link with syslog ports cache
-  if (!isset($GLOBALS['cache']['syslog']['ports_links']))
-  {
+  if (!isset($GLOBALS['cache']['syslog']['ports_links'])) {
     $GLOBALS['cache']['syslog']['ports_links'] = [];
   }
   $ports_links = &$GLOBALS['cache']['syslog']['ports_links'];
 
   // Highlight port links
-  if (!isset($ports_links[$entry['device_id']]))
-  {
+  if (!isset($ports_links[$entry['device_id']])) {
     $ports_links[$entry['device_id']] = [];
-    foreach (dbFetchRows('SELECT `port_id`, `port_label_short`, `ifDescr`, `ifName` FROM `ports` WHERE `device_id` = ? AND `deleted` = ?', [ $entry['device_id'], 0 ]) as $port_descr)
-    {
+    $sql = 'SELECT `port_id`, `port_label_short`, `port_label_base`, `port_label_num`, `ifDescr`, `ifName` FROM `ports` WHERE `device_id` = ? AND `deleted` = ?';
+    foreach (dbFetchRows($sql, [ $entry['device_id'], 0 ]) as $port_descr) {
       $search = [ $port_descr['ifDescr'], $port_descr['ifName'], $port_descr['port_label_short'] ];
       // FIXME. Currently as hack for Extreme (should make universal with lots of examples), see:
       // https://jira.observium.org/browse/OBS-3304
-      if (preg_match('/\s(port\s*\d.*)/i', $port_descr['ifDescr'], $matches))
-      {
+      if (preg_match('/\s(port\s*\d.*)/i', $port_descr['ifDescr'], $matches)) {
         $search[] = $matches[1];
+      } elseif (strlen($port_descr['port_label_base']) && str_contains($port_descr['port_label_num'], '/')) {
+        // Brocade NOS derp interfaces with rbridge ids, ie:
+        // TenGigabitEthernet 22/0/20 or Te 22/0/20 -> TenGigabitEthernet 0/20
+        $search[] = $port_descr['port_label_base'] . '\d+/' . $port_descr['port_label_num'];
+        // and short
+        $search[] = short_ifname($port_descr['port_label_base'] . '\d+/' . $port_descr['port_label_num']);
       }
       $ports_links[$entry['device_id']][$port_descr['port_id']] = [
         'search'  => $search,
@@ -319,7 +326,7 @@ function generate_syslog_row($entry, $vars, $list = NULL)
   $entity_links = $ports_links[$entry['device_id']];
 
   // Highlight bgp peer links (try only when program match BGP)
-  if (str_iexists($entry['program'], 'bgp'))
+  if (str_icontains_array($entry['program'], 'bgp'))
   {
 
     // Link with syslog bgp cache
@@ -338,7 +345,7 @@ function generate_syslog_row($entry, $vars, $list = NULL)
         $search = [];
         foreach ([ 'bgpPeerIdentifier', 'bgpPeerRemoteAddr' ] as $param)
         {
-          if ($bgp_descr[$param] == '0.0.0.0') { continue; }
+          if ($bgp_descr[$param] === '0.0.0.0') { continue; }
 
           $search[] = 'Nbr ' . $bgp_descr[$param];
           $search[] = 'Neighbor ' . $bgp_descr[$param];
@@ -403,7 +410,7 @@ function generate_syslog_form_values($form_filter = FALSE, $column = NULL)
       foreach ($GLOBALS['config']['syslog']['priorities'] as $p => $priority)
       {
         if ($filter && !in_array($p, $form_filter)) { continue; } // Skip filtered entries
-        else if ($p > 7)                            { continue; }
+        if ($p > 7)                                 { continue; }
 
         $form_items[$p] = $priority;
         $form_items[$p]['name'] = nicecase($priority['name']);

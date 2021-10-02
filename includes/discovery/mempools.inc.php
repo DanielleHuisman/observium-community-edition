@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -17,24 +17,21 @@ include("includes/include-dir-mib.inc.php");
 
 // Detect mempools by simple MIB-based discovery :
 // FIXME - this should also be extended to understand multiple entries in a table, and take descr from an OID but this is all I need right now :)
-foreach (get_device_mibs_permitted($device) as $mib)
-{
-   if (is_array($config['mibs'][$mib]['mempool']))
-   {
-      echo("$mib ");
-      foreach ($config['mibs'][$mib]['mempool'] as $entry_name => $entry)
+// FIXME. In one day I'll rewrite this ;)
+foreach (get_device_mibs_permitted($device) as $mib) {
+   if (is_array($config['mibs'][$mib]['mempool'])) {
+     print_cli_data_field($mib);
+     foreach ($config['mibs'][$mib]['mempool'] as $entry_name => $entry)
       {
          if (discovery_check_if_type_exist($entry, 'mempool')) { continue; }
 
+         // Check array requirements list
+         if (discovery_check_requires_pre($device, $entry, 'mempool')) { continue; }
+
          $entry['found'] = FALSE;
 
-         // Init Precision (scale)/total/used/free
-         $used  = NULL;
-         $total = NULL;
-         $free  = NULL;
-         $perc  = NULL;
-         if (isset($entry['scale']) && is_numeric($entry['scale']) && $entry['scale'])
-         {
+         // Init Precision (scale)
+         if (isset($entry['scale']) && is_numeric($entry['scale']) && $entry['scale']) {
             $scale = $entry['scale'];
          } else {
             $scale = 1;
@@ -44,61 +41,67 @@ foreach (get_device_mibs_permitted($device) as $mib)
          // See QNAP NAS-MIB or HIK-DEVICE-MIB
          $unit = isset($entry['unit']) ? $entry['unit'] : NULL;
 
-         if ($entry['type'] == 'table' || !isset($entry['type']))
-         {
+         if ($entry['type'] === 'table' || !isset($entry['type'])) {
 
             /////////////////////
             // Table Discovery //
             /////////////////////
 
             // If the type is table, walk the table!
-            if ($entry['type'] == "table")
-            {
-               $entry['oids'][$entry_name] = $entry_name;
-               $entry['table'] = $entry_name;
-            } else {
-               // Type is not table, so we have to walk each OID individually
-               foreach(array('oid_used', 'oid_total', 'oid_free', 'oid_perc', 'oid_descr') as $oid)
-               {
-                  if (isset($entry[$oid])) { $entry['oids'][$oid] = $entry[$oid]; }
-               }
+            if (!isset($entry['table'])) {
+              $entry['table'] = $entry_name;
             }
             // FIXME - cache this outside the mempools array and then just array_merge it in. Descr OIDs are probably shared a lot
-
-            if (isset($entry['extra_oids']))
-            {
-               foreach((array)$entry['extra_oids'] as $oid) { $entry['oids'][$oid] = $oid; }
-            }
 
             // Fetch table or Oids
             $table_oids = array('oid_used', 'oid_total', 'oid_free', 'oid_perc', 'oid_descr', 'extra_oids');
             $mempools_array = discover_fetch_oids($device, $mib, $entry, $table_oids);
-            // foreach ($entry['oids'] as $oid)
-            // {
-            //    $mempools_array = snmpwalk_cache_oid($device, $oid, $mempools_array, $mib);
-            // }
 
             // FIXME - generify description generation code and just pass it template and OID array.
 
             $i = 1; // Used in descr as %i%
-            $mempools_count = count($mempools_array);
-            foreach ($mempools_array as $index => $mempool_entry)
-            {
+            $mempools_count = safe_count($mempools_array);
+            foreach ($mempools_array as $index => $mempool_entry) {
                $oid_num = $entry['oid_num'] . '.' . $index;
 
                // Generate mempool description
                $mempool_entry['i'] = $i;
                $mempool_entry['index'] = $index;
+               foreach (explode('.', $index) as $k => $i) {
+                 $mempool_entry['index'.$k] = $i;          // Index parts
+               }
                $descr = entity_descr_definition('mempool', $entry, $mempool_entry, $mempools_count);
 
+               // Check array requirements list
+               if (discovery_check_requires($device, $entry, $mempool_entry, 'mempool')) { continue; }
+
+               // Init perc/total/used/free
+               $used  = NULL;
+               $total = NULL;
+               $free  = NULL;
+               $perc  = NULL;
+               $options = [];
+
+               // Hardcoded total
+               if (!safe_empty($entry['total'])) { $total = $entry['total']; }
+
                // Fetch used, total, free and percentage values, if OIDs are defined for them
-               if ($entry['oid_used'] != '')      { $used = snmp_fix_numeric($mempool_entry[$entry['oid_used']], $unit); }
-               if ($entry['oid_free'] != '')      { $free = snmp_fix_numeric($mempool_entry[$entry['oid_free']], $unit); }
-               if ($entry['oid_perc'] != '')      { $perc = snmp_fix_numeric($mempool_entry[$entry['oid_perc']]); }
+               foreach(array('oid_used', 'oid_total', 'oid_free') as $oid) {
+                 if (!isset($entry[$oid])) { continue; }
+
+                 $param = str_replace('oid_', '', $oid);
+                 if (str_contains($entry[$oid], '.')) {
+                   $mempool_entry[$entry[$oid]] = snmp_cache_oid($device, $entry[$oid], $mib);
+                 }
+                 $$param = snmp_fix_numeric($mempool_entry[$entry[$oid]], $unit);
+               }
+               //if ($entry['oid_used'] != '')      { $used = snmp_fix_numeric($mempool_entry[$entry['oid_used']], $unit); }
+               //if ($entry['oid_free'] != '')      { $free = snmp_fix_numeric($mempool_entry[$entry['oid_free']], $unit); }
+               if (!safe_empty($entry['oid_perc'])) { $perc = snmp_fix_numeric($mempool_entry[$entry['oid_perc']]); }
 
                // Prefer hardcoded total over SNMP OIDs
-               if     ($entry['total'] != '')     { $total = $entry['total']; }
-               elseif ($entry['oid_total'] != '') { $total = snmp_fix_numeric($mempool_entry[$entry['oid_total']], $unit); }
+               //if     ($entry['total'] != '')     { $total = $entry['total']; }
+               //elseif ($entry['oid_total'] != '') { $total = snmp_fix_numeric($mempool_entry[$entry['oid_total']], $unit); }
 
                // Extrapolate all values from the ones we have.
                $mempool = calculate_mempool_properties($scale, $used, $total, $free, $perc, $options);
@@ -110,8 +113,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
                print_debug_vars(array(is_numeric($mempool['used']),is_numeric($mempool['total'])));
 
                // If we have valid used and total, discover the mempool
-               if (is_numeric($mempool['used']) && is_numeric($mempool['total']))
-               {
+               if (is_numeric($mempool['used']) && is_numeric($mempool['total'])) {
                   //print_r(array($valid['mempool'], $device, $index, $mib, $descr, $scale, $mempool['total'], $mempool['used'], $index, array('table' => $entry_name)));
 
                   $mempool_hc = 0; //  // FIXME mempool_hc = ?? currently keep as 0
@@ -123,58 +125,67 @@ foreach (get_device_mibs_permitted($device) as $mib)
 
          } else {
 
-            //////////////////
+            ////////////////////
             // Static mempool //
-            /////////////////
+            ////////////////////
+
+            // Init perc/total/used/free
+            $used  = NULL;
+            $total = NULL;
+            $free  = NULL;
+            $perc  = NULL;
 
             $index = 0; // FIXME. Need use same indexes style as in sensors
             $mempool_entry = array('index' => $index);
 
-            if (isset($entry['oid_descr']) && $entry['oid_descr'])
-            {
+            if (isset($entry['oid_descr']) && $entry['oid_descr']) {
                // Get description from specified OID
                $mempool_entry[$entry['oid_descr']] = snmp_get_oid($device, $entry['oid_descr'], $mib);
             }
             $descr = entity_descr_definition('mempool', $entry, $mempool_entry);
 
+            // Hardcoded total
+            if (!safe_empty($entry['total'])) { $total = $entry['total']; }
+
             // Fetch used, total, free and percentage values, if OIDs are defined for them
-            if ($entry['oid_used'] != '')
-            {
-               $used = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_used'], $mib), $unit);
-            }
+            foreach(array('oid_used', 'oid_total', 'oid_free') as $oid) {
+              if (!isset($entry[$oid])) { continue; }
+
+              $param = str_replace('oid_', '', $oid);
+              $$param = snmp_fix_numeric(snmp_get_oid($device, $entry[$oid], $mib), $unit);
+           }
+
+            // Fetch used, total, free and percentage values, if OIDs are defined for them
+            // if ($entry['oid_used'] != '') {
+            //    $used = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_used'], $mib), $unit);
+            // }
 
             // Prefer hardcoded total over SNMP OIDs
-            if ($entry['total'] != '')
-            {
-               $total = $entry['total'];
-            } else {
-               // No hardcoded total, fetch OID if defined
-               if ($entry['oid_total'] != '')
-               {
-                  $total = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_total'], $mib), $unit);
-               }
-            }
+            // if ($entry['total'] != '') {
+            //    $total = $entry['total'];
+            // } else {
+            //    // No hardcoded total, fetch OID if defined
+            //    if ($entry['oid_total'] != '') {
+            //       $total = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_total'], $mib), $unit);
+            //    }
+            // }
 
-            if ($entry['oid_free'] != '')
-            {
-               $free = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_free'], $mib), $unit);
-            }
+            // if ($entry['oid_free'] != '') {
+            //    $free = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_free'], $mib), $unit);
+            // }
 
-            if ($entry['oid_perc'] != '')
-            {
+            if (!safe_empty($entry['oid_perc'])) {
                $perc = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_perc'], $mib));
             }
 
             $mempool = calculate_mempool_properties($scale, $used, $total, $free, $perc, $entry);
 
             // If we have valid used and total, discover the mempool
-            if (is_numeric($mempool['used']) && is_numeric($mempool['total']))
-            {
+            if (is_numeric($mempool['used']) && is_numeric($mempool['total'])) {
                // Rename RRD if requested
-               if (isset($entry['rename_rrd']))
-               {
+               if (isset($entry['rename_rrd'])) {
                   $old_rrd = 'mempool-' . $entry['rename_rrd'];
-                  $new_rrd = 'mempool-' . $mib_lower . '-' . $index;
+                  $new_rrd = 'mempool-' . strtolower($mib) . '-' . $index;
                   rename_rrd($device, $old_rrd, $new_rrd);
                   unset($old_rrd, $new_rrd);
                }
@@ -186,11 +197,11 @@ foreach (get_device_mibs_permitted($device) as $mib)
          }
 
          unset($mempools_array, $mempool, $dot_index, $descr, $i); // Clean up
-         if (isset($entry['stop_if_found']) && $entry['stop_if_found'] && $entry['found'])
-         {
+         if (isset($entry['stop_if_found']) && $entry['stop_if_found'] && $entry['found']) {
             break;
          } // Stop loop if mempool found
       }
+     print_cli(PHP_EOL);
    }
 }
 
@@ -210,7 +221,7 @@ foreach (dbFetchRows('SELECT * FROM `mempools` WHERE `device_id` = ?', array($de
    }
 }
 
-$GLOBALS['module_stats'][$module]['status'] = count($valid['mempool']);
+$GLOBALS['module_stats'][$module]['status'] = safe_count($valid['mempool']);
 if (OBS_DEBUG && $GLOBALS['module_stats'][$module]['status'])
 {
    print_vars($valid['mempool']);

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,12 +14,12 @@
 
 $i = 0;
 
-foreach (dbFetchRows("SELECT * FROM `devices`") AS $device)
+foreach (dbFetchRows("SELECT * FROM `devices`") as $device)
 {
   // Reference the cache.
   //$device = &$cache['devices']['id'][$id];
 
-  $device['state'] = unserialize($device['device_state']);
+  $device['state'] = safe_unserialize($device['device_state']);
 
   foreach($device['state']['poller_mod_perf'] AS $mod => $time)
   {

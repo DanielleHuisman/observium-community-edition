@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -66,11 +66,11 @@
 // RAD-GEN-MIB::optPrtMonitorSupplyVoltage.2.minimum = INTEGER: 319
 // RAD-GEN-MIB::optPrtMonitorSupplyVoltage.2.maximum = INTEGER: 322
 
-$physicalConnectorEntry = snmp_walk_multipart_oid($device, 'physicalConnectorEntry', [], 'RAD-GEN-MIB');
+$physicalConnectorEntry = snmpwalk_multipart_oid($device, 'physicalConnectorEntry', [], 'RAD-GEN-MIB');
 print_debug_vars($physicalConnectorEntry);
 if (!snmp_status()) { return; }
 
-$oids = snmp_walk_multipart_oid($device, 'optPrtMonitorEntry', [], 'RAD-GEN-MIB');
+$oids = snmpwalk_multipart_oid($device, 'optPrtMonitorEntry', [], 'RAD-GEN-MIB');
 print_debug_vars($oids);
 
 foreach ($physicalConnectorEntry as $ifIndex => $entry)
@@ -81,7 +81,9 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry)
   ;
   $entry['ifIndex'] = $ifIndex;
   $entry['index']   = $index;
-  $entry = array_merge($entry, $oids[$ifIndex]['actual']);
+  if (isset($oids[$ifIndex]['actual'])) {
+    $entry = array_merge($entry, $oids[$ifIndex]['actual']);
+  }
   print_debug_vars($entry);
 
   $match = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%' ]];

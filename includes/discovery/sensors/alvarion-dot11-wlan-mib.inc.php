@@ -11,15 +11,15 @@
  *
  */
 
-$oids = snmpwalk_cache_multi_oid($device, 'brzaccVLNewAdbUnitName', array(), 'ALVARION-DOT11-WLAN-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$oids = snmpwalk_cache_oid($device, 'brzaccVLNewAdbUnitName', array(), 'ALVARION-DOT11-WLAN-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 /// NOTE. New table prefer, because old use weird indexes
 if ($oids)
 {
   //ALVARION-DOT11-WLAN-MIB::brzaccVLNewAdbUnitName.0.16.231.20.145.216 = "Kern Waste Tehachapi"
   //ALVARION-DOT11-WLAN-MIB::brzaccVLNewAdbSNR.0.16.231.20.145.216 = 25
   //ALVARION-DOT11-WLAN-MIB::brzaccVLNewAdbRSSI.0.16.231.20.145.216 = -76
-  $oids = snmpwalk_cache_multi_oid($device, 'brzaccVLNewAdbSNR',        $oids, 'ALVARION-DOT11-WLAN-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-  $oids = snmpwalk_cache_multi_oid($device, 'brzaccVLNewAdbRSSI',       $oids, 'ALVARION-DOT11-WLAN-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $oids = snmpwalk_cache_oid($device, 'brzaccVLNewAdbSNR', $oids, 'ALVARION-DOT11-WLAN-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $oids = snmpwalk_cache_oid($device, 'brzaccVLNewAdbRSSI', $oids, 'ALVARION-DOT11-WLAN-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 
   foreach ($oids as $index => $entry)
   {
@@ -46,9 +46,9 @@ if ($oids)
   //ALVARION-DOT11-WLAN-MIB::brzaccVLAdbUnitName.1 = STRING: "Kern Waste Tehachapi"
   //ALVARION-DOT11-WLAN-MIB::brzaccVLAdbSNR.1 = INTEGER: 28
   //ALVARION-DOT11-WLAN-MIB::brzaccVLAdbRSSI.1 = INTEGER: -75
-  $oids = snmpwalk_cache_multi_oid($device, 'brzaccVLAdbUnitName', array(), 'ALVARION-DOT11-WLAN-MIB');
-  $oids = snmpwalk_cache_multi_oid($device, 'brzaccVLAdbSNR',        $oids, 'ALVARION-DOT11-WLAN-MIB');
-  $oids = snmpwalk_cache_multi_oid($device, 'brzaccVLAdbRSSI',       $oids, 'ALVARION-DOT11-WLAN-MIB');
+  $oids = snmpwalk_cache_oid($device, 'brzaccVLAdbUnitName', array(), 'ALVARION-DOT11-WLAN-MIB');
+  $oids = snmpwalk_cache_oid($device, 'brzaccVLAdbSNR', $oids, 'ALVARION-DOT11-WLAN-MIB');
+  $oids = snmpwalk_cache_oid($device, 'brzaccVLAdbRSSI', $oids, 'ALVARION-DOT11-WLAN-MIB');
 
   foreach ($oids as $index => $entry)
   {

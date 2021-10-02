@@ -28,7 +28,7 @@ foreach ($radios_db as $radio_db)
   $radios_sorted_db[$radio_db['ap_number']][$radio_db['radio_number']] = $radio_db;
 }
 
-$sessions_array = snmpwalk_cache_multi_oid($device, "trpzClSessClientSessionTable", $sessions_array, "TRAPEZE-NETWORKS-CLIENT-SESSION-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$sessions_array = snmpwalk_cache_oid($device, "trpzClSessClientSessionTable", $sessions_array, "TRAPEZE-NETWORKS-CLIENT-SESSION-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 if (OBS_DEBUG > 1 && count($sessions_array)) { print_vars($sessions_array); }
 
 $timestamp = date('Y-m-d H:i:s', strtotime("now"));

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 """
  Observium
 
@@ -6,8 +6,7 @@
 
  @package    observium
  @subpackage poller
- @author     Job Snijders <job.snijders@atrato.com>
- @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2019 Observium Limited
+ @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2021 Observium Limited
 """
 
 """
@@ -64,31 +63,39 @@ try:
     s_time = time.time()
 except:
     print("ERROR: missing python module: time")
-    sys.exit(2)
+    exit(2)
 
 try:
     # Required modules
-    import threading, sys, subprocess, os, json, stat
+    import threading
+    import sys
+    import subprocess
+    import os
+    import json
+    import stat
 except:
     print("ERROR: missing one or more of the following python modules:")
     print("threading, sys, subprocess, os, json, stat")
     sys.exit(2)
 
-"""
-    Register global exepthook for ability stop execute wrapper by Ctrl+C
-    See: https://stackoverflow.com/questions/6598053/python-global-exception-handling
-"""
 
 def new_except_hook(exctype, value, traceback):
+    """
+        Register global exepthook for ability stop execute wrapper by Ctrl+C
+        See: https://stackoverflow.com/questions/6598053/python-global-exception-handling
+    """
+    
     if exctype == KeyboardInterrupt:
         print("\n\nExiting by CTRL+C.\n\n")
         sys.exit(2)
     else:
         sys.__excepthook__(exctype, value, traceback)
+
+
 sys.excepthook = new_except_hook
 
 
-class bcolors:
+class Colors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -98,31 +105,40 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-"""
-    Definition for write msg to log file
-"""
 
-def logfile(msg):
-    msg = "[%s] %s(%s): %s/%s: %s\n" % (time.strftime("%Y/%m/%d %H:%M:%S %z"), scriptname, os.getpid(), config['install_dir'], scriptname, msg)
+def logfile(log):
+    """
+        Definition for write msg to log file
+    """
+
+    log = "[%s] %s(%s): %s/%s: %s\n" % (time.strftime("%Y/%m/%d %H:%M:%S %z"), scriptname, os.getpid(), config['install_dir'], scriptname, log)
 
     # https://jira.observium.org/browse/OBS-2631
     # if the log file is a "character special device file" or a "FIFO (named pipe)" we must use mode 'w'
-    fstat = os.stat(log_path).st_mode
-    if stat.S_ISCHR(fstat) or stat.S_ISFIFO(fstat):
-        fmode = 'w'
-    else:
-        fmode = 'a'
+    try:
+        fstat = os.stat(log_path).st_mode
+        if stat.S_ISCHR(fstat) or stat.S_ISFIFO(fstat):
+            fmode = 'w'
+        else:
+            fmode = 'a'
+    except OSError:
+        print("\nLog file %s not exist.\n" % log_path)
+        return
 
-    with open(log_path, fmode) as f:
-        f.write(msg)
+    try:
+        with open(log_path, fmode) as f:
+            f.write(log)
+    except IOError:
+        print("\nLog file %s write not permitted.\n" % log_path)
+
 
 # base script name
-scriptname      = os.path.basename(sys.argv[0])
+scriptname = os.path.basename(sys.argv[0])
 
 # major/minor python version: (2,7), (3,2), etc
-python_version  = sys.version_info[:2]
+python_version = sys.version_info[:2]
 
-if python_version < (3,0):
+if python_version < (3, 0):
     try:
         import Queue
     except:
@@ -143,7 +159,7 @@ else:
     except:
         print("ERROR: missing python module: queue")
         sys.exit(2)
-    # MySQLdb not avialable for python3
+    # MySQLdb not available for python3
     # http://stackoverflow.com/questions/4960048/python-3-and-mysql
     try:
         import pymysql as MySQLdb
@@ -161,8 +177,8 @@ else:
         # FIXME. I not know how install on RHEL and FreeBSD
         print(" On other OSes install pip for python3 and than run from root user:")
         print("            pip3 install PyMySQL")
-        #print(" On RHEL/CentOS: yum install MySQL-python")
-        #print(" On FreeBSD: cd /usr/ports/*/py-MySQLdb && make install clean")
+        # print(" On RHEL/CentOS: yum install MySQL-python")
+        # print(" On FreeBSD: cd /usr/ports/*/py-MySQLdb && make install clean")
         sys.exit(2)
 
 
@@ -178,7 +194,7 @@ try:
     import argparse
     parser = argparse.ArgumentParser(description='Process Wrapper for Observium')
     parser.add_argument('process', nargs='?', default='poller', help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
-    #parser.add_argument('process', nargs='?', default='poller', choices=['poller', 'discovery', 'billing'], help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
+    # parser.add_argument('process', nargs='?', default='poller', choices=['poller', 'discovery', 'billing'], help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
     parser.add_argument('-w', '--workers', nargs='?', type=int, default=0, help='Number of threads to spawn. Defauilt: CPUs x 2')
     parser.add_argument('-p', '--poller_id', nargs='?', type=int, default=-1, help='Specify poller_id if this wrapper for partitioned poller. Default not used.')
     parser.add_argument('-s', '--stats', action='store_true', help='Store total polling times to RRD.', default=False)
@@ -192,9 +208,9 @@ try:
 
     # Parse passed arguments
     args = parser.parse_args()
-    #print(args)
+    # print(args)
 
-    # for compatability with old passed argument with worker
+    # for compatibility with old passed argument with worker
     try:
         # poller-wrapper.py 16
         workers = int(args.process)
@@ -206,23 +222,23 @@ try:
         process = args.process
         workers = int(args.workers)
 
-    instances_count   = int(args.instances)
-    instance_number   = int(args.number)
+    instances_count = int(args.instances)
+    instance_number = int(args.number)
     stats = args.stats
     debug = args.debug
-    test  = args.test
+    test = args.test
 except ImportError:
-    ### FIXME, do not use this compatability, just stop execute here
+    ### FIXME, do not use this compatibility, just stop execute here
     print("WARNING: missing the argparse python module:")
     print("On Ubuntu: apt-get install libpython%s.%s-stdlib" % python_version)
     print("On RHEL/CentOS: yum install python-argparse")
     print("On Debian: apt-get install python-argparse")
     print("Continuing with basic argument support.")
-    instances_count   = 1
-    instance_number   = 0
+    instances_count = 1
+    instance_number = 0
     stats = False
     debug = False
-    test  = False
+    test = False
     try:
         # poller-wrapper.py 16
         workers = int(sys.argv[1])
@@ -260,16 +276,26 @@ ob_install_dir = os.path.dirname(os.path.realpath(__file__))
 config_file = ob_install_dir + '/config.php'
 
 def get_config_data():
+
     config_cmd = ['/usr/bin/env', 'php', '%s/config_to_json.php' % ob_install_dir]
+    # limit requested options only required (skip huge definitions)
+    config_options = ['db_user', 'db_pass', 'db_host', 'db_name', 'db_port', 'db_socket',
+                      'install_dir', 'rrd_dir', 'temp_dir', 'log_dir', 'mib_dir',
+                      'rrdcached', 'rrdtool', 'rrd',
+                      'poller-wrapper', 'poller_id', 'poller_name']
+    config_cmd.append('-o')
+    config_cmd.append(','.join(config_options))
     try:
         proc = subprocess.Popen(config_cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
     except:
         print("ERROR: Could not execute: %s" % config_cmd)
         sys.exit(2)
-    return proc.communicate()[0].decode('utf-8') # decode required in python3
+    return proc.communicate()[0].decode('utf-8')  # decode required in python3
+
 
 try:
-    with open(config_file) as f: pass
+    with open(config_file) as f:
+        pass
 except IOError as e:
     print("ERROR: Oh dear... %s does not seem readable" % config_file)
     sys.exit(2)
@@ -280,37 +306,40 @@ except:
     print("ERROR: Could not load or parse observium configuration, are PATHs correct?")
     sys.exit(2)
 
-db_username  = config['db_user']
-db_password  = config['db_pass']
-db_server    = config['db_host']
-db_dbname    = config['db_name']
+if test:
+    print(config)
+
+db_username = config['db_user']
+db_password = config['db_pass']
+db_server = config['db_host']
+db_dbname = config['db_name']
 
 try:
-    db_port  = int(config['db_port'])
+    db_port = int(config['db_port'])
 except KeyError:
-    db_port  = 3306
+    db_port = 3306
 try:
     db_socket = config['db_socket']
 except KeyError:
     db_socket = False
 
-poller_path     = config['install_dir'] + '/poller.php'
-discovery_path  = config['install_dir'] + '/discovery.php'
-alerter_path    = config['install_dir'] + '/alerter.php'
-billing_path    = config['install_dir'] + '/poll-billing.php'
+poller_path = config['install_dir'] + '/poller.php'
+discovery_path = config['install_dir'] + '/discovery.php'
+alerter_path = config['install_dir'] + '/alerter.php'
+billing_path = config['install_dir'] + '/poll-billing.php'
 
-# RRDcacheD & remote rrd
+# rrdcached & remote rrd
 try:
     rrdcached_address = config['rrdcached']
-    remote_rrd = rrdcached_address.find('/') < 0 # unix:/file or /file
+    remote_rrd = rrdcached_address.find('/') < 0  # unix:/file or /file
 except KeyError:
     # rrdcached config not set, reset remote_rrd
     remote_rrd = False
 
 try:
-    temp_path   = config['temp_dir']
+    temp_path = config['temp_dir']
 except KeyError:
-    temp_path   = '/tmp'
+    temp_path = '/tmp'
 try:
     rrd_path = config['rrd_dir']
 except KeyError:
@@ -335,7 +364,8 @@ if amount_of_workers < 1:
     try:
         # use threads count based on cpus count
         import multiprocessing
-        amount_of_workers = multiprocessing.cpu_count() * 2
+        cpu_count = multiprocessing.cpu_count()
+        amount_of_workers = cpu_count * 2
         # Limit maximum amount of worker based on CPU count
         if amount_of_workers > 256:
             print("WARNING: Too many CPU count detected, threads limited to 128 (detected: %s). For more threads please use configuration option $config['poller-wrapper']['threads'] or pass as argument -w [THREADS]" % (amount_of_workers))
@@ -346,9 +376,18 @@ if amount_of_workers < 1:
         print("WARNING: used default threads number %s. For change use configuration option or pass as argument -w [THREADS]" % (amount_of_workers))
 
 if test:
-    print("Script: %s, Prosess: %s, Workers: %s, Stats: %s, Debug: %s, Test: %s" % (scriptname, process, amount_of_workers, stats, debug, test))
+    cpu_count = 'unknown'
+    if 'cpu_count' not in locals():
+        try:
+            import multiprocessing
+            cpu_count = multiprocessing.cpu_count()
+        except (ImportError, NotImplementedError):
+            cpu_count = 'unknown'
+
+    print("Script: %s, Prosess: %s, Workers: %s, CPUs: %s, Instances: %s, InstanceID: %s" % (scriptname, process, amount_of_workers, cpu_count, instances_count, instance_number))
+    print("Stats: %s, Debug: %s, Test: %s" % (stats, debug, test))
     print("Versions:\n  Python - %s.%s.%s" % sys.version_info[:3])
-    print("  DB - %s" % (db_version))
+    print("  DB - %s" % db_version)
 
 if os.path.isfile(alerter_path):
     alerting = config['poller-wrapper']['alerter']
@@ -377,6 +416,7 @@ if max_la <= 0:
     max_la = 10
 
 # partitioned poller
+poller_arg = False  # pass poller id to requested script
 if args.poller_id < 0:
     # poller_id not passed from command line, use config or default
     try:
@@ -384,6 +424,8 @@ if args.poller_id < 0:
     except:
         poller_id = 0
 else:
+    # poller_arg = args.poller_id > 0
+    poller_arg = True
     poller_id = args.poller_id
 
 """
@@ -395,12 +437,12 @@ try:
 
     # use this cleanup in discovery --host new (not in poller)
     if process == 'discovery':
-        mib_indexes  = glob.glob(config['mib_dir'] + '/.index')
+        mib_indexes = glob.glob(config['mib_dir'] + '/.index')
         mib_indexes += glob.glob(config['mib_dir'] + '/*/.index')
-        #mib_indexes += glob.glob('/var/lib/snmp/mib_indexes/*') # not permitted for wrapper process
-        #print(mib_indexes)
+        # mib_indexes += glob.glob('/var/lib/snmp/mib_indexes/*') # not permitted for wrapper process
+        # print(mib_indexes)
         for mib_index in mib_indexes:
-            #print(mib_index)
+            # print(mib_index)
             try:
                 os.remove(mib_index)
             except:
@@ -413,7 +455,7 @@ try:
 except:
     pass
 
-#sys.exit(2)
+# sys.exit(2)
 
 real_duration = 0
 per_device_duration = {}
@@ -453,43 +495,43 @@ except:
     pollers to polling hosts matching their geographic naming scheme.
 """
 
-stop_script = False # trigger for stop execute script inside try
-
-where_devices = "WHERE disabled != 1" # Filter disabled devices by default
+stop_script = False  # trigger for stop execute script inside try
+where_devices = "WHERE disabled != 1"  # Filter disabled devices by default
 
 # Use include device groups
-if args.include_groups != None:
+if args.include_groups is not None:
     # Fetch device_id from selected groups
     query = "SELECT entity_id FROM group_table WHERE entity_type = 'device' AND entity_id > 0 AND group_id IN (%s)"
     cursor.execute(query % ",".join(map(str, args.include_groups)))
     include_devices = []
     for row in cursor.fetchall():
         include_devices.append(row[0])
-    #print(map(str, include_devices))
-    #print(query % ",".join(map(str, args.include_groups)))
+    # print(map(str, include_devices))
+    # print(query % ",".join(map(str, args.include_groups)))
     where_devices += " AND device_id IN (%s)" % ",".join(map(str, include_devices))
 
 # Use exclude device groups
-if args.exclude_groups != None:
+if args.exclude_groups is not None:
     # Fetch device_id from selected groups
     query = "SELECT entity_id FROM group_table WHERE entity_type = 'device' AND entity_id > 0 AND group_id IN (%s)"
     cursor.execute(query % ",".join(map(str, args.exclude_groups)))
     exclude_devices = []
     for row in cursor.fetchall():
         exclude_devices.append(row[0])
-    #print(map(str, exclude_devices))
-    #print(query % ",".join(map(str, args.include_groups)))
+    # print(map(str, exclude_devices))
+    # print(query % ",".join(map(str, args.include_groups)))
 
     where_devices += " AND device_id NOT IN (%s)" % ",".join(map(str, exclude_devices))
 
 if poller_id > 0:
-    print(bcolors.OKBLUE + 'INFO: This is poller_id ('+str(poller_id)+') using poller-restricted devices list' + bcolors.ENDC)
-    where_devices += " AND poller_id = '" + str(poller_id) + "'"
-
+    print(Colors.OKBLUE + 'INFO: This is poller_id ('+str(poller_id)+') using poller-restricted devices list' + Colors.ENDC)
 else:
-    print(bcolors.OKBLUE + 'This is the default poller. Will only poll devices with no specified poller set.' + bcolors.ENDC)
+    print(Colors.OKBLUE + 'This is the default poller. Will only poll devices with no specified poller set.' + Colors.ENDC)
     # Set default value of 0 for process tables and the like
     poller_id = 0
+
+# Always select devices by poller_id
+where_devices += " AND poller_id = '" + str(poller_id) + "'"
 
 if test:
     print(where_devices)
@@ -532,7 +574,7 @@ else:
         # Normal billing poll
         query = """SELECT   bill_id
                    FROM     bills"""
-        order =  " ORDER BY bill_id ASC"
+        order = " ORDER BY bill_id ASC"
         query = query + order
         if test:
             print(query)
@@ -544,9 +586,9 @@ else:
                    FROM     devices
                    %s""" % (where_devices,)
         if process == 'discovery':
-            order =  " ORDER BY last_discovered_timetaken DESC"
+            order = " ORDER BY last_discovered_timetaken DESC"
         else:
-            order =  " ORDER BY last_polled_timetaken DESC"
+            order = " ORDER BY last_polled_timetaken DESC"
 
         # skip down devices in discovery
         if process == 'discovery':
@@ -565,14 +607,17 @@ else:
                     command_options = '-d -h ' + host_wildcard
                 else:
                     command_options = '-q -h ' + host_wildcard
-                print("INFO: starting discovery.php for %s" % host_wildcard)
-                #print("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
+                # append poller id arg when requested
+                if poller_arg:
+                    command_options = '-p %s %s' % (poller_id, command_options)
+                print("INFO: starting %s for %s on poller id %s" % (process, host_wildcard, poller_id))
+                # print("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
                 os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
-                print("INFO: finished discovery.php for %s" % host_wildcard)
-                #sys.exit(0) # this not worked inside try, see: https://stackoverflow.com/questions/7709411/why-finally-block-is-executing-after-calling-sys-exit0-in-except-block
+                print("INFO: finished %s for %s on poller id %s" % (process, host_wildcard, poller_id))
+                # sys.exit(0) # this not worked inside try, see: https://stackoverflow.com/questions/7709411/why-finally-block-is-executing-after-calling-sys-exit0-in-except-block
                 stop_script = True
-                #wc_query = query + " AND (last_discovered IS NULL OR last_discovered = '0000-00-00 00:00:00' OR force_discovery = '1')"
-                #cursor.execute(wc_query)
+                # wc_query = query + " AND (last_discovered IS NULL OR last_discovered = '0000-00-00 00:00:00' OR force_discovery = '1')"
+                # cursor.execute(wc_query)
             else:
                 wc_query = query + " AND hostname LIKE %s " + order
                 cursor.execute(wc_query, (host_wildcard,))
@@ -595,20 +640,20 @@ for row in devices:
 
 if test:
     print(devices_list)
-#sys.exit(2)
+# sys.exit(2)
 
 """
     Get current wrapper process info and remove stale db entries
 """
 
-pid     = os.getpid()
-ppid    = os.getppid()
-uid     = os.getuid()
-la      = os.getloadavg()
+pid = os.getpid()
+ppid = os.getppid()
+uid = os.getuid()
+la = os.getloadavg()
 try:
-  command = subprocess.check_output('ps -ww -o args -p %s' % (pid), shell=True, universal_newlines=True).splitlines()[1]
+    command = subprocess.check_output('ps -ww -o args -p %s' % pid, shell=True, universal_newlines=True).splitlines()[1]
 except:
-  command = scriptname
+    command = scriptname
 
 
 """
@@ -622,53 +667,57 @@ p_query = """SELECT `process_id`, `process_pid`, `process_ppid`, `process_uid`, 
              FROM   `observium_processes`
              WHERE  `process_name` = %s AND `poller_id` = %s"""
 try:
-  cursor.execute(p_query, (processname,poller_id))
-  for row in cursor.fetchall():
-    # print(row)
-    test_running = False
-    test_id, test_pid, test_ppid, test_uid, test_command, test_start = row
-    try:
-      test_ps = subprocess.check_output('ps -ww -o ppid,uid,args -p %s' % (test_pid), shell=True, universal_newlines=True).splitlines()[1]
-      # print(test_ps)
-      test_ps = test_ps.split(None, 2)
-      # print(test_ps)
-      # print("PPID: %s, %s" % (test_ppid, int(test_ps[0])))
-      # print(" UID: %s, %s" % (test_uid, int(test_ps[1])))
-      # print("name: %s, %s" % (processname, test_ps[2]))
-      test_running = (test_ppid == int(test_ps[0])) and (test_uid == int(test_ps[1])) and (scriptname in test_ps[2])
-    except:
-      #not exist pid
-      pass
+    cursor.execute(p_query, (processname, poller_id))
+    for row in cursor.fetchall():
+        # print(row)
+        test_running = False
+        test_id, test_pid, test_ppid, test_uid, test_command, test_start = row
+        try:
+            test_ps = subprocess.check_output('ps -ww -o ppid,uid,args -p %s' % test_pid, shell=True,
+                                              universal_newlines=True).splitlines()[1]
+            # print(test_ps)
+            test_ps = test_ps.split(None, 2)
+            # print(test_ps)
+            # print("PPID: %s, %s" % (test_ppid, int(test_ps[0])))
+            # print(" UID: %s, %s" % (test_uid, int(test_ps[1])))
+            # print("name: %s, %s" % (processname, test_ps[2]))
+            test_running = (test_ppid == int(test_ps[0])) and (test_uid == int(test_ps[1])) and (scriptname in test_ps[2])
+        except:
+            # not exist pid
+            pass
 
-    #print("Test: %s" % (test_running))
-    if not test_running:
-      # process not exist, remove stale db entry
-      try:
-        cursor.execute("""DELETE FROM `observium_processes` WHERE `process_id` = %s""", (test_id,))
-        #db.commit()
-        # print("Removed stale DB entry %s" % test_id)
-      except:
-        pass
-    else:
-      ps_count += 1
-      # print("Count: %s" % (ps_count))
+        # print("Test: %s" % (test_running))
+        if not test_running:
+            # process not exist, remove stale db entry
+            try:
+                cursor.execute("""DELETE FROM `observium_processes` WHERE `process_id` = %s""", (test_id,))
+                # db.commit()
+                # print("Removed stale DB entry %s" % test_id)
+            except:
+                pass
+        else:
+            ps_count += 1
+            # print("Count: %s" % (ps_count))
 
 except:
-  try:
-    ### FIXME. Remove this compatability, always use from db process counts!
-    ps_list = subprocess.check_output('ps ax | grep %s | grep -v grep' % (scriptname), shell=True, universal_newlines=True)
-    # divide by 2 because cron starts 2 processes (/bin/sh and main process)
-    ps_count = len(ps_list.splitlines()) / 2
-    ps_count -= 1 # decrease current process
-  except:
-    # Skip searching, something wrong
-    pass
+    try:
+        ### FIXME. Remove this compatibility, always use from db process counts!
+        ps_list = subprocess.check_output('ps ax | grep %s | grep -v grep' % scriptname, shell=True,
+                                          universal_newlines=True)
+        # divide by 2 because cron starts 2 processes (/bin/sh and main process)
+        ps_count = len(ps_list.splitlines()) / 2
+        ps_count -= 1  # decrease current process
+    except:
+        # Skip searching, something wrong
+        pass
 
-# This prevents race and too high LA on server. Default is 4 processes and 10 load average. More than 4 already running poller-wrapper it's big trouble!
+# This prevents race and too high LA on server.
+# Default is 4 processes and 10 load average.
+# More than 4 already running poller-wrapper it's big trouble!
 if ps_count > max_running and la[1] >= max_la:
-  print("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (processname, ps_count, la[1]))
-  logfile("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (processname, ps_count, la[1]))
-  sys.exit(2)
+    print("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (processname, ps_count, la[1]))
+    logfile("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (processname, ps_count, la[1]))
+    sys.exit(2)
 
 # Increase count by current wrapper process
 ps_count += 1
@@ -677,20 +726,22 @@ ps_count += 1
 p_query = """INSERT INTO `observium_processes` (`process_pid`,`process_ppid`,`process_name`,`process_uid`,`process_command`,`process_start`,`device_id`,`poller_id`)
              VALUES (%s,%s,%s,%s,%s,%s,'0',%s)"""
 try:
-  cursor.execute(p_query, (pid,ppid,processname,uid,command,s_time,poller_id))
-  process_id = db.insert_id()
-  #db.commit()
+    cursor.execute(p_query, (pid, ppid, processname, uid, command, s_time, poller_id))
+    process_id = db.insert_id()
+    # db.commit()
 except:
-  pass
+    process_id = None
+    pass
 
 if test:
-  print("Already running %s processes: %s, load average (5min) %.2f" % (processname, ps_count, la[1]))
-  #print(process_id)
-  #time.sleep(30) # delays for 30 seconds
-  p_query = """DELETE FROM `observium_processes` WHERE `process_id` = %s"""
-  cursor.execute(p_query, (process_id,))
-  #db.commit()
-  sys.exit(2)
+    print("Already running %s processes: %s, load average (5min) %.2f" % (processname, ps_count, la[1]))
+    # print(process_id)
+    # time.sleep(30) # delays for 30 seconds
+    if process_id is not None:
+        p_query = """DELETE FROM `observium_processes` WHERE `process_id` = %s"""
+        cursor.execute(p_query, (process_id,))
+        # db.commit()
+    sys.exit(2)
 
 # Open dev null handle
 FNULL = open(os.devnull, 'w')
@@ -701,7 +752,7 @@ FNULL = open(os.devnull, 'w')
     Check if this is first process instance and --host parameter not passed
 """
 if process == 'discovery' and instance_number == 0 and 'host_wildcard' not in globals():
-    #print("/usr/bin/env php %s -q -u >> /dev/null 2>&1" % (discovery_path))
+    # print("/usr/bin/env php %s -q -u >> /dev/null 2>&1" % (discovery_path))
     if debug:
         command_options = '-d -u'
     else:
@@ -711,10 +762,11 @@ if process == 'discovery' and instance_number == 0 and 'host_wildcard' not in gl
     os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
     print("INFO: finished discovery.php for update")
 
-"""
-    Create/update poller stat times
-"""
+
 def update_wrapper_times(rrd_file, count, runtime, workers):
+    """
+        Create/update poller stat times
+    """
 
     if not remote_rrd:
         rrd_file = rrd_path + '/' + rrd_file
@@ -725,7 +777,7 @@ def update_wrapper_times(rrd_file, count, runtime, workers):
         cmd_create = config['rrdtool'] + ' create ' + rrd_file + ' DS:devices' + rrd_dst + ' DS:totaltime' + rrd_dst + ' DS:threads' + rrd_dst
         cmd_create += ' --step ' + str(config['rrd']['step']) + ' ' + ' '.join(config['rrd']['rra'].split())
         if remote_rrd:
-            # --no-overwrite avialable since 1.4.3
+            # --no-overwrite available since 1.4.3
             cmd_create += ' --no-overwrite --daemon ' + rrdcached_address
         else:
             logfile(cmd_create)
@@ -740,12 +792,14 @@ def update_wrapper_times(rrd_file, count, runtime, workers):
     if debug:
         print("DEBUG: " + cmd_update)
 
-"""
-    Create/update poller wrapper count
-"""
+
 def update_wrapper_count(rrd_file, count):
+    """
+        Create/update poller wrapper count
+    """
+
     if not remote_rrd:
-        rrd_file = rrd_path  + '/' + rrd_file
+        rrd_file = rrd_path + '/' + rrd_file
 
     if remote_rrd or not os.path.isfile(rrd_file):
         # Create RRD
@@ -753,29 +807,30 @@ def update_wrapper_count(rrd_file, count):
         cmd_create = config['rrdtool'] + ' create ' + rrd_file + ' DS:wrapper_count' + rrd_dst
         cmd_create += ' --step ' + str(config['rrd']['step']) + ' ' + ' '.join(config['rrd']['rra'].split())
         if remote_rrd:
-            # --no-overwrite avialable since 1.4.3
+            # --no-overwrite available since 1.4.3
             cmd_create += ' --no-overwrite --daemon ' + rrdcached_address
         else:
             logfile(cmd_create)
         os.system(cmd_create)
         if debug:
             print("DEBUG: " + cmd_create)
-    cmd_update = config['rrdtool'] + ' update ' + rrd_file + ' N:%s' % (count)
+    cmd_update = config['rrdtool'] + ' update ' + rrd_file + ' N:%s' % count
     if remote_rrd:
         cmd_update += ' --daemon ' + rrdcached_address
     os.system(cmd_update)
     if debug:
         print("DEBUG: " + cmd_update)
 
-"""
-    A seperate queue and a single worker for printing information to the screen prevents
-    the good old joke:
-
-        Some people, when confronted with a problem, think,
-        "I know, I'll use threads," and then two they hav erpoblesms.
-"""
 
 def printworker():
+    """
+        A seperate queue and a single worker for printing information to the screen prevents
+        the good old joke:
+
+            Some people, when confronted with a problem, think,
+            "I know, I'll use threads," and then two they hav erpoblesms.
+    """
+
     while True:
         worker_id, device_id, elapsed_time = print_queue.get()
         global real_duration
@@ -789,12 +844,13 @@ def printworker():
             print("WARNING: worker %s finished %s %s in %s seconds" % (worker_id, entity, device_id, elapsed_time))
         print_queue.task_done()
 
-"""
-    This class will fork off single instances of the poller.php process, record
-    how long it takes, and push the resulting reports to the printer queue
-"""
 
 def process_worker():
+    """
+        This class will fork off single instances of the poller.php process, record
+        how long it takes, and push the resulting reports to the printer queue
+    """
+
     command_paths = {
         'poller': poller_path,
         'discovery': discovery_path,
@@ -803,12 +859,17 @@ def process_worker():
     process_path = command_paths[process]
 
     command_list = []
-    command_out  = FNULL # set non-debug output to /dev/null
+    command_out = FNULL  # set non-debug output to /dev/null
     if process == 'billing':
         # billing use -b [bill_id]
         command_list.append('-b')
     else:
         # poller/discovery us -h [device_id]
+        if poller_arg:
+            # add poller id arg
+            command_list.append('-p')
+            command_list.append(poller_id)
+
         command_list.append('-h')
 
     if debug:
@@ -824,9 +885,11 @@ def process_worker():
             command_args.extend(command_list)
             command_args.append(device_id)
             if debug:
-                command_out = temp_path + '/observium_' + process + '_' + str(device_id) + '.debug'
-            #print(command_args) #debug
+                command_out = open(temp_path + '/observium_' + process + '_' + str(device_id) + '.debug', 'w')
+            # print(command_args) #debug
             subprocess.check_call(map(str, command_args), stdout=command_out, stderr=subprocess.STDOUT)
+            if debug:
+                command_out.close()
 
             # additional alerter process only after poller process
             if process == 'poller' and alerting:
@@ -836,7 +899,7 @@ def process_worker():
                 command_args.append(device_id)
                 if debug:
                     command_out = temp_path + '/observium_alerter_' + str(device_id) + '.debug'
-                #print(command_args) #debug
+                # print(command_args) #debug
                 subprocess.check_call(map(str, command_args), stdout=FNULL, stderr=subprocess.STDOUT)
                 print("INFO: finished alerter.php for %s" % device_id)
 
@@ -847,6 +910,7 @@ def process_worker():
         except:
             pass
         process_queue.task_done()
+
 
 process_queue = Queue.Queue()
 print_queue = Queue.Queue()
@@ -875,14 +939,14 @@ except (KeyboardInterrupt, SystemExit):
 
 total_time = time.time() - s_time
 
-la  = os.getloadavg() # get new load average after polling
+la  = os.getloadavg()  # get new load average after polling
 msg = "processed %s %ss in %.2f seconds with %s threads, load average (5min) %.2f" % (len(devices_list), entity, total_time, amount_of_workers, la[1])
 print("INFO: %s %s\n" % (processname, msg))
 logfile(msg)
 
 show_stopper = False
 exit_code = 0
-if total_time > 300:
+if process != 'discovery' and total_time > 300:
     recommend = int(total_time / 300.0 * amount_of_workers + 1)
     print("WARNING: the process took more than 5 minutes to finish, you need faster hardware or more threads")
     print("INFO: in sequential style processing the elapsed time would have been: %s seconds" % real_duration)
@@ -907,31 +971,33 @@ if process == 'poller' and stats:
         if localhost_t.find('.') > 0:
             localhost = localhost_t
 
-    poller_stats   = {'instances_count': instances_count,
-                      'wrapper_count':   ps_count}
+    poller_stats = {
+        'instances_count': instances_count,
+        'wrapper_count':   ps_count
+    }
     instance_stats = {
-                      'hostname':        localhost,
-                      'instances_count': instances_count, # this is need for check in calculate average
-                      'workers_count':   amount_of_workers,
-                      'devices_count':   len(devices_list),
-                      'devices_ids':     devices_list,
-                      'last_starttime':  '%.3f' % s_time,
-                      'last_runtime':    '%.3f' % total_time,
-                      'last_status':     exit_code,
-                      #'last_message':    msg
-                     }
+        'hostname':        localhost,
+        'instances_count': instances_count,  # this is need for check in calculate average
+        'workers_count':   amount_of_workers,
+        'devices_count':   len(devices_list),
+        'devices_ids':     devices_list,
+        'last_starttime':  '%.3f' % s_time,
+        'last_runtime':    '%.3f' % total_time,
+        'last_status':     exit_code,
+        # 'last_message':    msg
+    }
 
-    instances_clean      = []
+    instances_clean = []
     instances_total_time = total_time
     instances_total_devices = len(devices_list)
-    i                    = 1
+    i = 1
 
     query = """SELECT attrib_type, attrib_value FROM observium_attribs WHERE attrib_type LIKE 'poller_wrapper_instance_%'"""
     cursor.execute(query)
 
     for row in cursor.fetchall():
-        #print(row)
-        n = int(row[0].replace('poller_wrapper_instance_', '')) # get stat for instance number n
+        # print(row)
+        n = int(row[0].replace('poller_wrapper_instance_', ''))  # get stat for instance number n
         if n >= instances_count:
             # seems as old stats, instances count reduced
             instances_clean.append(row[0])
@@ -941,21 +1007,21 @@ if process == 'poller' and stats:
         else:
             instance = json.loads(row[1])
             if int(instance['instances_count']) == instances_count:
-                #print(instance)
+                # print(instance)
                 i += 1
-                instances_total_time    += float(instance['last_runtime'])
+                instances_total_time += float(instance['last_runtime'])
                 instances_total_devices += int(instance['devices_count'])
             else:
                 instances_clean.append(row[0])
 
     instances_average_time = instances_total_time / i
     poller_stats['total_devices_count'] = instances_total_devices
-    poller_stats['total_runtime']       = '%.3f' % instances_total_time
-    poller_stats['average_runtime']     = '%.3f' % instances_average_time
+    poller_stats['total_runtime'] = '%.3f' % instances_total_time
+    poller_stats['average_runtime'] = '%.3f' % instances_average_time
 
-    #print(poller_stats)
-    #print(instance_stats)
-    #print(instances_clean)
+    # print(poller_stats)
+    # print(instance_stats)
+    # print(instances_clean)
 
     # write instance and total stats into db
     cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
@@ -987,11 +1053,11 @@ if process == 'poller' and stats:
     # clean stale instance stats
     for row in instances_clean:
         cursor.execute("DELETE FROM `observium_attribs` WHERE `attrib_type` = %s", (row,))
-        #db.commit()
+        # db.commit()
 
     # Write poller statistics to RRD
     if poller_id > 0:
-        # partioned poller wrapper
+        # partitioned poller wrapper
         rrd_name_base = 'poller-wrapper-id' + str(poller_id)
     else:
         # default poller wrapper
@@ -1012,10 +1078,10 @@ if process == 'poller' and stats:
 # Remove process info from DB
 p_query = """DELETE FROM `observium_processes` WHERE `process_id` = %s"""
 try:
-  cursor.execute(p_query, (process_id,))
-  #db.commit()
+    cursor.execute(p_query, (process_id,))
+    # db.commit()
 except:
-  pass
+    pass
 
 # Close opened handles
 db.close()

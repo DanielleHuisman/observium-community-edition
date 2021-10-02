@@ -43,7 +43,7 @@
  enterprises.netgear.ngNasManager.diskTable.diskEntry.diskTemperature.3 = INTEGER: 44
 **/
 
-$cache['readydataos-mib']['diskTable'] = snmpwalk_cache_multi_oid($device, 'diskTable', array(), 'READYDATAOS-MIB');
+$cache['readydataos-mib']['diskTable'] = snmpwalk_cache_oid($device, 'diskTable', array(), 'READYDATAOS-MIB');
 
 foreach ($cache['readydataos-mib']['diskTable'] as $index => $entry)
 {
@@ -80,7 +80,7 @@ foreach ($cache['readydataos-mib']['diskTable'] as $index => $entry)
 
 */
 
-$cache['readydataos-mib']['fanTable'] = snmpwalk_cache_multi_oid($device, 'fanTable', array(), 'READYDATAOS-MIB');
+$cache['readydataos-mib']['fanTable'] = snmpwalk_cache_oid($device, 'fanTable', array(), 'READYDATAOS-MIB');
 
 foreach ($cache['readydataos-mib']['fanTable'] as $index => $entry)
 {
@@ -104,7 +104,7 @@ foreach ($cache['readydataos-mib']['fanTable'] as $index => $entry)
 
 }
 
-$cache['readydataos-mib']['temperatureTable'] = snmpwalk_cache_multi_oid($device, 'temperatureTable', array(), 'READYDATAOS-MIB');
+$cache['readydataos-mib']['temperatureTable'] = snmpwalk_cache_oid($device, 'temperatureTable', array(), 'READYDATAOS-MIB');
 
 foreach ($cache['readydataos-mib']['temperatureTable'] as $index => $entry)
 {

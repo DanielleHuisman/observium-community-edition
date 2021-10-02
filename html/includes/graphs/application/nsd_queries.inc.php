@@ -33,7 +33,7 @@ $i++;
 $rrd_list[$i]['filename'] = $queries_filename;
 $rrd_list[$i]['descr']    = 'Without AA bit';
 $rrd_list[$i]['ds']       = 'numQueriesWoAA';
-$rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % count($config['graph_colours'][$colours])];
+$rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % safe_count($config['graph_colours'][$colours])];
 $i++;
 
 $server = 0;
@@ -45,7 +45,7 @@ while (1)
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr']    = "Server$server";
     $rrd_list[$i]['ds']       = "numQueries";
-    $rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % count($config['graph_colours'][$colours])];
+    $rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % safe_count($config['graph_colours'][$colours])];
     $i++;
 
     $server++;

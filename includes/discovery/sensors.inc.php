@@ -94,6 +94,34 @@ if(is_array($config['sensors']['static']))
   }
 }
 
+//Detect static counters
+
+if(is_array($config['counters']['static']))
+{
+  print_cli_data_field('Static Counters');
+  foreach($config['counters']['static'] AS $counter)
+  {
+    if ($counter['device_id'] == $device['device_id'])
+    {
+      $value = snmp_get_oid($device, $counter['oid']);
+      if (isset($value))
+      {
+        //$options[$limit] = snmp_fix_numeric($value);
+        if (is_numeric($value))
+        {
+          $options = array();
+          $fields = array('counter_unit', 'limit_auto', 'limit', 'limit_low', 'limit_warn', 'limit_low_warn');
+          foreach($fields AS $field) { if (isset($counter[$field])) { $options[$field] = $counter[$field]; } }
+          if(!isset($counter['class'])) { $counter['class'] = 'counter'; }
+
+          discover_counter($device, $counter['class'], 'STATIC', 'static', $counter['oid'], $counter['oid'], $counter['descr'], $counter['multiplier'], $value, $options);
+
+        }
+      }
+    }
+  }
+}
+
 print_debug_vars($valid['sensor']);
 foreach (array_keys($config['sensor_types']) as $type)
 {

@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -59,24 +58,24 @@ foreach (array('ifType', 'ifSpeed', 'port_descr_type') as $entry)
   $query  = "SELECT `$entry` FROM `ports`";
   $query .= " LEFT JOIN `devices` USING (`device_id`)";
 
-  if (isset($where_array[$entry]))
-  {
-    $tmp = $where_array[$entry];
-    unset($where_array[$entry]);
-    $query .= ' WHERE 1 ' . implode('', $where_array);
-    $where_array[$entry] = $tmp;
-  } else {
-    $query .= $where;
-  }
+    $query .= ' WHERE 1 ';
+    foreach ($where_array as $where_entry) {
+      if (!str_contains($where_entry, "`$entry`")) {
+        $query .= $where_entry;
+      }
+    }
 
   $query .= " AND `$entry` != ''".$cache['where']['ports_permitted']." GROUP BY `$entry` ORDER BY `$entry`";
+  if ($entry === 'ifSpeed') {
+    $query .= ' DESC';
+  }
 
+  $form_items[$entry] = [];
   foreach (dbFetchRows($query) as $data)
   {
-    if ($entry == "ifType")
-    {
+    if ($entry === "ifType") {
       $form_items[$entry][$data['ifType']] = rewrite_iftype($data['ifType']) . ' ('.$data['ifType'].')';
-    } elseif ($entry == "ifSpeed") {
+    } elseif ($entry === "ifSpeed") {
       $form_items[$entry][$data[$entry]] = formatRates($data[$entry]);
     } else {
       $form_items[$entry][$data[$entry]] = nicecase($data[$entry]);
@@ -84,9 +83,9 @@ foreach (array('ifType', 'ifSpeed', 'port_descr_type') as $entry)
   }
 }
 
-$form_items['devices'] = generate_form_values('device'); // Always all devices
-
 asort($form_items['ifType']);
+
+$form_items['devices'] = generate_form_values('device'); // Always all devices
  
 $form_items['sort'] = array('device' => 'Device',
             'port' => 'Port',

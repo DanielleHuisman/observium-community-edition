@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,7 +22,7 @@ if (!$vars['entity_type']) { $vars['entity_type'] = 'all'; }
 $navbar['class'] = "navbar-narrow";
 $navbar['brand'] = "Alert Types";
 
-if ($vars['entity_type'] == 'all') { $navbar['options']['all']['class'] = "active"; }
+if ($vars['entity_type'] === 'all') { $navbar['options']['all']['class'] = "active"; }
 $navbar['options']['all']['url'] = generate_url(array('page' => 'device', 'device' => $device['device_id'],
                                                 'tab' => 'alerts', 'entity_type' => 'all'));
 $navbar['options']['all']['text'] = "All";
@@ -45,7 +44,7 @@ if (isset($config['enable_syslog']) && $config['enable_syslog'] && OBSERVIUM_EDI
   $entity_type = "syslog";
 
   if (!$vars['entity_type']) { $vars['entity_type'] = 'syslog'; }
-  if ($vars['entity_type'] == 'syslog') { $navbar['options'][$entity_type]['class'] = "active"; }
+  if ($vars['entity_type'] === 'syslog') { $navbar['options'][$entity_type]['class'] = "active"; }
 
   $navbar['options'][$entity_type]['url'] = generate_url(array('page' => 'device', 'device' => $device['device_id'],
                                                   'tab' => 'alerts', 'entity_type' => $entity_type));
@@ -53,10 +52,12 @@ if (isset($config['enable_syslog']) && $config['enable_syslog'] && OBSERVIUM_EDI
   $navbar['options'][$entity_type]['text'] = 'Syslog';
 }
 
+/* Not required anymore
 $navbar['options_right']['update']['url']  = generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'alerts', 'action'=>'update'));
 $navbar['options_right']['update']['text'] = 'Rebuild';
 $navbar['options_right']['update']['icon'] = $config['icon']['rebuild'];
-if ($vars['action'] == 'update') { $navbar['options_right']['update']['class'] = 'active'; }
+if ($vars['action'] === 'update') { $navbar['options_right']['update']['class'] = 'active'; }
+*/
 
 $navbar['options_right']['filters']['url']       = '#';
 $navbar['options_right']['filters']['text']      = 'Filter';
@@ -70,7 +71,7 @@ $filters = array('all'     => array('url'   => generate_url($vars, array('status
 
                  'failed_delayed' => array('url'   => generate_url($vars, array('status' => 'failed_delayed')),
                                        'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['error'],
+                                       'icon'  => $config['icon']['important'],
                                        'text'  => 'Failed & Delayed'),
 
                  'failed'     => array('url'   => generate_url($vars, array('status' => 'failed')),
@@ -80,7 +81,7 @@ $filters = array('all'     => array('url'   => generate_url($vars, array('status
 
                  'suppressed' => array('url'   => generate_url($vars, array('status' => 'suppressed')),
                                        'url_o' => generate_url($vars, array('status' => 'all')),
-                                       'icon'  => $config['icon']['exclamation'],
+                                       'icon'  => $config['icon']['shutdown'],
                                        'text'  => 'Suppressed')
 );
 
@@ -109,19 +110,18 @@ print_navbar($navbar);
 unset($navbar);
 
 // Run actions
-
-if($vars['action'] == 'update')
-{
+/* Not required anymore
+if ($vars['action'] === 'update') {
   echo generate_box_open();
   update_device_alert_table($device);
   $alert_table = cache_device_alert_table($device['device_id']);
   echo generate_box_close();
 }
+*/
 
 $vars['pagination'] = TRUE;
 
-if($vars['entity_type'] == "syslog")
-{
+if ($vars['entity_type'] === "syslog") {
 
   print_logalert_log($vars);
 

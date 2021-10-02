@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -94,7 +93,7 @@ if ((int)$ciscoFlashDevicesSupported > 0)
     CISCO-FLASH-MIB::ciscoFlashDeviceRemovable.6 = INTEGER: true(1)
     CISCO-FLASH-MIB::ciscoFlashDeviceRemovable.7 = INTEGER: true(1)
     */
-    $fstype = ($flash['ciscoFlashDeviceRemovable'] == 'true' ? 'ciscoFlashRemovable' : 'ciscoFlash');
+    $fstype = $flash['ciscoFlashDeviceRemovable'] === 'true' ? 'ciscoFlashRemovable' : 'ciscoFlash';
     if (isset($flash['ciscoFlashDeviceSizeExtended']) && $flash['ciscoFlashDeviceSizeExtended'] > 0)
     {
       $hc   = 1;

@@ -11,9 +11,9 @@
  *
  */
 
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringNodeDescr', array(), $mib);
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringFPCIndex',  $srx_spu_array, $mib);
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringCPUUsage',  $srx_spu_array, $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringNodeDescr', array(), $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringFPCIndex', $srx_spu_array, $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringCPUUsage', $srx_spu_array, $mib);
 
 foreach ($srx_spu_array as $index => $entry)
 {

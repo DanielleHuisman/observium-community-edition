@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -48,9 +47,11 @@ foreach ($navbar['options'] as $option => $array)
 print_navbar($navbar);
 unset($navbar);
 
-arsort($device['state']['poller_mod_perf']);
+if (is_array($device['state']['poller_mod_perf'])) {
+  arsort($device['state']['poller_mod_perf']);
+}
 
-if ($vars['view'] == 'db')
+if ($vars['view'] === 'db')
 {
   echo generate_box_open();
   echo '<table class="' .OBS_CLASS_TABLE_STRIPED_TWO.' table-hover"><tbody>' . PHP_EOL;
@@ -74,7 +75,7 @@ if ($vars['view'] == 'db')
   echo '</tbody></table>';
   echo generate_box_close();
 }
-else if ($vars['view'] == 'snmp')
+elseif ($vars['view'] === 'snmp')
 {
   echo generate_box_open();
   echo '<table class="' .OBS_CLASS_TABLE_STRIPED_TWO.' table-hover"><tbody>' . PHP_EOL;
@@ -100,7 +101,7 @@ else if ($vars['view'] == 'snmp')
   echo '</tbody></table>';
   echo generate_box_close();
 }
-else if ($vars['view'] == 'memory')
+elseif ($vars['view'] === 'memory')
 {
   echo generate_box_open();
   echo '<table class="' .OBS_CLASS_TABLE_STRIPED_TWO.' table-hover"><tbody>' . PHP_EOL;
@@ -118,7 +119,7 @@ else if ($vars['view'] == 'memory')
   echo '</tbody></table>';
   echo generate_box_close();
 }
-else if ($vars['view'] == 'poller')
+elseif ($vars['view'] === 'poller')
 {
 
   echo generate_box_open();
@@ -215,12 +216,12 @@ foreach ($device['state']['poller_mod_perf'] as $module => $time)
             <tbody>
 <?php
 
-$times = array_slice($device['state']['poller_history'], 0, 30, TRUE);
+$times = is_array($device['state']['poller_history']) ? array_slice($device['state']['poller_history'], 0, 30, TRUE) : [];
 foreach ($times as $start => $duration)
 {
   echo('    <tr>
       <td>'.format_unixtime($start).'</td>
-      <td>'.number_format($duration, 2).'s</td>
+      <td>'.format_uptime($duration).'</td>
     </tr>');
 }
 
@@ -247,12 +248,12 @@ foreach ($times as $start => $duration)
             <tbody>
 <?php
 
-$times = array_slice($device['state']['discovery_history'], 0, 30, TRUE);
+$times = is_array($device['state']['discovery_history']) ? array_slice($device['state']['discovery_history'], 0, 30, TRUE) : [];
 foreach ($times as $start => $duration)
 {
   echo('    <tr>
       <td>'.format_unixtime($start).'</td>
-      <td>'.number_format($duration, 2).'s</td>
+      <td>'.format_uptime($duration).'</td>
     </tr>');
 }
 

@@ -27,7 +27,7 @@
 //IT-WATCHDOGS-V4-MIB::internalDewPoint.1 = INTEGER: 394 0.1 Degrees
 
 $temperatureUnits = snmp_get($device, 'temperatureUnits.0', '-Oqv', 'IT-WATCHDOGS-V4-MIB');
-$oids = snmpwalk_cache_multi_oid($device, 'internalTable', array(), 'IT-WATCHDOGS-V4-MIB');
+$oids = snmpwalk_cache_oid($device, 'internalTable', array(), 'IT-WATCHDOGS-V4-MIB');
 
 foreach ($oids as $index => $entry)
 {

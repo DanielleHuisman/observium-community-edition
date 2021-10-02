@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -25,7 +24,7 @@ EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempUnitState.1 = INTEGER: normal
 EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempUnitTemperature.1 = INTEGER: 52
 */
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesTempSensorsTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesTempSensorsTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
 
 // By first detect if device used old FAST-BOXSERVICES-PRIVATE-MIB, it use single key in boxServicesTempSensorsTable
 $first_key = current(array_keys($oids));
@@ -97,7 +96,7 @@ foreach ($oids as $index => $entry)
 // EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.1.0 = INTEGER: 56
 // EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanUnitIndex.1.0 = Gauge32: 1
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesFansTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesFansTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
@@ -145,11 +144,11 @@ foreach ($oids as $index => $entry)
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.1.0 = INTEGER: operational(2)
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowerSuppUnitIndex.1.0 = Gauge32: 1
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesPowSuppliesTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesPowSuppliesTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
-  if ($entry['boxServicesPowSupplyItemType'] == 0 && $entry['boxServicesPowSupplyItemState'] == 'failed') { continue; } // This sensor not really exist
+  if ($entry['boxServicesPowSupplyItemType'] == 0 && $entry['boxServicesPowSupplyItemState'] === 'failed') { continue; } // This sensor not really exist
 
   $descr = ucfirst($entry['boxServicesPowSupplyItemType']) . ' Power Supply ' . $entry['boxServicesPowSupplyIndex'];
   if ($entry['boxServicesPowerSuppUnitIndex'] > 1)
@@ -159,7 +158,7 @@ foreach ($oids as $index => $entry)
   $oid   = ".1.3.6.1.4.1.4413.1.1.43.1.7.1.3.$index";
   $value = $entry['boxServicesPowSupplyItemState'];
 
-  if ($value != 'notpresent')
+  if ($value !== 'notpresent')
   {
     discover_status_ng($device, $mib, 'boxServicesPowSupplyItemState', $oid, $index, 'edgeswitch-boxServicesItemState', $descr, $value, array('entPhysicalClass' => 'powerSupply', 'rename_rrd' => 'edgeswitch-boxServicesItemState-boxServicesPowSupplyItemState.%index%'));
   }

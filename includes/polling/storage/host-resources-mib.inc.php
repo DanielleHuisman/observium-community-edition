@@ -32,7 +32,7 @@ if (isset($wmi['disk']['logical']) && count($wmi['disk']['logical']))
     $disk_label  = 'Label:' . $disk['VolumeName'];
     $disk_serial = 'Serial Number ' . ltrim(strtolower($disk['VolumeSerialNumber']), '0');
     $wmi_found   = str_starts($storage['storage_descr'], $disk_name) &&
-                   str_exists($storage['storage_descr'], $disk_label) &&
+                   str_contains_array($storage['storage_descr'], $disk_label) &&
                    str_ends($storage['storage_descr'], $disk_serial);
     if ($wmi_found)
     {

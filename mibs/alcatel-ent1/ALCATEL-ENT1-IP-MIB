@@ -16,15 +16,15 @@ IMPORTS
         MODULE-COMPLIANCE, OBJECT-GROUP,
         NOTIFICATION-GROUP
                 FROM SNMPv2-CONF
-        softentENT1Ip
+        softentIND1Ip
                 FROM ALCATEL-ENT1-BASE
         InetAddressType, InetAddress
                 FROM INET-ADDRESS-MIB
         ifIndex, InterfaceIndex, InterfaceIndexOrZero
                 FROM IF-MIB;
 
-alcatelENT1IPMIB MODULE-IDENTITY
-    LAST-UPDATED "201312090000Z"
+alcatelIND1IPMIB MODULE-IDENTITY
+    LAST-UPDATED "201602250000Z"
     ORGANIZATION "Alcatel-Lucent"
     CONTACT-INFO
         "Please consult with Customer Service to ensure the most appropriate
@@ -66,6 +66,14 @@ alcatelENT1IPMIB MODULE-IDENTITY
                      Copyright (C) 1995-2006 Alcatel-Lucent
                          ALL RIGHTS RESERVED WORLDWIDE"
 
+    REVISION      "201602250000Z"
+    DESCRIPTION
+        "Mark as obsolete the old chassis/slot/port values"
+
+    REVISION      "201509090000Z"
+    DESCRIPTION
+        "The alaIpPortServiceTable is deprecated."
+
     REVISION      "201410170000Z"
     DESCRIPTION
         "added alaIpServiceSourceIpTable"
@@ -90,15 +98,15 @@ alcatelENT1IPMIB MODULE-IDENTITY
     DESCRIPTION
         "The latest version of this MIB Module."
 
-    ::= { softentENT1Ip 1 }
+    ::= { softentIND1Ip 1 }
 
 alcatelIND1IPMIBNotifications OBJECT-IDENTITY
         STATUS current
         DESCRIPTION
             "Branch For IP MIB Subsystem Notifications."
-        ::= { alcatelENT1IPMIB 0 }
+        ::= { alcatelIND1IPMIB 0 }
 
-alcatelIND1IPMIBObjects OBJECT IDENTIFIER ::= { alcatelENT1IPMIB 1 }
+alcatelIND1IPMIBObjects OBJECT IDENTIFIER ::= { alcatelIND1IPMIB 1 }
 
 AlaIpServiceSourceIpAppIndex ::= TEXTUAL-CONVENTION
     STATUS   current
@@ -354,7 +362,7 @@ alaDoSMac OBJECT-TYPE
 alaDoSSlot OBJECT-TYPE
         SYNTAX Integer32
         MAX-ACCESS accessible-for-notify
-        STATUS deprecated
+        STATUS obsolete
         DESCRIPTION
                 "Slot on which recent suspect packet was received.
                  This object is deprecated in favor of alaDoSPortIfindex."
@@ -363,7 +371,7 @@ alaDoSSlot OBJECT-TYPE
 alaDoSPort OBJECT-TYPE
         SYNTAX Integer32
         MAX-ACCESS accessible-for-notify
-        STATUS deprecated
+        STATUS obsolete
         DESCRIPTION
                 "Port on which recent suspect packet was received.
                  This object is deprecated in favor of alaDoSPortIfindex."
@@ -384,7 +392,7 @@ alaDoSStatus OBJECT-TYPE
 alaDoSChassisId OBJECT-TYPE
         SYNTAX Integer32
         MAX-ACCESS accessible-for-notify
-        STATUS deprecated
+        STATUS obsolete
         DESCRIPTION
                 "Chassis on which recent suspect packet was received.
                  This object is deprecated in favor of alaDoSPortIfindex."
@@ -705,13 +713,15 @@ IpNetToMediaAugEntry ::= SEQUENCE {
         ipNetToMediaPort                Integer32,
         ipNetToMediaName                SnmpAdminString,
         ipNetToMediaChassisId           Integer32,
-        ipNetToMediaPortIfindex         InterfaceIndexOrZero
+        ipNetToMediaPortIfindex         InterfaceIndexOrZero,
+        ipNetToMediaSubType             INTEGER,
+        ipNetToMediaSubId               Integer32 
         }
 
 ipNetToMediaSlot OBJECT-TYPE
     SYNTAX      Integer32
     MAX-ACCESS  read-write
-    STATUS      deprecated
+    STATUS      obsolete
     DESCRIPTION
         "Slot associated with address translation. An address translation
          not associated with a slot/port pair will have ipNetToMediaSlot
@@ -727,7 +737,7 @@ ipNetToMediaSlot OBJECT-TYPE
 ipNetToMediaPort OBJECT-TYPE
     SYNTAX      Integer32
     MAX-ACCESS  read-write
-    STATUS      deprecated
+    STATUS      obsolete
     DESCRIPTION
         "Port associated with address translation. An address translation
          not associated with a slot/port pair will have ipNetToMediaSlot
@@ -751,7 +761,7 @@ ipNetToMediaName OBJECT-TYPE
 ipNetToMediaChassisId OBJECT-TYPE
     SYNTAX      Integer32
     MAX-ACCESS  read-write
-    STATUS      deprecated
+    STATUS      obsolete
     DESCRIPTION
         "Chassis Id associated with address translation.
          This object is deprecated in favor of ipNetToMediaPortIfindex to
@@ -763,8 +773,46 @@ ipNetToMediaPortIfindex OBJECT-TYPE
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
-        "Ifindex of the port for this address translation."
+    "Ifindex of the port for this address translation. 
+    This object carries different values for address translations on 
+    physical ports and virtual ports (SAPs and SDPs)
+    This field should be set to one of the following
+      1. ifIndex of the physical port for translations on Vlan domain (physical port)
+      2. ifIndex of the SAP for the translations on service (VPLS, SPBM & VxLAN) domain SAPs or
+      3. SDP_ID of a SDP for translations on service domain SDPs"
     ::= { ipNetToMediaAugEntry 5  }
+
+ipNetToMediaSubType OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  default(0),
+                  sap(1),
+                  sBind(2)
+            }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "This object is used for network to media entries learnt on the
+      virtual ports (SAPs & SDPs), the virtual port could be created by
+      SPB-M,VPLS or VxLAN services. this is invalid for the entries
+      learnt on the physical ports and always set to 0 on physical ports"
+   DEFVAL      { default }
+   ::= { ipNetToMediaAugEntry 6 }
+
+ipNetToMediaSubId OBJECT-TYPE
+   SYNTAX        Integer32  (0 .. 2147483647)
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+     "This object is used for the entries learnt on the virtual ports (SAPs & SDPs).
+     This is invalid for the entries lernt on the physical ports and the value
+     will always be set to 0 on physical ports (virtual ports are created by SPB-M,VPLS or 
+     VxLAN services). This field should be the EncapId for SAP, and service id for SBIND.
+      
+     If this entry is learnt on a SAP, this object holds  vlan id (1 .. 4096)
+     this entry is leant in SDP, this object holds service id (1 .. 32767)"
+   ::= { ipNetToMediaAugEntry 7 }
+
+
 
 --
 -- DoS traps
@@ -1162,9 +1210,9 @@ alaIpServicePort OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "IP service port. To modify the default port, use corresponding MIB attribute below:
-         - ftp : alaIpFtpPort from alaIpFtpConfig in ALCATEL-ENT1-IP-MIB.mib
-         - ssh : alaIpSshPort from alaIpSshConfig in ALCATEL-ENT1-IP-MIB.mib
-         - telnet : alaIpTelnetPort from alaIpTelnetConfig in ALCATEL-ENT1-IP-MIB.mib
+         - ftp : alaIpFtpPort from alaIpFtpConfig in ALCATEL-IND1-IP-MIB.mib
+         - ssh : alaIpSshPort from alaIpSshConfig in ALCATEL-IND1-IP-MIB.mib
+         - telnet : alaIpTelnetPort from alaIpTelnetConfig in ALCATEL-IND1-IP-MIB.mib
          - http : alaIND1WebMgtHttpPort from alcatelIND1WebMgtMIBObjects in ALCATEL-IND1-WEBMGT-MIB.mib
          - ntp : can't be modified
          - snmp : can't be modified
@@ -1187,9 +1235,9 @@ alaIpServiceStatus  OBJECT-TYPE
          (although snmp is never fully shut down; if disabled in some VRF, it will run in the default VRF).
          Note that that http, https, and ntp here are read-only; use alternatives described below to enable/disable service.
          If you want to block packet and shut down service, use corresponding MIB attribute below:
-         - ftp : alaIpFtpAdminStatus from alaIpFtpConfig in ALCATEL-ENT1-IP-MIB.mib
-         - ssh : alaIpSshAdminStatus from alaIpSshConfig in ALCATEL-ENT1-IP-MIB.mib
-         - telnet : alaIpTelnetAdminStatus from alaIpTelnetConfig in ALCATEL-ENT1-IP-MIB.mib
+         - ftp : alaIpFtpAdminStatus from alaIpFtpConfig in ALCATEL-IND1-IP-MIB.mib
+         - ssh : alaIpSshAdminStatus from alaIpSshConfig in ALCATEL-IND1-IP-MIB.mib
+         - telnet : alaIpTelnetAdminStatus from alaIpTelnetConfig in ALCATEL-IND1-IP-MIB.mib
          - http enable : alaIND1WebMgtAdminStatus from alcatelIND1WebMgtMIBObjects in ALCATEL-IND1-WEBMGT-MIB.mib
          - http disable : alaIND1WebMgtServerStatus from alcatelIND1WebMgtMIBObjects in ALCATEL-IND1-WEBMGT-MIB.mib
          - ntp : alaIpNtpVrfName (in this mib), and alaNtpEnable and alaNtpBroadcastEnable from alaNtpConfig in ALCATEL-IND1-NTP-MIB.mib
@@ -1201,21 +1249,23 @@ alaIpServiceStatus  OBJECT-TYPE
     ::= { alaIpServiceEntry 3 }
 
 --
--- IP port service table
+-- The deprecated IP port service table
 --
 
 alaIpPortServiceTable OBJECT-TYPE
     SYNTAX      SEQUENCE OF AlaIpPortServiceEntry
     MAX-ACCESS  not-accessible
-    STATUS      current
+    STATUS      deprecated
     DESCRIPTION
-        "Table to enable/disable IP services by port on switch"
+        "Table to enable/disable IP services by port on switch.
+         This table has been deprecated in favor of the
+         alaIpServiceTable."
     ::= { alcatelIND1IPMIBObjects 13 }
 
 alaIpPortServiceEntry OBJECT-TYPE
     SYNTAX      AlaIpPortServiceEntry
     MAX-ACCESS  not-accessible
-    STATUS      current
+    STATUS      deprecated
     DESCRIPTION
         "An entry in alaIpPortServiceTable"
     INDEX { alaIpPortServicePort }
@@ -1229,7 +1279,7 @@ AlaIpPortServiceEntry ::= SEQUENCE {
 alaIpPortServicePort OBJECT-TYPE
     SYNTAX      Integer32 (1..65535)
     MAX-ACCESS  read-only
-    STATUS      current
+    STATUS      deprecated
     DESCRIPTION
         "IP service port"
     ::= { alaIpPortServiceEntry 1 }
@@ -1240,7 +1290,7 @@ alaIpPortServiceStatus  OBJECT-TYPE
                 disabled(2)
     }
     MAX-ACCESS  read-write
-    STATUS      current
+    STATUS      deprecated
     DESCRIPTION
         "enable/disable IP service"
     DEFVAL { enabled }
@@ -1287,22 +1337,23 @@ AlaIpInterfaceEntry ::= SEQUENCE {
         alaIpInterfaceTunnelSrcAddressType InetAddressType,
         alaIpInterfaceTunnelSrc InetAddress,
         alaIpInterfaceTunnelDstAddressType InetAddressType,
-        alaIpInterfaceTunnelDst InetAddress,
-        alaIpInterfaceVipAddress IpAddress,
-	    alaIpInterfaceDhcpStatus INTEGER,
-        alaIpInterfaceDhcpIpRelease INTEGER,
-        alaIpInterfaceDhcpIpRenew INTEGER,
-        alaIpInterfaceDhcpOption60String SnmpAdminString,
-        alaIpInterfaceChassisId  Integer32,
-        alaIpInterfaceSlot  Integer32,
-        alaIpInterfacePort  Integer32,
-        alaIpInterfaceTag   INTEGER,
-        alaIpInterfaceArpCount Counter32,
-        alaIpInterfaceArpNiChassis Integer32,
-        alaIpInterfaceArpNiSlot Integer32,
-        alaIpInterfaceArpNiDevice Integer32,
-        alaIpInterfacePortIfindex InterfaceIndexOrZero,
-	alaIpInterfaceDhcpVsiAcceptFilterString SnmpAdminString
+		  alaIpInterfaceTunnelDst InetAddress,
+		  alaIpInterfaceVipAddress IpAddress,
+		  alaIpInterfaceDhcpStatus INTEGER,
+		  alaIpInterfaceDhcpIpRelease INTEGER,
+		  alaIpInterfaceDhcpIpRenew INTEGER,
+		  alaIpInterfaceDhcpOption60String SnmpAdminString,
+		  alaIpInterfaceChassisId  Integer32,
+		  alaIpInterfaceSlot  Integer32,
+		  alaIpInterfacePort  Integer32,
+		  alaIpInterfaceTag   INTEGER,
+		  alaIpInterfaceArpCount Counter32,
+		  alaIpInterfaceArpNiChassis Integer32,
+		  alaIpInterfaceArpNiSlot Integer32,
+		  alaIpInterfaceArpNiDevice Integer32,
+		  alaIpInterfacePortIfindex InterfaceIndexOrZero,
+		  alaIpInterfaceDhcpVsiAcceptFilterString SnmpAdminString,
+		  alaIpInterfaceServiceID	Unsigned32
 }
 
 alaIpInterfaceName  OBJECT-TYPE
@@ -1351,7 +1402,8 @@ alaIpInterfaceDeviceType  OBJECT-TYPE
                 emp (2),
                 loopback (3),
                 greTunnel (4),
-                ipipTunnel (5)
+                ipipTunnel (5),
+                service (6)
         }
         MAX-ACCESS read-write
         STATUS  current
@@ -1384,7 +1436,8 @@ alaIpInterfaceIpForward OBJECT-TYPE
 alaIpInterfaceEncap OBJECT-TYPE
         SYNTAX INTEGER {
                 ethernet2(1),
-                snap(2)
+                snap(2),
+                service(3)
         }
         MAX-ACCESS read-write
         STATUS current
@@ -1587,7 +1640,7 @@ alaIpInterfaceDhcpOption60String OBJECT-TYPE
 alaIpInterfaceChassisId OBJECT-TYPE
         SYNTAX      Integer32
         MAX-ACCESS  read-write
-        STATUS      deprecated
+        STATUS      obsolete
         DESCRIPTION
                "ChassisId associated with the physical port bound 
                 directly with the IP Interface. An Ip interface not bound
@@ -1600,7 +1653,7 @@ alaIpInterfaceChassisId OBJECT-TYPE
 alaIpInterfaceSlot OBJECT-TYPE
         SYNTAX      Integer32
         MAX-ACCESS  read-write
-        STATUS      deprecated
+        STATUS      obsolete
         DESCRIPTION
                "Slot associated with the physical port bound directly 
                 with the IP Interface. An Ip interface not bound directly 
@@ -1612,7 +1665,7 @@ alaIpInterfaceSlot OBJECT-TYPE
 alaIpInterfacePort OBJECT-TYPE
         SYNTAX      Integer32
         MAX-ACCESS  read-write
-        STATUS      deprecated
+        STATUS      obsolete
         DESCRIPTION
                "Port associated with the physical port bound directly with the 
                 IP Interface. An Ip interface not bound directly with a physical 
@@ -1681,13 +1734,22 @@ alaIpInterfacePortIfindex OBJECT-TYPE
         ::= { alaIpInterfaceEntry 35 }
 
 alaIpInterfaceDhcpVsiAcceptFilterString OBJECT-TYPE
-	SYNTAX      SnmpAdminString (SIZE (0..63))
+        SYNTAX      SnmpAdminString (SIZE (0..63))
         MAX-ACCESS read-write
         STATUS current
         DESCRIPTION
                "The string value to prefer an OV-Server.
                On the basis of this value DHCP-Ack will be accepted."
         ::= { alaIpInterfaceEntry 36 }
+
+alaIpInterfaceServiceID  OBJECT-TYPE
+      SYNTAX Unsigned32(0..32767)
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+             "The service to which the L3 VPN interface is bound; 0 if unbound."
+      DEFVAL { 0 }
+      ::= { alaIpInterfaceEntry 37}
 
 alaIpItfConfigTable OBJECT-TYPE
         SYNTAX SEQUENCE OF AlaIpItfConfigEntry
@@ -2022,7 +2084,7 @@ alaIpNetToMediaDpaIfIndex OBJECT-TYPE
 --
 -- conformance information
 --
-alcatelIND1IPMIBConformance OBJECT IDENTIFIER ::= { alcatelENT1IPMIB 2 }
+alcatelIND1IPMIBConformance OBJECT IDENTIFIER ::= { alcatelIND1IPMIB 2 }
 alcatelIND1IPMIBCompliances OBJECT IDENTIFIER ::= { alcatelIND1IPMIBConformance 1 }
 alcatelIND1IPMIBGroups OBJECT IDENTIFIER ::= { alcatelIND1IPMIBConformance 2 }
 
@@ -2030,7 +2092,7 @@ alaIpCompliance MODULE-COMPLIANCE
         STATUS     current
     DESCRIPTION
             "The compliance statement for switches with Alcatel IP stack and
-            implementing ALCATEL-ENT1-IP-MIB."
+            implementing ALCATEL-IND1-IP-MIB."
     MODULE
     MANDATORY-GROUPS { alaIpConfigGroup,
                        alaIpNetToMediaGroup,
@@ -2136,7 +2198,9 @@ alaIpNetToMediaAugGroup OBJECT-GROUP
                ipNetToMediaPort,
                ipNetToMediaName,
                ipNetToMediaChassisId,
-               ipNetToMediaPortIfindex
+               ipNetToMediaPortIfindex,
+               ipNetToMediaSubId,
+               ipNetToMediaSubType
              }
     STATUS     current
     DESCRIPTION
@@ -2232,32 +2296,33 @@ alaIpInterfaceGroup OBJECT-GROUP
                alaIpInterfaceMtu,
                alaIpInterfaceLocalProxyArp,
                alaIpInterfacePrimCfg,
-               alaIpInterfaceOperState,
-               alaIpInterfaceOperReason,
-               alaIpInterfaceRouterMac,
-               alaIpInterfaceBcastAddr,
-               alaIpInterfacePrimAct,
-               alaIpInterfaceRemoteAddr,
-               alaIpInterfaceTunnelSrcAddressType,
-               alaIpInterfaceTunnelSrc,
-               alaIpInterfaceTunnelDstAddressType,
-               alaIpInterfaceTunnelDst,
-               alaIpInterfaceVipAddress,
-	           alaIpInterfaceDhcpStatus,
-	           alaIpInterfaceDhcpIpRelease,
-	           alaIpInterfaceDhcpIpRenew,
-	           alaIpInterfaceDhcpOption60String,
-               alaIpInterfaceChassisId,
-               alaIpInterfaceSlot,
-               alaIpInterfacePort,
-               alaIpInterfaceTag,
-               alaIpInterfaceArpCount,
-               alaIpInterfaceArpNiChassis,
-               alaIpInterfaceArpNiSlot,
-               alaIpInterfaceArpNiDevice,
-               alaIpInterfacePortIfindex,
-	       alaIpInterfaceDhcpVsiAcceptFilterString 
-             }
+					alaIpInterfaceOperState,
+					alaIpInterfaceOperReason,
+					alaIpInterfaceRouterMac,
+					alaIpInterfaceBcastAddr,
+					alaIpInterfacePrimAct,
+					alaIpInterfaceRemoteAddr,
+					alaIpInterfaceTunnelSrcAddressType,
+					alaIpInterfaceTunnelSrc,
+					alaIpInterfaceTunnelDstAddressType,
+					alaIpInterfaceTunnelDst,
+					alaIpInterfaceVipAddress,
+					alaIpInterfaceDhcpStatus,
+					alaIpInterfaceDhcpIpRelease,
+					alaIpInterfaceDhcpIpRenew,
+					alaIpInterfaceDhcpOption60String,
+					alaIpInterfaceChassisId,
+					alaIpInterfaceSlot,
+					alaIpInterfacePort,
+					alaIpInterfaceTag,
+					alaIpInterfaceArpCount,
+					alaIpInterfaceArpNiChassis,
+					alaIpInterfaceArpNiSlot,
+					alaIpInterfaceArpNiDevice,
+					alaIpInterfacePortIfindex,
+					alaIpInterfaceDhcpVsiAcceptFilterString,
+					alaIpInterfaceServiceID
+	 }
     STATUS     current
     DESCRIPTION
             "A collection of objects to support management of configuration

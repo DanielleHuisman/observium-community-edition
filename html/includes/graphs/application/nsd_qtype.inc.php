@@ -33,7 +33,7 @@ $colours = $config['graph_colours']['mixed']; # needs moar colours!
 
 foreach ($dns_qtype as $qtype)
 {
-  $array["qType$qtype"] = array('descr' => "$qtype", 'colour' => $colours[(count($array) % count($colours))]);
+  $array["qType$qtype"] = array('descr' => "$qtype", 'colour' => $colours[(safe_count($array) % safe_count($colours))]);
 }
 
 $i = 0;

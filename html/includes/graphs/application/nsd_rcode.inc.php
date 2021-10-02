@@ -28,7 +28,7 @@ $colours = $config['graph_colours']['mixed']; # needs moar colours!
 
 foreach ($dns_rcode as $rcode)
 {
-  $array["rcode$rcode"] = array('descr' => strtoupper($rcode), 'colour' => $colours[(count($array) % count($colours))]);
+  $array["rcode$rcode"] = array('descr' => strtoupper($rcode), 'colour' => $colours[(safe_count($array) % safe_count($colours))]);
 }
 
 if (is_file($rrd_filename))

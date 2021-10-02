@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -32,7 +32,7 @@ if(isset($vars['role_id']))
 
   $role = dbFetchRow("SELECT * FROM `roles` WHERE `role_id` = ?", array($vars['role_id']));
 
-  if(count($role)){
+  if(safe_count($role)){
 
 ?>
 
@@ -84,7 +84,7 @@ if(isset($vars['role_id']))
                 $group_members = dbFetchRows("SELECT * FROM `roles_users` WHERE `role_id` = ? AND `auth_mechanism` = ?", [ $role['role_id'], $config['auth_mechanism'] ]);
                 $user_list = auth_user_list();
 
-                if (count($group_members))
+                if (safe_count($group_members))
                 {
                   echo '<div class="box-body no-padding">';
                   echo('<table class="table table-hover table-condensed">');
@@ -192,18 +192,18 @@ if(isset($vars['role_id']))
           <?php
 
           // Start platform permissions
-          if (OBSERVIUM_EDITION != 'community')
+          if (OBSERVIUM_EDITION !== 'community')
           {
             echo generate_box_open(array('header-border' => TRUE, 'title' => 'Platform Permissions'));
 
             // Cache group permissions
+            $role_perms['permission'] = [];
             foreach (dbFetchRows("SELECT * FROM `roles_permissions` WHERE `role_id` = ?", array($vars['role_id'])) as $perm)
             {
               $role_perms['permission'][$perm['permission']] = TRUE;
             }
 
-            if (count($role_perms['permission']))
-            {
+            if (safe_count($role_perms['permission'])) {
               echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
               foreach ($role_perms['permission'] as $perm => $status)
@@ -245,7 +245,7 @@ if(isset($vars['role_id']))
             }
 
             // Permissions Selector
-            $permissions_list = array_keys($role_perms['permission']);
+            $permissions_list = array_keys((array)$role_perms['permission']);
 
             $form = array('type'  => 'simple',
                           'style' => 'padding: 7px; margin: 0px;',
@@ -301,7 +301,7 @@ if(isset($vars['role_id']))
           if (isset($config['enable_billing']) && $config['enable_billing'])
           {
             echo generate_box_open(array('header-border' => TRUE, 'title' => 'Bill Permissions'));
-            if (count($role_perms['bill']))
+            if (safe_count($role_perms['bill']))
             {
               echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
@@ -344,7 +344,7 @@ if(isset($vars['role_id']))
             }
 
             // Bills
-            $permissions_list = array_keys($role_perms['bill']);
+            $permissions_list = array_keys((array)$role_perms['bill']);
 
             $form = array('type'  => 'simple',
                           'style' => 'padding: 7px; margin: 0px;',
@@ -395,7 +395,7 @@ if(isset($vars['role_id']))
           {
             echo generate_box_open(array('header-border' => TRUE, 'title' => 'Entity Group Permissions'));
 
-            if (count($role_perms['group']))
+            if (safe_count($role_perms['group']))
             {
               echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
@@ -440,7 +440,7 @@ if(isset($vars['role_id']))
             }
 
             // Groups
-            $permissions_list = array_keys($role_perms['group']);
+            $permissions_list = array_keys((array)$role_perms['group']);
 
             $form = array('type'  => 'simple',
                           'style' => 'padding: 7px; margin: 0px;',
@@ -496,7 +496,7 @@ if(isset($vars['role_id']))
           // Start device permissions
           echo generate_box_open(array('header-border' => TRUE, 'title' => 'Device Permissions'));
 
-          if (count($role_perms['device']))
+          if (safe_count($role_perms['device']))
           {
             echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
@@ -540,7 +540,7 @@ if(isset($vars['role_id']))
           }
 
           // Devices
-          $permissions_list = array_keys($role_perms['device']);
+          $permissions_list = array_keys((array)$role_perms['device']);
           // Display devices this user doesn't have Permissions to
           $form = array('type'  => 'simple',
                         'style' => 'padding: 7px; margin: 0px;',
@@ -587,7 +587,7 @@ if(isset($vars['role_id']))
 
           // Start port permissions
           echo generate_box_open(array('header-border' => TRUE, 'title' => 'Port Permissions'));
-          if (count($role_perms['port']))
+          if (safe_count($role_perms['port']))
           {
             echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
@@ -634,7 +634,7 @@ if(isset($vars['role_id']))
           }
 
           // Ports
-          $permissions_list = array_keys($role_perms['port']);
+          $permissions_list = array_keys((array)$role_perms['port']);
 
           // Display devices this user doesn't have Permissions to
           $form = array('type'  => 'simple',
@@ -685,7 +685,7 @@ if(isset($vars['role_id']))
           // Start sensor permissions
           echo generate_box_open(array('header-border' => TRUE, 'title' => 'Sensor Permissions'));
 
-          if (count($role_perms['sensor']))
+          if (safe_count($role_perms['sensor']))
           {
             echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
@@ -729,7 +729,7 @@ if(isset($vars['role_id']))
             //print_warning('This user currently has no permitted sensors');
           }
 
-          $permissions_list = array_keys($role_perms['sensor']);
+          $permissions_list = array_keys((array)$role_perms['sensor']);
           // Display devices this user doesn't have Permissions to
           $form = array('type'  => 'simple',
                         'style' => 'padding: 7px; margin: 0px;',
@@ -797,7 +797,7 @@ if(isset($vars['role_id']))
 
   $roles = dbFetchRows("SELECT * FROM `roles` ORDER BY `role_name`");
 
-  if (count($roles))
+  if (safe_count($roles))
   {
 
     echo(generate_box_open());

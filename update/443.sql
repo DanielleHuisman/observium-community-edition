@@ -1,0 +1,1 @@
+ALTER TABLE `pollers` ADD `host_id` VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL AFTER `poller_name`, ADD `host_uname` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `host_id`;

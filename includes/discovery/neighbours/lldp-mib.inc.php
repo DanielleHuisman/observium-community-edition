@@ -15,19 +15,26 @@ $lldpRemTable_oids = array('lldpRemChassisIdSubtype', 'lldpRemChassisId',
                            'lldpRemPortIdSubtype', 'lldpRemPortId', 'lldpRemPortDesc',
                            'lldpRemSysName');
 $lldp_array = array();
-foreach ($lldpRemTable_oids as $oid)
-{
+foreach ($lldpRemTable_oids as $oid) {
   //$lldp_array = snmpwalk_cache_threepart_oid($device, $oid, $lldp_array, "LLDP-MIB");
   $lldp_array = snmpwalk_cache_oid($device, $oid, $lldp_array, "LLDP-MIB");
 
   if (empty($lldp_array)) { break; } // Stop walk if no data
 }
-if ($lldp_array)
-{
+
+if ($lldp_array) {
   // lldpRemSysDesc can be multiline
   //$lldp_array = snmpwalk_cache_threepart_oid($device, 'lldpRemPortDesc', $lldp_array, "LLDP-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
   //$lldp_array = snmpwalk_cache_threepart_oid($device, 'lldpRemSysDesc', $lldp_array, "LLDP-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
   $lldp_array = snmpwalk_cache_oid($device, 'lldpRemSysDesc', $lldp_array, "LLDP-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
+
+  if (is_device_mib($device, 'LLDP-EXT-MED-MIB')) {
+    // See Cumulus Linux
+    // not exist lldpRemSysName, lldpRemSysDesc
+    $lldp_array = snmpwalk_cache_oid($device, 'lldpXMedRemSoftwareRev', $lldp_array, "LLDP-EXT-MED-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
+    $lldp_array = snmpwalk_cache_oid($device, 'lldpXMedRemMfgName',     $lldp_array, "LLDP-EXT-MED-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
+    $lldp_array = snmpwalk_cache_oid($device, 'lldpXMedRemModelNam',    $lldp_array, "LLDP-EXT-MED-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
+  }
 
   // lldpRemManAddrTable
   // Case 1:
@@ -65,13 +72,10 @@ if ($lldp_array)
   $lldp_addr = snmpwalk_cache_oid($device, 'lldpRemManAddrIfId',         [], "LLDP-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   $lldp_addr = snmpwalk_cache_oid($device,     'lldpRemManAddr', $lldp_addr, "LLDP-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 
-  foreach ($lldp_addr as $index => $entry)
-  {
-    if (isset($lldp_array[$index]))
-    {
+  foreach ($lldp_addr as $index => $entry) {
+    if (isset($lldp_array[$index])) {
       $lldp_array[$index] = array_merge($lldp_array[$index], $entry);
-      if (isset($entry['lldpRemManAddr']))
-      {
+      if (isset($entry['lldpRemManAddr'])) {
         $addr = hex2ip($entry['lldpRemManAddr']);
         $lldp_array[$index]['lldpRemMan'][$addr] = $entry; // For multiple entries
       }
@@ -83,8 +87,7 @@ if ($lldp_array)
     $lldpRemLocalPortNum = array_shift($index_array);
     $lldpRemIndex        = array_shift($index_array);
     $lldp_index          = "$lldpRemTimeMark.$lldpRemLocalPortNum.$lldpRemIndex";
-    if (!isset($lldp_array[$lldp_index]))
-    {
+    if (!isset($lldp_array[$lldp_index])) {
       continue;
     }
     $lldp_array[$lldp_index] = array_merge($lldp_array[$lldp_index], $entry);
@@ -99,25 +102,18 @@ if ($lldp_array)
     $lldpAddressFamily   = array_shift($index_array);
     $len                 = array_shift($index_array);
     $addr                = implode('.', $index_array);
-    if (isset($entry['lldpRemManAddr']))
-    {
+    if (isset($entry['lldpRemManAddr'])) {
       // Already exist Oid, just merge
       $addr = hex2ip($entry['lldpRemManAddr']);
       //continue;
-    }
-    elseif ($lldpAddressFamily == 1 || $len == 4)
-    {
+    } elseif ($lldpAddressFamily == 1 || $len == 4) {
       // IPv4, ie: 4.10.129.2.171
       $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
-    }
-    elseif ($lldpAddressFamily == 2 || $len == 16)
-    {
+    } elseif ($lldpAddressFamily == 2 || $len == 16) {
       // IPv6, ie: 16.42.2.32.40.255.0.0.0.0.0.0.1.0.0.1.113
       $addr = snmp2ipv6($addr);
       $lldp_array[$lldp_index]['lldpRemManAddr'] = $addr;
-    }
-    elseif ($lldpAddressFamily == 0 && $len == 6)
-    {
+    } elseif ($lldpAddressFamily == 0 && $len == 6) {
       // Hrm, I really not know what is this, ie, seems as MAC address:
       // 6 132.181.156.89.235.128 84:B5:9C:59:EB:80
       continue;
@@ -128,16 +124,13 @@ if ($lldp_array)
 
 print_debug_vars($lldp_array, 1);
 
-if ($lldp_array)
-{
+if ($lldp_array) {
   $dot1d_array = snmp_cache_table($device, "dot1dBasePortIfIndex", array(), "BRIDGE-MIB");
   //$lldp_local_array = snmpwalk_cache_oid($device, "lldpLocalSystemData", array(), "LLDP-MIB");
   $lldp_local_array = snmpwalk_cache_oid($device, "lldpLocPortEntry", array(), "LLDP-MIB");
 
-  foreach ($lldp_array as $index => $lldp)
-  {
-    if (str_exists($index, '.'))
-    {
+  foreach ($lldp_array as $index => $lldp) {
+    if (str_contains_array($index, '.')) {
       // This is correct RFC case:
       // LLDP-MIB::lldpRemChassisIdSubtype.0.0.1 = INTEGER: macAddress(4)
       list($lldpRemTimeMark, $lldpRemLocalPortNum, $lldpRemIndex) = explode('.', $index);
@@ -153,8 +146,7 @@ if ($lldp_array)
     $port = NULL;
 
     // Prefer by LLDP-MIB
-    if (!$port && !empty($lldp_local_array[$lldpRemLocalPortNum]['lldpLocPortDesc']))
-    {
+    if (!$port && !empty($lldp_local_array[$lldpRemLocalPortNum]['lldpLocPortDesc'])) {
       //lldpLocPortIdSubtype.15 = interfaceName
       //lldpLocPortIdSubtype.16 = interfaceName
       //lldpLocPortId.15 = "Te1/15"
@@ -162,8 +154,7 @@ if ($lldp_array)
       //lldpLocPortDesc.15 = TenGigabitEthernet1/15
       //lldpLocPortDesc.16 = TenGigabitEthernet1/16
       $ifName = $lldp_local_array[$lldpRemLocalPortNum]['lldpLocPortDesc'];
-      if ($ifName === 'OOBM')
-      {
+      if ($ifName === 'OOBM') {
         // procurve:
         // ifDescr.5481 = Out Of Band Management Port
         // ifDescr.5492 = Out Of Band Management loopback Interface
@@ -179,8 +170,7 @@ if ($lldp_array)
 
     // By BRIDGE-MIB (Warning, seems as more hard on multiple platforms not correctly association with ifIndex for LLDP)
     if (!$port && is_numeric($dot1d_array[$lldpRemLocalPortNum]['dot1dBasePortIfIndex']) &&
-        !in_array($device['os'], [ 'junos', 'dell-os10' ])) // Incorrect association on this platforms
-    {
+        !in_array($device['os'], [ 'junos', 'dell-os10' ])) { // Incorrect association on this platforms
       // Get the port using BRIDGE-MIB
       $ifIndex = $dot1d_array[$lldpRemLocalPortNum]['dot1dBasePortIfIndex'];
 
@@ -188,10 +178,8 @@ if ($lldp_array)
     }
 
     // last try by lldpLocPortId, also see below for remote port
-    if (!$port)
-    {
-      switch ($lldp_local_array[$lldpRemLocalPortNum]['lldpLocPortIdSubtype'])
-      {
+    if (!$port) {
+      switch ($lldp_local_array[$lldpRemLocalPortNum]['lldpLocPortIdSubtype']) {
         case 'interfaceName':
           $ifName = snmp_hexstring($lldp_local_array[$lldpRemLocalPortNum]['lldpLocPortId']);
           $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` = ? AND (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?)", [ $device['device_id'], 0, $ifName, $ifName, $ifName ]);
@@ -220,8 +208,7 @@ if ($lldp_array)
           */
           $peer_where = generate_query_values($device['device_id'], 'device_id'); // Additional filter for include self IPs
           // Fetch all devices with peer IP and filter by UP
-          if ($ids = get_entity_ids_ip_by_network('port', $ip, $peer_where))
-          {
+          if ($ids = get_entity_ids_ip_by_network('port', $ip, $peer_where)) {
             $port = get_port_by_id_cache($ids[0]);
           }
 
@@ -230,8 +217,7 @@ if ($lldp_array)
     }
 
     // Ohh still unknown port? this is not should happen, but this derp LLDP implementation on your device
-    if (!$port && is_numeric($lldpRemLocalPortNum))
-    {
+    if (!$port && is_numeric($lldpRemLocalPortNum)) {
       print_debug('WARNING. Local port for neighbour not found, used incorrect lldpRemLocalPortNum as ifIndex.');
       $ifIndex = $lldpRemLocalPortNum; // This is incorrect, not really ifIndex, but seems sometime this numbers same
       $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` = ? AND `ifIndex` = ? AND `ifDescr` NOT LIKE 'Vlan%'", [ $device['device_id'], 0, $ifIndex ]);
@@ -241,19 +227,15 @@ if ($lldp_array)
     $remote_port_id   = NULL;
 
     // Sometime lldpRemPortDesc is not set
-    if (!isset($lldp['lldpRemPortDesc']))
-    {
+    if (!isset($lldp['lldpRemPortDesc'])) {
       $lldp['lldpRemPortDesc'] = '';
     }
 
     // lldpRemPortId can be hex string
-    if ($lldp['lldpRemPortIdSubtype'] !== 'macAddress')
-    {
+    if ($lldp['lldpRemPortIdSubtype'] !== 'macAddress') {
       // On Extreme platforms, they remove the leading 1: from ports. Put it back if there isn't a :.
-      if (preg_match ('/^ExtremeXOS.*$/', $lldp['lldpRemSysDesc']))
-      {
-        if (!preg_match ('/\:/',$lldp['lldpRemPortId']))
-        {
+      if (preg_match ('/^ExtremeXOS.*$/', $lldp['lldpRemSysDesc'])) {
+        if (!preg_match ('/\:/',$lldp['lldpRemPortId'])) {
           $lldp['lldpRemPortId'] = '1:'.$lldp['lldpRemPortId'];
         }
       } else {
@@ -263,29 +245,23 @@ if ($lldp_array)
 
     // Clean MAC & IP
     $remote_mac = $lldp['lldpRemChassisIdSubtype'] === 'macAddress' ? $lldp['lldpRemChassisId'] : NULL;
-    if (isset($lldp['lldpRemMan']) && count($lldp['lldpRemMan']) > 1)
-    {
+    if (isset($lldp['lldpRemMan']) && count($lldp['lldpRemMan']) > 1) {
       // Multiple IP addresses.. detect best?
-      foreach (array_keys($lldp['lldpRemMan']) as $addr)
-      {
+      foreach (array_keys($lldp['lldpRemMan']) as $addr) {
         $addr_version = get_ip_version($addr);
         $addr_type = get_ip_type($addr);
-        if (in_array($addr_type, [ 'unspecified', 'loopback', 'reserved', 'multicast' ]))
-        {
+        if (in_array($addr_type, [ 'unspecified', 'loopback', 'reserved', 'multicast' ])) {
           continue;
         }
-        elseif ($addr_version == 6 && $addr_type === 'link-local')
-        {
+        if ($addr_version == 6 && $addr_type === 'link-local') {
           continue;
         }
-        elseif ($addr_type === 'unicast')
-        {
+        if ($addr_type === 'unicast') {
           // Prefer IPv4/IPv6 unicast
           $lldp['lldpRemManAddr'] = $addr;
           break;
         }
-        elseif ($addr_version == 4)
-        {
+        if ($addr_version == 4) {
           // Than prefer IPv4
           $lldp['lldpRemManAddr'] = $addr;
           break;
@@ -295,10 +271,15 @@ if ($lldp_array)
       print_debug("Multiple remote IP addresses detect, selected: $addr");
       print_debug_vars($lldp);
     }
-    if (isset($lldp['lldpRemManAddr']))
-    {
+    if (isset($lldp['lldpRemManAddr'])) {
       $lldp['lldpRemManAddr'] = hex2ip($lldp['lldpRemManAddr']);
     }
+
+    // Cumulus Linux have empty lldpRemSysDesc
+    if (!isset($lldp['lldpRemSysDesc']) && isset($lldp['lldpXMedRemModelName'])) {
+      $lldp['lldpRemSysDesc'] = trim($lldp['lldpXMedRemMfgName'] . ' ' . $lldp['lldpXMedRemModelName']);
+    }
+    $lldp['lldpRemSysVersion'] = safe_empty($lldp['lldpXMedRemSoftwareRev']) ? NULL : $lldp['lldpXMedRemSoftwareRev'];
 
     // Remote sysname is MAC in some cases
     // lldpRemChassisIdSubtype.0.16.1 = macAddress
@@ -307,25 +288,26 @@ if ($lldp_array)
     // lldpRemPortId.0.16.1 = "40 E3 D6 CE 8A 9A "
     // lldpRemSysName.0.16.1 = 40:e3:d6:ce:8a:9a
     // lldpRemManAddrIfId.0.16.1.1.4.10.10.14.132 = 8
-    if (preg_match('/^[a-f\d]{2}([: ][a-f\d]{2}){5}$/', $lldp['lldpRemSysName']) && get_ip_version($lldp['lldpRemManAddr']))
-    {
+    if (preg_match('/^[a-f\d]{2}([: ][a-f\d]{2}){5}$/', $lldp['lldpRemSysName']) && get_ip_version($lldp['lldpRemManAddr'])) {
       // Replace by IP address for better discovery
       print_debug("LLDP hostname replaced: ".$lldp['lldpRemSysName']." -> ".$lldp['lldpRemManAddr']);
       $lldp['lldpRemSysName'] = $lldp['lldpRemManAddr'];
-    }
-    elseif (empty($lldp['lldpRemSysName']) && $lldp['lldpRemChassisIdSubtype'] === 'macAddress' &&
-            strlen($lldp['lldpRemSysDesc']))
-    {
-      // use mac address instead empty hostname:
-      // lldpRemChassisIdSubtype.89.3.1 = macAddress
-      // lldpRemChassisId.89.3.1 = "6C B0 CE 12 A9 A8 "
-      // lldpRemPortIdSubtype.89.3.1 = local
-      // lldpRemPortId.89.3.1 = "g25"
-      // lldpRemPortDesc.89.3.1 = g25
-      // lldpRemSysName.89.3.1 =
-      // lldpRemSysDesc.89.3.1 = GS724Tv4 ProSafe 24-port Gigabit Ethernet Smart Switch, 6.3.1.4, B1.0.0.4
-      // lldpRemManAddrIfId.89.3.1.1.4.192.168.0.239 = 51
-      $lldp['lldpRemSysName'] = str_replace(array(' ', '-'), '', strtolower($lldp['lldpRemChassisId']));
+    } elseif (safe_empty($lldp['lldpRemSysName']) && !safe_empty($lldp['lldpRemSysDesc'])) {
+      if ($lldp['lldpRemChassisIdSubtype'] === 'macAddress') {
+        // use mac address instead empty hostname:
+        // lldpRemChassisIdSubtype.89.3.1 = macAddress
+        // lldpRemChassisId.89.3.1 = "6C B0 CE 12 A9 A8 "
+        // lldpRemPortIdSubtype.89.3.1 = local
+        // lldpRemPortId.89.3.1 = "g25"
+        // lldpRemPortDesc.89.3.1 = g25
+        // lldpRemSysName.89.3.1 =
+        // lldpRemSysDesc.89.3.1 = GS724Tv4 ProSafe 24-port Gigabit Ethernet Smart Switch, 6.3.1.4, B1.0.0.4
+        // lldpRemManAddrIfId.89.3.1.1.4.192.168.0.239 = 51
+        $lldp['lldpRemSysName'] = str_replace(array( ' ', '-' ), '', strtolower($lldp['lldpRemChassisId']));
+      } elseif ($lldp['lldpRemChassisIdSubtype'] === 'networkAddress' &&
+                preg_match('/^01 (?<ip>([A-F\d]{2}\s?){4})$/', $lldp['lldpRemChassisId'], $matches)) {
+        $lldp['lldpRemSysName'] = hex2ip($matches['ip']);
+      }
     }
 
     // Try find remote device and check if already cached
@@ -337,8 +319,7 @@ if ($lldp_array)
       $remote_device_id = autodiscovery_device($lldp['lldpRemSysName'], $lldp['lldpRemManAddr'], 'LLDP', $lldp['lldpRemSysDesc'], $device, $port);
     }
 
-    if ($remote_device_id)
-    {
+    if ($remote_device_id) {
       $if = $lldp['lldpRemPortDesc'];
       $id = $lldp['lldpRemPortId'];
 
@@ -440,7 +421,7 @@ if ($lldp_array)
       'remote_hostname' => $lldp['lldpRemSysName'],
       'remote_port'     => $lldp['lldpRemPortId'],
       'remote_platform' => $lldp['lldpRemSysDesc'],
-      'remote_version'  => NULL,
+      'remote_version'  => $lldp['lldpRemSysVersion'], //NULL,
       'remote_address'  => $lldp['lldpRemManAddr']
     ];
     discover_neighbour($port, 'lldp', $neighbour);

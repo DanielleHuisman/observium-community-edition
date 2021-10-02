@@ -25,11 +25,11 @@
 
 if (!$hardware)
 {
-  if     (str_exists($poll_device['sysDescr'], 'x86'))     { $hardware = 'Generic x86'; }
-  elseif (str_exists($poll_device['sysDescr'], 'ia64'))    { $hardware = 'Intel Itanium IA64'; }
-  elseif (str_exists($poll_device['sysDescr'], 'EM64'))    { $hardware = 'Intel x64'; }
-  elseif (str_exists($poll_device['sysDescr'], 'AMD64'))   { $hardware = 'AMD x64'; }
-  elseif (str_exists($poll_device['sysDescr'], 'Intel64')) { $hardware = 'Intel x64'; }
+  if     (str_contains_array($poll_device['sysDescr'], 'x86'))     { $hardware = 'Generic x86'; }
+  elseif (str_contains_array($poll_device['sysDescr'], 'ia64'))    { $hardware = 'Intel Itanium IA64'; }
+  elseif (str_contains_array($poll_device['sysDescr'], 'EM64'))    { $hardware = 'Intel x64'; }
+  elseif (str_contains_array($poll_device['sysDescr'], 'AMD64'))   { $hardware = 'AMD x64'; }
+  elseif (str_contains_array($poll_device['sysDescr'], 'Intel64')) { $hardware = 'Intel x64'; }
 }
 
 $windows = [];
@@ -172,8 +172,8 @@ if (isset($windows['type']))
   $type = $windows['type'];
 }
 
-if     (str_exists($poll_device['sysDescr'], 'Uniprocessor'))   { $features = 'Uniprocessor'; }
-elseif (str_exists($poll_device['sysDescr'], 'Multiprocessor')) { $features = 'Multiprocessor'; }
+if     (str_contains_array($poll_device['sysDescr'], 'Uniprocessor'))   { $features = 'Uniprocessor'; }
+elseif (str_contains_array($poll_device['sysDescr'], 'Multiprocessor')) { $features = 'Multiprocessor'; }
 
 // Detect processor type? : I.E.  x86 Family 15 Model 2 Stepping 7
 

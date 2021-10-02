@@ -16,15 +16,15 @@ $ups_array = array();
 
 $InputTableCount = snmp_get($device, 'upsESystemInputNumPhases.0', '-OQv', $mib);
 echo('upsESystemInputTable ('.$InputTableCount.' entries)');
-$ups_array = snmpwalk_cache_multi_oid($device, 'upsESystemInputTable', $ups_array, $mib);
+$ups_array = snmpwalk_cache_oid($device, 'upsESystemInputTable', $ups_array, $mib);
 
 $OutputTableCount = snmp_get($device, 'upsESystemOutputNumPhase.0', '-OQv', $mib);
 echo('upsESystemOutputTable ('.$OutputTableCount.' entries)');
-$ups_array = snmpwalk_cache_multi_oid($device, 'upsESystemOutputTable', $ups_array, $mib);
+$ups_array = snmpwalk_cache_oid($device, 'upsESystemOutputTable', $ups_array, $mib);
 
 $BypassTableCount = snmp_get($device, 'upsESystemBypassNumPhase.0', '-OQv', $mib);
 echo('upsESystemBypassTable ('.$BypassTableCount.' entries)');
-$ups_array = snmpwalk_cache_multi_oid($device, 'upsESystemBypassTable', $ups_array, $mib);
+$ups_array = snmpwalk_cache_oid($device, 'upsESystemBypassTable', $ups_array, $mib);
 
 $scale = 0.1;
 $nominal = snmp_get($device, 'upsESystemConfigOutputVoltage.0', '-OQv', $mib) * $scale;

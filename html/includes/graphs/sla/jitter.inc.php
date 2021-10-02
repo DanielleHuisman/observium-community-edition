@@ -78,7 +78,7 @@ $rrd_options .= " GPRINT:ploss:MAX:%6.1lf%%\\l ";
 $rrd_options .= " COMMENT:'Loss colour\: ' ";
 
 $loss_values = array(0, 2, 4, 6, 8, 10, 15, 20, 25, 40, 50, 100);
-//for ($p = 0; $p < count($config['graph_colours']['percents']); $p++)
+//for ($p = 0; $p < safe_count($config['graph_colours']['percents']); $p++)
 foreach ($loss_values as $p => $loss_value)
 {
   //$loss_value = $config['sla']['loss_value'][$p];

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -29,93 +29,9 @@ include($config['html_dir']."/includes/alerting-navbar.inc.php");
 
   // print_vars($vars);
 
-  if (isset($vars['submit']) && $vars['submit'] === "add_alert_check")
-  {
-    $message = '<h4>Adding alert checker</h4> ';
-
-    $ok = TRUE;
-    foreach (array('entity_type', 'alert_name', 'alert_severity', 'check_conditions', 'assoc_device_conditions', 'assoc_entity_conditions') as $var)
-    {
-      if (!isset($vars[$var]) || strlen($vars[$var]) == '0') { $ok = FALSE; }
-    }
-
-    if ($ok)
-    {
-      $check_array = array();
-
-      $conditions = array();
-      foreach (explode("\n", trim($vars['check_conditions'])) AS $cond)
-      {
-        $condition = array();
-        list($condition['metric'], $condition['condition'], $condition['value']) = explode(" ", trim($cond), 3);
-        $conditions[] = $condition;
-      }
-      $check_array['conditions'] = json_encode($conditions);
-
-      $check_array['entity_type'] = $vars['entity_type'];
-      $check_array['alert_name'] = $vars['alert_name'];
-      $check_array['alert_message'] = $vars['alert_message'];
-      $check_array['severity'] = $vars['alert_severity'];
-      $check_array['suppress_recovery'] = ($vars['alert_send_recovery'] == '1' || $vars['alert_send_recovery'] == 'on' ? 0 : 1);
-      $check_array['alerter'] = NULL;
-      $check_array['and'] = $vars['alert_and'];
-      $check_array['delay'] = $vars['alert_delay'];
-      $check_array['enable'] = '1';
-
-      $check_id = dbInsert('alert_tests', $check_array);
-      if (is_numeric($check_id))
-      {
-        $message .= '<p>Alert inserted as <a href="'.generate_url(array('page' => 'alert_check', 'alert_test_id' => $check_id)).'">'.$check_id.'</a></p>';
-
-        $assoc_array = array();
-        $assoc_array['alert_test_id'] = $check_id;
-        $assoc_array['entity_type'] = $vars['entity_type'];
-        $assoc_array['enable'] = '1';
-        $dev_conds = array();
-        foreach (explode("\n", trim($vars['assoc_device_conditions'])) AS $cond)
-        {
-          list($condition['attrib'], $condition['condition'], $condition['value']) = explode(" ", trim($cond), 3);
-          $dev_conds[] = $condition;
-        }
-        $assoc_array['device_attribs'] = json_encode($dev_conds);
-        if ($vars['assoc_device_conditions'] == "*") { $vars['assoc_device_conditions'] = json_encode(array()); }
-        $ent_conds = array();
-        foreach (explode("\n", trim($vars['assoc_entity_conditions'])) AS $cond)
-        {
-          list($condition['attrib'], $condition['condition'], $condition['value']) = explode(" ", trim($cond), 3);
-          $ent_conds[] = $condition;
-        }
-        $assoc_array['entity_attribs'] = json_encode($ent_conds);
-        if ($vars['assoc_entity_conditions'] == "*") { $vars['assoc_entity_conditions'] = json_encode(array()); }
-
-        $assoc_id = dbInsert('alert_assoc', $assoc_array);
-        if (is_numeric($assoc_id))
-        {
-          print_success($message . "<p>Association inserted as ".$assoc_id."</p>");
-          set_obs_attrib('alerts_require_rebuild', '1');
-          unset($vars); // Clean vars for use with new associations
-        } else {
-          print_warning($message . "<p>Association creation failed.</p>");
-          dbDelete('alert_tests', "`alert_test_id` = ?", array($check_id)); // Undo alert checker create
-        }
-      } else {
-        print_error($message . "<p>Alert creation failed. Please note that the alert name <b>must</b> be unique.</p>");
-      }
-    } else {
-      print_warning($message . "Missing required data.");
-    }
-
-    if (OBS_DEBUG)
-    {
-      print_message("<h4>TEMPLATE:<h4> <pre>" . escape_html(generate_template('alert', array_merge($check_array, $vars))) . "</pre>", 'console', FALSE);
-    }
-
-  }
-
-if(!isset($vars['entity_type'])) {
+if (!isset($vars['entity_type'])) {
 
    print generate_box_open(array('title' => 'Select Alert Checker Entity Type', 'padding' => true, 'header-border' => true));
-
 
    //echo '<h4>Select Entity Type</h4>';
 
@@ -144,8 +60,72 @@ if(!isset($vars['entity_type'])) {
     });
     </script>';
 
-} else
-{
+   /*
+  // Allow duplication of existing checks
+  echo generate_box_open(array('title' => 'Duplicate Existing Checker', 'padding' => true, 'header-border' => true));
+
+  $alert_checks = cache_alert_rules($vars);
+  $alert_checks = array_sort($alert_checks, 'alert_name');
+
+  echo '<table class="table table-striped table-hover">
+  <thead>
+    <tr>
+    <th class="state-marker"></th>
+    <th style="width: 1px;"></th>
+    <th style="width: 400px">Name</th>
+    <th style="width: 140px"></th>
+    <th></th>
+    </tr>
+  </thead>
+  <tbody>', PHP_EOL;
+
+  foreach ($alert_checks as $check) {
+
+    // Process the alert checker to add classes and colours and count status.
+    humanize_alert_check($check);
+
+    echo('<tr class="' . $check['html_row_class'] . '">');
+
+    echo('
+    <td class="state-marker"></td>
+    <td style="width: 1px;"></td>');
+
+    // Print the conditions applied by this alert
+
+    echo '<td><strong>';
+    echo '<a href="', generate_url(array('page' => 'alert_check', 'alert_test_id' => $check['alert_test_id'])), '">' . escape_html($check['alert_name']) . '</a></strong><br />';
+    echo '<small>', escape_html($check['alert_message']), '</small>';
+    echo '</td>';
+
+    echo '<td><i class="' . $config['entities'][$check['entity_type']]['icon'] . '"></i></td>';
+
+    echo('</td>');
+
+    echo('</tr>');
+
+  }
+  // End loop of associations
+
+  echo '</table>';
+  echo generate_box_close();
+  // End duplication of existing checks
+*/
+
+} else {
+
+    if(isset($vars['duplicate_id']) && $alert_dupe = get_alert_test_by_id($vars['duplicate_id'])){
+      humanize_alert_check($alert_dupe);
+      $conditions = safe_json_decode($alert_dupe['conditions']);
+      $condition_text_block = array();
+      foreach ($conditions as $condition)
+      {
+        $condition_text_block[] = $condition['metric'] .' '. $condition['condition'] .' ' .
+          str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
+      }
+      $vars['alert_conditions'] = implode(PHP_EOL, $condition_text_block);
+      $vars = array_merge($vars, $alert_dupe);
+    }
+    //r($vars);
 
    ?>
 
@@ -153,7 +133,7 @@ if(!isset($vars['entity_type'])) {
           class="form-horizontal">
 
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-5">
 
                <?php
 
@@ -280,7 +260,7 @@ if(!isset($vars['entity_type'])) {
 
             </div> <!-- col -->
 
-            <div class="col-md-8">
+            <div class="col-md-7">
 
                <?php
 
@@ -317,28 +297,56 @@ if(!isset($vars['entity_type'])) {
 
                    echo(PHP_EOL . '          </div>' . PHP_EOL);
 
+                   /// FIXME. Better styling on page...
                    $metrics_list = [];
-                   foreach ($config['entities'][$vars['entity_type']]['metrics'] as $metric => $entry)
-                   {
-                     $metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;('.$entry['label'].')';
+                   foreach ($config['entities'][$vars['entity_type']]['metrics'] as $metric => $entry) {
+                     $metric_list = [
+                       'metric'      => $metric,
+                       'description' => $entry['label'],
+                     ];
+                     $metric_list['values'] = '';
+                     if (is_array($entry['values'])) {
+                       $metric_list['values'] = '<span class="label">'.implode('</span>  <span class="label">', $entry['values']).'</span>';
+                     } elseif ($entry['type'] === 'integer') {
+                       $metric_list['values'] = escape_html('<numeric>');
+                       if (str_contains($metric, 'value')) {
+                         $metric_list['values'] .= '<br />';
+                         // some table fields
+                         foreach ([ 'limit_high', 'limit_high_warn', 'limit_low', 'limit_low_warn' ] as $field) {
+                           if (isset($config['entities'][$vars['entity_type']]['table_fields'][$field])) {
+                             $metric_list['values'] .= '<span class="label">@' . $config['entities'][$vars['entity_type']]['table_fields'][$field].'</span>  ';
+                           }
+                         }
+                       }
+                     } else {
+                       $metric_list['values'] = escape_html('<'.$entry['type'].'>');
+                     }
+                     $metrics_list[] = $metric_list;
+                     //$metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
                    }
+                   //$form_params['metrics'] = implode(',<br/>', $metrics_list);
+                   $metrics_opts = [
+                     'columns' => [
+                       [ 'Metrics', 'style="width: 5%;"' ],
+                       'Description',
+                       'Values'
+                     ],
+                     'metric' => [ 'class' => 'label' ],
+                     'description' => [ 'class' => 'text-nowrap' ],
+                     'values' => [ 'escape' => FALSE ]
+                   ];
 
                    $item = array('id'          => 'alert_conditions',
                                  'name'        => 'Metric Conditions',
                                  'placeholder' => TRUE,
                                  //'width'       => '220px',
-                                 'class'       => 'col-md-7',
+                                 'class'       => 'col-md-10',
                                  'style'       => 'margin-right: 10px',
                                  'rows'        => count($metrics_list) > 3 ? count($metrics_list) : 3,
                                  'value'       => $vars['alert_conditions']);
                    echo generate_form_element($item, 'textarea');
 
-                   $metrics_list = [];
-                   foreach ($config['entities'][$vars['entity_type']]['metrics'] as $metric => $entry)
-                   {
-                     $metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
-                   }
-                   echo('<div class="col-md-5"><b>List of known metrics:</b><br />' . implode(',<br/>', $metrics_list) . '</div>');
+                   echo('<div class="col-md-12"><b>List of known metrics:</b><br />' . build_table($metrics_list, $metrics_opts) . '</div>');
 
                    echo generate_box_close();
 
@@ -359,7 +367,7 @@ if(!isset($vars['entity_type'])) {
 
                    echo '<div id="' . $form_id . '"></div>';
 
-                   generate_querybuilder_form($vars['entity_type'], 'attribs', $form_id);
+                   generate_querybuilder_form($vars['entity_type'], 'attribs', $form_id, $alert_dupe['alert_assoc']);
 
                    // generate_querybuilder_form($vars['entity_type'], 'metrics');
 
@@ -416,8 +424,8 @@ if(!isset($vars['entity_type'])) {
                                 alert_send_recovery: document.getElementById('alert_send_recovery').value,
                                 alert_severity: document.getElementById('alert_severity').value,
                                 alert_and: document.getElementById('alert_and').value,
-                                alert_conditions: document.getElementById('alert_conditions').value
-                               
+                                alert_conditions: document.getElementById('alert_conditions').value,
+                                requesttoken: document.getElementById('requesttoken').value
                             });
       
       var request = $.ajax({
@@ -430,7 +438,7 @@ if(!isset($vars['entity_type'])) {
       
     request.success(  function(json) {
       
-        if(json.status === 'ok') 
+        if (json.status === 'ok') 
         {
             div.html('<div class=\"alert alert-success\">Creation Succeeded. Redirecting!</div>')
             window.setTimeout(window.location.href = json.redirect,5000);

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -32,7 +31,7 @@ if ($args['nototal'] || $nototal)
 }
 
 // Here we scale the length of the description to make sure we keep the numbers
-$data_len = count($data_show) * 8;
+$data_len = safe_count($data_show) * 8;
 if ($width > 600) {
   $descr_len = 40;
 } elseif ($width > 300) {

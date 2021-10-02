@@ -23,11 +23,11 @@ if (is_array($cefs))
     echo("Caching OIDs: ");
     $entity_array = array();
     echo(" entPhysicalDescr");
-    $entity_array = snmpwalk_cache_multi_oid($device, "entPhysicalDescr", $entity_array, "ENTITY-MIB");
+    $entity_array = snmpwalk_cache_oid($device, "entPhysicalDescr", $entity_array, "ENTITY-MIB");
     echo(" entPhysicalName");
-    $entity_array = snmpwalk_cache_multi_oid($device, "entPhysicalName", $entity_array, "ENTITY-MIB");
+    $entity_array = snmpwalk_cache_oid($device, "entPhysicalName", $entity_array, "ENTITY-MIB");
     echo(" entPhysicalModelName");
-    $entity_array = snmpwalk_cache_multi_oid($device, "entPhysicalModelName", $entity_array, "ENTITY-MIB");
+    $entity_array = snmpwalk_cache_oid($device, "entPhysicalModelName", $entity_array, "ENTITY-MIB");
   }
     foreach ($cefs as $entity => $afis)
   {

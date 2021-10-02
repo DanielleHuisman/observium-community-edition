@@ -9,12 +9,14 @@ IMPORTS
     rlInetRoutingDistanceEntry, rlInetStaticRouteEntry      FROM RADLAN-IPv6
     OBJECT-TYPE, Unsigned32                                 FROM SNMPv2-SMI
     TruthValue, DisplayString, RowStatus                    FROM SNMPv2-TC
-    ifIndex                                                 FROM IF-MIB
+    ifIndex, InterfaceIndex                                 FROM IF-MIB
     EltexBgpAsSize, EltexBgpOriginCode, 
     EltexBgpRouteMapAsPathAction                            FROM ELTEX-BGP-MIB
     rlRouteMapPbrEntry                                      FROM MARVELL-ROUTEMAP-MIB
     InetAddress, InetAddressType                            FROM INET-ADDRESS-MIB
-    RlRedistDstProtocol                                     FROM RADLAN-Redistribute;
+    RlRedistDstProtocol                                     FROM RADLAN-Redistribute
+    inetCidrRouteEntry                                      FROM IP-FORWARD-MIB
+    VlanId                                                  FROM Q-BRIDGE-MIB;
 
 eltMesIpSpec MODULE-IDENTITY
        LAST-UPDATED "201402120000Z"
@@ -36,6 +38,14 @@ EltMesRouteMapPermitOrDeny ::= TEXTUAL-CONVENTION
                   deny(2)           -- Unmatched routes are denied
                 }
 
+EltInetCidrRouteInstallStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "If the route is installed in the forwarding routing table, 
+                 then success, otherwise failure."
+    SYNTAX      INTEGER {
+                  success(1),        -- Route set in forwarding table
+                  failure(2)         -- Route not set in forwarding table
+                }
 
 eltMesOspf OBJECT IDENTIFIER ::=  { eltMesIpSpec 1 }
 -- see eltIpRouter.mib
@@ -70,7 +80,11 @@ eltInetRoutingDistanceEntry OBJECT-TYPE
 
 EltInetRoutingDistanceEntry ::= SEQUENCE {
     eltInetRoutingDistanceBgpInternal           INTEGER,
-    eltInetRoutingDistanceBgpExternal           INTEGER
+    eltInetRoutingDistanceBgpExternal           INTEGER,
+    eltInetRoutingDistanceIsisl1Internal        INTEGER,
+    eltInetRoutingDistanceIsisl2Internal        INTEGER,
+    eltInetRoutingDistanceIsisl1External        INTEGER,
+    eltInetRoutingDistanceIsisl2External        INTEGER
 }
 
 eltInetRoutingDistanceBgpInternal OBJECT-TYPE
@@ -88,6 +102,34 @@ eltInetRoutingDistanceBgpExternal OBJECT-TYPE
     DESCRIPTION "The administrative distance used for external BGP routes."
     ::= { eltInetRoutingDistanceEntry 2 }
 
+eltInetRoutingDistanceIsisl1Internal OBJECT-TYPE
+    SYNTAX      INTEGER  (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The administrative distance used for internal ISIS level 1 routes."
+    ::= { eltInetRoutingDistanceEntry 3 }
+
+
+eltInetRoutingDistanceIsisl2Internal OBJECT-TYPE
+    SYNTAX      INTEGER  (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The administrative distance used for internal ISIS level 2 routes."
+    ::= { eltInetRoutingDistanceEntry 4 }
+
+eltInetRoutingDistanceIsisl1External OBJECT-TYPE
+    SYNTAX      INTEGER  (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The administrative distance used for external ISIS level 1 routes."
+    ::= { eltInetRoutingDistanceEntry 5 }
+
+eltInetRoutingDistanceIsisl2External OBJECT-TYPE
+    SYNTAX      INTEGER  (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The administrative distance used for external ISIS level 2 routes."
+    ::= { eltInetRoutingDistanceEntry 6 }
 
 eltInetStaticRouteTable OBJECT-TYPE
     SYNTAX      SEQUENCE OF EltInetStaticRouteEntry
@@ -648,6 +690,70 @@ eltInetSummAddrAdvertise OBJECT-TYPE
                  either."
     DEFVAL { true }
     ::= { eltInetSummAddrEntry 7 }
+
+
+eltInetCidrRouteTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltInetCidrRouteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Table the status of set the route in the forwarding table"
+    ::= { eltMesInetRouting 4 }
+
+eltInetCidrRouteEntry OBJECT-TYPE
+    SYNTAX      EltInetCidrRouteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry the status of set the route in the forwarding table"
+    AUGMENTS { inetCidrRouteEntry }
+    ::= { eltInetCidrRouteTable 1 }
+
+EltInetCidrRouteEntry ::= SEQUENCE {
+    eltInetCidrRouteInstallStatus     EltInetCidrRouteInstallStatus
+}
+
+eltInetCidrRouteInstallStatus OBJECT-TYPE
+    SYNTAX       EltInetCidrRouteInstallStatus
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "If the route is installed in the forwarding routing table, then success, otherwise failure"
+    ::= { eltInetCidrRouteEntry 1 }
+
+eltMesIpMgmt OBJECT IDENTIFIER ::=  { eltMesIpSpec 6 }
+
+eltIpMgmtInterfaceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltIpMgmtInterfaceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The table contains ip management interfaces."
+    ::= { eltMesIpMgmt 1 }
+
+eltIpMgmtInterfaceEntry OBJECT-TYPE
+    SYNTAX      EltIpMgmtInterfaceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The row definition for this table."
+    INDEX { ifIndex }
+    ::= { eltIpMgmtInterfaceTable 1 }
+
+EltIpMgmtInterfaceEntry ::= SEQUENCE {
+    eltIpMgmtInterfaceOuterVlanTag  VlanId,
+    eltIpMgmtInterfaceRowStatus     RowStatus
+}
+
+eltIpMgmtInterfaceOuterVlanTag OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Outer vlan tag for ip management interface."
+    ::= { eltIpMgmtInterfaceEntry 1 }
+
+eltIpMgmtInterfaceRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "This variable displays the status of the entry."
+    ::= { eltIpMgmtInterfaceEntry 2 }
 
 END
 

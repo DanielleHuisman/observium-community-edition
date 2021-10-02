@@ -61,10 +61,11 @@ switch ($vtpversion)
 }
 
 // Check if per port vlans (with contexts) supported by Q-BRIDGE-MIB
-$check_ports_vlans = FALSE;
-if (in_array($device['os'], array('ios', 'iosxe')) && is_device_mib($device, 'Q-BRIDGE-MIB'))
+$check_ports_vlans = isset($config['os'][$device['os']]['snmp']['context']) &&
+                     $config['os'][$device['os']]['snmp']['context'];
+if ($check_ports_vlans && is_device_mib($device, 'Q-BRIDGE-MIB'))
 {
-  // This shit only seems to work on Cisco (probably only IOS/IOS-XE)
+  // This shit only seems to work on Cisco (probably only IOS/IOS-XE and NX-OS)
   // But don't worry, walking do only if vlans previously found
 
   list($ios_version) = explode('(', $device['version']);
@@ -73,22 +74,20 @@ if (in_array($device['os'], array('ios', 'iosxe')) && is_device_mib($device, 'Q-
   {
     // Already configured snmp context
     print_warning("WARNING: Device already configured with SNMP context, polling ports vlans not possible.");
+    $check_ports_vlans = FALSE;
   }
   elseif ($device['snmp_version'] === 'v3' && $device['os'] === "ios" && ($ios_version * 10) <= 121)
   {
     // vlan context not worked on Cisco IOS <= 12.1 (SNMPv3)
     print_error("ERROR: For VLAN context to work on this device please use SNMP v2/v1 for this device (or upgrade IOS).");
-  } else {
-    // In that case - check per port vlans ;)
-    $check_ports_vlans = TRUE;
+    $check_ports_vlans = FALSE;
   }
 }
 
 if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking allowed (see above)
 {
   // Fetch first domain index
-  reset($discovery_vlans);
-  $vtp_domain_index = key($discovery_vlans);
+  $vtp_domain_index = array_key_first($discovery_vlans);
 
   foreach ($discovery_vlans[$vtp_domain_index] as $vlan_id => $entry)
   {
@@ -104,35 +103,37 @@ if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking all
     if (is_numeric($vlan_id) &&
         $vlan_id != 4095 && ($vlan_id < 1002 || $vlan_id > 1005)) // Ignore reserved VLAN IDs
     {
+      $vlan_data = [];
 
-      $device_context = $device;
-      // Add vlan context for snmp auth
+      // Vlan specific context
       if ($device['snmp_version'] === 'v3')
       {
-        $device_context['snmp_context'] = 'vlan-' . $vlan_id;
+        $context = 'vlan-' . $vlan_id;
       } else {
-        $device_context['snmp_context'] = $vlan_id;
+        $context = $vlan_id;
       }
-      $device_context['snmp_retries'] = 1;         // Set retries to 0 for speedup walking
-      $vlan_data = snmpwalk_cache_oid($device_context, "dot1dBasePortIfIndex", array(), "BRIDGE-MIB");
 
-      // Detection shit snmpv3 authorization errors for contexts
-      if ($GLOBALS['exec_status']['exitcode'] != 0)
+      $context_valid = snmp_context_exist($device, $context, 'dot1dBasePortIfIndex', 'BRIDGE-MIB');
+      if ($context_valid)
       {
+        $device_context = $device;
+        // Add vlan context for snmp auth
+        $device_context['snmp_context'] = $context;
+        // Set retries to 1 for speedup walking
+        //$device_context['snmp_retries'] = 1;
+
+        $vlan_data = snmpwalk_cache_oid($device_context, "dot1dBasePortIfIndex", $vlan_data, "BRIDGE-MIB");
+        $vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortEntry",    $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
         unset($device_context);
-        if ($device['snmp_version'] === 'v3')
-        {
-          print_error("ERROR: For VLAN context to work on Cisco devices with SNMPv3, it is necessary to add 'match prefix' in snmp-server config.");
-        } else {
-          print_error("ERROR: Device does not support per-VLAN community.");
-        }
+
+        // At this point vlan context is validated and exist
+        $discovery_vlans[$vtp_domain_index][$vlan_id]['vlan_context'] = 1;
+      }
+      elseif ($context_valid === FALSE)
+      {
+        // Stop loop for other vlans
         break;
       }
-      $vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortEntry", $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
-      unset($device_context);
-
-      // At this point vlan context is validated and exist
-      $discovery_vlans[$vtp_domain_index][$vlan_id]['vlan_context'] = 1;
 
       if ($vlan_data)
       {

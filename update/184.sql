@@ -7,7 +7,7 @@ UPDATE `eventlog` SET `entity_type` = 'processor' WHERE `entity_type` = 'process
 UPDATE `eventlog` SET `entity_type` = 'port' WHERE `entity_type` = 'interface';
 UPDATE `eventlog` SET `severity` = 4 WHERE `message` REGEXP '(above|under) threshold';
 UPDATE `eventlog` SET `entity_type` = 'sensor' WHERE `entity_type` IN ('airflow', 'apower', 'impedance', 'snr', 'load', 'runtime');
-UPDATE `eventlog` SET `severity` = 5 WHERE `message` REGEXP ' [.(.]by (user|cron|console)';
+UPDATE `eventlog` SET `severity` = 5 WHERE `message` REGEXP ' [(]by (user|cron|console)';
 UPDATE `eventlog` SET `severity` = 3 WHERE `message` LIKE 'Device status changed to%';
 UPDATE `eventlog` SET `severity` = 4 WHERE `message` LIKE '%probably the device was replaced%';
 UPDATE `eventlog` SET `severity` = 4 WHERE `message` LIKE 'OS changed%';

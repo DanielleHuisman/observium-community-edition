@@ -1,20 +1,17 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage syslog
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
-$scriptname = basename($argv[0]);
 
 //$options['d'] = array(TRUE, TRUE);
 include_once("includes/sql-config.inc.php");
@@ -90,7 +87,7 @@ while ($line = fgets($s))
   {
     // Never changed
   }
-  else if ($new_config > $cur_config)
+  elseif ($new_config > $cur_config)
   {
     $cur_config = $new_config;
 

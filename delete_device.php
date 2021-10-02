@@ -1,6 +1,5 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
@@ -8,16 +7,14 @@
  *
  * @package    observium
  * @subpackage cli
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
-$scriptname = basename($argv[0]);
 
 $options = getopt("d");
-if (isset($options['d'])) { array_shift($argv); } // for compatability
+if (isset($options['d'])) { array_shift($argv); } // for compatibility
 
 include("includes/sql-config.inc.php");
 
@@ -33,7 +30,7 @@ if ($argv[1])
   } else {
     $id = get_device_id_by_hostname($host);
   }
-  $delete_rrd = (isset($argv[2]) && strtolower($argv[2]) == 'rrd') ? TRUE : FALSE;
+  $delete_rrd = isset($argv[2]) && strtolower($argv[2]) === 'rrd';
 
   // Test if a valid id was fetched from get_device_id_by_hostname()
   if (isset($id) && is_numeric($id))

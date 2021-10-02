@@ -1,14 +1,13 @@
 DNOS-SWITCHING-MIB DEFINITIONS ::= BEGIN
 
--- Dell Networking OS Switching MIB
--- Copyright Dell (2003-2007) All rights reserved.
-
+-- Broadcom FastPath Switching MIB
+-- Copyright 2016-2020 Broadcom.
 -- This SNMP Management Information Specification
--- embodies Dell's confidential and proprietary
--- intellectual property. Dell retains all title
+-- embodies Broadcom's confidential and proprietary
+-- intellectual property. Broadcom retains all title
 -- and ownership in the Specification including any revisions.
 
--- This Specification is supplied "AS IS", Dell
+-- This Specification is supplied "AS IS", Broadcom 
 -- makes no warranty, either expressed or implied,
 -- as to the use, operation, condition, or performance of the
 -- Specification.
@@ -26,17 +25,62 @@ IMPORTS
                                         FROM Q-BRIDGE-MIB
     IANAifType                          FROM IANAifType-MIB
     ifIndex, InterfaceIndex             FROM IF-MIB
-    InetAddressType, InetAddress        FROM INET-ADDRESS-MIB
+    InetAddressType, InetAddress, InetPortNumber
+                                        FROM INET-ADDRESS-MIB
     AgentLogSeverity                    FROM DNOS-LOGGING-MIB;
 
     fastPathSwitching MODULE-IDENTITY
-        LAST-UPDATED "201404090000Z" -- 09 Apr 2014 12:00:00 GMT
-        ORGANIZATION "Dell, Inc."
+        LAST-UPDATED "202005140000Z" -- 14 May 2020 12:00:00 GMT
+        ORGANIZATION "Dell EMC"
         CONTACT-INFO ""
         DESCRIPTION
           "The Dell Networking Private MIB for Switching"
 
         -- Revision history.
+        REVISION
+          "202005140000Z" -- 14 May 2020 12:00:00 GMT
+        DESCRIPTION
+          "Deprecated several items in agentPrivateVlanTable
+          and agentPrivateVlanIntfAssocTable."
+        REVISION
+          "201909200000Z" -- 20 Sep 2019 12:00:00 GMT
+        DESCRIPTION
+          "Added agentPortType20GigBaseX, agentPortType25GigBaseX,
+           agentPortType5GigBaseX and agentPortType2pt5GigBaseX to 
+           agentPortTypeGroup."
+        REVISION
+          "201901160000Z" -- 16 Jan 2019 12:00:00 GMT
+        DESCRIPTION
+          "Added DHCP snooping violation trap in 
+           fastPathSwitchingTraps."
+        REVISION
+          "201812050000Z" -- 05 DEC 2018 12:00:00 GMT
+        DESCRIPTION
+          "Added support for ECDSA key file download"
+        REVISION
+          "201810030000Z" -- 03 OCT 2018 12:00:00 GMT
+        DESCRIPTION
+          "Obsoleted agentArpAclRuleTable, agentArpAclRemarkRuleTable and
+           all other objects within these tables.
+           Added agentArpAclRuleConfigTable, agentArpAclRemarkRuleConfigTable
+           and objects within these tables.
+           Added agentDaiVlanAclDenials object.
+           Added object agentDaiInterfaceValidate."
+        REVISION
+          "201512180000Z" -- 18 Dec 2015 12:00:00 GMT
+        DESCRIPTION
+          "Added object agentKeepalivePortLastLoopDetectedTime to
+           agentKeepalivePortEntry. Made object
+           agentKeepalivePortTimeSinceLastLoop as obsolete."
+        REVISION
+          "201506290000Z" -- 29 Jun 2015 12:00:00 GMT
+        DESCRIPTION
+          "Added below mentioned mibs for Loop protect feature.
+           agentKeepalivePortEntry - includes config and state objects for loop protect
+           feature on an interface.
+           agentSwitchKeepaliveGroup - includes config and state objects for loop protect
+           feature on a switch.
+           Also added loopProtectTrap trap to be sent on detection of loop."
         REVISION
           "201404090000Z" -- 09 Apr 2014 12:00:00 GMT
         DESCRIPTION
@@ -54,6 +98,7 @@ IMPORTS
           "200302061835Z"
         DESCRIPTION
           "Updated for release."
+          
 
     ::= { dnOS 1 }
 
@@ -995,6 +1040,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      This value is an exponentially weighted average and is affected by the
                      configured agentPortLoadStatsInterval."
          ::= { agentPortStatsRateEntry 12 }
+
 
  --**************************************************************************************
  -- agentConfigGroup
@@ -2174,6 +2220,357 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      "Clear LAG stats. Will always return 0 when read."
          ::= { agentLagConfigGroup 5 }
 
+    --**************************************************************************************
+    -- agentNetworkConfigGroup
+    --
+    --**************************************************************************************
+
+    agentNetworkConfigGroup                 OBJECT IDENTIFIER ::= { agentConfigGroup 3 }
+
+    agentNetworkIPAddress OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network ip address"
+         ::= { agentNetworkConfigGroup 1 }
+
+    agentNetworkSubnetMask OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network subnet mask"
+         ::= { agentNetworkConfigGroup 2 }
+
+    agentNetworkDefaultGateway OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network default gateway"
+         ::= { agentNetworkConfigGroup 3 }
+
+    agentNetworkBurnedInMacAddress OBJECT-TYPE
+         SYNTAX      PhysAddress
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network Burned-In MAC address"
+         ::= { agentNetworkConfigGroup 4 }
+
+    agentNetworkLocalAdminMacAddress OBJECT-TYPE
+         SYNTAX      PhysAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network locally administered MAC address"
+          ::= { agentNetworkConfigGroup 5 }
+
+    agentNetworkMacAddressType OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     burned-in(1),
+                     local(2)
+                  }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network Mac Address Type"
+         ::= { agentNetworkConfigGroup 6 }
+
+    agentNetworkConfigProtocol OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(1),
+                     bootp(2),
+                     dhcp(3)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network config protocol"
+         ::= { agentNetworkConfigGroup 7 }
+
+    agentNetworkConfigProtocolDhcpRenew OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     normalOperation(0),
+                     renew(1)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The switch's network config protocol dhcp is renewed. Will always return 0 when read."
+         ::= { agentNetworkConfigGroup 8 }
+
+    agentNetworkWebMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      obsolete
+         DESCRIPTION
+                     "The switch's network config protocol on next bootup
+
+                     This object has been obsoleted by agentHTTPWebMode."
+          ::= { agentNetworkConfigGroup 9 }
+
+    agentNetworkJavaMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      obsolete
+         DESCRIPTION
+                     "Configures the use of the Java interface through the Web.
+
+                     This object has been obsoleted by agentHTTPJavaMode."
+
+         ::= { agentNetworkConfigGroup 10 }
+
+    agentNetworkMgmtVlan OBJECT-TYPE
+         SYNTAX      Integer32 (1..4094)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The VLAN ID through which the switch can be managed using the
+                     agentNetworkIPAddress"
+         ::= { agentNetworkConfigGroup 11 }
+
+
+
+
+    --**************************************************************************************
+    -- ipv6 agentNetworkPortConfigGroup
+    --
+    --**************************************************************************************
+
+      agentNetworkIpv6AdminMode OBJECT-TYPE
+         SYNTAX   INTEGER {
+                    enabled(1),
+                    disabled(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                "The network port IPv6 administrative state"
+          ::= { agentNetworkConfigGroup 12 }
+
+      agentNetworkIpv6Gateway OBJECT-TYPE
+             SYNTAX      Ipv6AddressPrefix
+             MAX-ACCESS  read-write
+             STATUS      current
+             DESCRIPTION
+                     "The network port IPv6 Gateway Address"
+             ::=  { agentNetworkConfigGroup 13 }
+
+      agentNetworkIpv6AddrTable OBJECT-TYPE
+             SYNTAX  SEQUENCE OF AgentNetworkIpv6AddrEntry
+             MAX-ACCESS  not-accessible
+             STATUS      current
+             DESCRIPTION
+                  "The list of IPv6 address prefixes
+                   for the network port."
+             ::=  { agentNetworkConfigGroup 14 }
+
+ agentNetworkIpv6AddrEntry OBJECT-TYPE
+             SYNTAX  AgentNetworkIpv6AddrEntry
+             MAX-ACCESS  not-accessible
+             STATUS      current
+             DESCRIPTION
+                 "An interface entry containing objects of
+                 a particular IPv6 address prefix"
+             INDEX   {
+                       agentNetworkIpv6AddrPrefix
+                       }
+             ::= { agentNetworkIpv6AddrTable 1 }
+      AgentNetworkIpv6AddrEntry ::= SEQUENCE {
+        agentNetworkIpv6AddrPrefix
+          Ipv6AddressPrefix,
+        agentNetworkIpv6AddrPrefixLength
+          INTEGER,
+        agentNetworkIpv6AddrEuiFlag
+          INTEGER,
+        agentNetworkIpv6AddrStatus
+        RowStatus
+    }
+
+      agentNetworkIpv6AddrPrefix OBJECT-TYPE
+             SYNTAX      Ipv6AddressPrefix
+             MAX-ACCESS  not-accessible --read-write
+             STATUS      current
+             DESCRIPTION
+                  "The service port IPv6 Address Prefix"
+             ::=  { agentNetworkIpv6AddrEntry 1 }
+
+     agentNetworkIpv6AddrPrefixLength OBJECT-TYPE
+             SYNTAX      INTEGER (0..128)
+             MAX-ACCESS  read-create
+             STATUS      current
+             DESCRIPTION
+                  "The service port IPv6 Address Prefix Length"
+             ::=  { agentNetworkIpv6AddrEntry 2 }
+
+     agentNetworkIpv6AddrEuiFlag OBJECT-TYPE
+             SYNTAX      INTEGER {
+                                  enabled(1),
+                                  disabled(2)
+                                 }
+             MAX-ACCESS  read-create
+             STATUS      current
+             DESCRIPTION
+                  "The service port IPv6 Eui Flag"
+             ::=  { agentNetworkIpv6AddrEntry 3 }
+
+      agentNetworkIpv6AddrStatus OBJECT-TYPE
+             SYNTAX      RowStatus
+             MAX-ACCESS  read-create
+             STATUS      current
+             DESCRIPTION
+                          ""
+              ::= { agentNetworkIpv6AddrEntry 4}
+
+      agentNetworkIpv6AddressAutoConfig OBJECT-TYPE
+           SYNTAX     INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The ipv6 address autoconfig allows the device to perform IPv6
+                     stateless address auto-configuration to discover prefixes on the
+                     link and then to add the eui-64 based addresses to the network interface."
+         DEFVAL { disable }
+         ::= { agentNetworkConfigGroup 15 }
+
+      agentNetworkIpv6ConfigProtocol OBJECT-TYPE
+           SYNTAX      INTEGER {
+                       none(1),
+                       dhcp(2)
+                    }
+           MAX-ACCESS  read-write
+           STATUS      current
+           DESCRIPTION
+                       "The switch's network IPv6 config protocol"
+           ::= { agentNetworkConfigGroup 16 }
+
+    agentNetworkDhcp6ClientDuid OBJECT-TYPE
+      SYNTAX      DisplayString (SIZE(1..255))
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+       " The DHCPv6 Client unique DUID. This value cannot be modified"
+    ::= { agentNetworkConfigGroup 17 }
+
+    --**************************************************************************************
+    -- ipv6 agentNetworkStatsGroup
+    --
+    --**************************************************************************************
+
+    agentNetworkStatsGroup                 OBJECT IDENTIFIER ::= { agentNetworkConfigGroup 18 }
+
+    agentNetworkDhcp6ADVERTISEMessagesReceived OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type ADVERTISE that have been received by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 1 }
+
+    agentNetworkDhcp6REPLYMessagesReceived OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type REPLY that have been received by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 2 }
+
+    agentNetworkDhcp6ADVERTISEMessagesDiscarded OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type ADVERTISE that have been discarded by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 3 }
+
+    agentNetworkDhcp6REPLYMessagesDiscarded OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type REPLY that have been discarded by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 4 }
+
+    agentNetworkDhcp6MalformedMessagesReceived OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages received malformed by the DHCPv6 client on the network port."
+    ::= { agentNetworkStatsGroup 5 }
+    agentNetworkDhcp6SOLICITMessagesSent OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type SOLICIT that have been sent by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 6 }
+
+    agentNetworkDhcp6REQUESTMessagesSent OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type REQUEST that have been sent by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 7 }
+
+    agentNetworkDhcp6RENEWMessagesSent OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type RENEW that have been sent by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 8 }
+
+    agentNetworkDhcp6REBINDMessagesSent OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type REBIND that have been sent by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 9 }
+
+    agentNetworkDhcp6RELEASEMessagesSent OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The no. of DHCPv6 messages of type RELEASE that have been sent by the DHCPv6
+       client on the network port."
+    ::= { agentNetworkStatsGroup 10 }
+
+    agentNetworkDhcp6StatsReset OBJECT-TYPE
+       SYNTAX  INTEGER {
+           none(0),
+           reset(1)
+       }
+      MAX-ACCESS   read-write
+      STATUS       current
+      DESCRIPTION
+           "Clear the DHCPv6 Client statistics on the network port. A value of reset(1)
+            is used to reset the statistics. A read on this object will
+            always return the value none(0). The value none(0) cannot
+            be forcibly set by the administrator."
+      ::= { agentNetworkStatsGroup 11 }
 
     --**************************************************************************************
     -- agentServicePortConfigGroup
@@ -2667,7 +3064,7 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
     agentSwitchAddressAgingTimeout OBJECT-TYPE
          SYNTAX   Integer32 (0|10..1000000)
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "The FDB entry's address aging timeout (in seconds).value '0' to disable Aging Timeout feature."
          DEFVAL { 300 }
@@ -3223,6 +3620,54 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      trap(2)     - Generate trap on storm control."
 
          ::= { agentSwitchStormControlGroup 14 }
+
+    agentSwitchBroadcastStormControlAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(0),
+                     shutdown(1),
+                     trap(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the action to be taken when broadcast storm control rate limit is reached.
+                     none(0) - No action is taken.
+                     shutdown(1) - Diag disable the interface on storm control.
+                     trap(2)     - Generate trap on storm control."
+         DEFVAL { none }
+         ::= { agentSwitchStormControlGroup 15 }
+
+    agentSwitchMulticastStormControlAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(0),
+                     shutdown(1),
+                     trap(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the action to be taken when multicast storm control rate limit is reached.
+                     none(0) - No action is taken.
+                     shutdown(1) - Diag disable the interface on storm control.
+                     trap(2)     - Generate trap on storm control."
+         DEFVAL { none }
+         ::= { agentSwitchStormControlGroup 16 }
+
+    agentSwitchUnicastStormControlAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(0),
+                     shutdown(1),
+                     trap(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the action to be taken when unicast storm control rate limit is reached.
+                     none(0) - No action is taken.
+                     shutdown(1) - Diag disable the interface on storm control.
+                     trap(2)     - Generate trap on storm control."
+         DEFVAL { none }
+         ::= { agentSwitchStormControlGroup 17 }
 
     --**************************************************************************************
     -- agentSwitchSnoopingGroup
@@ -4682,7 +5127,11 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      sslpem-server(8),
                      sslpem-dhweak(9),
                      sslpem-dhstrong(10),
-                     ias-users(11)
+                     ias-users(11),
+                     ca-root-certificate(12),
+                     client-ssl-certificate(13),
+                     client-key-certificate(14),
+                     sshkey-ecdsa(15)
                      }
          MAX-ACCESS  read-write
          STATUS      current
@@ -4705,6 +5154,10 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
                      Note: SSH Key files can only be downloaded if SSH Server is administratively
                      disabled, and there are no active SSH sessions.
                      Kernel file can be downloaded only on raptor platform and linux operating system.
+                     ca-root-certificate    - SSL CA Trusted root certificate
+                     client-ssl-certificate - SSL Client PEM certificate file
+                     client-key-certificate - SSL Client Key File
+                     sshkey-ecdsa           - SSH-2 ECDSA Key File
                      "
          ::= { agentTransferDownloadGroup 5 }
 
@@ -4817,6 +5270,16 @@ agentInfoGroup                             OBJECT IDENTIFIER ::= { fastPathSwitc
          "Transfer download remote filename configures the file name for the file being
           transferred from remote system. It can be up to 31 alphanumeric characters."
          ::= { agentTransferDownloadGroup 13}
+
+    agentTransferDownloadCertificateNum    OBJECT-TYPE
+         SYNTAX INTEGER(0..8)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+         "To assign the certificate number index for downloading SSL certificates"
+         ::= { agentTransferDownloadGroup 14 }
+
+
 
     --**************************************************************************************
     -- agentImageConfigGroup
@@ -5336,8 +5799,15 @@ agentPortMirrorTypeTable OBJECT-TYPE
           agentPortDDisableAutorecoveryTime
               INTEGER,
           agentPortDDisableComponents
-              DisplayString
-          ,
+              DisplayString,
+          agentPortDDisableReason
+              INTEGER,
+          agentPortBroadcastControlAction
+              INTEGER,
+          agentPortMulticastControlAction
+              INTEGER,
+          agentPortUnicastControlAction
+              INTEGER,
           agentPortLoadStatsInterval
               Integer32
           }
@@ -5473,7 +5943,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
     agentPortDefaultType OBJECT-TYPE
          SYNTAX  OBJECT IDENTIFIER
          MAX-ACCESS  read-write
-         STATUS  obsolete
+         STATUS  current
          DESCRIPTION
                  "This object identifies the default administrative port type,
                   to be used in conjunction with the operational port type
@@ -5501,7 +5971,17 @@ agentPortMirrorTypeTable OBJECT-TYPE
                        dot3MauType100BaseTXHD
                        dot3MauType100BaseTXFD
                        dot3MauType100BaseFXFD
-                       dot3MauType10GBaseSX"
+                       dot3MauType1000BaseSXFD
+                       dot3MauType1000BaseTFD
+                       dot3MauType1000BaseXFD
+                       agentPortType2pt5GigBaseX
+                       agentPortType5GigBaseX
+                       dot3MauType10GigBaseX
+                       agentPortType20GigBaseX
+                       agentPortType25GigBaseX
+                       dot3MauType40GbaseCR4
+                       dot3MauType100GbaseCR10"
+
          REFERENCE "RFC 2668"
          ::= { agentPortConfigEntry 11 }
 
@@ -5537,7 +6017,16 @@ agentPortMirrorTypeTable OBJECT-TYPE
                        dot3MauType100BaseTXFD
                        dot3MauType100BaseFXFD
                        dot3MauType1000BaseSXFD
-                       dot3MauType10GBaseSX"
+                       dot3MauType1000BaseTFD
+                       dot3MauType1000BaseXFD
+                       agentPortType2pt5GigBaseX
+                       agentPortType5GigBaseX
+                       dot3MauType10GigBaseX
+                       agentPortType20GigBaseX
+                       agentPortType25GigBaseX
+                       dot3MauType40GbaseCR4
+                       dot3MauType100GbaseCR10"
+
          REFERENCE "RFC 2668"
          ::= { agentPortConfigEntry 12 }
 
@@ -5909,8 +6398,10 @@ agentPortMirrorTypeTable OBJECT-TYPE
                          speed-10mbit(4),
                          speed-100mbit(5),
                          speed-1gbit(6),
-                         speed-10gbit(7),
-                         na(8)
+                         speed-2p5gbit(7),
+                         speed-5gbit(8),
+                         speed-10gbit(9),
+                         na(10)
                       }
          MAX-ACCESS      read-write
          STATUS          current
@@ -5920,7 +6411,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                       enabled.If auto-duplex(0) is set but speed-auto(3) is not set, then the
                       admin advertisements will be limited to the speed values enabled.
                       Likewise, if speed-auto(3) is set, but auto-duplex(0) is not, then the
-                      advertisements will be limited to the duplex enabled.The na(8) will be
+                      advertisements will be limited to the duplex enabled.The na(10) will be
                       returned if neither a speed or duplex setting is set."
          ::= { agentPortConfigEntry 44 }
 
@@ -5934,7 +6425,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
          ::= { agentPortConfigEntry 46 }
 
     agentPortDDisableAutorecoveryTime OBJECT-TYPE
-         SYNTAX      INTEGER (0..3600)
+         SYNTAX      INTEGER (30..3600)
          MAX-ACCESS  read-only
          STATUS      current
          DESCRIPTION
@@ -5959,6 +6450,78 @@ agentPortMirrorTypeTable OBJECT-TYPE
                       range is 30 to 600 seconds."
          DEFVAL { 300 }
          ::= { agentPortConfigEntry 49 }
+
+     agentPortDDisableReason OBJECT-TYPE
+         SYNTAX      INTEGER {
+                          udld (1),
+                     bpduguard (3),
+                     bpdustorm (4)
+                          , dhcpsnooping (5)
+                          , arpinspection (6)
+                          , broadcaststorm (7)
+                          , multicaststorm (8)
+                          , unicaststorm (9)
+                          , sfp-mismatch (10)
+                          , sfpplus-mismatch (11)
+                          , pml (13)
+                          , dos (14)
+                          , spanningtree (15)
+
+                  }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The reason for which the port is set to D-Disable. Here reason is
+                      the enum assigned to the particular component."
+         ::= { agentPortConfigEntry 50 }
+
+    agentPortBroadcastControlAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(0),
+                     shutdown(1),
+                     trap(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the action to be taken when broadcast storm control rate limit is reached.
+                     none(0) - No action is taken.
+                     shutdown(1) - Diag disable the interface on storm control.
+                     trap(2)     - Generate trap on storm control."
+         DEFVAL { none }
+         ::= { agentPortConfigEntry 51 }
+
+    agentPortMulticastControlAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(0),
+                     shutdown(1),
+                     trap(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the action to be taken when multicast storm control rate limit is reached.
+                     none(0) - No action is taken.
+                     shutdown(1) - Diag disable the interface on storm control.
+                     trap(2)     - Generate trap on storm control."
+         DEFVAL { none }
+         ::= { agentPortConfigEntry 52 }
+
+    agentPortUnicastControlAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(0),
+                     shutdown(1),
+                     trap(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the action to be taken when unicast storm control rate limit is reached.
+                     none(0) - No action is taken.
+                     shutdown(1) - Diag disable the interface on storm control.
+                     trap(2)     - Generate trap on storm control."
+         DEFVAL { none }
+         ::= { agentPortConfigEntry 53 }
 
     --**************************************************************************************
     --    agentProtocolConfigGroup
@@ -6651,7 +7214,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
          ::= { agentStpCstPortEntry 6 }
 
     agentStpCstPortPathCost OBJECT-TYPE
-         SYNTAX      Unsigned32 (1..200000000)
+         SYNTAX      Unsigned32 (0..200000000)
          MAX-ACCESS  read-write
          STATUS      current
          DESCRIPTION
@@ -7638,7 +8201,7 @@ agentPortMirrorTypeTable OBJECT-TYPE
                      disable(2)
                   }
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
                      "Configures the use of the Java interface through Web connections."
          ::= { agentHTTPConfigGroup 2 }
@@ -7766,6 +8329,55 @@ agentPortMirrorTypeTable OBJECT-TYPE
                      "This field contains all the ports which include the VLAN for Trunk mode."
          ::= { agentVlanSwitchportTrunkModeEntry 2 }
 
+
+    --**************************************************************************************
+    -- agentDDisableAutorecoveryConfigGroup
+    --
+    --**************************************************************************************
+
+    agentDDisableAutorecoveryConfigGroup       OBJECT IDENTIFIER ::= { agentConfigGroup 24 }
+
+    agentDDisableAutorecoveryStatus OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Enable/Disable the D-Disable Autorecovery feature for all causes."
+          ::= { agentDDisableAutorecoveryConfigGroup 1 }
+
+    agentDDisableAutorecoveryTimeout OBJECT-TYPE
+         SYNTAX      INTEGER (30..3600)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Timeout to autorecovery from D-Disable port state."
+         ::= { agentDDisableAutorecoveryConfigGroup 2 }
+
+    agentDDisableAutorecoveryCause OBJECT-TYPE
+         SYNTAX      BITS {
+                     dhcpRateLimit(1)
+                     ,arpInspection(2)
+                     ,udld(3)
+                     ,bStormControl(4)
+                     ,bpduGuard(5)
+                     ,bpduRateLimit(6)
+                     ,mStormControl(8)
+                     ,uStormControl(9)
+                     ,loopProtect(10)
+                     ,pml(12)
+                     ,dos(13)
+                     ,linkFlap(14)
+                     ,authmgr(15)
+                     ,coa(16)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Enable/Disable the D-Disable Autorecovery feature for a particular cause."
+          ::= { agentDDisableAutorecoveryConfigGroup 3 }
 
 
 
@@ -8517,6 +9129,155 @@ agentPortMirrorTypeTable OBJECT-TYPE
                      "When set to enable(1), all dynamic authorization statistics will be reset."
          DEFVAL { disable }
          ::= { agentDynamicAuthorizationGroup 9 }
+
+    agentDynamicAuthorizationIgnoreBouncePortCommand OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    enable(1),
+                    disable(2)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "Specifies whether the CoA bounce port request will be ignored or not."
+        ::= { agentDynamicAuthorizationGroup 10 }
+
+    agentDynamicAuthorizationIgnoreDisablePortCommand OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    enable(1),
+                    disable(2)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "Specifies whether the CoA disable port request will be ignored or not."
+        ::= { agentDynamicAuthorizationGroup 11 }
+
+    --**************************************************************************************
+    -- agentKeepalivePortTable
+    --
+    --**************************************************************************************
+
+    agentKeepalivePortTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentKeepalivePortEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Keepalive port table."
+         ::= { agentConfigGroup  31 }
+
+    agentKeepalivePortEntry OBJECT-TYPE
+         SYNTAX      AgentKeepalivePortEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Keep alive port table."
+         INDEX       { ifIndex }
+         ::= { agentKeepalivePortTable 1 }
+
+    AgentKeepalivePortEntry ::=
+         SEQUENCE {
+         agentKeepalivePortState
+                 INTEGER,
+         agentKeepalivePortLoopDetected
+                 INTEGER,
+         agentKeepalivePortLoopCount
+                 Counter32,
+         agentKeepalivePortTimeSinceLastLoop
+                 INTEGER,
+         agentKeepalivePortRxAction
+                 INTEGER,
+         agentKeepalivePortStatus
+                 INTEGER,
+         agentKeepalivePortLastLoopDetectedTime
+                 DateAndTime
+         }
+    agentKeepalivePortState OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The keepalive state for the port.
+
+                     enable(1)  - enables keepalive on the port.
+                     disable(2) - disables keepalive on the port.
+
+                     The default port keepalive state is enabled."
+         ::= { agentKeepalivePortEntry 1 }
+
+    agentKeepalivePortLoopDetected OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     yes (1),
+                     no (2)
+                     }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Keepalive status for the port.
+
+                     yes (1)  - loop detected on the port.
+                     no  (2)  - no loop detected on the port."
+         ::= { agentKeepalivePortEntry 2 }
+
+    agentKeepalivePortLoopCount OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The loop count on a specific port."
+         ::= { agentKeepalivePortEntry 3 }
+
+    agentKeepalivePortTimeSinceLastLoop OBJECT-TYPE
+         SYNTAX      INTEGER
+         MAX-ACCESS  read-only
+         STATUS      obsolete
+         DESCRIPTION
+                     "Time since last loop detected on the port."
+         ::= { agentKeepalivePortEntry 4 }
+
+
+    agentKeepalivePortRxAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     log-msg      (1),
+                     log-shutdown (2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Action on detecting a loop on the port.
+
+                     log-msg      (1) - log a message.
+                     log-shutdown (2) - log message and shutdown the port."
+         ::= { agentKeepalivePortEntry 5 }
+
+    agentKeepalivePortStatus OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable       (1),
+                     disable      (2),
+                     diag-disable (3)
+                     }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Port status.
+
+                     enable       (1) - port is enabled.
+                     disable      (2) - port is disabled.
+                     diag-disable (3) - port is diagnostic disabled."
+         ::= { agentKeepalivePortEntry 6 }
+
+    agentKeepalivePortLastLoopDetectedTime OBJECT-TYPE
+         SYNTAX      DateAndTime
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "TimeStamp when last loop was detected on a port."
+                      DEFVAL      { '00000000'H }
+         ::= { agentKeepalivePortEntry 7 }
+
+
 		 
 --**************************************************************************************
 --    agentSystemGroup
@@ -8662,6 +9423,19 @@ agentSystemGroup                             OBJECT IDENTIFIER ::= { fastPathSwi
                      "Erase the text-based configuration file stored in
                       non-volatile memory.On read returns 0."
           ::= { agentSystemGroup 12 }
+
+    agentReloadConfig OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Reloads the text-based configuration file named startup-config
+                      stored in non-volatile memory.On read returns 0."
+          ::= { agentSystemGroup 14 }
+
 
 --**************************************************************************************
 --    agentCableTesterGroup
@@ -8955,7 +9729,8 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
         agentDaiVlanAclPermits          Counter32,
         agentDaiVlanSrcMacFailures      Counter32,
         agentDaiVlanDstMacFailures      Counter32,
-        agentDaiVlanIpValidFailures     Counter32
+        agentDaiVlanIpValidFailures     Counter32,
+        agentDaiVlanAclDenials          Counter32
     }
 
     agentDaiVlanStatsIndex OBJECT-TYPE
@@ -9017,7 +9792,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
         STATUS       current
         DESCRIPTION
             "Number of ARP packets that were permitted by DAI as
-             there is a matching ARP ACL rule found for this Vlan."
+             there is a matching ARP ACL permit rule found for this Vlan."
         ::= { agentDaiVlanStatsEntry 7 }
 
     agentDaiVlanSrcMacFailures OBJECT-TYPE
@@ -9052,6 +9827,14 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
              class E addresses (240.0.0.0/4), loopback addresses (127.0.0.0/8)."
         ::= { agentDaiVlanStatsEntry 10 }
 
+    agentDaiVlanAclDenials OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+            "Number of ARP packets that were dropped by DAI as
+             there is a matching ARP ACL deny rule found for this Vlan."
+        ::= { agentDaiVlanStatsEntry 11 }
 --************ The Dynamic ARP Inspection Interface Config Table ********
 
     agentDaiIfConfigTable OBJECT-TYPE
@@ -9124,6 +9907,20 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
         DEFVAL      { 1 }
         ::= { agentDaiIfConfigEntry 3 }
 
+   agentDaiInterfaceValidate OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current 
+        DESCRIPTION 
+            "This object indicates whether Dynamic ARP Inspection checks for source interface
+             match in the DHCP snooping binding database.
+
+             If this object is set to 'true', validation
+             is enabled.
+
+             If this object is set to 'false', validation
+             is disabled."
+        ::= { agentDaiConfigGroup 8 }
 
 --**************************************************************************************
 
@@ -9172,8 +9969,11 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
          MAX-ACCESS  read-create
          STATUS      current
          DESCRIPTION
-                     "The status of this conceptual row. Entries can not be deleted until all rows in
-                     arpAclRuleTable with corresponding values of arpAclIndex have been deleted.
+                     "The status of this conceptual row.
+
+                      Entries can not be deleted until all rows in
+                      agentArpAclRuleConfigTable with corresponding values of
+                      agentArpAclName have been deleted.
 
                      active(1)       - this ACL instance is active
                      createAndGo(4)  - set to this value to create an instance
@@ -9186,15 +9986,20 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentArpAclRuleTable OBJECT-TYPE
          SYNTAX      SEQUENCE OF AgentArpAclRuleEntry
          MAX-ACCESS  not-accessible
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
-                     "A table of the ARP ACL Rule entries"
+                     "A table of the ARP ACL Rule entries.
+
+                      The functionality that was offered by this table is now
+                      available through the agentArpAclRuleConfigTable, although
+                      with different table indices. All SNMP client implementations
+                      operating on this table MUST migrate to use the new table."
          ::= { agentArpAclGroup 2 }
 
     agentArpAclRuleEntry OBJECT-TYPE
          SYNTAX      AgentArpAclRuleEntry
          MAX-ACCESS  not-accessible
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
                      "Represents entry for a set of ARP ACL-match rules"
          INDEX       { agentArpAclName, agentArpAclRuleMatchSenderIpAddr, agentArpAclRuleMatchSenderMacAddr }
@@ -9212,7 +10017,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentArpAclRuleMatchSenderIpAddr OBJECT-TYPE
          SYNTAX      IpAddress
          MAX-ACCESS  read-create
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
                      "Sender IP address match value for the ARP ACL."
          ::= { agentArpAclRuleEntry 1 }
@@ -9220,7 +10025,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentArpAclRuleMatchSenderMacAddr OBJECT-TYPE
          SYNTAX      MacAddress
          MAX-ACCESS  read-create
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
                      "Sender MAC address match value for the ARP ACL."
          ::= { agentArpAclRuleEntry 2 }
@@ -9228,7 +10033,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentArpAclRuleRowStatus OBJECT-TYPE
          SYNTAX      RowStatus
          MAX-ACCESS  read-create
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
                      "The status of this conceptual row.
 
@@ -9236,6 +10041,304 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
                      createAndGo(4) - set to this value to create an instance
                      destroy(6)     - set to this value to delete an instance"
          ::= { agentArpAclRuleEntry 3 }
+
+    agentArpAclRuleConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentArpAclRuleConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table of ARP ACL Rule entries"
+         ::= { agentArpAclGroup 5 }
+
+    agentArpAclRuleConfigEntry OBJECT-TYPE
+         SYNTAX      AgentArpAclRuleConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a set of ARP ACL match criteria"
+         INDEX       { agentArpAclName, agentArpAclRuleConfigIndex }
+         ::= { agentArpAclRuleConfigTable 1 }
+
+    AgentArpAclRuleConfigEntry ::= SEQUENCE {
+         agentArpAclRuleConfigIndex
+              Unsigned32,
+         agentArpAclRuleConfigSenderIpAddr
+              IpAddress,
+         agentArpAclRuleConfigSenderMacAddr
+              MacAddress,
+         agentArpAclRuleConfigAction
+              INTEGER,
+         agentArpAclRuleConfigStatus
+              RowStatus
+         }
+
+    agentArpAclRuleConfigIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 ( 0 | 1..2147483647 )
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Sequence number of the rule within the ARP ACL.
+
+                      A value of 0 is special in that it is used to automatically
+                      assign the next higher available rule sequence number,
+                      after the last one in the given ARP ACL. In other words,
+                      a row is created at the end of the current table with a
+                      suitable value for the agentArpAclRuleConfigIndex object
+                      if a value of 0 was used during rule creation. The value
+                      of 0 can only be used while creating a new row in the
+                      table, and cannot be used in SET or GET operations. A
+                      value of 0 in a GET-NEXT operation will retrieve the
+                      sequence number of the first rule.
+
+                      The value of this object is not persistent across reboots.
+                      Upon a reboot of the management agent, the rules are
+                      assigned new sequence numbers while maintaining
+                      the rule order within the table."
+         ::= { agentArpAclRuleConfigEntry 1 }
+
+    agentArpAclRuleConfigSenderIpAddr OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Sender IP address match value for the ARP ACL.
+                      A value of 0.0.0.0 indicates 'any-ipv4 address' matching."
+         DEFVAL      { '00000000'h }
+         ::= { agentArpAclRuleConfigEntry 2 }
+
+    agentArpAclRuleConfigSenderMacAddr OBJECT-TYPE
+         SYNTAX      MacAddress
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Sender MAC address match value for the ARP ACL.
+                      A value of 00:00:00:00:00:00 indicates 'any-mac' matching."
+         DEFVAL      { '000000000000'h }
+         ::= { agentArpAclRuleConfigEntry 3 }
+
+    agentArpAclRuleConfigAction OBJECT-TYPE
+         SYNTAX      INTEGER {
+                         permit(1),
+                         deny(2)
+                     }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Action to be taken when this rule is hit:
+
+                      permit(1)   - ARP packet matching this rule is forwarded
+                      deny(2)     - ARP packet matching this rule is dropped"
+         DEFVAL      { permit }
+         ::= { agentArpAclRuleConfigEntry 4 }
+
+    agentArpAclRuleConfigStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "The status of this conceptual row.
+
+                      active(1)      - this ACL Rule is active
+                      createAndGo(4) - set to this value to create an instance
+                      destroy(6)     - set to this value to delete an instance"
+         ::= { agentArpAclRuleConfigEntry 5 }
+
+
+--*********************** ARP ACL Remarks Config Table ***********************
+
+    agentArpAclRemarkConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentArpAclRemarkConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     "A table for configuration of ARP ACL remarks entries.
+                      Created remarks will be associated with ARP ACL rule when
+                      the rule is created."
+         ::= { agentArpAclGroup 3 }
+
+    agentArpAclRemarkConfigEntry OBJECT-TYPE
+         SYNTAX      AgentArpAclRemarkConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     "The row in ARP ACL remarks configuration table."
+         INDEX       { agentArpAclName, agentArpAclRemarkIndex }
+         ::= { agentArpAclRemarkConfigTable 1 }
+         
+    AgentArpAclRemarkConfigEntry ::= SEQUENCE {         
+           agentArpAclRemarkIndex
+               Unsigned32,
+           agentArpAclRemarkStr
+               DisplayString,
+           agentArpAclRemarkStatus
+               RowStatus
+           }
+
+    agentArpAclRemarkIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..10)
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Index of remark(not associated with a rule) instance within ARP ACL."
+         ::= { agentArpAclRemarkConfigEntry 1 }
+
+    agentArpAclRemarkStr OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..100))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "ARP ACL remark(comment) string configuration.
+                      Each remark line is limited to 100 characters.
+                      Remark may consist of characters in the range A-Z, a-z, 0-9
+                      and special characters like space, hyphen, underscore."
+         ::= { agentArpAclRemarkConfigEntry 2 }
+
+    agentArpAclRemarkStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Status of this instance.
+
+                     active(1)      - this remark is configured.
+                     createAndGo(4) - set to this value to create the remark entry.
+                                      agentArpAclRemarkStr should be specified.
+                     destroy(6)     - set to this value to delete the remark entry."
+         ::= { agentArpAclRemarkConfigEntry 3 }
+
+--*********************** ARP ACL Rule Remarks Table ***********************
+
+    agentArpAclRemarkRuleTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentArpAclRemarkRuleEntry
+         MAX-ACCESS  not-accessible
+         STATUS      obsolete
+         DESCRIPTION 
+                     "This table displays remarks which are associated with ARP ACL rules.
+                      Each rule can be uniquely identified with ARP ACL name, IP and MAC addresses.
+                      Each remark within each rule can be uniquely identified with remark index.
+                      Remarks associated with the rule can't be edited in any way.
+                      They can be deleted only.
+
+                      The functionality that was offered by this table is now
+                      available through the agentArpAclRemarkRuleConfigTable,
+                      although with different table indices. All SNMP client
+                      implementations operating on this table MUST migrate to
+                      use the new table."
+         ::= { agentArpAclGroup 4 }
+
+    agentArpAclRemarkRuleEntry OBJECT-TYPE
+         SYNTAX      AgentArpAclRemarkRuleEntry
+         MAX-ACCESS  not-accessible
+         STATUS      obsolete
+         DESCRIPTION 
+                     "Row of the ARP ACL rule remarks table."
+         INDEX       { agentArpAclName, agentArpAclRuleMatchSenderIpAddr, agentArpAclRuleMatchSenderMacAddr, agentArpAclRuleRemarkIndex}
+         ::= { agentArpAclRemarkRuleTable 1 }
+         
+    AgentArpAclRemarkRuleEntry ::= SEQUENCE {         
+           agentArpAclRuleRemarkIndex
+               Unsigned32,
+           agentArpAclRuleRemarkStr
+               DisplayString,
+           agentArpAclRuleRemarkStatus
+               RowStatus
+           }
+		   
+    agentArpAclRuleRemarkIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..10)
+         MAX-ACCESS  read-only
+         STATUS      obsolete
+         DESCRIPTION
+                     "The index of the remark instance within ARP ACL rule."
+         ::= { agentArpAclRemarkRuleEntry 1 }
+		 
+    agentArpAclRuleRemarkStr OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..100))
+         MAX-ACCESS  read-only
+         STATUS      obsolete
+         DESCRIPTION
+                     "Displays the remark string for the specified ARP ACL rule." 
+         ::= { agentArpAclRemarkRuleEntry 2 }
+
+    agentArpAclRuleRemarkStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      obsolete
+         DESCRIPTION
+                     "Status of this instance.
+
+                     active(1)      - this remark is configured.
+                     destroy(6)     - set to this value to delete the remark entry."
+         ::= { agentArpAclRemarkRuleEntry 3 }
+
+    agentArpAclRemarkRuleConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentArpAclRemarkRuleConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "This table displays remarks which are associated with
+                      ARP ACL rules.
+
+                      Each ARP ACL rule is uniquely identified with ARP ACL name
+                      and ARP ACL rule sequence number. Each remark within each
+                      rule can be uniquely identified with remark index.
+
+                      Entries in this table are autonomously created by the
+                      system when a ARP ACL rule is created after creating one
+                      or more remark entries in the agentArpAclRemarkConfigTable.
+                      As entries are instantiated in this table, corresponding
+                      entries are autonomously removed from the
+                      agentArpAclRemarkConfigTable.
+
+                      Entries in this table cannot be edited in any way. They
+                      can only be deleted."
+         ::= { agentArpAclGroup 6 }
+
+    agentArpAclRemarkRuleConfigEntry OBJECT-TYPE
+         SYNTAX      AgentArpAclRemarkRuleConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Row in the ARP ACL rule remarks table."
+         INDEX       { agentArpAclName, agentArpAclRuleConfigIndex,
+                       agentArpAclRemarkRuleConfigIndex }
+         ::= { agentArpAclRemarkRuleConfigTable 1 }
+
+    AgentArpAclRemarkRuleConfigEntry ::= SEQUENCE {
+         agentArpAclRemarkRuleConfigIndex
+              Unsigned32,
+         agentArpAclRemarkRuleConfigStr
+              DisplayString,
+         agentArpAclRemarkRuleConfigStatus
+              RowStatus
+         }
+
+    agentArpAclRemarkRuleConfigIndex OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The index of this remark instance within a ARP ACL rule."
+         ::= { agentArpAclRemarkRuleConfigEntry 1 }
+
+    agentArpAclRemarkRuleConfigStr OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..100))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Displays the remark string for the specified ARP ACL rule."
+         ::= { agentArpAclRemarkRuleConfigEntry 2 }
+
+    agentArpAclRemarkRuleConfigStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "Status of this instance.
+
+                      active(1)      - this remark is configured.
+                      destroy(6)     - delete the remark entry."
+         ::= { agentArpAclRemarkRuleConfigEntry 3 }
 
 
 --**************************************************************************************
@@ -10089,6 +11192,50 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
                     utilization threshold."
         ::= { fastPathSwitchingTraps 28 }
 
+     loginSessionStartStopTrap NOTIFICATION-TYPE
+         OBJECTS {
+                     agentLoginSessionIndex,
+                     agentLoginSessionUserName,
+                     agentLoginSessionConnectionType,
+                     agentLoginSessionInetAddress,
+                     agentLoginSessionStatus
+                 }
+         STATUS             current
+         DESCRIPTION
+             "Trap is sent when a CLI session starts or ends."
+         ::= { fastPathSwitchingTraps 29 }
+
+     agentSwitchDDisableAutoRecoveryTrap  NOTIFICATION-TYPE
+         OBJECTS {
+                    ifIndex,
+                    agentPortDDisableReason
+                 }
+         STATUS             current
+         DESCRIPTION
+                      "Trap is sent when interface (ifIndex) is auto recovered
+                       from agentPortDDisableReason reason."
+         ::= { fastPathSwitchingTraps 30 }
+
+     loopProtectTrap NOTIFICATION-TYPE
+         OBJECTS {
+                     ifIndex
+                 }
+         STATUS             current
+         DESCRIPTION
+             "Trap is sent on detection of loop on an interface."
+             ::= { fastPathSwitchingTraps 32 }
+
+     agentdhcpSnoopViolationTrap NOTIFICATION-TYPE
+         OBJECTS {
+                     agentDynamicDsBindingIfIndex,
+                     agentDynamicDsBindingVlanId,
+                     agentDynamicDsBindingMacAddr
+                 }
+         STATUS             current
+         DESCRIPTION
+             "Trap is sent when DHCP snoop violation occurs on an interface."
+             ::= { fastPathSwitchingTraps 33 }
+
 
 --*****************************************************************************************
 --    sdmTemplate
@@ -10307,10 +11454,35 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
      agentPortTypeGroup          OBJECT IDENTIFIER ::= { agentSwitchConfigGroup 30 }
 
      agentPortType40GigBaseX OBJECT-IDENTITY
+           STATUS      obsolete
+           DESCRIPTION "Obsoleted by dot3MauType40GbaseCR4"
+           REFERENCE   ""
+           ::= { agentPortTypeGroup 1 }
+
+     agentPortType20GigBaseX OBJECT-IDENTITY
            STATUS      current
            DESCRIPTION "X PCS/PMA, unknown PMD. MAU MIB augmentation"
            REFERENCE   ""
-           ::= { agentPortTypeGroup 1 }
+           ::= { agentPortTypeGroup 2 }
+
+     agentPortType25GigBaseX OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION "X PCS/PMA, unknown PMD. MAU MIB augmentation"
+           REFERENCE   ""
+           ::= { agentPortTypeGroup 3 }
+
+     agentPortType2pt5GigBaseX OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION "X PCS/PMA, unknown PMD. MAU MIB augmentation"
+           REFERENCE   ""
+           ::= { agentPortTypeGroup 4 }
+
+     agentPortType5GigBaseX OBJECT-IDENTITY
+           STATUS      current
+           DESCRIPTION "X PCS/PMA, unknown PMD. MAU MIB augmentation"
+           REFERENCE   ""
+           ::= { agentPortTypeGroup 5 }
+
 
 --*****************************************************************************************
 --    Private Vlan
@@ -10321,7 +11493,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanTable OBJECT-TYPE
          SYNTAX      SEQUENCE OF AgentPrivateVlanEntry
          MAX-ACCESS  not-accessible
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      ""
          ::= { agentPrivateVlanGroup 1 }
@@ -10329,7 +11501,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanEntry OBJECT-TYPE
          SYNTAX      AgentPrivateVlanEntry
          MAX-ACCESS  not-accessible
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      ""
          INDEX       { dot1qVlanIndex }
@@ -10350,7 +11522,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
                      unconfigured(4)
                      }
         MAX-ACCESS   read-write
-        STATUS       current
+        STATUS       deprecated
         DESCRIPTION
                      "Enables vlan for Private Vlan and configures private vlan type."
         ::= { agentPrivateVlanEntry 1 }
@@ -10358,7 +11530,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanAssociate OBJECT-TYPE
          SYNTAX      VlanList
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "This field lists all the VlanIDs which are associated with the selected vlan.
                      If the selected vlan type is not primary(1), a zero-length bitmask is returned."
@@ -10369,7 +11541,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanIntfAssocTable OBJECT-TYPE
          SYNTAX      SEQUENCE OF AgentPrivateVlanIntfAssocEntry
          MAX-ACCESS  not-accessible
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      ""
          ::= { agentPrivateVlanGroup 2 }
@@ -10377,7 +11549,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanIntfAssocEntry OBJECT-TYPE
          SYNTAX      AgentPrivateVlanIntfAssocEntry
          MAX-ACCESS  not-accessible
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      ""
          INDEX       { ifIndex }
@@ -10393,13 +11565,25 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
          agentPrivateVlanIntfAssocPromiscuousSecondary
               VlanList,
          agentPrivateVlanIntfAssocOperational
-              VlanList
+              VlanList,
+         agentPrivateVlanIntfAssocPromiscuousTrunkNativeVlan
+              Integer32,
+         agentPrivateVlanIntfAssocPromiscuousTrunkAllowedVlan
+              VlanList,
+         agentPrivateVlanIntfAssocPromiscuousTrunkPrimary
+              Integer32,
+         agentPrivateVlanIntfAssocPromiscuousTrunkSecondary
+              VlanList,
+         agentPrivateVlanIntfAssocIsolatedTrunkPrimary
+              Integer32,
+         agentPrivateVlanIntfAssocIsolatedTrunkSecondary
+              Integer32
          }
 
     agentPrivateVlanIntfAssocHostPrimary OBJECT-TYPE
-         SYNTAX      Integer32 (1..4094)
+         SYNTAX      Integer32 (1..4093)
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "Configures the primary host vlan association with the interface.
                      This must be configured along with agentPrivateVlanIntfAssocHostSecondary before
@@ -10410,9 +11594,9 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
          ::= { agentPrivateVlanIntfAssocEntry 1 }
 
     agentPrivateVlanIntfAssocHostSecondary OBJECT-TYPE
-         SYNTAX      Integer32 (1..4094)
+         SYNTAX      Integer32 (1..4093)
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "Configures the secondary host vlan association with the interface.
                      This must be configured along with agentPrivateVlanIntfAssocHostPrimary before
@@ -10423,9 +11607,9 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
          ::= { agentPrivateVlanIntfAssocEntry 2 }
 
     agentPrivateVlanIntfAssocPromiscuousPrimary OBJECT-TYPE
-         SYNTAX      Integer32 (1..4094)
+         SYNTAX      Integer32 (1..4093)
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "Configures the primary promiscuous vlan association with the interface.
                      This must be configured along with agentPrivateVlanIntfAssocPromiscuousSecondary before
@@ -10435,7 +11619,7 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanIntfAssocPromiscuousSecondary OBJECT-TYPE
          SYNTAX      VlanList
          MAX-ACCESS  read-write
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "Configures the secondary promiscuous vlan association with the interface.
                      This must be configured along with agentPrivateVlanIntfAssocPromiscuousPrimary before
@@ -10445,11 +11629,89 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
     agentPrivateVlanIntfAssocOperational OBJECT-TYPE
          SYNTAX      VlanList
          MAX-ACCESS  read-only
-         STATUS      current
+         STATUS      deprecated
          DESCRIPTION
                      "Shows the operational private vlans associated with the interface."
          ::= { agentPrivateVlanIntfAssocEntry 5 }
 
+    agentPrivateVlanIntfAssocPromiscuousTrunkNativeVlan OBJECT-TYPE
+         SYNTAX      Integer32 (1..4093)
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the native VLAN on promiscuous or isolated trunk port.
+                     Untagged packets received on this trunk port are assigned this VLAN id.
+                     If native VLAN is not configured, untagged packets are dropped."
+         ::= { agentPrivateVlanIntfAssocEntry 6 }
+
+    agentPrivateVlanIntfAssocPromiscuousTrunkAllowedVlan OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the list of allowed normal VLANs and primary VLANs on promiscuous trunk port 
+                     and  allowed VLANs and secondary VLANs on isolated trunk port."
+         ::= { agentPrivateVlanIntfAssocEntry 7 }
+
+    agentPrivateVlanIntfAssocPromiscuousTrunkPrimary OBJECT-TYPE
+         SYNTAX      Integer32 (1..4093)
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the primary VLAN with which the packets are tagged.
+                     This must be configured along with agentPrivateVlanIntfAssocPromiscuousTrunkSecondary
+                     before the association is operational."
+         ::= { agentPrivateVlanIntfAssocEntry 8 }
+
+    agentPrivateVlanIntfAssocPromiscuousTrunkSecondary OBJECT-TYPE
+         SYNTAX      VlanList
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the list of secondary VLANs associated with the primary VLAN
+                     configured with agentPrivateVlanIntfAssocPromiscuousTrunkPrimary
+                     before the association is operational."
+         ::= { agentPrivateVlanIntfAssocEntry 9 }
+
+    agentPrivateVlanIntfAssocIsolatedTrunkPrimary OBJECT-TYPE
+         SYNTAX      Integer32 (1..4093)
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the primary VLAN with which the packets are tagged.
+                     This must be configured along with agentPrivateVlanIntfAssocIsolatedTrunkSecondary
+                     before the association is operational."
+         ::= { agentPrivateVlanIntfAssocEntry 10 }
+
+    agentPrivateVlanIntfAssocIsolatedTrunkSecondary OBJECT-TYPE
+         SYNTAX      Integer32 (1..4093)
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the secondary isolated VLAN associated with the primary VLAN
+                     configured with agentPrivateVlanIntfAssocIsolatedTrunkPrimary
+                     before the association is operational."
+         ::= { agentPrivateVlanIntfAssocEntry 11 }
+
+    agentPrivateVlanIntfAssocIsolatedTrunkPrimary OBJECT-TYPE
+         SYNTAX      Integer32 (1..4093)
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the primary VLAN with which the packets are tagged.
+                     This must be configured along with agentPrivateVlanIntfAssocIsolatedTrunkSecondary
+                     before the association is operational."
+         ::= { agentPrivateVlanIntfAssocEntry 10 }
+
+    agentPrivateVlanIntfAssocIsolatedTrunkSecondary OBJECT-TYPE
+         SYNTAX      Integer32 (1..4093)
+         MAX-ACCESS  read-write
+         STATUS      deprecated
+         DESCRIPTION
+                     "Configures the secondary isolated VLAN associated with the primary VLAN
+                     configured with agentPrivateVlanIntfAssocIsolatedTrunkPrimary
+                     before the association is operational."
+         ::= { agentPrivateVlanIntfAssocEntry 11 }
 
 
 --**************************************************************************************
@@ -10683,6 +11945,115 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
         "This object indicates the number of DHCP client messages received without Option-82 field
          on the trusted interface."
     ::= { agentDhcpL2RelayStatsEntry  4 }
+
+    --**************************************************************************************
+    -- agentDhcpL2RelaySubscriptionConfigGroup
+    --
+    --**************************************************************************************
+
+    agentDhcpL2RelaySubscriptionConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDhcpL2RelaySubscriptionConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table of the DHCP L2 Relay Interface subscription configuration entries."
+         ::= { agentDhcpL2RelayConfigGroup 8 }
+
+    agentDhcpL2RelaySubscriptionConfigEntry OBJECT-TYPE
+         SYNTAX      AgentDhcpL2RelaySubscriptionConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents entry for a DHCP L2 Relay subscription configuration on an interface."
+         INDEX       {
+                       agentDhcpL2RelaySubscriptionIntfIndex,
+                       agentDhcpL2RelaySubscriptionName
+                     }
+         ::= { agentDhcpL2RelaySubscriptionConfigTable 1 }
+
+   AgentDhcpL2RelaySubscriptionConfigEntry ::= SEQUENCE {
+          agentDhcpL2RelaySubscriptionIntfIndex        Unsigned32,
+          agentDhcpL2RelaySubscriptionName             DisplayString,
+          agentDhcpL2RelaySubscriptionEnable           INTEGER,
+          agentDhcpL2RelayCircuitIdSubscriptionEnable  INTEGER,
+          agentDhcpL2RelayRemoteIdSubscriptionEnable   DisplayString,
+          agentDhcpL2RelaySubscriptionRowStatus        RowStatus
+          }
+
+   agentDhcpL2RelaySubscriptionIntfIndex OBJECT-TYPE
+         SYNTAX      Unsigned32 (1..65535)
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The port number to be selected. Each port maps to an interface."
+         ::= { agentDhcpL2RelaySubscriptionConfigEntry 1 }
+
+   agentDhcpL2RelaySubscriptionName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..31))
+         MAX-ACCESS  not-accessible
+
+         STATUS      current
+         DESCRIPTION
+                     "The subscription name on an interface to be selected."
+         ::= { agentDhcpL2RelaySubscriptionConfigEntry 2 }
+
+    agentDhcpL2RelaySubscriptionEnable OBJECT-TYPE
+         SYNTAX      INTEGER {
+                               disable(0),
+                               enable(1)
+                             }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "This object indicates whether DHCP L2 Relay is
+             enabled on this Subscription for a given interface.
+
+             If this object is set to 'enable', DHCP L2 Relay
+             is enabled.
+
+             If this object is set to 'disable', DHCP L2 Relay
+             is disabled."
+        DEFVAL      { disable }
+        ::= { agentDhcpL2RelaySubscriptionConfigEntry 3 }
+
+    agentDhcpL2RelayCircuitIdSubscriptionEnable OBJECT-TYPE
+         SYNTAX      INTEGER {
+                               disable(0),
+                               enable(1)
+                             }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "This object indicates whether DHCP CircuitId is
+             enabled for L2 relaying on this Subscription for a
+             given interface.
+
+             If this object is set to 'enable', DHCP CircuitId
+             is enabled.
+
+             If this object is set to 'disable', DHCP CircuitId
+             is disabled."
+        DEFVAL      { disable }
+        ::= { agentDhcpL2RelaySubscriptionConfigEntry 4 }
+
+    agentDhcpL2RelayRemoteIdSubscriptionEnable OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..128))
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "When this object is set with a non-empty string,
+             DHCP RemoteId is enabled for L2 relaying on this
+             Subscription for a given interface."
+        ::= { agentDhcpL2RelaySubscriptionConfigEntry 5 }
+
+    agentDhcpL2RelaySubscriptionRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                      "The row status variable is used according to installation
+          and removal conventions for conceptual rows."
+         ::= { agentDhcpL2RelaySubscriptionConfigEntry 6 }
   --**************************************************************************************
     --    agentPvrstpSwitchConfigGroup
     --**************************************************************************************
@@ -11478,5 +12849,326 @@ agentCableTesterGroup               OBJECT IDENTIFIER ::= { fastPathSwitching 4 
              to save the DHCPv6 snooping bindings."
         ::= { agentDhcpv6SnoopingConfigGroup 14 }
 
+
+    --**************************************************************************************
+    -- agentSwitchKeepaliveGroup
+    --
+    --**************************************************************************************
+
+    agentSwitchKeepaliveGroup                       OBJECT IDENTIFIER ::= { agentSwitchConfigGroup 43 }
+
+
+    agentSwitchKeepaliveState OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable  (1),
+                     disable (2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The keepalive state for the switch.
+
+                     enable  (1) - enables keepalive on the switch.
+                     disable (2) - disables keepalive on the switch.
+
+                     The default switch keepalive state is disabled."
+         ::= { agentSwitchKeepaliveGroup 1 }
+
+    agentSwitchKeepaliveTransmitInterval OBJECT-TYPE
+         SYNTAX      Integer32 (1..10)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "The keepalive state for the port.
+
+                     enable  (1) - enables loop protect on the switch.
+                     disable (2) - disables loop protect on the switch."
+         ::= { agentSwitchKeepaliveGroup 2 }
+
+
+
+		--**************************************************************************************
+		-- agentSwitchportConfigTable
+		--
+		--**************************************************************************************
+
+		agentSwitchportConfigTable OBJECT-TYPE
+				SYNTAX      SEQUENCE OF AgentSwitchportConfigEntry
+				MAX-ACCESS  not-accessible
+				STATUS      current
+				DESCRIPTION
+										""
+				::= { agentSwitchConfigGroup 37 }
+
+		agentSwitchportConfigEntry OBJECT-TYPE
+				SYNTAX      AgentSwitchportConfigEntry
+				MAX-ACCESS  not-accessible
+				STATUS      current
+				DESCRIPTION
+										""
+				INDEX       { agentSwitchportIntfIndex }
+				::= { agentSwitchportConfigTable 1 }
+
+		AgentSwitchportConfigEntry ::= SEQUENCE {
+						agentSwitchportIntfIndex
+						Integer32,
+						agentSwitchportMode
+						INTEGER,
+						agentSwitchportAccessVlanID
+						VlanIndex,
+						agentSwitchportTrunkNativeVlanID
+						VlanIndex,
+						agentSwitchportTrunkNativeVlanTagging
+						INTEGER,
+						agentSwitchportTrunkAllowedVlanList
+						VlanList,
+						agentSwitchportGeneralUntaggedVlanList
+						VlanList,
+						agentSwitchportGeneralTaggedVlanList
+						VlanList,
+						agentSwitchportGeneralForbiddenVlanList
+						VlanList,
+						agentSwitchportGeneralDynamicallyAddedVlanList
+						VlanList,
+						agentSwitchportOperMode
+						INTEGER
+		}		
+
+			agentSwitchportIntfIndex OBJECT-TYPE
+					SYNTAX      Integer32 (1..65535)
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											"The port or LAG number to be selected. Each port/LAG maps to an interface."
+					::= { agentSwitchportConfigEntry 1 }
+
+			agentSwitchportMode OBJECT-TYPE
+					SYNTAX      INTEGER {
+											access(1),
+											trunk(2),
+											general(3)
+										}
+					MAX-ACCESS  read-write
+					STATUS      current
+					DESCRIPTION
+											"Configure the VLAN membership mode of a port."
+					::= { agentSwitchportConfigEntry 2 }
+
+			agentSwitchportAccessVlanID OBJECT-TYPE
+					SYNTAX      VlanIndex
+					MAX-ACCESS  read-write
+					STATUS      current
+					DESCRIPTION
+											"Configures the Access VLAN Id for the interface."
+			::= { agentSwitchportConfigEntry 3 }
+
+			agentSwitchportTrunkNativeVlanID OBJECT-TYPE
+					SYNTAX      VlanIndex
+					MAX-ACCESS  read-write
+					STATUS      current
+					DESCRIPTION
+											"Configures the Native VLAN Id for the interface."
+			::= { agentSwitchportConfigEntry 4 }
+
+			agentSwitchportTrunkNativeVlanTagging OBJECT-TYPE
+					SYNTAX      INTEGER {
+											enable(1),
+											disable(2)
+											}
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											"Describes the Native VLAN tagging for the interface.
+											'disable' mean that packets marked with Native VLAN are transmitted untagged from Trunk port. "
+			::= { agentSwitchportConfigEntry 5 }
+
+
+			agentSwitchportTrunkAllowedVlanList OBJECT-TYPE
+					SYNTAX      VlanList
+					MAX-ACCESS  read-write
+					STATUS      current
+					DESCRIPTION
+											"Configures the allowed VLAN list of Trunk switch interface."
+			::= { agentSwitchportConfigEntry 6 }
+
+			agentSwitchportGeneralUntaggedVlanList OBJECT-TYPE
+					SYNTAX      VlanList
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											"Shows the allowed untagged VLAN list of general switch interface."
+			::= { agentSwitchportConfigEntry 7 }
+
+			agentSwitchportGeneralTaggedVlanList OBJECT-TYPE
+					SYNTAX      VlanList
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											" Shows the allowed tagged VLAN list of general switch interface."
+			::= { agentSwitchportConfigEntry 8 }
+
+			agentSwitchportGeneralForbiddenVlanList OBJECT-TYPE
+					SYNTAX      VlanList
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											"Shows the Forbidden VLAN list of general switch interface."
+			::= { agentSwitchportConfigEntry 9 }
+
+			agentSwitchportGeneralDynamicallyAddedVlanList OBJECT-TYPE
+					SYNTAX      VlanList
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											"Shows the list of dynamically added VLANs for general switch interface."
+		::= { agentSwitchportConfigEntry 10 }
+
+			agentSwitchportOperMode OBJECT-TYPE
+					SYNTAX      INTEGER {
+											access(1),
+											trunk(2),
+											general(3)
+										}
+					MAX-ACCESS  read-only
+					STATUS      current
+					DESCRIPTION
+											"Fetch the operational switchport mode of a port." 
+					::= { agentSwitchportConfigEntry 11 }
+
+--**********************************************************************--
+    agentSwitchVlanStatsGroup         OBJECT IDENTIFIER ::= { agentSwitchConfigGroup 47 }
+
+        agentSwitchVlanStatsTable OBJECT-TYPE
+            SYNTAX       SEQUENCE OF AgentSwitchVlanStatsEntry
+            MAX-ACCESS   not-accessible
+            STATUS       current
+            DESCRIPTION  "VLAN Statistics Table"
+            ::= { agentSwitchVlanStatsGroup 1 }
+
+        agentSwitchVlanStatsEntry OBJECT-TYPE
+            SYNTAX       AgentSwitchVlanStatsEntry
+            MAX-ACCESS   not-accessible
+            STATUS       current
+            DESCRIPTION  "Represents entry for VLAN Statistics Table"
+            INDEX       { agentSwitchVlanStatsVlanId }
+            ::={ agentSwitchVlanStatsTable 1}
+
+        AgentSwitchVlanStatsEntry ::=
+             SEQUENCE {
+             agentSwitchVlanStatsVlanId
+                     INTEGER,
+             agentSwitchVlanStatsStatus
+                     RowStatus,
+             agentSwitchVlanStatsReceiveBytes
+                     Counter64,
+             agentSwitchVlanStatsReceivePackets
+                     Counter64,
+             agentSwitchVlanStatsReceiveDiscardBytes
+                     Counter64,
+             agentSwitchVlanStatsReceiveDiscardPackets
+                     Counter64,
+             agentSwitchVlanStatsTransmitBytes
+                     Counter64,
+             agentSwitchVlanStatsTransmitPackets
+                     Counter64,
+             agentSwitchVlanStatsTransmitDiscardBytes
+                     Counter64,
+             agentSwitchVlanStatsTransmitDiscardPackets
+                     Counter64,
+             agentSwitchVlanStatsClear
+                     INTEGER
+             }
+
+        agentSwitchVlanStatsVlanId OBJECT-TYPE
+            SYNTAX       INTEGER (1..4094)
+            MAX-ACCESS   not-accessible
+            STATUS       current
+            DESCRIPTION  "Requested VLAN ID"
+            ::={agentSwitchVlanStatsEntry 1 }
+
+        agentSwitchVlanStatsStatus OBJECT-TYPE
+            SYNTAX      RowStatus
+            MAX-ACCESS  read-create
+            STATUS      current
+            DESCRIPTION "Status of the statistics collection on the VLAN.
+                         Supported values:
+                           active(1)      - valid entry
+                           createAndGo(4) - used to create a new entry
+                           destroy(6)     - removes the entry"
+            ::= { agentSwitchVlanStatsEntry 2 }
+
+        agentSwitchVlanStatsReceiveBytes OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "bytes"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of bytes received for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 3 }
+
+        agentSwitchVlanStatsReceivePackets OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "frames"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of packets received for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 4 }
+
+        agentSwitchVlanStatsReceiveDiscardBytes OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "bytes"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of bytes received but discarded for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 5 }
+
+        agentSwitchVlanStatsReceiveDiscardPackets OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "frames"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of packets received but discarded for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 6 }
+
+        agentSwitchVlanStatsTransmitBytes OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "bytes"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of bytes transmitted for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 7 }
+
+        agentSwitchVlanStatsTransmitPackets OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "frames"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of packets transmitted for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 8 }
+
+        agentSwitchVlanStatsTransmitDiscardBytes OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "bytes"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of bytes discarded at egress for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 9 }
+
+        agentSwitchVlanStatsTransmitDiscardPackets OBJECT-TYPE
+            SYNTAX       Counter64
+            UNITS        "frames"
+            MAX-ACCESS   read-only
+            STATUS       current
+            DESCRIPTION  "Number of packets discarded at egress for a VLAN."
+            ::={ agentSwitchVlanStatsEntry 10 }
+
+        agentSwitchVlanStatsClear OBJECT-TYPE
+            SYNTAX       INTEGER {
+                            enable(1),
+                            disable(2)
+                         }
+            MAX-ACCESS   read-create
+            STATUS       current
+            DESCRIPTION  "When set to enable(1), all statistics for the VLAN will be cleared."
+            ::={ agentSwitchVlanStatsEntry 11 }
 
 END

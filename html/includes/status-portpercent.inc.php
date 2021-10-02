@@ -2,16 +2,22 @@
 
 $graph_data = array();
 
-$classes = array('primary', 'success', 'danger', 'warning', 'info');
-$colours = array('0a5f7f', '4d9221', 'd9534f', 'F0AD4E', '4BB1CF');
+$classes = array('primary', 'success', 'danger', 'warning', 'info', 'suppressed');
+$colours = array('0a5f7f', '4d9221', 'd9534f', 'F0AD4E', '4BB1CF', '740074');
 
 $i=0;
 
-if(isset($config['frontpage']['portpercent']['options'])) { $options = $config['frontpage']['portpercent']['options']; unset($config['frontpage']['portpercent']['options']); }
+if(isset($mod['vars']) && is_array($mod['vars']) && count($mod['vars']))
+{
+    $options = $mod['vars'];
+} else {
+    if(isset($config['frontpage']['portpercent']['options'])) { $options = $config['frontpage']['portpercent']['options']; unset($config['frontpage']['portpercent']['options']); }
+    $options['groups'] = $config['frontpage']['portpercent'];
+}
 
 //add up totals in/out for each type, put it in an array.
 $totals_array  = array();
-foreach ($config['frontpage']['portpercent'] as $type => $data) {
+foreach ($options['groups'] as $type => $data) {
 
         $totalInOctets = 0;
         $totalOutOctets = 0;
@@ -63,7 +69,13 @@ $legend = '<table class="table table-condensed-more">';
 
 $i=0;
 
+$table_min_height = 84; // Height of the three in/out/total bars
+$table_row_height = 26; // Height of single row
+$table_padding    = 8;  // Total vertical padding
 
+$table_height = ($table_row_height * count($totals_array)) + $table_padding;
+
+if($table_height < $table_min_height) { $table_height = $table_min_height; }
 
 foreach ($totals_array as $type => $dir)
 {
@@ -73,8 +85,7 @@ foreach ($totals_array as $type => $dir)
 
   if(!isset($colours[$i])) { $i = 0; }
 
-
-   $color = $config['graph_colours']['mixed'][$i];
+  $color = $config['graph_colours']['mixed'][$i];
   $class = $classes[$i];
 
   $bars_in  .= '  <div class="progress-bar progress-bar-'.$class.'" style="width: '.$percentIn.'%"><span class="sr-only">'.round($percentIn).'%'.'</span></div>';
@@ -129,14 +140,10 @@ echo generate_box_open($box_args);
 
         echo '<tr><td colspan=3>';
 
-        // Calculate height of the table
-        $table_height = (count($config['frontpage']['portpercent']) * 27);
-        if($table_height < 81) { $table_height = 81; }
-
         // Calculate height available for graph
         if(isset($width))
         {
-          $graph_array['height'] = $height - (82 + 9 + $table_height);
+          $graph_array['height'] = $height - (82 + 0 + $table_height);
         } else {
           $graph_array['height'] = 100;
         }

@@ -1,0 +1,615 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsissdfs.mib,v 1.9 2012/09/07 09:52:05 siva Exp $
+
+SUPERMICRO-DIFFSERV-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+    Unsigned32, MODULE-IDENTITY, OBJECT-TYPE,
+    enterprises, Integer32 FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, RowStatus, MacAddress FROM SNMPv2-TC
+    InetAddressPrefixLength FROM INET-ADDRESS-MIB;
+
+fsDiffServMib MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "Super Micro Computer Inc."
+    CONTACT-INFO "support@Supermicro.com"
+    DESCRIPTION
+         "This MIB defines the objects necessary to manage 
+         a device that uses the Differentiated Services"
+
+    REVISION "201209050000Z"
+    DESCRIPTION
+         "This MIB defines the objects necessary to manage 
+         a device that uses the Differentiated Services"
+
+    ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 83 }
+
+fsDiffServMIBObjects     OBJECT IDENTIFIER ::= { fsDiffServMib 1 }
+
+IfDirection ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+       "IfDirection specifies a direction of data travel on an
+       interface. 'inbound' traffic is operated on during reception from
+       the interface, while 'outbound' traffic is operated on prior to
+       transmission on the interface."
+    SYNTAX  INTEGER {
+                outbound(1),     -- egress interface
+                inbound(2)       -- ingress interface
+}
+
+
+PortList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Each octet within this value specifies a set of eight
+        ports, with the first octet specifying ports 1 through
+        8, the second octet specifying ports 9 through 16, etc.
+        Within each octet, the most significant bit represents
+        the lowest numbered port, and the least significant bit
+        represents the highest numbered port.  Thus, each port
+        of the bridge is represented by a single bit within the
+        value of this object.  If that bit has a value of '1'
+        then that port is included in the set of ports; the port
+        is not included if its bit has a value of '0'."
+    SYNTAX      OCTET STRING
+
+
+DscpOrAny ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS   current
+    DESCRIPTION
+       "The IP header Differentiated Services Code-Point that may be
+       used for discriminating among traffic streams. The value -1 is
+       used to indicate a wild card i.e. any value."
+    REFERENCE
+        "RFC 2474, RFC 2780"
+    SYNTAX   Unsigned32 (0..63)
+
+--
+-- Scalar Object For Enabling and Sutting down the module.
+--
+
+fsDiffServSystem       OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 1 }
+
+
+fsDsSystemControl OBJECT-TYPE
+    SYNTAX      INTEGER { start(1), shutdown(2)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+               "Starts or shutdowns DiffServ Module in the system.
+
+                When set as 'start',resources required by DiffServ module are
+                allocated & DiffServ module starts running.
+
+                When shutdown, all the pools used by DiffServ module will be 
+                released to the system."
+    ::= { fsDiffServSystem  1 }
+
+fsDsStatus OBJECT-TYPE
+    SYNTAX      INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+               "Enables or Disables DiffServ Module in the system.
+
+                When set as 'enabled', DiffServ module programs the hardware
+                and starts Protocol Operation.
+
+                When set as 'disabled', it stops protocol operation by 
+                deleting the hardware configuration."
+    ::= { fsDiffServSystem  2 }
+
+--
+-- MultiField Classifier
+--
+
+fsDiffServMFClassifier  OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 2 }
+
+--
+-- MultiField Classifier Table
+--
+
+fsDiffServMultiFieldClfrTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsDiffServMultiFieldClfrEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table contains the Multifield Classifier details."
+    ::= { fsDiffServMFClassifier 1 }
+
+fsDiffServMultiFieldClfrEntry OBJECT-TYPE
+    SYNTAX       FsDiffServMultiFieldClfrEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "An IP Multi-field Classifier entry describes a single MF Classifier."
+    INDEX { fsDiffServMultiFieldClfrId }
+    ::= { fsDiffServMultiFieldClfrTable 1 }
+
+FsDiffServMultiFieldClfrEntry ::= SEQUENCE {
+    fsDiffServMultiFieldClfrId           Integer32,
+    fsDiffServMultiFieldClfrFilterId     Unsigned32,
+    fsDiffServMultiFieldClfrFilterType   INTEGER,
+    fsDiffServMultiFieldClfrStatus       RowStatus
+}
+
+fsDiffServMultiFieldClfrId OBJECT-TYPE
+    SYNTAX         Integer32 (1..2147483647)
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "An index that enumerates the MultiField Classifier filter."
+    ::= { fsDiffServMultiFieldClfrEntry 1 }
+
+fsDiffServMultiFieldClfrFilterId OBJECT-TYPE
+    SYNTAX         Unsigned32
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION
+       "This Object specifies the ID of the filter the details of which 
+        should be matched against the incoming packet"
+    ::= { fsDiffServMultiFieldClfrEntry 2 }
+
+fsDiffServMultiFieldClfrFilterType OBJECT-TYPE
+    SYNTAX         INTEGER { macfilter(1), ipfilter(2)} 
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION
+       "This Object specifies the type of the filter"
+    ::= { fsDiffServMultiFieldClfrEntry 3 }
+
+fsDiffServMultiFieldClfrStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The status of this conceptual row. All writable objects in this
+        row may be modified only when the row status is not active."
+    ::= { fsDiffServMultiFieldClfrEntry 4 }
+
+
+--
+-- Classifier Table
+--
+
+fsDiffServClassifier  OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 3 }
+
+--
+-- Classifier Table
+--
+
+fsDiffServClfrTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsDiffServClfrEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "This table contains the Multifield filter details."
+    ::= { fsDiffServClassifier 1 }
+
+fsDiffServClfrEntry OBJECT-TYPE
+    SYNTAX       FsDiffServClfrEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An entry in the classifier table describes a single classifier.
+       All classifier elements belonging to the same classifier use the
+       classifier's fsDiffServClfrId as part of their index."
+    INDEX { fsDiffServClfrId }
+    ::= { fsDiffServClfrTable 1 }
+
+FsDiffServClfrEntry ::= SEQUENCE  {
+    fsDiffServClfrId              Integer32,
+    fsDiffServClfrMFClfrId        Integer32,
+    fsDiffServClfrInProActionId   Integer32,
+    fsDiffServClfrOutProActionId  Integer32,
+    fsDiffServClfrStatus          RowStatus
+}
+
+fsDiffServClfrId OBJECT-TYPE
+    SYNTAX       Integer32(1..2147483647)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An index that enumerates the classifier entries."
+    ::= { fsDiffServClfrEntry 1 }
+
+fsDiffServClfrMFClfrId OBJECT-TYPE
+    SYNTAX       Integer32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "The Object refers to a MultiField Classifier Id which is the index 
+        for  the MF  Classifier  table. A Valid value of this object is 
+        not mandatory for the creation of an entry in this table."
+    DEFVAL { 0 }
+    ::= { fsDiffServClfrEntry 2 }
+
+fsDiffServClfrInProActionId   OBJECT-TYPE
+    SYNTAX       Integer32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "The Object refers to a In Profile Action Id which is the index
+        for the InProfile Action Table. A Valid value of this object is
+        not mandatory for the creation of an entry in this table."
+    DEFVAL { 0 }
+    ::= { fsDiffServClfrEntry 3 }
+
+fsDiffServClfrOutProActionId  OBJECT-TYPE
+    SYNTAX       Integer32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "The Object refers to a Out Profile Action Id which is the index 
+        for the OutProfile Action Table. A Valid value of this object is
+        not mandatory for the creation of an entry in this table."
+    DEFVAL { 0 }
+    ::= { fsDiffServClfrEntry 4 }
+
+    
+fsDiffServClfrStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "The status of this conceptual row. The objects 
+        fsDiffServClfrInProActionId and  fsDiffServClfrOutProActionId
+        can be modified at any time. But the other Objects can not be 
+        modified when the RowStatus is 'active'for the particular entry. 
+        when the Row Status is set to 'destroy'for any of the entries
+        only the entry is removed from the table. As the Object in this
+        table are indexed to various other tables they stand unmodified 
+        by setting the RowStatus to 'destroy'."
+    ::= { fsDiffServClfrEntry 5 }
+
+
+--
+-- Actions
+--
+
+fsDiffServInProfileAction          OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 4 }
+fsDiffServOutProfileAction         OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 5 }
+
+--
+-- InProfile Action Table
+--
+
+fsDiffServInProfileActionTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsDiffServInProfileActionEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "The Action Table enumerates actions that can be performed to a
+       stream of traffic which is inprofile.For example, traffic exiting 
+       from a meter may be counted, marked, and potentially dropped before
+       entering a queue."  
+    ::= { fsDiffServInProfileAction 1 }
+
+fsDiffServInProfileActionEntry OBJECT-TYPE
+    SYNTAX       FsDiffServInProfileActionEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Each entry in the action table allows description of one of
+        action to be applied to traffic depending upon the treatment
+        selected by fsDiffServInProfileActionFlag."
+    INDEX { fsDiffServInProfileActionId }
+    ::= { fsDiffServInProfileActionTable 1 }
+
+FsDiffServInProfileActionEntry ::= SEQUENCE  {
+    fsDiffServInProfileActionId                Integer32,
+    fsDiffServInProfileActionFlag              Unsigned32,
+    fsDiffServInProfileActionNewPrio           Unsigned32,
+    fsDiffServInProfileActionIpTOS             Unsigned32,
+    fsDiffServInProfileActionPort              Unsigned32,
+    fsDiffServInProfileActionDscp              DscpOrAny,
+    fsDiffServInProfileActionStatus            RowStatus
+}
+
+fsDiffServInProfileActionId OBJECT-TYPE
+    SYNTAX       Integer32(1..2147483647)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An index that enumerates the In Profile Action entries." 
+    ::= { fsDiffServInProfileActionEntry 1 }
+
+
+fsDiffServInProfileActionFlag OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object defines the action to be performed on the packet,
+        when the packets are found to be In profile." 
+    ::= { fsDiffServInProfileActionEntry 2 }
+
+fsDiffServInProfileActionNewPrio OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object keeps the new priority value in case the action 
+        selected by fsDiffServInProfileActionFlag is to assign a new
+        priority/COS value." 
+    ::= { fsDiffServInProfileActionEntry 3 }
+
+fsDiffServInProfileActionIpTOS OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object keeps the new Ip TOS value in case the action 
+        selected by fsDiffServInProfileActionFlag is to assign a new
+        Ip TOS value." 
+    ::= { fsDiffServInProfileActionEntry 4 }
+
+fsDiffServInProfileActionPort OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object keeps the new port value in case the action 
+        selected by fsDiffServInProfileActionFlag is to assign a new
+        out port value." 
+    ::= { fsDiffServInProfileActionEntry 5 }
+
+fsDiffServInProfileActionDscp OBJECT-TYPE
+    SYNTAX       DscpOrAny
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object keeps the new DSCP value in case the action 
+        selected by fsDiffServInProfileActionFlag is to assign a new
+        DSCP value." 
+    ::= { fsDiffServInProfileActionEntry 6 }
+
+fsDiffServInProfileActionStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "The status of this conceptual row. All writable objects in this
+        row may be modified only when the row status is not active."
+    ::= { fsDiffServInProfileActionEntry 7 }
+
+
+--
+-- OutProfile Action Table
+--
+
+fsDiffServOutProfileActionTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsDiffServOutProfileActionEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "The Action Table enumerates actions that can be performed to a
+       stream of traffic which is out of profile.For example, traffic exiting 
+       from a meter may be counted, marked, and potentially dropped before
+       entering a queue."  
+    ::= { fsDiffServOutProfileAction 1 }
+
+fsDiffServOutProfileActionEntry OBJECT-TYPE
+    SYNTAX       FsDiffServOutProfileActionEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "Each entry in the action table allows description of one of
+        action to be applied to traffic depending upon the treatment
+        selected by fsDiffServOutProfileActionFlag."
+    INDEX { fsDiffServOutProfileActionId }
+    ::= { fsDiffServOutProfileActionTable 1 }
+
+FsDiffServOutProfileActionEntry ::= SEQUENCE  {
+    fsDiffServOutProfileActionId               Integer32,
+    fsDiffServOutProfileActionFlag             Unsigned32,
+    fsDiffServOutProfileActionDscp             DscpOrAny,
+    fsDiffServOutProfileActionMID              Integer32,
+    fsDiffServOutProfileActionStatus           RowStatus
+}
+
+fsDiffServOutProfileActionId OBJECT-TYPE
+    SYNTAX       Integer32(1..2147483647)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An index that enumerates the Out Profile Action entries." 
+    ::= { fsDiffServOutProfileActionEntry 1 }
+
+fsDiffServOutProfileActionFlag OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object defines the action to be performed on the packet
+        when the packets are found to be out of profile." 
+    ::= { fsDiffServOutProfileActionEntry 2 }
+
+fsDiffServOutProfileActionDscp OBJECT-TYPE
+    SYNTAX       DscpOrAny
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object keeps the new DSCP value in case the action 
+        selected by fsDiffServOutProfileActionFlag is to assign
+        a new DSCP value." 
+    ::= { fsDiffServOutProfileActionEntry 3 }
+
+fsDiffServOutProfileActionMID OBJECT-TYPE
+    SYNTAX       Integer32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This Object keeps the Meter Id to be added to the DataPath
+        to which this particular OutProfileAction is applicable."
+    ::= { fsDiffServOutProfileActionEntry 4 }
+
+fsDiffServOutProfileActionStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "The status of this conceptual row. All writable objects in this
+        row may be modified only when the row status is not active. The 
+        row comprises of an Meter Id which is an index to the Meter Table."
+    ::= { fsDiffServOutProfileActionEntry 5 }
+
+--
+-- Meter
+--
+
+fsDiffServMeter          OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 6 }
+
+--
+-- Meter Table
+--
+
+fsDiffServMeterTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsDiffServMeterEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "The Meter Table has the number of token with it and refreshCount value
+        for associated with the meter."
+    ::= { fsDiffServMeter 1 }
+
+fsDiffServMeterEntry OBJECT-TYPE
+    SYNTAX       FsDiffServMeterEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An entry in the Meter Table describing a single instance of
+       a Metering Unit."
+    INDEX { fsDiffServMeterId }
+    ::= { fsDiffServMeterTable 1 }
+
+FsDiffServMeterEntry ::= SEQUENCE  {
+    fsDiffServMeterId                       Integer32,
+    fsDiffServMetertokenSize                Unsigned32,
+    fsDiffServMeterRefreshCount             Unsigned32,
+    fsDiffServMeterStatus                   RowStatus
+}
+
+fsDiffServMeterId OBJECT-TYPE
+    SYNTAX       Integer32(1..2147483647)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An index that enumerates the Meter entries."
+    ::= { fsDiffServMeterEntry 1 }
+
+fsDiffServMetertokenSize  OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This values specifies the size of the meter bucket. The number 
+        of the token configured are dependent on support by the specific 
+        devices/hardware."
+    ::= { fsDiffServMeterEntry 2 }
+
+fsDiffServMeterRefreshCount OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "This values specifies the number of tokens to be added to the
+        meter bucket after each 8 usec."
+    ::= { fsDiffServMeterEntry 3 }
+
+fsDiffServMeterStatus OBJECT-TYPE
+    SYNTAX       RowStatus 
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+       "The status of this conceptual row. All writable objects in this
+        row may be modified only when this rowstatus in not active."
+    ::= { fsDiffServMeterEntry 4 }
+
+--
+-- Scheduler
+--
+
+fsDiffServScheduler      OBJECT IDENTIFIER ::= { fsDiffServMIBObjects 7 }
+
+--
+-- Scheduler Table
+--
+
+fsDiffServSchedulerTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsDiffServSchedulerEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "The Scheduler Table has the number of queues per data path and
+        weight associated with that."
+    ::= { fsDiffServScheduler 1 }
+
+fsDiffServSchedulerEntry OBJECT-TYPE
+    SYNTAX       FsDiffServSchedulerEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An entry in the Scheduler Table describing a single instance of
+       a scheduler."
+    INDEX { fsDiffServSchedulerId }
+    ::= { fsDiffServSchedulerTable 1 }
+
+FsDiffServSchedulerEntry ::= SEQUENCE  {
+    fsDiffServSchedulerId                   Integer32,
+    fsDiffServSchedulerDPId                 Integer32,
+    fsDiffServSchedulerQueueCount           Unsigned32,
+    fsDiffServSchedulerWeight               OCTET STRING,
+    fsDiffServSchedulerStatus               RowStatus
+}
+
+fsDiffServSchedulerId OBJECT-TYPE
+    SYNTAX       Integer32(1..2147483647)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "An index that enumerates the Scheduler entries."
+    ::= { fsDiffServSchedulerEntry 1 }
+
+fsDiffServSchedulerDPId OBJECT-TYPE
+    SYNTAX       Integer32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "The Data Path Id to which this Entry of the Scheduler is added.
+        This value is same as the index of the Data path Table."
+    ::= { fsDiffServSchedulerEntry 2 }
+
+fsDiffServSchedulerQueueCount OBJECT-TYPE
+    SYNTAX       Unsigned32(1..4)
+    MAX-ACCESS   read-write 
+    STATUS       current
+    DESCRIPTION
+       "The value here speicifies the number of queues for a data path."
+    DEFVAL      { 1 }   
+    ::= { fsDiffServSchedulerEntry 3 }
+
+fsDiffServSchedulerWeight OBJECT-TYPE
+    SYNTAX       OCTET STRING (SIZE(1..4))
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "The value here speicifies the weight speicified  for  each  of the queues.
+        Since maximum number of queues specified can be  four  only. This value is
+        used one byte basis."
+    ::= { fsDiffServSchedulerEntry 4 }
+
+fsDiffServSchedulerStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+       "The status of this conceptual row. All writable objects in this
+        row may be modified only when the rowstatus is not active."
+    ::= { fsDiffServSchedulerEntry 5 }
+    
+END
+

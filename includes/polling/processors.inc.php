@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -16,8 +15,7 @@ $table_rows = array();
 // Pre-cache all processors oid
 $query = 'SELECT `processor_oid` FROM `processors` WHERE `device_id` = ? AND `processor_oid` REGEXP ? AND `processor_type` != ?';
 // wmi excluded, select only valid numeric OIDs like .1.2.3.3 (excluded ucd-old, hr-average)
-if ($oid_to_cache = dbFetchColumn($query, array($device['device_id'], '^\.?[0-9]+(\.[0-9]+)+$', 'wmi')))
-{
+if ($oid_to_cache = dbFetchColumn($query, array($device['device_id'], '^\.?[0-9]+(\.[0-9]+)+$', 'wmi'))) {
   usort($oid_to_cache, 'compare_numeric_oids'); // correctly sort numeric oids
   print_debug_vars($oid_to_cache);
   $oid_cache = snmp_get_multi_oid($device, $oid_to_cache, $oid_cache, NULL, NULL, OBS_SNMP_ALL_NUMERIC);
@@ -26,19 +24,15 @@ if ($oid_to_cache = dbFetchColumn($query, array($device['device_id'], '^\.?[0-9]
 
 $sql  = "SELECT * FROM `processors` WHERE `device_id` = ?";
 
-foreach (dbFetchRows($sql, array($device['device_id'])) as $processor)
-{
+foreach (dbFetchRows($sql, array($device['device_id'])) as $processor) {
   // echo("Processor " . $processor['processor_descr'] . " ");
 
   $processor['processor_oid'] = '.' . ltrim($processor['processor_oid'], '.'); // Fix first dot in oid
 
   $file = $config['install_dir']."/includes/polling/processors/".$processor['processor_type'].".inc.php";
-  if (is_file($file))
-  {
+  if (is_file($file)) {
     include($file);
-  }
-  else if (isset($oid_cache[$processor['processor_oid']]))
-  {
+  } elseif (isset($oid_cache[$processor['processor_oid']])) {
     // Use cached OIDs
     $proc = $oid_cache[$processor['processor_oid']];
   } else {
@@ -48,15 +42,23 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $processor)
 
   $proc = snmp_fix_numeric($proc);
 
-  if (!$processor['processor_precision']) { $processor['processor_precision'] = 1; }
-  $proc = round($proc / $processor['processor_precision'], 2);
-  if ($processor['processor_returns_idle'] == 1) { $proc = 100 - $proc; } // The OID returns idle value, so we subtract it from 100.
+  if (is_numeric($proc)) {
+    if (!$processor['processor_precision']) {
+      $processor['processor_precision'] = 1;
+    }
+    $proc = round($proc / $processor['processor_precision'], 2);
+    if ($processor['processor_returns_idle'] == 1) {
+      $proc = 100 - $proc;
+    } // The OID returns idle value, so we subtract it from 100.
+  } else {
+    $proc = 0;
+  }
+  $processor['processor_usage'] = $proc;
 
   $graphs['processor'] = TRUE;
 
   // Update StatsD/Carbon
-  if ($config['statsd']['enable'] == TRUE)
-  {
+  if ($config['statsd']['enable'] == TRUE) {
     StatsD::gauge(str_replace(".", "_", $device['hostname']).'.'.'processor'.'.'.$processor['processor_type'] . "-" . $processor['processor_index'], $proc);
   }
 

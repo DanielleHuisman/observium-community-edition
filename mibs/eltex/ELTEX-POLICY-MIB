@@ -17,7 +17,9 @@ IMPORTS
     PortList                                    FROM Q-BRIDGE-MIB
     VlanId                                      FROM Q-BRIDGE-MIB
     rlPolicyClassifierEntry,
-    rlPolicyTrustModeEntry                      FROM RADLAN-POLICY-MIB
+    rlPolicyTrustModeEntry,rlPolicyVlanCfgEntry,
+    rlPolicyMeteringClassEntry,
+    rlPolicyActionEntry                         FROM RADLAN-POLICY-MIB
     eltMes                                      FROM ELTEX-MES;
 
 eltMesPolicy MODULE-IDENTITY
@@ -29,8 +31,11 @@ eltMesPolicy MODULE-IDENTITY
               "The private MIB module definition generic traffic policy in Eltex devices."
         ::= { eltMes 59 }
 
-eltPolicyClassifier OBJECT IDENTIFIER ::= { eltMesPolicy 2 }
-eltPolicyMapping    OBJECT IDENTIFIER ::= { eltMesPolicy 3 }
+eltPolicyClassifier        OBJECT IDENTIFIER ::= { eltMesPolicy 2 }
+eltPolicyMapping           OBJECT IDENTIFIER ::= { eltMesPolicy 3 }
+eltPolicyVlanConfiguration OBJECT IDENTIFIER ::= { eltMesPolicy 5 }
+eltPolicyMeterClass        OBJECT IDENTIFIER ::= { eltMesPolicy 6 }
+eltPolicyAction            OBJECT IDENTIFIER ::= { eltMesPolicy 7 }
 
 EltPolicyTrustTypes ::= TEXTUAL-CONVENTION
     STATUS  current
@@ -199,6 +204,159 @@ eltPolicyTrustModePortMode OBJECT-TYPE
     DESCRIPTION
        "Defines the interface qos trust operation mode relevant for qos basic mode."
     ::= { eltPolicyTrustModeEntry 1 }
+
+
+--
+-- Vlan Configuration table.
+--
+
+eltPolicyVlanConfigurationTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltPolicyVlanCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "This table enables the network administrator to fine-tune
+         the rate limit in pps given to each vlan.
+         The values in this table will thus override those of the
+         rlQosIfPolicyTable (THIS TABLE IS MANAGED FROM 3SW)."
+    ::= { eltPolicyVlanConfiguration 1 }
+
+eltPolicyVlanCfgEntry OBJECT-TYPE
+    SYNTAX  EltPolicyVlanCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Configuration parameters for each vlan."
+    AUGMENTS { rlPolicyVlanCfgEntry }
+    ::= { eltPolicyVlanConfigurationTable 1 }
+
+EltPolicyVlanCfgEntry ::= SEQUENCE {
+    eltPolicyVlanCfgCirPortRateLimitPps            Unsigned32,
+    eltPolicyVlanCfgCbsPortRateLimitPackets        Unsigned32
+   }
+
+eltPolicyVlanCfgCirPortRateLimitPps OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The CIR for the port Rate limit in packets per second.
+         CIR equal to 0 means that the rate limit does not apply
+         to traffic in this vlan."
+    DEFVAL { 0 }
+    ::= { eltPolicyVlanCfgEntry 1 }
+
+eltPolicyVlanCfgCbsPortRateLimitPackets OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The CBS for the port Rate Limit in packets."
+    DEFVAL { 0 }
+    ::= { eltPolicyVlanCfgEntry 2 }
+
+
+--
+--  Metering Class Table
+--
+
+eltPolicyMeterClassTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltPolicyMeteringClassEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "This table defines the Metering classes for the system."
+    ::= { eltPolicyMeterClass 1 }
+
+eltPolicyMeteringClassEntry OBJECT-TYPE
+    SYNTAX  EltPolicyMeteringClassEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Each statement consists of the following parameters"
+    AUGMENTS { rlPolicyMeteringClassEntry }
+    ::= { eltPolicyMeterClassTable 1 }
+
+EltPolicyMeteringClassEntry ::= SEQUENCE  {
+    eltPolicyMeteringClassAggregateMeterRatePps           Unsigned32,
+    eltPolicyMeteringClassAggregateMeterBurstSizePackets  Unsigned32
+}
+
+eltPolicyMeteringClassAggregateMeterRatePps OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The rate in packets per second of traffic considered within the
+         bandwidth allocated for this policy entry. Rate equal to 0 means
+         that the rate limit does not apply to traffic."
+    DEFVAL { 0 }
+    ::= { eltPolicyMeteringClassEntry 1 }
+
+eltPolicyMeteringClassAggregateMeterBurstSizePackets OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The Burst Size parameter for the aggregate meter leaky bucket in packets"
+    DEFVAL { 0 }
+    ::= { eltPolicyMeteringClassEntry 2 }
+
+
+--
+--  Action Table
+--
+eltPolicyActionTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltPolicyActionEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "This table defines the Actions for packets that pass the meter table
+         ie. the characteristics that are assigned to packets before they
+         reach the scheduler."
+    ::= { eltPolicyAction 2 }
+
+eltPolicyActionEntry OBJECT-TYPE
+    SYNTAX  EltPolicyActionEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Each multifield classification statement consists of the following
+         parameters"
+    AUGMENTS { rlPolicyActionEntry }
+    ::= { eltPolicyActionTable 1 }
+
+EltPolicyActionEntry ::=  SEQUENCE  {
+    eltPolicyPpsActionNonDsOutProfileDropPrecedence  INTEGER,
+    eltPolicyPpsActionChangeDscpNonConform           TruthValue
+}
+
+eltPolicyPpsActionNonDsOutProfileDropPrecedence OBJECT-TYPE
+    SYNTAX  INTEGER {
+        low(1),
+        medium(2),
+        high(3),
+        drop(4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "This paramer is used at non diffserv mode to attached the drop precedence
+         for packet OutProfile (metering), only if there is a support for drop precedence
+         and with what level."
+    DEFVAL{ low }
+    ::= { eltPolicyActionEntry 1 }
+
+eltPolicyPpsActionChangeDscpNonConform OBJECT-TYPE
+    SYNTAX  TruthValue
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "If true, the packet is re-marked with the value indicated by
+         newDscp for non conforming packets.
+         If false, the packet's DSCP value is not changed"
+    DEFVAL{ false }
+    ::= { eltPolicyActionEntry 2 }
 
 
 END

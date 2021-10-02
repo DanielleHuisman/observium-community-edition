@@ -1,0 +1,412 @@
+--  =======================================================================
+--  File        : oaDevUpgrade.mib
+--  Description : Private MIB for Download/Upload software and configuration
+--  By          : Yakov & Reuven
+--  Version     : 0.2
+--  Date        : 
+--  =======================================================================
+--
+--
+-- Copyright (c) 2006 MRV.  All Rights Reserved.
+--
+--
+-- Reproduction of this document is authorized on condition that this
+-- copyright notice is included.  This MRV SNMP MIB Specification
+-- embodies MRV's proprietary intellectual property.  MRV
+-- retains all title and ownership in the specification, including any
+-- revisions.
+--
+-- It is MRV's intent to encourage the widespread use of this
+-- specification in connection with the management of MRV's
+-- products. MRV grants vendor, end-users, and other interested
+-- parties a non-exclusive license to use this specification in
+-- connection with the management of MRV's products.
+--
+-- This specification is supplied "AS IS," and MRV makes no
+-- warranty, either express or implied, as to the use, operation,
+-- condition, or performance of the specification.
+--
+-- Copyright text courtesy of MRV
+--
+-- If you have any questions about this MIB, please call MRV
+-- Technical Support Center at 1-800-858-7815 from inside USA or
+-- 1-818-773-0900 from outside USA.
+--
+--
+-- MRV retains the right to change this MIB without notification.
+--
+
+OA-DEV-UPGRADE-MIB DEFINITIONS ::= BEGIN
+
+        IMPORTS
+
+    MODULE-IDENTITY, OBJECT-TYPE, enterprises,
+    Integer32,NOTIFICATION-TYPE                  FROM SNMPv2-SMI        -- RFC2578
+    MODULE-COMPLIANCE, OBJECT-GROUP,
+    NOTIFICATION-GROUP                           FROM SNMPv2-CONF       -- RFC2580
+    DisplayString                                FROM SNMPv2-TC         -- RFC2579
+    InetAddressType,    InetAddress              FROM INET-ADDRESS-MIB; -- RFC2851
+
+ -- RFC2851
+
+oaDevUpgrade  MODULE-IDENTITY
+    LAST-UPDATED "200611080000Z"
+    ORGANIZATION "MRV Communications, Inc."
+    CONTACT-INFO
+        "Yakov Vaisman
+         MRV Communication, Inc
+         http://www.mrv.com
+         Email:  yvaisman@mrv.com,
+
+         Reuven Putter
+         MRV Communication, Inc
+         http://www.mrv.com
+         Email:  rputter@mrv.com
+	"
+    DESCRIPTION
+        "Supports information for download/upload device software and/or configuration."
+
+    -- Revision history
+
+    REVISION "200611080000Z"
+    DESCRIPTION
+        "Initial edition."
+    ::= { nbDevGen 20 }
+
+-- ************************************************************
+-- NBase Object Identifier Definition
+-- ************************************************************
+
+nbase              OBJECT IDENTIFIER ::= { enterprises 629 }
+nbSwitchG1         OBJECT IDENTIFIER ::= { nbase 1 }
+nbSwitchG1Il       OBJECT IDENTIFIER ::= { nbSwitchG1 50}
+
+-- GROUPS for General Device Configuration
+nbDeviceConfig     OBJECT IDENTIFIER ::= { nbSwitchG1Il 11}
+nbDevGen           OBJECT IDENTIFIER ::= { nbDeviceConfig 1 }
+
+oaDevUpgrNotifications OBJECT IDENTIFIER ::= { oaDevUpgrade 0 }
+oaDevUpgrConformance   OBJECT IDENTIFIER ::= { oaDevUpgrade 101 }
+
+-- ************************************************************
+-- Objects in the Device's Upgrade Software/Configuration Group
+-- ************************************************************
+        
+oaDevUpgrGenSupport OBJECT-TYPE
+    SYNTAX  INTEGER {
+       notSupported (1),
+       supported    (2)
+    }       
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Download/upload feature support."
+    ::= { oaDevUpgrade 1 }
+
+-- ************************************************************
+
+oaDevUpgrTable         OBJECT-TYPE
+    SYNTAX  SEQUENCE OF OaDevUpgrEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table configures download/upload operations:
+         download software version, download/upload system configuration."
+    ::= { oaDevUpgrade 2 }
+
+oaDevUpgrEntry		OBJECT-TYPE
+    SYNTAX  OaDevUpgrEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "The entries of the table."
+    INDEX { oaDevUpgrType }
+    ::= { oaDevUpgrTable 1 }
+
+OaDevUpgrEntry ::= SEQUENCE {
+                      oaDevUpgrType              Integer32,
+                      oaDevUpgrProtocolApp       INTEGER,
+                      oaDevUpgrServerAddressType InetAddressType,
+                      oaDevUpgrServerAddress     InetAddress,
+                      oaDevUpgrRemoteDir         DisplayString,
+                      oaDevUpgrRemoteFileName    DisplayString,
+                      oaDevUpgrPeriodicity       INTEGER,
+                      oaDevUpgrPeriodDateTime    OCTET STRING,
+                      oaDevUpgrResetDevice       INTEGER,
+                      oaDevUpgrOperStatus        INTEGER,
+                      oaDevUpgrAdminStatus       INTEGER,
+                      oaDevUpgrUsername          DisplayString,
+                      oaDevUpgrPassword          DisplayString,
+                      oaDevUpgrServerAddressText DisplayString
+		}
+
+oaDevUpgrType          OBJECT-TYPE
+    SYNTAX  Integer32 (1..4)
+    MAX-ACCESS  accessible-for-notify
+--    MAX-ACCESS   not-accessible
+
+    STATUS       current
+    DESCRIPTION
+        "The Type of Upgrade (index of the table):
+            1=Download the Sw Agent version,
+            2=Download the startup Device Configuration,
+            3=Upload the current Device Configuration"
+    ::= { oaDevUpgrEntry 1 }
+
+oaDevUpgrProtocolApp    OBJECT-TYPE
+    SYNTAX  INTEGER {
+       other       (1),
+       tftpClient  (2),
+       ftpClient   (3),
+       sftpClient  (4),
+       scpClient   (5)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Protocol application used for upgrade operation"
+    ::= { oaDevUpgrEntry 2 }
+
+oaDevUpgrServerAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the type of host address to be used as a server
+         for performing a download/upload operation."
+    DEFVAL { unknown }
+    ::= { oaDevUpgrEntry 3 }
+
+oaDevUpgrServerAddress    OBJECT-TYPE
+    SYNTAX  InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the host address to be used as a server for
+         performing a download/upload operation. The server address type is
+         determined by the object value of corresponding
+         oaDevUpgrServerAddressType.
+
+         A value for this object MUST be set prior to set 
+         its corresponding oaDevUpgrAdminStatus."
+    DEFVAL { ''H }
+    ::= { oaDevUpgrEntry 4 }
+
+oaDevUpgrRemoteDir   OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Download/upload remote directory."
+    ::= { oaDevUpgrEntry 5 }
+
+oaDevUpgrRemoteFileName   OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Download/upload remote file name."
+    ::= { oaDevUpgrEntry 6 }
+
+oaDevUpgrPeriodicity OBJECT-TYPE
+    SYNTAX  INTEGER {
+               once              (1),
+               everyMonth        (2),
+               everyWeek         (3),
+               everyDay          (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Period of the operation"
+    ::= { oaDevUpgrEntry 7 }
+
+oaDevUpgrPeriodDateTime   OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (0 | 7 ))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "Date and time for upgrade version.
+
+         field  octets  contents                  range
+         -----  ------  --------                  -----
+           1      1-2   year                      0..65536
+           2       3    month                     1..12
+           3       4    day                       1..31
+           4       5    hour                      0..23
+           5       6    minutes                   0..59
+           6       7    day of Week               1..7	 -- used only for everyWeek action
+
+         For example, Tuesday May 26, 1992 at 1:30:15 PM
+         EDT would be displayed as: 1992-5-26,13:30 "
+    ::= { oaDevUpgrEntry 8 }
+
+oaDevUpgrResetDevice    OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               other                       (1),
+               resetDeviceAfterUpgrade     (2),
+               notResetDeviceAfterUpgrade  (3)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Reset after download/upload operation."
+    ::= { oaDevUpgrEntry 9 }
+
+oaDevUpgrOperStatus  OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               none                     (1),
+               waitForSchedule          (2),
+               actionInProcess          (3),
+               actionCompletedOk        (4),
+               actionError              (5),
+               actionCanceled           (6)	
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operational status of download/upload operation."
+    ::= { oaDevUpgrEntry 10 }
+		
+oaDevUpgrAdminStatus OBJECT-TYPE
+    SYNTAX  INTEGER  {
+               none                  (1),
+               startNow              (2),
+               scheduleAction        (3),
+               cancelScheduledAction (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Admin status activates download/upload operation."
+    ::= { oaDevUpgrEntry 11 }
+
+oaDevUpgrUsername   OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Use the username instead default."
+    ::= { oaDevUpgrEntry 12 }
+
+oaDevUpgrPassword   OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Password of the username."
+    ::= { oaDevUpgrEntry 13 }
+
+oaDevUpgrServerAddressText    OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Specifies the host address to be used as a server
+         in the Text format (used in Traps)."
+    ::= { oaDevUpgrEntry 14 }
+
+-- *******************************************************************
+--  Notification Definition section
+-- ******************************************************************* 
+ 
+oaDevUpgradeStarted NOTIFICATION-TYPE
+      OBJECTS {
+        oaDevUpgrType,
+        oaDevUpgrProtocolApp,
+        oaDevUpgrServerAddressText,
+        oaDevUpgrRemoteDir,
+        oaDevUpgrRemoteFileName
+      }
+      STATUS  current
+      DESCRIPTION
+          "Generated when a device Upgrade process starts."
+      ::= { oaDevUpgrNotifications 101 }
+
+oaDevUpgradeFailed NOTIFICATION-TYPE
+      OBJECTS {
+        oaDevUpgrType,
+        oaDevUpgrProtocolApp,
+        oaDevUpgrServerAddressText,
+        oaDevUpgrRemoteDir,
+        oaDevUpgrRemoteFileName
+      }
+      STATUS  current
+      DESCRIPTION
+          "Generated when a device Upgrade process was failed."
+      ::= { oaDevUpgrNotifications 102 }
+
+oaDevUpgradeCompletedOk NOTIFICATION-TYPE
+      OBJECTS {
+        oaDevUpgrType,
+        oaDevUpgrProtocolApp,
+        oaDevUpgrServerAddressText,
+        oaDevUpgrRemoteDir,
+        oaDevUpgrRemoteFileName
+      }
+      STATUS  current
+      DESCRIPTION
+          "Generated when a device Upgrade process completed successfully."
+      ::= { oaDevUpgrNotifications 103 }
+
+-- *******************************************************************
+--  Conformance Information 
+-- ******************************************************************* 
+ 
+oaDevUpgrMIBCompliances  OBJECT IDENTIFIER ::= { oaDevUpgrConformance 1 }
+oaDevUpgrMIBGroups       OBJECT IDENTIFIER ::= { oaDevUpgrConformance 2 }
+
+oaDevUpgrMIBCompliance MODULE-COMPLIANCE
+    STATUS current 
+    DESCRIPTION 
+        "The core compliance statement for all 'oaDevUpgrade' MIB implementations."
+    MODULE -- this module 
+     
+        MANDATORY-GROUPS { 
+                          oaDevUpgrGroup,
+                          oaDevUpgrNotificationsGroup
+                         }
+
+    ::= { oaDevUpgrMIBCompliances 1 }
+ 
+-- ................................................................... 
+-- Conformance Groups 
+-- ................................................................... 
+
+oaDevUpgrGroup  OBJECT-GROUP
+    OBJECTS { 
+             oaDevUpgrGenSupport,
+             oaDevUpgrType,
+             oaDevUpgrProtocolApp,
+             oaDevUpgrServerAddressType,
+             oaDevUpgrServerAddress,
+             oaDevUpgrRemoteDir,
+             oaDevUpgrRemoteFileName,
+             oaDevUpgrPeriodicity,
+             oaDevUpgrPeriodDateTime,
+             oaDevUpgrResetDevice,
+             oaDevUpgrOperStatus,
+             oaDevUpgrAdminStatus,
+             oaDevUpgrUsername,
+             oaDevUpgrPassword,
+             oaDevUpgrServerAddressText
+            }
+    STATUS current 
+    DESCRIPTION 
+        "Mandatory objects for grouping of Device Upgrade parameters."
+    ::= { oaDevUpgrMIBGroups 1 }
+ 
+oaDevUpgrNotificationsGroup  NOTIFICATION-GROUP
+    NOTIFICATIONS {
+
+             oaDevUpgradeStarted,
+             oaDevUpgradeFailed,
+             oaDevUpgradeCompletedOk
+          }
+    STATUS        current
+    DESCRIPTION
+        "The notification which are required to be supported by
+         implementations of this MIB."
+    ::= { oaDevUpgrMIBGroups 2 }
+
+END

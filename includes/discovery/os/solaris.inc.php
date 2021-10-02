@@ -31,7 +31,7 @@ if (!$os)
       if (version_compare($version, '5.10', '>'))
       {
         $os = 'opensolaris';
-        if (str_exists($sysDescr, 'oi_')) { $os = 'openindiana'; }
+        if (str_contains_array($sysDescr, 'oi_')) { $os = 'openindiana'; }
       }
     }
   }

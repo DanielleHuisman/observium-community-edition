@@ -1,11 +1,11 @@
 <?php
 
-include(dirname(__FILE__) . '/../includes/sql-config.inc.php'); // Here required DB connect
+include(__DIR__ . '/../includes/sql-config.inc.php'); // Here required DB connect
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');
 //include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '/../html/includes/functions.inc.php');
+include(__DIR__ . '/../html/includes/functions.inc.php');
 
 class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
 {
@@ -58,7 +58,7 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       array('some text here ', 'Some text here '),
       array(NULL, ''),
       array(FALSE, ''),
-      array(array('test'), NULL)
+      array(array('test'), '')
     );
   }
 

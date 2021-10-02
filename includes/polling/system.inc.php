@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,93 +23,8 @@ $uptimes = array('use'       => 'sysUpTime',
                  'sysUpTime' => $poll_device['sysUpTime']);
 
 // Find MIB-specific SNMP data via OID fetch: sysDescr, sysLocation, sysContact, sysName, sysUpTime
-$system_metatypes = array('sysDescr', 'sysLocation', 'sysContact', 'sysName', 'sysUpTime', 'reboot'); // 'snmpEngineID');
-foreach ($system_metatypes as $metatype)
-{
-
-  $param = ($metatype === 'sysUpTime') ? 'uptime' : strtolower($metatype); // For sysUptime use simple param name
-  foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supported by the device, in order
-  {
-    if (isset($config['mibs'][$mib][$param]))
-    {
-      foreach ($config['mibs'][$mib][$param] as $entry)
-      {
-        // For ability override metatype by vendor mib definition use 'force' boolean param
-        if (!isset($poll_device[$metatype]) ||                     // Poll if metatype not already set
-            $metatype === 'sysUpTime' || $metatype === 'reboot' || // Or uptime/reboot (always polled)
-            (isset($entry['force']) && $entry['force']))           // Or forced override (see ekinops EKINOPS-MGNT2-MIB mib definition
-        {
-
-          if (discovery_check_requires($device, $entry, $device, 'device'))
-          {
-            // Examples in QNAP NAS-MIB and RFC UPS-MIB
-            print_debug("Definition entry [$metatype] [$mib::".$entry['oid'].$entry['oid_next']."] skipped by test condition");
-            continue;
-          }
-
-          $flags = OBS_SNMP_ALL_UTF8; // Force HEX to UTF8 conversion
-          if (isset($entry['oid_num'])) // Use numeric OID if set, otherwise fetch text based string
-          {
-            //$value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid_num'])));
-            $value = snmp_get_oid($device, $entry['oid_num'], NULL, $flags);
-          }
-          elseif (isset($entry['oid_next']))
-          {
-            // If Oid passed without index part use snmpgetnext (see FCMGMT-MIB definitions)
-            //$value = trim(snmp_hexstring(snmp_getnext_oid($device, $entry['oid_next'], $mib)));
-            $value = snmp_getnext_oid($device, $entry['oid_next'], $mib, NULL, $flags);
-          } else {
-            //$value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid'], $mib)));
-            $value = snmp_get_oid($device, $entry['oid'], $mib, NULL, $flags);
-          }
-
-          if (snmp_status() && $value != '')
-          {
-            $polled = round($GLOBALS['exec_status']['endtime']);
-
-            // Field found (no SNMP error), perform optional transformations.
-            if (isset($entry['transform']))
-            {
-              // Just simplify definition entry (unify with others)
-              $entry['transformations'] = $entry['transform'];
-            }
-            $value = string_transform($value, $entry['transformations']);
-
-            // Detect uptime with MIB defined oids, see below uptimes 2.
-            if ($metatype === 'sysUpTime' || $metatype === 'reboot')
-            {
-              // Previous uptime from standard sysUpTime or other MIB::oid
-              $uptime_previous = isset($poll_device['device_uptime']) ? $poll_device['device_uptime'] : $poll_device['sysUpTime'];
-              if ($metatype === 'reboot' && is_numeric($value))
-              {
-                // Last reboot is same uptime, but as diff with current (polled) time (see INFINERA-ENTITY-CHASSIS-MIB)
-                $value = $polled - $value;
-              }
-              // Detect if new sysUpTime value more than the previous
-              if (is_numeric($value) && $value >= $uptime_previous)
-              {
-                $poll_device['device_uptime'] = $value;
-                $uptimes['message'] = isset($entry['oid_num']) ? $entry['oid_num'] : $mib . '::' . $entry['oid'];
-                $uptimes['message'] = 'Using device MIB poller '.$metatype.': ' . $uptimes['message'];
-
-                print_debug("Added System Uptime from SNMP definition walk: 'device_uptime' = '$value'");
-              }
-              // Continue for other possible sysUpTime and use maximum value
-              continue;
-            }
-
-            $poll_device[$metatype] = $value;
-            print_debug("Added System param from SNMP definition walk: '$metatype' = '$value'");
-
-            // Exit both foreach loops and move on to the next field.
-            break 2;
-          }
-        }
-      }
-    }
-  }
-
-}
+$system_metatypes = [ 'sysDescr', 'sysLocation', 'sysContact', 'sysName', 'sysUpTime', 'reboot' ]; // 'snmpEngineID' ];
+poll_device_mib_metatypes($device, $system_metatypes, $poll_device);
 
 // Store original sysName for devices who store hardware in this Oid,
 $poll_device['sysName_original'] = $poll_device['sysName'];
@@ -217,8 +132,7 @@ if (!isset($uptimes['message'])) { $uptimes['message'] = 'Using SNMP Agent '.$up
 $uptime = $uptimes['uptime'];
 print_debug($uptimes['message']." ($uptime sec. => ".$uptimes['formatted'].')');
 
-if (is_numeric($uptime) && $uptime > 0) // it really is very impossible case for $uptime equals to zero
-{
+if (is_numeric($uptime) && $uptime > 0) { // it really is very impossible case for $uptime equals to zero
   $uptimes['previous'] = $device['uptime'];              // Uptime from previous device poll
   $uptimes['diff']     = $uptimes['previous'] - $uptime; // Difference between previous and current uptimes
 
@@ -226,9 +140,8 @@ if (is_numeric($uptime) && $uptime > 0) // it really is very impossible case for
   $last_rebooted = $polled - $uptime;
   // Previous reboot unixtime
   $uptimes['last_rebooted']        = $device['last_rebooted'];
-  if (empty($uptimes['last_rebooted']) ||                  // 0 or ''
-      abs($device['last_rebooted'] - $last_rebooted) > 1200) // Fix when uptime updated by other Oid
-  {
+  if (empty($uptimes['last_rebooted']) ||                      // 0 or ''
+      abs($device['last_rebooted'] - $last_rebooted) > 1200) { // Fix when uptime updated by other Oid
     // Set last_rebooted for all devices who not have it already
     $uptimes['last_rebooted']      = $last_rebooted;
     $update_array['last_rebooted'] = $last_rebooted;
@@ -236,25 +149,20 @@ if (is_numeric($uptime) && $uptime > 0) // it really is very impossible case for
 
   // Notify only if current uptime less than one week (eg if changed from sysUpTime to snmpEngineTime)
   $rebooted = 0;
-  if ($uptime < 604800)
-  {
-    if ($uptimes['diff'] > 60)
-    {
+  if ($uptime < 604800) {
+    if ($uptimes['diff'] > 60) {
       // If difference betwen old uptime ($device['uptime']) and new ($uptime)
       // greater than 60 sec, than device truly rebooted
       $rebooted = 1;
-    }
-    elseif ($uptimes['previous'] < 300 && abs($uptimes['diff']) < 280)
-    {
+    } elseif ($uptimes['previous'] < 300 && $uptimes['diff'] !== 0 && abs($uptimes['diff']) < 280) {
       // This is rare, boundary case, when device rebooted multiple times between polling runs
+      // diff 0 mean we monitor snmp dump
       $rebooted = 1;
     }
 
     // Fix reboot flag with some borderline states (roll over counters)
-    if ($rebooted)
-    {
-      switch($uptimes['use'])
-      {
+    if ($rebooted) {
+      switch($uptimes['use']) {
         case 'hrSystemUptime':
         case 'sysUpTime':
           $uptimes_max = array(42949673);   // 497 days 2 hours 27 minutes 53 seconds, counter 2^32 (4294967296) divided by 100
@@ -267,8 +175,7 @@ if (is_numeric($uptime) && $uptime > 0) // it really is very impossible case for
           // Usually int(2147483647) in 32 bit systems and int(9223372036854775807) in 64 bit systems
           $uptimes_max = array(PHP_INT_MAX);
       }
-      if (isset($config['os'][$device['os']]['uptime_max'][$uptimes['use']]))
-      {
+      if (isset($config['os'][$device['os']]['uptime_max'][$uptimes['use']])) {
         // Add rollover counter time from definitions
         $uptimes_max = array_merge($uptimes_max, (array)$config['os'][$device['os']]['uptime_max'][$uptimes['use']]);
       }
@@ -383,21 +290,27 @@ foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supporte
 
 // END LA
 
+// Check if many oids empty (seems as device down after check)
+$poll_empty_count = 0;
+
 // Rewrite sysLocation if there is a mapping array or DB override
 //$poll_device['sysLocation'] = snmp_fix_string($poll_device['sysLocation']);
 $poll_device['sysLocation'] = rewrite_location($poll_device['sysLocation']);
 
-if ($device['location'] != $poll_device['sysLocation'])
-{
+if ($device['location'] != $poll_device['sysLocation']) {
   $update_array['location'] = $poll_device['sysLocation'];
   log_event("sysLocation changed: '".$device['location']."' -> '".$poll_device['sysLocation']."'", $device, 'device', $device['device_id']);
+
+  if (strlen($poll_device['sysLocation']) === 0) {
+    $poll_empty_count++;
+  } else {
+    $poll_empty_count--;
+  }
 }
 
 $poll_device['sysContact']  = str_replace(array('\"', '"') , '', $poll_device['sysContact']);
 
-if (in_array($poll_device['sysContact'], [ 'Uninitialized', 'not set', '<none>', '(none)',
-                                           'SNMPv2', 'Unknown', '?', '<private>' ]))
-{
+if (!is_valid_param($poll_device['sysContact'], 'sysContact')) {
   // Common wrong contacts: Uninitialized, not set, <none>, (none), SNMPv2, Unknown, ?, <private>
   $poll_device['sysContact'] = '';
 }
@@ -406,35 +319,59 @@ print_debug_vars($poll_device);
 
 // Check if snmpEngineID changed
 $force_discovery = FALSE;
-if (strlen($poll_device['snmpEngineID'] . $device['snmpEngineID']) && $poll_device['snmpEngineID'] != $device['snmpEngineID'])
-{
+if (strlen($poll_device['snmpEngineID'] . $device['snmpEngineID']) && $poll_device['snmpEngineID'] != $device['snmpEngineID']) {
   $update_array['snmpEngineID'] = $poll_device['snmpEngineID'];
-  if ($device['snmpEngineID'])
-  {
+  if ($device['snmpEngineID']) {
     // snmpEngineID changed, force full device rediscovery
     log_event('snmpEngineID changed: '.$device['snmpEngineID'].' -> '.$poll_device['snmpEngineID'].' (probably the device was replaced). The device will be rediscovered.', $device, 'device', $device['device_id'], 4);
     $force_discovery = TRUE;
     force_discovery($device);
   } else {
     log_event('snmpEngineID -> '.$poll_device['snmpEngineID'], $device, 'device', $device['device_id']);
+
+    if (strlen($poll_device['snmpEngineID']) === 0) {
+      $poll_empty_count++;
+    } else {
+      $poll_empty_count--;
+    }
   }
 }
 
 $oids = array('sysObjectID', 'sysContact', 'sysName', 'sysDescr');
-foreach ($oids as $oid)
-{
+foreach ($oids as $oid) {
   $poll_device[$oid] = snmp_fix_string($poll_device[$oid]);
   //print_vars($poll_device[$oid]);
-  if ($poll_device[$oid] != $device[$oid])
-  {
-    $update_array[$oid] = ($poll_device[$oid] ? $poll_device[$oid] : array('NULL'));
+  if ($poll_device[$oid] != $device[$oid]) {
+    $update_array[$oid] = $poll_device[$oid] ?: [ 'NULL' ];
     log_event("$oid -> '".$poll_device[$oid]."'", $device, 'device', $device['device_id']);
 
+    if (strlen($poll_device[$oid]) === 0) {
+      $poll_empty_count++;
+    } else {
+      $poll_empty_count--;
+    }
+
     // Update $device array for cases when model specific options required
-    if ($oid === 'sysObjectID' && $poll_device['sysObjectID'])
-    {
+    if ($oid === 'sysObjectID' && $poll_device['sysObjectID']) {
       $device['sysObjectID'] = $poll_device['sysObjectID'];
     }
+  }
+}
+
+// Re-check device status
+if ($poll_empty_count >= 2) {
+  $device_status = device_status_array($device);
+  if ($device['status'] != $device_status['status'] &&
+      $device_status['status'] == 0) {
+    $status        = $device_status['status'];
+    $status_type   = $device_status['status_type'];
+    $device['status']      = $device_status['status'];
+    $device['status_type'] = $device_status['status_type'];
+
+    // device going down by some reasons, prevent other polling
+    // reset update array
+    $update_array = [];
+    return;
   }
 }
 

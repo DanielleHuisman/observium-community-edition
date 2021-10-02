@@ -26,23 +26,23 @@ register_html_title('Settings');
  * @param Boolean $try_isset If True, return isset($sqlname) check, else return variable content
  * @return mixed
  */
-function sql_to_array($sqlname, $arrayvar, $try_isset = TRUE)
-{
+function sql_to_array($sqlname, $arrayvar, $try_isset = TRUE) {
+
   list($key, $pop_sqlname) = explode('|', $sqlname, 2);
 
-  $isset = isset($arrayvar[$key]);
-  if ($pop_sqlname === NULL)
-  {
+  if (!is_array($arrayvar)) { return FALSE; }
+
+  $isset = array_key_exists($key, $arrayvar);
+
+  if (safe_empty($pop_sqlname)) {
     // Reached the variable, return its content, or FALSE if it's not set
-    if ($try_isset)
-    {
+    if ($try_isset) {
       return $isset;
-    } else {
-      return ($isset ? $arrayvar[$key] : NULL);
     }
+    return $isset ? $arrayvar[$key] : NULL;
   }
-  else if ($isset)
-  {
+
+  if ($isset) {
     // Recurse to lower level
     return sql_to_array($pop_sqlname, $arrayvar[$key], $try_isset);
   }
@@ -70,15 +70,13 @@ include($config['install_dir'] . '/includes/config-variables.inc.php');
 
 // Loop all variables and build an array with sections, subsections and variables
 // This is only done on this page, so there is no performance issue for the rest of Observium
-foreach ($config_variable as $varname => $variable)
-{
+foreach ($config_variable as $varname => $variable) {
   $config_subsections[$variable['section']][$variable['subsection']][$varname] = $variable;
 }
 
 // Change/save config actions.
 
-if (($vars['submit'] == 'save' || $vars['action'] == 'save') && request_token_valid($vars))
-{
+if (($vars['submit'] === 'save' || $vars['action'] === 'save') && request_token_valid($vars)) {
   //r($vars);
   $updates = 0;
   $deletes = array();
@@ -89,8 +87,7 @@ if (($vars['submit'] == 'save' || $vars['action'] == 'save') && request_token_va
   // Submit button pressed
   foreach ($vars as $varname => $value)
   {
-    if (substr($varname, 0, 7) == 'varset_')
-    {
+    if (str_starts($varname, 'varset_')) {
       $varname = substr($varname, 7);
       $sqlname = str_replace('__', '|', $varname);
       $content = $vars[$varname];
@@ -191,6 +188,20 @@ if (($vars['submit'] == 'save' || $vars['action'] == 'save') && request_token_va
               }
             }
             break;
+          case 'enum-key-value':
+            //r($content);
+            //r($params);
+            if (isset($content['key'], $content['value'])) {
+              $tmp     = $content;
+              $content = [];
+              foreach ($tmp['key'] as $i => $key) {
+                if (safe_empty($key) && safe_empty($tmp['value'][$i])) { continue; } // skip empty key-value pair
+                $content[$key] = $tmp['value'][$i];
+              }
+              $ok = TRUE;
+              //r($content);
+            }
+            break;
           case 'enum-freeinput':
             //r($content);
             //r($params);
@@ -201,8 +212,7 @@ if (($vars['submit'] == 'save' || $vars['action'] == 'save') && request_token_va
               $content = array();
               $ok = TRUE;
             }
-            foreach ($content as $value)
-            {
+            foreach ($content as $value) {
               $ok = TRUE;
             }
             break;

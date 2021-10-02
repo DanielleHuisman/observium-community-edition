@@ -1,35 +1,40 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 ?>
 <div class="row" style="margin-top: 50px;">
   <div class="col-sm-12 col-md-10 col-md-offset-1 col-lg-8 col-lg-offset-2 col-xl-6 col-xl-offset-3">
-    <div class="box box-solid" <?php if(TRUE) { echo 'style="background-image: url(\'images/login-hamster-large.png\');  background-position: left 10px top -65px; background-repeat: no-repeat;"'; } ?> >
-     <div class="login-box" <?php if(isset($config['web']['logo'])) { echo 'style="background-image: url(../images/'.$config['web']['logo'].');"'; }  ?> >
+    <div class="box box-solid" <?php if (TRUE) { echo 'style="background-image: url(\'images/login-hamster-large.png\');  background-position: left 10px top -65px; background-repeat: no-repeat;"'; } ?> >
+     <div class="login-box" <?php if (isset($config['web']['logo'])) { echo 'style="background-image: url(../images/'.escape_html($config['web']['logo']).');"'; }  ?> >
       <div class="row">
         <div class="col-xs-4 col-sm-4 col-md-4">
         </div>
         <div class="col-xs-8 col-sm-8 col-md-8">
 <?php
-      $form = array('type'      => 'horizontal',
-                    'id'        => 'logonform',
-                    //'space'   => '20px',
-                    //'title'   => 'Logon',
-                    //'icon'    => 'oicon-key',
-                    'class'     => NULL, // Use empty class here, to not add additional divs
-                    'fieldset'  => array('logon' => 'Please log in:'),
-                    );
+      $form = [
+              'type'      => 'horizontal',
+              'id'        => 'logonform',
+              //'space'   => '20px',
+              //'title'   => 'Logon',
+              //'icon'    => 'oicon-key',
+              'class'     => NULL, // Use empty class here, to not add additional divs
+              'fieldset'  => array('logon' => 'Please log in:'),
+      ];
+
+    // Reset form url without logon message
+    if (isset($_GET['lm']))
+    {
+        $form['url'] = $config['base_url'];
+    }
 
       $form['row'][0]['username']  = array(
                                       'type'        => 'text',
@@ -66,6 +71,14 @@ if ($config['login_remember_me'] && OBS_ENCRYPT)
       print_form($form);
       unset($form);
 
+// Get and decrypt logout message
+if (isset($_GET['lm']) && $auth_message = decrypt($_GET['lm'], OBSERVIUM_PRODUCT.OBSERVIUM_VERSION))
+{
+  //print_vars($_GET['lm']);
+  //print_vars($auth_message);
+  //print_vars(decrypt($_GET['lm'], OBSERVIUM_PRODUCT));
+  $_SESSION['auth_message'] = $auth_message;
+}
 if (isset($_SESSION['auth_message']))
 {
   echo('<div class="controls" style="text-align: center; font-weight: bold; color: #cc0000; margin-top: 15px;">' . escape_html($_SESSION['auth_message']) . '</div');

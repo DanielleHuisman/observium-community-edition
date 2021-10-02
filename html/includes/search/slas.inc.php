@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -14,10 +14,8 @@
 $results = dbFetchRows("SELECT * FROM `slas` LEFT JOIN `devices` USING (`device_id`) WHERE (`sla_target` LIKE ? OR `sla_index` LIKE ? OR `sla_tag` LIKE ?) $query_permitted_device ORDER BY `sla_target` LIMIT $query_limit", array($query_param, $query_param, $query_param));
 
 
-if (count($results))
-{
-  foreach ($results as $result)
-  {
+if (count($results)) {
+  foreach ($results as $result) {
     humanize_sla($result);
 
     $descr = strlen($result['location']) ? escape_html($result['location']) . ' | ' : '';

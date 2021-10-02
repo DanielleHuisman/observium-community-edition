@@ -6,29 +6,26 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 /// SEARCH STATUS
 $results = dbFetchRows("SELECT * FROM `entPhysical`
                         LEFT JOIN `devices` USING (`device_id`)
-                        WHERE (`entPhysicalSerialNum` LIKE ? OR `entPhysicalModelName` LIKE ?) $query_permitted_device
-                        ORDER BY `entPhysicalName` LIMIT $query_limit", array($query_param, $query_param));
+                        WHERE `deleted` IS NULL AND (`entPhysicalSerialNum` LIKE ? OR `entPhysicalModelName` LIKE ?) $query_permitted_device
+                        ORDER BY `entPhysicalName` LIMIT $query_limit", [ $query_param, $query_param ]);
 
-if (count($results))
-{
-  foreach ($results as $result)
-  {
+if (safe_count($results)) {
+  foreach ($results as $result) {
     $name = $result['entPhysicalPhysicalName'];
     if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
 
-    if(strlen($result['entPhysicalModelName']))
-    {
+    if (strlen($result['entPhysicalModelName'])) {
       $model = $result['entPhysicalModelName'];
-    } elseif(strlen($result['entPhysicalDescr'])) {
+    } elseif (strlen($result['entPhysicalDescr'])) {
       $model = $result['entPhysicalDescr'];
-    } elseif(strlen($result['entPhysicalName'])) {
+    } elseif (strlen($result['entPhysicalName'])) {
       $model = $result['entPhysicalName'];
     } else {
       $model = "";

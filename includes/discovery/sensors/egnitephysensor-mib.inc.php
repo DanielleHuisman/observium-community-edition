@@ -81,14 +81,14 @@ foreach ($oids as $index => $entry)
   $descr = $entry['querxPhySensorName'];
 
   // Non common sensor classes:
-  if ($entry['querxPhySensorType'] == 'celsius' && str_iexists($descr, 'Dew'))
+  if ($entry['querxPhySensorType'] == 'celsius' && str_icontains_array($descr, 'Dew'))
   {
     $class = 'dewpoint';
   }
   elseif ($entry['querxPhySensorType'] == 'other')
   {
     // Probably can be some other sensor classes
-    if (str_iexists($descr, 'Pressure') || str_ends($entry['querxPhySensorUnitsDisplay'], [ 'Pa', 'psi' ]))
+    if (str_icontains_array($descr, 'Pressure') || str_ends($entry['querxPhySensorUnitsDisplay'], [ 'Pa', 'psi' ]))
     {
       $class = 'pressure';
       //$options['sensor_unit'] = $entry['querxPhySensorUnitsDisplay'];

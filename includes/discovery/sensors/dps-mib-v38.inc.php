@@ -28,7 +28,7 @@ DPS-MIB-V38::thresholds.1 = noAlarms
 DPS-MIB-V38::thresholds.5 = noAlarms
 DPS-MIB-V38::thresholds.17 = noAlarms
  */
-$oids = snmpwalk_cache_multi_oid($device, "analogChannels", array(), "DPS-MIB-V38");
+$oids = snmpwalk_cache_oid($device, "analogChannels", array(), "DPS-MIB-V38");
 
 foreach ($oids as $index => $entry)
 {
@@ -43,7 +43,7 @@ foreach ($oids as $index => $entry)
   // Detect class by description
   foreach (array('temperature', 'humidity', 'voltage', 'current', 'power') as $class)
   {
-    if (str_iexists($descr, $class))
+    if (str_icontains_array($descr, $class))
     {
       discover_sensor($class, $device, $oid_num, $index, $type, $descr, 1, $value);
       break; // stop foreach

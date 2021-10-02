@@ -10,7 +10,7 @@
  *
  */
 
-$oids = snmpwalk_cache_multi_oid($device, "rttMonCtrl", [], 'CISCO-RTTMON-MIB', NULL, OBS_SNMP_ALL_HEX);
+$oids = snmpwalk_cache_oid($device, "rttMonCtrl", [], 'CISCO-RTTMON-MIB', NULL, OBS_SNMP_ALL_HEX);
 
 // Add extended source/target info
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminTargetAddrType.44 = INTEGER: ipv4(1)
@@ -21,10 +21,10 @@ $oids = snmpwalk_cache_multi_oid($device, "rttMonCtrl", [], 'CISCO-RTTMON-MIB', 
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminSourceAddrType.66 = INTEGER: ipv6(2)
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminSourceAddress.44 = Hex-STRING: D9 4F 06 9C
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminSourceAddress.66 = ""
-//$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminTargetAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
-$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminTargetAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB', NULL, OBS_SNMP_ALL_HEX);
-//$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminSourceAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
-//$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminSourceAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB');
+//$oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminTargetAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
+$oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminTargetAddress", $oids, 'CISCO-RTTMON-IP-EXT-MIB', NULL, OBS_SNMP_ALL_HEX);
+//$oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminSourceAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
+//$oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminSourceAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB');
 
 foreach ($oids as $sla_index => $entry)
 {

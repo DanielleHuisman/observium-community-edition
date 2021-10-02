@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -166,6 +165,11 @@ function build_counter_query($vars, $query_count = FALSE)
       case "group_id":
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'counters.counter_id');
+        break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'counters.device_id');
         break;
       case "device":
       case "device_id":
@@ -444,7 +448,7 @@ function generate_counter_row($counter, $vars)
 
   // Set to TRUE if this counter in time based format (ie lifetime)
   $format_time = isset($config['counter_types'][$counter['counter_class']]['format']) &&
-                 str_exists($config['counter_types'][$counter['counter_class']]['format'], 'time');
+                 str_contains_array($config['counter_types'][$counter['counter_class']]['format'], 'time');
   $rates = [];
   // FIXME. Probably do not show rates for time based counters?.. (it's always around 1s/5m/1h)
   if (!$format_time)
@@ -647,14 +651,12 @@ function print_counter_form($vars, $single_device = FALSE)
                       'url'   => generate_url($vars));
 
   // Clean grids
-  foreach (array_keys($form['row'][0]) as $param)
-  {
-    unset($form['row'][0][$param]['grid']);
+  foreach ($form['row'] as $row => $rows) {
+    foreach (array_keys($rows) as $param) {
+      if (isset($form['row'][$row][$param]['grid'])) { unset($form['row'][$row][$param]['grid']); }
+    }
   }
-  foreach (array_keys($form['row'][1]) as $param)
-  {
-    unset($form['row'][1][$param]['grid']);
-  }
+
   // Copy forms
   $panel_form['row'][0]['device_id']      = $form['row'][0]['device_id'];
   $panel_form['row'][0]['counter_class']   = $form['row'][0]['counter_class'];

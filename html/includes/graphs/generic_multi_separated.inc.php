@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -38,7 +37,7 @@ if ($args['nototal'] || $nototal)
   }
 }
 
-$data_len = count($data_show) * 8;
+$data_len = safe_count($data_show) * 8;
 
 // Here we scale the length of the description to make sure we keep the numbers
 
@@ -79,7 +78,7 @@ if ($legend != 'no')
 
 $i = 0;
 $rrd_multi = array();
-$count = count($rrd_list);
+$count = safe_count($rrd_list);
 
 if(isset($colours_in))
 {

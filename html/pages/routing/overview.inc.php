@@ -10,6 +10,7 @@
  *
  */
 
+$g_i = 0;
 foreach ($datas as $type)
 {
   if ($type != "overview")
@@ -18,7 +19,7 @@ foreach ($datas as $type)
     if (is_file($filename))
     {
       $g_i++;
-      if (!is_integer($g_i/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
+      $row_colour = !is_intnum($g_i / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
 
       echo('<div style="background-color: '.$row_colour.';">');
       echo('<div style="padding:4px 0px 0px 8px;"><span class=graphhead>'.$type_text[$type].'</span>');
@@ -31,7 +32,7 @@ foreach ($datas as $type)
       $graph_title = $type_text[$type];
       $graph_type = "device_".$type;
 
-      include("includes/print-device-graph.php");
+      include($config['html_dir'] . "/includes/print-device-graph.php");
     }
   }
 }

@@ -13,7 +13,7 @@
 
 // Temperature Table
 
-$data = snmpwalk_cache_multi_oid($device, "tempSensorEntry", array(), "NETBOTZ410-MIB");
+$data = snmpwalk_cache_oid($device, "tempSensorEntry", array(), "NETBOTZ410-MIB");
 
 foreach($data as $index => $entry)
 {
@@ -25,7 +25,7 @@ unset($data, $index, $entry);
 
 // Humidity Table
 
-$data = snmpwalk_cache_multi_oid($device, "humiSensorEntry", array(), "NETBOTZ410-MIB");
+$data = snmpwalk_cache_oid($device, "humiSensorEntry", array(), "NETBOTZ410-MIB");
 
 foreach($data as $index => $entry)
 {
@@ -37,7 +37,7 @@ unset($data, $index, $entry);
 
 // Dew Point Table
 
-$data = snmpwalk_cache_multi_oid($device, "dewPointSensorEntry", array(), "NETBOTZ410-MIB");
+$data = snmpwalk_cache_oid($device, "dewPointSensorEntry", array(), "NETBOTZ410-MIB");
 
 foreach($data as $index => $entry)
 {
@@ -51,7 +51,7 @@ unset($data, $index, $entry);
 
 // Audio Sensor Table
 
-$data = snmpwalk_cache_multi_oid($device, "audioSensorEntry", array(), "NETBOTZ410-MIB");
+$data = snmpwalk_cache_oid($device, "audioSensorEntry", array(), "NETBOTZ410-MIB");
 
 foreach($data as $index => $entry)
 {
@@ -65,7 +65,7 @@ unset($data, $index, $entry);
 
 // Airflow Table
 
-$data = snmpwalk_cache_multi_oid($device, "airFlowSensorEntry", array(), "NETBOTZ410-MIB");
+$data = snmpwalk_cache_oid($device, "airFlowSensorEntry", array(), "NETBOTZ410-MIB");
 
 foreach($data as $index => $entry)
 {
@@ -78,7 +78,7 @@ unset($data, $index, $entry);
 
 // Amperes Table
 
-$data = snmpwalk_cache_multi_oid($device, "ampDetectSensorEntry", array(), "NETBOTZ410-MIB");
+$data = snmpwalk_cache_oid($device, "ampDetectSensorEntry", array(), "NETBOTZ410-MIB");
 
 foreach($data as $index => $entry)
 {

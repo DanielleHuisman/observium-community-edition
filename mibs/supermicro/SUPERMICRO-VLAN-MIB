@@ -1,0 +1,1612 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsvlan.mib,v 1.39 2013/07/09 12:59:43 siva Exp $
+
+SUPERMICRO-VLAN-MIB DEFINITIONS ::= BEGIN 
+ 
+IMPORTS 
+ 
+    OBJECT-TYPE,MODULE-IDENTITY, Integer32, Unsigned32,
+    enterprises, NOTIFICATION-TYPE, Counter32, IpAddress
+         FROM SNMPv2-SMI 
+    RowStatus, TEXTUAL-CONVENTION, MacAddress, TruthValue,
+    DisplayString
+         FROM SNMPv2-TC
+    dot1qTpFdbPort
+         FROM Q-BRIDGE-MIB
+    dot1qStaticUnicastEntry
+         FROM Q-BRIDGE-MIB
+    dot1qVlanStaticEntry
+         FROM Q-BRIDGE-MIB
+    VlanIdOrNone
+         FROM Q-BRIDGE-MIB
+    dot1qTpFdbEntry, PortList
+         FROM Q-BRIDGE-MIB;                                    -- [RFC4363]
+ 
+futureVlanMIB MODULE-IDENTITY 
+    LAST-UPDATED "201209050000Z" 
+    ORGANIZATION "Super Micro Computer Inc." 
+    CONTACT-INFO "support@Supermicro.com" 
+    DESCRIPTION "||||||"
+    REVISION "201209050000Z"
+    DESCRIPTION "||||||" 
+::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 65} 
+ 
+VlanId ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+        "A 12-bit VLAN ID used in the VLAN Tag header." 
+    SYNTAX      Integer32 (1..4094) 
+ 
+EnabledStatus ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+        "A simple status value for the object." 
+    SYNTAX      INTEGER { enabled(1), disabled(2) } 
+ 
+MacLearningStatus ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+        "A simple MAC learning status value specific to VLAN"
+    SYNTAX      INTEGER { enabled(1), disabled(2), default(3) } 
+ 
+dot1qFutureVlan     OBJECT IDENTIFIER   ::= { futureVlanMIB 1 } 
+ 
+--dot1qFutureVlanTunnelConfig - This sub group contains mib objects for 
+-- configuring VLAN Stacking (also known 802.1q in 802.1q) feature in VLAN.
+dot1qFutureVlanTunnelConfig OBJECT IDENTIFIER  ::= { futureVlanMIB 2 }
+dot1qFutureVlanTraps  OBJECT IDENTIFIER  ::= { futureVlanMIB 3 }
+ 
+-- dot1qFutureVlan group 
+ 
+-- SCALAR BEGIN 
+ 
+dot1qFutureVlanStatus OBJECT-TYPE 
+   SYNTAX      EnabledStatus 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The administrative status requested by management for the Vlan 
+      feature. The value enabled(1) indicates that Vlan should be enabled  
+      in the device on all ports. The value disabled(2) indicates that 
+      Vlan should be disabled in the device on all ports. The object can 
+      be set to disabled if and only if, dot1qGvrpStatus and dot1dGmrpStatus  
+      are disabled. The object should NOT be enabled before setting  
+      'dot1qFutureVlanType'.
+      Setting this object will affect the operational status of the
+      VLAN module (dot1qFutureVlanOperStatus)." 
+   ::= { dot1qFutureVlan 1 } 
+ 
+dot1qFutureVlanMacBasedOnAllPorts OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION 
+      "This object is only used to enable/disable the mac based type on all ports
+       of dot1qFutureVlanPortMacBasedClassification"
+   ::= { dot1qFutureVlan 2 } 
+
+dot1qFutureVlanPortProtoBasedOnAllPorts OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION 
+      "This object is only used to enable/disable the port protocol based type on all ports
+       of dot1qFutureVlanPortPortProtoBasedClassification"
+   ::= { dot1qFutureVlan 3 } 
+ 
+-- OBSOLETED
+-- dot1qFutureVlanOperLearningMode OBJECT-TYPE 
+--   SYNTAX      INTEGER { 
+--                  ivl (1), 
+--                 svl (2), 
+--                hybrid (3) 
+--               } 
+--   MAX-ACCESS  read-only
+--   STATUS      current 
+--   DESCRIPTION 
+--      "The type of the Vlan learning mode operational on this switch." 
+--   ::= { dot1qFutureVlan 4 } 
+ 
+dot1qFutureVlanShutdownStatus OBJECT-TYPE 
+   SYNTAX      TruthValue 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The administrative shutdown status requested by management for Vlan  
+      The value true(1) indicates that Vlan should be shutdown  
+      in the device on all ports. All memory will be released. 
+      The value false(2) indicates that Vlan should be active in the device  
+      on all ports."
+   DEFVAL   { false }       
+   ::= { dot1qFutureVlan 5 } 
+ 
+dot1qFutureGarpShutdownStatus OBJECT-TYPE 
+   SYNTAX      TruthValue 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The administrative status requested by management for GARP  
+      The value true(1) indicates that GARP should be shutdown  
+      in the device on all ports. All memory will be released. 
+      The value false(2) indicates that GARP should be active in  
+      the device on all ports. This object can be set to true only  
+      when none of the Garp applications (GVRP, GMRP) are enabled. 
+      Whenever Garp is enabled after shutdown, Gvrp and Gmrp must 
+      be enabled explicitly." 
+   DEFVAL   { false }       
+   ::= { dot1qFutureVlan 6 } 
+ 
+dot1qFutureVlanDebug OBJECT-TYPE 
+   SYNTAX      Integer32 (0..524287)
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "Enables the tracing in the selected submodule in VLAN. A 32 bit integer
+      is used to store the Tracing level in the specified module.
+       Different Tracing Levels -
+         BIT 0 - Initialisation and Shutdown Trace.
+         BIT 1 - Management trace.
+         BIT 2 - Data path trace.
+         BIT 3 - Control Plane trace.
+         BIT 4 - Packet Dump.
+         BIT 5 - OS Resource trace.
+         BIT 6 - All Failure trace (All failures including Packet Validation)
+         BIT 7 - Buffer Trace.
+
+       Different submodule Tracing -
+         BIT 16 - Tracing in VLAN module.
+         BIT 17 - Tracing in VLAN Priority module.
+         BIT 18 - Tracing in VLAN redundancy module.   
+
+       The remaining bits are reserved. The combination of levels and submodules 
+       are allowed i.e. Tracing can be allowed at all failure and data path 
+       level in All submodules by setting the BIT appropriately.
+       For Example, setting the debug value to the following bit stream, 
+          00000000000000010000000000000100 will enable data path trace 
+       prints in VLAN module. Multiple submodules and multiple levels can
+       be combined by setting the corresponding bits.
+       For Example, setting the debug value to the following bit stream,
+          00000000000000110000000000001100 will enable data path and 
+       control plane trace prints in VLAN and VLAN Priority modules.
+       
+       Note : BIT0 is the least significant bit and BIT31 is the most
+       significant bit."
+   ::= { dot1qFutureVlan 7 } 
+ 
+dot1qFutureVlanLearningMode OBJECT-TYPE
+   SYNTAX      INTEGER {
+               ivl(1),
+               svl(2),
+               hybrid(3)
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+         "The Type of VLAN learning mode.
+          When the object value is modified, the static
+          fid-vlan mappings and static unicast entries
+          need to be reconfigured. Static unicast configurations 
+          associated with old fid will get deleted." 
+   DEFVAL  { ivl }
+   ::= { dot1qFutureVlan 8 }
+
+dot1qFutureVlanHybridTypeDefault OBJECT-TYPE
+   SYNTAX      INTEGER {
+               ivl(1),
+               svl(2)
+               }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+         "The default learning mode of the switch if 
+          dot1qFutureVlanLearningMode is hvl (3).
+          When the object value is modified, the static
+          fid-vlan mappings and static unicast entries
+          need to be reconfigured. Static unicast configurations 
+          associated with old fid will get deleted."
+   DEFVAL  { ivl }
+   ::= { dot1qFutureVlan 9 }
+
+-- SCALAR END 
+ 
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Port Table 
+-- ---------------------------------------------------------------------------- 
+ 
+dot1qFutureVlanPortTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanPortEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Table containing the port type information." 
+   ::= { dot1qFutureVlan 10 } 
+ 
+dot1qFutureVlanPortEntry OBJECT-TYPE 
+   SYNTAX      Dot1qFutureVlanPortEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Entry indicating the type of the port." 
+   INDEX { dot1qFutureVlanPort } 
+   ::= { dot1qFutureVlanPortTable 1 } 
+    
+-- 2014/09/05 Chung : Global mapping and control for MAC-based and Subnet-base VLAN.
+-- dot1qFutureVlanPortMacBasedClassificatio and
+-- dot1qFutureVlanPortSubnetBasedClassification are invalid.
+
+Dot1qFutureVlanPortEntry ::= 
+   SEQUENCE { 
+      dot1qFutureVlanPort Integer32, 
+      dot1qFutureVlanPortType INTEGER, 
+--    dot1qFutureVlanPortMacBasedClassification EnabledStatus,
+      dot1qFutureVlanPortPortProtoBasedClassification EnabledStatus,
+      dot1qFutureVlanFilteringUtilityCriteria INTEGER,
+      dot1qFutureVlanPortProtected TruthValue,
+--    dot1qFutureVlanPortSubnetBasedClassification EnabledStatus,
+      dot1qFutureVlanPortUnicastMacLearning EnabledStatus,
+	  dot1qFutureVlanPortAllowedVlanList OCTET STRING
+   } 
+ 
+dot1qFutureVlanPort OBJECT-TYPE 
+   SYNTAX      Integer32 (1..65535) 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "The port number of the port for which this entry applies." 
+   ::= { dot1qFutureVlanPortEntry 1 } 
+ 
+dot1qFutureVlanPortType OBJECT-TYPE 
+   SYNTAX      INTEGER { 
+                  accessPort (1), 
+                  trunkPort (2), 
+                  hybridPort (3),
+                  hostPort (4), 
+                  promiscuousPort (5) 
+               } 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The type of the port is by default hybrid port. 
+       When configured as access port, the port can accept and send 
+       only untagged frames.
+       When configured as a trunk port, port is added as 
+       member of all the existing Vlans and also for any new vlan
+       created. 
+       When configured as hybrid port, the port can send or accept both 
+       tagged and untagged frames.  
+       
+       hostPort, promiscuousPort are types of port in PVLAN domain.
+       Behaviour of host port varies based on the secondary vlan to which
+       it is configured as member port.
+
+       If a host port is a member port of an isolated VLAN, traffic from the 
+       host port is sent only to the promiscuous port of the Private VLAN and 
+       the trunk port.
+
+       If a host port is a member port of the community VLAN, traffic from the 
+       port can be sent only to other ports of the community VLAN , trunk port 
+       and promiscuous port of the private VLAN. 
+       
+       A host port can be associated with only one secondary vlan and with
+       the associated primary vlan.
+
+       The PVID of host port will be set the ID of the secondary vlan
+       to which it belongs to.If a host port is member port of primary vlan, 
+       but is not member port of any secondary vlan, then its PVID will be 
+       set to primary vlan id.
+
+       When a port is configured as a hostPort or promiscuousPort, ingress
+       filtering will be enabled on that port. Also ingress filtering
+       cannot be disabled on hostPort and promiscuousPort.
+
+       Promiscuous ports should be configured as member port of primary vlan 
+       and member port of all secondary vlans associated with that 
+       primary vlan.
+
+       The PVID of promiscuous port will be set as the ID of the primary 
+       vlan to which it belongs to.
+
+       Host and  promiscuous ports should be configured as untagged members
+       of primary/secondary vlans.
+
+       When a access/hybrid port is configured as a member port of a
+       primary/secondary vlan, it becomes a hostPort automatically.
+       
+       When the type of the port is changed from promiscuous/host to
+       access/hybrid port, the port gets removed from the associated PVLAN
+       domain."
+
+   DEFVAL   { hybridPort } 
+   ::= { dot1qFutureVlanPortEntry 2 } 
+
+-- dot1qFutureVlanPortMacBasedClassification OBJECT-TYPE 
+--    SYNTAX      EnabledStatus
+--    MAX-ACCESS  read-write 
+--    STATUS      current 
+--    DESCRIPTION 
+--       "Object to expilicitly enable/disable the Mac based Classification 
+--       on port. This can be independently set without 
+--       any dependency in available configuration of
+--        dot1qFutureVlanMacBasedOnAllPorts " 
+--    ::= { dot1qFutureVlanPortEntry 3 } 
+
+dot1qFutureVlanPortPortProtoBasedClassification OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "Object to expilicitly enable/disable the port and protocol
+      Classification on port. This can be independently set without 
+      any dependency in available configuration of
+       dot1qFutureVlanPortProtoBasedOnAllPorts " 
+   ::= { dot1qFutureVlanPortEntry 4 } 
+ 
+ dot1qFutureVlanFilteringUtilityCriteria OBJECT-TYPE 
+   SYNTAX      INTEGER { 
+                  default  (1), 
+                  enhanced (2)
+               } 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "Based on this object, learning on a port is decided.
+      
+      If default filtering utility Criteria is selected on a port, then
+      learning of source mac from a received packet on that port will be
+      done only if there is atleast on member port in that vlan.
+
+      If enhanced filtering utility criteria is selected on a port,then
+      learning of source mac from a received packet on that port will be
+      done if the following are satisfied: 
+      
+      -    if at least one VLAN that uses the FID includes the reception
+      Port and at least one other Port with a Port State of Learning or
+      Forwarding in its member set, and:
+       
+       o The operPointToPointMAC parameter is false for the reception Port; or
+       o Ingress to the VLAN is permitted through a third Port.
+       
+       The third port can, but is not required to, be in the member set."
+   DEFVAL   { default } 
+   ::= { dot1qFutureVlanPortEntry 5 } 
+ 
+dot1qFutureVlanPortProtected  OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "The Split Horizon property of the port. If set to true, frames that 
+       are received on any other port that has the same property set to true,
+       will not be forwarded on this port."
+   DEFVAL   { false }
+   ::= { dot1qFutureVlanPortEntry 6 }
+ 
+-- dot1qFutureVlanPortSubnetBasedClassification OBJECT-TYPE 
+--    SYNTAX      EnabledStatus
+--    MAX-ACCESS  read-write 
+--    STATUS      current 
+--    DESCRIPTION 
+--       "Object to expilicitly enable/disable the Subnet based Vlan Classification 
+--       on port. This can be independently set without any dependency in 
+--       available configuration of dot1qFutureVlanSubnetBasedOnAllPorts. This
+--       object is not used in case of BCM chipsets." 
+--    ::= { dot1qFutureVlanPortEntry 7 }
+
+dot1qFutureVlanPortUnicastMacLearning OBJECT-TYPE
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "A Truth value indicating the unicast MAC learning enabled/disabled
+       status for this port. 
+       When Unicast Mac Learning is disabled, no unicast mac entry will be 
+       learnt on this port.
+       When Mac Learning is enabled, unicast mac entries will be learnt on this
+       port. Configuration of this object will not get affected by the value
+       configured for dot1qFutureVlanGlobalMacLearningStatus"
+   DEFVAL   { enabled }
+   ::= { dot1qFutureVlanPortEntry 8 }
+
+-- ----------------------------------------------------------------------------
+-- JC Add allowed vlan list for trunk ports
+-- ----------------------------------------------------------------------------
+dot1qFutureVlanPortAllowedVlanList OBJECT-TYPE 
+   SYNTAX      OCTET STRING (SIZE (0..512))
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "A string of octets containing one bit per vlan.
+	   Specifies the vlans which the trunk port can add to.
+	   By default all vlans are allowed to add the trunk ports.
+	   
+	   If a set of vlans are configured in the 'VlanList', the trunk port can
+	   reside only in the configured vlan set. The native vlan or port vlan 
+	   id must be in the list."
+
+   ::= { dot1qFutureVlanPortEntry 9 } 
+
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Mac Map Table 
+-- ---------------------------------------------------------------------------- 
+ 
+dot1qFutureVlanPortMacMapTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanPortMacMapEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "A table that contains information on Vlan-MAC address 
+      mapping. 
+      BCM supports Mac based VLAN globally (not on per port)." 
+   ::= { dot1qFutureVlan 11 } 
+
+-- 2014/09/05 Chung. System-wide config Mac Map.
+dot1qFutureVlanPortMacMapEntry OBJECT-TYPE
+   SYNTAX      Dot1qFutureVlanPortMacMapEntry
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Entry that contains Vlan-MAC address mapping." 
+   INDEX {dot1qFutureVlanPortMacMapAddr }
+   ::= { dot1qFutureVlanPortMacMapTable 1 }
+
+-- 2014/09/05 Chung. No support Map name and McastBcastOption
+Dot1qFutureVlanPortMacMapEntry ::=
+   SEQUENCE { 
+      dot1qFutureVlanPortMacMapAddr MacAddress,
+      dot1qFutureVlanPortMacMapVid  VlanId,
+--      dot1qFutureVlanPortMacMapName DisplayString,
+--      dot1qFutureVlanPortMacMapMcastBcastOption INTEGER,
+      dot1qFutureVlanPortMacMapRowStatus RowStatus
+   } 
+ 
+dot1qFutureVlanPortMacMapAddr OBJECT-TYPE
+   SYNTAX      MacAddress  
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "The Mac address for which the Vlan mapping is present in the entry." 
+   ::= { dot1qFutureVlanPortMacMapEntry 1 }
+ 
+dot1qFutureVlanPortMacMapVid OBJECT-TYPE
+   SYNTAX      VlanId 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The Vlan to which the mac address of this entry is mapped to." 
+   ::= { dot1qFutureVlanPortMacMapEntry 2 }
+ 
+-- dot1qFutureVlanPortMacMapName OBJECT-TYPE
+--    SYNTAX      DisplayString 
+--    MAX-ACCESS  read-write 
+--    STATUS      current 
+--    DESCRIPTION 
+--       "The name given to the mac-vlan entry." 
+--    ::= { dot1qFutureVlanPortMacMapEntry 3 }
+ 
+-- dot1qFutureVlanPortMacMapMcastBcastOption OBJECT-TYPE
+--    SYNTAX      INTEGER { allow(1), suppress(2) }
+--    MAX-ACCESS  read-write
+--    STATUS      current
+--    DESCRIPTION 
+--        "Configurable option for discarding/allowing Multicast/Broadcast Untagged
+--         frames. The value allow (1) indicates that Multicast/Broadcast frames
+--         with source Mac address as in the Mac Vlan entry will be dropped if mac
+--         based vlan is enabled on that port.The value suppress (2) indicates that
+--         Multicast/Broadcast frames with source Mac address as in the Mac Vlan
+--         entry will be processed if mac based vlan is enabled on that port"
+--     DEFVAL { allow }
+--     ::= { dot1qFutureVlanPortMacMapEntry 4 }
+ 
+dot1qFutureVlanPortMacMapRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The row status of the entry."  
+   ::= { dot1qFutureVlanPortMacMapEntry 5 }
+
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Vlan-Fid Map Table 
+-- ---------------------------------------------------------------------------- 
+ 
+dot1qFutureVlanFidMapTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanFidMapEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "This table contains information about the Filtering database identifier
+      (FID) used by vlan's to make forwarding decisions. Vlan's can be mapped 
+      to use the same FID to share filtering information among them. This will
+      cause the mapped vlan's to operate in shared vlan learning (SVL) mode.
+      Vlan's mapped to a unique FID will operate in independent vlan learning
+      mode (IVL). A SET operation on this table is allowed only when 
+      dot1qFutureVlanLearningMode is hybrid. By default all vlan's will be 
+      mapped to the FID equal to their vlan id when 
+      dot1qFutureVlanHybridTypeDefault is IVL. If the value of 
+      dot1qFutureVlanHybridTypeDefault is SVL all vlan's are mapped to 
+      filtering database id 1."
+
+   ::= { dot1qFutureVlan 12 } 
+ 
+dot1qFutureVlanFidMapEntry OBJECT-TYPE 
+   SYNTAX      Dot1qFutureVlanFidMapEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Entry mapping VlanId to Filtering database id."
+   INDEX { dot1qFutureVlanIndex } 
+   ::= { dot1qFutureVlanFidMapTable 1 } 
+    
+Dot1qFutureVlanFidMapEntry ::= 
+   SEQUENCE { 
+      dot1qFutureVlanIndex Unsigned32,
+      dot1qFutureVlanFid Unsigned32 
+   } 
+   
+ dot1qFutureVlanIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4094)
+    MAX-ACCESS  read-only  
+    STATUS      current
+    DESCRIPTION
+        "VLAN ID for which filtering database information is available."
+    ::= { dot1qFutureVlanFidMapEntry 1 }
+
+ dot1qFutureVlanFid OBJECT-TYPE 
+    SYNTAX      Unsigned32 (1..4094)
+    MAX-ACCESS  read-write
+    STATUS      current 
+    DESCRIPTION 
+       "The Filtering database id (FID) that will be used by the vlan."
+    ::= { dot1qFutureVlanFidMapEntry 2 } 
+
+ -- dot1qFutureVlanTunnelConfig group 
+ 
+-- SCALAR BEGIN 
+
+dot1qFutureVlanOperStatus OBJECT-TYPE 
+   SYNTAX      EnabledStatus 
+   MAX-ACCESS  read-only 
+   STATUS      current 
+   DESCRIPTION 
+      "The operational status of the Vlan module. 
+      The value enabled(1) indicates that Vlan module is currently enabled  
+      in the device. 
+      The value disabled(2) indicates that Vlan module is currently disabled 
+      in the device." 
+   ::= { dot1qFutureVlan 13 } 
+
+dot1qFutureGvrpOperStatus OBJECT-TYPE 
+   SYNTAX      EnabledStatus 
+   MAX-ACCESS  read-only 
+   STATUS      current 
+   DESCRIPTION 
+      "The operational status of the GVRP module. 
+      The value enabled(1) indicates that GVRP module is currently enabled  
+      in the device. 
+      The value disabled(2) indicates that GVRP module is currently disabled 
+      in the device." 
+   ::= { dot1qFutureVlan 14 } 
+
+dot1qFutureGmrpOperStatus OBJECT-TYPE 
+   SYNTAX      EnabledStatus 
+   MAX-ACCESS  read-only 
+   STATUS      current 
+   DESCRIPTION 
+      "The operational status of the GMRP module. 
+      The value enabled(1) indicates that GMRP module is currently enabled  
+      in the device. 
+      The value disabled(2) indicates that GMRP module is currently disabled 
+      in the device." 
+   ::= { dot1qFutureVlan 15 } 
+
+-- SCALAR END
+
+-- SCALAR BEGIN 
+
+dot1qFutureVlanBridgeMode OBJECT-TYPE
+   SYNTAX      INTEGER {
+                  customerBridge (1),
+                  providerBridge (2),
+                  providerCoreBridge (3),
+                  providerEdgeBridge (4)
+               }
+   MAX-ACCESS  read-write
+   STATUS      deprecated
+   DESCRIPTION
+      
+      "This object indicates the Bridge mode of the switch.
+      
+      Setting this to 'customerBridge' means that the switch will operate 
+      as a 802.1Q VLAN Bridge.
+
+      Setting this to 'providerBridge' means that the Bridge will operate as 
+      a normal Q-in-Q Bridge.
+
+      Setting this to 'providerCoreBridge' means that the switch will operate 
+      as a 802.1ad compliant provider bridge with only S-VLAN component.
+
+      Setting this to 'providerEdgeBridge' means that the switch will operate 
+      as a 802.1ad provider edge bridge with S-VLAN component and atleast 
+      one C-VLAN component.
+      
+      For changing the bridge mode, GARP and STP modules should be shutdown."
+
+   ::= { dot1qFutureVlanTunnelConfig 1 }
+
+
+dot1qFutureVlanTunnelBpduPri OBJECT-TYPE
+    SYNTAX      Integer32 (0..7)
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Specifies the default User Priority for all the tunneled Layer 2
+        BPDU's received on tunnel ports."
+    DEFVAL { 7 }
+    ::= { dot1qFutureVlanTunnelConfig 2 }
+
+-- SCALAR END
+
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Tunnel Table 
+-- ---------------------------------------------------------------------------- 
+ 
+dot1qFutureVlanTunnelTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanTunnelEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      deprecated
+   DESCRIPTION 
+      "This table contains information about the dot1q tunnel ports. A walk on 
+      this table will show only those interfaces that are configured for
+      tunneling.
+      This table is supported only when the Bridge is configured in Provider 
+      Bridge (Q-in-Q) mode.
+      For Provider Core or Edge bridges, the tunnel configuration objects 
+      are defined in fspb.mib"
+      
+   ::= { dot1qFutureVlanTunnelConfig 3 } 
+ 
+dot1qFutureVlanTunnelEntry OBJECT-TYPE 
+   SYNTAX      Dot1qFutureVlanTunnelEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      deprecated
+   DESCRIPTION 
+      "Entry indicating the tunnel information of the port."
+   INDEX { dot1qFutureVlanPort } 
+   ::= { dot1qFutureVlanTunnelTable 1 } 
+    
+Dot1qFutureVlanTunnelEntry ::= 
+   SEQUENCE { 
+      dot1qFutureVlanTunnelStatus EnabledStatus 
+   } 
+ 
+dot1qFutureVlanTunnelStatus OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      deprecated
+   DESCRIPTION 
+      "Indicates whether dot1qTunnelling is enabled on disabled on this port.
+      dot1qFutureVlanTunnelStatus can be set to `enabled` if and only if
+      the Bridge mode is set to be `Provider Bridge Mode` and VLAN port
+      type is set to 'accessPort'. Tunnelling can be enabled only on ports 
+      which are in 'dot1x force-authorised' state.
+      All tunnel ports should be set as untagged members for the access VLAN's
+      configured for that customer."
+   DEFVAL      { disabled }
+   ::= { dot1qFutureVlanTunnelEntry 1 } 
+
+
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Tunnel Protocol Table 
+-- ---------------------------------------------------------------------------- 
+ 
+dot1qFutureVlanTunnelProtocolTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanTunnelProtocolEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      deprecated
+   DESCRIPTION 
+      "This table contains information/statistics about the customer STP/GVRP BPDU's and
+      IGMP packets being tunneled inside the service provider network. A walk on this
+      table will show only those interfaces in which tunneling is enabled.
+
+      This table is supported only when the Bridge is configured in Provider 
+      Bridge (Q-in-Q) mode.
+      For Provider Core or Edge bridges, the tunnel protocol configuration
+      objects are defined in fspb.mib."
+   ::= { dot1qFutureVlanTunnelConfig 4 }
+ 
+dot1qFutureVlanTunnelProtocolEntry OBJECT-TYPE 
+   SYNTAX      Dot1qFutureVlanTunnelProtocolEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      deprecated
+   DESCRIPTION 
+      "Entry indicating the tunneling of STP/GVRP BPDU's and IGMP Packets on this port."
+   INDEX { dot1qFutureVlanPort } 
+   ::= { dot1qFutureVlanTunnelProtocolTable 1 } 
+    
+Dot1qFutureVlanTunnelProtocolEntry ::= 
+   SEQUENCE { 
+      dot1qFutureVlanTunnelStpPDUs      EnabledStatus,
+      dot1qFutureVlanTunnelStpPDUsRecvd Counter32,
+      dot1qFutureVlanTunnelStpPDUsSent    Counter32,
+      dot1qFutureVlanTunnelGvrpPDUs       EnabledStatus,
+      dot1qFutureVlanTunnelGvrpPDUsRecvd  Counter32,
+      dot1qFutureVlanTunnelGvrpPDUsSent   Counter32,
+      dot1qFutureVlanTunnelIgmpPkts        EnabledStatus,
+      dot1qFutureVlanTunnelIgmpPktsRecvd   Counter32,
+      dot1qFutureVlanTunnelIgmpPktsSent    Counter32
+   } 
+ 
+dot1qFutureVlanTunnelStpPDUs OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      deprecated
+   DESCRIPTION 
+      "Indicates whether tunneling of STP BPDUs is enabled or not."
+   DEFVAL      { disabled }
+   ::= { dot1qFutureVlanTunnelProtocolEntry 1 } 
+
+dot1qFutureVlanTunnelStpPDUsRecvd OBJECT-TYPE 
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION 
+      "The number of tunneled ingress STP PDU's."
+   ::= { dot1qFutureVlanTunnelProtocolEntry 2 } 
+
+dot1qFutureVlanTunnelStpPDUsSent OBJECT-TYPE 
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION 
+      "The number of tunneled egress STP PDU's."
+   ::= { dot1qFutureVlanTunnelProtocolEntry 3 } 
+
+dot1qFutureVlanTunnelGvrpPDUs OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      deprecated
+   DESCRIPTION 
+      "Indicates whether tunneling of GVRP BPDUs is enabled or not."
+   DEFVAL      { enabled }
+   ::= { dot1qFutureVlanTunnelProtocolEntry 4 } 
+
+dot1qFutureVlanTunnelGvrpPDUsRecvd OBJECT-TYPE 
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION 
+      "The number of tunneled ingress GVRP PDU's."
+   ::= { dot1qFutureVlanTunnelProtocolEntry 5 } 
+
+dot1qFutureVlanTunnelGvrpPDUsSent OBJECT-TYPE 
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION 
+      "The number of tunneled egress GVRP PDU's."
+   ::= { dot1qFutureVlanTunnelProtocolEntry 6 } 
+
+dot1qFutureVlanTunnelIgmpPkts OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      deprecated
+   DESCRIPTION 
+      "Indicates whether tunneling of IGMP Packets is enabled or not."
+   DEFVAL      { enabled }
+   ::= { dot1qFutureVlanTunnelProtocolEntry 7 } 
+
+dot1qFutureVlanTunnelIgmpPktsRecvd OBJECT-TYPE 
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION 
+      "The number of tunneled ingress IGMP Packets."
+   ::= { dot1qFutureVlanTunnelProtocolEntry 8 } 
+
+dot1qFutureVlanTunnelIgmpPktsSent OBJECT-TYPE 
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION 
+      "The number of tunneled egress IGMP Packets."
+   ::= { dot1qFutureVlanTunnelProtocolEntry 9 } 
+
+dot1qFutureVlanCounterTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanCounterEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+             "The table contains the statistics on a per VLAN basis.
+              It contains number of unicast, broadcast and unknown unicast
+              packets flooded per VLAN."
+   ::= { dot1qFutureVlan 16 }
+
+dot1qFutureVlanCounterEntry OBJECT-TYPE
+   SYNTAX      Dot1qFutureVlanCounterEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+              "The entry contains the VLAN statistics"
+   INDEX { dot1qFutureVlanIndex }
+   ::= { dot1qFutureVlanCounterTable 1 }
+Dot1qFutureVlanCounterEntry ::=
+   SEQUENCE {
+             dot1qFutureVlanCounterRxUcast         Counter32,
+             dot1qFutureVlanCounterRxMcastBcast    Counter32,
+             dot1qFutureVlanCounterTxUnknUcast     Counter32,
+             dot1qFutureVlanCounterTxUcast         Counter32,
+             dot1qFutureVlanCounterTxBcast         Counter32,
+             dot1qFutureVlanCounterStatus          EnabledStatus          
+            }
+
+dot1qFutureVlanCounterRxUcast OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+            " Number of unicast packets received in this VLAN."
+   ::= { dot1qFutureVlanCounterEntry 1 }
+
+dot1qFutureVlanCounterRxMcastBcast OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+            " Number of multicast/broadcast packets received in this VLAN."
+   ::= { dot1qFutureVlanCounterEntry 2 }
+
+dot1qFutureVlanCounterTxUnknUcast OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+             " Number of unknown unicast packets flooded in this VLAN."
+   ::= { dot1qFutureVlanCounterEntry 3 }
+
+dot1qFutureVlanCounterTxUcast OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+            " Number of known unicast packets forwarded in this VLAN."
+   ::= { dot1qFutureVlanCounterEntry 4 }
+
+dot1qFutureVlanCounterTxBcast OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+            " Number of broadcast packets forwarded in this VLAN."
+   ::= { dot1qFutureVlanCounterEntry 5 }
+
+dot1qFutureVlanCounterStatus OBJECT-TYPE
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "A Truth value indicating the statistics collection is enabled/disabled
+       for this vlan.
+
+       When statistics collection is set to disabled, Vlan stops collecting
+       statistics on this specific vlan.
+       When statistics collection is set to enabled, Vlan start collecting
+       statistices on this specific vlan"
+   DEFVAL   { disabled }       
+   ::= { dot1qFutureVlanCounterEntry 6 }
+
+dot1qFutureVlanUnicastMacControlTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1qFutureVlanUnicastMacControlEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing per VLAN Unicast MAC address control information. 
+        The control information includes the status of unicast MAC address 
+        learning as well as restricting the number of unique entries learnt to 
+        a specified limit for the specified VLAN."
+    ::= { dot1qFutureVlan 17 }
+
+dot1qFutureVlanUnicastMacControlEntry OBJECT-TYPE
+    SYNTAX      Dot1qFutureVlanUnicastMacControlEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information controlling the number of distinct unicast MAC addresses 
+         that can be learnt by a VLAN depending on whether learning is enabled
+         or disabled for the specified VLAN."
+    INDEX { dot1qFutureVlanIndex }
+    ::= { dot1qFutureVlanUnicastMacControlTable 1 }
+
+Dot1qFutureVlanUnicastMacControlEntry ::=
+    SEQUENCE {
+        dot1qFutureVlanUnicastMacLimit              Unsigned32,
+        dot1qFutureVlanAdminMacLearningStatus       MacLearningStatus,
+        dot1qFutureVlanOperMacLearningStatus        EnabledStatus,
+        dot1qFutureVlanPortFdbFlush                 TruthValue
+    }
+
+dot1qFutureVlanUnicastMacLimit OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Limiting value on the number of distinct unicast MAC addresses 
+         learnt in a VLAN. The lower limit and upper limit value that
+         can be SET for this object is determined by the underlying hardware.
+         Value 0 means unlimited and is the maximal limit the hardware supports."
+    ::= { dot1qFutureVlanUnicastMacControlEntry 1 }
+
+dot1qFutureVlanAdminMacLearningStatus OBJECT-TYPE
+    SYNTAX      MacLearningStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A Truth value used to configure the unicast MAC learning Admin status 
+          the VLAN to either be enabled (1) or disabled (2) or default (3).
+          Configuring this object to default behaviour is governed by value 
+          configured for dot1qFutureVlanGlobalMacLearningStatus."
+
+    DEFVAL { default }
+    ::= { dot1qFutureVlanUnicastMacControlEntry 2 }
+
+dot1qFutureVlanOperMacLearningStatus OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A Truth value indicating the unicast MAC learning enabled/disabled
+         Operational status for the specified VLAN.
+         If the VLAN does not have any member port, then the Mac Learning
+         Status for this VLAN will always be disabled, otherwise
+         The Mac Learning status for this VLAN will take value from Admin Mac
+         Learning status."
+    ::= { dot1qFutureVlanUnicastMacControlEntry 3 }
+
+dot1qFutureVlanPortFdbFlush OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "If this object is set as 'true', then all the dynamically
+       learnt MAC addresses in specified Vlan will be removed. After flush
+       this object is set to 'false'"
+    DEFVAL  {false}
+    ::= { dot1qFutureVlanUnicastMacControlEntry 4 }
+
+dot1qFutureGarpDebug OBJECT-TYPE 
+   SYNTAX      Integer32 (0..1048575)
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "Enables the tracing in the selected submodule in GARP. A 32 bit integer
+      is used to store the Tracing level in the specified module.
+       Different Tracing Levels -
+         BIT 0 - Initialisation and Shutdown Trace.
+         BIT 1 - Management trace.
+         BIT 2 - Data path trace.
+         BIT 3 - Control Plane trace.
+         BIT 4 - Packet Dump.
+         BIT 5 - OS Resource trace.
+         BIT 6 - All Failure trace (All failures including Packet Validation)
+         BIT 7 - Buffer Trace.
+
+       Different submodule Tracing -
+         BIT 16 - Tracing in GARP module.   
+         BIT 17 - Tracing in GMRP module.  
+         BIT 18 - Tracing in GVRP module.   
+         BIT 19 - Tracing in GARP redundancy module.   
+
+       The remaining bits are reserved. The combination of levels and submodules 
+       are allowed i.e. Tracing can be allowed at all failure and data path 
+       level in All submodules by setting the BIT appropriately.
+       For Example, setting the debug value to the following bit stream, 
+          00000000000000010000000000000100 will enable data path trace 
+       prints in GARP module. Multiple submodules and multiple levels can
+       be combined by setting the corresponding bits.
+       For Example, setting the debug value to the following bit stream,
+          00000000000001010000000000001100 will enable data path and 
+       control plane trace prints in GARP and GVRP modules.
+       
+       Note : BIT0 is the least significant bit and BIT31 is the most
+       significant bit."
+   ::= { dot1qFutureVlan 18 } 
+
+-- -------------------------------------------------------------
+-- dot1qFutureVlanTpFdbTable
+-- -------------------------------------------------------------
+ dot1qFutureVlanTpFdbTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1qFutureVlanTpFdbEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An extention to the dot1qTpFdbTable contains information
+        about unicast entries only learned via pseudowire
+        for which the device has forwarding and/or filtering
+        information. This information is used by the
+        transparent bridging function in determining how to
+        propagate a received frame."
+    REFERENCE
+        ""
+    ::= { dot1qFutureVlan 19 }
+
+dot1qFutureVlanTpFdbEntry OBJECT-TYPE
+    SYNTAX      Dot1qFutureVlanTpFdbEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information about the pseudowire on which MAC address was
+        learned"
+    AUGMENTS    { dot1qTpFdbEntry }
+    ::= { dot1qFutureVlanTpFdbTable 1 }
+
+Dot1qFutureVlanTpFdbEntry ::=
+    SEQUENCE {
+        dot1qFutureVlanTpFdbPw
+            Unsigned32,
+        dot1qTpOldFdbPort
+            INTEGER,
+        dot1qFutureConnectionIdentifier
+            MacAddress
+    }
+
+dot1qFutureVlanTpFdbPw OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Either the value '0', or the pseudowire number on
+        which a frame having a source address equal to the value
+        of the corresponding instance of dot1qTpFdbAddress has
+        been seen. A value of '0' indicates that the entry was
+        learned via the layer2 port. Non-zero value indicates
+        that this value must be used for forwading irrespective
+        of dot1qTpFdbPort"
+    ::= { dot1qFutureVlanTpFdbEntry 1 }
+
+dot1qTpOldFdbPort OBJECT-TYPE
+    SYNTAX     INTEGER (0..65535) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "This object is useful for generating the source relearning trap.
+         When a get is performed on this object, it returns the value of
+         Zero(0), so that ISS walk doesn't break. It indicates the port 
+         through which the mac-address was learnt previously, while generating
+         the source relearning trap."
+    ::= { dot1qFutureVlanTpFdbEntry 2 }
+
+dot1qFutureConnectionIdentifier OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "This object is to associate the backbone MAC address of the peer
+         backbone edge brige with customer Mac addresses that can be reached
+         through the peer backbone edge bridge."
+    ::= { dot1qFutureVlanTpFdbEntry 3 }
+
+
+dot1qFutureVlanWildCardTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1qFutureVlanWildCardEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Wild card vlan (Id : 0xFFF) static filtering information 
+        will be used for all Vlans for which there is no specific 
+        Static filtering exists in dot1qStaticUnicastTable or 
+        dot1qStaticMulticastTable."
+    REFERENCE
+        ""
+    ::= { dot1qFutureVlan 20 }
+    
+dot1qFutureVlanWildCardEntry OBJECT-TYPE
+    SYNTAX      Dot1qFutureVlanWildCardEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "WildCard vlan filtering Information configured into device by
+    management specifying set of ports to which frames received
+    from any port and for any vlan containing this wild card mac
+    address as destination address and for which there is no
+    static filtering information are allowed to be forwarded."
+    INDEX { dot1qFutureVlanWildCardMacAddress }
+    ::= { dot1qFutureVlanWildCardTable 1 }
+
+Dot1qFutureVlanWildCardEntry ::=
+    SEQUENCE {
+        dot1qFutureVlanWildCardMacAddress
+        MacAddress,
+        dot1qFutureVlanWildCardEgressPorts
+        PortList,
+        dot1qFutureVlanWildCardRowStatus
+        RowStatus
+    }
+
+dot1qFutureVlanWildCardMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "The destination MAC address in a frame to which this entry's 
+        filtering information applies. This object must take the 
+        value of a Unicast, Multicast or Broadcast address."
+    ::= { dot1qFutureVlanWildCardEntry 1 }
+
+dot1qFutureVlanWildCardEgressPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The set of ports to which frames received from a specific port
+        and destined for dot1qFutureVlanWildCardMacAddress address must
+        be forwarded, if there is no specific static filtering entry
+        exist for this MAC."
+    ::= { dot1qFutureVlanWildCardEntry 2 }
+
+dot1qFutureVlanWildCardRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The row status of the entry."  
+   ::= { dot1qFutureVlanWildCardEntry 3 }
+
+-- -------------------------------------------------------------
+-- The Static (Destination-Address Filtering) Database
+-- -------------------------------------------------------------
+
+dot1qFutureStaticUnicastExtnTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1qFutureStaticUnicastExtnEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing filtering information for Unicast
+        MAC addresses for each Filtering Database, configured
+        into the device by (local or network) management
+        specifying the set of ports to which frames received
+        from specific ports and containing specific unicast
+        destination addresses are allowed to be forwarded.  A
+        value of zero in this table as the port number from
+        which frames with a specific destination address are
+        received, is used to specify all ports for which there
+        is no specific entry in this table for that particular
+        destination address.  Entries are valid for unicast
+        addresses only."
+    REFERENCE
+        "IEEE 802.1Q/D11 Section 12.7.7,
+        ISO/IEC 15802-3 Section 7.9.1"
+    ::= { dot1qFutureVlan 21 }
+
+dot1qFutureStaticUnicastExtnEntry OBJECT-TYPE
+    SYNTAX      Dot1qFutureStaticUnicastExtnEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Filtering information configured into the device by
+        (local or network) management specifying the set of
+        ports to which frames received from a specific port and
+        containing a specific unicast destination address are
+        allowed to be forwarded."
+    AUGMENTS { dot1qStaticUnicastEntry }
+    ::= { dot1qFutureStaticUnicastExtnTable 1 }
+
+Dot1qFutureStaticUnicastExtnEntry ::=
+    SEQUENCE {
+        dot1qFutureStaticConnectionIdentifier
+            MacAddress
+    }
+
+dot1qFutureStaticConnectionIdentifier OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This object is to associate the backbone MAC address of the peer
+         backbone edge bridge with customer Mac addresses that can be reached 
+         through the peer backbone edge bridge."
+    ::= { dot1qFutureStaticUnicastExtnEntry 1 }
+
+-- scalar begin
+
+dot1qFutureUnicastMacLearningLimit OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The Limiting value on the number of distinct unicast MAC addresses
+       that can be learnt in the device.
+
+       The upper limit value that can be SET for this object is determined 
+       by the underlying hardware. The value that can be SET for this object 
+       cannot be less than the value set for the UnicastMacLimit per vlan for 
+       any of the vlans in the device."
+    ::= { dot1qFutureVlan 22 }
+
+dot1qFutureVlanBaseBridgeMode OBJECT-TYPE
+   SYNTAX      INTEGER
+                {
+                 dot1dTransparentMode(1),
+                 dot1qVlanMode(2)
+                }
+
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "This object indicates Base Bridge-Mode of the Switch.
+      Setting the value to transparent mode will make
+      switch behave according to IEEE 802.1d implementation.
+      Setting the value to VLAN mode will make switch behave
+      according to IEEE 802.1q Implementation"
+   ::= { dot1qFutureVlan 23 }
+
+dot1qFutureVlanSubnetBasedOnAllPorts OBJECT-TYPE 
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION 
+      "This object is used to enable/disable the subnet based VLAN Classification
+       on all ports of dot1qFutureVlanPortSubnetBasedClassification. On setting
+       this object to enable/disable status, Subnet based VLAN classification 
+       will be enabled/disabled on all the ports."
+   ::= { dot1qFutureVlan 24 }
+
+-- scalar end
+
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Subnet Map Table 
+-- ---------------------------------------------------------------------------- 
+ 
+dot1qFutureVlanPortSubnetMapTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanPortSubnetMapEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Subnet based VLAN classification - The source IP-subnet address in
+       the incoming packets is used to classify VLAN membership. 
+       Subnet based VLAN is applied only on IP packets.
+       This table contains information on Subnet-VlanId address mapping." 
+   ::= { dot1qFutureVlan 25 } 
+
+-- 2014/09/05 Chung. System-wide config Subnet Map. 
+dot1qFutureVlanPortSubnetMapEntry OBJECT-TYPE
+   SYNTAX      Dot1qFutureVlanPortSubnetMapEntry
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Entry that contains Vlan-Subnet address mapping." 
+--    INDEX { dot1qFutureVlanPort,
+--           dot1qFutureVlanPortSubnetMapAddr}
+   INDEX { dot1qFutureVlanPortSubnetMapAddr}
+   ::= { dot1qFutureVlanPortSubnetMapTable 1 }
+
+-- 2014/09/05 Chung. System-wide config Subnet Map. 
+Dot1qFutureVlanPortSubnetMapEntry ::=
+   SEQUENCE { 
+      dot1qFutureVlanPortSubnetMapAddr IpAddress,
+      dot1qFutureVlanPortSubnetMapVid  VlanId,
+--      dot1qFutureVlanPortSubnetMapARPOption INTEGER,
+      dot1qFutureVlanPortSubnetMapRowStatus RowStatus
+   } 
+ 
+dot1qFutureVlanPortSubnetMapAddr OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "The Source IP-Subnet address for which the Vlan mapping is present
+       in the entry." 
+   ::= { dot1qFutureVlanPortSubnetMapEntry 1 }
+
+dot1qFutureVlanPortSubnetMapVid OBJECT-TYPE
+   SYNTAX      VlanId 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The Vlan to which the Source IP-Subnet address of this entry is mapped to." 
+   ::= { dot1qFutureVlanPortSubnetMapEntry 2 }
+ 
+-- dot1qFutureVlanPortSubnetMapARPOption OBJECT-TYPE
+--    SYNTAX      INTEGER { allow(1), suppress(2) }
+--    MAX-ACCESS  read-write
+--    STATUS      current
+--    DESCRIPTION 
+--        "Configurable option for discarding/allowing ARP Untagged frames on
+--         the vlan. The value allow (1) indicates that ARP frames with source 
+--         IP-subnet address matching the dot1qFutureVlanPortSubnetMapEntry 
+--         will be classified to vlan based on dot1qFutureVlanPortSubnetMapEntry.
+--         The value suppress (2) indicates that ARP frames with source IP-Subnet
+--         address matching the dot1qFutureVlanPortSubnetMapEntry will not be
+--         classified to vlan based on dot1qFutureVlanPortSubnetMapEntry. The
+--         VLAN classification will be based on next subsequent classification 
+--         mechanism."
+--     DEFVAL { allow }
+--     ::= { dot1qFutureVlanPortSubnetMapEntry 3 }
+ 
+dot1qFutureVlanPortSubnetMapRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The row status of the entry."  
+   ::= { dot1qFutureVlanPortSubnetMapEntry 4 }
+-- ---------------------------------------------------------------------------- 
+-- Future Vlan Extension Table
+-- ---------------------------------------------------------------------------- 
+
+dot1qFutureStVlanExtTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureStVlanExtEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+        "An extension to dot1qVlanStaticTable VLAN table.
+         This table contains the Private Vlan (PVLAN) related
+         configurations."
+   ::= { dot1qFutureVlan 29 } 
+ 
+dot1qFutureStVlanExtEntry OBJECT-TYPE
+   SYNTAX      Dot1qFutureStVlanExtEntry
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+        "Each entry specifies the Private Vlan configuration done for
+         a given Vlan."
+   AUGMENTS { dot1qVlanStaticEntry }
+   ::= { dot1qFutureStVlanExtTable 1 }
+    
+Dot1qFutureStVlanExtEntry ::=
+   SEQUENCE { 
+      dot1qFutureStVlanPVlanType INTEGER,
+      dot1qFutureStVlanPrimaryVid VlanIdOrNone
+   } 
+ 
+dot1qFutureStVlanPVlanType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          normal (1),
+                          primary (2),
+                          isolated (3),
+                          community (4) 
+                        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object identifies the Private vlan type for this vlan.
+         normal    - Vlan does not belong to any Private VLAN domain.
+         primary   - Primary vlan in a Private VLAN domain.
+         isolated  - Isolated vlan in a Private VLAN domain.
+                     Devices connected to host ports of this vlan, can not
+                     communicate with each other.
+                     For every isolated vlan, one primary vlan id should be
+                     configured.
+         community - Community Vlan in a Private VLAN domain. Layer 2 
+                     behaviour for a community and normal vlan is same.
+                     For every community vlan, one primary vlan id should be
+                     configured.
+         Configuration of this object is allowed only when VLAN is not
+         active."
+    DEFVAL { normal }
+    ::= { dot1qFutureStVlanExtEntry 1 }
+
+dot1qFutureStVlanPrimaryVid OBJECT-TYPE
+   SYNTAX      VlanIdOrNone
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "This object identifies the primary vlan assoicated with this
+       vlan. 
+       For primary and normal vlans, this object will have the value zero 
+       and configuring this object to non-zero value will not be allowed for 
+       them.
+       For secondary vlans, this object identifies the associated
+       primary vlan."
+    DEFVAL { 0 }
+   ::= { dot1qFutureStVlanExtEntry 2 }
+
+--scalar begin
+
+dot1qFutureVlanGlobalMacLearningStatus OBJECT-TYPE
+   SYNTAX      EnabledStatus
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+         "This object specifies the global  MAC learning status of the
+          switch. The default value of global MAC learning status of
+          the switch is enabled.
+          This object can take only two values enabled or disabled.
+          The value as specified by this object will be applied
+          for a newly created VLAN. The configuration of this object 
+          will override the value of dot1qFutureVlanAdminMacLearningStatus
+          provided  the value of dot1qFutureVlanAdminMacLearningStatus is
+          default only."
+   DEFVAL  {enabled}
+   ::= { dot1qFutureVlan 26 }
+
+dot1qFutureVlanApplyEnhancedFilteringCriteria OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "If this object is set as 'false', then only default filtering
+   utility criteria will be applied on all ports.
+   Otherwise the filtering criteria to be used for the ports 
+   will be taken from dot1qFutureVlanFilteringUtilityCriteria 
+   for the respective ports.
+    - It is recommended to configure this object before any vlan configuration
+    is done in the system.
+    - It is recommended to configure this object in the following sequence:
+            -Configure this object
+            -Save the configuration into permanent database
+            -Restart the system."
+   DEFVAL  {true}
+   ::= { dot1qFutureVlan 27 }
+
+
+dot1qFutureVlanSwStatsEnabled OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+   "If set to 'true', statistics collection will be done and stored in 
+    software. This object can be set to 'true' only if the data switching
+    is done by software.
+    If set to 'false', the statistics collection will be done by the 
+    hardware and will not be stored in software.
+    If data switching is done by software, then the default value of this
+    object will be 'true'. Otherwise, the default value will be 'false'.
+    - It is recommended to configure this object before any vlan configuration
+    is done in the system.
+    - It is recommended to configure this object in the following sequence:
+            -Configure this object
+            -Save the configuration into permanent database
+            -Restart the system"
+   ::= { dot1qFutureVlan 28 }
+
+
+
+--scalar end
+
+--table ends
+
+dot1qVlanTraps OBJECT IDENTIFIER ::= { dot1qFutureVlanTraps 0 }
+
+dot1qFutureMacThresholdTrap  NOTIFICATION-TYPE
+    OBJECTS {
+        dot1qFutureVlanIndex,
+        dot1qFutureVlanUnicastMacLimit
+        }
+    STATUS     current
+    DESCRIPTION
+         "This trap is generated when the unicast mac limit threshold is 
+         exceeded for a particular VLAN.The generated trap will carry 
+         information regarding the Vlan Id whose Mac address limit has exceeded 
+         and the Mac address threshold that was configured for this VLAN."
+    ::= { dot1qVlanTraps 1 }
+
+dot1qFutureSrcRelearnTrap NOTIFICATION-TYPE
+    OBJECTS {
+        dot1qFutureVlanFid,
+        dot1qTpFdbPort,
+        dot1qTpOldFdbPort
+        }
+    STATUS     current
+    DESCRIPTION
+         "This trap is generated whenever Source relearning happens in a VLAN.
+          The generated trap will contain information about the VLAN for which 
+          the Source relearning happened, MAC Address and port number through
+          which this MAC address has been learnt now."
+    ::= { dot1qVlanTraps 2 }
+
+dot1qFutureSwitchMacLimitTrap NOTIFICATION-TYPE
+    OBJECTS {
+        dot1qFutureUnicastMacLearningLimit
+        }
+    STATUS     current
+    DESCRIPTION
+         "This trap is generated when the unicast mac limit threshold is
+         exceeded for the device.The generated trap will carry
+         information regarding the Mac address threshold that was configured
+         for this device."
+    ::= { dot1qVlanTraps 3 }
+
+-- ---------------------------------------------------------------------------- 
+-- Vlan Subnet Extension Table 
+-- ---------------------------------------------------------------------------- 
+
+dot1qFutureVlanPortSubnetMapExtTable OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF Dot1qFutureVlanPortSubnetMapExtEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Subnet based VLAN classification - The source IP-subnet address in
+       the incoming packets is used to classify VLAN membership. 
+       Subnet based VLAN is applied only on IP/ARP packets.
+       This table contains information on Subnet-VlanId address mapping."
+   ::= { dot1qFutureVlan 30 } 
+
+-- 2014/09/05 Chung. System-wide config Mac Map. 
+dot1qFutureVlanPortSubnetMapExtEntry OBJECT-TYPE
+   SYNTAX      Dot1qFutureVlanPortSubnetMapExtEntry
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "Entry that contains Vlan-Subnet address mapping." 
+--    INDEX { dot1qFutureVlanPort,
+--           dot1qFutureVlanPortSubnetMapExtAddr,
+--           dot1qFutureVlanPortSubnetMapExtMask }
+   INDEX { dot1qFutureVlanPortSubnetMapExtAddr,
+           dot1qFutureVlanPortSubnetMapExtMask }
+   ::= { dot1qFutureVlanPortSubnetMapExtTable 1 }
+
+Dot1qFutureVlanPortSubnetMapExtEntry ::=
+   SEQUENCE { 
+      dot1qFutureVlanPortSubnetMapExtAddr IpAddress,
+      dot1qFutureVlanPortSubnetMapExtMask IpAddress,
+      dot1qFutureVlanPortSubnetMapExtVid  VlanId,
+      dot1qFutureVlanPortSubnetMapExtARPOption INTEGER,
+      dot1qFutureVlanPortSubnetMapExtRowStatus RowStatus
+   } 
+
+dot1qFutureVlanPortSubnetMapExtAddr OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "The Source IP address for which the Vlan mapping is present
+       in the entry." 
+   ::= { dot1qFutureVlanPortSubnetMapExtEntry 1 }
+
+dot1qFutureVlanPortSubnetMapExtMask OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+      "The Subnet Mask for which the Vlan mapping is present
+      in the entry." 
+   ::= { dot1qFutureVlanPortSubnetMapExtEntry 2 }
+
+dot1qFutureVlanPortSubnetMapExtVid OBJECT-TYPE
+   SYNTAX      VlanId 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The Vlan to which the Source IP-Subnet address of this entry is mapped 
+       to."    
+   ::= { dot1qFutureVlanPortSubnetMapExtEntry 3 }
+
+-- dot1qFutureVlanPortSubnetMapExtARPOption OBJECT-TYPE
+--   SYNTAX      INTEGER { allow(1), suppress(2) }
+--   MAX-ACCESS  read-write
+--   STATUS      current
+--   DESCRIPTION 
+--       "Configurable option for discarding/allowing ARP Untagged frames on
+--        the vlan. The value allow (1) indicates that ARP frames with source 
+--        IP-subnet address matching the dot1qFutureVlanPortSubnetMapExtEntry 
+--        will be classified to vlan based on 
+--        dot1qFutureVlanPortSubnetMapExtEntry.The value suppress (2) indicates 
+--        that ARP frames with source IP-Subnet address matching the 
+--        dot1qFutureVlanPortSubnetMapExtEntry will not be classified to vlan 
+--        based on dot1qFutureVlanPortSubnetMapExtEntry. The VLAN classification 
+--        will be based on next subsequent classification mechanism."
+--    DEFVAL { allow }
+--    ::= { dot1qFutureVlanPortSubnetMapExtEntry 4 }
+
+dot1qFutureVlanPortSubnetMapExtRowStatus OBJECT-TYPE
+   SYNTAX      RowStatus 
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The row status of the entry."  
+   ::= { dot1qFutureVlanPortSubnetMapExtEntry 5 }
+
+--table ends   
+
+dot1qFutureVlanGlobalsFdbFlush OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "If this object is set as 'true', then all the dynamically learnt
+      MAC addresses will be removed. After flush, this object
+      is set to 'false'"
+   ::= { dot1qFutureVlan 31 }
+
+END    

@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,8 +24,7 @@ if (auth_usermanagement())
   {
     $delete_username = dbFetchCell("SELECT `username` FROM `users` WHERE `user_id` = ?", array($vars['user_id']));
 
-    if ($vars['confirm'] == "yes")
-    {
+    if (get_var_true($vars['confirm'])) {
       if (deluser($delete_username))
       {
         print_success('User "' . escape_html($delete_username) . '" deleted!');

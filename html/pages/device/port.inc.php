@@ -1,20 +1,24 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
+ */
+
+/**
+ * @var $config
+ * @var $device
+ * @var $permit_tabs
  */
 
 if (!isset($vars['view']) ) { $vars['view'] = "graphs"; }
 
-if ($permit_tabs['ports'])
-{
+if ($permit_tabs['ports']) {
   $sql  = "SELECT *, `ports`.`port_id` AS `port_id`";
   $sql .= " FROM  `ports`";
   //$sql .= " LEFT JOIN  `ports-state` USING(`port_id`)";
@@ -29,11 +33,12 @@ if ($permit_tabs['ports'])
   if ($port['ifPhysAddress']) { $mac = (string)$port['ifPhysAddress']; }
 
   $color = "black";
-  if      ($port['ifAdminStatus'] == "down") { $status = "<span class='grey'>Disabled</span>"; }
-  else if ($port['ifAdminStatus'] == "up")
-  {
-    if ($port['ifOperStatus'] == "down" || $port['ifOperStatus'] == "lowerLayerDown") { $status = "<span class='red'>Enabled / Disconnected</span>"; }
-    else                                                                              { $status = "<span class='green'>Enabled / Connected</span>"; }
+  if      ($port['ifAdminStatus'] === "down") {
+    $status = "<span class='grey'>Disabled</span>";
+  } elseif ($port['ifAdminStatus'] === "up") {
+    if ($port['ifOperStatus'] === "down" ||
+        $port['ifOperStatus'] === "lowerLayerDown") { $status = "<span class='red'>Enabled / Disconnected</span>"; }
+    else                                            { $status = "<span class='green'>Enabled / Connected</span>"; }
   }
 
   $i = 1;
@@ -53,17 +58,12 @@ if ($permit_tabs['ports'])
                       'port'    => $port['port_id']);
 
   $navbar['options']['graphs']['text']    = 'Graphs';
-
-  $navbar['options']['alerts']['text']    = 'Alerts';
-  $navbar['options']['alertlog']['text']  = 'Alert Log';
+  $navbar['options']['realtime']['text']  = 'Real time';   // FIXME CONDITIONAL
 
   //if (dbFetchCell("SELECT COUNT(*) FROM `sensors` WHERE `measured_class` = 'port' AND `measured_entity` = ? and `device_id` = ?", array($port['port_id'], $device['device_id'])))
-  if (dbExist('sensors', '`measured_class` = ? AND `measured_entity` = ? and `device_id` = ?', array('port', $port['port_id'], $device['device_id'])))
-  {
+  if (dbExist('sensors', '`measured_class` = ? AND `measured_entity` = ? and `device_id` = ?', array('port', $port['port_id'], $device['device_id']))) {
     $navbar['options']['sensors']['text'] = 'Sensors';
   }
-
-  $navbar['options']['realtime']['text']  = 'Real time';   // FIXME CONDITIONAL
 
   //if (dbFetchCell('SELECT COUNT(*) FROM `ip_mac` WHERE `port_id` = ?', array($port['port_id'])))
   if (dbExist('ip_mac', '`port_id` = ?', array($port['port_id'])))
@@ -92,6 +92,9 @@ if ($permit_tabs['ports'])
   {
     $navbar['options']['sros_queues']['text']    = 'CoS Queues';
   }
+
+  $navbar['options']['alerts']['text']    = 'Alerts';
+  $navbar['options']['alertlog']['text']  = 'Alert Log';
 
   $navbar['options']['events']['text']   = 'Eventlog';
 
@@ -131,14 +134,13 @@ if ($permit_tabs['ports'])
     $graphs = array('bits', 'packets', 'cells', 'errors');
     foreach ($graphs as $type)
     {
-      if ($vars['view'] == "atm-vp" && $vars['graph'] == $type) { $navbar['options']['atm-vp']['suboptions'][$type]['class'] = "active"; }
+      if ($vars['view'] === "atm-vp" && $vars['graph'] == $type) { $navbar['options']['atm-vp']['suboptions'][$type]['class'] = "active"; }
       $navbar['options']['atm-vp']['suboptions'][$type]['text'] = ucfirst($type);
       $navbar['options']['atm-vp']['suboptions'][$type]['url']  = generate_url($link_array,array('view'=>'atm-vc','graph'=>$type));
     }
   }
 
-  if (OBSERVIUM_EDITION != 'community' && $_SESSION['userlevel'] == '10' && $config['enable_billing'])
-  {
+  if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] == '10' && $config['enable_billing']) {
     $navbar['options_right']['bills'] = array('text' => 'Create Bill', 'icon' => $config['icon']['billing'], 'url' => generate_url(array('page' => 'bills', 'view' => 'add', 'port' => $port['port_id'])));
   }
 

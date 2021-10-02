@@ -1,0 +1,174 @@
+--    The proprietary MIB definitions follows:
+HPE-STORMCONTROL-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Counter32, Counter64, Unsigned32, TimeTicks, Integer32,enterprises
+        FROM SNMPv2-SMI
+    RowStatus, TruthValue,TEXTUAL-CONVENTION
+        FROM SNMPv2-TC
+    ifIndex   FROM IF-MIB
+    EnabledStatus
+                   FROM P-BRIDGE-MIB
+    MODULE-COMPLIANCE, OBJECT-GROUP
+        FROM SNMPv2-CONF
+	hpVCSE-40Gb-F8-Module
+		FROM HPSVRMGMT-OID;
+
+hpeStormControl MODULE-IDENTITY
+    LAST-UPDATED "201603020000Z"
+    ORGANIZATION "Hewlett Packard Enterprise"
+    CONTACT-INFO "Hewlett Packard Enterprise Support Center
+                 www.hpe.com/support<http://www.hpe.com/support>
+                 US, Canada & Caribbean: 1-800-633-3600
+                 UK & Ireland: 0845 161 0050
+                 Asia Pacific Region: 61-3-8877-5000"
+    DESCRIPTION "||hpeStormControl mib||||"
+    REVISION "201506260000Z"
+    DESCRIPTION "||||||"
+
+::= { hpeSynergyVCMIBObjects 4110}
+
+-- ------------------------------------------------------------
+-- groups in the MIB
+-- ------------------------------------------------------------
+
+hpeSynergyVCMIBObjects                   OBJECT IDENTIFIER ::= { hpVCSE-40Gb-F8-Module 1 }
+
+hpeStormControlGroup					 OBJECT IDENTIFIER ::= { hpeSynergyVCMIBObjects 1 }
+
+hpeStormControlSystemStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    disable (0),
+                    enable(1)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        " This object is used to enable or disable the StormControl on system.
+        When user disables all storm control configurations will be deleted"
+
+        DEFVAL {disabled}
+
+        ::= { hpeStormControlGroup 1 }
+
+hpeStormControlSystemRateLimitInPps OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "Allows to configure the limiting value for the maximum number of broadcast,
+        multicast and destination lookup failure packets that can be received per second
+        over the interface. Setting this object to the value zero disables rate
+        limiting for broadcast,multicast and destination lookup failure packets on all the 
+        interfaces. The value that can be set for this object is limited by the underlying hardware"
+
+        DEFVAL {0}
+
+        ::= { hpeStormControlGroup 2 }
+
+hpeStormControlSystemPollingInterval OBJECT-TYPE
+        SYNTAX      Integer32 (5..300)
+        UNITS       "Seconds"
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "This object is used to configure the polling time interval in seconds and this timer interval
+        is used to read the multicast,broadcast and destination lookup failure drop packets due to
+        the rate limit"
+
+        DEFVAL {5}
+
+        ::= { hpeStormControlGroup 3 }
+        
+
+hpeStormControlStatsTable  OBJECT-TYPE
+        SYNTAX     SEQUENCE OF HpeStormControlStatsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+        "A table to get the multicast,broadcast and destination lookup failure drop counters due to
+        the rate limit for each physical interface."
+
+        ::= { hpeStormControlGroup 4 }
+
+hpeStormControlStatsEntry OBJECT-TYPE
+        SYNTAX     HpeStormControlStatsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+        "an entry appears in this table for each physical interface."
+
+        INDEX { ifIndex }
+
+        ::= { hpeStormControlStatsTable 1 }
+
+HpeStormControlStatsEntry ::=
+        SEQUENCE {
+            hpeStormControlDLFDropCounters     Counter32,
+            hpeStormControlMCASTDropCounters   Counter32,
+            hpeStormControlBCASTDropCounters   Counter32,
+            hpeStormControlIfStatus            INTEGER
+            }
+
+
+hpeStormControlDLFDropCounters OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION 
+        "An entry to get the received destination lookup failure packet drop counters due to
+        the rate limit for the physical interface."
+    
+        ::= { hpeStormControlStatsEntry 1 }
+
+hpeStormControlMCASTDropCounters OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+         "An entry to get the received multicast packet drop counters due to
+         the rate limit for the physical interface."
+
+         ::= { hpeStormControlStatsEntry 2 }
+
+hpeStormControlBCASTDropCounters OBJECT-TYPE
+         SYNTAX      Counter32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+         "An entry to get the received broad cast packet drop counters due to
+         the rate limit for the physical interface."
+
+         ::= { hpeStormControlStatsEntry 3 }
+
+hpeStormControlIfStatus  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only   
+        STATUS      current
+        DESCRIPTION
+        "An entry to get the current drop status of dlf,bacst and mcast for the physical interface.
+         The represntation of reason is as follows
+         Bit 0 - dlf Drop Reason
+         Bit 1 - mcast Drop Reason
+         Bit 2 - bcast Drop Reason
+         ifExtReasonCode represents the reason code for each Interface for stormcontrol"
+
+         DEFVAL {0}
+
+        ::= { hpeStormControlStatsEntry 4 }
+
+-- Notifications or Traps
+
+      hpeStormControlTrap  OBJECT IDENTIFIER ::= {hpeStormControl 2}
+
+      hpestormControlTrap  NOTIFICATION-TYPE
+            OBJECTS {
+                        ifIndex,
+                        hpeStormControlIfStatus
+            }
+            STATUS       current
+            DESCRIPTION  "This trap is generated when bcast,mcast and dlf drop counters are reached 
+            the configured rate limit within specified polling interval for each physical interface"
+            ::= { hpeStormControlTrap 1 }
+END

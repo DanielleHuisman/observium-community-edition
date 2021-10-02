@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -260,18 +260,19 @@ function print_form($data, $return = FALSE)
   }
 
   // Form elements
-  if ($data['type'] == 'rows')
-  {
+  if ($data['type'] === 'rows') {
     // Rows form, see example in html/pages/devices.inc.php
     //$div_padding = 'padding: 0px '.$base_space.' '.$base_space.' '.$base_space.' !important;'; // Top padding set as 0px, all other to base
     $div_padding = 'padding: '.$base_space.' !important;';
-    if (strpos($base_class, 'box') !== FALSE)
-    {
+    if (str_contains_array($base_class, 'box')) {
       $base_space = ($data['space'] ? $data['space'] : '10px');
 
       // Box horizontal style
-      $box_args  = array('header-border' => TRUE,
-                         'body-style' => $div_padding); // Override top padding
+      $box_args  = [
+        'id' => 'box-' . $form_id,
+        'header-border' => TRUE,
+        'body-style' => $div_padding // Override top padding
+      ];
       if (isset($data['title'])) { $box_args['title'] = $data['title']; }
       $div_begin = generate_box_open($box_args);
       $div_end   = generate_box_close();
@@ -286,23 +287,23 @@ function print_form($data, $return = FALSE)
     // Calculate grid sizes for rows
     foreach ($data['row'] as $k => $row)
     {
-      $row_count = count($row);
+      $row_count = safe_count($row);
       // Default (auto) grid size for elements
-      $row_grid = intval(12 / $row_count);
+      $row_grid = (int)(12 / $row_count);
       $grid_count = 0; // Count for custom passed grid sizes
       foreach ($row as $id => $element)
       {
         if (isset($element['div_class']) && preg_match('/col-(?:lg|md|sm)-(\d+)/', $element['div_class'], $matches))
         {
           // Class with col size passed
-          $grid_count += intval($matches[1]);
+          $grid_count += (int)$matches[1];
         }
         else if (isset($element['grid']))
         {
           // Grid size passed
           if ($element['grid'] > 0 && $element['grid'] <= 12)
           {
-            $grid_count += intval($element['grid']);
+            $grid_count += (int)$element['grid'];
           } else {
             // Incorrect size
             unset($row[$k]['grid']);
@@ -310,7 +311,7 @@ function print_form($data, $return = FALSE)
         }
       }
       $row_grid = 12 - $grid_count;                            // Free grid size after custom grid
-      $row_grid = intval($row_grid / $row_count);              // Default (auto) grid size for elements
+      $row_grid = (int)($row_grid / $row_count);              // Default (auto) grid size for elements
       if ($grid_count > 2 && $row_grid < 1) { $row_grid = 1; } // minimum 1 for auto if custom grid passed
       else if ($row_grid < 2)               { $row_grid = 2; } // minimum 2 for auto
 
@@ -356,9 +357,13 @@ function print_form($data, $return = FALSE)
         {
           $element['div_class'] .= ' col-lg-push-0 col-md-push-0 col-sm-push-0';
         }
-        if ($id == 'search' && $data['url'])
-        {
+        if ($id === 'search') {
           // Add form_id here, for generate onclick action in submit button
+          if ($data['url']) {
+            $element['form_id'] = $form_id;
+          }
+        } else {
+          // all other cases add form_id
           $element['form_id'] = $form_id;
         }
         // Here added padding-block-start for space between rows (also if row elements moved to newline)
@@ -376,24 +381,24 @@ function print_form($data, $return = FALSE)
       // Add space between rows
       $row_style = 'style="margin-top: '.$base_space.';"';
     }
-  } // end rows type
-  else if ($data['type'] == 'horizontal')
-  {
+    // end rows type
+  } elseif ($data['type'] === 'horizontal') {
     // Horizontal form, see example in html/pages/user_edit.inc.php
-    if (strpos($base_class, 'widget') !== FALSE || strpos($base_class, 'box') !== FALSE)
-    {
+    if (str_contains_array($base_class, [ 'widget', 'box' ])) {
       $base_space = ($data['space'] ? $data['space'] : '10px');
 
       // Box horizontal style
-      $box_args  = array('header-border' => TRUE,
-                         'body-style' => 'padding-top: '.$base_space.' !important;'); // Override top padding
+      $box_args  = [
+        'id' => 'box-' . $form_id,
+        'header-border' => TRUE,
+        'body-style' => 'padding-top: '.$base_space.' !important;' // Override top padding
+      ];
+
       if (isset($data['title'])) { $box_args['title'] = $data['title']; }
       $div_begin = generate_box_open($box_args);
       $div_end   = generate_box_close();
       unset($box_args);
-    }
-    else if (empty($base_class))
-    {
+    } elseif (empty($base_class)) {
       // Clean class
       // Example in html/pages.logon.inc.php
       $div_begin = PHP_EOL;
@@ -455,7 +460,7 @@ function print_form($data, $return = FALSE)
                 // Copy from fieldset
                 $element['offset'] = $data['fieldset'][$element['fieldset']]['offset'];
               }
-              else if (($element['type'] == 'raw' || $element['type'] == 'html') &&
+              else if (($element['type'] === 'raw' || $element['type'] === 'html') &&
                        !isset($element['name']) && $first_key === $id)
               {
                 // When raw/html element first, disable offset
@@ -486,7 +491,7 @@ function print_form($data, $return = FALSE)
                 $row_label .= ' for="'.$element['id'].'">'.$element['name'].'</label>' . PHP_EOL;
               }
               $row_control_id = $element['id'] . '_div';
-              if ($element['type'] == 'datetime')
+              if ($element['type'] === 'datetime')
               {
                 $element['name'] = '';
               }
@@ -500,7 +505,7 @@ function print_form($data, $return = FALSE)
         {
           $element['div_class'] = $div_class;
         }
-        if ($element['div_class'] == 'form-actions')
+        if ($element['div_class'] === 'form-actions')
         {
           // Remove margins only for form-actions elements
           $div_style = 'margin: 0px;';
@@ -513,9 +518,13 @@ function print_form($data, $return = FALSE)
         {
           $div_style .= ' ' . $element['div_style'];
         }
-        if ($id == 'search' && $data['url'])
-        {
+        if ($id === 'search') {
           // Add form_id here, for generate onclick action in submit button
+          if ($data['url']) {
+            $element['form_id'] = $form_id;
+          }
+        } else {
+          // all other cases add form_id
           $element['form_id'] = $form_id;
         }
 
@@ -597,9 +606,13 @@ function print_form($data, $return = FALSE)
         $used_vars[]      = $id;
         $element['id']    = $id;
 
-        if ($id == 'search' && $data['url'])
-        {
+        if ($id === 'search') {
           // Add form_id here, for generate onclick action in submit button
+          if ($data['url']) {
+            $element['form_id'] = $form_id;
+          }
+        } else {
+          // all other cases add form_id
           $element['form_id'] = $form_id;
         }
         $string_elements .= generate_form_element($element);
@@ -657,13 +670,13 @@ function print_form($data, $return = FALSE)
 
     // Return form as string
     return $string;
-  } else {
-    // Print form
-    echo($string);
-
-    // Save generation time for profiling (after echo)
-    $GLOBALS['form_time'] += utime() - $form_start;
   }
+
+  // Print form
+  echo($string);
+
+  // Save generation time for profiling (after echo)
+  $GLOBALS['form_time'] += utime() - $form_start;
 }
 
 // Box specific form (mostly same as in print_form, but support only box style and fieldset options)
@@ -672,6 +685,16 @@ function print_form_box($data, $return = FALSE)
 {
   // Just return if safety requirements are not fulfilled
   if (isset($data['userlevel']) && $data['userlevel'] > $_SESSION['userlevel']) { return; }
+
+  // Return if the user doesn't have write permissions to the relevant entity
+  if (isset($data['entity_write_permit']) &&
+      !is_entity_write_permitted($data['entity_write_permit']['entity_id'], $data['entity_write_permit']['entity_type']))
+  {
+    return;
+  }
+
+  // Time our form filling.
+  $form_start = microtime(TRUE);
 
   $form_id    = (isset($data['id']) ? $data['id'] : 'form-'.strgen());
   $form_class = 'form form-horizontal';
@@ -708,7 +731,7 @@ function print_form_box($data, $return = FALSE)
   // Form elements
   $div_begin = '<div class="row">' . PHP_EOL;
   $div_end   = '</div>' . PHP_EOL;
-  if ($data['type'] == 'horizontal')
+  if ($data['type'] === 'horizontal')
   {
     $row_style = '';
     $fieldset  = array();
@@ -755,7 +778,7 @@ function print_form_box($data, $return = FALSE)
                 // Copy from fieldset
                 $element['offset'] = $data['fieldset'][$element['fieldset']]['offset'];
               }
-              else if (($element['type'] == 'raw' || $element['type'] == 'html') && $first_key === $id)
+              elseif (($element['type'] === 'raw' || $element['type'] === 'html') && $first_key === $id)
               {
                 // When raw/html element first, disable offset
                 $element['offset'] = FALSE;
@@ -777,7 +800,7 @@ function print_form_box($data, $return = FALSE)
                 $row_label .= ' for="'.$element['id'].'">'.$element['name'].'</label>' . PHP_EOL;
               }
               $row_control_id = $element['id'] . '_div';
-              if ($element['type'] == 'datetime')
+              if ($element['type'] === 'datetime')
               {
                 $element['name'] = '';
               }
@@ -791,7 +814,7 @@ function print_form_box($data, $return = FALSE)
         {
           $element['div_class'] = $div_class;
         }
-        if ($element['div_class'] == 'form-actions')
+        if ($element['div_class'] === 'form-actions')
         {
           // Remove margins only for form-actions elements
           $div_style = 'margin: 0px;';
@@ -804,9 +827,13 @@ function print_form_box($data, $return = FALSE)
         {
           $div_style .= ' ' . $element['div_style'];
         }
-        if ($id == 'search' && $data['url'])
-        {
+        if ($id === 'search') {
           // Add form_id here, for generate onclick action in submit button
+          if ($data['url']) {
+            $element['form_id'] = $form_id;
+          }
+        } else {
+          // all other cases add form_id
           $element['form_id'] = $form_id;
         }
 
@@ -855,7 +882,7 @@ function print_form_box($data, $return = FALSE)
         {
           $entry['style'] = 'padding-bottom: 0px !important;'; // Remove last additional padding space
         }
-        // Combinate fieldsets into common rows
+        // Combine fieldsets into common rows
         if ($entry['div'])
         {
           $divs[$entry['div']][] = $group;
@@ -912,7 +939,7 @@ function print_form_box($data, $return = FALSE)
         $fieldset[$group] = $row_elements . $fieldset_end;
       }
     }
-    // Combinate fieldsets into common rows
+    // Combine fieldsets into common rows
     foreach ($divs as $entry)
     {
       $row_elements = $div_begin;
@@ -971,13 +998,14 @@ function print_form_box($data, $return = FALSE)
 
     // Return form as string
     return $string;
-  } else {
-    // Print form
-    echo($string);
-
-    // Save generation time for profiling (after echo)
-    $GLOBALS['form_time'] += utime() - $form_start;
   }
+
+  // Print form
+  echo($string);
+
+  // Save generation time for profiling (after echo)
+  $GLOBALS['form_time'] += utime() - $form_start;
+
 }
 
 /**
@@ -1031,6 +1059,11 @@ function print_form_box($data, $return = FALSE)
  */
 function generate_form_element($item, $type = '')
 {
+  // Check community edition
+  if (isset($item['community']) && !$item['community'] && OBSERVIUM_EDITION === 'community') {
+    return '';
+  }
+
   $value_isset = isset($item['value']);
   if (!$value_isset) { $item['value'] = ''; }
   if (is_array($item['value']))
@@ -1045,10 +1078,17 @@ function generate_form_element($item, $type = '')
   $string          = '';
   $element_tooltip = '';
   $element_data    = '';
+
+  // auto add some common html attribs
+  foreach ([ 'onchange', 'oninput', 'onclick', 'ondblclick', 'onfocus', 'onsubmit' ] as $attrib) {
+    if (isset($item[$attrib])) {
+      $item['attribs'][$attrib] = $item[$attrib];
+    }
+  }
+
   if (isset($item['attribs']) && is_array($item['attribs']))
   {
     // Custom html attributes
-    $element_data .= ' ' . generate_html_attribs($item['attribs']);
 
     if (isset($item['attribs']['data-toggle']))
     {
@@ -1057,32 +1097,93 @@ function generate_form_element($item, $type = '')
       {
         case 'confirm':
         case 'confirmation':
+          if ($item['attribs']['data-toggle'] === 'confirmation') {
+            $item['attribs']['data-toggle'] = 'confirm';
+          }
           // popConfirm
-          register_html_resource('js',     'jquery.popconfirm.js');
-          register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").popConfirm();');
+          //register_html_resource('js',     'jquery.popconfirm.js');
+          //register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").popConfirm();');
+          // Bootstrap-Confirmation
+          register_html_resource('js',     'bootstrap-confirmation.js');
+
+          //register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] .
+          //                                 '\']").confirmation({rootSelector: \'[data-toggle=' . $item['attribs']['data-toggle'] . ']\',});');
+          //$script_options = [ 'rootSelector: \'[data-toggle=' . $item['attribs']['data-toggle'] . ']\'' ];
+
+          if (!isset($item['attribs']['data-btn-ok-label'])) {
+            // default "Yes"
+            //$item['attribs']['data-btn-ok-label'] = 'Yes';
+          }
+          if (!isset($item['attribs']['data-btn-ok-class'])) {
+            // default "btn btn-xs btn-primary"
+          }
+          if (!isset($item['attribs']['data-btn-ok-icon'])) {
+            // default "glyphicon glyphicon-ok"
+            //$item['attribs']['data-btn-ok-icon'] = 'Yes';
+          }
+          if (!isset($item['attribs']['data-btn-cancel-label'])) {
+            // default "No"
+            //$item['attribs']['data-btn-cancel-label'] = 'Cheese';
+          }
+          if (!isset($item['attribs']['data-btn-cancel-class'])) {
+            // default "btn btn-xs btn-default"
+            //$item['attribs']['data-btn-cancel-class'] = 'btn-small btn-warning';
+          }
+          if (!isset($item['attribs']['data-btn-cancel-icon'])) {
+            // default "glyphicon glyphicon-remove"
+            //$item['attribs']['data-btn-cancel-icon'] = 'icon-sort';
+          }
+
+          // migrate from popConfirm
+          if (!isset($item['attribs']['data-title'])) {
+            $item['attribs']['data-title'] = 'Confirmation';
+          }
+          if (!isset($item['attribs']['data-singleton'])) {
+            $item['attribs']['data-singleton'] = 'true';
+          }
+          if (!isset($item['attribs']['data-popout'])) {
+            $item['attribs']['data-popout'] = 'true';
+          }
+          if (isset($item['attribs']['data-confirm-placement'])) {
+            $item['attribs']['data-placement'] = $item['attribs']['data-confirm-placement'];
+            unset($item['attribs']['data-confirm-placement']);
+          }
+          if (isset($item['attribs']['data-confirm-content'])) {
+            $item['attribs']['data-content'] = $item['attribs']['data-confirm-content'];
+            unset($item['attribs']['data-confirm-content']);
+          }
+          //register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").confirmation({' . implode(', ', $script_options) . '});');
           break;
-        //case 'switch':
-        //  // bootstrapSwitch
-        //  register_html_resource('js',     'bootstrap-switch.min.js');
-        //  //register_html_resource('css',    'bootstrap-switch.css');
-        //  register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").bootstrapSwitch();');
-        //  break;
+        case 'switch':
+          // Bootstrap Toggle
+          //$element_data .= ' data-selector="bootstrap-toggle"';
+          $item['attribs']['data-selector'] = "bootstrap-toggle";
+          register_html_resource('js',     'bootstrap-toggle.min.js');
+          //register_html_resource('js',     'bootstrap-toggle.js'); /// DEVEL
+          register_html_resource('css',    'bootstrap-toggle.min.css');
+          register_html_resource('script', '$("input[data-selector=\'bootstrap-toggle\']").bootstrapToggle();');
+          /* bootstrapSwitch (deprecated)
+            register_html_resource('js',     'bootstrap-switch.min.js');
+          //register_html_resource('css',    'bootstrap-switch.css');
+            register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").bootstrapSwitch();');
+          */
+          break;
         case 'toggle':
-          if (str_exists($item['class'], 'tiny-toggle'))
-          {
+          if (str_contains($item['class'], 'tiny-toggle')) {
             // TinyToggle
             $script = '';
-            if ($item['onchange'])
-            {
+            if ($item['onchange']) {
               // Here toggle specific onchange behavior
               $script .= 'onChange: function(obj, value) { ' . $item['onchange'] . ' },';
               // Set custom element selector
               $selector = 'tiny-toggle-' . md5($item['onchange']);
-              $element_data .= ' data-selector="'.$selector.'"';
+              //$element_data .= ' data-selector="'.$selector.'"';
+              $item['attribs']['data-selector'] = $selector;
               register_html_resource('script', '$("input[data-selector=\''.$selector.'\'].tiny-toggle").tinyToggle({' . $script . '});');
               unset($item['onchange']);
             } else {
-              $element_data .= ' data-selector="tiny-toggle"';
+              //$element_data .= ' data-selector="tiny-toggle"';
+              $item['attribs']['data-selector'] = "tiny-toggle";
               //register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").tinyToggle({'.$script.'});'); // this selector intersects with bootstrap toggle
               register_html_resource('script', '$("input[data-selector=\'tiny-toggle\'].tiny-toggle").tinyToggle();');
             }
@@ -1090,7 +1191,8 @@ function generate_form_element($item, $type = '')
             register_html_resource('css', 'tiny-toggle.min.css');
           } else {
             // Bootstrap Toggle
-            $element_data .= ' data-selector="bootstrap-toggle"';
+            //$element_data .= ' data-selector="bootstrap-toggle"';
+            $item['attribs']['data-selector'] = "bootstrap-toggle";
             register_html_resource('js',     'bootstrap-toggle.min.js');
             //register_html_resource('js',     'bootstrap-toggle.js'); /// DEVEL
             register_html_resource('css',    'bootstrap-toggle.min.css');
@@ -1100,6 +1202,7 @@ function generate_form_element($item, $type = '')
           break;
       }
     }
+    $element_data .= ' ' . generate_html_attribs($item['attribs']);
   }
   switch ($item['type'])
   {
@@ -1114,36 +1217,38 @@ function generate_form_element($item, $type = '')
     case 'textarea':
     case 'text':
     case 'input':
-      if ($item['type'] != 'textarea')
+      $item_class = '';
+      $value_hidden = FALSE;
+      if ($item['type'] !== 'textarea')
       {
         $item_begin = '    <input type="'.$item['type'].'" ';
         // Autocomplete
         $autocomplete_off = isset($item['autocomplete']) && !$item['autocomplete']; // Disable autocomplete if it set in item params as FALSE!
         // password specific options
-        if ($item['type'] == 'password')
+        if ($item['type'] === 'password')
         {
           // disable autocomplete for passwords by default!
           $autocomplete_off = !(isset($item['autocomplete']) && $item['autocomplete']);
 
           // mask password field for disabled/readonly by bullet
-          if (strlen($item['value']) && ($item['disabled'] || $item['readonly']))
-          {
-            if (!($item['show_password'] && $_SESSION['userlevel'] > 7)) // For admin, do not replace, required for show password
-            {
-              $item['value_escaped'] = '&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;';
-            }
+          $value_len = strlen($item['value']);
+          if (($item['disabled'] || $item['readonly']) && $value_len &&
+              !($item['show_password'] && $_SESSION['userlevel'] > 7)) {
+            $item['value_escaped'] = '&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;';
+            $value_hidden = TRUE;
           }
           // add icon for show/hide password
-          if ($item['show_password'])
-          {
+          if ($item['show_password']) {
             $item_begin .= ' data-toggle="password" ';
             register_html_resource('js', 'bootstrap-show-password.min.js');
             $GLOBALS['cache_html']['javascript'][] = "$('[data-toggle=\"password\"]').password();";
           }
+          //elseif (!$value_hidden && $autocomplete_off) {}
         }
+
         // Disable Autocomplete if required
-        if ($autocomplete_off)
-        {
+        if ($autocomplete_off) {
+
           $browser = detect_browser();
           //r($browser);
 
@@ -1151,7 +1256,7 @@ function generate_form_element($item, $type = '')
           //https://developer.mozilla.org/en-US/docs/Web/Security/Securing_your_site/Turning_off_form_autocompletion#The_autocomplete_attribute_and_login_fields
           //https://www.chromium.org/developers/design-documents/form-styles-that-chromium-understands
           //https://stackoverflow.com/questions/41945535/html-disable-password-manager
-          if ($item['type'] === 'password')
+          if ($item['type'] === 'password' && !$value_hidden)
           {
             $autocomplete_value = 'new-password';
             $item_begin = '<input type="password" id="disable-pwd-mgr-1" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-1" />' .
@@ -1163,8 +1268,7 @@ function generate_form_element($item, $type = '')
           }
           $item_begin .= ' autocomplete="'.$autocomplete_value.'" ';
 
-          if ($browser['browser'] === 'Safari')
-          {
+          if ($browser['browser'] === 'Safari') {
             // Safari issue: https://stackoverflow.com/questions/22661977/disabling-safari-autofill-on-usernames-and-passwords
             //$item_begin .= ' autocomplete="off" readonly onfocus="if (this.hasAttribute(\'readonly\')) {this.removeAttribute(\'readonly\'); this.blur(); this.focus();}" ';
             //$item_begin .= ' autocomplete="false" ';
@@ -1194,7 +1298,7 @@ STYLE
           */
         }
         $item_end   = ' value="'.$item['value_escaped'].'" />';
-        $item_class = 'input';
+        $item_class .= 'input';
       } else {
         $item_begin = '    <textarea ';
         // textarea specific options
@@ -1207,7 +1311,7 @@ STYLE
           $item_begin .= 'cols="' . $item['cols'] . '" ';
         }
         $item_end   = '>' . $item['value_escaped'] . '</textarea>';
-        $item_class = 'form-control';
+        $item_class .= 'form-control';
       }
       $item_begin .= $element_data; // Add custom data- attribs
       if ($item['disabled'])
@@ -1228,18 +1332,31 @@ STYLE
         $string .= PHP_EOL;
         $string .= $item_begin . 'placeholder="'.$item['placeholder'].'" ';
         $item['placeholder'] = TRUE; // Set to true for check at end
+      } elseif ($item['type'] === 'text') {
+        $string .= $item_begin;
       } else {
         $string .= '  <div class="input-prepend">' . PHP_EOL;
         if (!$item['name']) { $item['name'] = get_icon('icon-list'); }
         $string .= '    <span class="add-on">'.$item['name'].'</span>' . PHP_EOL;
         $string .= $item_begin;
       }
+      if ($item['size'])
+      {
+        $string .= ' size="' . $item['size'] . '"';
+      }
       if ($item['class'])
       {
         $item_class .= ' ' . $item['class'];
       }
 
-      $string .= (isset($item['width'])) ? 'style="width:' . $item['width'] . '" ' : '';
+      // style
+      $style = isset($item['width']) ? 'width:' . $item['width'] . ';' : '';
+      if (isset($item['style'])) {
+        $style .= ' ' . $item['style'];
+        $style = trim($style);
+      }
+      $string .= $style ? 'style="' . $style . '" ' : '';
+
       $string .= 'name="'.$item['id'] . '" id="' .$item['id'] . '" class="' . $item_class;
 
       if ($item['ajax'] === TRUE && is_array($item['ajax_vars']))
@@ -1304,9 +1421,8 @@ SCRIPT;
       break;
 
     case 'switch':
-      // switch specific options
-      if (isset($item['revert']) && $item['revert'])
-      {
+      /* switch specific options (deprecated, replaced with bootstrap-toggle)
+      if (isset($item['revert']) && $item['revert']) {
         // Fallback for old preconfigured style
         if (!isset($item['size']))      { $item['size']      = 'mini'; }
         if (!isset($item['on-color']))  { $item['on-color']  = 'danger'; }
@@ -1318,49 +1434,41 @@ SCRIPT;
       // Convert to data attribs and recursive call to checkbox
       $item['attribs']['data-toggle'] = 'switch';
       $item_attribs = array('size', 'on-color', 'on-text', 'off-color', 'off-text');
-      foreach($item_attribs as $attr)
-      {
+      foreach($item_attribs as $attr) {
         if (isset($item[$attr])) { $item['attribs']['data-'.$attr] = $item[$attr]; }
       }
-      if (is_numeric($item['width']) && $item['width'] > 10)
-      {
-        $item['attribs']['data-handle-width'] = intval($item['width'] / 2);
+      if (is_numeric($item['width']) && $item['width'] > 10) {
+        $item['attribs']['data-handle-width'] = (int)($item['width'] / 2);
       }
       $item['type'] = 'checkbox'; // replace item type
       return generate_form_element($item);
-      // end switch
+      end switch */
 
     case 'switch-ng':
     case 'switch-new':
       //r($item);
-      // toggle specific options
+      // switch-ng specific options
       // Convert to data attribs and recursive call to checkbox
       $item['attribs']['data-toggle'] = 'toggle';
       // Convert to data attribs and recursive call to checkbox
       $item_attribs = [ 'size', 'width', 'height' ];
-      foreach($item_attribs as $attr)
-      {
+      foreach($item_attribs as $attr) {
         if (isset($item[$attr])) { $item['attribs']['data-'.$attr] = $item[$attr]; }
       }
       // Append icons
-      if (isset($item['icon']))
-      {
+      if (isset($item['icon'])) {
         $item['on-icon']  = isset($item['on-icon'])  ? $item['on-icon']  : $item['icon'];
         $item['off-icon'] = isset($item['off-icon']) ? $item['off-icon'] : $item['icon'];
       }
-      if (isset($item['on-icon']))
-      {
-        if (isset($item['on-text']))
-        {
+      if (isset($item['on-icon'])) {
+        if (isset($item['on-text'])) {
           $item['on-text'] = get_icon($item['on-icon']) . '&nbsp;' . $item['on-text'];
         } else {
           $item['on-text'] = get_icon($item['on-icon']);
         }
       }
-      if (isset($item['off-icon']))
-      {
-        if (isset($item['off-text']))
-        {
+      if (isset($item['off-icon'])) {
+        if (isset($item['off-text'])) {
           $item['off-text'] = get_icon($item['off-icon']) . '&nbsp;' . $item['off-text'];
         } else {
           $item['off-text'] = get_icon($item['off-icon']);
@@ -1368,9 +1476,10 @@ SCRIPT;
       }
       // This is compat with old 'switch' item attribs
       $item_attribs = [ 'on-color' => 'onstyle', 'on-text' => 'on', 'off-color' => 'offstyle', 'off-text' => 'off', 'class' => 'style' ];
-      foreach($item_attribs as $attr => $data_attr)
-      {
-        if (isset($item[$attr])) { $item['attribs']['data-'.$data_attr] = $item[$attr]; }
+      foreach($item_attribs as $attr => $data_attr) {
+        if (isset($item[$attr])) {
+          $item['attribs']['data-'.$data_attr] = $item[$attr];
+        }
       }
 
       // Onchange target id
@@ -1383,7 +1492,7 @@ SCRIPT;
       $item['type'] = 'checkbox';       // replace item type
       //r(generate_form_element($item));
       return generate_form_element($item);
-    // end toggle
+      // end switch-ng
 
     case 'toggle':
       // toggle specific options
@@ -1398,7 +1507,7 @@ SCRIPT;
       // Move placeholder to label
       if (isset($item['placeholder']) && is_string($item['placeholder']))
       {
-        $item['attribs']['data-tt-label'] = $item['placeholder'];
+        $item['attribs']['data-tt-label'] = get_markdown($item['placeholder'], TRUE, TRUE);
         unset($item['placeholder']);
       }
       $item_attribs = array('size', 'palette', 'group', 'label', 'icon-check', 'label-check', 'icon-uncheck', 'label-uncheck');
@@ -1437,7 +1546,7 @@ SCRIPT;
       {
         $string .= ' data-rel="tooltip" data-tooltip="'.escape_html($item['title']).'" title="'.escape_html($item['title']).'"';
       }
-      if ($item['value'] == '1' || $item['value'] === 'on' || $item['value'] === 'yes' || $item['value'] === TRUE)
+      if (get_var_true($item['value']))
       {
         $string .= ' checked';
       }
@@ -1449,10 +1558,6 @@ SCRIPT;
       {
         $string .= ' readonly="1" onclick="return false"';
       }
-      elseif ($item['onchange'])
-      {
-        $string .= ' onchange="'.$item['onchange'].'"';
-      }
       if ($item['class'])
       {
         $string .= ' class="' . trim($item['class']) . '"';
@@ -1463,7 +1568,7 @@ SCRIPT;
       {
         // add placeholder text at right of the element
         $string .= '      <label for="' . $item['id'] . '" class="help-inline" style="margin-top: 4px;">' .
-                   $item['placeholder'] . '</label>' . PHP_EOL;
+                   get_markdown($item['placeholder'], TRUE, TRUE) . '</label>' . PHP_EOL;
 //        $string = '      <label for="' . $item['id'] . '" class="help-inline" style="margin-top: 4px;">' . $string .
 //                  $item['placeholder'] . '</label>' . PHP_EOL;
       }
@@ -1474,7 +1579,7 @@ SCRIPT;
       register_html_resource('js', 'bootstrap-datetimepicker.min.js'); // Enable DateTime JS
       // Additionally register qTip (if not already enabled by $config['web_mouseover'])
       register_html_resource('js', 'jquery.qtip.min.js');
-      register_html_resource('css', 'jquery.qtip.min.css');
+      //register_html_resource('css', 'jquery.qtip.min.css'); // in obs css
       $id_from = $item['id'].'_from';
       $id_to = $item['id'].'_to';
       if ($value_isset && !$item['from'] && !$item['to'])
@@ -1518,7 +1623,7 @@ SCRIPT;
       // Date/Time input fields
       if ($item['from'] !== FALSE)
       {
-        $string .= '  <div id="'.$id_from.'_div" class="input-prepend" style="margin-bottom: 5px;">' . PHP_EOL;
+        $string .= '  <div id="'.$id_from.'_div" class="input-prepend">' . PHP_EOL;
         $string .= '    <span class="add-on btn"><i data-time-icon="icon-time" data-date-icon="icon-calendar"></i> '.$name_from.'</span>' . PHP_EOL;
         //$string .= '    <input type="text" class="input-medium" data-format="yyyy-MM-dd hh:mm:ss" ';
         $string .= '    <input type="text" data-format="yyyy-MM-dd hh:mm:ss" ';
@@ -1537,7 +1642,7 @@ SCRIPT;
       }
       if ($item['to'] !== FALSE)
       {
-        $string .= '  <div id="'.$id_to.'_div" class="input-prepend" style="margin-bottom: 5px;">' . PHP_EOL;
+        $string .= '  <div id="'.$id_to.'_div" class="input-prepend">' . PHP_EOL;
         $string .= '    <span class="add-on btn"><i data-time-icon="icon-time" data-date-icon="icon-calendar"></i> To</span>' . PHP_EOL;
         //$string .= '    <input type="text" class="input-medium" data-format="yyyy-MM-dd hh:mm:ss" ';
         $string .= '    <input type="text" data-format="yyyy-MM-dd hh:mm:ss"';
@@ -1549,16 +1654,16 @@ SCRIPT;
       // JS SCRIPT
       $min = '-Infinity';
       $max = 'Infinity';
-      $pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
+      $pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$/';
       if (!empty($item['min']))
       {
         if (preg_match($pattern, $item['min'], $matches))
         {
-          $matches[2] = $matches[2] - 1;
+          $matches[2] -= 1;
           array_shift($matches);
           $min = 'new Date(' . implode(',', $matches) . ')';
         }
-        else if ($item['min'] == 'now' || $item['min'] == 'current')
+        else if ($item['min'] === 'now' || $item['min'] === 'current')
         {
           $min = 'new Date()';
         }
@@ -1567,11 +1672,11 @@ SCRIPT;
       {
         if (preg_match($pattern, $item['max'], $matches))
         {
-          $matches[2] = $matches[2] - 1;
+          $matches[2] -= 1;
           array_shift($matches);
           $max = 'new Date(' . implode(',', $matches) . ')';
         }
-        else if ($item['max'] == 'now' || $item['max'] == 'current')
+        else if ($item['max'] === 'now' || $item['max'] === 'current')
         {
           $max = 'new Date()';
         }
@@ -1664,7 +1769,7 @@ SCRIPT;
       {
         $string .= ' disabled="1"';
       }
-      else if ($item['readonly'])
+      elseif ($item['readonly'])
       {
         $string .= ' disabled="1" readonly="1"'; // Bootstrap Tags Input not support readonly attribute, currently use disable
       }
@@ -1687,7 +1792,7 @@ SCRIPT;
       foreach ($item['value'] as $entry)
       {
         $value   = (string)$entry;
-        if ($value == '[there is no data]' || $value === '') { continue; }
+        if ($value === '[there is no data]' || $value === '') { continue; }
         $suggest[] = $value;
 
         $string .= '<option value="'.$value.'"';
@@ -1703,7 +1808,7 @@ SCRIPT;
         $item['values'] = array_keys($item['values']);
       }
       $suggest = array_merge($suggest, $item['values']);
-      if (count($suggest))
+      if (safe_count($suggest))
       {
         $option = '[{ hint: false, highlight: true, minLength: 1 },
                     { name: "suggest", limit: 16, source: suggest_'.$item['id'].' }]';
@@ -1732,7 +1837,7 @@ SCRIPT;
         register_html_resource('css', 'typeaheadjs.css');
       }
 
-      if (count($script_options))
+      if (safe_count($script_options))
       {
         $script  = $script_begin;
         $script .= "$('#".$item['id']."').tagsinput({" . PHP_EOL;
@@ -1750,7 +1855,7 @@ SCRIPT;
     case 'multiselect':
       unset($item['icon']); // For now not used icons in multiselect
     case 'select':
-      $count_values = count($item['values']);
+      $count_values = safe_count($item['values']);
       if (empty($item['values']))
       {
         $item['values'] = array(0 => '[there is no data]');
@@ -1905,7 +2010,7 @@ SCRIPT;
         $optgroups = array_merge($groups, $optgroups);
       }
 
-      if (count($optgroups) === 1) // && isset($optgroup['']))
+      if (safe_count($optgroups) === 1) // && isset($optgroup['']))
       {
         // Single optgroup, do not use optgroup tags
         $string .= array_shift($optgroup);
@@ -1924,24 +2029,21 @@ SCRIPT;
       $string .= PHP_EOL . '    </select>' . PHP_EOL;
       // End 'select' & 'multiselect'
       break;
+    case 'button':
     case 'submit':
-      $button_type    = 'submit';
+      $button_type = $item['type'] === 'button' ? 'button' : 'submit';
       $button_onclick = '';
-      if (isset($item['icon_only']) && $item['icon_only'] && $item['icon'])
-      {
+      if (isset($item['icon_only']) && $item['icon_only'] && $item['icon']) {
         // icon only submit button
         $button_class   = 'btn-icon';
-        if (!empty($item['class']))
-        {
+        if (!empty($item['class'])) {
           $button_class .= ' ' . $item['class'];
         }
       } else {
         // classic submit button
         $button_class   = 'btn';
-        if (!empty($item['class']))
-        {
-          if (!preg_match('/btn-(default|primary|success|info|warning|danger)/', $item['class']))
-          {
+        if (!empty($item['class'])) {
+          if (!preg_match('/btn-(default|primary|success|info|warning|danger)/', $item['class'])) {
             // Add default class if custom class hot have it
             $button_class .= ' btn-default';
           }
@@ -1950,33 +2052,28 @@ SCRIPT;
           $button_class .= ' btn-default';
         }
       }
-      if ($item['right'])
-      {
+      if ($item['right']) {
         $button_class .= ' pull-right';
       }
-      if ($item['form_id'] && $item['id'] == 'search')
-      {
+      if ($item['form_id'] && $item['id'] === 'search') {
         // Note, used script form_to_path() stored in js/observium.js
         $button_type    = 'button';
         $button_onclick = " onclick=\"form_to_path('".$item['form_id']."');\"";
       }
 
-      if ($item['onclick'])
-      {
+      if ($item['onclick']) {
         $button_onclick = ' onclick="'.$item['onclick'].'"';
       }
 
       $button_disabled = $item['disabled'] || $item['readonly'];
-      if ($button_disabled)
-      {
+      if ($button_disabled) {
         $button_class .= ' disabled';
       }
 
       $string .= '      <button id="' . $item['id'] . '" name="' . $item['id'] . '" type="'.$button_type.'"';
 
       // Add tooltip data
-      if ($item['tooltip'])
-      {
+      if ($item['tooltip']) {
         $button_class .= ' tooltip-from-element';
         $string .= ' data-tooltip-id="tooltip-' . $item['id'] . '"';
         $element_tooltip .= '<div id="tooltip-' . $item['id'] . '" style="display: none;">' . $item['tooltip'] . '</div>' . PHP_EOL;
@@ -1984,48 +2081,47 @@ SCRIPT;
 
       //$string .= ' class="'.$button_class.' text-nowrap" style="line-height: 20px;"'.$button_onclick;
       $string .= ' class="'.$button_class.' text-nowrap"'.$button_onclick;
-      if ($button_disabled)
-      {
+      if ($button_disabled) {
         $string .= ' disabled="1"';
       }
 
-      if ($item['value'])
-      {
+      if (isset($item['value'])) {
         $string .= ' value="' . $item['value_escaped'] . '"';
       }
       $string .= $element_data; // Add custom data- attribs
       $string .= '>';
-      switch($item['id'])
-      {
+      switch($item['id']) {
         // Note. 'update' - use POST request, all other - use GET with generate url from js.
         case 'update':
           $button_icon = 'icon-refresh';
           $button_name = 'Update';
           break;
-        default:
+        //case 'submit':
+        case 'search':
           $button_icon = 'icon-search';
           $button_name = 'Search';
+          break;
+        default:
+          $button_icon = '';
+          $button_name = 'Submit';
       }
       $nbsp = 0;
       if (array_key_exists('icon', $item)) { $button_icon = trim($item['icon']); }
-      if (strlen($button_icon))
-      {
+      if (!safe_empty($button_icon)) {
         $string .= '<i class="'.$button_icon.'" style="margin-right: 0px;"></i>'; // Override margin style, here used "own" margin
         $nbsp++;
       }
 
       if (array_key_exists('name', $item)) { $button_name = trim($item['name']); }
-      if (strlen($button_name))
-      {
+      if (!safe_empty($button_name)) {
         $nbsp++;
       }
 
-      if ($nbsp == 2)
-      {
+      if ($nbsp == 2) {
         $string .= '&nbsp;&nbsp;';
       }
       $string .= $button_name.'</button>' . PHP_EOL;
-      // End 'submit'
+      // End 'button', 'submit'
       break;
     case 'raw':
     case 'html':

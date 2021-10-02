@@ -62,7 +62,7 @@ if (is_array($data) && isset($data['memTotalReal']) && isset($data['memAvailReal
   // UCD-SNMP-MIB::versionTag.0 = 5.7.2
   // UCD-SNMP-MIB::versionCDate.0 = Wed Sep 18 15:12:36 2019
   // UCD-SNMP-MIB::versionConfigureOptions.0 =  '--build=x86_64-redhat-linux-gnu' '--host=x86_64-redhat-linux-gnu' '--program-prefix=' '--disable-dependency-tracking' '--prefix=/usr' '--exec-prefix=/usr' '--bindir=/usr/bin' '--sbindir=/usr/sbin' '--datadir=/usr/share' '--includedir=/usr/include' '--libdir=/usr/lib64' '--libexecdir=/usr/libexec' '--localstatedir=/var' '--sharedstatedir=/var/lib' '--mandir=/usr/share/man' '--infodir=/usr/share/info' '--disable-static' '--enable-shared' '--with-cflags=-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches   -m64 -mtune=generic -D_RPM_4_4_COMPAT' '--with-ldflags=-Wl,-z,relro -Wl,-z,now' '--with-sys-location=Unknown' '--with-logfile=/var/log/snmpd.log' '--with-persistent-directory=/var/lib/net-snmp' '--with-mib-modules=host agentx smux      ucd-snmp/diskio tcp-mib udp-mib mibII/mta_sendmail      ip-mib/ipv4InterfaceTable ip-mib/ipv6InterfaceTable      ip-mib/ipAddressPrefixTable/ipAddressPrefixTable      ip-mib/ipDefaultRouterTable/ipDef
-  if (is_array($ucd_version) && str_exists($ucd_version['versionConfigureOptions'], '-redhat-') &&
+  if (is_array($ucd_version) && str_contains_array($ucd_version['versionConfigureOptions'], '-redhat-') &&
       version_compare($ucd_version['versionTag'], '5.7.2', '>=')
       && strtotime($ucd_version['versionCDate']) > 1558483200)
   {

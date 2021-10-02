@@ -20,7 +20,7 @@ $oids = array('hpnicfEntityExtMemUsage', 'hpnicfEntityExtMemSize');
 $mempool_array = array();
 foreach ($oids as $oid)
 {
-  $mempool_array = snmpwalk_cache_multi_oid($device, $oid, $mempool_array, 'ENTITY-MIB:HPN-ICF-ENTITY-EXT-MIB');
+  $mempool_array = snmpwalk_cache_oid($device, $oid, $mempool_array, 'ENTITY-MIB:HPN-ICF-ENTITY-EXT-MIB');
   if (!$GLOBALS['snmp_status']) { break; }
 }
 

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -91,8 +91,7 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $storage)
 
   print_debug_vars($storage);
 
-  if ($storage['size'])
-  {
+  if (is_numeric($storage['used']) && $storage['size']) {
     $percent = round($storage['used'] / $storage['size'] * 100, 2);
   } else {
     $percent = 0;

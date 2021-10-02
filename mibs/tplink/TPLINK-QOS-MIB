@@ -24,9 +24,10 @@
 	tplinkQosNotifications	OBJECT IDENTIFIER	::= { tplinkQosMIB 2 }
 	
 		tplinkQosBasicConfig  		OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 1}
-        tplinkQosScheduler  		OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 2}
-  		tplinkQos8021p				OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 3}
-  		tplinkQosDSCP				OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 4}
+    tplinkQosScheduler  		OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 2}
+		tplinkQos8021p				OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 3}
+  	tplinkQos8021pRemap				OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 4}
+  	tplinkQosDSCP				OBJECT IDENTIFIER ::= {tplinkQosMIBObjects 5}
   			           
         -- the qos basic config
               
@@ -52,6 +53,8 @@
 								tpQosBasicConfigPort
 										DisplayString, 
 								tpQosBasicConfigPri
+										INTEGER,
+								tpQosBasicConfigTrust
 										INTEGER,
 								tpQosBasicConfigLag
 										OCTET STRING (SIZE (1..255))
@@ -90,100 +93,123 @@
                      7. Cos7
                      Specify the priority for the port."
             ::= { tpQosBasicConfigEntry 2 }
-       
+						
+				tpQosBasicConfigTrust OBJECT-TYPE
+						SYNTAX INTEGER{
+						untrust(0),
+						trust-8021p(1),
+						trust-DSCP(2)
+						}
+						MAX-ACCESS read-write
+						STATUS current
+						DESCRIPTION
+							"Trust mode for specified port.
+							 Untrust--Port priority activated.
+							 Trust-8021p--802.1p priority activated.
+							 Trust-DSCP--IP DSCP priority activated."  
+						::={ tpQosBasicConfigEntry 3 }		
+						
       tpQosBasicConfigLag OBJECT-TYPE
             SYNTAX  OCTET STRING (SIZE (1..255))  
             MAX-ACCESS  read-only
             STATUS  current
             DESCRIPTION
                     "The LAG number which the port belongs to. "
-            ::= { tpQosBasicConfigEntry 3 }
-         
-        tpQosSchedulerConfig OBJECT-TYPE
-	          SYNTAX  INTEGER{
-	      		sp-mode(0), 						
-	      		wrr-mode(1),
-	      		sp-wrr-mode(2),
-	      		equ-mode(3)						
-	      		}
-	            MAX-ACCESS  read-write
-	            STATUS  current
-	            DESCRIPTION
-	                    "Here you can select the schedule mode for the switch.
-	                     0. SP-Mode: Strict-Priority Mode. 
-	                        In this mode, the queue with higher priority will occupy the whole bandwidth. 
-	                        Packets in the queue with lower priority are sent only when the queue with 
-	                        higher priority is empty.  
-	                     1. WRR-Mode: Weight Round Robin Mode. 
-	                        In this mode, packets in all the queues are sent in order based on the weight 
-	                        value for each queue. 
-							You can also config the TC queues' weight with values 1-127. 
-	                     2. SP+WRR-Mode: Strict-Priority + Weight Round Robin Mode. 
-	                        In this mode, this switch provides two scheduling groups, SP group and WRR group. 
-	                        Queues in SP group and WRR group are scheduled strictly based on strict-priority mode 
-	                        while the queues inside WRR group follow the WRR mode. 
-	                        In SP+WRR mode, the largest TC queue is in the SP group and the others belong to the WRR group and 
-							You can also config the TC queues' weight with values 0-127, value 0 means this TC queue is in SP group.
-	                        In this way, when scheduling queues, the switch allows TC queues in SP group to occupy the whole bandwidth 
-	                        following the SP mode and the other TC queues in the WRR group will take up the bandwidth according to their ratio. 
-	                     3. Equ-Mode: Equal-Mode. 
-	                        In this mode, all the queues occupy the bandwidth equally."
-	            ::= { tplinkQosScheduler 1 }
-	            
-  			-- the qos 8021p config
+            ::= { tpQosBasicConfigEntry 4 }
 						
-        tpQosSchedulerWeightTable OBJECT-TYPE
-			SYNTAX SEQUENCE OF TpQosSchedulerWeightEntry
-            MAX-ACCESS  not-accessible
-            STATUS  current
-            DESCRIPTION
-                    "A table of the information of qos scheduler queue weight."
-            ::= { tplinkQosScheduler 2 }
+			tpQosSchedulerPort OBJECT-TYPE
+					SYNTAX OCTET STRING 
+					MAX-ACCESS  read-write
+					STATUS  current
+					DESCRIPTION
+									"The physical port number of the switch. Input a port to get or configure the port scheduler."
+						::= { tplinkQosScheduler 1 }	
+						
+			tpQosSchedulerTable OBJECT-TYPE
+				SYNTAX  SEQUENCE OF TpQosSchedulerEntry
+				MAX-ACCESS  not-accessible
+				STATUS  current
+				DESCRIPTION
+								"A list of qos scheduler config entries. Here you can configure the qos scheduler."
+				::= { tplinkQosScheduler 2 }
 			
-		tpQosSchedulerWeightEntry OBJECT-TYPE
-			SYNTAX TpQosSchedulerWeightEntry
-			MAX-ACCESS not-accessible
-			STATUS current
-			DESCRIPTION
-					"An entry contains of the information of qos scheduler queue weight config."
-			INDEX   { tpQosSchedulerTc }
-			::= { tpQosSchedulerWeightTable 1 }
-	
-	    TpQosSchedulerWeightEntry ::=
-            SEQUENCE {
-				tpQosSchedulerTc
-							INTEGER,
-				tpQosSchedulerWeight
-							INTEGER
-            }
-
-		tpQosSchedulerTc OBJECT-TYPE
-            SYNTAX  INTEGER{
-            			tc0(0),
-            			tc1(1),
-            			tc2(2),
-            			tc3(3),
-						tc4(4),
-						tc5(5),
-						tc6(6),
-						tc7(7)
-            }
-			MAX-ACCESS read-only
-			STATUS current
-			DESCRIPTION
-                    "Indicates the priority level the packets go egress. 
-                     The priority levels are labeled as TC."
-			::= { tpQosSchedulerWeightEntry 1 }
+			tpQosSchedulerEntry OBJECT-TYPE
+				SYNTAX  TpQosSchedulerEntry
+				MAX-ACCESS  not-accessible
+				STATUS  current
+				DESCRIPTION
+								"An entry contains of the information of qos scheduler."
+				INDEX   { tpQosSchedulerConfigTc }
+				::= { tpQosSchedulerTable 1 }   
+      
+			TpQosSchedulerEntry ::= 
+				SEQUENCE {
+						tpQosSchedulerConfigTc
+								INTEGER, 
+						tpQosSchedulerConfigMode
+								INTEGER,
+						tpQosSchedulerConfigWeight
+								INTEGER,
+						tpQosSchedulerConfigMinBandwidth
+								INTEGER,
+						tpQosSchedulerConfigManagementType
+								INTEGER
+				}			
+				
+			tpQosSchedulerConfigTc OBJECT-TYPE
+				SYNTAX INTEGER{
+					tc0(0), 						
+					tc1(1),
+					tc2(2),
+					tc3(3),
+					tc4(4),
+					tc5(5),
+					tc6(6),		
+					tc7(7)	
+				}
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION
+					"Traffic class queue ID."
+				::= {tpQosSchedulerEntry 1}
+				
+			tpQosSchedulerConfigMode OBJECT-TYPE
+				SYNTAX INTEGER{
+					strict(0),
+					weighted(1)
+				}
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION
+					"Queue schedule mode: Strict-Priority or Weighted-Round-Robin."
+				::= {tpQosSchedulerEntry 2}
+				
+			tpQosSchedulerConfigWeight OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION
+					"Weight of the queue: 0 stands for Strict schedule mode; 1-127 stands for WRR schedule mode."
+				::= {tpQosSchedulerEntry 3}
+				
+			tpQosSchedulerConfigMinBandwidth OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION
+					"Min-Bandwidth of the specified queue, value 0%-100%."
+				::= {tpQosSchedulerEntry 4}
 			
-		tpQosSchedulerWeight OBJECT-TYPE
-			SYNTAX  INTEGER(0..127)
-			MAX-ACCESS read-write
-			STATUS current
-			DESCRIPTION
-					"Indecates the egress queue weight value.
-					 The value ranges from 0 to 127."
-			::= { tpQosSchedulerWeightEntry 2 }
-			
+			tpQosSchedulerConfigManagementType OBJECT-TYPE
+				SYNTAX INTEGER{
+					taildrop(0)
+				}
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION
+					"Queue drop mode: taildrop."
+				::= {tpQosSchedulerEntry 5}
+				
         tpQos8021pTable OBJECT-TYPE
             SYNTAX  SEQUENCE OF TpQos8021pEntry
             MAX-ACCESS  not-accessible
@@ -191,7 +217,7 @@
             DESCRIPTION
                     "A list of qos 8021p entries.
                      Here you can configure 802.1P Priority."
-            ::= { tplinkQos8021p 2 }
+            ::= { tplinkQos8021p 1 }
 
         tpQos8021pEntry OBJECT-TYPE
             SYNTAX  TpQos8021pEntry
@@ -220,10 +246,10 @@
         
         tpQos8021pPriLevel OBJECT-TYPE
             SYNTAX  INTEGER{
-            			tc0(0),
-            			tc1(1),
-            			tc2(2),
-            			tc3(3),
+            tc0(0),
+            tc1(1),
+            tc2(2),
+            tc3(3),
 						tc4(4),
 						tc5(5),
 						tc6(6),
@@ -235,20 +261,129 @@
                     "Indicates the priority level the packets with tag are mapped to. 
                      The priority levels are labeled as TC."
             ::= { tpQos8021pEntry 2 }
-        
+	
+			
+        tpQos8021pRemapTable OBJECT-TYPE
+            SYNTAX  SEQUENCE OF TpQos8021pRemapEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+                    "A list of qos 8021p remapping entries.
+                     Here you can configure 802.1P Priority Remapping."
+            ::= { tplinkQos8021pRemap 1 }
+
+        tpQos8021pRemapEntry OBJECT-TYPE
+            SYNTAX  TpQos8021pRemapEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+                    "An entry contains of the information of qos 8021p remapping."
+            INDEX   { ifIndex }
+            ::= { tpQos8021pRemapTable 1 }
+    
+        TpQos8021pRemapEntry ::=
+            SEQUENCE {
+								tpQos8021pPort
+										DisplayString,
+                tpQos8021pPriTag0
+										INTEGER,
+                tpQos8021pPriTag1
+										INTEGER,
+                tpQos8021pPriTag2
+										INTEGER,
+                tpQos8021pPriTag3
+										INTEGER,
+                tpQos8021pPriTag4
+										INTEGER,
+                tpQos8021pPriTag5
+										INTEGER,
+                tpQos8021pPriTag6
+										INTEGER,
+                tpQos8021pPriTag7
+										INTEGER,
+								tpQos8021pPriLag
+										OCTET STRING (SIZE (1..255))
+            }
+
+        tpQos8021pPort OBJECT-TYPE
+            SYNTAX  DisplayString  
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+                    "The physical port number of the switch. "
+            ::= { tpQos8021pRemapEntry 1 }
+            
+        tpQos8021pPriTag0 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 2 }
+        tpQos8021pPriTag1 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 3 }   
+        tpQos8021pPriTag2 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 4 }
+        tpQos8021pPriTag3 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 5 }	
+        tpQos8021pPriTag4 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 6 }
+        tpQos8021pPriTag5 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 7 }   
+        tpQos8021pPriTag6 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 8 }
+        tpQos8021pPriTag7 OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the remapping value of the specified 802.1P priority."
+            ::= { tpQos8021pRemapEntry 9 }						
+       tpQos8021pPriLag OBJECT-TYPE
+            SYNTAX  OCTET STRING (SIZE (1..255))  
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+                    "The LAG number which the port belongs to. "
+            ::= { tpQos8021pRemapEntry 10 }
        -- the qos dscp config
         
-        tpQosDSCPEnable OBJECT-TYPE
-	          SYNTAX  INTEGER{
-	      		disable(0), 						
-	      		enable(1)		
-	      		}
-	            MAX-ACCESS  read-write
-	            STATUS  current
-	            DESCRIPTION
-	                    "0. disable
-	                     1. enable
-	                     Here you can enable or disable DSCP Priority."
+        tpQosDSCPPort OBJECT-TYPE
+            SYNTAX OCTET STRING 
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "The physical port number of the switch. Input a port to get or configure the DSCP priority."
 	            ::= { tplinkQosDSCP 1 }	
         
          tpQosDSCPTable OBJECT-TYPE
@@ -274,6 +409,8 @@
                 tpQosDSCPPriTag
 										INTEGER,
                 tpQosDSCPPriLevel
+										INTEGER,
+								tpQosDSCPPriRemap
 										INTEGER
             }
             
@@ -303,5 +440,13 @@
                     "Indicates the priority level the packets with tag are mapped to. 
                      The priority levels are labeled as cos0 - cos7."
             ::= { tpQosDSCPEntry 2 }
+
+						tpQosDSCPPriRemap OBJECT-TYPE
+            SYNTAX  INTEGER
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                    "Indicates the re-map DSCP value of the specified DSCP, it ranges from 0 to 63. "
+            ::= { tpQosDSCPEntry 3 }
 END
 

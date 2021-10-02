@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -202,10 +201,20 @@ foreach ($graph_def['ds'] as $ds_name => $ds)
     $ds_unit = (strlen($ds['unit']) ? $ds['unit'] : '');      // Unit text per DS
     if (isset($ds['num_fmt'])) { $num_fmt = $ds['num_fmt']; } // Numeric format per DS
 
-    if (in_array("lst", $data_show)) { $cmd_graph .= " GPRINT:".$ds_data.":LAST:%".$num_fmt."lf".$mag_unit.$ds_unit; }
-    if (in_array("avg", $data_show)) { $cmd_graph .= " GPRINT:".$ds_data.":AVERAGE:%".$num_fmt."lf".$mag_unit.$ds_unit; }
-    if (in_array("min", $data_show)) { $cmd_graph .= " GPRINT:".$ds_data."_min:MIN:%".$num_fmt."lf".$mag_unit.$ds_unit; }
-    if (in_array("max", $data_show)) { $cmd_graph .= " GPRINT:".$ds_data."_max:MAX:%".$num_fmt."lf".$mag_unit.$ds_unit; }
+    if (is_array($data_show)) {
+      if (in_array("lst", $data_show)) {
+        $cmd_graph .= " GPRINT:" . $ds_data . ":LAST:%" . $num_fmt . "lf" . $mag_unit . $ds_unit;
+      }
+      if (in_array("avg", $data_show)) {
+        $cmd_graph .= " GPRINT:" . $ds_data . ":AVERAGE:%" . $num_fmt . "lf" . $mag_unit . $ds_unit;
+      }
+      if (in_array("min", $data_show)) {
+        $cmd_graph .= " GPRINT:" . $ds_data . "_min:MIN:%" . $num_fmt . "lf" . $mag_unit . $ds_unit;
+      }
+      if (in_array("max", $data_show)) {
+        $cmd_graph .= " GPRINT:" . $ds_data . "_max:MAX:%" . $num_fmt . "lf" . $mag_unit . $ds_unit;
+      }
+    }
     $cmd_graph .= " COMMENT:'\\l'";
 
     if ($ds['line'] == TRUE)

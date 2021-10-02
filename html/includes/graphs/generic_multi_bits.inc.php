@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -64,7 +63,7 @@ if ($i)
   if ($inverse) { $in = 'out'; $out = 'in'; } else { $in = 'in'; $out = 'out'; }
   $in_thing  = implode(',', $rrd_multi['in_thing']);
   $out_thing = implode(',', $rrd_multi['out_thing']);
-  $pluses    = str_repeat(',ADDNAN', count($rrd_multi['in_thing']) - 1);
+  $pluses    = str_repeat(',ADDNAN', safe_count($rrd_multi['in_thing']) - 1);
   $rrd_options .= " CDEF:".$in."octets=" . $in_thing . $pluses;
   $rrd_options .= " CDEF:".$out."octets=" . $out_thing . $pluses;
   $rrd_options .= " CDEF:doutoctets=outoctets,-1,*";
@@ -79,7 +78,7 @@ if ($i)
   {
     $in_thingX  = implode(',', $rrd_multi['in_thingX']);
     $out_thingX = implode(',', $rrd_multi['out_thingX']);
-    $plusesX    = str_repeat(',ADDNAN', count($rrd_multi['in_thingX']) - 1);
+    $plusesX    = str_repeat(',ADDNAN', safe_count($rrd_multi['in_thingX']) - 1);
     $rrd_options .= " CDEF:".$in."octetsX=" . $in_thingX . $plusesX;
     $rrd_options .= " CDEF:".$out."octetsX=" . $out_thingX . $plusesX;
     $rrd_options .= " CDEF:doutoctetsX=outoctetsX,-1,*";

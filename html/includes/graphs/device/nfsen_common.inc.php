@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,21 +14,19 @@ $simple_rrd = TRUE;
 
 $rrd_filename = get_nfsen_filename($device['hostname']);
 
-if ($rrd_filename)
-{
+if ($rrd_filename) {
   $flowtypes = array('tcp', 'udp', 'icmp', 'other');
 
   $rrd_list=array();
   $nfsen_iter=1;
-  foreach ($flowtypes as $flowtype)
-  {
+  foreach ($flowtypes as $flowtype) {
 
     $rrd_list[$nfsen_iter]['filename'] = $rrd_filename;
     $rrd_list[$nfsen_iter]['descr'] = $flowtype;
     $rrd_list[$nfsen_iter]['ds'] = $dsprefix . $flowtype;
 
     # set a multiplier which in turn will create a CDEF if this var is set
-    if ($dsprefix == "traffic_") { $multiplier = "8"; }
+    if ($dsprefix === "traffic_" || $dsprefix === "bytes_") { $multiplier = "8"; }
 
     $colours   = "mixed";
     $nototal   = 0;

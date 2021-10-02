@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -58,7 +57,7 @@ unset($navbar);
                   'id'         => 'modal-add_contact',
                   'title'      => 'Add New Contact',
                   'icon'       => 'oicon-sql-join-inner',
-                  //'modal_args' => $modal_args, // !!! This generate modal specific form
+                  //'modal_args' => [ 'class' => 'modal-lg' ], // !!! This generate modal specific form
                   //'class'      => '',          // Clean default box class!
                   'url'        => 'contacts/'
                   );
@@ -106,7 +105,7 @@ unset($navbar);
     foreach ($config['transports'] as $transport => $data)
     {
       $row++;
-      if (count($data['parameters']['required']) || count($data['parameters']['global']))
+      if (safe_count($data['parameters']['required']) || safe_count($data['parameters']['global']))
       {
         $form['row'][$row]['contact_' . $transport . '_required'] = array(
                                       'type'        => 'html',
@@ -114,11 +113,7 @@ unset($navbar);
                                       'html'        => '<h3 id="contact_' . $transport . '_required">Required parameters</h3>');
         $row++;
 
-        if (!count($data['parameters']['global'])) { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
-        // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
-        // This needs supporting code in the transport to check for set variable and if not, use the global default
-
-        foreach (array_merge((array)$data['parameters']['required'], $data['parameters']['global']) as $parameter => $param_data) // Temporary merge req & global
+        foreach (array_merge((array)$data['parameters']['required'], (array)$data['parameters']['global']) as $parameter => $param_data) // Temporary merge req & global
         {
           switch($param_data['type'])
           {
@@ -137,7 +132,7 @@ unset($navbar);
               // Boolean type is just select with true/false string
               if (!isset($param_data['params']))
               {
-                $param_data['params'] = ['' => 'Unset', 'true' => 'True', 'false' => 'False' ];
+                $param_data['params'] = [ '' => 'Unset', 'true' => 'True', 'false' => 'False' ];
               }
             // do not break here
             case 'enum':
@@ -149,6 +144,21 @@ unset($navbar);
                 'value'    => isset($param_data['default']) ? $param_data['default'] : '',
                 'values'   => $param_data['params']
               ];
+              break;
+            case 'textarea':
+              $form_param = [
+                'type'     => 'textarea',
+                'fieldset'    => 'body',
+                'name'     => $param_data['description'],
+                'width'    => '270px',
+                'rows'     => 5,
+                'value'    => isset($param_data['default']) ? $param_data['default'] : ''
+              ];
+              // Prettify JSON
+              if (isset($param_data['format']) && $param_data['format'] === 'json' &&
+                  $json = safe_json_decode($form_param['value'])) {
+                $form_param['value'] = safe_json_encode($json, JSON_PRETTY_PRINT);
+              }
               break;
             default:
               $form_param = [
@@ -167,15 +177,14 @@ unset($navbar);
             $form['row'][$row]['contact_' . $transport . '_tooltip'] = array(
                                       'type'        => 'html',
                                       'fieldset'    => 'body',
-                                      'html'        => generate_tooltip_link(NULL, '&nbsp;<i class="'.$config['icon']['question'].'"></i>', $param_data['tooltip']));
+                                      'html'        => generate_tooltip_link(NULL, '&nbsp;<i class="'.$config['icon']['question'].'"></i>', escape_html($param_data['tooltip'])));
           }
 
           $row++;
         }
       }
 
-      if (count($data['parameters']['optional']))
-      {
+      if (safe_count($data['parameters']['optional'])) {
         $form['row'][$row]['contact_' . $transport . '_optional'] = array(
                                       'type'        => 'html',
                                       'fieldset'    => 'body',
@@ -193,7 +202,7 @@ unset($navbar);
                 'name'     => $param_data['description'],
                 'width'    => '270px',// '100%',
                 //'value'    => isset($param_data['default']) ? $param_data['default'] : '',
-                'value'    => '',
+                'value'    => isset($param_data['default']) ? $param_data['default'] : '',
                 'values'   => $param_data['params']
               ];
               break;
@@ -211,10 +220,24 @@ unset($navbar);
               'fieldset' => 'body',
               'name'     => $param_data['description'],
               'width'    => '270px', //'100%',
-              //'value'    => isset($param_data['default']) ? $param_data['default'] : '',
-              'value'    => '',
+              'value'    => isset($param_data['default']) ? $param_data['default'] : '',
               'values'   => $param_data['params']
             ];
+            break;
+          case 'textarea':
+            $form_param = [
+              'type'     => 'textarea',
+              'fieldset'    => 'body',
+              'name'     => $param_data['description'],
+              'width'    => '270px',
+              'rows'     => 5,
+              'value'    => isset($param_data['default']) ? $param_data['default'] : ''
+            ];
+            // Prettify JSON
+            if (isset($param_data['format']) && $param_data['format'] === 'json' &&
+                $json = safe_json_decode($form_param['value'])) {
+              $form_param['value'] = safe_json_encode($json, JSON_PRETTY_PRINT);
+            }
             break;
           default:
             $form_param = [
@@ -238,6 +261,48 @@ unset($navbar);
         }
       }
 
+      // Custom notification templates if allowed for transport
+      // if (isset($data['notification']['message_template'])) {
+      //   $form['row'][$row]['contact_' . $transport . '_notification'] = array(
+      //     'type'        => 'html',
+      //     'fieldset'    => 'body',
+      //     'html'        => '<h3 id="contact_' . $transport . '_optional">Notification parameters</h3>');
+      //   $row++;
+      //
+      //   $form_param = [
+      //     'type'     => 'toggle',
+      //     'view'     => 'toggle',
+      //     'size'     => 'large',
+      //     'palette'  => 'blue',
+      //     'fieldset' => 'body',
+      //     'name'     => 'Use custom template',
+      //     'onchange' => "toggleAttrib('disabled', 'contact_" . $transport . "_message_template')",
+      //     'value'    => 'off'
+      //   ];
+      //   $form['row'][$row]['contact_' . $transport . '_custom_template'] = $form_param;
+      //   $row++;
+      //
+      //   $form['row'][$row++]['contact_' . $transport . '_doc_mustache'] = array(
+      //     'type'        => 'html',
+      //     'fieldset'    => 'body',
+      //     'offset'      => TRUE,
+      //     'html'        => 'See <a href="https://mustache.github.com/mustache.5.html" target="_blank">Mustache templates syntax</a>');
+      //
+      //   $template = get_template('notification', $data['notification']['message_template']);
+      //   // Remove header comment(s)
+      //   $template = preg_replace('!^\s*/\*[\*\s]+Observium\s.*?\*/\s!is', '', $template);
+      //   $form_param = [
+      //     'type'     => 'textarea',
+      //     'fieldset' => 'body',
+      //     'disabled' => TRUE,
+      //     'name'     => 'Message template',
+      //     'class'    => 'input-xlarge',
+      //     'rows'     => 6,
+      //     'value'    => $template
+      //   ];
+      //   $form['row'][$row]['contact_' . $transport . '_message_template'] = $form_param;
+      //   $row++;
+      // }
     }
 
     $form['row'][$row]['close'] = array(
@@ -310,16 +375,14 @@ if (!$readonly && isset($vars['action']))
         {
           foreach ($parameters as $parameter => $description)
           {
-            if (isset($vars['contact_' . $vars['contact_method'] . '_' . $parameter]))
-            {
+            if (isset($vars['contact_' . $vars['contact_method'] . '_' . $parameter])) {
               $endpoint_data[$parameter] = $vars['contact_' . $vars['contact_method'] . '_' . $parameter];
             }
           }
         }
 
-        if ($endpoint_data)
-        {
-          dbInsert('alert_contacts', [ 'contact_descr' => $vars['contact_descr'], 'contact_endpoint' => json_encode($endpoint_data), 'contact_method' => $vars['contact_method'] ]);
+        if ($endpoint_data) {
+          dbInsert('alert_contacts', [ 'contact_descr' => $vars['contact_descr'], 'contact_endpoint' => safe_json_encode($endpoint_data), 'contact_method' => $vars['contact_method'] ]);
         }
       }
       break;
@@ -329,54 +392,61 @@ if (!$readonly && isset($vars['action']))
       $update_state = array();
       $contact = get_contact_by_id($vars['contact_id']);
 
-      foreach (json_decode($contact['contact_endpoint'], TRUE) as $field => $value)
+      foreach (safe_json_decode($contact['contact_endpoint']) as $field => $value)
       {
         $contact['endpoint_parameters'][$field] = $value;
       }
 
-      $update_state['contact_disabled'] = $vars['contact_enabled'] == '1' ? 0 : 1;
+      $update_state['contact_disabled'] = get_var_true($vars['contact_enabled']) ? 0 : 1;
 
-      if (strlen($vars['contact_descr']) && $vars['contact_descr'] != $contact['contact_descr'])
-      {
+      if (strlen($vars['contact_descr']) && $vars['contact_descr'] != $contact['contact_descr']) {
         $update_state['contact_descr'] = $vars['contact_descr'];
       }
 
       $data = $config['transports'][$contact['contact_method']];
-      if (!count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
-      if (!count($data['parameters']['optional'])) { $data['parameters']['optional'] = array(); }
+      if (!safe_count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
+      if (!safe_count($data['parameters']['optional'])) { $data['parameters']['optional'] = array(); }
       // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
       // This needs supporting code in the transport to check for set variable and if not, use the global default
 
       $update_endpoint = $contact['endpoint_parameters'];
-      foreach (array_merge($data['parameters']['required'], $data['parameters']['global'], $data['parameters']['optional']) as $parameter => $param_data)
-      {
+      foreach (array_merge((array)$data['parameters']['required'],
+                           (array)$data['parameters']['global'],
+                           (array)$data['parameters']['optional']) as $parameter => $param_data) {
         if ((isset($data['parameters']['optional'][$parameter]) || // Allow optional param as empty
              is_array($vars['contact_endpoint_'.$parameter]) || strlen($vars['contact_endpoint_'.$parameter])) &&
-            $vars['contact_endpoint_'.$parameter] != $contact['endpoint_parameters'][$parameter])
-        {
+            $vars['contact_endpoint_'.$parameter] != $contact['endpoint_parameters'][$parameter]) {
           $update_endpoint[$parameter] = $vars['contact_endpoint_'.$parameter];
         }
       }
       //r($update_endpoint);
-      $update_endpoint = json_encode($update_endpoint);
-      if ($update_endpoint != $contact['contact_endpoint'])
-      {
+      $update_endpoint = safe_json_encode($update_endpoint);
+      if ($update_endpoint != $contact['contact_endpoint']) {
         //r($update_endpoint);
         //r($contact['contact_endpoint']);
         $update_state['contact_endpoint'] = $update_endpoint;
       }
 
+      // custom template
+      $vars['contact_message_custom'] = get_var_true($vars['contact_message_custom']);
+      if ($vars['contact_message_custom'] != (bool)$contact['contact_message_custom']) {
+        $update_state['contact_message_custom'] = $vars['contact_message_custom'] ? '1' : '0';
+      }
+      if ($vars['contact_message_custom'] && $vars['contact_message_template'] != $contact['contact_message_template']) {
+        $update_state['contact_message_template'] = $vars['contact_message_template'];
+      }
+      //r($contact);
+      //r($vars);
+
       $rows_updated = dbUpdate($update_state, 'alert_contacts', 'contact_id = ?', array($vars['contact_id']));
       break;
 
     case 'delete_contact':
-      if (in_array($vars['confirm_'.$vars['contact_id']], array('1', 'on', 'yes', 'confirm')))
-      {
+      if (get_var_true($vars['confirm_'.$vars['contact_id']], 'confirm')) {
         $rows_deleted  = dbDelete('alert_contacts',       '`contact_id` = ?', array($vars['contact_id']));
         $rows_deleted += dbDelete('alert_contacts_assoc', '`contact_id` = ?', array($vars['contact_id']));
 
-        if ($rows_deleted)
-        {
+        if ($rows_deleted) {
           print_success('Deleted contact and all associations ('.$vars['contact_id'].')');
         }
       }

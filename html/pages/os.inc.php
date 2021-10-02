@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@ if ($_SESSION['userlevel'] <= 7)
 }
 
 print generate_box_open();
-echo '<h2>Supported OS Types: '.count($config['os']).'</h2>';
+echo '<h2>Supported OS Types: '.safe_count($config['os']).'</h2>';
 print generate_box_close();
 
 foreach (dbFetchRows('SELECT `os`, COUNT(*) AS `count` FROM `devices` GROUP BY `os`') AS $row)
@@ -51,6 +50,7 @@ echo '
       <th>Devices</th>
       <th>MIBs</th>
       <th>Rules</th>
+      <th>Hardware IDs</th>
     </tr>
   </thead>';
 
@@ -77,9 +77,9 @@ foreach($config['os'] as $os_name => $os)
     echo '    <td><span class="label label-primary">'.$os_name.'</span></td>';
     echo '    <td><span class="entity"><span class="'. $config['device_types'][$os['type']]['icon'].'"> </span> '. $os['type'].'</span></td>';
     echo '    <td>'.(isset($oses[$os_name]) ? '<a href="'.generate_url(array('page' => 'devices', 'os' => $os_name)).'">'.$oses[$os_name].' devices</a>' : '').'</td>';
-    echo '    <td>'.count($os['mibs']).'</td>';
-    echo '    <td>'.count($os['mib_blacklist']).'</td>';
-    echo '    <td>'.count($os['sysObjectID']).'</td>';
+    echo '    <td>'.safe_count($os['mibs']).'</td>';
+    echo '    <td>'.safe_count($os['mib_blacklist']).'</td>';
+    echo '    <td>'.safe_count($os['sysObjectID']).'</td>';
     echo '  </tr>';
 
 //    echo '  <tr>';
@@ -96,4 +96,4 @@ echo '</table>';
 
 echo generate_box_close();
 
-?>
+// EOF

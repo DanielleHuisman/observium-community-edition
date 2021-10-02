@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -20,7 +19,7 @@ $colour_area="ffaaaa";
 
 $sql = "SELECT * FROM `applications-state` WHERE `application_id` = ?";
 $app_state = dbFetchRow($sql, array($app['app_id']));
-$app_data = unserialize($app_state['app_state']);
+$app_data = safe_unserialize($app_state['app_state']);
 $descr = rrdtool_escape($app['app_instance'], $descr_len);
 
 $rrd_options .= " -b 1024 -l 0 ";

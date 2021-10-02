@@ -33,7 +33,8 @@ foreach ($devices as $device)
   {
     if (!$location_filter || $device['location'] == $location_filter)
     {
-      print_device_row($device, 'details');
+      $vars['view'] = 'details';
+      print_device_row($device, $vars);
     }
   }
 }

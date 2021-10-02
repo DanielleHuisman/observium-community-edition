@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -29,7 +29,7 @@ switch (OBS_DB_EXTENSION)
     {
       require($config['install_dir'] . '/includes/db/mysql.inc.php');
     } else {
-      echo('ERROR. PHP mysql extension not exist. Execution is stopped.' . PHP_EOL);
+      echo('ERROR. PHP mysql extension does not exist. Execution is stopped.' . PHP_EOL);
       exit(2);
     }
     break;
@@ -39,7 +39,7 @@ switch (OBS_DB_EXTENSION)
     {
       require($config['install_dir'] . '/includes/db/mysqli.inc.php');
     } else {
-      echo('ERROR. PHP mysqli extension not exist. Execution is stopped.' . PHP_EOL);
+      echo('ERROR. PHP mysqli extension does not exist. Execution is stopped.' . PHP_EOL);
       exit(2);
     }
 }
@@ -112,7 +112,23 @@ function dbSetVariable($var, $value, $scope = 'SESSION')
   {
     $scope = 'SESSION';
   }
-  if (is_int($value))
+
+  // Define DB NAME for later use (same as in get_versions())
+  if (!defined('OBS_DB_NAME'))
+  {
+    $mysql_version = dbFetchCell("SELECT version();");
+    $mysql_name    = str_icontains_array($mysql_version, 'Maria') ? 'MariaDB' : 'MySQL';
+    define('OBS_DB_NAME', $mysql_name);
+  }
+
+  // Override MySQL variable with MariaDB analog
+  if ($var === 'MAX_EXECUTION_TIME' && OBS_DB_NAME === 'MariaDB')
+  {
+    $var = 'MAX_STATEMENT_TIME';
+    $value /= 1000;
+  }
+
+  if (is_intnum($value) || is_float($value))
   {
     $value = [ $value ];
   }
@@ -179,8 +195,8 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
 
   $fullSql = dbMakeQuery($sql, $parameters);
 
-  if (OBS_DEBUG > 0 || $print_query)
-  {
+  $debug = defined('OBS_DEBUG') ? OBS_DEBUG : 0;
+  if ($debug > 0 || $print_query) {
     // Pre query debug output
     if (is_cli())
     {
@@ -191,15 +207,13 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
     }
   }
 
-  if (OBS_DEBUG > 0 || $GLOBALS['config']['profile_sql'])
-  {
+  if ($debug > 0 || $GLOBALS['config']['profile_sql']) {
     $time_start = microtime(true);
   }
 
   $result = dbCallQuery($fullSql); // sets $this->result
 
-  if (OBS_DEBUG > 0 || $GLOBALS['config']['profile_sql'])
-  {
+  if ($debug > 0 || $GLOBALS['config']['profile_sql']) {
     $runtime = number_format(microtime(true) - $time_start, 8);
     $debug_msg .= 'SQL RUNTIME['.($runtime > 0.05 ? '%r' : '%g').$runtime.'s%n]';
     if ($GLOBALS['config']['profile_sql'])
@@ -209,8 +223,7 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
     }
   }
 
-  if (OBS_DEBUG > 0)
-  {
+  if ($debug > 0) {
     if ($result === FALSE && (error_reporting() & 1))
     {
       $error_msg = 'Error in query: (' . dbError() . ') ' . dbErrorNo();
@@ -223,8 +236,7 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
 
     if (is_cli())
     {
-      if (OBS_DEBUG > 1)
-      {
+      if ($debug > 1) {
         $rows = dbAffectedRows();
         $debug_msg = 'ROWS['.($rows < 1 ? '%r' : '%g').$rows.'%n]'.PHP_EOL.$debug_msg;
       }
@@ -277,13 +289,13 @@ function dbFetchColumn($sql, $parameters = array(), $print_query = FALSE)
  * The first will become the array key
  * The second the key's value
  */
-function dbFetchKeyValue($sql, $parameters = array(), $print_query)
+function dbFetchKeyValue($sql, $parameters = array(), $print_query = FALSE)
 {
   $data = array();
   foreach (dbFetchRows($sql, $parameters, $print_query) as $row)
   {
     $key = array_shift($row);
-    if (sizeof($row) == 1)
+    if (is_array($row) && count($row) === 1)
     { // if there were only 2 fields in the result
       // use the second for the value
       $data[$key] = array_shift($row);
@@ -599,7 +611,7 @@ function dbMakeQuery($sql, $parameters)
 {
   // bypass extra logic if we have no parameters
   
-  if (sizeof($parameters) == 0)
+  if (safe_count($parameters) === 0)
   {
     return $sql;
   }
@@ -618,7 +630,7 @@ function dbMakeQuery($sql, $parameters)
     }
   }
 
-  if (count($namedParams) == 0)
+  if (safe_count($namedParams) === 0)
   {
     // use simple pattern if named params not used (this broke some queries)
     $pattern = '/(\?)/';
@@ -635,7 +647,7 @@ function dbMakeQuery($sql, $parameters)
   // every-other item in $result will be the placeholder that was found
 
   $query = '';
-  for ($i = 0; $i < sizeof($result); $i+=2)
+  for ($i = 0; $i < safe_count($result); $i+=2)
   {
     $query .= $result[$i];
 
@@ -659,7 +671,7 @@ function dbPrepareData($data)
 {
   $values = array();
 
-  foreach ($data as $key=>$value)
+  foreach ($data as $key => $value)
   {
     $escape = true;
     // don't quote if value is an array, we treat it
@@ -667,7 +679,7 @@ function dbPrepareData($data)
     // value contained in the array IF there is one item in the array
     if (is_array($value) && !is_object($value))
     {
-      if (count($value) == 1)
+      if (count($value) === 1)
       {
         $escape = false;
         $value = array_shift($value);
@@ -737,14 +749,12 @@ function dbPlaceHolders($values)
  * @param bool   $leading_and Add leading AND to result query
  * @return string             Generated query
  */
-function generate_query_values($value, $column, $condition = NULL, $leading_and = TRUE)
-{
+function generate_query_values($value, $column, $condition = NULL, $leading_and = TRUE) {
   //if (!is_array($value)) { $value = explode(',', $value); }
   if (!is_array($value)) { $value = array((string)$value); }
   $column = '`' . str_replace(array('`', '.'), array('', '`.`'), $column) . '`'; // I.column -> `I`.`column`
   $condition = ($condition === TRUE ? 'LIKE' : strtoupper(trim($condition)));
-  if (str_exists($condition, [ 'NOT', '!=']))
-  {
+  if (str_contains_array($condition, [ 'NOT', '!=' ])) {
     $negative  = TRUE;
     $condition = str_replace(array('NOT', '!=', ' '), '', $condition);
   } else {
@@ -754,8 +764,7 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
   $search  = array('%', '_');
   $replace = array('\%', '\_');
   $values  = array();
-  switch ($condition)
-  {
+  switch ($condition) {
     // Use LIKE condition
     case 'LIKE':
       // Replace (* by %) and (? by _) only for LIKE condition
@@ -768,16 +777,12 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
     case 'LIKE%':
       if ($negative) { $implode = ' AND '; $like = ' NOT LIKE '; }
       else           { $implode = ' OR ';  $like = ' LIKE '; }
-      foreach ($value as $v)
-      {
-        if ($v === '*')
-        {
+      foreach ($value as $v) {
+        if ($v === '*') {
           $values = array("ISNULL($column, 1)" . $like . "'%'");
           break;
-        }
-        else if ($v === '')
-        {
-          $values[] = "ISNULL($column, '')" . $like . "''";
+        } elseif ($v === '') {
+          $values[] = "COALESCE($column, '')" . $like . "''";
         } else {
           $v = dbEscape($v); // Escape BEFORE replace!
           $v = str_replace($search, $replace, $v);
@@ -786,8 +791,7 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
         }
       }
       $values = array_unique($values); // Removes duplicate values
-      if (count($values))
-      {
+      if (count($values)) {
         $where = ' AND (' . implode($implode, $values) . ')';
       } else {
         // Empty values
@@ -809,10 +813,9 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
     // Use IN condition
     default:
       $where = '';
-      foreach ($value as $v)
-      {
-        if ($v == OBS_VAR_UNSET || $v === '')
-        {
+      $add_null = FALSE;
+      foreach ($value as $v) {
+        if ($v == OBS_VAR_UNSET || $v === '') {
           $add_null = TRUE; // Add check NULL values at end
           $values[] = "''";
         } else {
@@ -820,23 +823,18 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
         }
       }
       $count = count($values);
-      if ($count == 1)
-      {
+      if ($count === 1) {
         $where .= $column . ($negative ? ' != ' : ' = ') . $values[0];
-      }
-      else if ($count)
-      {
+      } elseif ($count) {
         $values = array_unique($values); // Removes duplicate values
         $where .= $column . ($negative ? ' NOT IN (' : ' IN (') . implode(',', $values) . ')';
       } else {
         // Empty values
         $where = $negative ? '1' : '0';
       }
-      if ($add_null)
-      {
+      if ($add_null) {
         // Add search for empty values
-        if ($negative)
-        {
+        if ($negative) {
           $where .= " AND $column IS NOT NULL";
         } else {
           $where .= " OR $column IS NULL";
@@ -847,9 +845,153 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
       }
       break;
   }
-  if(!$leading_and) { $where = preg_replace('/^(\ )+AND/', '', $where); }
+  if (!$leading_and) { $where = preg_replace('/^(\ )+AND/', '', $where); }
 
   return $where;
 }
+
+/**
+ * Export current Schema DB as array or json encoded string.
+ *  can used for compare 2 schema for differences
+ *
+ * @param string $format
+ *
+ * @return array|string
+ */
+function export_db_schema($format = 'json')
+{
+  // Export current schema
+  $db_schema = [];
+  $db_tables = dbFetchRows('SHOW TABLE STATUS;');
+  //print_vars($db_tables);
+  //$db_tables = dbFetchColumn('SHOW TABLES;');
+  foreach ($db_tables as $db_table)
+  {
+    $table_name = $db_table['Name'];
+
+    // Main table params
+    $db_schema[$table_name] = [
+      'table'     => $table_name,
+      'engine'    => $db_table['Engine'],
+      'collation' => $db_table['Collation'],
+      'comment'   => $db_table['Comment'],
+    ];
+
+    //print_cli("Table: ".$table_name.PHP_EOL);
+    // Indexes
+    foreach (dbFetchRows('SHOW INDEX FROM `' . $table_name . '`;') as $entry)
+    {
+      //print_vars($entry);
+      if (isset($db_schema[$table_name]['indexes'][$entry['Key_name']]))
+      {
+        $db_schema[$table_name]['indexes'][$entry['Key_name']]['columns'][$entry['Seq_in_index']] = [ 'column' => $entry['Column_name'], 'size' => $entry['Sub_part'] ];
+      } else {
+        $db_schema[$table_name]['indexes'][$entry['Key_name']] = [
+          'name'      => $entry['Key_name'],
+          'columns'   => [ $entry['Seq_in_index'] => [ 'column' => $entry['Column_name'], 'size' => $entry['Sub_part'] ] ],
+          'unique'    => $entry['Non_unique'] ? FALSE : TRUE,
+          //'type'      => $entry['Index_type'],
+          //'collation' => $entry['Collation'],
+          'comment'   => $entry['Index_comment'],
+        ];
+      }
+    }
+
+    // Columns
+    foreach (dbFetchRows('SHOW FULL COLUMNS FROM `' . $table_name . '`;') as $seq => $entry)
+    {
+      //print_vars($entry);
+      // Normalize type with size
+      $types = [];
+      $unsigned = str_contains($entry['Type'], 'unsigned');
+      foreach (explode(' ', $entry['Type']) as $type) {
+        switch ($type) {
+          case 'tinyint':
+            $types[] = $unsigned ? $type . '(3)' : $type . '(4)';
+            break;
+          case 'smallint':
+            $types[] = $unsigned ? $type . '(5)' : $type . '(6)';
+            break;
+          case 'mediumint':
+            $types[] = $type . '(8)';
+            break;
+          case 'int':
+            $types[] = $unsigned ? $type . '(10)' : $type . '(11)';
+            break;
+          case 'bigint':
+            $types[] = $type . '(20)';
+            break;
+          default:
+            // Already type hint: int(11)
+            // Or not necessary: unsigned
+            $types[] = $type;
+        }
+      }
+      if (is_string($entry['Default'])) {
+        $entry['Default'] = str_replace('current_timestamp()', 'CURRENT_TIMESTAMP', $entry['Default']);
+      }
+      if (is_string($entry['Extra'])) {
+        $entry['Extra'] = str_replace('current_timestamp()', 'CURRENT_TIMESTAMP', $entry['Extra']);
+      }
+      if (str_contains($entry['Default'], 'CURRENT_TIMESTAMP') &&
+          !str_contains($entry['Extra'], 'DEFAULT_GENERATED')) {
+        $entry['Extra'] = rtrim('DEFAULT_GENERATED ' . $entry['Extra']);
+      }
+
+      $type = preg_replace('/ \/\* mariadb-\S+ \*\//', '', implode(' ', $types));
+      $db_schema[$table_name]['columns'][$entry['Field']] = [
+        'column'    => $entry['Field'],
+        'seq'       => $seq,
+        //'type'      => $entry['Type'],
+        'type'      => $type,
+        'collation' => $entry['Collation'],
+        'null'      => $entry['Null'] === 'YES',
+        'key'       => $entry['Key'],
+        'default'   => $entry['Default'],
+        'extra'     => $entry['Extra'],
+        'comment'   => $entry['Comment'],
+      ];
+    }
+
+    // Data
+    if ($table_name === 'observium_attribs') {
+      // Add schema version
+      $db_schema[$table_name]['data'][] = [ 'attrib_type' => 'dbSchema', 'attrib_value' => get_db_version() . '' ];
+    }
+
+    // Create table
+    $create = dbFetchRow("SHOW CREATE TABLE `$table_name`;");
+    //print_vars($create);
+    $db_schema[$table_name]['create'] = str_replace([ "\n ", "\n" ], '', $create['Create Table']);
+    // Remove autoincrement
+    $db_schema[$table_name]['create'] = preg_replace('/(\).*) AUTO_INCREMENT=\d+/', '$1', $db_schema[$table_name]['create']);
+    // Remove strange comments ' /* mariadb-5.3 */'
+    $db_schema[$table_name]['create'] = preg_replace('/ \/\* mariadb-\S+ \*\//', '', $db_schema[$table_name]['create']);
+  }
+  print_debug_vars($db_schema);
+  if ($format === 'array')
+  {
+    return $db_schema;
+  // }
+  // elseif ($format == 'yaml' && function_exists('yaml_emit'))
+  // {
+  //   return yaml_emit($db_schema, YAML_UTF8_ENCODING);
+  }
+
+  // Default JSON
+  return safe_json_encode($db_schema, JSON_PRETTY_PRINT);
+}
+
+/**
+ * Import Schema DB created by export_db_schema() and convert to MySQL SQL.
+ *
+ * @param string|array Array or JSON encoded string with db schema
+ * @return string List of SQL commands which can used as
+ */
+/*
+function import_db_schema($db_schema)
+{
+}
+*/
 
 // EOF

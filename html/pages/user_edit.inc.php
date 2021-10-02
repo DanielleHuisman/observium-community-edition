@@ -420,8 +420,8 @@ register_html_resource('js', 'observium-entities.js');
 
           $users = dbFetchRows("SELECT * FROM `users`");
 
-          if (count($role_membership))
-          {
+          $role_list = [];
+          if (safe_count($role_membership)) {
             echo '<div class="box-body no-padding">';
             echo('<table class="table table-hover table-condensed">');
 
@@ -433,8 +433,7 @@ register_html_resource('js', 'observium-entities.js');
             );
             //echo(get_table_header($cols));
 
-            foreach ($role_membership as $role)
-            {
+            foreach ($role_membership as $role) {
 
               echo '<tr>';
               echo '<td width="5"></td>';
@@ -465,9 +464,7 @@ register_html_resource('js', 'observium-entities.js');
               $role_list[] = $role['role_id'];
             }
             echo('</table></div>');
-          }
-          else
-          {
+          } else {
             echo('<p class="text-center text-warning bg-warning" style="padding: 10px; margin: 0px;"><strong>This user currently has no role memberships</strong></p>');
           }
 
@@ -487,10 +484,8 @@ register_html_resource('js', 'observium-entities.js');
           $roles = dbFetchRows("SELECT * FROM `roles`");
 
 
-          foreach ($roles as $role)
-          {
-            if (!in_array($role['role_id'], $role_list))
-            {
+          foreach ($roles as $role) {
+            if (!in_array($role['role_id'], $role_list)) {
               $form_items['roles'][$role['role_id']] = array('name'    => escape_html($role['role_name']),
                                                              'descr'   => escape_html($role['role_descr']));
             }

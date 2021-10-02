@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -40,9 +40,14 @@ function build_oid_query($vars)
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'oid_entry_id');
         break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'oids_entries.device_id');
+        break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'device_id');
+        $sql .= generate_query_values($value, 'oids_entries.device_id');
         break;
     }
   }
@@ -79,7 +84,7 @@ function build_oid_query($vars)
 function print_oid_table_header($vars, $entries)
 {
 
-    echo('<table class="' . ($vars['graphs'] == 'yes' ? OBS_CLASS_TABLE_STRIPED_TWO : OBS_CLASS_TABLE_STRIPED) . '">');
+    echo('<table class="' . (get_var_true($vars['graphs']) ? OBS_CLASS_TABLE_STRIPED_TWO : OBS_CLASS_TABLE_STRIPED) . '">');
 
     $cols[] = array('', 'class="state-marker"');
     $cols['hostname']   = array('Device', 'style="width: 280px;"');
@@ -91,7 +96,7 @@ function print_oid_table_header($vars, $entries)
     $cols['value']  = array('Value', 'style="width: 80px;"');
     $cols['event']  = array('Event', 'style="width: 60px;"');
 
-    if ($entries[0]['oid_autodiscover'] == '0' && $vars['page'] == "customoid") {
+    if ($entries[0]['oid_autodiscover'] == '0' && $vars['page'] === "customoid") {
         $cols['actions'] = array('', 'style="width: 40px;"'); echo "derp";
     }
 
@@ -133,7 +138,6 @@ function print_oid_table($vars)
       $graph_array['type'] = "customoid_graph";
       $graph_array['width'] = 100;
       $graph_array['height'] = 20;
-      $graph_array['bg'] = 'ffffff00';
       $graph_array['from'] = $config['time']['day'];
 
       if (is_numeric($entry['value']) || TRUE) {

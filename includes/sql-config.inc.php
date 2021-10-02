@@ -6,17 +6,17 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
+// Set scriptname and process name
+$scriptname = isset($_SERVER["SCRIPT_FILENAME"]) ? basename($_SERVER["SCRIPT_FILENAME"]) : basename($argv[0]);
+define('OBS_SCRIPT_NAME', $scriptname);
+define('OBS_PROCESS_NAME', basename($scriptname, '.php'));
+
 // Load configuration file into $config variable
-if (!isset($config['install_dir']))
-{
-  $base_dir = realpath(dirname(__FILE__) . '/..');
-} else {
-  $base_dir = $config['install_dir'];
-}
+$base_dir = isset($config['install_dir']) ? $config['install_dir'] : dirname(__DIR__);
 
 // Clear config array, we're starting with a clean state
 $config = array();
@@ -25,13 +25,12 @@ require($base_dir."/includes/defaults.inc.php");
 require($base_dir."/config.php");
 
 // Base dir, if it's not set in config
-if (!isset($config['install_dir']))
-{
+if (!isset($config['install_dir'])) {
   $config['install_dir'] = $base_dir;
 }
 
 // Include necessary supporting files
-require_once($config['install_dir'] . "/includes/functions.inc.php");
+require_once($config['install_dir'] . "/includes/common.inc.php");
 
 // Die if exec/proc_open functions disabled in php.ini. This install not functional for run Observium.
 if (!is_exec_available()) { die; }
@@ -39,25 +38,23 @@ if (!is_exec_available()) { die; }
 // Load definitions
 require($config['install_dir'] . "/includes/definitions.inc.php");
 
-// CLEANME, this already included in functions.inc.php
-// Common functions, for is_ssl and print_warning/print_error
-//include_once($config['install_dir'].'/includes/common.inc.php');
+// Include more necessary supporting files
+require_once($config['install_dir'] . "/includes/functions.inc.php");
 
 // Connect to database
-if (!$GLOBALS[OBS_DB_LINK])
-{
-  if (defined('OBS_DB_SKIP') && OBS_DB_SKIP === TRUE)
-  {
+// if (!defined('OBS_DB_SKIP') || OBS_DB_SKIP !== TRUE) {
+//   $GLOBALS[OBS_DB_LINK] = dbOpen($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
+// }
+
+if (!$GLOBALS[OBS_DB_LINK]) {
+  if (defined('OBS_DB_SKIP') && OBS_DB_SKIP === TRUE) {
     print_warning("WARNING: In PHP Unit tests we can skip DB connect. But if you test db functions, check your configs.");
   } else {
-    print_error("DB Error " . dbErrorNo() . ": " . dbError());
+    print_message("%yDB not connected, please check database connection configuration.%r\nDB Error " . dbErrorNo() . ": " . dbError() . "%n", 'color');
     die; // Die if not PHP Unit tests
   }
-}
-else if (!get_db_version() && !(isset($options['u']) || isset($options['V'])))
-{
-  if (!dbQuery('SELECT 1 FROM `devices` LIMIT 1;'))
-  {
+} elseif (!(isset($options['u']) || isset($options['V'])) && !get_db_version()) {
+  if (!dbQuery('SELECT 1 FROM `devices` LIMIT 1;')) {
     // DB schema not installed, install first
     print_error("DB schema not installed, first install it.");
     die;
@@ -71,15 +68,12 @@ else if (!get_db_version() && !(isset($options['u']) || isset($options['V'])))
   $db_modes_exclude = [ 'STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'ONLY_FULL_GROUP_BY',
                         'NO_ZERO_DATE', 'NO_ZERO_IN_DATE', 'ERROR_FOR_DIVISION_BY_ZERO' ];
   $db_modes_update  = array();
-  foreach ($db_modes_exclude as $db_mode_exclude)
-  {
-    if (in_array($db_mode_exclude, $db_modes))
-    {
+  foreach ($db_modes_exclude as $db_mode_exclude) {
+    if (in_array($db_mode_exclude, $db_modes)) {
       $db_modes_update[] = $db_mode_exclude;
     }
   }
-  if (count($db_modes_update))
-  {
+  if (count($db_modes_update)) {
     $db_modes = array_diff($db_modes, $db_modes_update);
     dbQuery('SET SESSION `sql_mode` = ?', array(implode(',', $db_modes)));
     print_debug('DB mode(s) disabled: '.implode(', ', $db_modes_update));
@@ -88,8 +82,7 @@ else if (!get_db_version() && !(isset($options['u']) || isset($options['V'])))
 
   // Sync DB timezone
   $timezone = get_timezone();
-  if ($timezone['diff'] !== 0)
-  {
+  if ($timezone['diff'] !== 0) {
     print_debug("DB timezone different from php timezone. Syncing..");
     dbSetVariable('time_zone', $timezone['php']);
     // Refresh timezone
@@ -98,17 +91,34 @@ else if (!get_db_version() && !(isset($options['u']) || isset($options['V'])))
 
   // Maybe better in another place, but at least here it runs always; keep track of what svn revision we last saw, and eventlog the upgrade versions.
   // We have versions here from the includes above, and we just connected to the DB.
-  $rev_old = @get_obs_attrib('current_rev');
-  if (($rev_old < OBSERVIUM_REV || !is_numeric($rev_old)) && OBSERVIUM_VERSION_LONG != '0.SVN.ERROR')
-  {
-    // Ignore changes to not correctly detected version (0.SVN.ERROR)
-    // Version update detected, log it
-    $version_old = @get_obs_attrib('current_version');
-    log_event("Observium updated: $version_old -> " . OBSERVIUM_VERSION_LONG, NULL, NULL, NULL, 5);
+  if (OBS_PROCESS_NAME === 'discovery') {
+    $rev_old = @get_obs_attrib('current_rev');
+    if (($rev_old < OBSERVIUM_REV || !is_numeric($rev_old)) && OBSERVIUM_VERSION_LONG !== '0.SVN.ERROR') {
+      // Ignore changes to not correctly detected version (0.SVN.ERROR)
+      // Version update detected, log it
+      $version_old = @get_obs_attrib('current_version');
+      if ($version_old !== OBSERVIUM_VERSION_LONG) {
+        // Prevent eventlog spamming on incorrect version detect
+        log_event("Observium updated: $version_old -> " . OBSERVIUM_VERSION_LONG, NULL, NULL, NULL, 5);
 
-    set_obs_attrib('current_rev',     OBSERVIUM_REV);
-    set_obs_attrib('current_version', OBSERVIUM_VERSION_LONG);
+        set_obs_attrib('current_rev', OBSERVIUM_REV);
+        set_obs_attrib('current_version', OBSERVIUM_VERSION_LONG);
+
+        // Set reset opcache (need split cli/web, because has a separate opcode)
+        if (opcache_reset()) {
+          print_debug("PHP Opcache CLI was reset.");
+        }
+      }
+    }
+  } elseif (OBS_PROCESS_NAME === 'index' && @get_obs_attrib('opcache_reset')) {
+    if (opcache_reset()) {
+      print_debug("PHP Opcache WUI was reset.");
+    }
+    del_obs_attrib('opcache_reset');
   }
+  //else {
+    //print_vars(OBS_PROCESS_NAME);
+  //}
 
   // Clean
   unset($db_modes, $db_modes_exclude, $db_mode_exclude, $db_modes_update, $rev_old);
@@ -164,23 +174,28 @@ foreach ($cmds as $path)
 }
 unset($cmds, $path);
 
-// Disable nonexistant features in CE, do not try to turn on, it will not give effect
-if (OBSERVIUM_EDITION == 'community')
-{
+// Fping 4+ use -6 argument
+if (!is_executable($config['fping6']) && version_compare(get_versions('fping'), '4.0', '>=')) {
+  $config['fping6'] = $config['fping'] . ' -6';
+}
+
+// Disable nonexistent features in CE, do not try to turn on, it will not give effect
+if (OBSERVIUM_EDITION === 'community') {
   $config['enable_billing'] = 0;
   $config['api']['enabled'] = 0;
+  $config['web_theme_default'] = 'light';
 
   // Disabled (not exist) modules
   unset($config['poller_modules']['oids'],
         $config['poller_modules']['loadbalancer'],
         $config['poller_modules']['aruba-controller'],
-        $config['poller_modules']['netscaler-vsvr']);
+        $config['poller_modules']['netscaler-vsvr'],
+        $config['poller_name']);
 }
 
 // Self hostname for observium server
 // FIXME, used only in smokeping integration
-if (!isset($config['own_hostname']))
-{
+if (!isset($config['own_hostname'])) {
   $config['own_hostname'] = get_localhost();
 }
 
@@ -201,7 +216,7 @@ elseif (!isset($config['base_url']))
 {
   if (isset($_SERVER["SERVER_NAME"]) && isset($_SERVER["SERVER_PORT"]))
   {
-    if (strpos($_SERVER["SERVER_NAME"] , ":"))
+    if (str_contains($_SERVER["SERVER_NAME"] , ":") && !str_contains($_SERVER["SERVER_NAME"] , "["))
     {
       // Literal IPv6
       $config['base_url']  = "http://[" . $_SERVER["SERVER_NAME"] ."]" . ($_SERVER["SERVER_PORT"] != 80 ? ":".$_SERVER["SERVER_PORT"] : '') ."/";
@@ -269,6 +284,12 @@ if (isset($config['bad_xdp_platform']))
   $config['xdp']['ignore_platform'] = array_merge((array)$config['xdp']['ignore_platform'], (array)$config['bad_xdp_platform']);
 }
 
+// Compat for adama ;)
+if (isset($config['sensors_limits_events']))
+{
+  $config['sensors']['limits_events'] = $config['sensors_limits_events'];
+}
+
 // Security fallback check
 if (isset($config['auth']['remote_user']) && $config['auth']['remote_user'] && !isset($_SERVER['REMOTE_USER']))
 {
@@ -282,15 +303,15 @@ foreach ($config['ignore_common_subnet'] as $i => $content)
 {
   if (str_contains($content, ':'))
   {
-    $config['ignore_common_subnet'][$i] = ip_uncompress($content);
+    // NOTE. ipv6_networks have uncompressed but not fixed length
+    $config['ignore_common_subnet'][$i] = ip_uncompress($content, FALSE);
   }
 }
 
 unset($i); unset($content);
 
-// Disable phpFastCache 5.x for PHP less than 5.5, since it unsupported
-if ($config['cache']['enable'] && version_compare(PHP_VERSION, '5.5.0', '<'))
-{
+// Disable phpFastCache for PHP less than 5.6, since it unsupported
+if ($config['cache']['enable'] && PHP_VERSION_ID < 50600) {
   $config['cache']['enable'] = FALSE;
 }
 
@@ -302,24 +323,49 @@ if (isset($config['poller_id']))
 }
 else
 */
-if (isset($config['poller_name']))
-{
+if (OBSERVIUM_EDITION === 'community') {
+  // Distributed pollers not available on community edition
+  $config['poller_id'] = 0;
+} elseif (isset($options['p']) && is_intnum($options['p']) && $options['p'] >= 0) {
+  // Poller id passed in poller wrapper
+  $config['poller_id'] = (int) $options['p'];
+  print_debug("Poller ID (".$config['poller_id'].") passed from command line arguments.");
+  /* not sure when required
+  if ($options['p'] > 0 && !dbExist('pollers', '`poller_id` = ?', [ $options['p'] ])) {
+    // This poller not exist, create it
+    // I not sure that this should be in global sql-config include @mike
+    $poller = [
+      'poller_id'   => $options['p'],
+      'poller_name' => $config['poller_name'],
+      'host_id'     => get_local_id(),
+      'host_uname'  => php_uname()
+    ];
+    $config['poller_id'] = (int) dbInsert('pollers', $poller);
+    unset($poller);
+  } else {
+    $config['poller_id'] = (int) $options['p'];
+  }
+  */
+} elseif (isset($config['poller_name'])) {
   $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `poller_name` = ?", array($GLOBALS['config']['poller_name']));
 
-  if (is_numeric($poller_id))
-  {
-    $config['poller_id'] = $poller_id;
+  if (is_numeric($poller_id)) {
+    $config['poller_id'] = (int) $poller_id;
   } else {
     // This poller not exist, create it
     // I not sure that this should be in global sql-config include @mike
-    $config['poller_id'] = dbInsert('pollers', array('poller_name' => $config['poller_name']));
+    $poller = [
+      'poller_name' => $config['poller_name'],
+      'host_id'     => get_local_id(),
+      'host_uname'  => php_uname()
+    ];
+    $config['poller_id'] = (int) dbInsert('pollers', $poller);
   }
-  unset($poller_id);
+  unset($poller_id, $poller);
 
 } else {
   // Default poller
   $config['poller_id'] = 0;
-
 }
 
 // EOF

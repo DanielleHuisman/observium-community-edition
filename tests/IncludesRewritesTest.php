@@ -1,17 +1,18 @@
 <?php
 
 // Import from CVS
-require(dirname(__FILE__) . '/data/CsvFileIterator.php');
+require(__DIR__ . '/data/CsvFileIterator.php');
 
-$base_dir = realpath(dirname(__FILE__) . '/..');
+$base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
 
 // Base observium includes
-include(dirname(__FILE__) . '/../includes/defaults.inc.php');
+include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
-include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '/../includes/definitions.inc.php');
-include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/common.inc.php');
+include(__DIR__ . '/../includes/definitions.inc.php');
+include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/functions.inc.php');
 
 // for generate provider data, uncomment this and run:
 // php tests/IncludesRewritesTest.php
@@ -174,6 +175,7 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('"sdfslfkm s\'fdsf" a;lm aamjn "',          'sdfslfkm s\'fdsf" a;lm aamjn '),
       array('"\"sdfslfkm s\'fdsf" a;lm aamjn \""',      'sdfslfkm s\'fdsf" a;lm aamjn '),
       array('\'\"sdfslfkm s\'fdsf" a;lm aamjn \"\'',    'sdfslfkm s\'fdsf" a;lm aamjn '),
+      array('"\'\"sdfslfkm s\'fdsf" a;lm aamjn \"\'"',  'sdfslfkm s\'fdsf" a;lm aamjn '),
       array('  \'\"sdfslfkm s\'fdsf" a;lm aamjn \"\' ', 'sdfslfkm s\'fdsf" a;lm aamjn '),
       array('"""sdfslfkm s\'fdsf" a;lm aamjn """',      'sdfslfkm s\'fdsf" a;lm aamjn '),
       array('"""sdfslfkm s\'fdsf" a;lm aamjn """"""""', 'sdfslfkm s\'fdsf" a;lm aamjn """""'),
@@ -374,7 +376,11 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
         'somekey4' => 'port-%descr%-%index%-% %.rrd',
       ),
       'somekey2' => 'port-%descr%-%index%-%.rrd',
-      'perf-pollermodule-%index%.rrd'
+      'perf-pollermodule-%index%.rrd',
+      // Must be keep as is
+      'bool' => TRUE,
+      'int' => 293847,
+      'null' => NULL
     );
     $rto = array(
       'somekey' => array(
@@ -382,7 +388,10 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
         'somekey4' => 'port--0-% %.rrd',
       ),
       'somekey2' => 'port--0-%.rrd',
-      'perf-pollermodule-0.rrd'
+      'perf-pollermodule-0.rrd',
+      'bool' => TRUE,
+      'int' => 293847,
+      'null' => NULL
     );
 
     return array(
@@ -645,6 +654,11 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('ciscosb',      array('ifDescr' => '1', 'ifName' => '1', 'ifType' => 'propVirtual'), // ++ ifType
                             array('port_label' => 'Vlan1', 'port_label_num' => '1', 'port_label_base' => 'Vlan', 'port_label_short' => 'Vlan1')),
 
+      array('alliedwareplus', array('ifDescr' => 'apc-ups', 'ifName' => 'port1.0.21', 'ifType' => 'ethernetCsmacd'), // ifAlias in ifDescr
+                            array('port_label' => 'port1.0.21', 'port_label_num' => '1.0.21', 'port_label_base' => 'port', 'port_label_short' => 'port1.0.21', 'ifAlias' => 'apc-ups')),
+      array('alliedwareplus', array('ifDescr' => '-', 'ifName' => 'port1.0.21', 'ifType' => 'ethernetCsmacd'), // ifAlias in ifDescr
+                            array('port_label' => 'port1.0.21', 'port_label_num' => '1.0.21', 'port_label_base' => 'port', 'port_label_short' => 'port1.0.21', 'ifAlias' => '')),
+
       // base/num port
       array('generic',      array('ifDescr' => 'GigaVUE-212 Port  8/48 (Network Port)'),
                             array('port_label' => 'GigaVUE-212 Port 8/48', 'port_label_num' => '8/48', 'port_label_base' => 'GigaVUE-212 Port ', 'port_label_short' => 'Port 8/48')),
@@ -659,7 +673,7 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('generic',      array('ifDescr' => 'dwdm0/1/0/6'),
                             array('port_label' => 'dwdm0/1/0/6', 'port_label_num' => '0/1/0/6', 'port_label_base' => 'dwdm', 'port_label_short' => 'DWDM0/1/0/6')),
       array('generic',      array('ifDescr' => 'Cable8/1/4-upstream2'),
-                            array('port_label' => 'Cable8/1/4-upstream2', 'port_label_num' => '8/1/4-upstream2', 'port_label_base' => 'Cable', 'port_label_short' => 'Cable8/1/4-upstream2')),
+                            array('port_label' => 'Cable8/1/4-upstream2', 'port_label_num' => '8/1/4-upstream2', 'port_label_base' => 'Cable', 'port_label_short' => 'Ca8/1/4-upstream2')),
       array('generic',      array('ifDescr' => '16GigabitEthernet1/2/1'),
                             array('port_label' => '16GigabitEthernet1/2/1', 'port_label_num' => '1/2/1', 'port_label_base' => '16GigabitEthernet', 'port_label_short' => '16Gi1/2/1')),
       array('generic',      array('ifDescr' => 'cau4-0/2/0'),
@@ -675,7 +689,7 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('generic',      array('ifDescr' => 'GigabitEthernet0/1.ServiceInstance.206'),
                             array('port_label' => 'GigabitEthernet0/1.ServiceInstance.206', 'port_label_num' => '0/1.ServiceInstance.206', 'port_label_base' => 'GigabitEthernet', 'port_label_short' => 'Gi0/1.SI.206')),
       array('generic',      array('ifDescr' => 'Integrated-Cable7/0/0:0'),
-                            array('port_label' => 'Integrated-Cable7/0/0:0', 'port_label_num' => '7/0/0:0', 'port_label_base' => 'Integrated-Cable', 'port_label_short' => 'Integrated-Cable7/0/0:0')),
+                            array('port_label' => 'Integrated-Cable7/0/0:0', 'port_label_num' => '7/0/0:0', 'port_label_base' => 'Integrated-Cable', 'port_label_short' => 'In7/0/0:0')),
       array('generic',      array('ifDescr' => 'Logical Upstream Channel 1/0.0/0'),
                             array('port_label' => 'Logical Upstream Channel 1/0.0/0', 'port_label_num' => '1/0.0/0', 'port_label_base' => 'Logical Upstream Channel ', 'port_label_short' => 'Upstream 1/0.0/0')),
       array('generic',      array('ifDescr' => 'Video Downstream 0/0/38'),

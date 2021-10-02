@@ -15,23 +15,23 @@
 namespace phpFastCache\Drivers\Couchbase;
 
 use CouchbaseCluster as CouchbaseClient;
-use phpFastCache\Core\DriverAbstract;
-use phpFastCache\Core\StandardPsr6StructureTrait;
-use phpFastCache\Entities\driverStatistic;
+use phpFastCache\Core\Pool\DriverBaseTrait;
+use phpFastCache\Core\Pool\ExtendedCacheItemPoolInterface;
+use phpFastCache\Entities\DriverStatistic;
 use phpFastCache\Exceptions\phpFastCacheDriverCheckException;
 use phpFastCache\Exceptions\phpFastCacheDriverException;
+use phpFastCache\Exceptions\phpFastCacheInvalidArgumentException;
+use phpFastCache\Exceptions\phpFastCacheLogicException;
 use Psr\Cache\CacheItemInterface;
 
 /**
  * Class Driver
  * @package phpFastCache\Drivers
+ * @property CouchbaseClient $instance Instance of driver service
  */
-class Driver extends DriverAbstract
+class Driver implements ExtendedCacheItemPoolInterface
 {
-    /**
-     * @var CouchbaseClient
-     */
-    public $instance;
+    use DriverBaseTrait;
 
     /**
      * @var \CouchbaseBucket[]
@@ -70,7 +70,7 @@ class Driver extends DriverAbstract
     /**
      * @param \Psr\Cache\CacheItemInterface $item
      * @return mixed
-     * @throws \InvalidArgumentException
+     * @throws phpFastCacheInvalidArgumentException
      */
     protected function driverWrite(CacheItemInterface $item)
     {
@@ -78,15 +78,19 @@ class Driver extends DriverAbstract
          * Check for Cross-Driver type confusion
          */
         if ($item instanceof Item) {
-            return $this->getBucket()->upsert(md5($item->getKey()), $this->encode($this->driverPreWrap($item)), ['expiry' => $item->getTtl()]);
+            try {
+                return (bool)$this->getBucket()->upsert($item->getEncodedKey(), $this->encode($this->driverPreWrap($item)), ['expiry' => $item->getTtl()]);
+            } catch (\CouchbaseException $e) {
+                return false;
+            }
         } else {
-            throw new \InvalidArgumentException('Cross-Driver type confusion detected');
+            throw new phpFastCacheInvalidArgumentException('Cross-Driver type confusion detected');
         }
     }
 
     /**
      * @param \Psr\Cache\CacheItemInterface $item
-     * @return mixed
+     * @return null|array
      */
     protected function driverRead(CacheItemInterface $item)
     {
@@ -94,7 +98,7 @@ class Driver extends DriverAbstract
             /**
              * CouchbaseBucket::get() returns a CouchbaseMetaDoc object
              */
-            return $this->decode($this->getBucket()->get(md5($item->getKey()))->value);
+            return $this->decode($this->getBucket()->get($item->getEncodedKey())->value);
         } catch (\CouchbaseException $e) {
             return null;
         }
@@ -103,7 +107,7 @@ class Driver extends DriverAbstract
     /**
      * @param \Psr\Cache\CacheItemInterface $item
      * @return bool
-     * @throws \InvalidArgumentException
+     * @throws phpFastCacheInvalidArgumentException
      */
     protected function driverDelete(CacheItemInterface $item)
     {
@@ -111,9 +115,13 @@ class Driver extends DriverAbstract
          * Check for Cross-Driver type confusion
          */
         if ($item instanceof Item) {
-            return $this->getBucket()->remove(md5($item->getKey()));
+            try {
+                return (bool)$this->getBucket()->remove($item->getEncodedKey());
+            } catch (\Couchbase\Exception $e) {
+                return $e->getCode() === COUCHBASE_KEY_ENOENT;
+            }
         } else {
-            throw new \InvalidArgumentException('Cross-Driver type confusion detected');
+            throw new phpFastCacheInvalidArgumentException('Cross-Driver type confusion detected');
         }
     }
 
@@ -127,16 +135,17 @@ class Driver extends DriverAbstract
 
     /**
      * @return bool
+     * @throws phpFastCacheLogicException
      */
     protected function driverConnect()
     {
         if ($this->instance instanceof CouchbaseClient) {
-            throw new \LogicException('Already connected to Couchbase server');
+            throw new phpFastCacheLogicException('Already connected to Couchbase server');
         } else {
 
 
             $host = isset($this->config[ 'host' ]) ? $this->config[ 'host' ] : '127.0.0.1';
-            //$port = isset($server[ 'port' ]) ? $server[ 'port' ] : '11211';
+            $port = isset($this->config[ 'port' ]) ? $this->config[ 'port' ] : 8091;
             $password = isset($this->config[ 'password' ]) ? $this->config[ 'password' ] : '';
             $username = isset($this->config[ 'username' ]) ? $this->config[ 'username' ] : '';
             $buckets = isset($this->config[ 'buckets' ]) ? $this->config[ 'buckets' ] : [
@@ -146,13 +155,15 @@ class Driver extends DriverAbstract
               ],
             ];
 
-            $this->instance = $this->instance ?: new CouchbaseClient("couchbase://{$host}", $username, $password);
+            $this->instance = new CouchbaseClient("couchbase://{$host}:{$port}", $username, $password);
 
             foreach ($buckets as $bucket) {
                 $this->bucketCurrent = $this->bucketCurrent ?: $bucket[ 'bucket' ];
                 $this->setBucket($bucket[ 'bucket' ], $this->instance->openBucket($bucket[ 'bucket' ], $bucket[ 'password' ]));
             }
         }
+
+        return true;
     }
 
     /**
@@ -166,14 +177,14 @@ class Driver extends DriverAbstract
     /**
      * @param $bucketName
      * @param \CouchbaseBucket $CouchbaseBucket
-     * @throws \LogicException
+     * @throws phpFastCacheLogicException
      */
     protected function setBucket($bucketName, \CouchbaseBucket $CouchbaseBucket)
     {
         if (!array_key_exists($bucketName, $this->bucketInstances)) {
             $this->bucketInstances[ $bucketName ] = $CouchbaseBucket;
         } else {
-            throw new \LogicException('A bucket instance with this name already exists.');
+            throw new phpFastCacheLogicException('A bucket instance with this name already exists.');
         }
     }
 
@@ -184,16 +195,17 @@ class Driver extends DriverAbstract
      *******************/
 
     /**
-     * @return driverStatistic
+     * @return DriverStatistic
      */
     public function getStats()
     {
         $info = $this->getBucket()->manager()->info();
 
-        return (new driverStatistic())
+        return (new DriverStatistic())
           ->setSize($info[ 'basicStats' ][ 'diskUsed' ])
           ->setRawData($info)
           ->setData(implode(', ', array_keys($this->itemInstances)))
-          ->setInfo('CouchBase version ' . $info[ 'nodes' ][ 0 ][ 'version' ] . ', Uptime (in days): ' . round($info[ 'nodes' ][ 0 ][ 'uptime' ] / 86400, 1) . "\n For more information see RawData.");
+          ->setInfo('CouchBase version ' . $info[ 'nodes' ][ 0 ][ 'version' ] . ', Uptime (in days): ' . round($info[ 'nodes' ][ 0 ][ 'uptime' ] / 86400,
+              1) . "\n For more information see RawData.");
     }
 }

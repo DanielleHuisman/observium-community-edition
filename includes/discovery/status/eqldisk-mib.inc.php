@@ -22,7 +22,7 @@ if (is_numeric($eqlgrpmemid))
   // EQLDISK-MIB::eqlDiskStatus.1.1049142137.2 = INTEGER: on-line(1)
   // EQLDISK-MIB::eqlDiskId.1.1049142137.1 = INTEGER: 0
   // EQLDISK-MIB::eqlDiskId.1.1049142137.2 = INTEGER: 1
-  $cache['equallogic']['eqlDiskTable'] = snmpwalk_cache_multi_oid($device, 'eqlDiskTable', array(), 'EQLDISK-MIB');
+  $cache['equallogic']['eqlDiskTable'] = snmpwalk_cache_oid($device, 'eqlDiskTable', array(), 'EQLDISK-MIB');
 
   foreach ($cache['equallogic']['eqlDiskTable'] as $index => $entry)
   {

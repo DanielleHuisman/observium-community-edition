@@ -6,12 +6,11 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-function generate_inventory_query($vars)
-{
+function generate_inventory_query($vars) {
 
   $param = array();
   $where = ' WHERE 1 ';
@@ -64,7 +63,7 @@ function generate_inventory_query($vars)
 
   $query = 'FROM `entPhysical`';
 
-  if ($vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id' || $devices == TRUE)
+  if ($vars['sort'] === 'hostname' || $vars['sort'] === 'device' || $vars['sort'] === 'device_id' || $devices == TRUE)
   {
     $query .= ' LEFT JOIN `devices` USING(`device_id`)';
     $select[] = 'devices.hostname';
@@ -89,8 +88,7 @@ function generate_inventory_query($vars)
       $sort_neg   = 'DESC';
   }
 
-  switch($vars['sort'])
-  {
+  switch($vars['sort']) {
     case 'device':
     case 'hostname':
       $query .= ' ORDER BY `hostname` '.$sort_order;
@@ -107,8 +105,7 @@ function generate_inventory_query($vars)
       // $sql .= ' ORDER BY `hostname` '.$sort_order.', `sensor_descr` '.$sort_order;
   }
 
-  if (isset($vars['pageno']))
-  {
+  if (isset($vars['pageno'])) {
     $start = $vars['pagesize'] * ($vars['pageno'] - 1);
     $query .= ' LIMIT '.$start.','.$vars['pagesize'];
   }
@@ -121,14 +118,12 @@ function generate_inventory_query($vars)
  * Display Devices Inventory.
  *
  * @param array $vars
- * @return none|boolean
+ * @return void|boolean
  *
  */
-function print_inventory($vars)
-{
+function print_inventory($vars) {
   // On "Inventory" device tab display hierarchical list
-  if ($vars['page'] == 'device' && is_numeric($vars['device']) && device_permitted($vars['device']))
-  {
+  if ($vars['page'] === 'device' && is_numeric($vars['device']) && device_permitted($vars['device'])) {
     // DHTML expandable tree
     register_html_resource('js', 'mktree.js');
     register_html_resource('css', 'mktree.css');
@@ -165,12 +160,11 @@ function print_inventory($vars)
   if ($pagination) { $count = dbFetchCell($queries['query_count'], $queries['param']); }
 
   $list = array('device' => FALSE);
-  if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'inventory') { $list['device'] = TRUE; }
+  if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'inventory') { $list['device'] = TRUE; }
 
   $string = generate_box_open($vars['header']);
   $string .= '<table class="'.OBS_CLASS_TABLE_STRIPED.'">' . PHP_EOL;
-  if (!$short)
-  {
+  if (!$short) {
     $string .= '  <thead>' . PHP_EOL;
     $string .= '    <tr>' . PHP_EOL;
     if ($list['device']) { $string .= '      <th>Device</th>' . PHP_EOL; }
@@ -184,20 +178,15 @@ function print_inventory($vars)
   }
   $string .= '  <tbody>' . PHP_EOL;
 
-  foreach ($entries as $entry)
-  {
+  foreach ($entries as $entry) {
     $string .= '  <tr>' . PHP_EOL;
-    if ($list['device'])
-    {
+    if ($list['device']) {
       $string .= '    <td class="entity" style="white-space: nowrap">' . generate_device_link($entry, NULL, array('page' => 'device', 'tab' => 'entphysical')) . '</td>' . PHP_EOL;
     }
-    if ($entry['ifIndex'])
-    {
+    if ($entry['ifIndex']) {
       $interface = get_port_by_ifIndex($entry['device_id'], $entry['ifIndex']);
       $entry['entPhysicalName'] = generate_port_link($interface);
-    }
-    elseif ($entry['entPhysicalClass'] == "sensor")
-    {
+    } elseif ($entry['entPhysicalClass'] === "sensor") {
       $sensor = dbFetchRow("SELECT * FROM `sensors` 
                             WHERE `device_id` = ? AND (`entPhysicalIndex` = ? OR `sensor_index` = ?)", array($entry['device_id'], $entry['entPhysicalIndex'], $entry['entPhysicalIndex']));
 
@@ -226,8 +215,7 @@ function print_inventory($vars)
                            'entPhysicalParentRelPos','entPhysicalMfgName');
 
 
-  foreach($entries as $entry)
-  {
+  foreach($entries as $entry) {
     $entries_cleaned[$entry['entPhysical_id']] = array_intersect_key($entry, array_flip($entries_allowed));
   }
 
@@ -256,22 +244,18 @@ function print_inventory($vars)
  * @return null
  *
  */
-function print_ent_physical($entPhysicalContainedIn, $level, $class)
-{
-  global $device;
-  global $config;
+function print_ent_physical($entPhysicalContainedIn, $level, $class) {
+  global $device, $config;
 
   $initial = $entPhysicalContainedIn === 0 && $level === 0;
   $where = '`device_id` = ? AND `entPhysicalContainedIn` = ?';
-  if ($initial)
-  {
+  if ($initial) {
     // First level must be not deleted!
     $where .= ' AND `deleted` IS NULL';
   }
 
   $ents = dbFetchRows("SELECT * FROM `entPhysical` WHERE $where ORDER BY `entPhysicalContainedIn`, `ifIndex`, `entPhysicalIndex`", [ $device['device_id'], $entPhysicalContainedIn ]);
-  if ($initial && empty($ents))
-  {
+  if ($initial && empty($ents)) {
     // In some rare cases device report initial entity with index -1
     //$entPhysicalContainedIn -= 1;
     $entPhysicalContainedIn = dbFetchCell("SELECT MIN(`entPhysicalContainedIn`) FROM `entPhysical` WHERE `device_id` = ? AND `deleted` IS NULL", [ $device['device_id'] ]);
@@ -280,8 +264,7 @@ function print_ent_physical($entPhysicalContainedIn, $level, $class)
   }
   //r($ents);
 
-  foreach ($ents as $ent)
-  {
+  foreach ($ents as $ent) {
     $link = '';
     $value = NULL;
     $text = " <li class='$class'>";
@@ -299,8 +282,7 @@ relay
 
     // icons
     $icon = 'hardware'; // default icon
-    switch (TRUE)
-    {
+    switch (TRUE) {
       case str_starts($ent['entPhysicalClass'], 'chassis'):
         $icon = 'device';
         break;
@@ -308,14 +290,14 @@ relay
         $icon = 'linecard'; // need something better
         break;
       case str_starts($ent['entPhysicalClass'], [ 'module', 'adapter' ]):
-      case str_exists($ent['entPhysicalClass'], 'Interface'):
+      case str_contains_array($ent['entPhysicalClass'], 'Interface'):
         $icon = 'linecard';
         break;
       case $ent['entPhysicalClass'] === 'port':
         $icon = 'port';
         break;
       case str_starts($ent['entPhysicalClass'], [ 'container', 'fabric', 'backplane' ]):
-      case str_exists($ent['entPhysicalClass'], 'Concentrator'):
+      case str_contains_array($ent['entPhysicalClass'], 'Concentrator'):
         $icon = 'package';
         break;
       case str_starts($ent['entPhysicalClass'], [ 'stack' ]):
@@ -333,10 +315,9 @@ relay
       case str_starts($ent['entPhysicalClass'], 'power'):
         $icon = 'powersupply';
         break;
-      case $ent['entPhysicalClass'] == 'sensor':
+      case $ent['entPhysicalClass'] === 'sensor':
         $sensor = dbFetchRow("SELECT * FROM `sensors` WHERE `device_id` = ? AND (`entPhysicalIndex` = ? OR `sensor_index` = ?)", array($device['device_id'], $ent['entPhysicalIndex'], $ent['entPhysicalIndex']));
-        if ($sensor['sensor_class'])
-        {
+        if ($sensor['sensor_class']) {
           $icon = $GLOBALS['config']['sensor_types'][$sensor['sensor_class']]['icon'];
           $link = generate_entity_link('sensor', $sensor);
 
@@ -350,40 +331,26 @@ relay
       case str_starts($ent['entPhysicalClass'], [ 'routing', 'forwarding' ]):
         $icon = 'routing';
         break;
-      case $ent['entPhysicalClass'] == 'other':
+      case $ent['entPhysicalClass'] === 'other':
         $tmp_descr = $ent['entPhysicalDescr'] . ' ' . $ent['entPhysicalName'];
-        if (str_iexists($tmp_descr, [ 'switch' ]))
-        {
+        if (str_icontains_array($tmp_descr, [ 'switch' ])) {
           $icon = 'switching';
-        }
-        elseif (str_iexists($tmp_descr, [ 'cpu', 'processor' ]))
-        {
+        } elseif (str_icontains_array($tmp_descr, [ 'cpu', 'processor' ])) {
           $icon = 'processor';
-        }
-        elseif (str_iexists($tmp_descr, [ 'ram', 'memory' ]))
-        {
+        } elseif (str_icontains_array($tmp_descr, [ 'ram', 'memory' ])) {
           $icon = 'mempool';
-        }
-        elseif (str_iexists($tmp_descr, [ 'flash', 'storage' ]))
-        {
+        } elseif (str_icontains_array($tmp_descr, [ 'flash', 'storage' ])) {
           $icon = 'storage';
-        }
-        elseif (str_iexists($tmp_descr, [ 'stack' ]))
-        {
+        } elseif (str_icontains_array($tmp_descr, [ 'stack' ])) {
           $icon = 'databases';
-        }
-        elseif (str_iexists($tmp_descr, [ 'board', 'slot' ]))
-        {
+        } elseif (str_icontains_array($tmp_descr, [ 'board', 'slot' ])) {
           $icon = 'linecard'; // need something better
-        }
-        elseif (str_exists($tmp_descr, [ 'Tray', ]))
-        {
+        } elseif (str_contains_array($tmp_descr, [ 'Tray', ])) {
           $icon = 'package';
         }
         break;
     }
-    if ($ent['deleted'] !== NULL)
-    {
+    if ($ent['deleted'] !== NULL) {
       $icon = 'minus';
       $icon = ':x:'; // emoji icon just for experiment
     }
@@ -394,61 +361,53 @@ relay
     $ent_text = '';
 
     // port ifIndex
-    if ($ent['ifIndex'] && $port = get_port_by_ifIndex($device['device_id'], $ent['ifIndex']))
-    {
+    if ($ent['ifIndex'] && $port = get_port_by_ifIndex($device['device_id'], $ent['ifIndex'])) {
       $link = generate_port_link($port);
     }
 
-    if ($link)
-    {
+    if ($link) {
       $ent['entPhysicalName'] = $link;
     }
 
     // vendor + model + hw
     $ent_model = '';
-    if ($ent['entPhysicalModelName'] && !in_array($ent['entPhysicalModelName'], [ 'N/A' ]))
-    {
-      if ($ent['entPhysicalMfgName'] && !in_array($ent['entPhysicalMfgName'], [ 'N/A' ]))
-      {
+    if ($ent['entPhysicalModelName'] && !in_array($ent['entPhysicalModelName'], [ 'N/A' ])) {
+      if ($ent['entPhysicalMfgName'] && !in_array($ent['entPhysicalMfgName'], [ 'N/A' ])) {
         $ent_model .= $ent['entPhysicalMfgName'];
       }
 
-      $ent_model .= " ${ent['entPhysicalModelName']}";
+      $ent_model .= ' ' . $ent['entPhysicalModelName'];
 
-      if ($ent['entPhysicalHardwareRev'] && !in_array($ent['entPhysicalHardwareRev'], [ 'N/A' ]))
-      {
+      if ($ent['entPhysicalHardwareRev'] && !in_array($ent['entPhysicalHardwareRev'], [ 'N/A' ])) {
         $ent_model .= " ${ent['entPhysicalHardwareRev']}";
       }
       $ent_model = trim($ent_model);
     }
 
-    if ($ent['entPhysicalModelName'] && $ent_model)
-    {
-      if ($ent['ifIndex'])
-      {
+    if ($ent['entPhysicalModelName'] && $ent_model) {
+      if ($ent['ifIndex']) {
         // For ports different order
         $ent_text .= "<strong>" . $ent['entPhysicalName'] . " (" . $ent_model . ")</strong>";
       } else {
         $ent_text .= "<strong>" . $ent_model . "</strong> (" . $ent['entPhysicalName'] . ")";
       }
-    }
-    elseif ($ent_model)
-    {
+    } elseif ($ent_model) {
       $ent_text .= "<strong>" . $ent_model . "</strong>";
-    }
-    elseif ($ent['entPhysicalName'])
-    {
+    } elseif ($ent['entPhysicalName']) {
       $ent_text .= "<strong>" . $ent['entPhysicalName'] . "</strong>";
-    }
-    elseif ($ent['entPhysicalDescr'])
-    {
+    } elseif ($ent['entPhysicalDescr']) {
       $ent_text .= "<strong>" . $ent['entPhysicalDescr'] . "</strong>";
+    }
+
+    // entPhysicalAssetID
+    if (strlen($ent['entPhysicalAssetID']) &&
+      !in_array($ent['entPhysicalAssetID'], [ 'zeroDotZero', 'zeroDotZero.0' ])) {
+      $ent_text .= " (" . $ent['entPhysicalAssetID'] . ")";
     }
 
     // entPhysicalVendorType
     if (strlen($ent['entPhysicalVendorType']) &&
-        !in_array($ent['entPhysicalVendorType'], [ 'zeroDotZero', 'zeroDotZero.0' ]))
-    {
+        !in_array($ent['entPhysicalVendorType'], [ 'zeroDotZero', 'zeroDotZero.0' ])) {
       $ent_text .= " (" . $ent['entPhysicalVendorType'] . ")";
     }
     //$ent_text .= " [" . $ent['entPhysicalClass'] . "]"; // DEVEL
@@ -456,22 +415,28 @@ relay
     $ent_text .= "<br /><div class='small' style='margin-left: 20px;'>" . $ent['entPhysicalDescr'];
 
     // Value
-    if ($value)
-    {
+    if ($value) {
       $ent_text .= ' (' . $value . ')';
     }
 
     $text .= $ent_text;
 
-    // Serial
-    if ($ent['entPhysicalSerialNum'])
-    {
-      $text .= ' <span class="text-info">[Serial: '.$ent['entPhysicalSerialNum'].']</span> ';
+    // Serial, Hardware/Firmware/Software Rev
+    if ($ent['entPhysicalSerialNum']) {
+      $text .= ' <span class="label label-primary">SN: '.$ent['entPhysicalSerialNum'].'</span> ';
+    }
+    if ($ent['entPhysicalHardwareRev']) {
+      $text .= ' <span class="label label-default">HW: '.$ent['entPhysicalHardwareRev'].'</span> ';
+    }
+    if ($ent['entPhysicalFirmwareRev']) {
+      $text .= ' <span class="label label-info">FW: '.$ent['entPhysicalFirmwareRev'].'</span> ';
+    }
+    if ($ent['entPhysicalSoftwareRev']) {
+      $text .= ' <span class="label label-success">SW: '.$ent['entPhysicalSoftwareRev'].'</span> ';
     }
 
     // Deleted
-    if ($ent['deleted'] !== NULL)
-    {
+    if ($ent['deleted'] !== NULL) {
       $text .= ' <span class="text-info">[Deleted: '.$ent['deleted'].']</span> ';
     }
 
@@ -479,8 +444,7 @@ relay
     echo($text);
 
     $count = dbFetchCell("SELECT COUNT(*) FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ?", array($device['device_id'], $ent['entPhysicalIndex']));
-    if ($count)
-    {
+    if ($count) {
       echo("<ul>");
       print_ent_physical($ent['entPhysicalIndex'], $level+1, '');
       echo("</ul>");

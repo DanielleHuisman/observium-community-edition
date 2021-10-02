@@ -17,7 +17,7 @@
 
 // Getting APs
 
-$accesspoints_snmp = snmpwalk_cache_multi_oid($device, "trpzApConfApConfigTable", $accesspoints_snmp, "TRAPEZE-NETWORKS-AP-CONFIG-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$accesspoints_snmp = snmpwalk_cache_oid($device, "trpzApConfApConfigTable", $accesspoints_snmp, "TRAPEZE-NETWORKS-AP-CONFIG-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 if (OBS_DEBUG > 1) { print_vars($accesspoints_snmp); }
 
 $accesspoints_db = dbFetchRows("SELECT `name`, `model`, `location`, `fingerprint`, `serial`, `device_id`, `ap_number` FROM `wifi_accesspoints` WHERE `device_id` = ?", array($device['device_id']));

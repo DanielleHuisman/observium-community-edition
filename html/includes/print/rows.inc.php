@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -45,8 +44,7 @@ function generate_box_open($args = array())
         } else {
           $return .= '<button type="button"';
         }
-        if (isset($control['url']) && strlen($control['url']) && $control['url'] != '#')
-        {
+        if (isset($control['url']) && strlen($control['url']) && $control['url'] !== '#') {
           $return .= ' href="'.$control['url'].'"';
         } else {
           //$return .= ' onclick="return false;"';
@@ -62,8 +60,7 @@ function generate_box_open($args = array())
         if (isset($control['icon'])) { $return .= '<i class="'.$control['icon'].'"></i> '; }
         if (isset($control['text'])) { $return .= $control['text']; }
 
-        if (isset($control['anchor']) && $control['anchor'] == TRUE)
-        {
+        if (isset($control['anchor']) && $control['anchor'] == TRUE) {
           $return .= '</a>';
         } else {
           $return .= '</button>';

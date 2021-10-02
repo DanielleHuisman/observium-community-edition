@@ -6,11 +6,13 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $valid['neighbours'] = array();
+
+// SELECT * FROM `autodiscovery` WHERE `remote_device_id` IS NOT NULL AND `remote_device_id` NOT IN (SELECT `device_id` FROM `devices`)
 
 // Include all discovery modules
 $include_dir = "includes/discovery/neighbours";
@@ -55,7 +57,7 @@ echo(PHP_EOL);
 $table_headers = array('%WProtocol%n', '%WifName%n', '%WRemote: hostname%n', '%Wport%n', '%Wplatform%n', '%Wversion%n');
 print_cli_table($table_rows, $table_headers);
 
-$GLOBALS['module_stats'][$module]['status'] = count($valid[$module]);
+$GLOBALS['module_stats'][$module]['status'] = safe_count($valid[$module]);
 if (OBS_DEBUG && $GLOBALS['module_stats'][$module]['status']) { print_vars($valid[$module]); }
 
 unset($valid['neighbours']);

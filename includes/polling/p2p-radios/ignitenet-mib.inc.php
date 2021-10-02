@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Observium
  *
@@ -9,8 +10,6 @@
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
  *
  */
-
-echo(" ignitenet ");
 
 $infomcs[0] = 'auto';
 $infomcs[4] = 'mcs-6m(4)';
@@ -54,51 +53,27 @@ $infomcs[43] = 'nss2-mcs4(43)';
 $infomcs[44] = 'nss2-mcs5(44)';
 $infomcs[45] = 'nss2-mcs6(45)';
 
-// Getting Radios
+echo(" IGNITENET-MIB P2P-MIB ");
 
-$radios_snmp = snmpwalk_cache_oid($device, "enterprises.47307.1.1.2.0", array(), "IGNITENET-MIB");
+// Get radio data
+$data_info = snmpwalk_cache_oid($device, '1.3.6.1.4.1.47307.1.4.2', array(), "IGNITENET-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 
-$oids = array('');
-
-$radiocount = snmpwalk_cache_oid($device, '.1.3.6.1.4.1.47307.1.4.1.0', array(), "IGNITENET-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-
-$oids = array('1.3.6.1.4.1.47307.1.4.2.1.2');
-
-$get_oids = array();
-foreach ($oids as $oid)
+$i=0;
+// Goes through the SNMP radio data
+foreach ($data_info as $key=>$value) 
 {
-    $enabled[$oid] = snmpwalk_cache_oid($device, $oid, array(), "IGNITENET-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-}
-
-$i = 0;
-
-foreach ($enabled['1.3.6.1.4.1.47307.1.4.2.1.2'] as $link)
-{
-  $i = $i+1;
-  //disabled or enabled
-  if ($link['iso'] == '1') 
-  {
-
-  $oids = array('1.3.6.1.4.1.47307.1.4.2.1.4.'.$i, '1.3.6.1.4.1.47307.1.4.2.1.5.'.$i, '1.3.6.1.4.1.47307.1.4.2.1.7.'.$i, '1.3.6.1.4.1.47307.1.4.2.1.10.'.$i,
-              '1.3.6.1.4.1.47307.1.4.2.1.13.'.$i);
-
-  $get_oids = array();
-  foreach ($oids as $oid)
-  {
-    $data[$oid] = snmpwalk_cache_oid($device, $oid, array(), "IGNITENET-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-  }
-
-    $radio['radio_name']           = $data['1.3.6.1.4.1.47307.1.4.2.1.13.'.$i]['3.6.1.4.1.47307.1.4.2.1.13.'.$i]['iso'];
-    $radio['radio_status']         = 'ok';
+  if ( $data_info[$key]['mlRadioInfoEnabled'] == 'enabled') {  
+    $radio['radio_name']       = $data_info[$key]['mlRadioInfoFrequency']/1000 . "GHz";
+    $radio['radio_status']     = $data_info[$key]['mlRadioInfoEnabled'];
     $radio['radio_loopback']       = array('NULL');
     $radio['radio_tx_mute']        = array('NULL');
-    $radio['radio_tx_freq']        = $data['1.3.6.1.4.1.47307.1.4.2.1.4.'.$i]['3.6.1.4.1.47307.1.4.2.1.4.'.$i]['iso']*1000;
-    $radio['radio_rx_freq']        = $data['1.3.6.1.4.1.47307.1.4.2.1.4.'.$i]['3.6.1.4.1.47307.1.4.2.1.4.'.$i]['iso']*1000;
-    $radio['radio_tx_power']       = $data['1.3.6.1.4.1.47307.1.4.2.1.7.'.$i]['3.6.1.4.1.47307.1.4.2.1.7.'.$i]['iso'];
-    $radio['radio_rx_level']       = $data['1.3.6.1.4.1.47307.1.4.2.1.10.'.$i]['3.6.1.4.1.47307.1.4.2.1.10.'.$i]['iso'];
+    $radio['radio_tx_freq']    = $data_info[$key]['mlRadioInfoFrequency']*1000;
+    $radio['radio_rx_freq']    = $data_info[$key]['mlRadioInfoFrequency']*1000;
+    $radio['radio_tx_power']     = $data_info[$key]['mlRadioInfoTxPower'];
+    $radio['radio_rx_level']     = $data_info[$key]['mlRadioInfoRSSILocal'];
     $radio['radio_e1t1_channels']  = array('NULL');
     $radio['radio_bandwidth']      = array('NULL');
-    $radio['radio_modulation']     = $infomcs[$data['1.3.6.1.4.1.47307.1.4.2.1.5.'.$i]['3.6.1.4.1.47307.1.4.2.1.5.'.$i]['iso']];
+    $radio['radio_modulation']   = $infomcs[$data_info[$key]['mlRadioInfoMCS']];
     $radio['radio_total_capacity'] = array('NULL');
     $radio['radio_eth_capacity']   = array('NULL');
     $radio['radio_rmse']           = array('NULL');       // Convert to units
@@ -109,9 +84,10 @@ foreach ($enabled['1.3.6.1.4.1.47307.1.4.2.1.2'] as $link)
     $radio['radio_standard']       = array('NULL');
     $radio['radio_cur_capacity']   = array('NULL');
 
-    poll_p2p_radio($device, 'ignitenet-mib', $i, $radio);
 
+    print_debug_vars($radio);
+
+    poll_p2p_radio($device, 'IGNITENET-MIB', $key, $radio);
   }
 }
-
 

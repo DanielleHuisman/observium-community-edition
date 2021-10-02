@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,32 +15,39 @@ function discover_counter_definition($device, $mib, $entry)
 
   echo($entry['oid']. ' [');
 
+  // Just append mib name to definition entry, for simple pass to external functions
+  if (empty($entry['mib']))
+  {
+    $entry['mib'] = $mib;
+  }
+
   // Check that types listed in skip_if_valid_exist have already been found
   if (discovery_check_if_type_exist($entry, 'counter')) { echo '!]'; return; }
 
   // Check array requirements list
   if (discovery_check_requires_pre($device, $entry, 'counter')) { echo '!]'; return; }
 
-  // Fetch table or Oids
-  $table_oids = array('oid', 'oid_descr', 'oid_scale', 'oid_unit', 'oid_class', 'oid_add',
-                      'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high',
-                      'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale',
-                      'oid_extra', 'oid_entPhysicalIndex');
-  $counter_array = discover_fetch_oids($device, $mib, $entry, $table_oids);
-
+  // Validate if Oid exist for current mib (in case when used generic definitions, ie edgecore)
   if (empty($entry['oid_num']))
   {
     // Use snmptranslate if oid_num not set
     $entry['oid_num'] = snmp_translate($entry['oid'], $mib);
+    if (empty($entry['oid_num']))
+    {
+      echo("]");
+      print_debug("Oid [".$entry['oid']."] not exist for mib [$mib]. Counter skipped.");
+      return;
+    }
   } else {
     $entry['oid_num'] = rtrim($entry['oid_num'], '.');
   }
 
-  // Just append mib name to definition entry, for simple pass to external functions
-  if (empty($entry['mib']))
-  {
-    $entry['mib'] = $mib;
-  }
+  // Fetch table or Oids
+  $table_oids = array('oid', 'oid_descr', 'oid_scale', 'oid_unit', 'oid_class', 'oid_add',
+                      'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high', 'oid_limit_warn',
+                      'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale',
+                      'oid_extra', 'oid_entPhysicalIndex');
+  $counter_array = discover_fetch_oids($device, $mib, $entry, $table_oids);
 
   $counters = array(); // Reset per-class counters for each MIB
 
@@ -87,6 +94,9 @@ function discover_counter_definition($device, $mib, $entry)
       $counter['index'.$k] = $i;           // Index parts
     }
     $counter['i']     = $counters[$class]; // i++ counter in descr (per counter class)
+
+    // Check valid exist with entity tags
+    if (discovery_check_if_type_exist($entry, 'counter', $counter)) { continue; }
 
     // Check array requirements list
     if (discovery_check_requires($device, $entry, $counter, 'counter')) { continue; }
@@ -201,45 +211,39 @@ function discover_counter_definition($device, $mib, $entry)
  * @param array $options       Options (counter_unit, limit_auto, limit*, poller_type, scale, measured_*)
  * @return bool
  */
-function discover_counter($device, $class, $mib, $object, $oid, $index, $counter_descr, $scale = 1, $value = NULL, $options = array())
-{
-  global $config;
+function discover_counter($device, $class, $mib, $object, $oid, $index, $counter_descr, $scale = 1, $value = NULL, $options = []) {
 
   //echo 'MIB:'; print_vars($mib);
 
-  $poller_type   = (isset($options['poller_type']) ? $options['poller_type'] : 'snmp');
+  $poller_type = isset($options['poller_type']) ? $options['poller_type'] : 'snmp';
   // Class for counter is free text string (not limited by known classes)
-  $class = strlen($class) ? strtolower($class) : 'counter';
+  $class = safe_empty($class) ? 'counter' : strtolower($class);
   // Use MIB & Object or Numeric Oid?
   $use_mib_object = $mib && $object;
 
   $counter_deleted = 0;
 
   // Init main
-  $param_main = array('oid' => 'counter_oid', 'counter_descr' => 'counter_descr', 'scale' => 'counter_multiplier',
-                      'counter_deleted' => 'counter_deleted', 'mib' => 'counter_mib', 'object' => 'counter_object');
+  $param_main = [ 'oid' => 'counter_oid', 'counter_descr' => 'counter_descr', 'scale' => 'counter_multiplier',
+                  'counter_deleted' => 'counter_deleted', 'mib' => 'counter_mib', 'object' => 'counter_object' ];
 
   // Init numeric values
   if (!is_numeric($scale) || $scale == 0) { $scale = 1; }
 
-
   // Skip discovery counter if value not numeric or null (default)
-  if (strlen($value))
-  {
+  if (!safe_empty($value)) {
     // Some retarded devices report data with spaces and commas
     // STRING: "  20,4"
     $value = snmp_fix_numeric($value);
   }
 
-  if (is_numeric($value))
-  {
+  if (is_numeric($value)) {
     $value = scale_value($value, $scale);
     // $value *= $scale; // Scale before unit conversion
     $value = value_to_si($value, $options['counter_unit'], $class); // Convert if not SI unit
 
     // Extra add value
-    if (isset($options['value_add']) && is_numeric($options['value_add']))
-    {
+    if (isset($options['value_add']) && is_numeric($options['value_add'])) {
       $value += scale_value($options['value_add'], $options['scale_add']);
     }
   } else {
@@ -253,14 +257,12 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
 
   $param_limits = array('limit_high' => 'counter_limit',     'limit_high_warn' => 'counter_limit_warn',
                         'limit_low'  => 'counter_limit_low', 'limit_low_warn'  => 'counter_limit_low_warn');
-  foreach ($param_limits as $key => $column)
-  {
+  foreach ($param_limits as $key => $column) {
     // Set limits vars and unit convert if required
     $$key = (is_numeric($options[$key]) ? value_to_si($options[$key], $options['counter_unit'], $class) : NULL);
   }
   // Set by which param use limits
-  switch (strtolower($options['limit_by']))
-  {
+  switch (strtolower($options['limit_by'])) {
     case 's':
     case 'sec':
     case 'second':
@@ -291,20 +293,19 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
 
   // Init optional
   $param_opt = array('entPhysicalIndex', 'entPhysicalClass', 'entPhysicalIndex_measured', 'measured_class', 'measured_entity', 'counter_unit');
-  foreach ($param_opt as $key)
-  {
+  foreach ($param_opt as $key) {
     $$key = ($options[$key] ? $options[$key] : NULL);
   }
 
   print_debug("Discover counter: [class: $class, device: ".$device['hostname'].", oid: $oid, index: $index, descr: $counter_descr, scale: $scale, limits: ($limit_low, $limit_low_warn, $limit_high_warn, $limit_high), CURRENT: $value, $entPhysicalIndex, $entPhysicalClass");
 
   // Check counter ignore filters
-  foreach ($config['ignore_counter'] as $bi)        { if (strcasecmp($bi, $counter_descr) == 0)   { print_debug("Skipped by equals: $bi, $counter_descr "); return FALSE; } }
-  foreach ($config['ignore_counter_string'] as $bi) { if (stripos($counter_descr, $bi) !== FALSE) { print_debug("Skipped by strpos: $bi, $counter_descr "); return FALSE; } }
-  foreach ($config['ignore_counter_regexp'] as $bi) { if (preg_match($bi, $counter_descr) > 0)    { print_debug("Skipped by regexp: $bi, $counter_descr "); return FALSE; } }
+  if (entity_descr_check($counter_descr, 'counter')) { return FALSE; }
+  //foreach ($config['ignore_counter'] as $bi)        { if (strcasecmp($bi, $counter_descr) == 0)   { print_debug("Skipped by equals: $bi, $counter_descr "); return FALSE; } }
+  //foreach ($config['ignore_counter_string'] as $bi) { if (stripos($counter_descr, $bi) !== FALSE) { print_debug("Skipped by strpos: $bi, $counter_descr "); return FALSE; } }
+  //foreach ($config['ignore_counter_regexp'] as $bi) { if (preg_match($bi, $counter_descr) > 0)    { print_debug("Skipped by regexp: $bi, $counter_descr "); return FALSE; } }
 
-  if (!is_null($limit_low_warn) && !is_null($limit_high_warn) && ($limit_low_warn > $limit_high_warn))
-  {
+  if (!is_null($limit_low_warn) && !is_null($limit_high_warn) && ($limit_low_warn > $limit_high_warn)) {
     // Fix high/low thresholds (i.e. on negative numbers)
     list($limit_high_warn, $limit_low_warn) = array($limit_low_warn, $limit_high_warn);
   }
@@ -313,8 +314,7 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
   print_debug_vars($limit_low_warn);
   print_debug_vars($limit_low);
 
-  if ($use_mib_object)
-  {
+  if ($use_mib_object) {
     $where = '`device_id` = ? AND `counter_class` = ? AND `counter_mib` = ? AND `counter_object` = ? AND `counter_index` = ? AND `poller_type`= ?';
     $params = [$device['device_id'], $class, $mib, $object, $index, $poller_type];
   } else {
@@ -323,13 +323,11 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     $params = [$device['device_id'], $class, $oid, $index, $poller_type];
   }
 
-  if (!dbExist('counters', $where, $params))
-  {
+  if (!dbExist('counters', $where, $params)) {
     if (!$limit_high) { $limit_high = sensor_limit_high($class, $value, $limit_auto); }
     if (!$limit_low)  { $limit_low  = sensor_limit_low($class, $value, $limit_auto); }
 
-    if (!is_null($limit_low) && !is_null($limit_high) && ($limit_low > $limit_high))
-    {
+    if (!is_null($limit_low) && !is_null($limit_high) && ($limit_low > $limit_high)) {
       // Fix high/low thresholds (i.e. on negative numbers)
       list($limit_high, $limit_low) = array($limit_low, $limit_high);
       print_debug("High/low limits swapped.");
@@ -340,21 +338,18 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
       'counter_class' => $class, 'counter_index' => $index
     ];
 
-    foreach ($param_main as $key => $column)
-    {
+    foreach ($param_main as $key => $column) {
       $counter_insert[$column] = $$key;
     }
 
-    foreach ($param_limits as $key => $column)
-    {
+    foreach ($param_limits as $key => $column) {
       // Convert strings/numbers to (float) or to array('NULL')
       $$key = is_numeric($$key) ? (float)$$key : array('NULL');
       $counter_insert[$column] = $$key;
     }
     $counter_insert['counter_limit_by'] = $limit_by;
 
-    foreach ($param_opt as $key)
-    {
+    foreach ($param_opt as $key) {
       if (is_null($$key)) { $$key = array('NULL'); }
       $counter_insert[$key] = $$key;
     }
@@ -365,11 +360,9 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     $counter_id = dbInsert($counter_insert, 'counters');
 
     // Extra oid add
-    if ($counter_id && isset($options['oid_add']))
-    {
+    if ($counter_id && isset($options['oid_add'])) {
       set_entity_attrib('counter', $counter_id, 'oid_add', $options['oid_add'], $device['device_id']);
-      if (isset($options['scale_add']))
-      {
+      if (isset($options['scale_add'])) {
         set_entity_attrib('counter', $counter_id, 'scale_add', $options['scale_add'], $device['device_id']);
       }
     }
@@ -496,16 +489,12 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
 
   // Rename old (converted) RRDs to definition format
   // Allow with changing class or without
-  if (isset($options['rename_rrd']) || isset($options['rename_rrd_full']))
-  {
+  if (isset($options['rename_rrd']) || isset($options['rename_rrd_full'])) {
     $rrd_tags = array('index' => $index, 'mib' => $mib, 'object' => $object, 'oid' => $object);
-    if (isset($options['rename_rrd']))
-    {
+    if (isset($options['rename_rrd'])) {
       $options['rename_rrd'] = array_tag_replace($rrd_tags, $options['rename_rrd']);
       $old_rrd               = 'counter-' . $class . '-' . $options['rename_rrd'];
-    }
-    elseif (isset($options['rename_rrd_full']))
-    {
+    } elseif (isset($options['rename_rrd_full'])) {
       $options['rename_rrd_full'] = array_tag_replace($rrd_tags, $options['rename_rrd_full']);
       $old_rrd               = 'counter-' . $options['rename_rrd_full'];
     }
@@ -513,7 +502,7 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     rename_rrd($device, $old_rrd, $new_rrd);
   }
 
-  $GLOBALS['valid']['counter'][$mib][$object][$index] = 1;
+  $GLOBALS['valid']['counter'][$class][$mib][$object][$index] = 1;
 
   return $counter_id;
   //return TRUE;
@@ -547,7 +536,7 @@ function poll_counter($device, &$oid_cache)
       print_debug_vars($counter_db, 1);
     }
 
-    if ($counter_db['poller_type'] == "snmp")
+    if ($counter_db['poller_type'] === "snmp")
     {
       $counter_db['counter_oid'] = '.' . ltrim($counter_db['counter_oid'], '.'); // Fix first dot in oid for caching
       
@@ -575,7 +564,7 @@ function poll_counter($device, &$oid_cache)
         $counter_poll['counter_value_add'] = snmp_fix_numeric(snmp_get_oid($device, $counter_attribs['oid_add'], 'SNMPv2-MIB'));
       }
     }
-    elseif ($counter_db['poller_type'] == "agent")
+    elseif ($counter_db['poller_type'] === "agent")
     {
       if (isset($agent_sensors))
       {
@@ -585,7 +574,7 @@ function poll_counter($device, &$oid_cache)
         continue;
       }
     }
-    elseif ($counter_db['poller_type'] == "ipmi")
+    elseif ($counter_db['poller_type'] === "ipmi")
     {
       if (isset($ipmi_counters))
       {
@@ -704,11 +693,11 @@ function poll_counter($device, &$oid_cache)
       $counter_poll['counter_event'] = check_thresholds($counter_db['counter_limit_low'],  $counter_db['counter_limit_low_warn'],
                                                         $counter_db['counter_limit_warn'], $counter_db['counter_limit'],
                                                         $counter_poll[$limit_by]);
-      if ($counter_poll['counter_event'] == 'alert')
+      if ($counter_poll['counter_event'] === 'alert')
       {
         $counter_poll['counter_status'] = 'Counter critical thresholds exceeded.';
       }
-      elseif ($counter_poll['counter_event'] == 'warning')
+      elseif ($counter_poll['counter_event'] === 'warning')
       {
         $counter_poll['counter_status'] = 'Counter warning thresholds exceeded.';
       } else {
@@ -716,7 +705,7 @@ function poll_counter($device, &$oid_cache)
       }
 
       // Reset Alert if counter ignored
-      if ($counter_poll['counter_event'] != 'ok' && $counter_db['counter_ignore'])
+      if ($counter_poll['counter_event'] !== 'ok' && $counter_db['counter_ignore'])
       {
         $counter_poll['counter_event'] = 'ignore';
         $counter_poll['counter_status'] = 'Counter thresholds exceeded, but ignored.';
@@ -734,7 +723,7 @@ function poll_counter($device, &$oid_cache)
       // Counter event changed, log and set counter_last_change
       $counter_poll['counter_last_change'] = $counter_polled_time;
 
-      if ($counter_db['counter_event'] == 'ignore')
+      if ($counter_db['counter_event'] === 'ignore')
       {
         print_message("[%yCounter Ignored%n]", 'color');
       }
@@ -776,7 +765,7 @@ function poll_counter($device, &$oid_cache)
     // Add table row
 
     $type = $counter_db['counter_mib'] . '::' . $counter_db['counter_object'] . '.' . $counter_db['counter_index'];
-    $format = strval($config['counter_types'][$counter_db['counter_class']]['format']);
+    $format = (string)$config['counter_types'][$counter_db['counter_class']]['format'];
     $table_rows[] = array($counter_db['counter_descr'],
                           $counter_db['counter_class'],
                           $type,
@@ -797,8 +786,11 @@ function poll_counter($device, &$oid_cache)
     //$rrd_file = get_counter_rrd($device, $counter_db);
     //rrdtool_create($device, $rrd_file, "DS:counter:GAUGE:600:-20000:U");
     //rrdtool_update($device, $rrd_file, "N:" . $counter_poll['counter_value']);
-    $ds = ['sensor' => $counter_poll['counter_value'],
-           'counter' => round($counter_poll['counter_value'], 0)]; // RRD COUNTER must be integer
+    $ds = [
+      'sensor' => $counter_poll['counter_value'],
+      // RRD COUNTER must be integer
+      'counter' => (is_numeric($counter_poll['counter_value']) ? round($counter_poll['counter_value'], 0) : 0)
+    ];
     rrdtool_update_ng($device, 'counter', $ds, $counter_db['counter_id']);
 
     // Enable graph
@@ -837,34 +829,31 @@ function poll_counter($device, &$oid_cache)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function check_valid_counter($device, $poller_type = 'snmp')
-{
+function check_valid_counter($device, $poller_type = 'snmp') {
   $valid = &$GLOBALS['valid']['counter'];
 
   $entries = dbFetchRows("SELECT * FROM `counters` WHERE `device_id` = ? AND `poller_type` = ? AND `counter_deleted` = '0'", array($device['device_id'], $poller_type));
 
-  foreach ($entries as $entry)
-  {
-    $index = $entry['counter_index'];
+  foreach ($entries as $entry) {
+    $index  = $entry['counter_index'];
+    $class  = $entry['counter_class'];
     $object = $entry['counter_object'];
-    $mib   = strlen($entry['counter_mib']) ? $entry['counter_mib'] : '__';
-    if (!$valid[$mib][$object][$index] ||
-        $valid[$mib][$object][$index] > 1) // Duplicate entry
-    {
+    $mib    = strlen($entry['counter_mib']) ? $entry['counter_mib'] : '__';
+    if (!$valid[$class][$mib][$object][$index] ||
+        $valid[$class][$mib][$object][$index] > 1) {// Duplicate entry
       echo("-");
       print_debug("Status deleted: $mib::$object.$index");
       //dbDelete('counter',       "`counter_id` = ?", array($entry['counter_id']));
 
       dbUpdate(array('counter_deleted' => '1'), 'counters', '`counter_id` = ?', array($entry['counter_id']));
 
-      foreach (get_entity_attribs('counter', $entry['counter_id']) as $attrib_type => $value)
-      {
+      foreach (get_entity_attribs('counter', $entry['counter_id']) as $attrib_type => $value) {
         del_entity_attrib('counter', $entry['counter_id'], $attrib_type);
       }
       log_event("Counter deleted: ".$entry['counter_class']." ". $entry['counter_index']." ".$entry['counter_descr'], $device, 'counter', $entry['counter_id']);
     } else {
       // Increase counter as hint for find duplicates
-      $valid[$mib][$object][$index]++;
+      $valid[$class][$mib][$object][$index]++;
     }
   }
 }

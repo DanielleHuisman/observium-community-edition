@@ -14,23 +14,23 @@
 // FIXME: Currently no EMD "stack" support
 
 echo('outletConfigDesc ');
-$cache['ipoman']['out'] = snmpwalk_cache_multi_oid($device, 'outletConfigDesc', $cache['ipoman']['out'], $mib);
+$cache['ipoman']['out'] = snmpwalk_cache_oid($device, 'outletConfigDesc', $cache['ipoman']['out'], $mib);
 echo('outletConfigLocation ');
-$cache['ipoman']['out'] = snmpwalk_cache_multi_oid($device, 'outletConfigLocation', $cache['ipoman']['out'], $mib);
+$cache['ipoman']['out'] = snmpwalk_cache_oid($device, 'outletConfigLocation', $cache['ipoman']['out'], $mib);
 echo('inletConfigDesc ');
-$cache['ipoman']['in'] = snmpwalk_cache_multi_oid($device, 'inletConfigDesc', $cache['ipoman'], $mib);
+$cache['ipoman']['in'] = snmpwalk_cache_oid($device, 'inletConfigDesc', $cache['ipoman'], $mib);
 
 $oids_in = array();
 $oids_out = array();
 
 echo('inletConfigCurrentHigh ');
-$oids_in = snmpwalk_cache_multi_oid($device, 'inletConfigCurrentHigh', $oids_in, $mib);
+$oids_in = snmpwalk_cache_oid($device, 'inletConfigCurrentHigh', $oids_in, $mib);
 echo('inletStatusCurrent ');
-$oids_in = snmpwalk_cache_multi_oid($device, 'inletStatusCurrent', $oids_in, $mib);
+$oids_in = snmpwalk_cache_oid($device, 'inletStatusCurrent', $oids_in, $mib);
 echo('outletConfigCurrentHigh ');
-$oids_out = snmpwalk_cache_multi_oid($device, 'outletConfigCurrentHigh', $oids_out, $mib);
+$oids_out = snmpwalk_cache_oid($device, 'outletConfigCurrentHigh', $oids_out, $mib);
 echo('outletStatusCurrent ');
-$oids_out = snmpwalk_cache_multi_oid($device, 'outletStatusCurrent', $oids_out, $mib);
+$oids_out = snmpwalk_cache_oid($device, 'outletStatusCurrent', $oids_out, $mib);
 
 $scale = 0.001;
 foreach ($oids_in as $index => $entry)
@@ -62,11 +62,11 @@ foreach ($oids_out as $index => $entry)
 $oids = array();
 
 echo('inletConfigFrequencyHigh ');
-$oids = snmpwalk_cache_multi_oid($device, 'inletConfigFrequencyHigh', $oids, $mib);
+$oids = snmpwalk_cache_oid($device, 'inletConfigFrequencyHigh', $oids, $mib);
 echo('inletConfigFrequencyLow ');
-$oids = snmpwalk_cache_multi_oid($device, 'inletConfigFrequencyLow', $oids, $mib);
+$oids = snmpwalk_cache_oid($device, 'inletConfigFrequencyLow', $oids, $mib);
 echo('inletStatusFrequency ');
-$oids = snmpwalk_cache_multi_oid($device, 'inletStatusFrequency', $oids, $mib);
+$oids = snmpwalk_cache_oid($device, 'inletStatusFrequency', $oids, $mib);
 
 $scale = 0.1;
 foreach ($oids as $index => $entry)
@@ -127,9 +127,9 @@ if ($emd_installed != 'disabled')
 $oids_out = array();
 
 #  echo('inletStatusWH ');
-#  $oids_in = snmpwalk_cache_multi_oid($device, 'inletStatusWH', $oids_in, $mib);
+#  $oids_in = snmpwalk_cache_oid($device, 'inletStatusWH', $oids_in, $mib);
 echo('outletStatusWH ');
-$oids_out = snmpwalk_cache_multi_oid($device, 'outletStatusWH', $oids_out, $mib);
+$oids_out = snmpwalk_cache_oid($device, 'outletStatusWH', $oids_out, $mib);
 
 #  foreach ($oids_in as $index => $entry)
 #  {
@@ -156,11 +156,11 @@ foreach ($oids_out as $index => $entry)
 $oids = array();
 
 echo('inletConfigVoltageHigh ');
-$oids = snmpwalk_cache_multi_oid($device, 'inletConfigVoltageHigh', $oids, $mib);
+$oids = snmpwalk_cache_oid($device, 'inletConfigVoltageHigh', $oids, $mib);
 echo('inletConfigVoltageLow ');
-$oids = snmpwalk_cache_multi_oid($device, 'inletConfigVoltageLow', $oids, $mib);
+$oids = snmpwalk_cache_oid($device, 'inletConfigVoltageLow', $oids, $mib);
 echo('inletStatusVoltage ');
-$oids = snmpwalk_cache_multi_oid($device, 'inletStatusVoltage', $oids, $mib);
+$oids = snmpwalk_cache_oid($device, 'inletStatusVoltage', $oids, $mib);
 
 $scale = 0.1;
 foreach ($oids as $index => $entry)

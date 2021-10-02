@@ -1,23 +1,20 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage alerts
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
-$scriptname = basename($argv[0]);
 
 $options = getopt("d");
-if (isset($options['d'])) { array_shift($argv); } // for compatability
+if (isset($options['d'])) { array_shift($argv); } // for compatibility
 
 include("includes/sql-config.inc.php");
 
@@ -52,7 +49,7 @@ if (is_array($errored))
     $i++;
   }
   // Send the alert email
-  notify($device, "Observium detected errors on $i interface" . ($i != 1 ? 's' : ''), $msg);
+  //notify($device, "Observium detected errors on $i interface" . ($i != 1 ? 's' : ''), $msg);
 }
 
 echo("$errored interfaces with errors over the past 5 minutes.\n");

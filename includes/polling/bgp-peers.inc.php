@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -208,8 +207,9 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
 
         // #2 - Request not completed
         // #1002 - Request timeout
-        if (snmp_error_code() === 2 || snmp_error_code() === 1002)
-        {
+        if (in_array(snmp_error_code(), [ OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED,
+                                          OBS_SNMP_ERROR_REQUEST_TIMEOUT,
+                                          OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT ], TRUE)) {
           $snmp_incomplete = TRUE;
         }
       }
@@ -232,7 +232,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
         list(,$peer_ip) = explode('.', $peer_ip, 2);
         $peer_ip  = hex2ip($peer_ip);
 
-        if ($peer_ip  == '0.0.0.0') { $peer_ip  = ''; }
+        if ($peer_ip === '0.0.0.0') { $peer_ip  = ''; }
         $peer_as  = $entry['cbgpPeer2RemoteAs'];
         $peer = array('ip'            => $peer_ip,
                       'as'            => $peer_as,
@@ -248,18 +248,19 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
       //$cisco_fix   = snmpwalk_cache_oid($device, 'bgpPeerLocalAddr', array(), 'BGP4-MIB');
     } else {
       echo("BGP4-MIB ");
-      $bgp_peers = snmpwalk_cache_multi_oid($device, 'bgpPeerRemoteAs', array(), 'BGP4-MIB');
+      $bgp_peers = snmpwalk_cache_oid($device, 'bgpPeerRemoteAs', array(), 'BGP4-MIB');
 
       // #2 - Request not completed
       // #1002 - Request timeout
-      if (snmp_error_code() === 2 || snmp_error_code() === 1002)
-      {
+      if (in_array(snmp_error_code(), [ OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED,
+                                        OBS_SNMP_ERROR_REQUEST_TIMEOUT,
+                                        OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT ], TRUE)) {
         $snmp_incomplete = TRUE;
       }
 
       foreach ($bgp_oids as $bgp_oid)
       {
-        $bgp_peers = snmpwalk_cache_multi_oid($device, $bgp_oid, $bgp_peers, 'BGP4-MIB');
+        $bgp_peers = snmpwalk_cache_oid($device, $bgp_oid, $bgp_peers, 'BGP4-MIB');
       }
 
       // Collect founded peers
@@ -295,8 +296,9 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
       {
         // #2 - Request not completed
         // #1002 - Request timeout
-        if (snmp_error_code() === 2 || snmp_error_code() === 1002)
-        {
+        if (in_array(snmp_error_code(), [ OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED,
+                                          OBS_SNMP_ERROR_REQUEST_TIMEOUT,
+                                          OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT ], TRUE)) {
           $snmp_incomplete = TRUE;
         }
 

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -87,8 +86,7 @@ foreach ($supply_data as $supply)
   }
 
   // Supply percent
-  if ($level >= 0 && $capacity > 0)
-  {
+  if (is_numeric($level) && $level >= 0 && $capacity > 0) {
     //$supplyperc = round($level / $supply['supply_capacity'] * 100);
     $supplyperc = round($level / $capacity * 100);
   } else {

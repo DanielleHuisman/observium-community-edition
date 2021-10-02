@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -31,6 +30,7 @@ function build_devices_where_array($vars)
       switch ($var)
       {
         case 'group':
+        case 'group_id':
           $values = get_group_entities($value);
           $where_array[$var] = generate_query_values($values, 'device_id');
           break;
@@ -212,6 +212,7 @@ function print_device_header($device, $args = array())
     $graph_array['bg']     = "FFFFFF00";
 
     // Preprocess device graphs array
+    $graphs_enabled = [];
     foreach ($device['graphs'] as $graph)
     {
       $graphs_enabled[] = $graph['graph'];
@@ -260,13 +261,14 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
   if (!is_array($device)) { print_error("Invalid device passed to print_device_row()!"); }
 
   if (!is_array($vars)) { $vars = array('view' => $vars); } // For compatibility
-  //if ($device['os'] == "ios") { formatCiscoHardware($device, TRUE); }
+
   humanize_device($device);
 
   $tags = array(
       'html_row_class'  => $device['html_row_class'],
       'device_id'     => $device['device_id'],
       'device_link'   => generate_device_link($device, NULL, $link_vars),
+      'device_url'    => generate_device_url($device, $link_vars),
       'hardware'      => escape_html($device['hardware']),
       'features'      => escape_html($device['features']),
       'os_text'       => $device['os_text'],
@@ -280,14 +282,15 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
   {
     case 'detail':
     case 'details':
-      $tags['device_image']  = get_device_icon($device);
+    $table_cols = 7;
+    $tags['device_image']  = get_device_icon($device);
       $tags['ports_count']   = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `device_id` = ? AND `deleted` = ?", array($device['device_id'], 0));
       //$tags['sensors_count'] = dbFetchCell("SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `sensor_deleted` = ?", array($device['device_id'], 0));
       //$tags['sensors_count'] += dbFetchCell("SELECT COUNT(*) FROM `status` WHERE `device_id` = ? AND `status_deleted` = ?", array($device['device_id'], 0));
       $tags['sensors_count']  = $cache['sensors']['devices'][$device['device_id']]['count'];
       $tags['sensors_count'] += $cache['statuses']['devices'][$device['device_id']]['count'];
       $hostbox = '
-  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\'device/device='.$tags['device_id'].'/\')" style="cursor: pointer;">
+  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\''.$tags['device_url'].'\')" style="cursor: pointer;">
     <td class="state-marker"></td>
     <td class="text-center vertical-align" style="width: 64px; text-align: center;">'.$tags['device_image'].'</td>
     <td style="width: 300px;"><span class="entity-title">'.$tags['device_link'].'</span><br />'.$tags['location'].'</td>
@@ -347,7 +350,7 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
         );
 
         $hostbox = '
-  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\'device/device='.$tags['device_id'].'/tab=perf/\')" style="cursor: pointer;">
+  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\''.generate_device_url($device, ['tab' => 'perf']).'\')" style="cursor: pointer;">
     <td class="state-marker"></td>
     <td class="vertical-align" style="width: 64px; text-align: center;">'.$tags['device_image'].'</td>
     <td class="vertical-align" style="width: 300px;"><span class="entity-title">' . $tags['device_link'] . '</span><br />'.$tags['location'].'</td>
@@ -384,6 +387,7 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
       }
 
       // Preprocess device graphs array
+      $graphs_enabled = [];
       foreach ($GLOBALS['cache']['devices']['id'][$device['device_id']]['graphs'] as $graph)
       {
         $graphs_enabled[] = $graph['graph'];
@@ -407,7 +411,7 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
       }
 
       $hostbox = '
-  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\'device/device='.$tags['device_id'].'/\')" style="cursor: pointer;">
+  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\''.$tags['device_url'].'\')" style="cursor: pointer;">
     <td class="state-marker"></td>
     <td class="vertical-align" style="width: 64px; text-align: center;">'.$tags['device_image'].'</td>
     <td style="width: 300px;"><span class="entity-title">'.$tags['device_link'].'</span><br />'.$tags['location'].'</td>
@@ -426,7 +430,7 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
       $tags['sensors_count'] = dbFetchCell("SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ?;", array($device['device_id']));
       $tags['sensors_count'] += dbFetchCell("SELECT COUNT(*) FROM `status` WHERE `device_id` = ?;", array($device['device_id']));
       $hostbox = '
-  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\'device/device='.$tags['device_id'].'/\')" style="cursor: pointer;">
+  <tr class="'.$tags['html_row_class'].'" onclick="openLink(\''.$tags['device_url'].'\')" style="cursor: pointer;">
     <td class="state-marker"></td>
     <td class="vertical-align" style="width: 64px; text-align: center;">'.$tags['device_image'].'</td>
     <td style="width: 300;"><span class="entity-title">'.$tags['device_link'].'</span><br />'.$tags['location'].'</td>
@@ -465,43 +469,36 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
  *
  * @return string Img tag with icon or base icon name
  */
-function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
-{
+function get_device_icon($device, $base_icon = FALSE, $dark = FALSE) {
   global $config;
 
   $icon = 'generic';
   $device['os'] = strtolower($device['os']);
   $model = $config['os'][$device['os']]['model'];
 
-  if ($device['icon'] && is_file($config['html_dir'] . '/images/os/' . $device['icon'] . '.png'))
-  {
+  if ($device['icon'] && is_file($config['html_dir'] . '/images/os/' . $device['icon'] . '.png')) {
     // Custom device icon from DB
     $icon  = $device['icon'];
-  }
-  elseif ($model && isset($config['model'][$model][$device['sysObjectID']]['icon']) &&
-          is_file($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'] . '.png'))
-  {
+  } elseif ($model && isset($config['model'][$model][$device['sysObjectID']]['icon']) &&
+            is_file($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'] . '.png')) {
     // Per model icon
     $icon  = $config['model'][$model][$device['sysObjectID']]['icon'];
-  }
-  elseif ($config['os'][$device['os']]['icon'] &&
-          is_file($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'] . '.png'))
-  {
+  } elseif ($config['os'][$device['os']]['icon'] &&
+            is_file($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'] . '.png')) {
     // Icon defined in os definition
     $icon  = $config['os'][$device['os']]['icon'];
   } else {
-    if ($device['distro'])
-    {
+    if ($device['distro']) {
       // Icon by distro name
-      $distro = safename(strtolower(trim($device['distro'])));
-      if (is_file($config['html_dir'] . '/images/os/' . $distro . '.png'))
-      {
+      // Red Hat Enterprise -> redhat
+      $distro = strtolower(trim(str_replace([ ' Enterprise', 'Red Hat' ], [ '', 'redhat' ], $device['distro'])));
+      $distro = safename($distro);
+      if (is_file($config['html_dir'] . '/images/os/' . $distro . '.png')) {
         $icon  = $distro;
       }
     }
 
-    if ($icon === 'generic' && is_file($config['html_dir'] . '/images/os/' . $device['os'] . '.png'))
-    {
+    if ($icon === 'generic' && is_file($config['html_dir'] . '/images/os/' . $device['os'] . '.png')) {
       // Icon by OS name
       $icon  = $device['os'];
     }
@@ -534,9 +531,9 @@ function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
   }
 
   // Set dark mode by session
-  if (isset($_SESSION['dark_mode']))
+  if (isset($_SESSION['theme']))
   {
-    $dark = (bool)$_SESSION['dark_mode'];
+    $dark = str_contains($_SESSION['theme'], 'dark');
   }
 
   // Prefer dark variant of icon in dark mode
@@ -630,6 +627,7 @@ function generate_device_popup($device, $vars = array(), $start = NULL, $end = N
   }
 
   // Preprocess device graphs array
+  $graphs_enabled = [];
   foreach ($device['graphs'] as $graph)
   {
     if($graph['enabled'] != '0')

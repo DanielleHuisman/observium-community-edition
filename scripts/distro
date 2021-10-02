@@ -2,7 +2,7 @@
 #
 #   Observium License Version 1.0
 #
-#   Copyright (c) 2013-2018 Joe Holden, (c) 2015 Mike Stupalov
+#   Copyright (c) 2013-2019 Joe Holden, (c) 2015 Mike Stupalov
 #
 #   The intent of this license is to establish the freedom to use, share and contribute to
 #   the software regulated by this license.
@@ -44,10 +44,9 @@
 #   The Software and this license document are provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
 #   WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 #
-#   URL: [https://gitlab.com/joewholden/distroscript]
-#   README: [https://gitlab.com/joewholden/distroscript/blob/master/README.md]
+#   URL: [https://github.com/jwh/distroscript]
 
-DISTROSCRIPT="2.2.1"
+DISTROSCRIPT="2.2.3"
 
 if [ -z ${DISTROFORMAT} ]; then
     DISTROFORMAT="pipe"
@@ -85,12 +84,14 @@ getkernel() {
 getdistro() {
     if [ "${OS}" = "Linux" ]; then
         if [ -f /etc/os-release ]; then
+            # note, this source include also set variable name $VERSION, ie on debian "10 (buster)"
             . /etc/os-release
-            DISTRO=`echo ${NAME} | awk '{print $1}'`
+            #DISTRO=`echo ${NAME} | awk '{print $1}'`
+            DISTRO="${NAME% *}"
         elif [ -x /usr/bin/lsb_release ]; then
             DISTRO=`/usr/bin/lsb_release -si 2>/dev/null`
         elif [ -f /etc/redhat-release ]; then
-            DISTRO=`cat /etc/redhat-release | awk '{print $1}'`
+            DISTRO=`cat /etc/redhat-release | cut -d" " -f1`
         elif [ -f /etc/fedora-release ]; then
             DISTRO="Fedora"
         elif [ -f /etc/debian_version ]; then
@@ -260,6 +261,7 @@ getversion() {
     elif [ "${OS}" = "OpenBSD" -o "${OS}" = "NetBSD" ]; then
         VERSION=`uname -r`
     elif [ "${OS}" = "Linux" ]; then
+        VERSION=none
         if [ "${DISTRO}" = "Debian GNU/Linux" ]; then
             DISTRO="Debian"
         fi
@@ -268,24 +270,29 @@ getversion() {
         elif [ "${DISTRO}" = "Slackware" ]; then
             VERSION=`cat /etc/slackware-version | cut -d" " -f2`
         elif [ -f /etc/os-release ]; then
-            if [ "${DISTRO}" = "Debian" ]; then
-                if [ -f /usr/bin/lsb_release ]; then
-                    VERSION=`lsb_release -sr 2>/dev/null`
-                fi
-            else
-                . /etc/os-release
-                VERSION=${VERSION_ID}
-            fi
+            . /etc/os-release
+            VERSION="${VERSION_ID}"
         elif [ -f /etc/redhat-release ]; then
-            VERSION=`cat /etc/redhat-release | sed 's/.*release\ //' | sed 's/\ .*//'`
+            VERSION=`cat /etc/redhat-release | sed 's/.*release\ //' | cut -d" " -f1`
         elif [ -x /usr/bin/lsb_release ]; then
             VERSION=`lsb_release -sr 2>/dev/null`
-        elif [ -f /etc/os-release ]; then
-            . /etc/os-release
-            VERSION=${VERSION_ID}
-        else
-            VERSION=
+        elif [ -f /etc/debian_version ]; then
+            VERSION=`cat /etc/debian_version | cut -d"." -f1`
         fi
+
+        # reset not numeric version string
+        case $VERSION in 0*|1*|2*|3*|4*|5*|6*|7*|8*|9*)
+            ;;
+            *)
+                VERSION=none
+                ;;
+        esac
+
+        if [ "${VERSION}" = "none" -a -f /etc/os-release ]; then
+            . /etc/os-release
+            VERSION="${VERSION_ID}"
+        fi
+
     elif [ "${OS}" = "Darwin" ]; then
         VERSION=`sw_vers -productVersion`
     elif [ "${OS}" = "Solaris" ]; then
@@ -325,11 +332,14 @@ detectvirt() {
         QEMU*Virtual*CPU*)
             type=qemu
             ;;
-        KVM*)
+        KVM*|[Go][Oo][Oo][Gg][Ll][Ee]*)
             type=kvm
             ;;
-        zvm|oracle|bochs|uml|parallels|kvm|qemu)
-            type=${1}
+        zvm|oracle|bochs|uml|parallels|kvm|qemu|qnx|acrn|powervm)
+            type="${1}"
+            ;;
+        vm-other)
+            type=other
             ;;
         *)
             type=none
@@ -344,7 +354,7 @@ detectcont() {
     type=none
     case $1 in
         *)
-            type=${1}
+            type="${1}"
             ;;
     esac
 
@@ -354,27 +364,23 @@ detectcont() {
 getcont() {
     CONT="none"
     if [ "${OS}" = "Linux" ]; then
-		if [ "${CONT}" = "none" ]; then
-			if [ -f /proc/user_beancounters ]; then
-				if [ "`grep 'envID:' /proc/self/status | awk '{print $2}'`" != "0" ]; then
-					CONT=openvz
-				fi
-			fi
+		if [ "${CONT}" = "none" -a -f /proc/user_beancounters ]; then
+            if [ "`awk '/envID:/ {print $2}' /proc/self/status 2>/dev/null`" != "0" ]; then
+                CONT=openvz
+            fi
 		fi
-        if [ "${CONT}" = "none" ]; then
+        if [ "${CONT}" = "none" -a -f /usr/bin/systemd-detect-virt ]; then
+            CONT=`/usr/bin/systemd-detect-virt -c`
+        fi
+        if [ "${CONT}" = "none" -a -f /proc/1/cgroup ]; then
             if grep -qa docker /proc/1/cgroup 2>/dev/null; then
                 CONT=docker
+            elif grep -qa lxc /proc/1/cgroup 2>/dev/null; then
+                CONT=lxc
             fi
         fi
-        if [ "${CONT}" = "none" ]; then
-            if [ -f /usr/bin/systemd-detect-virt ]; then
-                CONT=`/usr/bin/systemd-detect-virt -c`
-            fi
-        fi
-        if [ "${CONT}" = "none" ]; then
-            if [ -f /.dockerenv ]; then
-                CONT=docker
-            fi
+        if [ "${CONT}" = "none" -a -f /.dockerenv ]; then
+            CONT=docker
         fi
     elif [ "${OS}" = "FreeBSD" -o "${OS}" = "OpenBSD" -o "${OS}" = "NetBSD" ]; then
         if [ "${OS}" = "FreeBSD" ]; then
@@ -396,17 +402,13 @@ getcont() {
 getvirt() {
     VIRT="none"
     if [ "${OS}" = "Linux" ]; then
-        if [ "${VIRT}" = "none" ]; then
-            if [ -f /usr/bin/systemd-detect-virt ]; then
-                tmp=`/usr/bin/systemd-detect-virt -v`
-                VIRT=`detectvirt "${tmp}"`
-            fi
+        if [ "${VIRT}" = "none" -a -f /usr/bin/systemd-detect-virt ]; then
+            tmp=`/usr/bin/systemd-detect-virt -v`
+            VIRT=`detectvirt "${tmp}"`
         fi
-        if [ "${VIRT}" = "none" ]; then
-            if [ -f /sys/devices/virtual/dmi/id/product_name ]; then
-                tmp=`cat /sys/devices/virtual/dmi/id/product_name`
-                VIRT=`detectvirt "${tmp}"`
-            fi
+        if [ "${VIRT}" = "none" -a -f /sys/devices/virtual/dmi/id/product_name ]; then
+            tmp=`cat /sys/devices/virtual/dmi/id/product_name`
+            VIRT=`detectvirt "${tmp}"`
         fi
         if [ "${VIRT}" = "none" ]; then
             if [ -f `which dmidecode 2>/dev/null` ]; then

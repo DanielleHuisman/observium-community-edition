@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -35,8 +34,10 @@ if (isset($vars['timestamp_to'])   && preg_match($timestamp_pattern, $vars['time
   $vars['to'] = strtotime($vars['timestamp_to']);
   unset($vars['timestamp_to']);
 }
-if (!is_numeric($vars['from'])) { $vars['from'] = $config['time']['day']; }
-if (!is_numeric($vars['to']))   { $vars['to']   = $config['time']['now']; }
+
+// Validate rrdtool compatible time string and set to now/day if it's not valid
+if (preg_match('/^(\-?\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['to']))   { $to   = $vars['to'];   } // else { $to     = $config['time']['now']; }
+if (preg_match('/^(\-?\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['from'])) { $from = $vars['from']; } // else { $from   = $config['time']['day']; }
 
 preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>.+)/', $vars['type'], $graphtype);
 
@@ -89,8 +90,12 @@ if (!$auth)
   $graph_array = $vars;
   $graph_array['height'] = "60";
   $graph_array['width']  = $thumb_width;
-  $graph_array['legend'] = "no";
-  $graph_array['to']     = $config['time']['now'];
+
+  // Clear collectd argument forcing axis rendering
+  if (isset($graph_array['draw_all'])) { unset($graph_array['draw_all']); }
+
+  //$graph_array['legend'] = "no";
+  //$graph_array['to']     = $config['time']['now'];
 
   $navbar = array('brand' => "Graph", 'class' => "navbar-narrow");
 
@@ -145,29 +150,27 @@ if (!$auth)
 
   // Adding to the dashboard
 
-  if($_SESSION['userlevel'] > 7)
-  {
+  if ($_SESSION['userlevel'] > 7) {
 
     $dashboards = dbFetchRows("SELECT * FROM `dashboards`");
     // FIXME - widget_exists() dashboard_exists(), widget_permitted(), dashboard_permitted(), etc.
     // FIXME - convert this to ajax call, maybe make the code usable on other pages too
 
-    $valid = array('id', 'device');
-    $add_array = array('type' => $vars['type'],
-                       'period' => $vars['to'] - $vars['from']);
+    $valid = array('id', 'device', 'c_plugin', 'c_plugin_instance', 'c_type', 'c_type_instance');
+    $add_array = [ 'type' => $vars['type'] ];
+    if (isset($vars['period']) && is_numeric($vars['period'])) { $add_array['period'] = $vars['period']; }
+
     foreach($vars as $var => $value) { if(in_array($var, $valid))  { $add_array[$var] = $value; } }
 
-    if(isset($vars['dash_add']) && dashboard_exists($vars['dash_add']))
-    {
+    if (isset($vars['dash_add']) && dashboard_exists($vars['dash_add'])) {
       $widget_id = dbInsert(array('dash_id' => $vars['dash_add'], 'widget_config' => json_encode($add_array), 'widget_type' => 'graph', 'x' => 0, 'y' => 99, 'width' => 3, 'height' => 2), 'dash_widgets');
       print_message('Graph widget added to dashboard.', 'info');
       unset($vars['dash_add']);
     }
 
-    if(isset($vars['dash_add_widget']))
-    {
+    if (isset($vars['dash_add_widget'])) {
       dbUpdate(array('widget_config' => json_encode($add_array)), 'dash_widgets', '`widget_id` = ?', array($vars['dash_add_widget']));
-      if(dbAffectedRows() == 1) { print_message("Widget updated.", 'info'); }
+      if (dbAffectedRows() == 1) { print_message("Widget updated.", 'info'); }
       unset($vars['dash_add_widget']);
     }
 
@@ -185,12 +188,10 @@ if (!$auth)
     }
 
 
-    if(count($dashboards))
-    {
+    if (safe_count($dashboards)) {
       $navbar['options_right']['dash']['text'] = "Add to Dashboard";
 
-      foreach($dashboards as $dash)
-      {
+      foreach($dashboards as $dash) {
         $navbar['options_right']['dash']['suboptions'][$dash['dash_id']]['text'] = "Add to " . $dash['dash_name'];
         $navbar['options_right']['dash']['suboptions'][$dash['dash_id']]['url'] = generate_url($vars, array('page' => "graphs", 'dash_add' => $dash['dash_id']));
 /* Disable adding to specific widgets, the menu doesn't expand.
@@ -225,15 +226,33 @@ if (!$auth)
                        'threeyear' => 'Three Years'
                       );
 
+  $periods = ['21600' => '6 Hours',
+    '86400'    => '1 Day',
+    '172800'   => '2 Days',
+    '604800'   => 'One Week',
+    //'1209600'  => 'Two Weeks',
+    '2628000'  => 'One Month',
+    '7884000'  => 'Three Months',
+    '31536000' => 'One Year',
+    '94608000' => 'Three Years'];
+
+
   echo('<table style="width: 100%; background: transparent;"><tr>');
 
-  foreach ($thumb_array as $period => $text)
+  foreach ($periods as $period => $text)
   {
-    $graph_array['from']   = $config['time'][$period];
+    //$graph_array['from']   = $config['time'][$period];
 
-    $link_array = $vars;
-    $link_array['from'] = $graph_array['from'];
-    $link_array['to'] = $graph_array['to'];
+    $graph_array['period'] = $period;
+
+    $remove_vars = ['from', 'to'];
+    foreach($remove_vars as $remove_var) {
+      if (isset($graph_array[$remove_var])) { unset($graph_array[$remove_var]); }
+    }
+
+    $link_array = $graph_array;
+    //$link_array['from'] = $graph_array['from'];
+    //$link_array['to'] = $graph_array['to'];
     $link_array['page'] = "graphs";
     $link = generate_url($link_array);
 
@@ -254,10 +273,23 @@ if (!$auth)
 
   echo generate_box_close();
 
+  $form_vars = $vars;
+  unset($form_vars['from']);
+  unset($form_vars['to']);
+  unset($form_vars['period']);
+
   $form = array('type'          => 'rows',
                 'space'         => '5px',
                 'submit_by_key' => TRUE,
-                'url'           => 'graphs'.generate_url($vars));
+                'url'           => 'graphs'.generate_url($form_vars));
+
+  if (is_numeric($vars['from']) && $vars['from'] < 0) { $text_from = time() + $vars['from']; } else { $text_from = date('Y-m-d H:i:s', $vars['from']); }
+  if ($vars['to'] === 'now' || $vars['to'] === "NOW") { $text_to = time() + $vars['to']; } else { $text_to = date('Y-m-d H:i:s', $vars['to']); }
+
+  if (isset($vars['period']) && (!isset($vars['from']) || !isset($vars['to']))) {
+      $text_to = date('Y-m-d H:i:s', time());
+      $text_from = date('Y-m-d H:i:s', time() - $vars['period']);
+  }
 
   // Datetime Field
   $form['row'][0]['timestamp'] = array(
@@ -271,8 +303,8 @@ if (!$auth)
                               'min'         => '2007-04-03 16:06:59',  // Hehe, who will guess what this date/time means? --mike
                                                                        // First commit! Though Observium was already 7 months old by that point. --adama
                               'max'         => date('Y-m-d 23:59:59'), // Today
-                              'from'        => date('Y-m-d H:i:s', $vars['from']),
-                              'to'          => date('Y-m-d H:i:s', $vars['to']));
+                              'from'        => $text_from,
+                              'to'          => $text_to);
 
   $search_grid = 2;
   if ($type == "port")
@@ -312,14 +344,13 @@ if (!$auth)
   }
 
   // Update button
-  $form['row'][0]['update']   = array(
-                              'type'        => 'submit',
-                              //'name'        => 'Search',
-                              //'icon'        => 'icon-search',
-                              //'div_class'   => 'col-lg-2 col-md-2 col-sm-2 col-xs-2',
-                              'grid'        => $search_grid,
-                              'grid_xs'     => ($search_grid > 1 ? $search_grid : 12),
-                              'right'       => TRUE);
+  $form['row'][0]['update'] = [ 'type'        => 'submit',
+                                //'name'        => 'Search',
+                                //'icon'        => 'icon-search',
+                                //'div_class'   => 'col-lg-2 col-md-2 col-sm-2 col-xs-2',
+                                'grid'        => $search_grid,
+                                'grid_xs'     => ($search_grid > 1 ? $search_grid : 12),
+                                'right'       => TRUE ];
 
   print_form($form);
   unset($form, $speed_list, $speed, $search_grid);
@@ -342,14 +373,12 @@ $navbar['class'] = "navbar-narrow";
 $navbar['options']['legend']   =  array('text' => 'Show Legend', 'inverse' => TRUE);
 $navbar['options']['previous'] =  array('text' => 'Graph Previous');
 
-if(in_array('trend', $graph_return['valid_options']))
-{
+if (in_array('trend', $graph_return['valid_options'])) {
   $navbar['options']['trend']    =  array('text' => 'Graph Trend');
 }
 $navbar['options']['max']      =  array('text' => 'Graph Maximum');
 
-if(in_array('inverse', $graph_return['valid_options']))
-{
+if (in_array('inverse', $graph_return['valid_options'])) {
    $navbar['options']['inverse']    =  array('text' => 'Invert Graph');
 }
 

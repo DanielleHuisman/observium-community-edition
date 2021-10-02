@@ -1,0 +1,1 @@
+ALTER TABLE `alert_contacts` ADD `contact_message_custom` BOOLEAN NOT NULL DEFAULT FALSE AFTER `contact_disabled_until`, ADD `contact_message_template` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `contact_message_custom`;

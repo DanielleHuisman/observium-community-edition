@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -53,43 +52,50 @@
 # adslAturPerfValidIntervals.1 = 0
 # adslAturPerfInvalidIntervals.1 = 0
 
-function process_port_adsl(&$this_port, $device, $port)
-{
+function process_port_adsl(&$this_port, $device, $port) {
   // Check to make sure Port data is cached.
   if (!isset($this_port['adslLineCoding'])) { return; }
 
   // Used below for StatsD only
-  $adsl_oids = array('adslAtucCurrSnrMgn', 'adslAtucCurrAtn', 'adslAtucCurrOutputPwr', 'adslAtucCurrAttainableRate', 'adslAtucChanCurrTxRate', 'adslAturCurrSnrMgn',
-                     'adslAturCurrAtn', 'adslAturCurrOutputPwr', 'adslAturCurrAttainableRate', 'adslAturChanCurrTxRate', 'adslAtucPerfLofs', 'adslAtucPerfLoss',
-                     'adslAtucPerfLprs', 'adslAtucPerfESs', 'adslAtucPerfInits', 'adslAturPerfLofs', 'adslAturPerfLoss', 'adslAturPerfLprs', 'adslAturPerfESs',
-                     'adslAtucChanCorrectedBlks', 'adslAtucChanUncorrectBlks', 'adslAturChanCorrectedBlks', 'adslAturChanUncorrectBlks');
+  $adsl_oids = [
+    'adslAtucCurrSnrMgn', 'adslAtucCurrAtn', 'adslAtucCurrOutputPwr', 'adslAtucCurrAttainableRate', 'adslAtucChanCurrTxRate',
+    'adslAturCurrSnrMgn', 'adslAturCurrAtn', 'adslAturCurrOutputPwr', 'adslAturCurrAttainableRate', 'adslAturChanCurrTxRate',
+    'adslAtucPerfLofs', 'adslAtucPerfLoss', 'adslAtucPerfLprs', 'adslAtucPerfESs', 'adslAtucPerfInits',
+    'adslAturPerfLofs', 'adslAturPerfLoss', 'adslAturPerfLprs', 'adslAturPerfESs',
+    'adslAtucChanCorrectedBlks', 'adslAtucChanUncorrectBlks',
+    'adslAturChanCorrectedBlks', 'adslAturChanUncorrectBlks'
+  ];
 
-  $adsl_db_oids = array('adslLineCoding', 'adslLineType', 'adslAtucInvVendorID', 'adslAtucInvVersionNumber', 'adslAtucCurrSnrMgn', 'adslAtucCurrAtn',
-                        'adslAtucCurrOutputPwr', 'adslAtucCurrAttainableRate', 'adslAturInvSerialNumber', 'adslAturInvVendorID', 'adslAturInvVersionNumber',
-                        'adslAtucChanCurrTxRate', 'adslAturChanCurrTxRate', 'adslAturCurrSnrMgn', 'adslAturCurrAtn', 'adslAturCurrOutputPwr', 'adslAturCurrAttainableRate');
+  $adsl_db_oids = [
+    'adslLineCoding', 'adslLineType',
+    'adslAtucInvVendorID', 'adslAtucInvVersionNumber', 'adslAtucCurrSnrMgn', 'adslAtucCurrAtn', 'adslAtucCurrOutputPwr', 'adslAtucCurrAttainableRate',
+    'adslAturInvSerialNumber', 'adslAturInvVendorID', 'adslAturInvVersionNumber',
+    'adslAtucChanCurrTxRate', 'adslAturChanCurrTxRate', 'adslAturCurrSnrMgn', 'adslAturCurrAtn', 'adslAturCurrOutputPwr', 'adslAturCurrAttainableRate'
+  ];
 
-  $adsl_tenth_oids = array('adslAtucCurrSnrMgn', 'adslAtucCurrAtn', 'adslAtucCurrOutputPwr', 'adslAturCurrSnrMgn', 'adslAturCurrAtn', 'adslAturCurrOutputPwr');
+  $adsl_tenth_oids = [ 'adslAtucCurrSnrMgn', 'adslAtucCurrAtn', 'adslAtucCurrOutputPwr', 'adslAturCurrSnrMgn', 'adslAturCurrAtn', 'adslAturCurrOutputPwr' ];
 
-  foreach ($adsl_tenth_oids as $oid)
-  {
-    if (isset($this_port[$oid]))
-    {
+  foreach ($adsl_tenth_oids as $oid) {
+    if (isset($this_port[$oid])) {
       $this_port[$oid] = $this_port[$oid] / 10;
     }
   }
 
-  //if (dbFetchCell("SELECT COUNT(*) FROM `ports_adsl` WHERE `port_id` = ?", array($port['port_id'])) == "0")
-  if (!dbExist('ports_adsl', '`port_id` = ?', array($port['port_id'])))
-  {
-    dbInsert(array('port_id' => $port['port_id']), 'ports_adsl');
+  if (!dbExist('ports_adsl', '`port_id` = ?', array($port['port_id']))) {
+    dbInsert([ 'device_id' => $device['device_id'], 'port_id' => $port['port_id'] ], 'ports_adsl');
   }
+  $adsl_port = dbFetchRow('SELECT * FROM `ports_adsl` WHERE `port_id` = ?', [ $port['port_id'] ]);
 
-  $adsl_update = array('port_adsl_updated' => array('NOW()'));
-  foreach ($adsl_db_oids as $oid)
-  {
-    $adsl_update[$oid] = $this_port[$oid];
+  $adsl_update = [];
+  foreach ($adsl_db_oids as $oid) {
+    if ($adsl_port[$oid] != $this_port[$oid]) {
+      $adsl_update[$oid] = $this_port[$oid];
+    }
   }
-  dbUpdate($adsl_update, 'ports_adsl', '`port_id` = ?', array($port['port_id']));
+  if (count($adsl_update)) {
+    $adsl_update['port_adsl_updated'] = [ 'NOW()' ];
+    dbUpdate($adsl_update, 'ports_adsl', '`port_id` = ?', [ $port['port_id'] ]);
+  }
 
   if ($this_port['adslAtucCurrSnrMgn'] > "1280") { $this_port['adslAtucCurrSnrMgn'] = "U"; }
   if ($this_port['adslAturCurrSnrMgn'] > "1280") { $this_port['adslAturCurrSnrMgn'] = "U"; }
@@ -120,10 +126,8 @@ function process_port_adsl(&$this_port, $device, $port)
     'AturChanUncorrectBl' => $this_port['adslAturChanUncorrectBl'],
   ), get_port_rrdindex($port));
 
-  if ($GLOBALS['config']['statsd']['enable'])
-  {
-    foreach ($adsl_oids as $oid)
-    {
+  if ($GLOBALS['config']['statsd']['enable']) {
+    foreach ($adsl_oids as $oid) {
       // Update StatsD/Carbon
       StatsD::gauge(str_replace(".", "_", $device['hostname']).'.'.'port'.'.'.$port['ifIndex'].'.'.$oid, $this_port[$oid]);
     }

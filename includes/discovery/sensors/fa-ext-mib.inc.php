@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,19 +24,20 @@
 $flags = OBS_SNMP_ALL_NUMERIC_INDEX;
 
 $oids = snmpwalk_cache_oid($device, 'swSfpStatTable',                    array(), 'FA-EXT-MIB', NULL, $flags);
-if (!count($oids))
-{
+if (!safe_count($oids)) {
   return;
 }
 $oids = snmpwalk_cache_oid($device, 'connUnitPortIndex',                   $oids, 'FCMGMT-MIB', NULL, $flags);
 //$oids = snmpwalk_cache_oid($device, 'connUnitPortName',                    $oids, 'FCMGMT-MIB', NULL, $flags);
 
-$port_sw = snmpwalk_cache_multi_oid($device, 'swFCPortSpecifier', array(), 'SW-MIB');
+$port_sw = snmpwalk_cache_oid($device, 'swFCPortSpecifier', array(), 'SW-MIB');
 
 //print_vars($oids);
 foreach ($oids as $index => $entry)
 {
-  $entry   = array_merge($entry, $port_sw[$entry['connUnitPortIndex']]);
+  if (isset($port_sw[$entry['connUnitPortIndex']])) {
+    $entry = array_merge($entry, $port_sw[$entry['connUnitPortIndex']]);
+  }
   $port_fc = $entry['swFCPortSpecifier'];
 
   $port = dbFetchRow('SELECT * FROM `ports` WHERE `device_id` = ? AND (`ifName` = ? OR `ifDescr` REGEXP ?)', array($device['device_id'], $port_fc, '^FC[[:alnum:]]* port '.$port_fc.'$'));

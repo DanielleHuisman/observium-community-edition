@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,11 +6,12 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $dsdescr = "Bytes/s ";
+// Nfsen-ng use different prefix 'bytes_'
 $dsprefix = "traffic_";
 
 include("nfsen_common.inc.php");

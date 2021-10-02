@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -29,40 +29,43 @@ $where .= implode('', $where_array);
 
 register_html_title("Devices");
 
-foreach ($config['device_types'] as $entry)
-{
+foreach ($config['device_types'] as $entry) {
   $types[$entry['type']] = $entry;
+}
+
+$query_geocoding = '';
+if ($config['geocoding']['enable']) {
+  foreach ([ 'location_lat', 'location_lon', 'location_country', 'location_state', 'location_county', 'location_city' ] as $field) {
+    if (isset($where_array[$field])) {
+      $query_geocoding = ' LEFT JOIN `devices_locations` USING (`device_id`)';
+      break;
+    }
+  }
 }
 
 // Generate array with form elements
 $form_items = array();
-foreach (array('os', 'hardware', 'vendor', 'version', 'features', 'type', 'distro') as $entry)
-{
-  $query  = "SELECT DISTINCT `$entry` FROM `devices`";
-  if (isset($where_array[$entry]))
-  {
+foreach ([ 'os', 'hardware', 'vendor', 'version', 'features', 'type', 'distro' ] as $entry) {
+  $query  = "SELECT DISTINCT `$entry` FROM `devices`" . $query_geocoding;
+  if (isset($where_array[$entry])) {
     $tmp = $where_array[$entry];
     unset($where_array[$entry]);
     $query .= ' WHERE 1 ' . implode('', $where_array);
     $where_array[$entry] = $tmp;
   } else {
+    //r($where_array);
     $query .= $where;
   }
   $query .= " AND `$entry` != '' $query_permitted";
   $selected = dbFetchColumn($query);
 
   $query_all = "SELECT DISTINCT `$entry` FROM `devices` WHERE `$entry` != '' $query_permitted ORDER BY `$entry`";
-  foreach (dbFetchColumn($query_all) as $item)
-  {
-    $group = in_array($item, $selected) ? "Listed" : "Other";
-    if ($entry == 'os')
-    {
+  foreach (dbFetchColumn($query_all) as $item) {
+    $group = in_array($item, $selected, TRUE) ? "Listed" : "Other";
+    if ($entry === 'os') {
       $name = [ 'name' => $config['os'][$item]['text'], 'group' => $group ];
-    }
-    elseif ($entry == 'type')
-    {
-      if (isset($types[$item]))
-      {
+    } elseif ($entry === 'type') {
+      if (isset($types[$item])) {
         $name = [ 'name' => $types[$item]['text'], 'icon' => $types[$item]['icon'], 'group' => $group ];
       } else {
         $name = [ 'name' => nicecase($item),       'icon' => $config['icon']['exclamation'], 'group' => $group ];
@@ -74,28 +77,28 @@ foreach (array('os', 'hardware', 'vendor', 'version', 'features', 'type', 'distr
   }
 }
 
-asort($form_items['os']);
+if (isset($form_items['os'])) {
+  asort($form_items['os']);
+}
 
 $tmp = $where_array;
 if (isset($where_array['location']))
 {
   unset($tmp['location']);
 }
-$query  = "SELECT DISTINCT `location` FROM `devices`";
+$query  = "SELECT DISTINCT `devices`.`location` FROM `devices`" . $query_geocoding;
 $query .= ' WHERE 1 ' . implode('', $tmp);
 $query .= " $query_permitted";
 $selected = dbFetchColumn($query);
 unset($tmp);
 
-foreach (get_locations() as $entry)
-{
-  $group = in_array($entry, $selected) ? "Listed" : "Other";
+foreach (get_locations() as $entry) {
+  $group = in_array($entry, $selected, TRUE) ? "Listed" : "Other";
   if ($entry === '') { $entry = OBS_VAR_UNSET; }
   $form_items['location'][$entry] = [ 'name' => $entry, 'group' => $group ];
 }
 
-foreach (get_type_groups('device') as $entry)
-{
+foreach (get_type_groups('device') as $entry) {
   $form_items['group'][$entry['group_id']] = $entry['group_name'];
 }
 //print_vars($form_items);
@@ -315,8 +318,7 @@ $panel_form['row'][7]['search']['grid'] = 2;
 register_html_panel(generate_form($panel_form));
 
 
-if ($vars['searchbar'] != "hide")
-{
+if ($vars['searchbar'] !== "hide") {
   echo '<div class="hidden-xl">';
   print_form($form);
   echo '</div>';
@@ -345,8 +347,7 @@ foreach ($navbar['options'] as $option => $array)
 }
 
 // Set graph period stuff
-if ($vars['format'] == 'graphs')
-{
+if ($vars['format'] === 'graphs') {
   $timestamp_pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
   if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from']))
   {
@@ -372,10 +373,9 @@ if ($vars['format'] == 'graphs')
 //                      'diskio'    => 'Disk I/O',
 //                      'poller_perf' => 'Poll Time'
 //                      );
-foreach (array('graphs') as $type)
-{
+foreach (array('graphs') as $type) {
   /// FIXME. Weird graph menu, they too long and not actual for all devices,
-  /// but here also not posible use sql query from `device_graphs` because here not stored all graphs
+  /// but here also not possible use sql query from `device_graphs` because here not stored all graphs
   /// FIXME - We need to register all graphs in `device_graphs` :D
 
   $vars_graphs = $vars;
@@ -384,19 +384,17 @@ foreach (array('graphs') as $type)
 
   $where_graphs = ' WHERE 1 ' . implode('', $where_graphs);
 
-  $query  = 'SELECT `graph` FROM `device_graphs` LEFT JOIN `devices` USING (`device_id`)';
+  $query  = 'SELECT `graph` FROM `device_graphs` LEFT JOIN `devices` USING (`device_id`)' . $query_geocoding;
   $query .= $where_graphs . $query_permitted . ' AND `device_graphs`.`enabled` = 1 GROUP BY `graph`';
 
-  foreach (dbFetchColumn($query) as $option)
-  {
+  foreach (dbFetchColumn($query) as $option) {
     $data = $config['graph_types']['device'][$option];
   /*
   foreach ($config['graph_types']['device'] as $option => $data)
   { */
     if (!isset($data['descr'])) { $data['descr'] = nicecase($option);}
 
-    if ($vars['format'] == $type && $vars['graph'] == $option)
-    {
+    if ($vars['format'] == $type && $vars['graph'] == $option) {
       $navbar['options'][$type]['suboptions'][$option]['class'] = 'active';
       $navbar['options'][$type]['text'] .= " (".$data['descr'].')';
     }
@@ -405,8 +403,7 @@ foreach (array('graphs') as $type)
   }
 }
 
-if (isset($vars['pagination']) && (!$vars['pagination'] || $vars['pagination'] == 'no'))
-{
+if (isset($vars['pagination']) && (!$vars['pagination'] || $vars['pagination'] == 'no')) {
   $navbar['options_right']['pagination']     = array('text' => 'Enable Pagination', 'url' => generate_url($vars, array('pagination' => NULL)));
 } else {
   $navbar['options_right']['pagination']     = array('text' => 'Disable Pagination' , 'url' => generate_url($vars, array('pagination' => '0', 'pageno' => NULL, 'pagesize' => NULL)));
@@ -419,8 +416,7 @@ if ($vars['searchbar'] == "hide")
   $navbar['options_right']['searchbar']     = array('text' => 'Hide Search' , 'url' => generate_url($vars, array('searchbar' => 'hide')));
 }
 
-if ($vars['bare'] == "yes")
-{
+if (get_var_true($vars['bare'])) {
   $navbar['options_right']['header']     = array('text' => 'Show Header', 'url' => generate_url($vars, array('bare' => NULL)));
 } else {
   $navbar['options_right']['header']     = array('text' => 'Hide Header', 'url' => generate_url($vars, array('bare' => 'yes')));
@@ -433,8 +429,7 @@ unset($navbar);
 
 // Print period options for graphs
 
-if ($vars['format'] == 'graphs')
-{
+if ($vars['format'] === 'graphs') {
   $form = array('type'          => 'rows',
                 'space'         => '5px',
                 'submit_by_key' => TRUE); //Do not use url here, because it discards all other vars from url
@@ -466,12 +461,9 @@ if ($vars['format'] == 'graphs')
   unset($form);
 }
 
-$count = dbFetchCell("SELECT COUNT(*) FROM `devices` ".$where.$query_permitted);
-
 $sort = build_devices_sort($vars);
 
-if (isset($vars['sort']) && $vars['sort'] == 'domain')
-{
+if (isset($vars['sort']) && $vars['sort'] === 'domain') {
   // Special Domain sort, require additional pseudo fields
   $query  = "SELECT *,";
   $query .= " SUBSTRING_INDEX(SUBSTRING_INDEX(`hostname`,'.',-3),'.',1) AS `leftmost`,";
@@ -491,7 +483,7 @@ $query .= $where . $query_permitted . $sort;
 // Pagination
 $pagination_html = '';
 if (isset($vars['pagination']) && (!$vars['pagination'] || $vars['pagination'] == 'no')) {} // Skip if pagination set to false
-elseif ($count)
+elseif ($count = dbFetchCell("SELECT COUNT(*) FROM `devices`".$query_geocoding.$where.$query_permitted))
 {
   pagination($vars, 0, TRUE); // Get default pagesize/pageno
   $start = $vars['pagesize'] * $vars['pageno'] - $vars['pagesize'];
@@ -510,15 +502,13 @@ if (count($devices))
   if (is_file($include_file))
   {
     echo $pagination_html;
-    if ($format != 'graphs')
-    {
+    if ($format !== 'graphs') {
       echo generate_box_open();
     }
 
     include($include_file);
 
-    if ($vars['format'] != 'graphs')
-    {
+    if ($vars['format'] !== 'graphs') {
       echo generate_box_close();
     }
     echo $pagination_html;

@@ -12,9 +12,9 @@
  */
 
 $hpups_array = array();
-$hpups_array = snmpwalk_cache_multi_oid($device, 'upsInput', $hpups_array, 'CPQPOWER-MIB');
-$hpups_array = snmpwalk_cache_multi_oid($device, 'upsOutput', $hpups_array, 'CPQPOWER-MIB');
-$hpups_array = snmpwalk_cache_multi_oid($device, 'upsBypass', $hpups_array, 'CPQPOWER-MIB');
+$hpups_array = snmpwalk_cache_oid($device, 'upsInput', $hpups_array, 'CPQPOWER-MIB');
+$hpups_array = snmpwalk_cache_oid($device, 'upsOutput', $hpups_array, 'CPQPOWER-MIB');
+$hpups_array = snmpwalk_cache_oid($device, 'upsBypass', $hpups_array, 'CPQPOWER-MIB');
 
 foreach (array_slice(array_keys($hpups_array),1) as $phase)
 {
@@ -132,8 +132,8 @@ unset($hpups_array);
 //CPQPOWER-MIB::pduOutputPower.2 = INTEGER: 671
 //CPQPOWER-MIB::pduOutputNumBreakers.1 = INTEGER: 3
 //CPQPOWER-MIB::pduOutputNumBreakers.2 = INTEGER: 3
-$hppdu_array = snmpwalk_cache_multi_oid($device, 'pduIdentTable',       array(), 'CPQPOWER-MIB');
-$hppdu_array = snmpwalk_cache_multi_oid($device, 'pduOutputTable', $hppdu_array, 'CPQPOWER-MIB');
+$hppdu_array = snmpwalk_cache_oid($device, 'pduIdentTable', array(), 'CPQPOWER-MIB');
+$hppdu_array = snmpwalk_cache_oid($device, 'pduOutputTable', $hppdu_array, 'CPQPOWER-MIB');
 foreach ($hppdu_array as $index => $entry)
 {
   // Monitor PDU Status
@@ -182,7 +182,7 @@ foreach ($hppdu_array as $index => $entry)
 //CPQPOWER-MIB::breakerPercentLoad.2.6 = INTEGER: 0
 //CPQPOWER-MIB::breakerStatus.1.1 = INTEGER: 0
 //CPQPOWER-MIB::breakerStatus.2.6 = INTEGER: 0
-$hppdu_breaker_array = snmpwalk_cache_multi_oid($device, 'pduOutputBreakerTable', array(), 'CPQPOWER-MIB');
+$hppdu_breaker_array = snmpwalk_cache_oid($device, 'pduOutputBreakerTable', array(), 'CPQPOWER-MIB');
 foreach ($hppdu_breaker_array as $index => $entry)
 {
   if ($entry['breakerVoltage'] <= 0) { continue; }

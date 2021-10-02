@@ -16,7 +16,7 @@
 // GUDEADS-PDU8110-MIB::pdu8110HygroSensor.1 = INTEGER: -9999 0.1 percent humidity
 // GUDEADS-PDU8110-MIB::pdu8110HygroSensor.2 = INTEGER: -9999 0.1 percent humidity
 
-$cache['pdu8110x'] = snmpwalk_cache_multi_oid($device, 'pdu8110SensorTable', array(), 'GUDEADS-PDU8110-MIB');
+$cache['pdu8110x'] = snmpwalk_cache_oid($device, 'pdu8110SensorTable', array(), 'GUDEADS-PDU8110-MIB');
 
 $scale = 0.1;
 foreach ($cache['pdu8110x'] as $index => $entry)

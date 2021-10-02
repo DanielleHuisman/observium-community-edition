@@ -39,7 +39,7 @@ $boxServicesStackTempSensorsTable = FALSE;
 // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesStackTempSensorTemperature.1.0 = INTEGER: 28
 // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesStackTempSensorTemperature.2.0 = INTEGER: 27
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesStackTempSensorsTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesStackTempSensorsTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
@@ -76,7 +76,7 @@ foreach ($oids as $index => $entry)
 if (!$boxServicesStackTempSensorsTable)
 {
   // This table has been obsoleted by boxServicesStackTempSensorsTable - run it only if we didn't find that table.
-  $oids = snmpwalk_cache_multi_oid($device, 'boxServicesTempSensorsTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
+  $oids = snmpwalk_cache_oid($device, 'boxServicesTempSensorsTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
 
   // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorIndex.0 = INTEGER: 0
   // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorType.0 = INTEGER: fixed(1)
@@ -125,7 +125,7 @@ if (!$boxServicesStackTempSensorsTable)
 // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.3 = INTEGER: 0
 // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.4 = INTEGER: 0
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesFansTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesFansTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
@@ -171,7 +171,7 @@ foreach ($oids as $index => $entry)
 // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.0 = INTEGER: operational(2)
 // FASTPATH-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.1 = INTEGER: operational(2)
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesPowSuppliesTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesPowSuppliesTable', array(), 'FASTPATH-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {

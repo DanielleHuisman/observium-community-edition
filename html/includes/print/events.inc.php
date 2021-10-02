@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -26,8 +25,7 @@
  * @return null
  *
  */
-function print_events($vars)
-{
+function print_events($vars) {
   global $config;
 
   // Get events array
@@ -40,14 +38,17 @@ function print_events($vars)
   } else {
     // Entries have been returned. Print the table.
     $list = array('device' => FALSE, 'port' => FALSE);
-    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'eventlog') { $list['device'] = TRUE; }
-    if ($events['short'] || !isset($vars['port']) || empty($vars['port'])) { $list['entity'] = TRUE; }
+    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'eventlog') {
+      $list['device'] = TRUE;
+    }
+    if ($events['short'] || !isset($vars['port']) || empty($vars['port'])) {
+      $list['entity'] = TRUE;
+    }
 
     $string = generate_box_open($vars['header']);
 
     $string .= '<table class="'.OBS_CLASS_TABLE_STRIPED_MORE.'">' . PHP_EOL;
-    if (!$events['short'])
-    {
+    if (!$events['short']) {
       $string .= '  <thead>' . PHP_EOL;
       $string .= '    <tr>' . PHP_EOL;
       $string .= '      <th class="state-marker"></th>' . PHP_EOL;
@@ -88,8 +89,7 @@ function print_events($vars)
       $string .= '  <tr class="'.$entry['html_row_class'].'">' . PHP_EOL;
       $string .= '<td class="state-marker"></td>' . PHP_EOL;
 
-      if ($events['short'])
-      {
+      if ($events['short']) {
         $string .= '    <td class="syslog" style="white-space: nowrap">';
         $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
         $string .= generate_tooltip_link('', format_uptime($timediff, "short-3"), format_timestamp($entry['timestamp']), NULL) . '</td>' . PHP_EOL;
@@ -98,18 +98,15 @@ function print_events($vars)
         $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
       }
 
-      if ($entry['device_id'] == 0 && $entry['entity_type'] == '')
-      {
-        // Compatability for global events
+      if ($entry['device_id'] == 0 && safe_empty($entry['entity_type'])) {
+        // Compatibility for global events
         $entry['entity_type'] = 'global';
       }
 
-      if ($list['device'])
-      {
-        if ($entry['entity_type'] == 'global')
-        {
-          // Global events
-          $string .= '    <td class="entity"><span class="label">GLOBAL</span></td>' . PHP_EOL;
+      if ($list['device']) {
+        if (in_array($entry['entity_type'], [ 'global', 'info' ] )) {
+          // Global, Info events
+          $string .= '    <td class="entity"><span class="label">'.strtoupper($entry['entity_type']).'</span></td>' . PHP_EOL;
         } else {
           $dev = device_by_id_cache($entry['device_id']);
           $device_vars = array('page'    => 'device',
@@ -119,17 +116,17 @@ function print_events($vars)
           $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
         }
       }
-      if ($list['entity'])
-      {
-        if ($entry['entity_type'] == 'device' && !$entry['entity_id']) { $entry['entity_id'] = $entry['device_id']; }
-        if ($entry['entity_type'] == 'port')
-        {
+      if ($list['entity']) {
+        if ($entry['entity_type'] === 'device' && !$entry['entity_id']) {
+          $entry['entity_id'] = $entry['device_id'];
+        }
+        if ($entry['entity_type'] === 'port') {
           $this_if = get_port_by_id_cache($entry['entity_id']);
           $entry['link'] = '<span class="entity">' . get_icon('port') . ' ' . generate_port_link_short($this_if) . '</span>';
-        }
-        else if ($entry['entity_type'] == 'global')
-        {
+        } elseif ($entry['entity_type'] === 'global') {
           $entry['link'] = get_icon('info');
+        } elseif ($entry['entity_type'] === 'info') {
+          $entry['link'] = get_icon('important');
         } else {
           if (!empty($config['entities'][$entry['entity_type']]['icon']))
           {
@@ -151,7 +148,9 @@ function print_events($vars)
       } else {
         $string .= '    <td>';
       }
-      $string .= escape_html($entry['message']) . '</td>' . PHP_EOL;
+      // Use markdown parsed for Debug events, for allow links to docs (use Markdown Extra).
+      $message_escape = $entry['severity'] >= 7 ? get_markdown($entry['message'], TRUE, TRUE) : escape_html($entry['message']);
+      $string .= $message_escape . '</td>' . PHP_EOL;
       //$string .= $entry['message'] . '</td>' . PHP_EOL;
       $string .= '  </tr>' . PHP_EOL;
     }

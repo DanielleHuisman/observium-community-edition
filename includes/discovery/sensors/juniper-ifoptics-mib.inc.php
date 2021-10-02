@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -20,8 +19,7 @@ $jnx_config = snmpwalk_cache_oid($device, 'jnxIfOtnOChCfgTable', $jnx_config, 'J
 foreach ($jnx_config as $entry)
 {
   $ifIndex = $entry['jnxIfOtnIndex'];
-  if (isset($jnx[$ifIndex]))
-  {
+  if (isset($jnx[$ifIndex])) {
     $jnx[$ifIndex] = array_merge($jnx[$ifIndex], $entry);
   }
 }
@@ -52,15 +50,17 @@ foreach ($jnx as $index => $entry)
   $value    = $entry[$oid_name];
   $limits   = array('limit_high'       => $entry['jnxModuleTempHighThresh'] * $scale,
                     'limit_low'        => $entry['jnxModuleTempLowThresh']  * $scale);
-  if ($value != 0)
+  if ($value != 0 && $value != -32768)
   {
     discover_sensor_ng($device,'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
   }
 
-  if ($entry['jnxPMCurTxOutputPower'] == 0      && $entry['jnxPMCurRxInputPower'] == 0 &&
-      $entry['jnxPMCurTxLaserBiasCurrent'] == 0 && $entry['jnxPMCurRxLaserBiasCurrent'] == 0)
+  if ( ($entry['jnxPMCurTxOutputPower'] == 0 || $entry['jnxPMCurTxOutputPower'] == -32768) &&
+       ($entry['jnxPMCurRxInputPower'] == 0  || $entry['jnxPMCurRxInputPower'] == -32768) &&
+       ($entry['jnxPMCurTxLaserBiasCurrent'] == 0 || $entry['jnxPMCurTxLaserBiasCurrent'] == -32768) &&
+       ($entry['jnxPMCurRxLaserBiasCurrent'] == 0 || $entry['jnxPMCurRxLaserBiasCurrent'] == -32768) )
   {
-    // Skip other empty dom sensors
+    // Skip other empty dom sensors if all values are zero or -32768
     continue;
   }
 

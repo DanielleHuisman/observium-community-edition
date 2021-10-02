@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -37,7 +36,7 @@ $table_defs['RBN-SUBSCRIBER-ACTIVE-MIB']['rbnSubsEncapsCount'] = array (
   'table'      => 'rbnSubsEncapsCount',
   'numeric'    => '.1.3.6.1.4.1.2352.2.27.1.2.2.1.2',
   'mib'        => 'RBN-SUBSCRIBER-ACTIVE-MIB',
-  'mib_dir'    => 'redback',
+  'mib_dir'    => 'ericsson',
   'call_function' => 'snmpwalk_cache_bare_oid',
   'descr'      => 'Subscriber Encapsulation Count',
   'graphs'     => array('rbnSubsEncapsCount'),
@@ -50,8 +49,8 @@ $table_defs['RBN-SUBSCRIBER-ACTIVE-MIB']['rbnSubsEncapsCount'] = array (
     'rbnSubsEncapsCount.multi1483'   =>  array('numeric' => '5',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
     'rbnSubsEncapsCount.dot1q1483'   =>  array('numeric' => '6',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
     'rbnSubsEncapsCount.dot1qEnet'   =>  array('numeric' => '7',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'rbnSubsEncapsCount.clips'       =>  array('numeric' => '12',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'rbnSubsEncapsCount.other'       =>  array('numeric' => '255',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
+    'rbnSubsEncapsCount.clips'       =>  array('numeric' => '12', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
+    'rbnSubsEncapsCount.other'       =>  array('numeric' => '255', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
   )
 );
 

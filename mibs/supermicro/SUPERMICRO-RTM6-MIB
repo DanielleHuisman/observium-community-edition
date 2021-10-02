@@ -1,0 +1,418 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- /*****************************************************************
+--  *                                                               *
+--  * $RCSfile: fsrtm6.mib,v $                                      *
+--  *                                                               *
+--  * $Date: 2012/10/10 07:20:39 $                                  *
+--  *                                                               *
+--  * $Revision: 1.6 $                                             *
+--  *                                                               *
+--  ****************************************************************/
+
+SUPERMICRO-RTM6-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+    OBJECT-TYPE, MODULE-IDENTITY, IpAddress,
+    Integer32, Unsigned32, enterprises     FROM SNMPv2-SMI
+    RowStatus                              FROM SNMPv2-TC;
+
+futurertm6 MODULE-IDENTITY
+     LAST-UPDATED "201209050000Z"
+     ORGANIZATION "Super Micro Computer Inc."
+     CONTACT-INFO "support@Supermicro.com"
+     DESCRIPTION " This mib module is for RTMv6 module"
+     REVISION "201209050000Z"
+     DESCRIPTION " This mib module is for RTMv6 module"
+::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 92}
+
+fsrrd6Scalar        OBJECT IDENTIFIER ::= { futurertm6 1 }
+   fsRrd6RouterId OBJECT-TYPE
+      SYNTAX IpAddress
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "The 4-byte Identifier value that uniquely identifies
+          the router in its operational environment. This can
+          be set only if the fsRrd6AdminStatus is disabled."
+      ::= { fsrrd6Scalar 1 }
+
+   fsRrd6FilterByOspfTag OBJECT-TYPE
+      SYNTAX INTEGER {
+         enable (1),
+         disable (2)
+      }
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "To enable distribution of routes based on the tag value
+         (ref RFC1745 sec 2.1). This filter takes precedence over the 
+          common RRD6 control table."
+      DEFVAL { disable }
+      ::= { fsrrd6Scalar 2 }
+
+   fsRrd6FilterOspfTag OBJECT-TYPE
+      SYNTAX Integer32
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "The tag based on which routes have to be filtered for
+         export to routing protocols"
+      ::= { fsrrd6Scalar 3 }
+
+   fsRrd6FilterOspfTagMask OBJECT-TYPE
+      SYNTAX Integer32 
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "The bitmask to be applied to fsRrd6FilterOspfTag for comparison.
+         This bitmask specifies the fields of the OSPF tag to be
+         considered for filtering."
+      DEFVAL { -1 }
+      ::= { fsrrd6Scalar 4 }
+
+   fsRrd6RouterASNumber OBJECT-TYPE
+      SYNTAX     Integer32
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+                 "The Autonomous system number in which this router is running."
+      DEFVAL { 0 }
+      ::= { fsrrd6Scalar 5 }
+
+   fsRrd6AdminStatus OBJECT-TYPE
+      SYNTAX    INTEGER {
+         enabled(1),
+         disabled(2)
+      }
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+                 "The Admin status of the RTM. This object can be set to 
+      enabled only after setting the AS number and the Router ID to a valid
+      value."
+      DEFVAL { disabled }
+      ::= { fsrrd6Scalar 6 }
+
+   fsRrd6Trace OBJECT-TYPE
+      SYNTAX  Unsigned32
+      MAX-ACCESS read-write
+      STATUS  current
+      DESCRIPTION
+      "Enables the tracing in the selected submodule in RTM6. A 32 bit
+       integer is used to store the Tracing level in the specified module.
+       Different Tracing Levels -
+       BIT 0 - Initialisation and Shutdown Trace.
+       BIT 1 - Management trace.
+       BIT 2 - Data path trace.
+       BIT 3 - Control Plane trace.
+       BIT 4 - OS Resource trace.
+       BIT 5 - All Failure trace.
+       The remaining bits are unused.The combination of levels and submodules
+       are allowed i.e. Tracing can be allowed at all failure and data path
+       level in All submodules by setting the BIT appropriately."
+       ::= { fsrrd6Scalar 7 }
+       
+   fsRrd6ThrotLimit OBJECT-TYPE
+      SYNTAX    Unsigned32 (1..4294967295)
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+      "In RTM6 operations which hogs CPU for a long time are being throttled.
+      These events will process only limited number of routes set by this
+      object for each iteration. Typically, the values used shall be
+      in the range 1..65535"
+      DEFVAL { 1000 }
+      ::= { fsrrd6Scalar 8 }
+
+
+-- SCALAR_TABLE_END fsrrd6Scalar
+
+   fsRrd6ControlTable OBJECT-TYPE 
+      SYNTAX   SEQUENCE OF FsRrd6ControlEntry
+      MAX-ACCESS   not-accessible 
+      STATUS    current 
+      DESCRIPTION
+         "Control Table for configuring routes allowed/denied
+         for export." 
+     
+      ::= { futurertm6 2 }
+
+
+   fsRrd6ControlEntry OBJECT-TYPE
+        SYNTAX    FsRrd6ControlEntry
+            MAX-ACCESS    not-accessible
+            STATUS    current
+        DESCRIPTION
+           "An entry of fsRrd6ControlTable."
+            INDEX {
+                 fsRrd6ControlDestIpAddress,
+                 fsRrd6ControlNetMaskLen
+             }
+             ::= { fsRrd6ControlTable 1 }
+
+
+   FsRrd6ControlEntry ::= 
+         SEQUENCE {
+            fsRrd6ControlDestIpAddress
+               OCTET STRING,
+            fsRrd6ControlNetMaskLen
+               Integer32,
+            fsRrd6ControlSourceProto
+               INTEGER,
+            fsRrd6ControlDestProto
+               Integer32,
+            fsRrd6ControlRouteExportFlag
+               INTEGER,
+            fsRrd6ControlRowStatus
+               RowStatus
+         }
+
+   fsRrd6ControlDestIpAddress OBJECT-TYPE
+      SYNTAX   OCTET STRING (SIZE (16))
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+         "The destination IPv6 address of this route."
+      ::= { fsRrd6ControlEntry 1 }
+
+   fsRrd6ControlNetMaskLen OBJECT-TYPE
+      SYNTAX   Integer32 (1 .. 128)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+         "Indicate the prefix len and the derived reverse mask should be
+         logical-ANDed with the destination  address. The mask is
+         also used to specify the range of IP addresses.
+         For Eg:
+             Destination Net = 128:11:: and
+             Net Mask Len = 32 (::255:255:255:255) specifies the range of
+         routes starting from 128:11:: to 121:11::255:255:255:255
+         For specifying all routes give 
+         Destination Net = ::0 and Net Mask Len = 128"
+      ::= { fsRrd6ControlEntry 2 }
+
+
+   fsRrd6ControlSourceProto OBJECT-TYPE
+      SYNTAX INTEGER {
+          all        (0),   -- any protocol
+          other      (1),   -- none of the following
+          local      (2),   -- interface entries
+          netmgmt    (3),   -- static route
+          ndisc      (4),   -- Redirect Routes
+          rip        (5),   -- RIPng
+          ospf       (6),   -- Open Shortest Path First
+          bgp        (7),   -- Border Gateway Protocol
+          idrp       (8),   -- InterDomain Routing Protocol
+          igrp       (9)    -- InterGateway Routing Protocol
+      }
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "The Identifier of the source routing protocol.
+         A value of zero will be interpreted as 'any', which matches route
+         from all protocols. This object should be set before
+         fsRrd6ControlRouteExportFlag is configured. For an ALL ROUTE entry,
+         this value must be always 0"
+      DEFVAL { 0 }
+      ::= { fsRrd6ControlEntry 3}
+
+   fsRrd6ControlDestProto OBJECT-TYPE
+      SYNTAX Integer32 
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "The identifier of the destination routing protocol.
+          This field is a bit mask, a 1 indicates that the route
+          has to be exported to the routing protocol corresponding
+          to the bit-position.
+          +---------------------------------------------------+
+          | reserved   | reserved   | reserved   |  reserved  |
+          +---------------------------------------------------+
+          |     15     |     14     |    13      |     12     |
+          +---------------------------------------------------+
+          | reserved   | reserved   | reserved   |    igrp    |
+          +---------------------------------------------------+
+          |     11     |     10     |     9      |      8     |
+          +---------------------------------------------------+
+          |    idrp    |     bgp    |   ospf     |    rip     |
+          +---------------------------------------------------+
+          |      7     |      6     |     5      |      4     |
+          +---------------------------------------------------+
+          |    ndisc   |   netmgmt  |   local    |   other    |
+          +---------------------------------------------------+
+          |      3     |      2     |     1      |      0     |
+          +---------------------------------------------------+
+         A value of zero will be interpreted as 'any', which matches route
+         destinated to all protocols. This object should be set before
+         fsRrd6ControlRouteExportFlag is configured. For an ALL ROUTE entry,
+         this value must be always 0."
+      DEFVAL { 0 }
+      ::= { fsRrd6ControlEntry 4}
+
+   fsRrd6ControlRouteExportFlag OBJECT-TYPE
+      SYNTAX INTEGER {
+         permit (1),
+         deny (2)
+      }
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "This flag specifies whether the route is allowed for export or
+         denied. If the ALL ROUTE entry has this value as permit, then all
+         other entries can be set only as deny and vice-versa.
+         Changing the status of the ALL ROUTE entry is possible only when
+         there is no other filter configuration exists."
+      ::= { fsRrd6ControlEntry 5}
+
+   fsRrd6ControlRowStatus OBJECT-TYPE
+      SYNTAX RowStatus
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "The status of this row by which a new row can be created or deleted
+          according to the SMIv2 conventions. The values supported for set
+          operation are - createandwait, active, destroy. Creation/Deletion
+          of the ALL ROUTE entry is possible only when there is no other
+          filter configuration exists."
+      ::= { fsRrd6ControlEntry 6 }
+
+--Routing Protocol Registration table.
+
+   fsRrd6RoutingProtoTable OBJECT-TYPE
+      SYNTAX   SEQUENCE OF FsRrd6RoutingProtoEntry
+      MAX-ACCESS    not-accessible 
+      STATUS    current 
+      DESCRIPTION
+         "Registration Table for the different routing protocols.
+         This table is read-only and reflects the information of 
+         routing protocols held by the Route Table Manager."
+      ::= { futurertm6 3 }
+
+   fsRrd6RoutingProtoEntry OBJECT-TYPE
+      SYNTAX    FsRrd6RoutingProtoEntry
+      MAX-ACCESS    not-accessible
+      STATUS    current
+      DESCRIPTION
+           "An entry in to the fsRrd6RoutingProtoTable."
+      INDEX {
+              fsRrd6RoutingProtoId
+            } 
+      ::= { fsRrd6RoutingProtoTable 1 }
+
+
+    FsRrd6RoutingProtoEntry ::= 
+         SEQUENCE {
+            fsRrd6RoutingProtoId
+               INTEGER,
+            fsRrd6RoutingRegnId
+               Integer32,
+            fsRrd6RoutingProtoTaskIdent
+               OCTET STRING,
+            fsRrd6RoutingProtoQueueIdent
+               OCTET STRING,
+            fsRrd6AllowOspfAreaRoutes 
+               INTEGER,
+            fsRrd6AllowOspfExtRoutes
+               INTEGER    
+         }
+
+   fsRrd6RoutingProtoId OBJECT-TYPE
+      SYNTAX INTEGER {
+          other      (1),   -- none of the following
+          local      (2),   -- interface entries
+          netmgmt    (3),   -- static route
+          ndisc      (4),   -- Redirect Routes
+          rip        (5),   -- RIPng
+          ospf       (6),   -- Open Shortest Path First
+          bgp        (7),   -- Border Gateway Protocol
+          idrp       (8),   -- InterDomain Routing Protocol
+          igrp       (9)    -- InterGateway Routing Protocol
+      }
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+         "The Identifier of the routing protocol registered
+         with the routing table manager"
+      ::= { fsRrd6RoutingProtoEntry 1 }
+
+   fsRrd6RoutingRegnId OBJECT-TYPE
+      SYNTAX Integer32
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+         "The Registeration ID assigned by the RTM for this Routing Protocol "
+      ::= { fsRrd6RoutingProtoEntry 2 }
+
+   fsRrd6RoutingProtoTaskIdent OBJECT-TYPE
+      SYNTAX OCTET STRING
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+         "The Name/Identifier of the Routing Task"
+      ::= { fsRrd6RoutingProtoEntry 3 }
+
+   fsRrd6RoutingProtoQueueIdent OBJECT-TYPE
+      SYNTAX OCTET STRING
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+         "The Name/Identifier of the Message Queue to which messages
+         to the Routing Task are posted."
+      ::= { fsRrd6RoutingProtoEntry 4 }
+
+   fsRrd6AllowOspfAreaRoutes OBJECT-TYPE
+      SYNTAX INTEGER {
+         enable (1),
+         disable (2)
+      }
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "A single configuration to PERMIT all OSPF inter-area and intra-area
+          address/mask pairs to be exported into this routing protocol.
+          This configuration takes precedence over filtering based on
+          the control table. "
+      DEFVAL { disable }
+      ::= { fsRrd6RoutingProtoEntry 5 }
+
+   fsRrd6AllowOspfExtRoutes OBJECT-TYPE
+      SYNTAX INTEGER {
+         enable (1),
+         disable (2)
+      }
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "A single configuration to PERMIT all OSPF Type 1 and Type 2
+          Exteral address/mask pairs to be exported into this routing protocol.
+          This configuration together with the control table, take care of 
+          selective route export."
+      DEFVAL { disable }
+      ::= { fsRrd6RoutingProtoEntry 6 }
+
+fsRtm6RedTest        OBJECT IDENTIFIER ::= { futurertm6 4 }
+
+-- RTM6_RED TIME Group
+-- This group defines objects for RTM6_RED TIME.
+
+fsRtm6RedEntryTime  OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS   read-only
+    STATUS   current
+    DESCRIPTION
+       "Time when the node starts entering active state
+       from standby state "
+    ::= { fsRtm6RedTest 1 }
+
+fsRtm6RedExitTime  OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS   read-only
+    STATUS   current
+    DESCRIPTION
+       "Time when the node completes entering active state
+       from standby state "
+    ::= { fsRtm6RedTest 2 }
+
+END
+

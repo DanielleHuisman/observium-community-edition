@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -428,10 +427,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
    global $table_rows;
    $table_rows = array();
 
-   if (OBS_DEBUG > 1)
-   {
-      print_vars($peerlist);
-   }
+   print_debug_vars($peerlist);
 
    if (isset($peerlist))
    {
@@ -453,7 +449,18 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
       // Filter IP search by BGP enabled devices (without self)
       $bgp_device_ids = dbFetchColumn('SELECT `device_id` FROM `devices` WHERE `device_id` != ? AND `bgpLocalAs` > 0 AND `disabled` = 0 AND `status` = 1', array($device['device_id']));
       $peer_as_where  = generate_query_values($bgp_device_ids, 'device_id');
-      $peer_ip_where  = $peer_as_where . generate_query_values('up', 'ifOperStatus');
+
+      $peer_devices = [];
+      $peer_devices_ids = [];
+      foreach (dbFetchRows('SELECT `device_id`, `bgpPeerLocalAddr`, `bgpPeerRemoteAddr` FROM `bgpPeers` WHERE `bgpPeerRemoteAs` = ?' . $peer_as_where, [ $bgpLocalAs ]) as $entry)
+      {
+        $peer_devices[$entry['bgpPeerLocalAddr']][$entry['bgpPeerRemoteAddr']] = $entry['device_id'];
+        $peer_devices_ids[] = $entry['device_id'];
+      }
+      print_debug_vars($peer_devices);
+
+      $peer_ip_where  = generate_query_values($peer_devices_ids, 'device_id') . generate_query_values('up', 'ifOperStatus');
+
       foreach ($peerlist as $peer)
       {
          $astext      = get_astext($peer['as']);
@@ -465,24 +472,28 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
 
          // Search remote device if possible
          $peer_addr_version = get_ip_version($peer['ip']);
+         $peer_addr_type    = get_ip_type($peer['ip']);
+         $peer_local_type   = get_ip_type($peer['local_ip']);
          $peer_device_id    = array('NULL');
-         if ($peer_addr_version)
+         if (!in_array($peer_addr_type, array('unspecified', 'loopback')) &&
+             !in_array($peer_local_type, array('unspecified', 'loopback')))
          {
-            $peer_addr_type = get_ip_type($peer['ip']);
-            if (in_array($peer_addr_type, array('unspecified', 'loopback')))
-            {
-               // Ignore 127.0.0.1, ::1, 0.0.0.0, ::
-            }
-            elseif ($tmp_id = dbFetchCell('SELECT `device_id` FROM `bgpPeers` WHERE `bgpPeerLocalAddr` = ? AND `bgpPeerRemoteAs` = ? AND `bgpPeerRemoteAddr` = ?' . $peer_as_where, array($peer['ip'], $bgpLocalAs, $peer['local_ip'])))
+
+            //if ($tmp_id = dbFetchCell('SELECT `device_id` FROM `bgpPeers` WHERE `bgpPeerLocalAddr` = ? AND `bgpPeerRemoteAs` = ? AND `bgpPeerRemoteAddr` = ?' . $peer_as_where, array($peer['ip'], $bgpLocalAs, $peer['local_ip'])))
+            print_debug("bgpPeerLocalAddr: ".$peer['ip'].", bgpPeerRemoteAddr: ".$peer['local_ip']);
+            if (isset($peer_devices[$peer['ip']][$peer['local_ip']]))
             {
                // Simple search remote device by Local IP and Local AS and Remote IP
-               $peer_device_id = $tmp_id;
+               //$peer_device_id = $tmp_id;
+               $peer_device_id = $peer_devices[$peer['ip']][$peer['local_ip']];
             }
             elseif ($ids = get_entity_ids_ip_by_network('device', $peer['ip'], $peer_ip_where))
             {
                // Fetch all devices with peer IP
                // Peer device will found if device UP and NOT DISABLED, port with IP is UP, bgpLocalAs present on remote device
 
+               $peer_device_id = array_shift($ids);
+               /*
                foreach($ids as $tmp_id)
                {
                   //if (dbFetchCell('SELECT COUNT(*) FROM `bgpPeers` WHERE `device_id` = ? AND `bgpPeerRemoteAs` = ?', array($tmp_id, $bgpLocalAs)))
@@ -493,6 +504,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
                      break; // Found, stop loop
                   }
                }
+               */
 
             }
 
@@ -627,7 +639,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
                   //if (dbFetchCell('SELECT COUNT(*) FROM `bgpPeers_cbgp` WHERE `device_id` = ? AND `bgpPeer_id` = ? AND `afi` = ? AND `safi` = ?', array($device['device_id'], $peer_id, $afi, $safi)) == 0)
                   if (!dbExist('bgpPeers_cbgp', '`device_id` = ? AND `bgpPeer_id` = ? AND `afi` = ? AND `safi` = ?', array($device['device_id'], $peer_id, $afi, $safi)))
                   {
-                     $params = array('bgpPeer_id' => $peer_id, 'device_id' => $device['device_id'], 'bgpPeer_id' => $peer_id, 'afi' => $afi, 'safi' => $safi);
+                     $params = [ 'device_id' => $device['device_id'], 'bgpPeer_id' => $peer_id, 'afi' => $afi, 'safi' => $safi ];
                      dbInsert($params, 'bgpPeers_cbgp');
                   }
                }
@@ -748,7 +760,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
    $table_headers = array('%WLocal: AS%n', '%WIP%n', '%WPeer: AS%n', '%WIP%n', '%WFamily%n', '%WrDNS%n', '%WRemote Device%n');
    print_cli_table($table_rows, $table_headers);
 
-   unset($p_list, $peerlist, $vendor_mib, $cisco_version, $cisco_peers, $table_rows, $table_headers);
+   unset($p_list, $peerlist, $vendor_mib, $cisco_version, $cisco_peers, $table_rows, $table_headers, $peer_devices, $peer_devices_ids);
 }
 
 // EOF

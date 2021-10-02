@@ -6,8 +6,8 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -30,17 +30,17 @@ if ($device['type'] == 'wireless')
   {
     if ($vars['view'] == $option) { $navbar['options'][$option]['class'] = "active"; }
     $navbar['options'][$option]['text'] = $text;
-    $navbar['options'][$option]['url'] = generate_url($vars, array('view'=>$option, 'graph' => NULL));
+    $navbar['options'][$option]['url'] = generate_url($vars, array('view' => $option, 'graph' => NULL));
   }
 
-  $graph_types = array("conns"  => "Connections",
-                      );
+  // FIXME. This page not exist.. (c) mike
+  //$graph_types = array("conns" => "Connections");
 
   foreach ($graph_types as $type => $descr)
   {
     if ($vars['graph'] == $type) { $navbar['options_right'][$type]['class'] = "active"; }
     $navbar['options_right'][$type]['text'] = $descr;
-    $navbar['options_right'][$type]['url'] = generate_url($vars,array('view' => 'graphs', 'graph'=>$type));
+    $navbar['options_right'][$type]['url'] = generate_url($vars, array('view' => 'graphs', 'graph' => $type));
   }
 
   print_navbar($navbar); unset($navbar);
@@ -247,7 +247,8 @@ if ($device['type'] == 'wireless')
                        echo '<td align="left" style="width: 90px">';
                        foreach ($graph_types as $graph_type => $graph_text)
                        {
-                               $graph_type = "lwappmember_" . $graph_type;
+                               //$graph_type = "lwappmember_" . $graph_type;
+                               $graph_type = "wifi-ap-member_" . $graph_type;
                                $graph_array['to']     = $config['time']['now'];
                                $graph_array['from']   = $config['time']['day'];
                                $graph_array['id']     = $member['ap_index_member'];

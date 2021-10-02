@@ -1,32 +1,34 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-$datas = array(
+$datas = [
   'Traffic' => 'nfsen_traffic',
   'Packets' => 'nfsen_packets',
-  'Flows' => 'nfsen_flows'
-);
+  'Flows'   => 'nfsen_flows'
+];
 
-foreach ($datas as $name => $type)
-{
+// Detect Nfsen-ng
+$nfsen_rrd_info = rrdtool_file_info($nfsen_rrd_file);
+if (isset($nfsen_rrd_info['DS']['bytes'])) {
+  $datas['Traffic'] = 'nfsen_bytes';
+}
+
+foreach ($datas as $name => $type) {
   $graph_title = nicecase($name);
   $graph_array['type'] = "device_".$type;
   $graph_array['device'] = $device['device_id'];
-  #$graph_array['legend'] = no;
+  #$graph_array['legend'] = 'no';
 
-  $box_args = array('title' => $graph_title,
-                    'header-border' => TRUE,
-                    );
+  $box_args = [ 'title' => $graph_title, 'header-border' => TRUE ];
 
   echo generate_box_open($box_args);
 

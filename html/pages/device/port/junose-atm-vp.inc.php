@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -17,9 +17,9 @@ if (!$graph_type) { $graph_type = "atmvp_bits"; }
 
 echo('<table cellspacing="0" cellpadding="5" border="0">');
 
-foreach (dbFetchRows("SELECT * FROM juniAtmVp WHERE port_id = ?", array($interface['port_id'])) as $vp)
+foreach (dbFetchRows("SELECT * FROM `juniAtmVp` WHERE `port_id` = ?", array($interface['port_id'])) as $vp)
 {
-  if (is_integer($row/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
+  $row_colour = is_intnum($row / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
   echo('<tr bgcolor="'.$row_colour.'">');
   echo('<td><span class=strong>'.$row.'. VP'.$vp['vp_id'].' '.$vp['vp_descr'].'</span></td>');
   echo('</tr>');

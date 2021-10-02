@@ -15,7 +15,7 @@ IMPORTS
     MacAddress                                              FROM BRIDGE-MIB-A
     MODULE-IDENTITY, OBJECT-TYPE, Integer32, Unsigned32     FROM SNMPv2-SMI
     TruthValue                                              FROM SNMPv2-TC
-    rldot1sMstpInstanceEntry                                FROM RADLAN-BRIDGEMIBOBJECTS-MIB
+    rldot1sMstpInstanceEntry, rldot1sMstpInstancePortEntry  FROM RADLAN-BRIDGEMIBOBJECTS-MIB
     Counter                                                 FROM RFC1155-SMI;
 
 
@@ -105,6 +105,16 @@ EltBridgeStpPortConnectionType ::= TEXTUAL-CONVENTION
                                 p2p(1),    -- point-to-point connection type
                                 shared(2)  -- shared connection type
                              }
+
+EltBridgeStpGuardModeType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "STP port guard modes."
+    SYNTAX          INTEGER  {
+                                root (1),   -- enable root guard, disable loop guard
+                                loop (2),   -- disable root guard, enable loop guard
+                                none (3),   -- disable root and loop guard
+                                default (4) -- disable root guard, set default loop guard mode
+                             }
 --
 -- eltBridgeExtMacLearningVlanTable
 --
@@ -144,6 +154,22 @@ eltBridgeExtMacLearningVlanEnabled OBJECT-TYPE
 						in this VLAN or not."
     DEFVAL          { true }
     ::= { eltBridgeExtMacLearningVlanEntry 2 }
+
+--
+-- eltBridgeExtMacLearningRelearnCached
+--
+
+eltBridgeExtMacLearningRelearnCached OBJECT-TYPE
+    SYNTAX  TruthValue
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Allows installing a new MAC address in the data plane even 
+         if the address is already cached in the control plane's table. 
+         This option may improve address learning efficiency in case of 
+         cache synchronization issues. CAUTION: it may increase CPU usage."
+    DEFVAL { false }
+    ::= { eltMesBridgeExtMacLearning 2 }
 
 --
 -- eltBridgeStpConfigPortTable
@@ -440,6 +466,47 @@ eltdot1sMstpInstanceNumOfTcBpduHandled OBJECT-TYPE
     ::= { eltdot1sMstpInstanceEntry 5 }
 
 --
+-- eltdot1sMstpInstancePortTable
+--
+
+eltdot1sMstpInstancePortTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF Eltdot1sMstpInstancePortEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "A table that contains pair <msti, port> specific information
+         for the Spanning Tree Protocol."
+    ::= { eltMesBridgeMstp 5 }
+
+eltdot1sMstpInstancePortEntry OBJECT-TYPE
+    SYNTAX  Eltdot1sMstpInstancePortEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "A list of information maintained by every pair <msti, port>
+         about the Spanning Tree Protocol state for that pair."
+    AUGMENTS { rldot1sMstpInstancePortEntry }
+    ::= { eltdot1sMstpInstancePortTable 1 }
+
+Eltdot1sMstpInstancePortEntry ::= SEQUENCE {
+    eltdot1sMstpInstancePortRestrictedRole  TruthValue
+}
+
+eltdot1sMstpInstancePortRestrictedRole OBJECT-TYPE
+    SYNTAX  TruthValue
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "If TRUE causes the Port not to be selected as Root Port for the 
+         MSTI, even if it has the best spanning tree priority vector.
+         Such a Port will be selected as an Alternate Port after the Root Port
+         has been selected."
+    REFERENCE
+        "IEEE 802.1ad-D3-1: Section 13.24.29"
+    DEFVAL { false }
+    ::= { eltdot1sMstpInstancePortEntry 1 }
+    
+--
 --   The Per-VLAN Spanning Tree Configuration Table
 --
 
@@ -482,7 +549,9 @@ EltBridgePvstConfigEntry ::= SEQUENCE {
     eltBridgePvstConfigTcProtectionInterval
         INTEGER,
     eltBridgePvstConfigTcProtectionThresholdValue
-        INTEGER
+        INTEGER,
+    eltBridgePvstConfigLoopGuardDefault
+        TruthValue
 }
 
 eltBridgePvstVlanIndex OBJECT-TYPE
@@ -594,6 +663,15 @@ eltBridgePvstConfigTcProtectionThresholdValue OBJECT-TYPE
     DEFVAL          { 1 }
     ::= { eltBridgePvstConfigEntry 10 }
 
+eltBridgePvstConfigLoopGuardDefault OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION         
+            "Indicates status of loopguard feature."
+    DEFVAL          { false }
+    ::= { eltBridgePvstConfigEntry 11 }
+
 --
 --   The Per-VLAN Spanning Tree Port Configuration Table
 --
@@ -627,7 +705,15 @@ EltBridgePvstPortConfigEntry ::= SEQUENCE {
     eltBridgePvstPortConfigAdminPathCost
         INTEGER,
     eltBridgePvstPortConfigPriority
-        INTEGER
+        INTEGER,
+    eltBridgePvstPortConfigAutoEdgePort
+        TruthValue,
+    eltBridgePvstPortConfigAdminEdgePort
+        TruthValue,
+    eltBridgePvstPortConfigGuardMode
+        EltBridgeStpGuardModeType,
+    eltBridgePvstPortConfigRestrictedTcn
+        TruthValue
 }
 
 eltBridgePvstPortIndex OBJECT-TYPE
@@ -680,6 +766,47 @@ eltBridgePvstPortConfigPriority OBJECT-TYPE
             dot1dStpPort."
     DEFVAL          { 128 }
     ::= { eltBridgePvstPortConfigEntry 5 }
+
+eltBridgePvstPortConfigAutoEdgePort OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "If TRUE causes the Port when become up, to enter the blocking state,
+            and if during 3 seconds it doesn't receive a BPDU, it will enter
+            the forwarding state."
+    DEFVAL { true }
+    ::= { eltBridgePvstPortConfigEntry 6 }
+
+eltBridgePvstPortConfigAdminEdgePort OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The administrative value of the Edge Port parameter.  A
+            value of TRUE(1) indicates that this port should be
+            assumed as an edge-port and a value of FALSE(2) indicates
+            that this port should be assumed as a non-edge-port."
+    DEFVAL { false }
+    ::= { eltBridgePvstPortConfigEntry 7 }
+
+eltBridgePvstPortConfigGuardMode OBJECT-TYPE
+    SYNTAX          EltBridgeStpGuardModeType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Indicates the mode of loop guard feature on this instance's port."
+    DEFVAL { default }
+    ::= { eltBridgePvstPortConfigEntry 8 }
+
+eltBridgePvstPortConfigRestrictedTcn OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Configure filtering of Spanning Tree BPDUs with TC flag set."
+    DEFVAL          { false }
+    ::= { eltBridgePvstPortConfigEntry 9 } 
 
 --
 --   The Per-VLAN Spanning Tree Status Table
@@ -848,7 +975,11 @@ EltBridgePvstPortStatusEntry ::= SEQUENCE {
     eltBridgePvstPortStatusDesigBridge
         BridgeId,
     eltBridgePvstPortStatusDesigPort
-        OCTET STRING
+        OCTET STRING,
+    eltBridgePvstPortStatusOperEdgePort
+        TruthValue,
+    eltBridgePvstPortStatusInconsistencyState
+        EltBridgeStpInconsistencyStateType
 }
 
 eltBridgePvstPortStatusPortState OBJECT-TYPE
@@ -921,6 +1052,26 @@ eltBridgePvstPortStatusDesigPort OBJECT-TYPE
             "The Port Identifier of the port on the Designated
             Bridge for this port's segment."
     ::= { eltBridgePvstPortStatusEntry 6 }
+
+eltBridgePvstPortStatusOperEdgePort OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational value of the Edge Port parameter.  The
+         object is initialized to the value of
+         eltBridgePvstPortConfigAdminEdgePort and is set FALSE on
+         reception of a BPDU."
+    ::= { eltBridgePvstPortStatusEntry 7 }
+
+eltBridgePvstPortStatusInconsistencyState OBJECT-TYPE
+    SYNTAX          EltBridgeStpInconsistencyStateType
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "Guard mode of VLAN's port."
+    DEFVAL          { none }
+    ::= { eltBridgePvstPortStatusEntry 8 }
 
 --
 --   The Per-VLAN Spanning Tree Auxilary Table

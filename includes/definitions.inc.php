@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,7 +25,7 @@ ini_set('default_charset', 'UTF-8');
 // Flags (mostly used in snmp and network functions, only 2^bit)
 // Bits 0-3 common flags
 define('OBS_QUOTES_STRIP',         1); // Strip ALL quotes from string
-define('OBS_QUOTES_TRIM',          2); // Trim quotes only from begin/end of string
+define('OBS_QUOTES_TRIM',          2); // Trim double/single quotes only from begin/end of string
 define('OBS_ESCAPE',               4); // Escape strings or output
 define('OBS_DECODE_UTF8',          8); // Decode ascii coded chars in string as correct UTF-8
 
@@ -129,25 +129,40 @@ define('OBS_PATTERN_EMAIL_LONG_FULL', OBS_PATTERN_START . OBS_PATTERN_EMAIL_LONG
 
 // SNMP HEX-STRING group \1 or 'hex'
 define('OBS_PATTERN_SNMP_HEX',  '(?<hex>[a-f\d]{2}(\ +[a-f\d]{2})*)\ ?');
+// SNMP NUMERIC OID group \1 or 'oid_num'
+define('OBS_PATTERN_SNMP_OID_NUM',  '/^(?<oid_num>\.?(\d+(?:\.\d+)+))$/');
+
+// patterns for validating kind of used data
+define('OBS_PATTERN_ALPHA',    '/^[\w\.\-]+$/');
+define('OBS_PATTERN_NOPRINT',  '/[^\p{L}\p{N}\p{P}\p{S} ]/u'); // Non-printable UTF8 chars
+define('OBS_PATTERN_NOLATIN',  '/[^\p{Common}\p{Latin}]/u');   // Non Latin (UTF8?) chars
+define('OBS_PATTERN_VAR_NAME', '/^\w[\w\s\.\-+]*(\[[\w\.\-+]*\])*$/');
 
 // Json flags
-define('OBS_JSON_BIGINT_AS_STRING', version_compare(PHP_VERSION, '5.4.0', '>=') && !(defined('JSON_C_VERSION') && PHP_INT_SIZE > 4)); // Check if BIGINT supported
-$json_encode = defined('JSON_UNESCAPED_UNICODE') ? JSON_UNESCAPED_UNICODE : 0;
-$json_encode = defined('JSON_PRESERVE_ZERO_FRACTION') ? $json_encode | JSON_PRESERVE_ZERO_FRACTION : $json_encode;
+define('OBS_JSON_BIGINT_AS_STRING', PHP_VERSION_ID >= 50400 && PHP_INT_SIZE > 4 && !(defined('JSON_C_VERSION'))); // Check if BIGINT supported
+$json_encode = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+if (defined('JSON_PRESERVE_ZERO_FRACTION')) {
+  $json_encode |= JSON_PRESERVE_ZERO_FRACTION;
+}
 $json_decode = OBS_JSON_BIGINT_AS_STRING ? JSON_BIGINT_AS_STRING : 0;
+$json_decode |= JSON_UNESCAPED_UNICODE;
+/* use fix_json_unicode()
+if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+  // Prevent invalid UTF8 broke whole json
+  // available in php7.2+
+  $json_decode |=  JSON_INVALID_UTF8_IGNORE; //JSON_INVALID_UTF8_SUBSTITUTE;
+}
+*/
 define('OBS_JSON_ENCODE', $json_encode);
 define('OBS_JSON_DECODE', $json_decode);
 unset($json_encode, $json_decode);
 
 // Detect encrypt module
-if (PHP_VERSION_ID >= 70200 && check_extension_exists('sodium'))
-{
+if (PHP_VERSION_ID >= 70200 && extension_loaded('sodium')) {
   // Libsodium is part of php since 7.2
   define('OBS_ENCRYPT', TRUE);
   define('OBS_ENCRYPT_MODULE', 'sodium');
-}
-else if (check_extension_exists('mcrypt'))
-{
+} elseif (extension_loaded('mcrypt')) {
   // Older php can use mcrypt (not supported since php 7.2)
   define('OBS_ENCRYPT', TRUE);
   define('OBS_ENCRYPT_MODULE', 'mcrypt');
@@ -161,13 +176,10 @@ else if (check_extension_exists('mcrypt'))
 ini_set('serialize_precision', -1);
 
 // Use more accurate math
-if (function_exists('bcadd'))
-{
+if (function_exists('bcadd')) {
   // BC Math
   define('OBS_MATH', 'bc');
-}
-elseif (defined('GMP_VERSION'))
-{
+} elseif (defined('GMP_VERSION')) {
   // GMP (gmp have troubles with convert float numbers)
   define('OBS_MATH', 'gmp');
 } else {
@@ -177,12 +189,16 @@ elseif (defined('GMP_VERSION'))
 //var_dump(OBS_MATH);
 
 // Minimum supported versions
+// NOTE. Minimum supported versions equals to latest in minimum supported RHEL (7.x at 02.2021)
 define('OBS_MIN_PHP_VERSION',     '5.6.26'); // PHP (15 Sep 2016, https://www.php.net/releases/index.php)
-define('OBS_MIN_PYTHON2_VERSION', '2.7.12'); // Python 2 (26 June 2016, https://www.python.org/doc/versions/)
+//define('OBS_MIN_PYTHON2_VERSION', '2.7.12'); // Python 2 (26 June 2016, https://www.python.org/doc/versions/)
+define('OBS_MIN_PYTHON2_VERSION', '2.7.5');  // last in RHEL/CentOS 7 (and Ubuntu LTS 14.04)
 define('OBS_MIN_PYTHON3_VERSION', '3.5.2');  // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
 define('OBS_MIN_MYSQL_VERSION',   '5.6.5');  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
-define('OBS_MIN_MARIADB_VERSION', '10.0');   // MySQL 5.6 mostly equals with MariaDB 10.0: https://mariadb.com/kb/en/timestamp/
-define('OBS_MIN_RRD_VERSION',     '1.5.5');  // RRDTool (10 Nov 2015, https://github.com/oetiker/rrdtool-1.x/tags)
+//define('OBS_MIN_MARIADB_VERSION', '10.0');   // MySQL 5.6 mostly equals with MariaDB 10.0: https://mariadb.com/kb/en/timestamp/
+define('OBS_MIN_MARIADB_VERSION', '5.5.68'); // 5.5.68 last in RHEL/CentOS 7 and 5.5.63 in Ubuntu LTS 14.04
+define('OBS_MIN_RRD_VERSION',     '1.4.8');  // last in RHEL/CentOS 7
+//define('OBS_MIN_RRD_VERSION',     '1.5.5');  // RRDTool (10 Nov 2015, https://github.com/oetiker/rrdtool-1.x/tags)
 
 // Minimum possible unixtime, only for validate passed unixtime
 //define('OBS_MIN_UNIXTIME', 946684800); // 01/01/2000 @ 12:00am (UTC), just in most cases unixtime not possible less than this date (net-snmp released in 2000, any network device not have uptime longest)
@@ -196,30 +212,47 @@ define('OBSERVIUM_DOCS_URL',     'https://docs.observium.org');
 define('OBS_QUIET', isset($options['q']));
 
 // Set DEBUG
-if (isset($options['d']))
-{
+if (isset($options['d'])) {
   // CLI
   echo("DEBUG!\n");
-  define('OBS_DEBUG', count($options['d'])); // -d == 1, -dd == 2..
+  define('OBS_DEBUG', is_array($options['d']) ? count($options['d']) : 1); // -d == 1, -dd == 2..
   ini_set('display_errors', 1);
   ini_set('display_startup_errors', 1);
-  if (OBS_DEBUG > 1)
-  {
+  if (OBS_DEBUG > 1) {
     //ini_set('error_reporting', E_ALL ^ E_NOTICE); // FIXME, too many warnings ;)
     ini_set('error_reporting', E_ALL ^ E_NOTICE ^ E_WARNING);
   } else {
     ini_set('error_reporting', E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR); // Only various errors
   }
-}
-elseif ($debug_web_requested = ((isset($_REQUEST['debug']) && $_REQUEST['debug']) ||
-                                (isset($_SERVER['PATH_INFO']) && strpos($_SERVER['PATH_INFO'], 'debug')) ||
-                                (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'debug'))))
-{
+} elseif (defined('OBS_API')) {
+  // API
+  $debug_web_requested = ((isset($_REQUEST['debug']) && $_REQUEST['debug']) ||
+                          (isset($_SERVER['PATH_INFO']) && strpos($_SERVER['PATH_INFO'], 'debug')) ||
+                          (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'debug')));
+  if ($debug_web_requested) {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 0);
+    ini_set('log_errors', 0);
+    ini_set('allow_url_fopen', 0);
+    ini_set('error_reporting', E_ALL);
+    $debug = TRUE;
+    // API used self debug output
+    if (isset($config['web_debug_unprivileged']) && $config['web_debug_unprivileged'] &&
+        is_numeric($_GET['debug']) && $_GET['debug'] > 1) {
+      define('OBS_DEBUG', 1);
+    } else {
+      define('OBS_DEBUG', 0);
+    }
+  } else {
+    define('OBS_DEBUG', 0);
+  }
+} elseif ($debug_web_requested = ((isset($_REQUEST['debug']) && $_REQUEST['debug']) ||
+                                  (isset($_SERVER['PATH_INFO']) && strpos($_SERVER['PATH_INFO'], 'debug')) ||
+                                  (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'debug')))) {
   // WEB
 
   // Note, for security reasons set OBS_DEBUG constant in WUI moved to auth module
-  if (isset($config['web_debug_unprivileged']) && $config['web_debug_unprivileged'])
-  {
+  if (isset($config['web_debug_unprivileged']) && $config['web_debug_unprivileged']) {
     define('OBS_DEBUG', 1);
 
     ini_set('display_errors', 1);
@@ -227,31 +260,32 @@ elseif ($debug_web_requested = ((isset($_REQUEST['debug']) && $_REQUEST['debug']
     //ini_set('error_reporting', E_ALL ^ E_NOTICE);
     ini_set('error_reporting', E_ALL ^ E_NOTICE ^ E_WARNING);
   } // else not set anything before auth
-
+  
 } else {
   define('OBS_DEBUG', 0);
   ini_set('display_errors', 0);
   ini_set('display_startup_errors', 0);
   //ini_set('error_reporting', 0); // Use default php config
 }
+if (!defined('OBS_DEBUG') || !OBS_DEBUG) {
+  // Disable E_NOTICE from reporting.
+  error_reporting(error_reporting() & ~E_NOTICE);
+}
 ini_set('log_errors', 1);
-//$debug = OBS_DEBUG; // DEBUG. Temporary fallback to old variable
 
 //
 // Unit test not used sql connect and does not include includes/sql-config.inc.php
 if (defined('__PHPUNIT_PHAR__'))
 {
   // Base dir, if it's not set in config
-  if (!isset($config['install_dir']))
-  {
-    $config['install_dir'] = realpath(dirname(__FILE__) . '/..');
+  if (!isset($config['install_dir'])) {
+    $config['install_dir'] = dirname(__DIR__);
   }
-  if (!defined('OBS_DB_SKIP'))
-  {
+  if (!defined('OBS_DB_SKIP')) {
     define('OBS_DB_SKIP', TRUE);
   }
   // In phpunit, autoload not work
-  set_include_path(dirname(__FILE__) . "/../libs/pear" . PATH_SEPARATOR . get_include_path());
+  set_include_path(dirname(__DIR__) . "/libs/pear" . PATH_SEPARATOR . get_include_path());
   require("Net/IPv4.php");
   require("Net/IPv6.php");
   require("Console/Color2.php");
@@ -265,59 +299,85 @@ set_include_path($config['install_dir'] . "/libs/pear" . PATH_SEPARATOR . // Sti
                  $config['install_dir'] . "/libs"      . PATH_SEPARATOR .
                  get_include_path());
 
+// Set default paths.
+$config['install_dir'] = rtrim($config['install_dir'], ' /');
+if (!isset($config['html_dir'])) { $config['html_dir'] = $config['install_dir'] . '/html'; }
+else                             { $config['html_dir'] = rtrim($config['html_dir'], ' /'); }
+if (!isset($config['rrd_dir']))  { $config['rrd_dir']  = $config['install_dir'] . '/rrd'; }
+else                             { $config['rrd_dir']  = rtrim($config['rrd_dir'], ' /'); }
+
+// Fix RRD Directory path to always have a trailing slash so that it works nicely with rrdcached
+//$config['rrd_dir'] = fix_path_slash($config['rrd_dir']);
+
+if (!isset($config['log_dir']))       { $config['log_dir']      = $config['install_dir'] . '/logs'; }
+else                                  { $config['log_dir']      = rtrim($config['log_dir'], ' /'); }
+if (!isset($config['log_file']))      { $config['log_file']     = $config['log_dir'] . '/observium.log'; } // FIXME should not be absolute path, look for where it is used
+if (!isset($config['temp_dir']))      { $config['temp_dir']     = '/tmp'; }
+else                                  { $config['temp_dir']     = rtrim($config['temp_dir'], ' /'); }
+if (!isset($config['mib_dir']))       { $config['mib_dir']      = $config['install_dir'] . '/mibs'; }
+else                                  { $config['mib_dir']      = rtrim($config['mib_dir'], ' /'); }
+if (!isset($config['template_dir']))  { $config['template_dir'] = $config['install_dir'] . '/templates'; }
+else                                  { $config['template_dir'] = rtrim($config['template_dir'], ' /'); }
+if (!isset($config['cache_dir']))     { $config['cache_dir']    = $config['temp_dir'] . '/observium_cache'; }
+else                                  { $config['cache_dir']    = rtrim($config['cache_dir'], ' /'); }
+if (!isset($config['nagplug_dir']))   { $config['nagplug_dir']   = '/usr/lib/nagios/plugins'; }
+else                                  { $config['nagplug_dir']   = rtrim($config['nagplug_dir'], ' /'); }
+
 // Load random_compat (for PHP 5.x)
 require_once("random_compat/random.php");
 
 // Load hash-compat (for < PHP 5.6)
 require_once("hash-compat/hash_equals.php");
 
+// Collect php errors mostly fr catch php8 errors
+if ($config['php_debug']) {
+  ini_set('error_reporting', E_ALL ^ E_WARNING ^ E_STRICT);
+  ini_set("error_log", $config['log_dir'] . "/php-errors.log");
+}
+
 // Debug nicer functions
-if (OBS_DEBUG || strlen($_SERVER['REMOTE_ADDR']))
-{
+if ((defined('OBS_DEBUG') && OBS_DEBUG) || strlen($_SERVER['REMOTE_ADDR'])) {
   // Nicer for print_vars(), for WUI loaded always,
   // Required php tokenizer extension!
   if (!function_exists('rt') && function_exists('token_get_all') &&
-      is_file($config['install_dir']."/libs/ref.inc.php"))
-  {
+      is_file($config['install_dir']."/libs/ref.inc.php")) {
     include($config['install_dir']."/libs/ref.inc.php");
   }
 }
 
 // Community specific definition
-if (is_file($config['install_dir'].'/includes/definitions/definitions.dat'))
-{
+if (is_file($config['install_dir'].'/includes/definitions/definitions.dat')) {
   //var_dump($config);
   $config_tmp = file_get_contents($config['install_dir'].'/includes/definitions/definitions.dat');
   $config_tmp = gzuncompress($config_tmp);
-  $config_tmp = unserialize($config_tmp);
+  $config_tmp = safe_unserialize($config_tmp);
   //var_dump($config_tmp);
-  if (is_array($config_tmp) && isset($config_tmp['os'])) // Simple check for passed correct data
-  {
+  if (is_array($config_tmp) && isset($config_tmp['os'])) { // Simple check for passed correct data
     $config = array_merge($config, $config_tmp);
   }
   unset($config_tmp);
 }
 
-$definition_files = array('os',           // OS definitions
-                          'wui',          // Web UI specific definitions
-                          'graphtypes',   // Graph Type definitions
-                          'rrdtypes',     // RRD Type definitions
-                          'entities',     // Entity type definitions
-                          'rewrites',     // Rewriting array definitions
-                          'mibs',         // MIB definitions
-                          'models',       // Hardware model definitions (leave it after os and rewrites)
-                          'vendors',      // Vendor/manufacturer definitions
-                          'geo',          // Geolocation api definitions
-                          'vm',           // Virtual Machine definitions
-                          'transports',   // Alerting transport definitions
-                          'apps',         // Apps system definitions
-                          );
+$definition_files = [
+  'os',           // OS definitions
+  'wui',          // Web UI specific definitions
+  'graphtypes',   // Graph Type definitions
+  'rrdtypes',     // RRD Type definitions
+  'entities',     // Entity type definitions
+  'rewrites',     // Rewriting array definitions
+  'mibs',         // MIB definitions
+  'models',       // Hardware model definitions (leave it after os and rewrites)
+  'vendors',      // Vendor/manufacturer definitions
+  'geo',          // Geolocation api definitions
+  'vm',           // Virtual Machine definitions
+  'transports',   // Alerting transport definitions
+  'apis',         // External APIs definitions
+  'apps',         // Apps system definitions
+];
 
-foreach ($definition_files as $file)
-{
+foreach ($definition_files as $file) {
   $file = $config['install_dir'].'/includes/definitions/'.$file.'.inc.php';
-  if (is_file($file))
-  {
+  if (is_file($file)) {
     include($file);
   }
 }
@@ -463,59 +523,165 @@ $config['snmp']['transports'] = array('udp', 'udp6', 'tcp', 'tcp6');
 // 'count' is min total errors count, after which autodisable this MIB/oid pair
 // 'rate' is min total rate (per poll), after which autodisable this MIB/oid pair
 // note, rate not fully correct after server reboot (it will less than really)
-$config['snmp']['errorcodes'][-1]   = array('reason' => 'Cached', // snmp really not requested, but gets from cache
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][0]    = array('reason' => 'OK',
-                                            'msg'    => '');
+$config['snmp']['errorcodes'][-1]   = [
+  'reason' => 'Cached',                 // snmp really not requested, but gets from cache
+  'name'   => 'OBS_SNMP_ERROR_CACHED',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][0]    = [
+  'reason' => 'OK',
+  'name'   => 'OBS_SNMP_ERROR_OK',
+  'msg'    => ''
+];
 
 // [1-99] Non critical
-$config['snmp']['errorcodes'][1]    = array('reason' => 'Empty response',           // exitcode = 0, but not have any data
-                                            'count'  => 288,                        // 288 with rate 1/poll ~ 1 day
-                                            'rate'   => 0.9,
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][2]    = array('reason' => 'Request not completed',    // Snmp output return correct data, but stopped by some reason (timeout, network error)
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][3]    = array('reason' => 'Too long response',        // Not empty output, but exitcode = 1 and runtime > 10
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][4]    = array('reason' => 'Too big max-repetition in GETBULK', // Not empty output, but exitcode = 2 and stderr "Reason: (tooBig)"
-                                            'count'  => 2880,                       // 2880 with rate 1/poll ~ 10 day
-                                            'rate'   => 0.9,
-                                            'msg'    => '');
+$config['snmp']['errorcodes'][1]    = [
+  'reason' => 'Empty response',         // exitcode = 0, but not have any data
+  'count'  => 288,                      // 288 with rate 1/poll ~ 1 day
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_EMPTY_RESPONSE',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][2]    = [
+  'reason' => 'Request not completed',  // Snmp output return correct data, but stopped by some reason (timeout, network error)
+  'name'   => 'OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][3]    = [
+  'reason' => 'Too long response',      // Not empty output, but exitcode = 1 and runtime > 10
+  'name'   => 'OBS_SNMP_ERROR_TOO_LONG_RESPONSE',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][4]    = [
+  'reason' => 'Too big max-repetition in GETBULK', // Not empty output, but exitcode = 2 and stderr "Reason: (tooBig)"
+  'count'  => 2880,                     // 2880 with rate 1/poll ~ 10 day
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_TOO_BIG_MAX_REPETITION_IN_GETBULK',
+  'msg'    => 'WARNING! %command% did not complete. Try to increase SNMP timeout or decrease SNMP Max Repetitions on the device properties page or set to 0 to not use bulk snmp commands.'
+];
+$config['snmp']['errorcodes'][5]    = [
+  'reason' => 'GETNEXT empty response', // Not empty output, SNMPGETNEXT returned different Oid
+  'count'  => 288,                      // 288 with rate 1/poll ~ 1 day
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_GETNEXT_EMPTY_RESPONSE',
+  'msg'    => ''
+];
 
 // [900-999] Critical errors, but this is incorrect auth or config or missed files on client side
-$config['snmp']['errorcodes'][900]  = array('reason' => 'isSNMPable',               // Device up/down test, not used for counting
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][991]  = array('reason' => 'Authentication failure',   // Snmp auth errors
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][994]  = array('reason' => 'Unknown host',             // Unknown host
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][995]  = array('reason' => 'Incorrect arguments',      // Incorrect arguments passed to snmpcmd
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][996]  = array('reason' => 'MIB or oid not found',     // MIB module or oid not found in specified dirs
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][997]  = array('reason' => 'Wrong .index in mibs dir', // This is common net-snmp bug, require delete all .index files
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][998]  = array('reason' => 'MIB or oid disabled',      // MIB or oid disabled
-                                            'msg'    => '');
-$config['snmp']['errorcodes'][999]  = array('reason' => 'Unknown',                  // Some unidentified error
-                                            'count'  => 288,                        // 288 with rate 1.95/poll ~ 12 hours
-                                            'rate'   => 0.9,
-                                            'msg'    => '');
+$config['snmp']['errorcodes'][900]  = [
+  'reason' => 'isSNMPable',             // Device up/down test, not used for counting
+  'name'   => 'OBS_SNMP_ERROR_ISSNMPABLE',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][991]  = [
+  'reason' => 'Authentication failure', // Snmp auth errors
+  'name'   => 'OBS_SNMP_ERROR_AUTHENTICATION_FAILURE',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][992]  = [
+  'reason' => 'Unsupported authentication or privacy protocol', // Snmp auth errors
+  'name'   => 'OBS_SNMP_ERROR_UNSUPPORTED_ALGO',
+  'msg'    => 'ERROR! Unsupported SNMPv3 authentication or privacy protocol detected. Newer version of net-snmp required. Please read [FAQ](' .
+              OBSERVIUM_DOCS_URL . '/faq/#snmpv3-strong-authentication-or-encryption){target=_blank}.'
+];
+$config['snmp']['errorcodes'][993]  = [
+  'reason' => 'OID not increasing',     // OID not increasing
+  'name'   => 'OBS_SNMP_ERROR_OID_NOT_INCREASING',
+  'msg'    => 'WARNING! %command% ended prematurely due to an error [%reason%] on MIB::Oid [%mib%::%oid%]. Try to use -Cc option for %command% command.'
+];
+$config['snmp']['errorcodes'][994]  = [
+  'reason' => 'Unknown host',           // Unknown host
+  'name'   => 'OBS_SNMP_ERROR_UNKNOWN_HOST',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][995]  = [
+  'reason' => 'Incorrect arguments',    // Incorrect arguments passed to snmpcmd
+  'name'   => 'OBS_SNMP_ERROR_INCORRECT_ARGUMENTS',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][996]  = [
+  'reason' => 'MIB or oid not found',   // MIB module or oid not found in specified dirs
+  'name'   => 'OBS_SNMP_ERROR_MIB_OR_OID_NOT_FOUND',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][997]  = [
+  'reason' => 'Wrong .index in mibs dir', // This is common net-snmp bug, require delete all .index files
+  'name'   => 'OBS_SNMP_ERROR_WRONG_INDEX_IN_MIBS_DIR',
+  'msg'    => 'ERROR! Wrong .index in mibs dir net-snmp bug detected. Required delete all .index files. Please read [FAQ](' .
+              OBSERVIUM_DOCS_URL . '/faq/#all-my-hosts-seem-down-to-observium-snmp-doesnt-seem-to-work-anymore){target=_blank}.'
+];
+$config['snmp']['errorcodes'][998]  = [
+  'reason' => 'MIB or oid disabled',    // MIB or oid disabled
+  'name'   => 'OBS_SNMP_ERROR_MIB_OR_OID_DISABLED',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][999]  = [
+  'reason' => 'Unknown',                // Some unidentified error
+  'count'  => 288,                      // 288 with rate 1.95/poll ~ 12 hours
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_UNKNOWN',
+  'msg'    => ''
+];
 
-// [1000-1xxx] Critical errors on device side, can autodisable
-$config['snmp']['errorcodes'][1000] = array('reason' => 'Failed response',          // Any critical error in snmp output, which not return useful data
-                                            'count'  => 70,                         // errors in every poll run, disable after ~ 6 hours
-                                            'rate'   => 0.9,
-                                            'msg'    => '');
+// [1000-1xxx] Critical errors on device side, can be auto disabled
+$config['snmp']['errorcodes'][1000] = [
+  'reason' => 'Failed response',          // Any critical error in snmp output, which not return useful data
+  'count'  => 70,                         // errors in every poll run, disable after ~ 6 hours
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_FAILED_RESPONSE',
+  'msg'    => ''
+];
 //$config['snmp']['errorcodes'][1001] = array('reason' => 'Authentication failure',   // Snmp auth errors
 //                                            'count'  => 25,                         // errors in every poll run, disable after ~ 1.5 hour
 //                                            'rate'   => 0.9,
 //                                            'msg'    => '');
-$config['snmp']['errorcodes'][1002] = array('reason' => 'Request timeout',          // Cmd exit by timeout
-                                            'count'  => 25,                         // errors in every poll run, disable after ~ 1.5 hour
-                                            'rate'   => 0.9,
-                                            'msg'    => '');
+$config['snmp']['errorcodes'][1002] = [
+  'reason' => 'Request timeout',          // Cmd exit by timeout
+  'count'  => 25,                         // errors in every poll run, disable after ~ 1.5 hour
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_REQUEST_TIMEOUT',
+  'msg'    => ''
+];
+$config['snmp']['errorcodes'][1004] = [
+  'reason' => 'Bulk Request timeout',     // Cmd exit by timeout
+  'count'  => 25,                         // errors in every poll run, disable after ~ 1.5 hour
+  'rate'   => 0.9,
+  'name'   => 'OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT',
+  'msg'    => 'ERROR! %command% exit by timeout. Try to decrease SNMP Max Repetitions on the device properties page or set to 0 to not use bulk snmp commands.'
+];
+// Register error code constants
+define('OBS_SNMP_ERROR_CACHED',                           -1);
+define('OBS_SNMP_ERROR_OK',                                0);
+define('OBS_SNMP_ERROR_EMPTY_RESPONSE',                    1);
+define('OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED',             2);
+define('OBS_SNMP_ERROR_TOO_LONG_RESPONSE',                 3);
+define('OBS_SNMP_ERROR_TOO_BIG_MAX_REPETITION_IN_GETBULK', 4);
+define('OBS_SNMP_ERROR_GETNEXT_EMPTY_RESPONSE',            5);
+define('OBS_SNMP_ERROR_ISSNMPABLE',                      900);
+define('OBS_SNMP_ERROR_AUTHENTICATION_FAILURE',          991);
+define('OBS_SNMP_ERROR_UNSUPPORTED_ALGO',                992);
+define('OBS_SNMP_ERROR_OID_NOT_INCREASING',              993);
+define('OBS_SNMP_ERROR_UNKNOWN_HOST',                    994);
+define('OBS_SNMP_ERROR_INCORRECT_ARGUMENTS',             995);
+define('OBS_SNMP_ERROR_MIB_OR_OID_NOT_FOUND',            996);
+define('OBS_SNMP_ERROR_WRONG_INDEX_IN_MIBS_DIR',         997);
+define('OBS_SNMP_ERROR_MIB_OR_OID_DISABLED',             998);
+define('OBS_SNMP_ERROR_UNKNOWN',                         999);
+define('OBS_SNMP_ERROR_FAILED_RESPONSE',                1000);
+define('OBS_SNMP_ERROR_REQUEST_TIMEOUT',                1002);
+define('OBS_SNMP_ERROR_BULK_REQUEST_TIMEOUT',           1004);
+/*
+foreach ($config['snmp']['errorcodes'] as $errorcode => $tmp) {
+  //$errorname = $tmp['name'];
+  // fast generate names:
+  $errorname = str_replace([ '.', ' ', '-' ], [ '', '_', '_' ], $tmp['reason']);
+  $errorname = 'OBS_SNMP_ERROR_'.strtoupper($errorname);
+  print_debug("define('$errorname', $errorcode);");
 
+  define($errorname, $errorcode);
+}
+unset($errorname, $errorcode, $tmp);
+*/
 
 // IPMI user levels (used in GUI, first entry = default if unset)
 
@@ -531,7 +697,8 @@ $config['ipmi']['interfaces']['lanplus'] = array('text' => 'IPMI v2.0 RMCP+ LAN 
 $config['ipmi']['interfaces']['imb']     = array('text' => 'Intel IMB Interface');
 $config['ipmi']['interfaces']['open']    = array('text' => 'Linux OpenIPMI Interface');
 
-// RANCID OS map (for config generation script)
+// CLEANME. RANCID OS map (for config generation script)
+/* MOVED to os definitions as $config['os'][$os]['rancid']
 $config['rancid']['os_map']['arista_eos'] = 'arista';
 //$config['rancid']['os_map']['avocent']    = 'avocent';
 //$config['rancid']['os_map']['ciena-waveserveros']   = 'ciena-ws';
@@ -539,18 +706,17 @@ $config['rancid']['os_map']['cyclades']   = 'avocent';
 $config['rancid']['os_map']['f5']         = 'f5'; // Only for <= v10
 $config['rancid']['os_map']['fortigate']  = 'fortigate';
 $config['rancid']['os_map']['ftos']       = 'force10';
-$config['rancid']['os_map']['ios']        = 'cisco';
+$config['rancid']['os_map']['ios']        = 'cisco'; // ios in rancid 3.11+
 $config['rancid']['os_map']['iosxe']      = 'cisco';
-$config['rancid']['os_map']['iosxr']      = 'cisco-xr';
+$config['rancid']['os_map']['iosxr']      = 'cisco-xr'; // ios-xr in rancid 3.11+
 $config['rancid']['os_map']['asa']        = 'cisco';
 $config['rancid']['os_map']['pixos']      = 'cisco';
-$config['rancid']['os_map']['nxos']       = 'cisco-nx';
+$config['rancid']['os_map']['nxos']       = 'cisco-nx'; // ios-nx in rancid 3.11+
 $config['rancid']['os_map']['ironware']   = 'foundry';
-//$config['rancid']['os_map']['procurve']   = 'hp'; // v3 only
-$config['rancid']['os_map']['junos']      = 'juniper';
+$config['rancid']['os_map']['junos']      = 'juniper'; // junos in rancid 3.11+
 $config['rancid']['os_map']['screenos']   = 'netscreen';
 $config['rancid']['os_map']['opengear']   = 'opengear';
-$config['rancid']['os_map']['routeros']   = 'mikrotik';
+$config['rancid']['os_map']['routeros']   = 'mikrotik'; // routeros in rancid 3.13+
 $config['rancid']['os_map']['pfsense']    = 'pfsense';
 $config['rancid']['os_map']['netscaler']  = 'netscaler';
 // Rancid v3.0+ specific os map
@@ -561,11 +727,11 @@ $config['rancid']['os_map_3']['powerconnect-radlan']   = 'dell';
 $config['rancid']['os_map_3']['dnos6']                 = 'dell';
 $config['rancid']['os_map_3']['enterasys']             = 'enterasys';
 $config['rancid']['os_map_3']['xos']                   = 'extreme';
-//$config['rancid']['os_map_3']['juniper-srx']           = 'juniper-srx'; // SRX in junos..
+//--$config['rancid']['os_map_3']['juniper-srx']           = 'juniper-srx'; // SRX in junos..
 $config['rancid']['os_map_3']['mrvos']                 = 'mrv';
 $config['rancid']['os_map_3']['seos']                  = 'redback';
 // Rancid v3.2+ specific os map
-//$config['rancid']['os_map_3.2']['wlc']                 = 'cisco-wlc4';
+//--$config['rancid']['os_map_3.2']['wlc']                 = 'cisco-wlc4';
 $config['rancid']['os_map_3.2']['wlc']                 = 'cisco-wlc5';
 $config['rancid']['os_map_3.2']['panos']               = 'paloalto';
 $config['rancid']['os_map_3.2']['procurve']            = 'hp';
@@ -577,20 +743,25 @@ $config['rancid']['os_map_3.4']['a10-ax']              = 'a10';
 $config['rancid']['os_map_3.4']['a10-ex']              = 'a10';
 // Rancid v3.5+ specific os map
 $config['rancid']['os_map_3.5']['edgemax']             = 'edgemax';
-//$config['rancid']['os_map_3.5']['f5']                  = 'bigip'; // v11+
+//--$config['rancid']['os_map_3.5']['f5']                  = 'bigip'; // v11+
 // Rancid v3.7+ specific os map
-$config['rancid']['os_map_3.7']['ciscosb']             = 'cisco-sb';
-//$config['rancid']['os_map_3.7']['wlc']                 = 'cisco-wlc8';
+$config['rancid']['os_map_3.7']['ciscosb']             = 'cisco-sb'; // ios-sb in rancid 3.11+
+//--$config['rancid']['os_map_3.7']['wlc']                 = 'cisco-wlc8';
 $config['rancid']['os_map_3.7']['timos']               = 'sros'; // Classic CLI (TiMOS)
 // Rancid v3.8+ specific os map
-$config['rancid']['os_map_3.8']['cisco-firepower']     = 'fxos';
+$config['rancid']['os_map_3.8']['cisco-fxos']          = 'fxos';
 $config['rancid']['os_map_3.8']['vrp']                 = 'vrp';
-//$config['rancid']['os_map_3.8']['f5']                  = 'bigip13'; // v13+
+//--$config['rancid']['os_map_3.8']['f5']                  = 'bigip13'; // v13+
 //$config['rancid']['os_map_3.8']['timos']               = 'sros-md'; // MD-CLI (TiMOS) 7750 SR and 7950 XRS routers
 // Rancid v3.9+ specific os map
 //$config['rancid']['os_map_3.9']['arrcus']                 = 'arcos'; // We not support this OS
-
-
+// Rancid v3.11+ specific os map
+//$config['rancid']['os_map_3.11']['ios-exr']               = 'ios-exr';
+//$config['rancid']['os_map_3.11']['junos-evo']             = 'junos-evo';
+// Rancid v3.13+ specific os map
+//$config['rancid']['os_map_3.13']['axis-switch']             = 'axis';
+//--$config['rancid']['os_map_3.13']['ios-xr7']               = 'ios-xr7'; // IOS XR 7+
+*/
 # Enable these (in config.php) if you added the powerconnect addon to your RANCID install
 #$config['rancid']['os_map']['powerconnect-fastpath'] = 'dell';
 #$config['rancid']['os_map']['powerconnect-radlan']   = 'dell';
@@ -603,7 +774,9 @@ $config['rancid']['os_map_3.8']['vrp']                 = 'vrp';
 // Include DB functions
 
 define('OBS_DB_LINK', 'observium_link'); // Global variable name for DB link identifier, required for mysqli
-$config['db_extension'] = strtolower($config['db_extension']);
+define('OBS_DB_EXTENSION', 'mysqli');    // Old MySQL extension is deprecated since PHP 5.5, we unsupported it anymore
+$config['db_extension'] = OBS_DB_EXTENSION;
+/*
 switch ($config['db_extension'])
 {
   case 'mysql':
@@ -614,37 +787,15 @@ switch ($config['db_extension'])
   default:
     define('OBS_DB_EXTENSION', 'mysqli');
 }
+*/
 require_once($config['install_dir'] . "/includes/db.inc.php");
 
-include($config['install_dir'].'/includes/definitions/version.inc.php');
-
-// Set default paths.
-$config['install_dir'] = rtrim($config['install_dir'], ' /');
-if (!isset($config['html_dir'])) { $config['html_dir'] = $config['install_dir'] . '/html'; }
-else                             { $config['html_dir'] = rtrim($config['html_dir'], ' /'); }
-if (!isset($config['rrd_dir']))  { $config['rrd_dir']  = $config['install_dir'] . '/rrd'; }
-else                             { $config['rrd_dir']  = rtrim($config['rrd_dir'], ' /'); }
-
-// Fix RRD Directory path to always have a trailing slash so that it works nicely with rrdcached
-//$config['rrd_dir'] = fix_path_slash($config['rrd_dir']);
-
-if (!isset($config['log_dir']))       { $config['log_dir']      = $config['install_dir'] . '/logs'; }
-else                                  { $config['log_dir']      = rtrim($config['log_dir'], ' /'); }
-if (!isset($config['log_file']))      { $config['log_file']     = $config['log_dir'] . '/observium.log'; } // FIXME should not be absolute path, look for where it is used
-if (!isset($config['temp_dir']))      { $config['temp_dir']     = '/tmp'; }
-else                                  { $config['temp_dir']     = rtrim($config['temp_dir'], ' /'); }
-if (!isset($config['mib_dir']))       { $config['mib_dir']      = $config['install_dir'] . '/mibs'; }
-else                                  { $config['mib_dir']      = rtrim($config['mib_dir'], ' /'); }
-if (!isset($config['template_dir']))  { $config['template_dir'] = $config['install_dir'] . '/templates'; }
-else                                  { $config['template_dir'] = rtrim($config['template_dir'], ' /'); }
-if (!isset($config['cache_dir']))     { $config['cache_dir']    = $config['temp_dir'] . '/observium_cache'; }
-else                                  { $config['cache_dir']    = rtrim($config['cache_dir'], ' /'); }
-if (!isset($config['nagplug_dir']))   { $config['nagplug_dir']   = '/usr/lib/nagios/plugins'; }
-else                                  { $config['nagplug_dir']   = rtrim($config['nagplug_dir'], ' /'); }
-
-
 // Connect to database
-$GLOBALS[OBS_DB_LINK] = dbOpen($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
+if (OBS_DB_SKIP !== TRUE) {
+  $GLOBALS[OBS_DB_LINK] = dbOpen($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
+}
+
+require($config['install_dir'] . '/includes/definitions/version.inc.php');
 
 // Base user levels
 
@@ -745,6 +896,20 @@ $config['obsolete_config'][] = array('old' => 'snmp->snmp_sysorid',  'new' => 'd
 $config['obsolete_config'][] = array('old' => 'bad_xdp',             'new' => 'xdp->ignore_hostname',       'info' => 'changed since 20.6.10520');
 $config['obsolete_config'][] = array('old' => 'bad_xdp_regexp',      'new' => 'xdp->ignore_hostname_regex', 'info' => 'changed since 20.6.10520');
 $config['obsolete_config'][] = array('old' => 'bad_xdp_platform',    'new' => 'xdp->ignore_platform',       'info' => 'changed since 20.6.10520');
+
+$config['obsolete_config'][] = [ 'old' => 'discovery_modules->cisco-vrf', 'new' => 'discovery_modules->vrf', 'info' => 'changed since 20.10.10792' ];
+
+// do not keep in memory this setting, use get_defined_settings($key)
+$config['hide_config'] = [
+  // SSH related
+  //'ssh_username', 'ssh_key', 'ssh_key_path', 'ssh_key_password',
+  // DB related
+  //'db_user', 'db_pass',
+  // Auth related
+  //'auth_radius_secret', 'auth_ldap_binddn', 'auth_ldap_bindpw',
+  // WMI related
+  //'wmi->user', 'wmi->pass',
+];
 
 // Here whitelist of base definitions keys which can be overridden by config.php file
 // Note, this required only for override already exist definitions, for additions not required

@@ -68,9 +68,26 @@ foreach ($svcs as $svc)
   echo('<td>'.escape_html($svc['svc_type']).'</td>');
   echo('<td>'.escape_html($svc['svc_label']).'</td>');
   echo('<td>'.escape_html($svc['svc_state']).'</td>');
-  echo('<td>
-          <input type=checkbox data-toggle="switch-revert" id="svcs['.$svc['svc_id'].'][svc_ignore]" name="svcs['.$svc['svc_id'].'][svc_ignore]"'.($svc['svc_ignore'] ? "checked" : "").'>
-        </td>');
+  $item = array(
+    'id'            => 'svcs['.$svc['svc_id'].'][svc_ignore]',
+    //'type'          => 'switch',
+    'type'          => 'switch-ng',
+    'off-text'      => 'Yes',
+    'off-color'     => 'success',
+    'on-color'      => 'danger',
+    //'on-icon'       => 'icon-trash',
+    'on-text'       => 'No',
+    //'off-icon'      => 'icon-sitemap',
+    //'grid'          => 1,
+    'size'          => 'mini',
+    //'height'        => '15px',
+    //'title'         => 'Show/Hide Removed',
+    //'placeholder'   => 'Removed',
+    'readonly'      => $readonly,
+    //'disabled'      => TRUE,
+    //'submit_by_key' => TRUE,
+    'value'         => $svc['svc_ignore']);
+  echo('<td>'.generate_form_element($item).'</td>');
   echo('</tr>');
 }
 ?>

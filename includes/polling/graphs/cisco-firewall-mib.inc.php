@@ -11,6 +11,13 @@
  *
  */
 
+// CISCO-FIREWALL-MIB::cfwConnectionStatDescription.protoIp.currentInUse = STRING: number of connections currently in use by the entire firewall
+// CISCO-FIREWALL-MIB::cfwConnectionStatDescription.protoIp.high = STRING: highest number of connections in use at any one time since system startup
+// CISCO-FIREWALL-MIB::cfwConnectionStatCount.protoIp.currentInUse = Counter32: 0
+// CISCO-FIREWALL-MIB::cfwConnectionStatCount.protoIp.high = Counter32: 0
+// CISCO-FIREWALL-MIB::cfwConnectionStatValue.protoIp.currentInUse = Gauge32: 6135
+// CISCO-FIREWALL-MIB::cfwConnectionStatValue.protoIp.high = Gauge32: 28581
+
 $graph = 'firewall_sessions_ipv4'; // Current graph
 
 //if (!isset($graphs_db[$graph]) || $graphs_db[$graph] === TRUE)

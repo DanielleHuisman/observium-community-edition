@@ -29,7 +29,7 @@
 // NETGEAR-ISDP-MIB::agentIsdpCacheProtocolVersion.19.1 = STRING: "2"
 // NETGEAR-ISDP-MIB::agentIsdpCacheHoldtime.19.1 = INTEGER: 167 seconds
 
-include("isdp-mib.inc.php");
+include(__DIR__ . "/isdp-mib.inc.php");
 
 // EOF
 

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -16,10 +16,8 @@ $results = dbFetchRows("SELECT * FROM `status`
                         WHERE `status_descr` LIKE ? $query_permitted_device
                         ORDER BY `status_descr` LIMIT $query_limit", array($query_param));
 
-if (count($results))
-{
-  foreach ($results as $result)
-  {
+if (safe_count($results)) {
+  foreach ($results as $result) {
     $name = $result['status_descr'];
     if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
     $descr = strlen($result['location']) ? escape_html($result['location']) . ' | ' : '';

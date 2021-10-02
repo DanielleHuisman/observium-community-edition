@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -29,7 +28,7 @@ if (!is_array($config['auth_ldap_server']))
   {
     $config['auth_ldap_server'] = ldap_domain_servers_from_dns($config['auth_ldap_ad_domain']);
   } else {
-    $config['auth_ldap_server'] = array($config['auth_ldap_server']);
+    $config['auth_ldap_server'] = [ $config['auth_ldap_server'] ];
   }
 }
 
@@ -49,16 +48,16 @@ function ldap_search_user($ldap_group, $userdn, $depth = -1)
 
   if ($config['auth_ldap_groupreverse'])
   {
-    $compare = ldap_compare($ds, $userdn, $config['auth_ldap_attr']['memberOf'], $ldap_group);
+    $compare = ldap_internal_compare($ds, $userdn, $config['auth_ldap_attr']['memberOf'], $ldap_group);
   } else {
-    $compare = ldap_compare($ds, $ldap_group, $config['auth_ldap_groupmemberattr'], $userdn);
+    $compare = ldap_internal_compare($ds, $ldap_group, $config['auth_ldap_groupmemberattr'], $userdn);
   }
 
-  if ($compare === TRUE)
-  {
+  if ($compare === TRUE) {
     return TRUE; // Member found, return TRUE
   }
-  elseif (!$config['auth_ldap_groupreverse'] && $config['auth_ldap_recursive'] && ($depth < $config['auth_ldap_recursive_maxdepth']))
+
+  if (!$config['auth_ldap_groupreverse'] && $config['auth_ldap_recursive'] && ($depth < $config['auth_ldap_recursive_maxdepth']))
   {
     $depth++;
 
@@ -72,34 +71,34 @@ function ldap_search_user($ldap_group, $userdn, $depth = -1)
 
     $ldap_search  = ldap_search($ds, trim($config['auth_ldap_groupbase'], ', '), $filter, array($config['auth_ldap_attr']['dn']));
     //r($filter);
-    $ldap_results = ldap_get_entries($ds, $ldap_search);
+    if (is_resource($ldap_search)) {
+      $ldap_results = ldap_get_entries($ds, $ldap_search);
 
-    //r($ldap_results);
-    array_shift($ldap_results); // Chop off "count" array entry
+      //r($ldap_results);
+      array_shift($ldap_results); // Chop off "count" array entry
 
-    foreach($ldap_results as $element)
-    {
-      if (!isset($element[$config['auth_ldap_attr']['dn']])) { continue; }
+      foreach ($ldap_results as $element) {
+        if (!isset($element[$config['auth_ldap_attr']['dn']])) {
+          continue;
+        }
 
-      // Not sure, seems as different results in LDAP vs AD
-      // See: https://jira.observium.org/browse/OBS-3240 and https://jira.observium.org/browse/OBS-3310
-      $element_dn = is_array($element[$config['auth_ldap_attr']['dn']]) ? $element[$config['auth_ldap_attr']['dn']][0] : $element[$config['auth_ldap_attr']['dn']];
+        // Not sure, seems as different results in LDAP vs AD
+        // See: https://jira.observium.org/browse/OBS-3240 and https://jira.observium.org/browse/OBS-3310
+        $element_dn = is_array($element[$config['auth_ldap_attr']['dn']]) ? $element[$config['auth_ldap_attr']['dn']][0] : $element[$config['auth_ldap_attr']['dn']];
 
-      print_debug("LDAP[UserSearch][$depth][Comparing: " . $element_dn . "][". $config['auth_ldap_groupmemberattr'] . "=$userdn]");
+        print_debug("LDAP[UserSearch][$depth][Comparing: " . $element_dn . "][" . $config['auth_ldap_groupmemberattr'] . "=$userdn]");
 
-      $result = ldap_search_user($element_dn, $userdn, $depth);
-      if ($result === TRUE)
-      {
-        return TRUE; // Member found, return TRUE
+        $result = ldap_search_user($element_dn, $userdn, $depth);
+        if ($result === TRUE) {
+          return TRUE; // Member found, return TRUE
+        }
       }
     }
 
     return FALSE; // Not found, return FALSE.
   }
-  else
-  {
-    return FALSE; // Recursion disabled or reached maximum depth, return FALSE.
-  }
+
+  return FALSE; // Recursion disabled or reached maximum depth, return FALSE.
 }
 
 /**
@@ -116,10 +115,11 @@ function ldap_init()
     $ds = @ldap_connect(implode(' ',$config['auth_ldap_server']), $config['auth_ldap_port']);
     print_debug("LDAP[Connected]");
 
-    if ($config['auth_ldap_starttls'] && ($config['auth_ldap_starttls'] == 'optional' || $config['auth_ldap_starttls'] == 'require'))
+    if ($config['auth_ldap_starttls'] &&
+        (in_array($config['auth_ldap_starttls'], [ 'optional', 'require', '1', 1, TRUE ], TRUE)))
     {
       $tls = ldap_start_tls($ds);
-      if ($config['auth_ldap_starttls'] == 'require' && $tls == FALSE)
+      if ($config['auth_ldap_starttls'] === 'require' && !$tls)
       {
         session_logout();
         print_error("Fatal error: LDAP TLS required but not successfully negotiated [" . ldap_error($ds) . "]");
@@ -171,14 +171,11 @@ function ldap_authenticate($username, $password)
       // Auth via Apache + LDAP fallback -> automatically authenticated, fall through to group permission check
       if ($config['auth']['remote_user'] || ldap_bind($ds, $binduser, $password))
       {
-        if (!$config['auth_ldap_group'])
-        {
+        if (!$config['auth_ldap_group']) {
           // No groups defined, auth is sufficient
           return 1;
-        }
-        else
-        {
-          $userdn = ($config['auth_ldap_groupmembertype'] == 'fulldn' ? $binduser : $username);
+        } else {
+          $userdn = ($config['auth_ldap_groupmembertype'] === 'fulldn' ? $binduser : $username);
 
           foreach ($config['auth_ldap_group'] as $ldap_group)
           {
@@ -202,6 +199,15 @@ function ldap_authenticate($username, $password)
               return 1;
             }
           }
+        }
+
+        // Restore bind dn when used binddn or bindanonymous
+        // https://jira.observium.org/browse/OBS-1976
+        if (!$config['auth']['remote_user'] &&
+            ($config['auth_ldap_binddn'] || $config['auth_ldap_bindanonymous'])) {
+
+          unset($GLOBALS['cache']['ldap']['bind_result']);
+          ldap_bind_dn();
         }
       } else {
         print_debug(ldap_error($ds));
@@ -321,7 +327,7 @@ function ldap_auth_user_level($username)
     ldap_bind_dn();
 
     // Find all defined groups $username is in
-    $userdn  = ($config['auth_ldap_groupmembertype'] == 'fulldn' ? ldap_internal_dn_from_username($username) : $username);
+    $userdn  = (strtolower($config['auth_ldap_groupmembertype']) === 'fulldn' ? ldap_internal_dn_from_username($username) : $username);
     print_debug("LDAP[UserLevel][UserDN: $userdn]");
 
     // This used to be done with a filter, but AD seems to be really retarded with regards to escaping.
@@ -397,7 +403,7 @@ function ldap_auth_user_id($username)
   
   print_debug("LDAP[Filter][$filter][" . trim($config['auth_ldap_suffix'], ', ') . "]");
   $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter);
-  $entries = ldap_get_entries($ds, $search);
+  $entries = is_resource($search) ? ldap_get_entries($ds, $search) : [];
   //print_vars($entries);
 
   if ($entries['count'])
@@ -570,7 +576,7 @@ function ldap_internal_user_entries($entries, &$userlist)
       $email       = $entry['mail'][0];
       $description = $entry['description'][0];
 
-      $userdn = (strtolower($config['auth_ldap_groupmembertype']) == 'fulldn' ? $entry['dn'] : $username);
+      $userdn = (strtolower($config['auth_ldap_groupmembertype']) === 'fulldn' ? $entry['dn'] : $username);
       if ($config['auth_ldap_groupreverse'])
       {
         print_debug("LDAP[UserList][Compare: $userdn][".$config['auth_ldap_attr']['memberOf']."][" . implode('|',$config['auth_ldap_group']) . "]");
@@ -620,7 +626,7 @@ function ldap_internal_paged_entries($filter, $attributes)
 {
   global $config, $ds;
 
-  if ($config['auth_ldap_version'] >= 3 && version_compare(PHP_VERSION, '7.3.0', '>='))
+  if ($config['auth_ldap_version'] >= 3 && PHP_VERSION_ID >= 70300)
   {
     // Use pagination for speedup fetch huge lists, there is new style, see:
     // https://www.php.net/manual/en/ldap.examples-controls.php (Example #5)
@@ -633,14 +639,17 @@ function ldap_internal_paged_entries($filter, $attributes)
         $ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes, 0, 0, 0, LDAP_DEREF_NEVER,
         [['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => $page_size, 'cookie' => $cookie]]]
       );
-      ldap_parse_result($ds, $search, $errcode , $matcheddn , $errmsg , $referrals, $controls);
-      print_debug(ldap_error($ds));
-      $entries = array_merge($entries, ldap_get_entries($ds, $search));
+      if (is_resource($search)) {
+        ldap_parse_result($ds, $search, $errcode, $matcheddn, $errmsg, $referrals, $controls);
+        print_debug(ldap_error($ds));
+        $entries = array_merge($entries, ldap_get_entries($ds, $search));
 
-      if (isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie']))
-      {
-        // You need to pass the cookie from the last call to the next one
-        $cookie = $controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'];
+        if (isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'])) {
+          // You need to pass the cookie from the last call to the next one
+          $cookie = $controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'];
+        } else {
+          $cookie = '';
+        }
       } else {
         $cookie = '';
       }
@@ -664,13 +673,17 @@ function ldap_internal_paged_entries($filter, $attributes)
 
       $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
       print_debug(ldap_error($ds));
-      $entries = array_merge($entries, ldap_get_entries($ds, $search));
-      //print_vars($filter);
-      //print_vars($search);
+      if (is_resource($search)) {
+        $entries = array_merge($entries, ldap_get_entries($ds, $search));
+        //print_vars($filter);
+        //print_vars($search);
 
-      //ldap_internal_user_entries($entries, $userlist);
+        //ldap_internal_user_entries($entries, $userlist);
 
-      ldap_control_paged_result_response($ds, $search, $cookie);
+        ldap_control_paged_result_response($ds, $search, $cookie);
+      } else {
+        $cookie = '';
+      }
 
     } while($page_test && $cookie !== NULL && $cookie != '');
     // Reset LDAP paged result
@@ -683,11 +696,13 @@ function ldap_internal_paged_entries($filter, $attributes)
     $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
     print_debug(ldap_error($ds));
 
-    $entries = ldap_get_entries($ds, $search);
-    //print_vars($filter);
-    //print_vars($search);
+    if (is_resource($search)) {
+      $entries = ldap_get_entries($ds, $search);
+      //print_vars($filter);
+      //print_vars($search);
 
-    //ldap_internal_user_entries($entries, $userlist);
+      //ldap_internal_user_entries($entries, $userlist);
+    }
   }
 
   return $entries;
@@ -746,8 +761,9 @@ function ldap_little_endian($hex)
  *
  * @param string $username Bind username (optional)
  * @param string $password Bind password (optional)
+ *
  * @return bool FALSE if bind succeeded, TRUE if not
-*/
+ */
 function ldap_bind_dn($username = "", $password = "")
 {
   global $config, $ds, $cache;
@@ -755,51 +771,49 @@ function ldap_bind_dn($username = "", $password = "")
   print_debug("LDAP[Bind DN called]");
 
   // Avoid binding multiple times on one resource, this upsets some LDAP servers.
-  if (isset($cache['ldap_bind_result']))
-  {
-    return $cache['ldap_bind_result'];
-  } else {
-    if ($config['auth_ldap_binddn'])
-    {
-      print_debug("LDAP[Bind][" . $config['auth_ldap_binddn'] . "]");
-      $bind = ldap_bind($ds, $config['auth_ldap_binddn'], $config['auth_ldap_bindpw']);
-    } else {
-      // Try anonymous bind if configured to do so
-      if ($config['auth_ldap_bindanonymous'])
-      {
-        print_debug("LDAP[Bind][anonymous]");
-        $bind = ldap_bind($ds);
-      } else {
-        if (($username == '' || $password == '') && isset($_SESSION['user_encpass']))
-        {
-          // Use session credintials
-          print_debug("LDAP[Bind][session]");
-          $username = $_SESSION['username'];
-          if (!isset($_SESSION['encrypt_required']))
-          {
-            $key = session_unique_id();
-            if (OBS_ENCRYPT_MODULE == 'mcrypt')
-            {
-              $key .= get_unique_id();
-            }
-            $password = decrypt($_SESSION['user_encpass'], $key);
-          } else {
-            // WARNING, requires mcrypt or sodium
-            $password = base64_decode($_SESSION['user_encpass'], TRUE);
-          }
-        }
-        print_debug("LDAP[Bind][" . $config['auth_ldap_prefix'] . $username . $config['auth_ldap_suffix'] . "]");
-        $bind = ldap_bind($ds, $config['auth_ldap_prefix'] . $username . $config['auth_ldap_suffix'], $password);
-      }
-    }
+  if (isset($cache['ldap']['bind_result'])) {
+    return $cache['ldap']['bind_result'];
   }
 
-  if ($bind)
+  if ($config['auth_ldap_binddn'])
   {
-    $cache['ldap_bind_result'] = 0;
+    // Bind user/password
+    print_debug("LDAP[Bind][" . $config['auth_ldap_binddn'] . "]");
+    $bind = ldap_bind($ds, $config['auth_ldap_binddn'], $config['auth_ldap_bindpw']);
+  } elseif ($config['auth_ldap_bindanonymous']) {
+    // Try anonymous bind if configured to do so
+    print_debug("LDAP[Bind][anonymous]");
+    $bind = ldap_bind($ds);
+  } else {
+    // Session bind
+    if (($username == '' || $password == '') && isset($_SESSION['user_encpass']))
+    {
+      // Use session credentials
+      print_debug("LDAP[Bind][session]");
+      $username = $_SESSION['username'];
+      if (!isset($_SESSION['encrypt_required']))
+      {
+        $key = session_unique_id();
+        if (OBS_ENCRYPT_MODULE === 'mcrypt')
+        {
+          $key .= get_unique_id();
+        }
+        $password = decrypt($_SESSION['user_encpass'], $key);
+      } else {
+        // WARNING, requires mcrypt or sodium
+        $password = base64_decode($_SESSION['user_encpass'], TRUE);
+      }
+    }
+
+    print_debug("LDAP[Bind][" . $config['auth_ldap_prefix'] . $username . $config['auth_ldap_suffix'] . "]");
+    $bind = ldap_bind($ds, $config['auth_ldap_prefix'] . $username . $config['auth_ldap_suffix'], $password);
+  }
+
+  if ($bind) {
+    $cache['ldap']['bind_result'] = 0;
     return FALSE;
   } else {
-    $cache['ldap_bind_result'] = 1;
+    $cache['ldap']['bind_result'] = 1;
     print_debug("Error binding to LDAP server: " . implode(' ',$config['auth_ldap_server']) . ': ' . ldap_error($ds));
     session_logout();
     return TRUE;
@@ -830,11 +844,14 @@ function ldap_internal_dn_from_username($username)
     print_debug("LDAP[Filter][$filter][" . trim($config['auth_ldap_suffix'], ', ') . "]");
 
     $search  = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter);
-    $entries = ldap_get_entries($ds, $search);
+    if (is_resource($search)) {
+      $entries = ldap_get_entries($ds, $search);
 
-    if ($entries['count'])
-    {
-      list($cache['ldap']['dn'][$username],) = ldap_escape_filter_value($entries[0]['dn']);
+      if ($entries['count']) {
+        list($cache['ldap']['dn'][$username],) = ldap_escape_filter_value($entries[0]['dn']);
+      }
+    } else {
+      return '';
     }
   }
 
@@ -860,7 +877,7 @@ function ldap_internal_auth_user_id($result)
   global $config;
 
   // For AD, convert SID S-1-5-21-4113566099-323201010-15454308-1104 to 1104 as our numeric unique ID
-  if ($config['auth_ldap_attr']['uidNumber'] == "objectSid")
+  if ($config['auth_ldap_attr']['uidNumber'] === "objectSid")
   {
     $sid = explode('-', ldap_bin_to_str_sid($result['objectsid'][0]));
     $userid = $sid[count($sid)-1];
@@ -878,6 +895,50 @@ function ldap_internal_auth_user_id($result)
 }
 
 /**
+ * Compare value of attribute found in entry specified with DN
+ * Internal implementation with workaround for dumb services.
+ *
+ * @param $ds
+ * @param $dn
+ * @param $attribute
+ * @param $value
+ *
+ * @return bool
+ */
+function ldap_internal_compare($ds, $dn, $attribute, $value) {
+  global $cache;
+
+  // Return cached
+  $cache_key = $dn . ',' . $attribute . '=' . $value;
+  if (isset($cache['ldap']['compare'][$cache_key])) {
+    return $cache['ldap']['compare'][$cache_key];
+  }
+
+  $compare = ldap_compare($ds, $dn, $attribute, $value);
+  //$compare = -1;
+
+  // On error, try compare by get entries for some dumb services
+  // https://jira.observium.org/browse/OBS-3611
+  if ($compare === -1) {
+    $filter_params = [ ldap_filter_create($attribute, $value) ];
+    $filter        = ldap_filter_combine($filter_params);
+
+    if ($read = ldap_read($ds, $dn, $filter, [ 'dn', 'count' ], 1)) {
+      $entry   = ldap_get_entries($ds, $read);
+      //print_vars($filter);
+      //print_vars($dn);
+      //print_vars($entry);
+      $compare = (int)$entry['count'] === 1;
+    }
+  }
+
+  // Cache
+  $cache['ldap']['compare'][$cache_key] = $compare;
+
+  return $compare;
+}
+
+/**
  * Retrieves list of domain controllers from DNS through SRV records.
  * Private function for this LDAP module only.
  *
@@ -888,9 +949,6 @@ function ldap_internal_auth_user_id($result)
 function ldap_domain_servers_from_dns($domain)
 {
   global $config;
-
-  //include_once('Net/DNS2.php');
-  //include_once('Net/DNS2/RR/SRV.php');
 
   $servers = array();
 
@@ -922,14 +980,14 @@ function ldap_domain_servers_from_dns($domain)
  */
 function ldap_filter_create($param, $value, $condition = '=', $escape = TRUE)
 {
-  if ($escape)
-  {
-    $value = array_shift(ldap_escape_filter_value($value));
+  if ($escape) {
+    $value = ldap_escape_filter_value($value);
+    $value = array_shift($value);
   }
 
   // Convert common rule name to ldap rule
   // Default rule is equals
-  $condition = trim(strtolower($condition));
+  $condition = strtolower(trim($condition));
   switch ($condition)
   {
     case 'ge':
@@ -983,7 +1041,7 @@ function ldap_filter_create($param, $value, $condition = '=', $escape = TRUE)
  * Combine two or more filter objects using a logical operator
  *
  * @param array $values Array with Filter entries generated by ldap_filter_create()
- * @param string $condition The locical operator. May be "and", "or", "not" or the subsequent logical equivalents "&", "|", "!"
+ * @param string $condition The logical operator. May be "and", "or", "not" or the subsequent logical equivalents "&", "|", "!"
  * @return string Generated filter
  */
 function ldap_filter_combine($values = array(), $condition = '&')
@@ -991,7 +1049,7 @@ function ldap_filter_combine($values = array(), $condition = '&')
   $count = count($values);
   if (!$count) { return ''; }
 
-  $condition = trim(strtolower($condition));
+  $condition = strtolower(trim($condition));
   switch ($condition)
   {
     case '!':
@@ -1000,7 +1058,7 @@ function ldap_filter_combine($values = array(), $condition = '&')
       break;
     case '|':
     case 'or':
-      if ($count == 1)
+      if ($count === 1)
       {
         $filter = array_shift($values);
       } else {
@@ -1010,7 +1068,7 @@ function ldap_filter_combine($values = array(), $condition = '&')
     case '&':
     case 'and':
     default:
-      if ($count == 1)
+      if ($count === 1)
       {
         $filter = array_shift($values);
       } else {
@@ -1028,7 +1086,7 @@ function ldap_filter_combine($values = array(), $condition = '&')
  * LDAP filters "*", "(", ")", and "\" (the backslash) are converted into the representation of a
  * backslash followed by two hex digits representing the hexadecimal value of the character.
  *
- * @param array $values Array of values to escape
+ * @param array|string $values Array of values to escape
  *
  * @return array Array $values, but escaped
  */
@@ -1043,11 +1101,8 @@ function ldap_escape_filter_value($values = array())
   foreach ($values as $key => $val)
   {
     // Escaping of filter meta characters
-    $val = str_replace('\\', '\5c', $val);
-    $val = str_replace('\5c,', '\2c', $val);
-    $val = str_replace('*',  '\2a', $val);
-    $val = str_replace('(',  '\28', $val);
-    $val = str_replace(')',  '\29', $val);
+    $val = str_replace([ '\\', '\5c,', '*', '(', ')' ],
+                       [ '\5c', '\2c', '\2a', '\28', '\29' ], $val);
 
     // ASCII < 32 escaping
     $val = asc2hex32($val);

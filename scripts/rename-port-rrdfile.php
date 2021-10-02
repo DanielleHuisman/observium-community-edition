@@ -1,6 +1,5 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
@@ -8,12 +7,11 @@
  *
  * @package    observium
  * @subpackage scripts
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]).'/..');
-$scriptname = basename($argv[0]);
 
 $options = getopt("dh:");
 

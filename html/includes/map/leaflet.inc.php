@@ -11,6 +11,10 @@
  *
  */
 
+
+/*
+ * Don't do this here, this is inside a widget!
+ *
 register_html_resource('css', 'leaflet.css');
 register_html_resource('js', 'leaflet.js');
 
@@ -30,6 +34,8 @@ register_html_resource('css', 'MarkerCluster.Default.css');
 
 //register_html_resource('js', '/geo.php');
 
+*/
+
 // [lat, lng], zoom
 if (is_numeric($config['frontpage']['map']['zoom']) &&
     is_numeric($config['frontpage']['map']['center']['lat']) &&
@@ -45,7 +51,7 @@ else
 {
   // Auto zoom
   $leaflet_init   = '[0, -0], 2';
-  $leaflet_bounds = 'map.fitBounds(realtime.getBounds(), { padding: [30, 30] });';
+  $leaflet_bounds = 'map'.$vars['widget_id'].'.fitBounds(realtime.getBounds(), { padding: [30, 30] });';
 }
 
 switch ($config['frontpage']['map']['tiles'])
@@ -120,7 +126,7 @@ switch ($config['frontpage']['map']['tiles'])
             })
         };
 
-        var map = L.map('map'),
+        var map<?php echo $vars['widget_id']; ?> = L.map('map<?php echo $vars['widget_id']; ?>'),
             realtime = L.realtime({
                 url: 'geojson.php',
                 crossOrigin: true,
@@ -187,31 +193,31 @@ switch ($config['frontpage']['map']['tiles'])
                     return layer;
                 }
 
-            }).addTo(map);
+            }).addTo(map<?php echo $vars['widget_id']; ?>);
 
-        map.setView(<?php echo $leaflet_init; ?>);
+        map<?php echo $vars['widget_id']; ?>.setView(<?php echo $leaflet_init; ?>);
 
 <?php
 //  echo $leaflet_bounds;
  ?>
 
         /* disable scroll wheel by default, toggle by click on map */
-        map.scrollWheelZoom.disable();
-        map.on('click', function () {
-            if (map.scrollWheelZoom.enabled()) {
-                map.scrollWheelZoom.disable();
+        map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.disable();
+        map<?php echo $vars['widget_id']; ?>.on('click', function () {
+            if (map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.enabled()) {
+                map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.disable();
             } else {
-                map.scrollWheelZoom.enable();
+                map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.enable();
             }
         });
 
-        map.on('mouseover', function () {
+        map<?php echo $vars['widget_id']; ?>.on('mouseover', function () {
             //console.log('STOPPING');
             realtime.stop();
             //console.log(realtime.isRunning());
         });
 
-        map.on('mouseout', function () {
+        map<?php echo $vars['widget_id']; ?>.on('mouseout', function () {
             //console.log('STARTING');
             realtime.start();
             //console.log(realtime.isRunning());
@@ -232,7 +238,7 @@ switch ($config['frontpage']['map']['tiles'])
             echo "format: '" . $leaflet_format . "',";
           } ?>
             attribution: '<?php echo $leaflet_copy; ?>'
-        }).addTo(map);
+        }).addTo(map<?php echo $vars['widget_id']; ?>);
 
 
         realtime.on('update', function () {

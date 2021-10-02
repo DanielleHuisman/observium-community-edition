@@ -52,9 +52,13 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 	InetAddressType, InetAddress
 		FROM INET-ADDRESS-MIB		-- RFC2851
 		
+	RowStatus
+		FROM SNMPv2-TC			-- RFC2579
+	
  	esMgmt			
 		FROM ZYXEL-ES-SMI;
 
+		
 	zyxelPoe MODULE-IDENTITY
 		LAST-UPDATED	"201207010000Z"    
 		ORGANIZATION "Enterprise Solution ZyXEL"     
@@ -131,12 +135,15 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
         	ieee802dot3af(0),
         	legacy(1),
         	preIeee802dot3at(2),
-        	ieee802dot3at(3)
+        	ieee802dot3at(3),
+		ieee802dot3bt(4),
+		preIeee802dot3bt(5),
+		forceIeee802dot3at(6)
        	}
         MAX-ACCESS	read-write
         STATUS	current
         DESCRIPTION    	
-						"Set PoE Power Up Mode Setup 802.3af mode (0), Legacy mode (1), Pre-802.3at mode(2), 802.3at mode(3)"
+						"Set PoE Power Up Mode Setup 802.3af mode (0), Legacy mode (1), Pre-802.3at mode(2), 802.3at mode(3), 802.3bt mode(4), Pre-802.3bt mode(5), Force-802.3at mode(6)"
 						
 						 
         ::= { zyxelPoePsePortEntry 2 }  
@@ -160,7 +167,7 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 						
 						 
         ::= { zyxelPoePsePortEntry 4 }         
-
+		
 -- zyxelPoePreAllocate
 		zyPoePreAllocate OBJECT-TYPE
         SYNTAX  EnabledStatus
@@ -187,12 +194,63 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
                     "Set Poe Power Sequence Mode Delay Setup  Enable/Disable."
         ::= { zyxelPoeSetup 5 }                       
-        
+
 -- *******************************************************************
 -- *
 -- * zyxelPoeStatus
 -- *
 -- *******************************************************************
+
+
+-- zyxelPoePsePortTimeRangeTable
+        zyxelPoePsePortTimeRangeTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF ZyxelPoePsePortTimeRangeEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+					"The table contains power ethernet port time-range settings. "
+        ::= { zyxelPoeSetup 6 }
+		
+		zyxelPoePsePortTimeRangeEntry OBJECT-TYPE
+        SYNTAX	ZyxelPoePsePortTimeRangeEntry
+        MAX-ACCESS	not-accessible
+        STATUS	current
+        DESCRIPTION    	
+					"An entry contains power ethernet port time-range settings. "
+        INDEX          	{ dot1dBasePort, zyPoePsePortTimeRangeName }
+        ::= { zyxelPoePsePortTimeRangeTable 1 }	
+		
+        ZyxelPoePsePortTimeRangeEntry ::=
+		SEQUENCE {                                                                     
+		zyPoePsePortTimeRangeName		DisplayString,      	
+		zyPoePsePortTimeRangeRowStatus	RowStatus      
+        }
+
+		zyPoePsePortTimeRangeName OBJECT-TYPE
+		SYNTAX      DisplayString
+		MAX-ACCESS  read-only
+		STATUS      current
+		DESCRIPTION
+						"Time-Based PoE allow to schedule the PoE works time. Specifiy the time-range which is already created."
+		::= { zyxelPoePsePortTimeRangeEntry 1 }
+		
+		zyPoePsePortTimeRangeRowStatus OBJECT-TYPE
+		SYNTAX      RowStatus
+		MAX-ACCESS  read-create
+		STATUS      current
+		DESCRIPTION
+						"This object allow entry to be create and deleted a poe port time-range entry."            
+		::= { zyxelPoePsePortTimeRangeEntry 2 }	
+
+-- zyPoeContinuousPoE
+		zyPoeContinuousPoE OBJECT-TYPE
+		SYNTAX  EnabledStatus
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+                    "Set Continuous PoE Enable/Disable."
+        ::= { zyxelPoeSetup 7 }        
+
 		
 -- zyxelPoePsePortInfoTable
         zyxelPoePsePortInfoTable OBJECT-TYPE
@@ -215,7 +273,8 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
         ZyxelPoePsePortInfoEntry ::=
 		SEQUENCE {
         	zyPoePsePortInfoPowerConsumption	INTEGER,
-			zyPoePsePortTimeRangeState			INTEGER
+			zyPoePsePortTimeRangeState			INTEGER,
+			zyPoePsePortTimeRangeInProfile		DisplayString
         }
 
 		zyPoePsePortInfoPowerConsumption OBJECT-TYPE
@@ -239,12 +298,24 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 						In(1): system time is in the time range.
 						Out(2): system time is out of the time range."
         ::= { zyxelPoePsePortInfoEntry 2 }   
+
   
 -- *******************************************************************
 -- *
 -- * zyxelPoeTrapInfoObject
 -- *
 -- *******************************************************************
+
+ 
+		zyPoePsePortTimeRangeInProfile OBJECT-TYPE
+        SYNTAX	DisplayString
+        MAX-ACCESS	read-only
+        STATUS	current
+        DESCRIPTION    	
+						"time-range profile name which is in profile"
+        ::= { zyxelPoePsePortInfoEntry 3 }   
+ 
+
     	zyPoeTrapPsePowerSupplyFailedReason OBJECT-TYPE
         SYNTAX  INTEGER { 
 			internalPowerSupplyForPoeFailed(0), 
@@ -339,6 +410,14 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 			"PoE device works fail."
 		::= { zyxelPoeNotifications 8 } 
 
+		zyPoePowerPortOverStandard NOTIFICATION-TYPE
+        OBJECTS {
+			ifIndex
+        }
+        STATUS  current
+        DESCRIPTION
+			"Port uses more power than standard defined value."
+		::= { zyxelPoeNotifications 9 }
 
 -- *******************************************************************
 -- *
@@ -379,10 +458,12 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
         	zyPoeAutoPdRecoveryPortMode 			INTEGER,
 			zyPoeAutoPdRecoveryPortIpAddressType	InetAddressType,      	
 			zyPoeAutoPdRecoveryPortIpAddress		InetAddress,
-			zyPoeAutoPdRecoveryPortInterval			INTEGER,
-			zyPoeAutoPdRecoveryPortRetryCount		INTEGER,
+			zyPoeAutoPdRecoveryPollingInterval				INTEGER,
+			zyPoeAutoPdRecoveryPortPollingCount				INTEGER,
 			zyPoeAutoPdRecoveryPortAction			INTEGER,
-			zyPoeAutoPdRecoveryPortRebootTime		INTEGER
+			zyPoeAutoPdRecoveryPortResumePollingInterval	INTEGER,
+			zyPoeAutoPdRecoveryPortPdRebootCount			INTEGER,
+			zyPoeAutoPdRecoveryPortResumePowerInterval		INTEGER
         }
 		zyPoeAutoPdRecoveryPortState OBJECT-TYPE
         SYNTAX	EnabledStatus
@@ -394,7 +475,7 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 
 		zyPoeAutoPdRecoveryPortMode OBJECT-TYPE
         SYNTAX	INTEGER {
-        	lldp(1)
+        	lldp(1),
 			ping(2)
        	}
         MAX-ACCESS	read-write
@@ -419,7 +500,7 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 		    "PD IP address."
         ::= { zyxelPoeAutoPdRecoveryPortEntry 4 }
 
-		zyPoeAutoPdRecoveryPortInterval OBJECT-TYPE
+		zyPoeAutoPdRecoveryPollingInterval OBJECT-TYPE
         SYNTAX  INTEGER (10..300)
         MAX-ACCESS	read-write
         STATUS	current
@@ -427,8 +508,8 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 		    "Time interval between each ping request to PD. Default value is 20 (seconds)."
         ::= { zyxelPoeAutoPdRecoveryPortEntry 5 }		
 
-		zyPoeAutoPdRecoveryPortRetryCount OBJECT-TYPE
-        SYNTAX  INTEGER (1..5)
+		zyPoeAutoPdRecoveryPortPollingCount OBJECT-TYPE
+        SYNTAX  INTEGER (2..5)
         MAX-ACCESS	read-write
         STATUS	current
         DESCRIPTION    	
@@ -437,7 +518,7 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 
 		zyPoeAutoPdRecoveryPortAction OBJECT-TYPE
         SYNTAX  INTEGER {
-			reboot-alarm(1)
+			reboot-alarm(1),
 			alarm(2)
 		}
         MAX-ACCESS	read-write
@@ -446,11 +527,27 @@ ZYXEL-POWER-ETHERNET-MIB DEFINITIONS ::= BEGIN
 		    "Action will be applied if PD without any response. Default value is  reboot-alarm(1)"
         ::= { zyxelPoeAutoPdRecoveryPortEntry 7 }	
 
-		zyPoeAutoPdRecoveryPortRebootTime OBJECT-TYPE
-        SYNTAX  INTEGER (30..600)
+		zyPoeAutoPdRecoveryPortResumePollingInterval OBJECT-TYPE
+        SYNTAX  INTEGER (60..800)
         MAX-ACCESS	read-write
         STATUS	current
         DESCRIPTION    	
-		    "PD reboot waiting time.  Default value is 300 (seconds)."
+		    "PD reboot waiting time.  Default value is 600 (seconds)."
         ::= { zyxelPoeAutoPdRecoveryPortEntry 8 }		
+
+		zyPoeAutoPdRecoveryPortPdRebootCount OBJECT-TYPE
+        SYNTAX  INTEGER (1..5)
+        MAX-ACCESS	read-write
+        STATUS	current
+        DESCRIPTION    	
+		    "PD reboot count. Default value is 1 (time)."
+        ::= { zyxelPoeAutoPdRecoveryPortEntry 9 }
+
+		zyPoeAutoPdRecoveryPortResumePowerInterval OBJECT-TYPE
+        SYNTAX  INTEGER (5..120)
+        MAX-ACCESS	read-write
+        STATUS	current
+        DESCRIPTION    	
+		    "Set delay time to resume the PoE power supply. Default value is 10 (seconds)."
+        ::= { zyxelPoeAutoPdRecoveryPortEntry 10 }			
 END          

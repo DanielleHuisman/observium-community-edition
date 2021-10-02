@@ -1,0 +1,636 @@
+-- SOCOMEC UPS MIB
+-- UPS MIB 
+--
+-- { iso org(3) dod(6) internet(1) private(4) enterprises(1) socomecUPS(4555)
+-- software(1) network(5) ups(1) }
+-- ==============================================================================================
+
+-- build on 5.01-5 from UPS MIB
+-- vers. 1.00 creation
+-- 24/07/2008 - NVO
+--
+-- THIS MIB INCLUDES ONLY UPS DATA (exept battery part)
+--
+-- The AdicomUnitObjects define the unit MIB version, dedicated for each unit in parallel
+
+-- ==============================================================================================
+-- Revision 1.01
+-- 04/08/2008 - NVO
+-- adding TRAP 10: Alarm cancelled
+-- ==============================================================================================
+-- ==============================================================================================
+-- Revision 1.02
+-- 12/11/2008 - NVO
+-- UPS-SYS and UNIT data management update:
+--      UPS-SYS info: means that these data are coming from a comprehensive view of all units (synthesis)
+--                    or single unit data
+--      UNIT info: means that the data are coming where the SNMP connection is located (unit 1 for example)
+--              
+-- UPS BATTERY STATUS (synthesis of every unit battery status)
+-- Low=A011, Depleted=A012, Discharging=A010, Failure=A009 (include all units battery alarms)
+-- 
+-- UNIT BATTERY MEASUREMENTS
+--
+-- UNIT INPUT STATUS
+--
+-- UPS OUTPUT STATUS
+--           standby(1): if all others conditions are false. Avoid using unit info   
+--
+-- UPS Bypass STATUS
+--
+-- UPS ALARMS
+-- ==============================================================================================
+-- ==============================================================================================
+-- Revision 1.03
+-- 11/02/2009 - NVO
+-- On Battery TRAP management: as a standard TRAP.
+-- adding: adicomUpsTrapTemperatureAlarm
+-- ==============================================================================================
+-- ==============================================================================================
+-- Revision 1.04
+-- 03/03/2009 - NVO
+-- TrapTemperatureAlarm removed
+-- Replaced by TrapLoadOnInverter
+-- ==============================================================================================
+
+SOCOMECUPS-ADICOM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+  DisplayString, TimeStamp, TimeInterval, TestAndIncr,
+  AutonomousType
+    FROM SNMPv2-TC
+  enterprises
+    FROM RFC1155-SMI
+  OBJECT-TYPE
+    FROM RFC-1212
+  DisplayString
+    FROM RFC1213-MIB
+  TRAP-TYPE
+    FROM RFC-1215;
+
+PositiveInteger ::= INTEGER (1..2147483647)
+NonNegativeInteger ::= INTEGER (1..2147483647)
+
+
+
+socomecUPS         OBJECT IDENTIFIER ::= { enterprises 4555 }
+software           OBJECT IDENTIFIER ::= { socomecUPS 1 }
+network            OBJECT IDENTIFIER ::= { software 1 }
+adicomUps          OBJECT IDENTIFIER ::= { network 5 }
+adicomUpsObjects   OBJECT IDENTIFIER ::= { adicomUps 1 }
+adicomUpsTraps     OBJECT IDENTIFIER ::= { adicomUps 2 }
+
+
+adicomUpsIdent     OBJECT IDENTIFIER ::= { adicomUpsObjects 1 }
+adicomUpsBattery   OBJECT IDENTIFIER ::= { adicomUpsObjects 2 }      
+adicomUpsInput     OBJECT IDENTIFIER ::= { adicomUpsObjects 3 }      
+adicomUpsOutput    OBJECT IDENTIFIER ::= { adicomUpsObjects 4 }      
+adicomUpsBypass    OBJECT IDENTIFIER ::= { adicomUpsObjects 5 }
+adicomUpsAlarm     OBJECT IDENTIFIER ::= { adicomUpsObjects 6 }
+adicomUpsAgent     OBJECT IDENTIFIER ::= { adicomUpsObjects 7 }
+
+-- ===========================================================================
+--
+-- adicomUpsIdentification
+-- IdentModel = I000
+-- IdentSerialNumber = I022
+-- IdentFirmwareVersion = W001
+-- IdentAgentSoftwareVersion = W005
+-- ===========================================================================
+
+adicomUpsIdentModel OBJECT-TYPE
+      SYNTAX DisplayString (SIZE (0..63))
+      ACCESS read-only
+      STATUS mandatory
+      DESCRIPTION
+          "The UPS Model designation."
+      ::= { adicomUpsIdent 1 }
+
+adicomUpsIdentSerialNumber OBJECT-TYPE
+      SYNTAX DisplayString (SIZE(0..15))
+      ACCESS read-only
+      STATUS mandatory
+      DESCRIPTION
+          "The UPS serial number"
+      ::= { adicomUpsIdent 2 }
+
+adicomUpsIdentFirmwareVersion OBJECT-TYPE
+       SYNTAX DisplayString (SIZE (0..63))
+       ACCESS read-only
+       STATUS mandatory
+       DESCRIPTION
+           "The UPS firmware version."
+      ::= { adicomUpsIdent 3 }
+
+adicomUpsIdentAgentSoftwareVersion OBJECT-TYPE
+      SYNTAX DisplayString (SIZE(0..31))
+      ACCESS read-only
+      STATUS mandatory
+      DESCRIPTION
+          "SNMP agent software version."
+      ::= { adicomUpsIdent 4 }
+
+-- ===========================================================================
+--
+-- UPS BATTERY STATUS
+-- Low=A011, Depleted=A012, Discharging=A010, Failure=A009
+--
+-- UNIT BATTERY MEASUREMENTS
+-- SecondOnBattery = M090 
+-- EstimatedMinutesRemaining = M095 
+-- EstimatedChargeRemaining = M094 
+-- BatteryVoltage = (M082 + M083)
+-- BatteryTemperature = M091
+-- ===========================================================================
+
+adicomUpsBatteryStatus OBJECT-TYPE
+     SYNTAX     INTEGER {
+           unknown(1),
+           batteryNormal(2),
+           batteryLow(3),
+           batteryDepleted(4),
+           batteryDischarging(5),
+           batteryFailure(6)
+     }
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The battery status of the unit"
+     ::= { adicomUpsBattery 1 }
+
+adicomUpsSecondsOnBattery OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+        "If the unit is on battery power, the elapsed time
+        since the unit last switched to battery power."
+     ::= { adicomUpsBattery 2 }
+
+adicomUpsEstimatedMinutesRemaining OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+        "An estimate of the time to battery charge depletion
+        under the present load conditions."
+     ::= { adicomUpsBattery 3 }
+
+adicomUpsEstimatedChargeRemaining OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+        "An estimate of the battery charge remaining expressed
+         as a percent of full charge."
+     ::= { adicomUpsBattery 4 }
+
+adicomUpsBatteryVoltage OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The battery voltage in 0.1 Volt DC."
+     ::= { adicomUpsBattery 5 }
+
+adicomUpsBatteryTemperature OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The temperature measurement inside the battery cabinet in 0.1 deg.C."
+     ::= { adicomUpsBattery 6 }
+
+
+
+-- ===========================================================================
+--
+-- UNIT INPUT STATUS
+--
+-- InputFrequency=M064
+-- InputNumLines = 3 if (T014=0) else 1 phase ups
+-- InputVoltage=M058,M059,M060
+-- ===========================================================================
+
+
+adicomUpsInputFrequency OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Rectifier Input frequency in 0.1 HZ."
+     ::= { adicomUpsInput 1 }
+
+
+adicomUpsInputNumLines OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The number of phases"
+     ::= { adicomUpsInput 2 }
+
+
+adicomUpsInputTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AdicomUpsInputEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "A list of input table entries"
+    ::= { adicomUpsInput  3 }
+
+
+adicomUpsInputEntry OBJECT-TYPE
+    SYNTAX AdicomUpsInputEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "Array of measurements"
+    INDEX { adicomUpsInputLineIndex }
+    ::= { adicomUpsInputTable  1 }
+
+AdicomUpsInputEntry ::= SEQUENCE {
+             adicomUpsInputLineIndex INTEGER,
+             adicomUpsInputVoltage INTEGER
+             }
+
+adicomUpsInputLineIndex OBJECT-TYPE
+     SYNTAX INTEGER (0..65535)
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Rectifier input phase number."
+     ::= { adicomUpsInputEntry 1 }
+
+adicomUpsInputVoltage OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Rectifier input voltage in volts."
+     ::= { adicomUpsInputEntry 2 }
+
+-- ===========================================================================
+--
+-- UPS OUTPUT STATUS
+-- normal=S000, bypass=S001, battery=A010, booster=notmanage, reduce=notmanage, ecomode=S006, esaver=S004
+-- OutputFrequency = M009
+-- OutputLoadRate = M023
+-- OutputkVA= = M024
+-- OutputNumLines = 4 if (T014=0)
+-- OutputVoltage = M003,M004,M005
+-- OutputCurrent = M006,M007,M008
+
+-- ===========================================================================
+
+adicomUpsOutputSource OBJECT-TYPE
+     SYNTAX INTEGER {
+           standby(1),
+           none(2),
+           normal(3),
+           bypass(4),
+           battery(5),
+           booster(6),
+           reducer(7),
+           standby(8),
+           eco-mode(9),
+           e-saver(10)
+     }
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS load status"
+     ::= { adicomUpsOutput 1 }
+
+
+adicomUpsOutputFrequency OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS Output frequency in 0.1 HZ."
+     ::= { adicomUpsOutput 2 }
+
+adicomUpsOutputLoadRate OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS Output Load Rate in %."
+     ::= { adicomUpsOutput 3 }
+
+adicomUpsOutputkVA OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS Output Power in kVA."
+     ::= { adicomUpsOutput 4 }
+
+adicomUpsOutputNumLines OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Number of phases"
+     ::= { adicomUpsOutput 5 }
+
+adicomUpsOutputTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AdicomUpsOutputEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "A list of input table entries."
+    ::= { adicomUpsOutput  6 }
+
+adicomUpsOutputEntry OBJECT-TYPE
+    SYNTAX AdicomUpsOutputEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "Array of measurements"
+    INDEX { adicomUpsOutputLineIndex }
+    ::= { adicomUpsOutputTable  1 }
+
+AdicomUpsOutputEntry ::= SEQUENCE {
+             adicomUpsOutputLineIndex INTEGER,
+             adicomUpsOutputVoltage INTEGER,
+             adicomUpsOutputCurrent INTEGER
+             }
+
+adicomUpsOutputLineIndex OBJECT-TYPE
+     SYNTAX INTEGER (0..65535)
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Output phase number."
+     ::= { adicomUpsOutputEntry 1 }
+
+adicomUpsOutputVoltage OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Output voltage in volts."
+     ::= { adicomUpsOutputEntry 2 }
+
+adicomUpsOutputCurrent OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Output current in Amps."
+     ::= { adicomUpsOutputEntry 3 }
+
+-- ===========================================================================
+--
+-- UPS Bypass STATUS
+--
+-- BypassFrequency=M031
+-- BypassNumLines = 3 if (T014=0) else 1 phase ups
+-- BypassVoltage=M028,M029,M030
+-- ===========================================================================
+
+
+adicomUpsBypassFrequency OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Bypass Input frequency in 0.1 HZ."
+     ::= { adicomUpsBypass 1 }
+
+
+adicomUpsBypassNumLines OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The number of phases"
+     ::= { adicomUpsBypass 2 }
+
+
+adicomUpsBypassTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AdicomUpsBypassEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "A list of bypass table entries"
+    ::= { adicomUpsBypass  3 }
+
+
+adicomUpsBypassEntry OBJECT-TYPE
+    SYNTAX AdicomUpsBypassEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "Array of measurements"
+    INDEX { adicomUpsBypassLineIndex }
+    ::= { adicomUpsBypassTable  1 }
+
+AdicomUpsBypassEntry ::= SEQUENCE {
+             adicomUpsBypassLineIndex INTEGER,
+             adicomUpsBypassVoltage INTEGER
+             }
+
+adicomUpsBypassLineIndex OBJECT-TYPE
+     SYNTAX INTEGER (0..65535)
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Bypass input supply phase number."
+     ::= { adicomUpsBypassEntry 1 }
+
+adicomUpsBypassVoltage OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Bypass input voltage in volts."
+     ::= { adicomUpsBypassEntry 2 }
+
+
+-- ===========================================================================
+--
+-- UPS ALARMS
+-- The alarm table is not manage in this case (?)
+-- 
+-- wellknown alarm list:
+-- ImminentStop=A000
+-- UpsOverload=A001
+-- TransferImpossible=A002 or A003
+-- InsufficientResource=A004
+-- RedundancyLoss=A005
+-- TemperatureAlarm=A013
+-- GeneralAlarm=A015
+-- ===========================================================================
+
+adicomUpsWellKnownAlarms OBJECT IDENTIFIER ::= { adicomUpsAlarm  1 }
+
+adicomUpsImminentStop OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS Imminent Stop"
+     ::= { adicomUpsWellKnownAlarms 1 }
+
+adicomUpsOverload OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS in overload"
+     ::= { adicomUpsWellKnownAlarms 2 }
+
+adicomUpsTransferImpossible OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "Transfer Impossible"
+     ::= { adicomUpsWellKnownAlarms 3 }
+
+
+adicomUpsInsufficientResource OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The UPS hasn't the resource to supply the load."
+     ::= { adicomUpsWellKnownAlarms 4 }
+
+adicomUpsRedundancyLoss OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The units are not any more redundant"
+     ::= { adicomUpsWellKnownAlarms 5 }
+
+
+adicomUpsTemperatureAlarm OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "The UPS or battery temperature is over the limits"
+     ::= { adicomUpsWellKnownAlarms 6 }
+
+
+adicomUpsGeneralAlarm OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+         "UPS general alarm"
+     ::= { adicomUpsWellKnownAlarms 7 }
+
+
+-- ===========================================================================
+-- adicomUpsAgent
+--
+-- Agent
+-- ===========================================================================   
+     
+adicomUpsAgentTrapString OBJECT-TYPE
+        SYNTAX DisplayString
+        ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+                "This OID allows traps to be sent with an octet string argument"
+        ::= { adicomUpsAgent 1 }
+
+
+-- ===========================================================================
+-- adicomUpsTraps
+--
+-- Traps group
+-- TrapLoadOnInverter = S000
+-- TrapOnBatteryPower = A010
+-- TrapBatteryLow = A011 or A012
+-- TrapPowerRestored = S013
+-- TrapImminentStop = A000
+-- TrapOverload = A001
+-- TrapOutputLoadOFF = S003
+-- TrapOutputOnBypass = S001
+-- TrapGeneralAlarm = A015
+-- TrapAlarmCancelled = all traps are no more active (level 1 to level 0)
+-- ===========================================================================
+
+   -- This section defines the well-known notifications sent by UPS
+   -- Care must be taken to insure that no particular notification
+   -- is sent to a single receiving entity more often than once
+   -- every five seconds.
+
+   adicomUpsTrapLoadOnInverter TRAP-TYPE
+    ENTERPRISE adicomUpsTraps
+    VARIABLES { adicomUpsAgentTrapString }
+    DESCRIPTION
+        "INFORMATION: Load protected and supplied by Inverter."
+     ::= 1
+
+   adicomUpsTrapOnBatteryPower TRAP-TYPE
+    ENTERPRISE adicomUpsTraps
+    VARIABLES { adicomUpsAgentTrapString }
+    DESCRIPTION
+        "WARNING: The UPS has switched to battery backup power."
+     ::= 2
+
+   adicomUpsTrapBatteryLow TRAP-TYPE
+    ENTERPRISE adicomUpsTraps
+    VARIABLES { adicomUpsAgentTrapString }
+    DESCRIPTION
+        "SEVERE: Battery is near to be discharged."      
+     ::= 3
+
+   adicomUpsTrapPowerRestored TRAP-TYPE
+    ENTERPRISE adicomUpsTraps
+    VARIABLES { adicomUpsAgentTrapString }
+    DESCRIPTION
+        "INFORMATION: Input power has been restored."
+     ::= 4
+
+   adicomUpsTrapImminentStop TRAP-TYPE
+       ENTERPRISE adicomUpsTraps
+       VARIABLES { adicomUpsAgentTrapString }
+       DESCRIPTION
+               "SEVERE: UPS Imminent Stop"
+     ::= 5
+
+   adicomUpsTrapOverload    TRAP-TYPE
+       ENTERPRISE adicomUpsTraps
+       VARIABLES { adicomUpsAgentTrapString }
+       DESCRIPTION
+               "SEVERE: UPS in Overload"
+     ::= 6
+
+   adicomUpsTrapOutputLoadOFF   TRAP-TYPE
+       ENTERPRISE adicomUpsTraps
+       VARIABLES { adicomUpsAgentTrapString }
+       DESCRIPTION
+               "WARNING: Load not supplied"
+     ::= 7
+
+   adicomUpsTrapOutputOnBypass  TRAP-TYPE
+       ENTERPRISE adicomUpsTraps
+       VARIABLES { adicomUpsAgentTrapString }
+       DESCRIPTION
+               "WARNING: Load supplied by automatic bypass"
+     ::= 8
+     
+   adicomUpsTrapGeneralAlarm    TRAP-TYPE
+       ENTERPRISE adicomUpsTraps
+       VARIABLES { adicomUpsAgentTrapString }
+       DESCRIPTION
+               "WARNING: UPS general alarm"
+     ::= 9   
+
+   adicomUpsTrapAlarmCancelled    TRAP-TYPE
+       ENTERPRISE adicomUpsTraps
+       VARIABLES { adicomUpsAgentTrapString }
+       DESCRIPTION
+               "Alarm cancelled. UPS in normal situation"
+     ::= 10   
+
+END

@@ -1,0 +1,1348 @@
+--
+-- ASN.1 MIB Definitions
+-- Output Date: Tue Jul 12 15:01:04 2016
+--
+
+IPE-DOT3OAM-MIB DEFINITIONS ::= BEGIN
+
+-----------------------------------------------
+-- IMPORTS Definitions
+-----------------------------------------------
+
+    IMPORTS
+        InterfaceIndex, InterfaceIndexOrZero
+            FROM IF-MIB
+        Counter32, enterprises, Integer32, IpAddress, NOTIFICATION-TYPE,
+        OBJECT-TYPE, Opaque, Unsigned32
+            FROM SNMPv2-SMI
+        DateAndTime, MacAddress, TEXTUAL-CONVENTION
+            FROM SNMPv2-TC;
+
+-----------------------------------------------
+-- Textual Convention Definitions
+-----------------------------------------------
+
+    EnableDisableValue ::= TEXTUAL-CONVENTION
+        STATUS       current
+        DESCRIPTION  "Enable/Disable Type"
+        SYNTAX       INTEGER { invalid(0), disable(1), enable(2) }
+
+    SeverityValue ::= TEXTUAL-CONVENTION
+        STATUS       current
+        DESCRIPTION  "Severity (CCITT Rec. X.733)"
+        SYNTAX       INTEGER {
+                         cleared(1),
+                         indetermine(2),
+                         critical(3),
+                         major(4),
+                         minor(5),
+                         warning(6)
+                     }
+
+-----------------------------------------------
+-- Begin User MIB Object Definitions
+-----------------------------------------------
+
+    nec OBJECT IDENTIFIER
+        ::= { enterprises 119 }
+
+    nec-mib OBJECT IDENTIFIER
+        ::= { nec 2 }
+
+    necProductDepend OBJECT IDENTIFIER
+        ::= { nec-mib 3 }
+
+    radioEquipment OBJECT IDENTIFIER
+        ::= { necProductDepend 69 }
+
+    pasoNeoIpe-common OBJECT IDENTIFIER
+        ::= { radioEquipment 501 }
+
+-----------------------------------------------
+-- IPE COMMON Group Definitions
+-----------------------------------------------
+
+    alarmStatusGroup OBJECT IDENTIFIER
+        ::= { pasoNeoIpe-common 3 }
+
+    provisioningGroup OBJECT IDENTIFIER
+        ::= { pasoNeoIpe-common 5 }
+
+    maintenanceGroup OBJECT IDENTIFIER
+        ::= { pasoNeoIpe-common 6 }
+
+-----------------------------------------------
+-- alarmStatusGroup Definitions
+-----------------------------------------------
+
+    asDot3OamGroup OBJECT IDENTIFIER
+        ::= { alarmStatusGroup 46 }
+
+    asDot3OamPortTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF AsDot3OamPortEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains status of the OAM capabilities of the
+            interface."
+        ::= { asDot3OamGroup 1 }
+
+    asDot3OamPortEntry OBJECT-TYPE
+        SYNTAX       AsDot3OamPortEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Entries in the table are created automatically."
+        INDEX        { asDot3OamPortIfIndex }
+        ::= { asDot3OamPortTable 1 }
+
+    AsDot3OamPortEntry ::= SEQUENCE {
+        asDot3OamPortIfIndex             InterfaceIndex,
+        asDot3OamPortNEAddress           IpAddress,
+        asDot3OamPortOperStatus          INTEGER,
+        asDot3OamPortMaxOamPduSize       Unsigned32,
+        asDot3OamPortConfigRevision      Unsigned32,
+        asDot3OamPortFunctionsSupported  BITS
+    }
+
+    asDot3OamPortIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { asDot3OamPortEntry 1 }
+
+    asDot3OamPortNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { asDot3OamPortEntry 2 }
+
+    asDot3OamPortOperStatus OBJECT-TYPE
+        SYNTAX       INTEGER {
+                         invalid(0),
+                         disabled(1),
+                         linkFault(2),
+                         passiveWait(3),
+                         activeSendLocal(4),
+                         sendLocalAndRemote(5),
+                         sendLocalAndRemoteOK(6),
+                         oamPeeringLocallyRejected(7),
+                         oamPeeringRemotelyRejected(8),
+                         operational(9),
+                         nonOperHalfDuplex(10)
+                     }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "This value is always disabled(1) if OAM is disabled on the
+            interface via the provDot3OamPortEnabled.
+            
+            If the link has detected a fault and is transmitting OAMPDUs with
+            a link fault indication or the interface is not operational, the
+            value is linkFault(2).
+            
+            The passiveWait(3) state is returned only by OAM entities in
+            passive mode and reflects the state in which the OAM entity is
+            waiting to see if the peer device is OA capable. The
+            activeSendLocal(4) value is used by active mode trying to
+            discover whether the peer has OAM capability but has not yet made
+            that determination.
+            
+            The state sendLocalAndRemote(5) reflects that the local OA entity
+            has discovered the peer but has not yet accepted or rejected the
+            configuration of the peer. The local device can, for whatever
+            reason, decide that the peer device is unacceptable and decline
+            OAM peering. If the local OAM entity rejects the peer OAM entity,
+            the state becomes oamPeeringLocallyRejected(7). If the OAM
+            peering is allowed by the local device, the state moves to
+            sendLocalAndRemoteOk(6).
+            
+            If the remote OAM entity rejects the peering, the state becomes
+            oamPeeringRemotelyRejected(8). When the local OAM entity learns
+            that both it and the remote OAM entity have accepted the peering,
+            the state moves to operational(9). Since Ethernet OAM functions
+            are not designed to work completely over half-duplex interfaces,
+            the value nonOperHalfDuplex(10) is returned whenever Ethernet OAM
+            is enabled, but the interface is in half-duplex operation."
+        ::= { asDot3OamPortEntry 3 }
+
+    asDot3OamPortMaxOamPduSize OBJECT-TYPE
+        SYNTAX       Unsigned32 (64..1518)
+        UNITS        "octets"
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The largest OAMPDU that the OAM entity supports. OA entities
+            exchange maximum OAMPDU sizes and negotiate to use the smaller of
+            the two maximum OAMPDU sizes between the peers."
+        ::= { asDot3OamPortEntry 4 }
+
+    asDot3OamPortConfigRevision OBJECT-TYPE
+        SYNTAX       Unsigned32 (0..65535)
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The configuration revision of the OAM entity as reflected in the
+            latest OAMPDU sent by the OAM entity. The config revision is used
+            by OAM entities to indicate that configuration changes have
+            occurred, which might require the peer OAM entity to re-evaluate
+            whether OAM peering is allowed."
+        ::= { asDot3OamPortEntry 5 }
+
+    asDot3OamPortFunctionsSupported OBJECT-TYPE
+        SYNTAX       BITS {
+                         unidirectionalSupport(0),
+                         loopbackSupport(1),
+                         eventSupport(2),
+                         variableSupport(3)
+                     }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The OAM functions supported on this interface. OAM consists of
+            separate functional sets beyond the basic discovery process that
+            is always required. These functional groups can be supported
+            independently by any implementation. These values are
+            communicated to the peer via the local configuration field of
+            Information OAMPDUs.
+            
+            Setting unidirectionalSupport(0) indicates that the OA entity
+            supports the transmission of OAMPDUs on links that are operating
+            in unidirectional mode. Setting loopbackSupport(1) indicates that
+            the OAM entity can initiate and respond to loopback commands.
+            Setting eventSupport(2) indicates that the OAM entity can send
+            and receive Event Notification OAMPDUs. Setting
+            variableSupport(3) indicates that the OAM entity can send and
+            receive Variable Request and Response OAMPDUs."
+        ::= { asDot3OamPortEntry 6 }
+
+    asDot3OamPeerTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF AsDot3OamPeerEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains information about the OAM peer for a
+            particular interface. OAM entities communicates with a single OAM
+            peer entity on Ethernet links."
+        ::= { asDot3OamGroup 2 }
+
+    asDot3OamPeerEntry OBJECT-TYPE
+        SYNTAX       AsDot3OamPeerEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "An entry in the table containing information on the peer entity
+            for a single interface.
+            
+            Note that there is at most on OAM peer for each interface. Peer
+            information is not reliable when asDot3OamPortStatus is
+            disabled(1), linkFault(2), passiveWait(3), activeSendLocal(4), or
+            nonOperHalfDuplex(10)."
+        INDEX        { asDot3OamPeerIfIndex }
+        ::= { asDot3OamPeerTable 1 }
+
+    AsDot3OamPeerEntry ::= SEQUENCE {
+        asDot3OamPeerIfIndex             InterfaceIndex,
+        asDot3OamPeerNEAddress           IpAddress,
+        asDot3OamPeerMacAddress          MacAddress,
+        asDot3OamPeerVendorOui           OCTET STRING,
+        asDot3OamPeerVendorInfo          Unsigned32,
+        asDot3OamPeerMode                INTEGER,
+        asDot3OamPeerMaxOamPduSize       Unsigned32,
+        asDot3OamPeerConfigRevision      Unsigned32,
+        asDot3OamPeerFunctionsSupported  BITS
+    }
+
+    asDot3OamPeerIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { asDot3OamPeerEntry 1 }
+
+    asDot3OamPeerNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { asDot3OamPeerEntry 2 }
+
+    asDot3OamPeerMacAddress OBJECT-TYPE
+        SYNTAX       MacAddress
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The MAC address of the peer OAM entity. The MAC address is
+            derived from the most recently received OAMPDU."
+        ::= { asDot3OamPeerEntry 3 }
+
+    asDot3OamPeerVendorOui OBJECT-TYPE
+        SYNTAX       OCTET STRING (SIZE(3..3))
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The OUI of the OAM peer as reflected in the latest Information
+            OAMPDU received with a Local Information TLV. The OUI can be used
+            to identify the vendor of the remote OA entity. This value is
+            initialized to three octets of zero before any Local Information
+            TLV is received."
+        ::= { asDot3OamPeerEntry 4 }
+
+    asDot3OamPeerVendorInfo OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The Vendor Info of the OAM peer as reflected in the latest
+            Information OAMPDU received with a Local Information TLV.
+            The semantics of the Vendor Information field is proprietary and
+            specific to the vendor. This value is initialized to zero before
+            any Local Information TLV is received."
+        ::= { asDot3OamPeerEntry 5 }
+
+    asDot3OamPeerMode OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), passive(1), active(2), unknown(3) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The mode of the OAM peer as reflected in the latest Information
+            OAMPDU received with a Local Information TLV. The mode of the
+            peer can be determined from the Configuration field in the Local
+            Information TLV of the last Information OAMPDU received from the
+            peer. The value is unknown(3) whenever no Local Information TLV
+            has been received. The values of active(2) and passive(1) are
+            returned when a Local Information TLV has been received
+            indicating that the peer is in active or passive mode,
+            respectively."
+        ::= { asDot3OamPeerEntry 6 }
+
+    asDot3OamPeerMaxOamPduSize OBJECT-TYPE
+        SYNTAX       Unsigned32 (0|64..1518)
+        UNITS        "octets"
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The maximum size of OAMPDU supported by the peer as reflected in
+            the latest Information OAMPDU received with a Local Information
+            TLV. Ethernet OAM on this interface must not use OAMPDUs that
+            exceed this size. The maximum OAMPDU size can be determined from
+            the PDU Configuration field of the Local Information TLV of the
+            last Information OAMPDU received from the peer. A value of zero
+            is returned if no Local Information TLV has been received.
+            Otherwise, the value of the OAM peer's maximum OAMPDU size is
+            returned in this value."
+        ::= { asDot3OamPeerEntry 7 }
+
+    asDot3OamPeerConfigRevision OBJECT-TYPE
+        SYNTAX       Unsigned32 (0..65535)
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The configuration revision of the OAM peer as reflected in the
+            latest OAMPDU. This attribute is changed by the peer whenever it
+            has a local configuration change for Ethernet OA on this
+            interface. The configuration revision can be determined from the
+            Revision field of the Local Information TLV of the most recently
+            received Information OAMPDU with a Local Information TLV. A value
+            of zero is returned if no Local Information TLV has been
+            received."
+        ::= { asDot3OamPeerEntry 8 }
+
+    asDot3OamPeerFunctionsSupported OBJECT-TYPE
+        SYNTAX       BITS {
+                         unidirectionalSupport(0),
+                         loopbackSupport(1),
+                         eventSupport(2),
+                         variableSupport(3)
+                     }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The OAM functions supported on the interface. OAM consists of
+            separate functionality sets above the basic discovery process.
+            This value indicates the capabilities of the peer OAM entity with
+            respect to these functions. This value is initialized so all bits
+            are clear.
+            
+            If unidirectionalSupport(0) is set, the the peer OAM entity
+            supports sending OAM frames on the interfaces when the receive
+            path is known to be inoperable. If loopbackSupport(1) is set,
+            then the peer OAM entity can send and receive OAM loopback
+            commands. If eventSupport(2) is set, then the peer OAM entity can
+            send and receive event OAMPDUs to signal various error
+            conditions. If variableSupport(3) is set, then the peer OAM
+            entity can send and receive variable requests to monitor the
+            attribute value.
+            
+            The capabilities of the OAM peer can be determined from the
+            configuration field of the Local Information TLV of the most
+            recently received Information OAMPDU with a Local Information
+            TLV. All zeros are returned if no Local Information TLV has yet
+            been received."
+        ::= { asDot3OamPeerEntry 9 }
+
+    asDot3OamPortStatsTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF AsDot3OamPortStatsEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains statistics for the OAM function on a
+            particular interface. There is an entry in the table for every
+            asDot3OamPortTable."
+        ::= { asDot3OamGroup 3 }
+
+    asDot3OamPortStatsEntry OBJECT-TYPE
+        SYNTAX       AsDot3OamPortStatsEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "An entry in the table containing statistics information on the
+            Ethernet OAM function for a single interface. Entries are
+            automatically created for every entry in the asDot3OamPortTable.
+            Counters are maintained across transitions in
+            asDot3OamPortStatus."
+        INDEX        { asDot3OamPortStatsIfIndex }
+        ::= { asDot3OamPortStatsTable 1 }
+
+    AsDot3OamPortStatsEntry ::= SEQUENCE {
+        asDot3OamPortStatsIfIndex       InterfaceIndex,
+        asDot3OamPortStatsNEAddress     IpAddress,
+        asDot3OamInformationTx          Counter32,
+        asDot3OamInformationRx          Counter32,
+        asDot3OamUniqueEventNotifTx     Counter32,
+        asDot3OamUniqueEventNotifRx     Counter32,
+        asDot3OamDuplicateEventNotifTx  Counter32,
+        asDot3OamDuplicateEventNotifRx  Counter32,
+        asDot3OamLoopbackControlTx      Counter32,
+        asDot3OamLoopbackControlRx      Counter32,
+        asDot3OamVariableRequestTx      Counter32,
+        asDot3OamVariableRequestRx      Counter32,
+        asDot3OamVariableResponseTx     Counter32,
+        asDot3OamVariableResponseRx     Counter32,
+        asDot3OamOrgSpecificTx          Counter32,
+        asDot3OamOrgSpecificRx          Counter32,
+        asDot3OamUnsupportedCodesTx     Counter32,
+        asDot3OamUnsupportedCodesRx     Counter32,
+        asDot3OamFramesLostDueToOam     Counter32
+    }
+
+    asDot3OamPortStatsIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { asDot3OamPortStatsEntry 1 }
+
+    asDot3OamPortStatsNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { asDot3OamPortStatsEntry 2 }
+
+    asDot3OamInformationTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Information OAMPDUs transmitted on the
+            interface."
+        ::= { asDot3OamPortStatsEntry 3 }
+
+    asDot3OamInformationRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Information OAMPDUs received on the
+            interface."
+        ::= { asDot3OamPortStatsEntry 4 }
+
+    asDot3OamUniqueEventNotifTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of unique Event OAMPDUs transmitted on the
+            interface. Event Notifications may be sent in duplicate to
+            increase the probability of successfully being received, given
+            the possibility that a frame may be lost in transit. Duplicate
+            Event Notification transmissions are counted by
+            asDot3OamDuplicatedEventNotifTx.
+            
+            A unique Event Notification OAMPDU is indicated as an Event
+            Notification OAMPDU with a Sequence Number field that is distinct
+            from the previously transmitted Event Notification OAMPDU
+            Sequence Number."
+        ::= { asDot3OamPortStatsEntry 5 }
+
+    asDot3OamUniqueEventNotifRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of unique Event OAMPDUs received on the
+            interface. Event Notifications may be sent in duplicate to
+            increase the probability of successfully being received, given
+            the possibility that a frame may be lost in transit. Duplicate
+            Event Notification receptions are counted by
+            asDot3OamDuplicateEventNotifRx.
+            
+            A unique Event Notification OAMPDU is indicated as an Event
+            Notification OAMPDU with a Sequence Nubmer field that is distinct
+            from the previously received Event Notification OAMPDU Sequence
+            Number."
+        ::= { asDot3OamPortStatsEntry 6 }
+
+    asDot3OamDuplicateEventNotifTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of duplicate Event OAMPDUs transmitted on
+            the interface. Event Notification OAMPDUs may be sent in
+            duplicate to increase the probability of successfully being
+            received, given the possibility that a frame may be lost in
+            transit.
+            
+            A duplicate Event Notification OAMPDU is indicated as an Event
+            Notification OAMPDU with a Sequence Number field that is
+            identical to the previously transmitted Event Notification OAMPDU
+            Sequence Number."
+        ::= { asDot3OamPortStatsEntry 7 }
+
+    asDot3OamDuplicateEventNotifRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of duplicate Event OAMPDUs received on the
+            interface. Event Notification OAMPDUs may be sent in duplicate to
+            increase the probability of successfully being received, given
+            the possibility that a frame may be lost in transit.
+            
+            A duplicate Event Notification OAMPDU is indicated as an Event
+            Notification OAMPDU with a Sequence Number field that is
+            identical to the previously received Event Notification OAMPDU
+            Sequence Number."
+        ::= { asDot3OamPortStatsEntry 8 }
+
+    asDot3OamLoopbackControlTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Loopback Control OAMPDUs transmitted on
+            the interface."
+        ::= { asDot3OamPortStatsEntry 9 }
+
+    asDot3OamLoopbackControlRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Loopback Control OAMPDUs received on
+            the interface."
+        ::= { asDot3OamPortStatsEntry 10 }
+
+    asDot3OamVariableRequestTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Variable Request OAMPDUs transmitted on
+            the interface."
+        ::= { asDot3OamPortStatsEntry 11 }
+
+    asDot3OamVariableRequestRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Variable Request OAMPDUs received on
+            the interface."
+        ::= { asDot3OamPortStatsEntry 12 }
+
+    asDot3OamVariableResponseTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Variable Response OAMPDUs transmitted
+            on the interface."
+        ::= { asDot3OamPortStatsEntry 13 }
+
+    asDot3OamVariableResponseRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Variable Response OAMPDUs received on
+            the interface."
+        ::= { asDot3OamPortStatsEntry 14 }
+
+    asDot3OamOrgSpecificTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Organization Specific OAMPDUs
+            transmitted on the interface."
+        ::= { asDot3OamPortStatsEntry 15 }
+
+    asDot3OamOrgSpecificRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of Organization Specific OAMPDUs received
+            on the interface."
+        ::= { asDot3OamPortStatsEntry 16 }
+
+    asDot3OamUnsupportedCodesTx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of OAMPDUs transmitted on the interface
+            with an unsupported op-code."
+        ::= { asDot3OamPortStatsEntry 17 }
+
+    asDot3OamUnsupportedCodesRx OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of OAMPDUs received on the interface with
+            an unsupported op-code."
+        ::= { asDot3OamPortStatsEntry 18 }
+
+    asDot3OamFramesLostDueToOam OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "A count of the number of frames that were dropped by the OA
+            multiplexer. Since the OAM multiplexer has multiple inputs and a
+            single output, there may be cases where frames are dropped due to
+            transmit resource contention. This counter is incremented
+            whenever a fram is dropped by the OAM layer.
+            Note that any Ethernet frame, not just OAMPDUs, may be dropped by
+            the OAM layer. This can occur when an OAMPDU takes precedence
+            over a 'normal' frame resulting in the 'normal' frame being
+            dropped.
+            
+            When this counter is incremented, no other counters in ths MIB
+            are incremented."
+        ::= { asDot3OamPortStatsEntry 19 }
+
+    asDot3OamPortAlarmTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF AsDot3OamPortAlarmEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains alarm & status information of the
+            interface."
+        ::= { asDot3OamGroup 4 }
+
+    asDot3OamPortAlarmEntry OBJECT-TYPE
+        SYNTAX       AsDot3OamPortAlarmEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "An entry in the table containing alarm & status information on
+            the Ethernet OAM function for a single interface. Entries are
+            automatically created for enery entry in the asDot3OamPortTable."
+        INDEX        { asDot3OamPortAlarmIfIndex }
+        ::= { asDot3OamPortAlarmTable 1 }
+
+    AsDot3OamPortAlarmEntry ::= SEQUENCE {
+        asDot3OamPortAlarmIfIndex                   InterfaceIndex,
+        asDot3OamPortAlarmNEAddress                 IpAddress,
+        asDot3OamPortLinkOamDown                    SeverityValue,
+        asDot3OamPortLocalDyingGasp                 INTEGER,
+        asDot3OamPortLocalCriticalEvent             INTEGER,
+        asDot3OamPortRemoteErroredSymbolEvent       INTEGER,
+        asDot3OamPortRemoteErroredFramePeriodEvent  INTEGER,
+        asDot3OamPortRemoteErroredFrameEvent        INTEGER,
+        asDot3OamPortRemoteErroredFrameSecondEvent  INTEGER,
+        asDot3OamPortRemoteLinkFault                SeverityValue,
+        asDot3OamPortRemoteDyingGasp                SeverityValue,
+        asDot3OamPortRemoteCriticalEvent            SeverityValue
+    }
+
+    asDot3OamPortAlarmIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { asDot3OamPortAlarmEntry 1 }
+
+    asDot3OamPortAlarmNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { asDot3OamPortAlarmEntry 2 }
+
+    asDot3OamPortLinkOamDown OBJECT-TYPE
+        SYNTAX       SeverityValue
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The alarm status of the OAM function status. When the Discovery
+            State of the interface is not in SEND_ANY, the object becomes
+            alarm state."
+        ::= { asDot3OamPortAlarmEntry 3 }
+
+    asDot3OamPortLocalDyingGasp OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), normal(1), generated(2) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Generating Dying Gasp OAMPDU status.
+            If the OAM entity sends the DyingGasp OAMPDUs, the object will
+            return the value 'generated'."
+        ::= { asDot3OamPortAlarmEntry 4 }
+
+    asDot3OamPortLocalCriticalEvent OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), normal(1), generated(2) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Generating Critical Event OAMPDU status.
+            If the OAM entity sends the CriticalEvent OAMPDUs, the object
+            will return the value 'generated'."
+        ::= { asDot3OamPortAlarmEntry 5 }
+
+    asDot3OamPortRemoteErroredSymbolEvent OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), normal(1), received(2) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving Errored Symbol Event OAMPDU status.
+            If the OAM entity receives the ErroredSymbolEvent OAMPDUs from
+            peer, the object will show the value 'received'."
+        ::= { asDot3OamPortAlarmEntry 6 }
+
+    asDot3OamPortRemoteErroredFramePeriodEvent OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), normal(1), received(2) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving Errored Frame Period Event OAMPDU status.
+            If the OAM entity receives the ErroredFramePeriodEvent OAMPDUs
+            from peer, the object will show the value 'received'."
+        ::= { asDot3OamPortAlarmEntry 7 }
+
+    asDot3OamPortRemoteErroredFrameEvent OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), normal(1), received(2) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving Errored Frame Event OAMPDU status.
+            If the OAM entity receives the ErroredFrameEvent OAMPDUs from
+            peer, the object will show the value 'received'."
+        ::= { asDot3OamPortAlarmEntry 8 }
+
+    asDot3OamPortRemoteErroredFrameSecondEvent OBJECT-TYPE
+        SYNTAX       INTEGER { invalid(0), normal(1), received(2) }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving Errored Frame Second Event OAMPDU status.
+            If the OAM entity receives the ErroredFrameSecondEvent OAMPDUs
+            from peer, the object will show the value 'received'."
+        ::= { asDot3OamPortAlarmEntry 9 }
+
+    asDot3OamPortRemoteLinkFault OBJECT-TYPE
+        SYNTAX       SeverityValue
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving Link Fault OAMPDU.
+            If the OAM entity receives the LinkFault OAMPDUs from peer, the
+            object will report Link Fault Alarm of the interface."
+        ::= { asDot3OamPortAlarmEntry 10 }
+
+    asDot3OamPortRemoteDyingGasp OBJECT-TYPE
+        SYNTAX       SeverityValue
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving DyingGasp OAMPDU.
+            If the OAM entity receives the DyingGasp OAMPDUs from peer, the
+            object will report DyingGasp Alarm of the interface."
+        ::= { asDot3OamPortAlarmEntry 11 }
+
+    asDot3OamPortRemoteCriticalEvent OBJECT-TYPE
+        SYNTAX       SeverityValue
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "Receiving Critial Event OAMPDU.
+            If the OAM entity receives the CriticalEvent OAMPDUs from peer,
+            the object will report CriticalEvent Alarm of the interface."
+        ::= { asDot3OamPortAlarmEntry 12 }
+
+-----------------------------------------------
+-- provisioningGroup Definitions
+-----------------------------------------------
+
+    provDot3OamGroup OBJECT IDENTIFIER
+        ::= { provisioningGroup 46 }
+
+    provDot3OamPortTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ProvDot3OamPortEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains provisioning objects for the OAM function on
+            a particular interface."
+        ::= { provDot3OamGroup 1 }
+
+    provDot3OamPortEntry OBJECT-TYPE
+        SYNTAX       ProvDot3OamPortEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "An entry in the table that contains configuration on the
+            Ethernet OAM function for sngle interface. Entries in the table
+            are created automatically for each interface."
+        INDEX        { provDot3OamPortIfIndex }
+        ::= { provDot3OamPortTable 1 }
+
+    ProvDot3OamPortEntry ::= SEQUENCE {
+        provDot3OamPortIfIndex           InterfaceIndex,
+        provDot3OamPortNEAddress         IpAddress,
+        provDot3OamPortEnabled           EnableDisableValue,
+        provDot3OamPortMode              INTEGER,
+        provDot3OamTxPduRepetitionTimes  Integer32,
+        provDot3OamLocalLinkLostTimer    Integer32,
+        provDot3OamTxPduCounts           Integer32,
+        provDot3OamLoopbackIgnoreRx      INTEGER,
+        provDot3OamLlfCriticalEvent      EnableDisableValue
+    }
+
+    provDot3OamPortIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { provDot3OamPortEntry 1 }
+
+    provDot3OamPortNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { provDot3OamPortEntry 2 }
+
+    provDot3OamPortEnabled OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object is used to provision the default administrative OAM
+            mode for the interface. This object represents the desired state
+            of OAM for this interface.
+            
+            This object always starts disabled state until explicit
+            management action or configuration information retained by the
+            system causes a transition to the enabled state. When enabled,
+            Ethernet OAM will attempt to operate over this interface."
+        DEFVAL       { disable }
+        ::= { provDot3OamPortEntry 3 }
+
+    provDot3OamPortMode OBJECT-TYPE
+        SYNTAX       INTEGER { passive(1), active(2) }
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object configures the mode of OAM operation for this
+            interface. OAM on Ethernet interfaces may be in 'active' mode or
+            'passive' mode. These two modes differ in that active mode
+            provides additional capabilities to initiate monitoring
+            activities with the remote OAM peer entity, while passive mode
+            generally waits for the peer to initiate OA actions with it.
+            
+            Changing this value results in incrementing the configuration
+            revision field of locally generated OAMPDUs and potentially
+            re-doing the OAM discovery process if the asDot3OamPortStatus was
+            already operational(9)."
+        DEFVAL       { active }
+        ::= { provDot3OamPortEntry 4 }
+
+    provDot3OamTxPduRepetitionTimes OBJECT-TYPE
+        SYNTAX       Integer32 (1..10)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object configures the number of notification OAMPDUs when
+            the critical event occurs."
+        DEFVAL       { 3 }
+        ::= { provDot3OamPortEntry 5 }
+
+    provDot3OamLocalLinkLostTimer OBJECT-TYPE
+        SYNTAX       Integer32 (1..10)
+        UNITS        "seconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object configures the detection time of losing the OAM Link
+            state."
+        DEFVAL       { 5 }
+        ::= { provDot3OamPortEntry 6 }
+
+    provDot3OamTxPduCounts OBJECT-TYPE
+        SYNTAX       Integer32 (1..10)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object configures the maximum transmission counts of slow
+            protocol PDUs excluding DyingGasp and Critical Event PDUs."
+        DEFVAL       { 10 }
+        ::= { provDot3OamPortEntry 7 }
+
+    provDot3OamLoopbackIgnoreRx OBJECT-TYPE
+        SYNTAX       INTEGER { ignore(1), process(2) }
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If ignore(1) is set, the OAM entity ignores Loopback Request
+            OAMPDUs from peer OAM entity, and the OAM entity can only
+            initiate loopback locally. It is necessary to change the value to
+            process(2) to accept loopback request."
+        DEFVAL       { process }
+        ::= { provDot3OamPortEntry 8 }
+
+    provDot3OamLlfCriticalEvent OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable is set, the OAM entity sends OAMPDUs with Critical
+            Event flag when the LLF control is notified."
+        DEFVAL       { enable }
+        ::= { provDot3OamPortEntry 9 }
+
+    provDot3OamEventTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF ProvDot3OamEventEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "Ethernet OAM includes the ability to generate and receive Event
+            Notification OAMPDUs to indicate various link problems. This
+            table contains the mechanisms to enable Event Notifications.
+            There is one entry in the table for every entry in
+            asDot3OamPortTable. The values in the table are maintained across
+            changes to asDot3OamPortStatus."
+        ::= { provDot3OamGroup 3 }
+
+    provDot3OamEventEntry OBJECT-TYPE
+        SYNTAX       ProvDot3OamEventEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "Entries are automatically created and deleted from this table,
+            and exists whenever the OAM entity supports Ethernet OA events.
+            
+            Event configuration controls when the local management entity
+            sends Event Notification OAMPDUs to its OAM peer, and when
+            certain event flags are set or cleared in OAMPDUs."
+        INDEX        { provDot3OamEventIfIndex }
+        ::= { provDot3OamEventTable 1 }
+
+    ProvDot3OamEventEntry ::= SEQUENCE {
+        provDot3OamEventIfIndex                 InterfaceIndex,
+        provDot3OamEventNEAddress               IpAddress,
+        provDot3OamErrSymPeriodEvNotifEnable    EnableDisableValue,
+        provDot3OamErrFramePeriodEvNotifEnable  EnableDisableValue,
+        provDot3OamErrFrameEvNotifEnable        EnableDisableValue,
+        provDot3OamErrFrameSecsEvNotifEnable    EnableDisableValue,
+        provDot3OamDyingGaspEnable              EnableDisableValue,
+        provDot3OamCriticalEventEnable          EnableDisableValue
+    }
+
+    provDot3OamEventIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { provDot3OamEventEntry 1 }
+
+    provDot3OamEventNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { provDot3OamEventEntry 2 }
+
+    provDot3OamErrSymPeriodEvNotifEnable OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable, the OAM entity should send an Event Notification
+            OAMPDU when an Errored Symbol Period Event occurs."
+        DEFVAL       { disable }
+        ::= { provDot3OamEventEntry 3 }
+
+    provDot3OamErrFramePeriodEvNotifEnable OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable, the OAM entity should send an Event Notification
+            OAMPDU when an Errored Frame Period Event occurs."
+        DEFVAL       { disable }
+        ::= { provDot3OamEventEntry 4 }
+
+    provDot3OamErrFrameEvNotifEnable OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable, the OAM entity should send an Event Notification
+            OAMPDU when an Errored Frame Event occurs."
+        DEFVAL       { disable }
+        ::= { provDot3OamEventEntry 5 }
+
+    provDot3OamErrFrameSecsEvNotifEnable OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable, the local OAM entity should send an Event
+            Notification OAMPDU when an Errored Frame Seconds Event occurs."
+        DEFVAL       { disable }
+        ::= { provDot3OamEventEntry 6 }
+
+    provDot3OamDyingGaspEnable OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable, the local OAM entity should attempt to indicate a
+            dying gasp via the OAMPDU flags to its peer OAM entity when a
+            dying gasp event occurs."
+        DEFVAL       { enable }
+        ::= { provDot3OamEventEntry 7 }
+
+    provDot3OamCriticalEventEnable OBJECT-TYPE
+        SYNTAX       EnableDisableValue
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "If enable, the local OAM entity should attempt to indicate a
+            critical event via the OAMPDU flags to its peer OAM entity when a
+            critical event occurs."
+        DEFVAL       { enable }
+        ::= { provDot3OamEventEntry 8 }
+
+-----------------------------------------------
+-- maintenanceGroup Definitions
+-----------------------------------------------
+
+    maintDot3OamGroup OBJECT IDENTIFIER
+        ::= { maintenanceGroup 46 }
+
+    maintDot3OamLoopbackTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF MaintDot3OamLoopbackEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains the On-demand Loopback control objects for
+            Ethernet OAM functions."
+        ::= { maintDot3OamGroup 1 }
+
+    maintDot3OamLoopbackEntry OBJECT-TYPE
+        SYNTAX       MaintDot3OamLoopbackEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "The system can execute up to 5 loopback functions
+            simultaneously, so 5 entries are automatically created when agent
+            boots."
+        INDEX        { maintDot3OamLoopbackIndex }
+        ::= { maintDot3OamLoopbackTable 1 }
+
+    MaintDot3OamLoopbackEntry ::= SEQUENCE {
+        maintDot3OamLoopbackIndex      Integer32,
+        maintDot3OamLoopbackNEAddress  IpAddress,
+        maintDot3OamLoopbackIfIndex    InterfaceIndexOrZero,
+        maintDot3OamLoopbackExecute    INTEGER,
+        maintDot3OamLoopbackFrames     Unsigned32,
+        maintDot3OamLoopbackPDULength  Unsigned32,
+        maintDot3OamLoopbackTxCounts   Unsigned32,
+        maintDot3OamLoopbackTimeout    Unsigned32
+    }
+
+    maintDot3OamLoopbackIndex OBJECT-TYPE
+        SYNTAX       Integer32 (1..5)
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { maintDot3OamLoopbackEntry 1 }
+
+    maintDot3OamLoopbackNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { maintDot3OamLoopbackEntry 2 }
+
+    maintDot3OamLoopbackIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndexOrZero
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "Set Index of target interface. 
+            The default value of this object is '0', and the value is
+            necessary for executing loopback function."
+        ::= { maintDot3OamLoopbackEntry 3 }
+
+    maintDot3OamLoopbackExecute OBJECT-TYPE
+        SYNTAX       INTEGER { start(1), stop(2) }
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "The object is used to execute loopback function.
+            Setting to 'execute' to start loopback testing."
+        ::= { maintDot3OamLoopbackEntry 4 }
+
+    maintDot3OamLoopbackFrames OBJECT-TYPE
+        SYNTAX       Unsigned32 (1..65535)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "The object is used to configure the number of transmit loopback
+            frames."
+        DEFVAL       { 10 }
+        ::= { maintDot3OamLoopbackEntry 5 }
+
+    maintDot3OamLoopbackPDULength OBJECT-TYPE
+        SYNTAX       Unsigned32 (64..1518)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  "The length of Loopback OAMPDU."
+        DEFVAL       { 64 }
+        ::= { maintDot3OamLoopbackEntry 6 }
+
+    maintDot3OamLoopbackTxCounts OBJECT-TYPE
+        SYNTAX       Unsigned32 (1..10)
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "The object is used to configure the number of transmit frames
+            per second."
+        DEFVAL       { 1 }
+        ::= { maintDot3OamLoopbackEntry 7 }
+
+    maintDot3OamLoopbackTimeout OBJECT-TYPE
+        SYNTAX       Unsigned32 (1..10)
+        UNITS        "seconds"
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "The object is used to configure the time of detecting timeout of
+            loopback testing."
+        DEFVAL       { 1 }
+        ::= { maintDot3OamLoopbackEntry 8 }
+
+    maintDot3OamLoopbackResultTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF MaintDot3OamLoopbackResultEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains the results of loopback testing. The results
+            will be updated when the loopback testing is completed."
+        ::= { maintDot3OamGroup 2 }
+
+    maintDot3OamLoopbackResultEntry OBJECT-TYPE
+        SYNTAX       MaintDot3OamLoopbackResultEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "The entries are automatically created when the agent boots. And
+            the index of the entry is identical to the
+            'maintDot3OamLoopbackIndex'."
+        INDEX        { maintDot3OamLoopbackResultIndex }
+        ::= { maintDot3OamLoopbackResultTable 1 }
+
+    MaintDot3OamLoopbackResultEntry ::= SEQUENCE {
+        maintDot3OamLoopbackResultIndex            Integer32,
+        maintDot3OamLoopbackResultNEAddress        IpAddress,
+        maintDot3OamLoopbackResultTxFrames         Unsigned32,
+        maintDot3OamLoopbackResultTxFrameOctets    Unsigned32,
+        maintDot3OamLoopbackResultRxFrames         Unsigned32,
+        maintDot3OamLoopbackResultRxFrameOctets    Unsigned32,
+        maintDot3OamLoopbackResultRxErroredFrames  Unsigned32,
+        maintDot3OamLoopbackResultExecStatus       INTEGER,
+        maintDot3OamLoopbackResultLastExecute      DateAndTime
+    }
+
+    maintDot3OamLoopbackResultIndex OBJECT-TYPE
+        SYNTAX       Integer32 (1..5)
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { maintDot3OamLoopbackResultEntry 1 }
+
+    maintDot3OamLoopbackResultNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { maintDot3OamLoopbackResultEntry 2 }
+
+    maintDot3OamLoopbackResultTxFrames OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "The number of transmitted loopback OAMPDUs."
+        ::= { maintDot3OamLoopbackResultEntry 3 }
+
+    maintDot3OamLoopbackResultTxFrameOctets OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "The total octets of transmitted loopback OAMPDUs."
+        ::= { maintDot3OamLoopbackResultEntry 4 }
+
+    maintDot3OamLoopbackResultRxFrames OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "The number of received loopback OAMPDUs."
+        ::= { maintDot3OamLoopbackResultEntry 5 }
+
+    maintDot3OamLoopbackResultRxFrameOctets OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "The total octets of received loopback OAMPDUs."
+        ::= { maintDot3OamLoopbackResultEntry 6 }
+
+    maintDot3OamLoopbackResultRxErroredFrames OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "The number of received errored OAMPDUs."
+        ::= { maintDot3OamLoopbackResultEntry 7 }
+
+    maintDot3OamLoopbackResultExecStatus OBJECT-TYPE
+        SYNTAX       INTEGER {
+                         noLoopback(1),
+                         failed(2),
+                         completed(3),
+                         executing(4)
+                     }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The status of loopback test result. 
+            'noLoopback' means no loopback test is executing. 'executing'
+            represents the loopback test is in progress, and the new loopback
+            request will be rejected.
+            'failed' means the previous loopback test failed. 'completed'
+            means the previous loopback test completed successfully."
+        ::= { maintDot3OamLoopbackResultEntry 8 }
+
+    maintDot3OamLoopbackResultLastExecute OBJECT-TYPE
+        SYNTAX       DateAndTime
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "The date and time of executing loopback test."
+        ::= { maintDot3OamLoopbackResultEntry 9 }
+
+    maintDot3OamLoopbackPortTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF MaintDot3OamLoopbackPortEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  
+            "This table contains control objects for loopback which was
+            triggered by peer node."
+        ::= { maintDot3OamGroup 3 }
+
+    maintDot3OamLoopbackPortEntry OBJECT-TYPE
+        SYNTAX       MaintDot3OamLoopbackPortEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  ""
+        INDEX        { maintDot3OamLoopbackPortIfIndex }
+        ::= { maintDot3OamLoopbackPortTable 1 }
+
+    MaintDot3OamLoopbackPortEntry ::= SEQUENCE {
+        maintDot3OamLoopbackPortIfIndex    InterfaceIndex,
+        maintDot3OamLoopbackPortNEAddress  IpAddress,
+        maintDot3OamLoopbackPortControl    INTEGER,
+        maintDot3OamLoopbackPortStatus     INTEGER
+    }
+
+    maintDot3OamLoopbackPortIfIndex OBJECT-TYPE
+        SYNTAX       InterfaceIndex
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "Index of this table."
+        ::= { maintDot3OamLoopbackPortEntry 1 }
+
+    maintDot3OamLoopbackPortNEAddress OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION  "reserved."
+        ::= { maintDot3OamLoopbackPortEntry 2 }
+
+    maintDot3OamLoopbackPortControl OBJECT-TYPE
+        SYNTAX       INTEGER {
+                         invalid(0),
+                         noOperation(1),
+                         initiateLoopback(2),
+                         terminateLoopback(3)
+                     }
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object controls the loopback function.
+            
+            Writing the value 'initiateLoopback' causes the local OAM entity
+            to start the loopback process with its peer. This value can only
+            be written when the maintDot3OamLoopbackPortStatus is
+            'noLoopback'. Writing the value 'initiateLoopback' in any other
+            state has no effect. When maintDot3OamLoopbackPortStatus is in
+            'remoteLoopback' state, writing 'terminateLoopback' causes the
+            local OAM entity to initiate the termination of the loopback
+            state. Writing 'terminateLoopack' in any other state has no
+            effect.
+            
+            Note. When getting this object, the agent always returns
+            'noOperation'. The loopback status can be obtained from
+            maintDot3OamLoopbackPortStatus."
+        ::= { maintDot3OamLoopbackPortEntry 3 }
+
+    maintDot3OamLoopbackPortStatus OBJECT-TYPE
+        SYNTAX       INTEGER {
+                         invalid(0),
+                         noLoopback(1),
+                         remoteLoopback(2),
+                         localLoopback(3)
+                     }
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "The loopback status of the local OAM entity.
+            
+            This object returns the loopback point. This means that the value
+            'remoteLoopback' represents the local OAM entity is initiator of
+            loopback and the loopback point is on the peer (remote) node.
+            On the other hand, the value 'localLoopback' means the loopback
+            point is on the local node."
+        ::= { maintDot3OamLoopbackPortEntry 4 }
+
+-----------------------------------------------
+-- End User MIB Object Definitions
+-----------------------------------------------
+
+END

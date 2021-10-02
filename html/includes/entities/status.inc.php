@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -43,26 +42,25 @@ function humanize_status(&$status)
   }
 
   $device = &$GLOBALS['cache']['devices']['id'][$status['device_id']];
-  if ((isset($device['status']) && !$device['status']) || (isset($device['disabled']) && $device['disabled']))
-  {
-    $status['row_class']     = 'error';
+  if ((isset($device['status']) && !$device['status']) ||
+      (isset($device['disabled']) && $device['disabled'])) {
+    $status['row_class'] = $status['row_class'] !== 'disabled' ? 'error' : $status['row_class'];
   }
+  // this is pseudo class only for js selectors
+  $status['row_class'] .= ' entity-status';
 
   // Set humanized entry in the array so we can tell later
   $status['humanized'] = TRUE;
 }
 
-function generate_status_query($vars, $query_count = FALSE)
-{
+function generate_status_query($vars, $query_count = FALSE) {
 
-  if ($query_count)
-  {
+  if ($query_count) {
     $sql = "SELECT COUNT(*) FROM `status`";
   } else {
     $sql  = "SELECT * FROM `status`";
 
-    if ($vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id')
-    {
+    if ($vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id') {
       $sql .= ' LEFT JOIN `devices` USING(`device_id`)';
     }
   }
@@ -71,14 +69,17 @@ function generate_status_query($vars, $query_count = FALSE)
   $sql .= " WHERE `status_deleted` = 0";
 
   // Build query
-  foreach($vars as $var => $value)
-  {
-    switch ($var)
-    {
+  foreach($vars as $var => $value) {
+    switch ($var) {
       case "group":
       case "group_id":
         $values = get_group_entities($value, 'status');
         $sql .= generate_query_values($values, 'status.status_id');
+        break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'status.device_id');
         break;
       case "device":
       case "device_id":
@@ -96,7 +97,7 @@ function generate_status_query($vars, $query_count = FALSE)
         break;
       case 'entity_state':
       case "measured_state":
-        $sql .= build_entity_measured_where('status', ['measured_state' => $value]);
+        $sql .= build_entity_measured_where('status', [ 'measured_state' => $value ]);
         break;
       case "class":
       case 'entPhysicalClass':
@@ -124,13 +125,11 @@ function generate_status_query($vars, $query_count = FALSE)
   $sql .= generate_query_permitted(array('device', 'status'));
 
   // If need count, just return sql without sorting
-  if ($query_count)
-  {
+  if ($query_count) {
     return $sql;
   }
 
-  switch ($vars['sort_order'])
-  {
+  switch ($vars['sort_order']) {
     case 'desc':
       $sort_order = 'DESC';
       $sort_neg   = 'ASC';
@@ -144,8 +143,7 @@ function generate_status_query($vars, $query_count = FALSE)
   }
 
 
-  switch($vars['sort'])
-  {
+  switch($vars['sort']) {
     case 'device':
       $sql .= ' ORDER BY `hostname` '.$sort_order;
       break;
@@ -165,7 +163,7 @@ function generate_status_query($vars, $query_count = FALSE)
       $sql .= ' ORDER BY `status_last_change` '.$sort_neg;
       break;
     default:
-      $sql .= ' ORDER BY `status_descr` '.$sort_order;
+      $sql .= ' ORDER BY `measured_entity_label`, `status_descr` '.$sort_order;
   }
 
   return $sql;
@@ -180,8 +178,7 @@ function print_status_table($vars)
   $sql = generate_status_query($vars);
 
   $status_list = array();
-  foreach(dbFetchRows($sql) as $status)
-  {
+  foreach(dbFetchRows($sql) as $status) {
     //if (isset($GLOBALS['cache']['devices']['id'][$status['device_id']]))
     //{
       $status['hostname'] = $GLOBALS['cache']['devices']['id'][$status['device_id']]['hostname'];
@@ -254,35 +251,33 @@ function print_status_row($status, $vars)
   echo generate_status_row($status, $vars);
 }
 
-function generate_status_row($status, $vars)
-{
-  global $config;
+function generate_status_row($status, $vars) {
 
   $table_cols = 7;
 
   humanize_status($status);
 
-  $alert = ($status['state_event'] == 'alert' ? $config['icon']['flag'] : '');
-
   // FIXME - make this "four graphs in popup" a function/include and "small graph" a function.
   // FIXME - DUPLICATED IN device/overview/status
 
   $graph_array = array();
-  $graph_array['to'] = $config['time']['now'];
+  $graph_array['to'] = get_time();
   $graph_array['id'] = $status['status_id'];
   $graph_array['type'] = "status_graph";
   $graph_array['legend'] = "no";
   $graph_array['width'] = 80;
   $graph_array['height'] = 20;
   $graph_array['bg'] = 'ffffff00';
-  $graph_array['from'] = $config['time']['day'];
+  $graph_array['from'] = get_time('day');
 
-  $status_misc = '<span class="label">' . $status['entPhysicalClass'] . '</span>';
+  //$status_misc = '<span class="label">' . $status['entPhysicalClass'] . '</span>';
+  $short = $vars['page'] === "device" && $vars['tab'] === "overview";
+  $hide_style = $status['status_event'] === 'ignore' && $short ? ' style="display: none;"' : '';
 
-  $row = '<tr class="' . $status['row_class'] . '">
+  $row = '<tr class="' . $status['row_class'] . '"'.$hide_style.'>
         <td class="state-marker"></td>';
 
-  if ($vars['page'] != "device" && $vars['popup'] != TRUE)
+  if ($vars['page'] !== "device" && $vars['popup'] != TRUE)
   {
     $row .= '<td class="entity">' . generate_device_link($status) . '</td>';
     $table_cols++;
@@ -311,21 +306,21 @@ function generate_status_row($status, $vars)
   $row .= '<td class="entity">' . generate_entity_link('status', $status) . '</td>';
 
   // FIXME -- Generify this. It's not just for sensors.
-  if ($vars['page'] == "device" && $vars['tab'] != "overview")
+  if ($vars['page'] === "device" && $vars['tab'] !== "overview")
   {
     $row .= '        <td>' .  (strlen($status['status_mib']) ? '<a href="https://mibs.observium.org/mib/'.$status['status_mib'].'/" target="_blank">' .nicecase($status['status_mib']) .'</a>' : '') . ( ( strlen($status['status_mib']) && strlen($status['status_object'])) ? '::' : '') .(strlen($status['status_mib']) ? '<a href="https://mibs.observium.org/mib/'.$status['status_mib'].'/#'.$status['status_object'].'" target="_blank">' .$status['status_object'] .'</a>' : ''). '.'.$status['status_index'].'</td>' . PHP_EOL;
     $table_cols++;
   }
 
-  if ($vars['tab'] != "overview")
+  if ($vars['tab'] !== "overview")
   {
     $row .= '<td><span class="label">' . $status['entPhysicalClass'] . '</span></td>';
     $table_cols++;
   }
   $row .= '<td style="width: 90px; text-align: right;">' . generate_entity_link('status', $status, $mini_graph, NULL, FALSE) . '</td>';
-  if ($vars['tab'] != "overview")
+  if ($vars['tab'] !== "overview")
   {
-    $row .= '<td style="white-space: nowrap">' . generate_tooltip_link('', format_uptime(($config['time']['now'] - $status['status_last_change']), 'short-2') . ' ago', format_unixtime($status['status_last_change'])) . '</td>
+    $row .= '<td style="white-space: nowrap">' . generate_tooltip_link('', format_uptime((get_time() - $status['status_last_change']), 'short-2') . ' ago', format_unixtime($status['status_last_change'])) . '</td>
         <td style="text-align: right;"><strong>' . generate_tooltip_link('', $status['status_event'], $status['event_descr'], $status['event_class']) . '</strong></td>';
     $table_cols++;
     $table_cols++;
@@ -333,7 +328,7 @@ function generate_status_row($status, $vars)
   $row .= '<td style="width: 80px; text-align: right;"><strong>' . generate_tooltip_link('', $status['status_name'], $status['event_descr'], $status['event_class']) . '</strong></td>
         </tr>' . PHP_EOL;
 
-  if ($vars['view'] == "graphs")
+  if ($vars['view'] === "graphs")
   {
     $vars['graph'] = "status";
   }
@@ -346,7 +341,7 @@ function generate_status_row($status, $vars)
       <td colspan="' . $table_cols . '">';
 
     unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-    $graph_array['to'] = $config['time']['now'];
+    $graph_array['to'] = get_time();
     $graph_array['id'] = $status['status_id'];
     $graph_array['type'] = "status_graph";
 
@@ -495,14 +490,12 @@ function print_status_form($vars, $single_device = FALSE)
                       'url'   => generate_url($vars));
 
   // Clean grids
-  foreach (array_keys($form['row'][0]) as $param)
-  {
-    unset($form['row'][0][$param]['grid']);
+  foreach ($form['row'] as $row => $rows) {
+    foreach (array_keys($rows) as $param) {
+      if (isset($form['row'][$row][$param]['grid'])) { unset($form['row'][$row][$param]['grid']); }
+    }
   }
-  foreach (array_keys($form['row'][1]) as $param)
-  {
-    unset($form['row'][1][$param]['grid']);
-  }
+
   // Copy forms
   $panel_form['row'][0]['device_id']      = $form['row'][0]['device_id'];
   $panel_form['row'][0]['entPhysicalClass'] = $form['row'][0]['entPhysicalClass'];

@@ -1,0 +1,1 @@
+ALTER TABLE `devices` CHANGE `snmp_authalgo` `snmp_authalgo` ENUM('MD5','SHA','SHA-224','SHA-256','SHA-384','SHA-512') CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL, CHANGE `snmp_cryptoalgo` `snmp_cryptoalgo` ENUM('DES','AES','AES-192','AES-192-C','AES-256','AES-256-C') CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL;

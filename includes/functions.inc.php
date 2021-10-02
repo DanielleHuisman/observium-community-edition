@@ -6,13 +6,13 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Observium Includes
 
-require_once($config['install_dir'] . "/includes/common.inc.php");
+require_once($config['install_dir'] . "/includes/common.inc.php"); // already included in sql-config.inc.php before definitions
 include_once($config['install_dir'] . "/includes/encrypt.inc.php");
 include_once($config['install_dir'] . "/includes/rrdtool.inc.php");
 include_once($config['install_dir'] . "/includes/influx.inc.php");
@@ -29,15 +29,17 @@ include_once($config['install_dir'] . "/includes/alerts.inc.php");
 
 //if (OBSERVIUM_EDITION != 'community') // OBSERVIUM_EDITION - not defined here..
 //{
-foreach (array('groups', 'billing', // Not exist in community edition
-               'community',         // community edition specific
-               'custom',            // custom functions, i.e. short_hostname
-              ) as $entry)
-{
+$fincludes = [
+  'groups', 'billing', // Not exist in community edition
+  'distributed',       // Not exist in community edition, distributed poller functions
+  'community',         // community edition specific
+  'custom',            // custom functions, i.e. short_hostname
+];
+foreach ($fincludes as $entry) {
   $file = $config['install_dir'] . '/includes/' . $entry . '.inc.php';
   if (is_file($file)) { include_once($file); }
 }
-
+unset($fincludes);
 
 // DOCME needs phpdoc block
 // Send to AMQP via UDP-based python proxy.
@@ -60,7 +62,13 @@ function messagebus_send($message)
   }
 }
 
-
+function get_var_true($var, $true = NULL) {
+  return $var === '1' || $var === 1 ||
+         $var === 'on' || $var === 'yes' ||
+         $var === TRUE ||
+         // allow extra param for true, ie confirm
+         (!empty($true) && $var === $true);
+}
 
 /**
  * Transforms a given string using an array of different transformations, in order.
@@ -82,8 +90,9 @@ function messagebus_send($message)
  *   'action' => 'regex_replace'/'preg_replace'  Replace 'from' with 'to'.
  *   'action' => 'timeticks'  Convert standart Timeticks to seconds
  *   'action' => 'age'/'uptime' Convert any human readable age/uptime to seconds (also support timeticks)
- *   'action' => 'explode'    Explode string by 'delimiter' (default ' ') and fetch array element (first (default), last)
+ *   'action' => 'explode'    Explode string by 'delimiter' (default ' ') and fetch array element (first (default), second, last or number)
  *   'action' => 'map'        Map string by key -> value, where key-value pairs passed by array 'map'
+ *   'action' => 'map_match'  Map string by pattern -> value, where pattern-value pairs passed by array 'map'
  *   'action' => 'units'      Convert byte/bit string with units to bytes/bits
  *   'action' => 'asdot'      Call bgp_asdot_to_asplain()
  *   'action' => 'entity_name' Call rewrite_entity_name()
@@ -91,27 +100,22 @@ function messagebus_send($message)
  *   'action' => 'urldecode'  Call rawurldecode()
  *   'action' => 'escape'     Call escape_html()
  *
- * @return string Transformed string
+ * @return string|array|null Transformed string
  */
-function string_transform($string, $transformations)
-{
-  if (!is_array($transformations) || empty($transformations))
-  {
+function string_transform($string, $transformations) {
+  if (!is_array($transformations) || empty($transformations)) {
     // Bail out if no transformations are given
     return $string;
   }
 
   // Simplify single action definition with less array nesting
-  if (isset($transformations['action']))
-  {
+  if (isset($transformations['action'])) {
     $transformations = array($transformations);
   }
 
-  foreach ($transformations as $transformation)
-  {
+  foreach ($transformations as $transformation) {
     $msg = "  String '$string' transformed by action [".$transformation['action']."] to: ";
-    switch ($transformation['action'])
-    {
+    switch ($transformation['action']) {
       case 'prepend':
         $string = $transformation['string'] . $string;
         break;
@@ -137,22 +141,17 @@ function string_transform($string, $transformations)
       case 'trim':
       case 'ltrim':
       case 'rtrim':
-        if (isset($transformation['chars']) && !isset($transformation['characters']))
-        {
+        if (isset($transformation['chars']) && !isset($transformation['characters'])) {
           // Just simple for brain memory key
           $transformation['characters'] = $transformation['chars'];
         }
-        if (!isset($transformation['characters']))
-        {
+        if (!isset($transformation['characters'])) {
           $transformation['characters'] = " \t\n\r\0\x0B";
         }
 
-        if ($transformation['action'] == 'rtrim')
-        {
+        if ($transformation['action'] === 'rtrim') {
           $string = rtrim($string, $transformation['characters']);
-        }
-        else if ($transformation['action'] == 'ltrim')
-        {
+        } elseif ($transformation['action'] === 'ltrim') {
           $string = ltrim($string, $transformation['characters']);
         } else {
           $string = trim($string, $transformation['characters']);
@@ -169,33 +168,45 @@ function string_transform($string, $transformations)
 
       case 'regex_replace':
       case 'preg_replace':
-        $tmp_string = preg_replace($transformation['from'], $transformation['to'], $string);
+        $to_string = preg_replace($transformation['from'], $transformation['to'], $string);
         $preg_last_error = preg_last_error();
-        if ($preg_last_error === PREG_INTERNAL_ERROR)
-        {
+        if ($preg_last_error === PREG_INTERNAL_ERROR) {
           // Dear Saint Patrick, we passed "from" without delimiter
-          $transformation['from'] = !str_exists($transformation['from'], '/') ? '/' . $transformation['from'] . '/' : '!' . $transformation['from'] . '!';
-          $tmp_string = preg_replace($transformation['from'], $transformation['to'], $string);
+          $transformation['from'] = !str_contains($transformation['from'], '/') ? '/' . $transformation['from'] . '/' : '!' . $transformation['from'] . '!';
+          $to_string = preg_replace($transformation['from'], $transformation['to'], $string);
+          $preg_last_error = preg_last_error();
         }
-        if (preg_last_error() == PREG_NO_ERROR)
-        {
-          $string = $tmp_string;
+        if ($preg_last_error === PREG_NO_ERROR) {
+          $string = $to_string;
         }
         break;
 
       case 'regex_match':
       case 'preg_match':
-        if (preg_match($transformation['from'], $string, $matches))
-        {
+        if (preg_match($transformation['from'], $string, $matches)) {
           $string = array_tag_replace($matches, $transformation['to']);
         }
         break;
 
       case 'map':
         // Map string by key -> value
-        if (is_array($transformation['map']) && isset($transformation['map'][$string]))
-        {
+        if (is_array($transformation['map']) && isset($transformation['map'][$string])) {
           $string = $transformation['map'][$string];
+        }
+        break;
+
+      case 'map_match':
+        if (isset($transformation['map_match'])) {
+          $transformation['map'] = $transformation['map_match'];
+        }
+        // Map string by pattern -> value
+        if (is_array($transformation['map'])) {
+          foreach ($transformation['map'] as $pattern => $to_string) {
+            if (preg_match($pattern, $string)) {
+              $string = $to_string;
+              break;
+            }
+          }
         }
         break;
 
@@ -242,21 +253,19 @@ function string_transform($string, $transformations)
         break;
 
       case 'explode':
+      case 'split':
         // String delimiter (default is single space " ")
-        if (isset($transformation['delimiter']) && strlen($transformation['delimiter']))
-        {
+        if (isset($transformation['delimiter']) && strlen($transformation['delimiter'])) {
           $delimiter = $transformation['delimiter'];
         } else {
           $delimiter = ' ';
         }
         $array = explode($delimiter, $string);
         // Get array index (default is first)
-        if (!isset($transformation['index']))
-        {
+        if (!isset($transformation['index'])) {
           $transformation['index'] = 'first';
         }
-        switch ((string)$transformation['index'])
-        {
+        switch ((string)$transformation['index']) {
           case 'all':
           case 'array':
             // return array instead single string
@@ -266,13 +275,18 @@ function string_transform($string, $transformations)
           case 'begin':
             $string = array_shift($array);
             break;
+          case 'second':
+          case 'secondary':
+          case 'two':
+            array_shift($array);
+            $string = array_shift($array);
+            break;
           case 'last':
           case 'end':
             $string = array_pop($array);
             break;
           default:
-            if (strlen($array[$transformation['index']]))
-            {
+            if (strlen($array[$transformation['index']])) {
               $string = $array[$transformation['index']];
             }
         }
@@ -306,21 +320,15 @@ function string_transform($string, $transformations)
 // Sorts an $array by a passed field.
 // TESTME needs unit testing
 // MOVEME to includes/common.inc.php
-function array_sort($array, $on, $order='SORT_ASC')
-{
+function array_sort($array, $on, $order='SORT_ASC') {
   $new_array = array();
   $sortable_array = array();
 
-  if (count($array) > 0)
-  {
-    foreach ($array as $k => $v)
-    {
-      if (is_array($v))
-      {
-        foreach ($v as $k2 => $v2)
-        {
-          if ($k2 == $on)
-          {
+  if (safe_count($array) > 0) {
+    foreach ($array as $k => $v) {
+      if (is_array($v)) {
+        foreach ($v as $k2 => $v2) {
+          if ($k2 == $on) {
             $sortable_array[$k] = $v2;
           }
         }
@@ -329,8 +337,7 @@ function array_sort($array, $on, $order='SORT_ASC')
       }
     }
 
-    switch ($order)
-    {
+    switch ($order) {
       case 'SORT_ASC':
         asort($sortable_array);
         break;
@@ -371,59 +378,15 @@ function hex2float($number) {
 // A function to process numerical values according to a $scale value
 // Functionised to allow us to have "magic" scales which do special things
 // Initially used for dec>hex>float values used by accuview
-function scale_value($value, $scale)
-{
+function scale_value($value, $scale) {
 
-  if ($scale == '161616') // This is used by Accuview Accuvim II
-  {
-    //CLEANME. Not required anymore, use unit name "accuenergy"
-    return hex2float(dechex($value));
-  } else if($scale != 0) {
+  // Scale when not zero (0, 0.0, '0', '0.0') or one (1, 1.0, '1', '1.0')
+  if ($scale != 0 && $scale != 1 &&
+      is_numeric($scale) && is_numeric($value)) {
     return $value * $scale;
-  } else {
-    return $value;
   }
 
-}
-
-/**
- * Custom value unit conversion functions for some vendors,
- * who do not know how use snmp float conversions,
- * do not know physics, mathematics and in general badly studied at school
- */
-
-function value_unit_accuenergy($value)
-{
-  return hex2float(dechex($value));
-}
-
-// See: https://jira.observium.org/browse/OBS-2941
-// Oids "pm10010mpMesrlineNetRxInputPwrPortn" and "pm10010mpMesrlineNetTxLaserOutputPwrPortn" in EKINOPS-Pm10010mp-MIB
-// If AV<32768:  Tx_Pwr(dBm) = AV/100
-// If AV>=32768: Tx_Pwr(dBm) = (AV-65536)/100
-function value_unit_ekinops_dbm1($value)
-{
-  if ($value >= 32768 && $value <= 65536)
-  {
-    return ($value - 65536) / 100;
-  }
-  else if ($value > 65536 || $value < 0)
-  {
-    return FALSE;
-  }
-
-  return $value / 100;
-}
-
-// See: https://jira.observium.org/browse/OBS-2941
-// oids "pm10010mpMesrclientNetTxPwrPortn" and "pm10010mpMesrclientNetRxPwrPortn" in EKINOPS-Pm10010mp-MIB
-// Power = 10*log(AV)-40) (Unit = dBm)
-function value_unit_ekinops_dbm2($value)
-{
-  //$si_value = 10 * log10($value) + 30; // this is how watts converted to dbm
-  $si_value = 10 * log10($value) - 40; // BUT this how convert it EKINOPS.... WHY??????
-
-  return $si_value;
+  return $value;
 }
 
 // Another sort array function
@@ -611,15 +574,6 @@ function include_wrapper($filename)
   return (boolean)$status;
 }
 
-// Strip all non-alphanumeric characters from a string.
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/common.inc.php
-function only_alphanumeric($string)
-{
-  return preg_replace('/[^a-zA-Z0-9]/', '', $string);
-}
-
 /**
  * Detect the device's OS
  *
@@ -639,7 +593,7 @@ function get_device_os($device)
   $recheck = isset($config['os'][$device['os']]);
 
   $sysDescr     = snmp_fix_string(snmp_get_oid($device, 'sysDescr.0', 'SNMPv2-MIB'));
-  $sysDescr_ok  = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === 1; // Allow empty response for sysDescr (not timeouts)
+  $sysDescr_ok  = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === OBS_SNMP_ERROR_EMPTY_RESPONSE; // Allow empty response for sysDescr (not timeouts)
   $sysObjectID  = snmp_cache_sysObjectID($device);
 
   // Cache discovery os definitions
@@ -661,7 +615,7 @@ function get_device_os($device)
   // By first check all sysObjectID
   foreach ($discovery_os['sysObjectID'] as $def => $cos)
   {
-    if (match_sysObjectID($sysObjectID, $def))
+    if (match_oid_num($sysObjectID, $def))
     {
       // Store matched OS, but by first need check by complex discovery arrays!
       $sysObjectID_def = $def;
@@ -848,26 +802,76 @@ function get_device_os($device)
 }
 
 /**
- * Compares sysObjectID with $needle. Return TRUE if match.
+ * Compares Numeric OID with $needle. Return TRUE if match.
  *
- * @param string $sysObjectID Walked sysObjectID from device
- * @param string $needle      Compare with this
- * @return boolean            TRUE if match, otherwise FALSE
+ * @param string       $oid    Numeric OID for compare
+ * @param string|array $needle Compare with this
+ * @return bool                TRUE if match, otherwise FALSE
  */
-function match_sysObjectID($sysObjectID, $needle)
+function match_oid_num($oid, $needle)
 {
-  if (substr($needle, -1) === '.')
-  {
-    // Use wildcard compare if sysObjectID definition have '.' at end, ie:
-    //   .1.3.6.1.4.1.2011.1.
-    if (str_starts($sysObjectID, $needle)) { return TRUE; }
-  } else {
-    // Use exact match sysObjectID definition or wildcard compare with '.' at end, ie:
-    //   .1.3.6.1.4.1.2011.2.27
-    if ($sysObjectID === $needle || str_starts($sysObjectID, $needle.'.')) { return TRUE; }
+  if (is_array($needle)) {
+    foreach ($needle as $entry) {
+      //print_debug("OID $oid compare to $entry = ");
+      if (match_oid_num($oid, $entry)) {
+        //print_debug("match\n");
+        return TRUE;
+      }
+      //print_debug("NOT match\n");
+    }
+    return FALSE;
   }
 
-  return FALSE;
+  # validate OID
+  $oid = trim($oid);
+  if (!preg_match('/^(?:(?<start>\.?)(?:\d+(?:\.\d+)+)|\.\d+)$/', $oid, $matches)) {
+    print_debug("Incorrect OID passed to match_oid_num('$oid', '$needle').");
+    return FALSE;
+  }
+  // append leading point if missing (1.3.6 -> .1.3.6)
+  if (isset($matches['start']) && $matches['start'] === '') {
+    $oid = '.'.$oid;
+  }
+
+  # validate needle (in other cases use regex)
+  $needle = trim($needle);
+  if (!preg_match('/^(?:(?<start>\.?)(?:\d+(?:\.\d+)+)|\.\d+)(?<end>\.)?$/', $needle, $matches)) {
+
+    // Try simple regex matches, ie .1.*.1., .1.3.(4|5|9), .1.3.4[56].*
+    if (preg_match('/^(?<start>\.?)\d+(?:\.(\d+|[\d\[\]\-]+|[\d\(\)\|]+|[\d\*]+))*(?<end>\.)?$/', $needle, $matches)) {
+      // append leading point if missing (1.3.6 -> .1.3.6)
+      if (isset($matches['start']) && $matches['start'] === '') {
+        $needle = '.'.$needle;
+      }
+
+      $needle_pattern = str_replace([ '.', '*' ], [ '\.', '.*?' ], $needle);
+      if (isset($matches['end']) && $matches['end'] === '.') {
+        $needle_pattern .= '\d+(\.\d+)*';
+      } else {
+        $needle_pattern .= '(\.\d+)*';
+      }
+
+      //print_message("/^$needle_pattern$/");
+      return (bool)preg_match('/^' . $needle_pattern . '$/', $oid);
+    }
+
+    print_debug("Incorrect Needle passed to match_oid_num('$oid', '$needle').");
+    return FALSE;
+  }
+  // append leading point if missing (1.3.6 -> .1.3.6)
+  if (isset($matches['start']) && $matches['start'] === '') {
+    $needle = '.'.$needle;
+  }
+
+  // Use wildcard compare if sysObjectID definition have '.' at end, ie:
+  //   .1.3.6.1.4.1.2011.1.
+  if (isset($matches['end']) && $matches['end'] === '.') {
+    return str_starts($oid, $needle);
+  }
+
+  // Use exact match sysObjectID definition or wildcard compare with '.' at end, ie:
+  //   .1.3.6.1.4.1.2011.2.27
+  return $oid === $needle || str_starts($oid, $needle.'.');
 }
 
 /**
@@ -959,8 +963,8 @@ function match_discovery_oids($device, $needle, $sysObjectID = NULL, $sysDescr =
         {
           //var_dump($def);
           //var_dump($sysObjectID);
-          //var_dump(match_sysObjectID($sysObjectID, $def));
-          if (match_sysObjectID($sysObjectID, $def))
+          //var_dump(match_oid_num($sysObjectID, $def));
+          if (match_oid_num($sysObjectID, $def))
           {
             $matched_defs[] = [ $oid, $def, $sysObjectID ];
             $needle_count--;
@@ -979,7 +983,7 @@ function match_discovery_oids($device, $needle, $sysObjectID = NULL, $sysDescr =
           $value_ok = TRUE;
         } else {
           $value    = snmp_fix_string(snmp_cache_oid($device, $oid . '.0', 'SNMPv2-MIB'));
-          $value_ok = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === 1; // Allow empty response
+          $value_ok = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === OBS_SNMP_ERROR_EMPTY_RESPONSE; // Allow empty response
         }
 
         foreach ((array)$needle[$oid] as $def)
@@ -997,11 +1001,29 @@ function match_discovery_oids($device, $needle, $sysObjectID = NULL, $sysDescr =
         }
         break;
 
+      case 'package':
+      case 'hrSWInstalledName':
+      case 'HOST-RESOURCES-MIB::hrSWInstalledName':
+        $defs = (array)$needle[$oid];
+        $oid = 'hrSWInstalledName';
+        foreach (snmp_cache_table($device, $oid, [], 'HOST-RESOURCES-MIB') as $entry) {
+          $value = $entry[$oid];
+          foreach ($defs as $def) {
+            if (preg_match($def, $value)) {
+              $matched_defs[] = [ $oid, $def, $value ];
+              $needle_count--;
+              $match = TRUE;
+              break 2;
+            }
+          }
+        }
+        break;
+
       default:
         // All other oids,
         // fetch by first, than compare with pattern
         $value    = snmp_fix_string(snmp_cache_oid($device, $oid));
-        $value_ok = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === 1; // Allow empty response
+        $value_ok = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === OBS_SNMP_ERROR_EMPTY_RESPONSE; // Allow empty response
 
         foreach ((array)$needle[$oid] as $def)
         {
@@ -1218,8 +1240,7 @@ function cache_discovery_definitions()
  * Compare two numeric oids and return -1, 0, 1
  * ie: .1.2.1. vs 1.2.2
  */
-function compare_numeric_oids($oid1, $oid2)
-{
+function compare_numeric_oids($oid1, $oid2) {
   $oid1_array = explode('.', ltrim($oid1, '.'));
   $oid2_array = explode('.', ltrim($oid2, '.'));
 
@@ -1228,13 +1249,13 @@ function compare_numeric_oids($oid1, $oid2)
 
   for ($i = 0; $i <= min($count1, $count2) - 1; $i++)
   {
-    $int1 = intval($oid1_array[$i]);
-    $int2 = intval($oid2_array[$i]);
-    if      ($int1 > $int2) { return 1; }
-    else if ($int1 < $int2) { return -1; }
+    $int1 = (int)$oid1_array[$i];
+    $int2 = (int)$oid2_array[$i];
+    if ($int1 > $int2) { return 1; }
+    if ($int1 < $int2) { return -1; }
   }
-  if      ($count1 > $count2) { return 1; }
-  else if ($count1 < $count2) { return -1; }
+  if ($count1 > $count2) { return 1; }
+  if ($count1 < $count2) { return -1; }
 
   return 0;
 }
@@ -1244,8 +1265,7 @@ function compare_numeric_oids($oid1, $oid2)
  * here reverse order
  * ie: .1.2.1. vs 1.2.2
  */
-function compare_numeric_oids_reverse($oid1, $oid2)
-{
+function compare_numeric_oids_reverse($oid1, $oid2) {
   return compare_numeric_oids($oid2, $oid1);
 }
 
@@ -1353,574 +1373,6 @@ function renamehost($id, $new, $source = 'console', $options = array())
   return FALSE;
 }
 
-// Deletes device from database and RRD dir.
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function delete_device($id, $delete_rrd = FALSE)
-{
-  global $config;
-
-  $ret = PHP_EOL;
-  $device = device_by_id_cache($id);
-  $host = $device['hostname'];
-
-  if (!is_array($device))
-  {
-    return FALSE;
-  } else {
-    $ports = dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ?", array($id));
-    if (!empty($ports))
-    {
-      $ret .= ' * Deleted interfaces: ';
-      $deleted_ports = [];
-      foreach ($ports as $int_data)
-      {
-        $int_if = $int_data['ifDescr'];
-        $int_id = $int_data['port_id'];
-        delete_port($int_id, $delete_rrd);
-        $deleted_ports[] = "id=$int_id ($int_if)";
-      }
-      $ret .= implode(', ', $deleted_ports).PHP_EOL;
-    }
-
-    // Remove entities from common tables
-    $deleted_entities = array();
-    foreach (get_device_entities($id) as $entity_type => $entity_ids)
-    {
-      foreach ($config['entity_tables'] as $table)
-      {
-        $where = '`entity_type` = ?' . generate_query_values($entity_ids, 'entity_id');
-        $table_status = dbDelete($table, $where, array($entity_type));
-        if ($table_status) { $deleted_entities[$entity_type] = 1; }
-      }
-    }
-    if (count($deleted_entities))
-    {
-      $ret .= ' * Deleted common entity entries linked to device: ';
-      $ret .= implode(', ', array_keys($deleted_entities)) . PHP_EOL;
-    }
-
-    $deleted_tables = array();
-    $ret .= ' * Deleted device entries from tables: ';
-    foreach ($config['device_tables'] as $table)
-    {
-      $where = '`device_id` = ?';
-      $table_status = dbDelete($table, $where, array($id));
-      if ($table_status) { $deleted_tables[] = $table; }
-    }
-    if (count($deleted_tables))
-    {
-      $ret .= implode(', ', $deleted_tables).PHP_EOL;
-
-      // Request for clear WUI cache
-      set_cache_clear('wui');
-    }
-
-    if ($delete_rrd)
-    {
-      $device_rrd = rtrim(get_rrd_path($device, ''), '/');
-      if (is_file($device_rrd.'/status.rrd'))
-      {
-        external_exec("rm -rf ".escapeshellarg($device_rrd));
-        $ret .= ' * Deleted device RRDs dir: ' . $device_rrd . PHP_EOL;
-      }
-
-    }
-
-    log_event("Deleted device: $host", $id, 'device', $id, 5); // severity 5, for logging user/console info
-    $ret .= " * Deleted device: $host";
-  }
-
-  return $ret;
-}
-
-function add_device_vars($vars)
-{
-
-    global $config;
-
-    $hostname = strip_tags($vars['hostname']);
-
-    // Keep original snmp/rrd config, for revert at end
-    $config_snmp = $config['snmp'];
-    $config_rrd  = $config['rrd_override'];
-
-    // Default snmp port
-    if ($vars['snmp_port'] && is_numeric($vars['snmp_port']))
-    {
-      $snmp_port = (int)$vars['snmp_port'];
-    } else {
-      $snmp_port = 161;
-    }
-
-    // Default snmp version
-    if ($vars['snmp_version'] !== "v2c" &&
-        $vars['snmp_version'] !== "v3"  &&
-        $vars['snmp_version'] !== "v1")
-    {
-      $vars['snmp_version'] = $config['snmp']['version'];
-    }
-
-    switch ($vars['snmp_version'])
-    {
-      case 'v2c':
-      case 'v1':
-
-        if (strlen($vars['snmp_community']))
-        {
-          // Hrm, I not sure why strip_tags
-          $snmp_community = strip_tags($vars['snmp_community']);
-          $config['snmp']['community'] = array($snmp_community);
-        }
-
-        $snmp_version = $vars['snmp_version'];
-
-        print_message("Adding SNMP$snmp_version host $hostname port $snmp_port");
-        break;
-
-      case 'v3':
-
-        if (strlen($vars['snmp_authlevel']))
-        {
-          $snmp_v3 = array (
-            'authlevel'  => $vars['snmp_authlevel'],
-            'authname'   => $vars['snmp_authname'],
-            'authpass'   => $vars['snmp_authpass'],
-            'authalgo'   => $vars['snmp_authalgo'],
-            'cryptopass' => $vars['snmp_cryptopass'],
-            'cryptoalgo' => $vars['snmp_cryptoalgo'],
-          );
-
-          array_unshift($config['snmp']['v3'], $snmp_v3);
-        }
-
-        $snmp_version = "v3";
-
-        print_message("Adding SNMPv3 host $hostname port $snmp_port");
-        break;
-
-      default:
-        print_error("Unsupported SNMP Version. There was a dropdown menu, how did you reach this error?"); // We have a hacker!
-        return FALSE;
-    }
-
-    if ($vars['ignorerrd'] == 'confirm' ||
-        $vars['ignorerrd'] == '1' ||
-        $vars['ignorerrd'] == 'on')
-    {
-      $config['rrd_override'] = TRUE;
-    }
-
-    $snmp_options = array();
-    if ($vars['ping_skip'] == '1' || $vars['ping_skip'] == 'on')
-    {
-      $snmp_options['ping_skip'] = TRUE;
-    }
-
-    // Optional SNMP Context
-    if (strlen(trim($vars['snmp_context'])))
-    {
-      $snmp_options['snmp_context'] = trim($vars['snmp_context']);
-    }
-
-    $result = add_device($hostname, $snmp_version, $snmp_port, strip_tags($vars['snmp_transport']), $snmp_options);
-
-    // Revert original snmp/rrd config
-    $config['snmp'] = $config_snmp;
-    $config['rrd_override'] = $config_rrd;
-
-    return $result;
-
-}
-
-
-
-/**
- * Adds the new device to the database.
- *
- * Before adding the device, checks duplicates in the database and the availability of device over a network.
- *
- * @param string $hostname Device hostname
- * @param string|array $snmp_version SNMP version(s) (default: $config['snmp']['version'])
- * @param string $snmp_port SNMP port (default: 161)
- * @param string $snmp_transport SNMP transport (default: udp)
- * @param array $options Additional options can be passed ('ping_skip' - for skip ping test and add device attrib for skip pings later
- *                                                         'break' - for break recursion,
- *                                                         'test'  - for skip adding, only test device availability)
- *
- * @return mixed Returns $device_id number if added, 0 (zero) if device not accessible with current auth and FALSE if device complete not accessible by network. When testing, returns -1 if the device is available.
- */
-// TESTME needs unit testing
-function add_device($hostname, $snmp_version = array(), $snmp_port = 161, $snmp_transport = 'udp', $options = array(), $flags = OBS_DNS_ALL)
-{
-  global $config;
-
-  // If $options['break'] set as TRUE, break recursive function execute
-  if (isset($options['break']) && $options['break']) { return FALSE; }
-  $return = FALSE; // By default return FALSE
-
-  // Reset snmp timeout and retries options for speedup device adding
-  unset($config['snmp']['timeout'], $config['snmp']['retries']);
-
-  $snmp_transport = strtolower($snmp_transport);
-
-  $hostname = strtolower(trim($hostname));
-
-  // Try detect if hostname is IP
-  switch (get_ip_version($hostname))
-  {
-    case 6:
-      $hostname = Net_IPv6::compress($hostname, TRUE); // Always use compressed IPv6 name
-    case 4:
-      if ($config['require_hostname'])
-      {
-        print_error("Hostname should be a valid resolvable FQDN name. Or set config option \$config['require_hostname'] as FALSE.");
-        return $return;
-      }
-      $ip       = $hostname;
-      break;
-    default:
-      if ($snmp_transport == 'udp6' || $snmp_transport == 'tcp6') // IPv6 used only if transport 'udp6' or 'tcp6'
-      {
-        $flags = $flags ^ OBS_DNS_A; // exclude A
-      }
-      // Test DNS lookup.
-      $ip       = gethostbyname6($hostname, $flags);
-  }
-
-  // Test if host exists in database
-  //if (dbFetchCell("SELECT COUNT(*) FROM `devices` WHERE `hostname` = ?", array($hostname)) == '0')
-  if (!dbExist('devices', '`hostname` = ?', array($hostname)))
-  {
-    if ($ip)
-    {
-      $ip_version = get_ip_version($ip);
-
-      // Test reachability
-      $options['ping_skip'] = isset($options['ping_skip']) && $options['ping_skip'];
-      if ($options['ping_skip'])
-      {
-        $flags = $flags | OBS_PING_SKIP;
-      }
-      if (isPingable($hostname, $flags))
-      {
-        // Test directory exists in /rrd/
-        if (!$config['rrd_override'] && file_exists($config['rrd_dir'].'/'.$hostname))
-        {
-          print_error("Directory <observium>/rrd/$hostname already exists.");
-          return FALSE;
-        }
-
-        // Detect snmp transport
-        if (stripos($snmp_transport, 'tcp') !== FALSE)
-        {
-          $snmp_transport = ($ip_version == 4 ? 'tcp' : 'tcp6');
-        } else {
-          $snmp_transport = ($ip_version == 4 ? 'udp' : 'udp6');
-        }
-        // Detect snmp port
-        if (!is_numeric($snmp_port) || $snmp_port < 1 || $snmp_port > 65535)
-        {
-          $snmp_port = 161;
-        } else {
-          $snmp_port = (int)$snmp_port;
-        }
-        // Detect snmp version
-        if (empty($snmp_version))
-        {
-          // Here set default snmp version order
-          $i = 1;
-          $snmp_version_order = array();
-          foreach (array('v2c', 'v3', 'v1') as $tmp_version)
-          {
-            if ($config['snmp']['version'] == $tmp_version)
-            {
-              $snmp_version_order[0]  = $tmp_version;
-            } else {
-              $snmp_version_order[$i] = $tmp_version;
-            }
-            $i++;
-          }
-          ksort($snmp_version_order);
-
-          foreach ($snmp_version_order as $tmp_version)
-          {
-            $ret = add_device($hostname, $tmp_version, $snmp_port, $snmp_transport, $options);
-            if ($ret === FALSE)
-            {
-              // Set $options['break'] for break recursive
-              $options['break'] = TRUE;
-            }
-            else if (is_numeric($ret) && $ret != 0)
-            {
-              return $ret;
-            }
-          }
-        }
-        else if ($snmp_version === "v3")
-        {
-          // Try each set of parameters from config
-          foreach ($config['snmp']['v3'] as $auth_iter => $snmp_extra)
-          {
-            // Append SNMP context if passed
-            if (isset($options['snmp_context']) && strlen($options['snmp_context']))
-            {
-              $snmp_extra['snmp_context'] = $options['snmp_context'];
-            }
-
-            $device = build_initial_device_array($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp_extra);
-
-            if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2)
-            {
-              // Hide snmp auth
-              print_message("Trying v3 parameters *** / ### [$auth_iter] ... ");
-            } else {
-              print_message("Trying v3 parameters " . $device['snmp_authname'] . "/" .  $device['snmp_authlevel'] . " ... ");
-            }
-
-            if (isSNMPable($device))
-            {
-              if (!check_device_duplicated($device))
-              {
-                if (isset($options['test']) && $options['test'])
-                {
-                  print_message('%WDevice "'.$hostname.'" has successfully been tested and available by '.strtoupper($snmp_transport).' transport with SNMP '.$snmp_version.' credentials.%n', 'color');
-                  $device_id = -1;
-                } else {
-                  $device_id = createHost($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp_extra);
-                  if ($options['ping_skip'])
-                  {
-                    set_entity_attrib('device', $device_id, 'ping_skip', 1);
-                    // Force pingable check
-                    if (isPingable($hostname, $flags ^ OBS_PING_SKIP))
-                    {
-                      //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
-                      print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
-                    }
-                  }
-                }
-                return $device_id;
-              } else {
-                // When detected duplicate device, this mean it already SNMPable and not need check next auth!
-                return FALSE;
-              }
-            } else {
-              print_warning("No reply on credentials " . $device['snmp_authname'] . "/" .  $device['snmp_authlevel'] . " using $snmp_version.");
-            }
-          }
-        }
-        else if ($snmp_version === "v2c" || $snmp_version === "v1")
-        {
-          // Try each community from config
-          foreach ($config['snmp']['community'] as $auth_iter => $snmp_community)
-          {
-            // Append SNMP context if passed
-            $snmp_extra = array();
-            if (isset($options['snmp_context']) && strlen($options['snmp_context']))
-            {
-              $snmp_extra['snmp_context'] = $options['snmp_context'];
-            }
-            $device = build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport, $snmp_extra);
-
-            if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2)
-            {
-              // Hide snmp auth
-              print_message("Trying $snmp_version community *** [$auth_iter] ...");
-            } else {
-              print_message("Trying $snmp_version community $snmp_community ...");
-            }
-
-            if (isSNMPable($device))
-            {
-              if (!check_device_duplicated($device))
-              {
-                if (isset($options['test']) && $options['test'])
-                {
-                  print_message('%WDevice "'.$hostname.'" has successfully been tested and available by '.strtoupper($snmp_transport).' transport with SNMP '.$snmp_version.' credentials.%n', 'color');
-                  $device_id = -1;
-                } else {
-                  $device_id = createHost($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport, $snmp_extra);
-                  if ($options['ping_skip'])
-                  {
-                    set_entity_attrib('device', $device_id, 'ping_skip', 1);
-                    // Force pingable check
-                    if (isPingable($hostname, $flags ^ OBS_PING_SKIP))
-                    {
-                      //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
-                      print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
-                    }
-                  }
-                }
-                return $device_id;
-              } else {
-                // When detected duplicate device, this mean it already SNMPable and not need check next auth!
-                return FALSE;
-              }
-            } else {
-              if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2)
-              {
-                print_warning("No reply on given community *** using $snmp_version.");
-              } else {
-                print_warning("No reply on community $snmp_community using $snmp_version.");
-              }
-              $return = 0; // Return zero for continue trying next auth
-            }
-          }
-        } else {
-          print_error("Unsupported SNMP Version \"$snmp_version\".");
-          $return = 0; // Return zero for continue trying next auth
-        }
-
-        if (!$device_id)
-        {
-          // Failed SNMP
-          print_error("Could not reach $hostname with given SNMP parameters using $snmp_version.");
-          $return = 0; // Return zero for continue trying next auth
-        }
-      } else {
-        // failed Reachability
-        print_error("Could not ping $hostname.");
-      }
-    } else {
-      // Failed DNS lookup
-      print_error("Could not resolve $hostname.");
-    }
-  } else {
-    // found in database
-    print_error("Already got device $hostname.");
-  }
-
-  return $return;
-}
-
-/**
- * Check duplicated devices in DB by sysName, snmpEngineID and entPhysicalSerialNum (if possible)
- *
- * If found duplicate devices return TRUE, in other cases return FALSE
- *
- * @param array $device Device array which should be checked for duplicates
- * @return bool TRUE if duplicates found
- */
-// TESTME needs unit testing
-function check_device_duplicated($device)
-{
-  // Hostname should be uniq
-  if ($device['hostname'] &&
-      //dbFetchCell("SELECT COUNT(*) FROM `devices` WHERE `hostname` = ?", array($device['hostname'])) != '0')
-      dbExist('devices', '`hostname` = ?', array($device['hostname'])))
-  {
-    // Return TRUE if have device with same hostname in DB
-    print_error("Already got device with hostname (".$device['hostname'].").");
-    return TRUE;
-  }
-
-  $snmpEngineID = snmp_cache_snmpEngineID($device);
-  $sysName_orig = snmp_get_oid($device, 'sysName.0', 'SNMPv2-MIB');
-  $sysName      = strtolower($sysName_orig);
-  if (empty($sysName))
-  {
-    $sysName_type = 'empty';
-    $sysName = FALSE;
-  }
-  elseif (is_valid_hostname($sysName_orig, TRUE))
-  {
-    // sysName stored in db as lowercase, always compare as lowercase too!
-    $sysName_type = 'fqdn';
-  } else{
-    // sysName not FQDN, hard case, many devices have default sysname or user just not write full sysname
-    $sysName_type = 'notfqdn';
-  }
-
-  if (!empty($snmpEngineID))
-  {
-    $test_devices = dbFetchRows('SELECT * FROM `devices` WHERE `disabled` = 0 AND `snmpEngineID` = ?', array($snmpEngineID));
-    foreach ($test_devices as $test)
-    {
-      $compare = strtolower($test['sysName']) === $sysName;
-      if ($compare)
-      {
-        // Check (if possible) serial, for cluster devices sysName and snmpEngineID same
-        $test_entPhysical = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalSerialNum` != ? ORDER BY `entPhysicalClass` LIMIT 1', array($test['device_id'], ''));
-        if (isset($test_entPhysical['entPhysicalSerialNum']))
-        {
-          // Compare by any common serial
-          $serial = snmp_get_oid($device, 'entPhysicalSerialNum.'.$test_entPhysical['entPhysicalIndex'], 'ENTITY-MIB');
-          $compare = strtolower($serial) == strtolower($test_entPhysical['entPhysicalSerialNum']);
-          if ($compare)
-          {
-            // This devices really same, with same sysName, snmpEngineID and entPhysicalSerialNum
-            print_error("Already got device with SNMP-read sysName ($sysName), 'snmpEngineID' = $snmpEngineID and 'entPhysicalSerialNum' = $serial (".$test['hostname'].").");
-            return TRUE;
-          }
-        } else {
-          // For not FQDN sysname check all (other) possible system Oids:
-          if ($sysName_type != 'fqdn')
-          {
-            $compare = compare_devices_oids($device, $test);
-            // Same sysName and snmpEngineID, but different some other system Oids
-            if (!$compare) { continue; }
-          }
-          // Return TRUE if have same snmpEngineID && sysName in DB
-          print_error("Already got device with SNMP-read sysName ($sysName) and 'snmpEngineID' = $snmpEngineID (".$test['hostname'].").");
-          return TRUE;
-        }
-      }
-    }
-
-  } else {
-
-    if ($sysName_type === 'empty' && ($device['os'] === 'generic' || empty($device['os'])))
-    {
-      // For some derp devices (ie, only ent tree Oids) detect os before next checks
-      $device['os'] = get_device_os($device);
-
-      $test_devices = dbFetchRows('SELECT * FROM `devices` WHERE `disabled` = 0 AND `sysName` = ? AND `os` = ?', [ $sysName, $device['os'] ]);
-    } else {
-      // If snmpEngineID empty, check by sysName (and additional system Oids)
-      $test_devices = dbFetchRows('SELECT * FROM `devices` WHERE `disabled` = 0 AND `sysName` = ?', [ $sysName ]);
-    }
-
-    foreach ($test_devices as $test)
-    {
-      // Last check (if possible) serial, for cluster devices sysName and snmpEngineID same
-      $test_entPhysical = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalSerialNum` != ? ORDER BY `entPhysicalClass` LIMIT 1', array($test['device_id'], ''));
-      if (isset($test_entPhysical['entPhysicalSerialNum']))
-      {
-        $serial = snmp_get_oid($device, "entPhysicalSerialNum.".$test_entPhysical['entPhysicalIndex'], "ENTITY-MIB");
-        $compare = strtolower($serial) == strtolower($test_entPhysical['entPhysicalSerialNum']);
-        if ($compare)
-        {
-          // This devices really same, with same sysName, snmpEngineID and entPhysicalSerialNum
-          print_error("Already got device with SNMP-read sysName ($sysName) and 'entPhysicalSerialNum' = $serial (".$test['hostname'].").");
-          return TRUE;
-        }
-      } else {
-        // Check all (other) possible system Oids:
-        $compare = compare_devices_oids($device, $test);
-        // Same sysName and other system Oids
-        if ($compare)
-        {
-          // Derp case, when device not have uniq Oids.. completely, ie Hikvision cams
-          //if (empty($sysName) && )
-          // This devices really same, with same sysName and other system Oids
-          print_error("Already got device with SNMP-read sysName ($sysName) and other system Oids (".$test['hostname'].").");
-          return TRUE;
-        }
-      }
-    }
-    // if (!$has_entPhysical)
-    // {
-    //   // Return TRUE if have same sysName in DB
-    //   print_error("Already got device with SNMP-read sysName ($sysName).");
-    //   return TRUE;
-    // }
-
-  }
-
-  // In all other cases return FALSE
-  return FALSE;
-}
-
 /**
  * Compare two devices by specified Oids (default: sysObjectID, sysDescr, sysContact, sysLocation, sysUpTime)
  *
@@ -1962,22 +1414,41 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
   {
     // See Hikvision os
     $oids = array_merge($oids, (array)$GLOBALS['config']['os'][$device1['os']]['snmpcheck']);
+    print_debug_vars($oids);
+  }
+  elseif (isset($GLOBALS['config']['os'][$device2['os']]['snmpcheck']))
+  {
+    // In other cases use check Oids by second device.
+    $oids = array_merge($oids, (array)$GLOBALS['config']['os'][$device2['os']]['snmpcheck']);
+    print_debug_vars($oids);
+  } else {
+    // compare by mib specific serials
+    foreach (get_device_mibs_permitted($device2) as $mib2)
+    {
+      foreach ($GLOBALS['config']['mibs'][$mib2]['serial'] as $entry)
+      {
+        if (isset($entry['oid']))
+        {
+          $oids[] = $mib2 . '::' . $entry['oid'];
+        }
+      }
+    }
   }
 
   $same = FALSE;
   $skip_ifPhysAddress = FALSE;
-  foreach ($oids as $oid)
+  $oids_compare = [];
+  foreach ($oids as $full_oid)
   {
-    if (!str_exists($oid, '::'))
+    if (!str_contains($full_oid, '::'))
     {
-      $mib = 'SNMPv2-MIB';
-    } else {
-      $mib = NULL;
+      $full_oid = 'SNMPv2-MIB::' . $full_oid;
     }
+    list($mib, $oid) = explode('::', $full_oid);
 
-    switch ($oid)
+    switch ($full_oid)
     {
-      case 'sysObjectID':
+      case 'SNMPv2-MIB::sysObjectID':
         // Do not compare when not support standard MIB
         if (!is_device_mib($device2, 'SNMPv2-MIB'))
         {
@@ -2001,14 +1472,20 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
           // Not same, break foreach
           if (OBS_DEBUG)
           {
-            print_warning("The compared oid differs on devices:");
-            print_cli_table([ [ $device1['hostname'], $value1 ], [ $device2['hostname'], $value2 ] ], [ 'Device', $oid ]);
+            // print_warning("The compared oid differs on devices:");
+            // print_cli_table([ [ $device1['hostname'], $value1 ],
+            //                   [ $device2['hostname'], $value2 ] ], [ 'Device', $full_oid ]);
+            $oids_compare[] = [ '%r'.$full_oid.'%n', $value1, $value2 ];
           }
           break 2;
         }
+        elseif (OBS_DEBUG)
+        {
+          $oids_compare[] = [ $full_oid, $value1, $value2 ];
+        }
         break;
 
-      case 'sysUpTime':
+      case 'SNMPv2-MIB::sysUpTime':
         // Do not compare uptime when
         if ($device2['status'] == 0 ||              // secondary device is down
             !is_device_mib($device2, 'SNMPv2-MIB')) // not support standard MIB
@@ -2038,10 +1515,16 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
             // Not same, break foreach
             if (OBS_DEBUG)
             {
-              print_warning("The compared oid differs on devices:");
-              print_cli_table([ [ $device1['hostname'], $value1 ], [ $device2['hostname'], $value2 ] ], [ 'Device', $oid ]);
+              // print_warning("The compared oid differs on devices:");
+              // print_cli_table([ [ $device1['hostname'], $value1 ],
+              //                   [ $device2['hostname'], $value2 ] ], [ 'Device', $full_oid ]);
+              $oids_compare[] = [ '%r'.$full_oid.'%n', $value1, $value2 ];
             }
             break 2;
+          }
+          elseif (OBS_DEBUG)
+          {
+            $oids_compare[] = [ $full_oid, $value1, $value2 ];
           }
         }
         break;
@@ -2083,10 +1566,16 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
             // Not same, break foreach
             if (OBS_DEBUG)
             {
-              print_warning("The compared oid differs on devices:");
-              print_cli_table([ [ $device1['hostname'], implode(', ', $value1) ], [ $device2['hostname'], implode(', ', $value2) ] ], [ 'Device', $oid ]);
+              // print_warning("The compared oid differs on devices:");
+              // print_cli_table([ [ $device1['hostname'], implode(', ', $value1) ],
+              //                   [ $device2['hostname'], implode(', ', $value2) ] ], [ 'Device', $full_oid ]);
+              $oids_compare[] = [ '%r'.$full_oid.'%n', implode(', ', $value1), implode(', ', $value2) ];
             }
             break 2;
+          }
+          elseif (OBS_DEBUG)
+          {
+            $oids_compare[] = [ $full_oid, implode(', ', $value1), implode(', ', $value2) ];
           }
         }
         break;
@@ -2106,6 +1595,7 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
         if ($use_db)
         {
           $ifPhysAddress2 = dbFetchRows('SELECT `ifIndex`, `ifPhysAddress` FROM `ports` WHERE `device_id` = ? AND `deleted` = ?', [ $device2['device_id'], 0 ]);
+          print_debug_vars($ifPhysAddress2);
           $value2 = count($ifPhysAddress2);
           if ($value2 < $value1 && $value2 > 0)
           {
@@ -2166,10 +1656,16 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
               // Not same, break foreach
               if (OBS_DEBUG)
               {
-                print_warning("The compared oid differs on devices:");
-                print_cli_table([ [ $device1['hostname'], implode(', ', $value1) ], [ $device2['hostname'], implode(', ', $value2) ] ], [ 'Device', $oid ]);
+                // print_warning("The compared oid differs on devices:");
+                // print_cli_table([ [ $device1['hostname'], implode(', ', $value1) ],
+                //                   [ $device2['hostname'], implode(', ', $value2) ] ], [ 'Device', $oid ]);
+                $oids_compare[] = [ '%r'.$full_oid.'%n', implode(', ', $value1), implode(', ', $value2) ];
               }
               break 2;
+            }
+            elseif (OBS_DEBUG)
+            {
+              $oids_compare[] = [ $full_oid, implode(', ', $value1), implode(', ', $value2) ];
             }
           }
         }
@@ -2179,11 +1675,12 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
         if ($device2['status'] == 0 ||    // secondary device is down
           !is_device_mib($device2, $mib)) // not support MIB
         {
+          print_debug("Check Oid ($full_oid) skipped, because second device is down or MIB ($mib) not defined.");
           break;
         }
 
         // When Oid not indexed, append default index
-        if (!str_exists($oid, '.'))
+        if (!str_contains($oid, '.'))
         {
           $oid .= '.0';
         }
@@ -2203,13 +1700,45 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
             // Not same, break foreach
             if (OBS_DEBUG)
             {
-              print_warning("The compared oid differs on devices:");
-              print_cli_table([ [ $device1['hostname'], $value1 ], [ $device2['hostname'], $value2 ] ], [ 'Device', $oid ]);
+              // print_warning("The compared oid differs on devices:");
+              // print_cli_table([ [ $device1['hostname'], $value1 ],
+              //                   [ $device2['hostname'], $value2 ] ], [ 'Device', $full_oid ]);
+              $oids_compare[] = [ '%r'.$full_oid.'%n', $value1, $value2 ];
             }
             break 2;
           }
+          elseif (OBS_DEBUG)
+          {
+            $oids_compare[] = [ $full_oid, $value1, $value2 ];
+          }
         }
     }
+  }
+
+  if ($same && OBS_DEBUG)
+  {
+    // If anyway device detect as same, just resolve hostnames for debug
+    if (!get_ip_version($device1['hostname']))
+    {
+      $ip1 = gethostbyname6($device1['hostname']);
+    } else {
+      $ip1 = $device1['hostname'];
+    }
+    if (!get_ip_version($device2['hostname']))
+    {
+      $ip2 = gethostbyname6($device2['hostname']);
+    } else {
+      $ip2 = $device2['hostname'];
+    }
+
+    array_unshift($oids_compare, [ '---', '---', '---' ]);
+    array_unshift($oids_compare, [ 'Resolved IPs:', $ip1, $ip2 ]);
+  }
+
+  if (count($oids_compare))
+  {
+    print_warning("The compared oids on devices:");
+    print_cli_table($oids_compare, [ 'Oid', $device1['hostname'] . ' (%gnew%n)', $device2['hostname'] . ' ('.$device2['device_id'].')' ]);
   }
 
   return $same;
@@ -2218,176 +1747,47 @@ function compare_devices_oids($device1, $device2, $oids = [], $use_db = TRUE)
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 // MOVEME to includes/common.inc.php
-function scanUDP($host, $port, $timeout)
-{
-  $handle = fsockopen($host, $port, $errno, $errstr, 2);
-  socket_set_timeout($handle, $timeout);
-  $write = fwrite($handle,"\x00");
-  if (!$write) { next; }
-  $startTime = time();
-  $header = fread($handle, 1);
-  $endTime = time();
-  $timeDiff = $endTime - $startTime;
-
-  if ($timeDiff >= $timeout)
-  {
-    fclose($handle); return 1;
-  } else { fclose($handle); return 0; }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port = 161, $snmp_transport = 'udp', $snmp_extra = array())
-{
-  $device = array();
-  $device['hostname']       = $hostname;
-  $device['snmp_port']      = $snmp_port;
-  $device['snmp_transport'] = $snmp_transport;
-  $device['snmp_version']   = $snmp_version;
-
-  if ($snmp_version === "v2c" || $snmp_version === "v1")
-  {
-    $device['snmp_community'] = $snmp_community;
-  }
-  else if ($snmp_version == "v3")
-  {
-    $device['snmp_authlevel']  = $snmp_extra['authlevel'];
-    $device['snmp_authname']   = $snmp_extra['authname'];
-    $device['snmp_authpass']   = $snmp_extra['authpass'];
-    $device['snmp_authalgo']   = $snmp_extra['authalgo'];
-    $device['snmp_cryptopass'] = $snmp_extra['cryptopass'];
-    $device['snmp_cryptoalgo'] = $snmp_extra['cryptoalgo'];
-  }
-  // Append SNMP context if passed
-  if (isset($snmp_extra['snmp_context']) && strlen($snmp_extra['snmp_context']))
-  {
-    $device['snmp_context'] = $snmp_extra['snmp_context'];
-  }
-
-  print_debug_vars($device);
-
-  return $device;
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/common.inc.php
-function netmask2cidr($netmask)
-{
-  $addr = Net_IPv4::parseAddress("1.2.3.4/$netmask");
-  return $addr->bitmask;
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/common.inc.php
-function cidr2netmask($cidr)
-{
-  return (long2ip(ip2long("255.255.255.255") << (32-$cidr)));
-}
-
-// Detect SNMP auth params without adding device by hostname or IP
-// if SNMP auth detected return array with auth params or FALSE if not detected
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function detect_device_snmpauth($hostname, $snmp_port = 161, $snmp_transport = 'udp', $detect_ip_version = FALSE)
-{
-  global $config;
-
-  // Additional checks for IP version
-  if ($detect_ip_version)
-  {
-    $ip_version = get_ip_version($hostname);
-    if (!$ip_version)
-    {
-      $ip = gethostbyname6($hostname);
-      $ip_version = get_ip_version($ip);
-    }
-    // Detect snmp transport
-    if (stripos($snmp_transport, 'tcp') !== FALSE)
-    {
-      $snmp_transport = ($ip_version == 4 ? 'tcp' : 'tcp6');
-    } else {
-      $snmp_transport = ($ip_version == 4 ? 'udp' : 'udp6');
-    }
-  }
-  // Detect snmp port
-  if (!is_numeric($snmp_port) || $snmp_port < 1 || $snmp_port > 65535)
-  {
-    $snmp_port = 161;
+function scan_port($host, $port, $proto = 'udp', $timeout = 1.0) {
+  if (is_float($timeout)) {
+    $msec = fmod($timeout, 1) * 1000;
   } else {
-    $snmp_port = (int)$snmp_port;
+    $msec = 0;
   }
-
-  // Here set default snmp version order
-  $i = 1;
-  $snmp_version_order = array();
-  foreach (array('v2c', 'v3', 'v1') as $tmp_version)
-  {
-    if ($config['snmp']['version'] == $tmp_version)
-    {
-      $snmp_version_order[0]  = $tmp_version;
-    } else {
-      $snmp_version_order[$i] = $tmp_version;
+  if (!(get_ip_version($host) || is_valid_hostname($host))) {
+    // not valid hostname/ip
+    print_error("Invalid host $host passed.");
+    return 0;
+  }
+  if (!str_istarts($proto, 'tcp')) {
+    // default scan udp
+    $host = 'udp://'.$host;
+  }
+  if (!is_valid_param($port, 'port')) {
+    print_error("Invalid port $port passed.");
+    return 0;
+  }
+  if ($handle = fsockopen($host, $port, $errno, $errstr, (float)$timeout)) {
+    stream_set_timeout($handle, (int)$timeout, (int)$msec);
+    $write = fwrite($handle, "\x00");
+    if (!$write) {
+      return 0;
     }
-    $i++;
-  }
-  ksort($snmp_version_order);
 
-  foreach ($snmp_version_order as $snmp_version)
-  {
-    if ($snmp_version === 'v3')
-    {
-      // Try each set of parameters from config
-      foreach ($config['snmp']['v3'] as $auth_iter => $snmp_v3)
-      {
-        $device = build_initial_device_array($hostname, NULL, $snmp_version, $snmp_port, $snmp_transport, $snmp_v3);
+    $startTime = time();
+    $header    = fread($handle, 1);
+    $endTime   = time();
+    $timeDiff  = $endTime - $startTime;
 
-        if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2)
-        {
-          // Hide snmp auth
-          print_message("Trying v3 parameters *** / ### [$auth_iter] ... ");
-        } else {
-          print_message("Trying v3 parameters " . $device['snmp_authname'] . "/" .  $device['snmp_authlevel'] . " ... ");
-        }
-
-        if (isSNMPable($device))
-        {
-          return $device;
-        } else {
-          if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2)
-          {
-            print_warning("No reply on credentials *** / ### using $snmp_version.");
-          } else {
-            print_warning("No reply on credentials " . $device['snmp_authname'] . "/" .  $device['snmp_authlevel'] . " using $snmp_version.");
-          }
-        }
-      }
-    } else { // if ($snmp_version === "v2c" || $snmp_version === "v1")
-      // Try each community from config
-      foreach ($config['snmp']['community'] as $auth_iter => $snmp_community)
-      {
-        $device = build_initial_device_array($hostname, $snmp_community, $snmp_version, $snmp_port, $snmp_transport);
-
-        if ($config['snmp']['hide_auth'] && OBS_DEBUG < 2)
-        {
-          // Hide snmp auth
-          print_message("Trying $snmp_version community *** [$auth_iter] ...");
-        } else {
-          print_message("Trying $snmp_version community $snmp_community ...");
-        }
-
-        if (isSNMPable($device))
-        {
-          return $device;
-        } else {
-          print_warning("No reply on community $snmp_community using $snmp_version.");
-        }
-      }
+    fclose($handle);
+    if ($timeDiff >= $timeout) {
+      return $timeDiff;
     }
   }
+  return 0;
+}
 
-  return FALSE;
+function scanUDP($host, $port, $timeout) {
+  return scan_port($host, $port, 'udp', $timeout);
 }
 
 /**
@@ -2397,31 +1797,35 @@ function detect_device_snmpauth($hostname, $snmp_port = 161, $snmp_transport = '
  * @return float SNMP query runtime in milliseconds
  */
 // TESTME needs unit testing
-function isSNMPable($device)
-{
-  if (isset($device['os'][0]) && isset($GLOBALS['config']['os'][$device['os']]['snmpable']) && $device['os'] != 'generic')
-  {
+function isSNMPable($device) {
+  if (isset($device['os'][0]) && isset($GLOBALS['config']['os'][$device['os']]['snmpable']) && $device['os'] !== 'generic') {
     // Known device os, and defined custom snmpable OIDs
     $pos   = snmp_get_multi_oid($device, $GLOBALS['config']['os'][$device['os']]['snmpable'], array(), 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
-    $count = count($pos);
+    //$err   = snmp_error_code();
+    $count = safe_count($pos);
   } else {
     // Normal checks by sysObjectID and sysUpTime
+    $pos = snmp_get_multi_oid($device, '.1.3.6.1.2.1.1.2.0 .1.3.6.1.2.1.1.3.0', [], 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
+    //print_vars($pos);
+    $count = safe_count($pos);
+    /*
     $pos   = snmp_get_multi_oid($device, 'sysObjectID.0 sysUpTime.0', array(), 'SNMPv2-MIB');
-    $count = count($pos[0]);
+    $count = safe_count($pos[0]);
+    */
+    $err   = snmp_error_code();
 
-    if ($count === 0 && (empty($device['os']) || !isset($GLOBALS['config']['os'][$device['os']])))
-    {
+    if ($count === 0 &&
+        $err !== OBS_SNMP_ERROR_AUTHENTICATION_FAILURE && $err !== OBS_SNMP_ERROR_UNSUPPORTED_ALGO && // skip on incorrect auth
+        (empty($device['os']) || !isset($GLOBALS['config']['os'][$device['os']]))) {
       // New device (or os changed) try to all snmpable OIDs
-      foreach (array_chunk($GLOBALS['config']['os']['generic']['snmpable'], 3) as $snmpable)
-      {
-        $pos   = snmp_get_multi_oid($device, $snmpable, array(), 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
-        if ($count = count($pos)) { break; } // stop foreach on first oids set
+      foreach (array_chunk($GLOBALS['config']['os']['generic']['snmpable'], 3) as $snmpable) {
+        $pos = snmp_get_multi_oid($device, $snmpable, array(), 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
+        if ($count = safe_count($pos)) { break; } // stop foreach on first oids set
       }
     }
   }
 
-  if ($GLOBALS['snmp_status'] && $count > 0)
-  {
+  if ($GLOBALS['snmp_status'] && $count > 0) {
     // SNMP response time in milliseconds.
     $time_snmp = $GLOBALS['exec_status']['runtime'] * 1000;
     $time_snmp = number_format($time_snmp, 2, '.', '');
@@ -2551,111 +1955,15 @@ function is_odd($number)
   return $number & 1; // 0 = even, 1 = odd
 }
 
-// TESTME needs unit testing
-/**
- * Add device into database
- *
- * @param string $hostname Device hostname
- * @param string $snmp_community SNMP v1/v2c community
- * @param string $snmp_version   SNMP version (v1, v2c, v3)
- * @param int    $snmp_port      SNMP port (default: 161)
- * @param string $snmp_transport SNMP transport (udp, udp6, tcp, tcp6)
- * @param array  $snmp_extra     SNMP v3 auth params and/or SNMP context
- *
- * @return bool|string
- */
-function createHost($hostname, $snmp_community = NULL, $snmp_version, $snmp_port = 161, $snmp_transport = 'udp', $snmp_extra = array())
-{
-  $hostname = trim(strtolower($hostname));
-
-  $device = array('hostname'       => $hostname,
-                  'sysName'        => $hostname,
-                  'status'         => '1',
-                  'snmp_community' => $snmp_community,
-                  'snmp_port'      => $snmp_port,
-                  'snmp_transport' => $snmp_transport,
-                  'snmp_version'   => $snmp_version
-            );
-
-  // Add snmp v3 auth params & snmp context
-  foreach (array('authlevel', 'authname', 'authpass', 'authalgo', 'cryptopass', 'cryptoalgo', 'context') as $v3_key)
-  {
-    if (isset($snmp_extra['snmp_'.$v3_key]))
-    {
-      // Or $snmp_v3['snmp_authlevel']
-      $device['snmp_'.$v3_key] = $snmp_extra['snmp_'.$v3_key];
-    }
-    else if (isset($snmp_extra[$v3_key]))
-    {
-      // Or $snmp_v3['authlevel']
-      $device['snmp_'.$v3_key] = $snmp_extra[$v3_key];
-    }
-  }
-
-  $device['os']           = get_device_os($device);
-  $device['sysObjectID']  = snmp_cache_sysObjectID($device);
-  $device['snmpEngineID'] = snmp_cache_snmpEngineID($device);
-  $device['sysName']      = snmp_get_oid($device, 'sysName.0',     'SNMPv2-MIB');
-  $device['location']     = snmp_get_oid($device, 'sysLocation.0', 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_UTF8);
-  $device['sysContact']   = snmp_get_oid($device, 'sysContact.0',  'SNMPv2-MIB', NULL, OBS_SNMP_ALL_UTF8);
-
-  if (isset($GLOBALS['config']['poller_name']))
-  {
-    $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `poller_name` = ?", array($GLOBALS['config']['poller_name']));
-
-    if (is_numeric($poller_id))
-    {
-      $device['poller_id'] = $poller_id;
-    }
-  }
-
-  if ($device['os'])
-  {
-    $device_id = dbInsert($device, 'devices');
-    if ($device_id)
-    {
-      log_event("Device added: $hostname", $device_id, 'device', $device_id, 5); // severity 5, for logging user/console info
-      if (strlen($device['sysObjectID']))
-      {
-        log_event('sysObjectID -> ' . $device['sysObjectID'], $device, 'device', $device_id);
-      }
-      if (strlen($device['snmpEngineID']))
-      {
-        log_event('snmpEngineID -> ' . $device['snmpEngineID'], $device, 'device', $device_id);
-      }
-      if (is_cli())
-      {
-        print_success("Now discovering ".$device['hostname']." (id = ".$device_id.")");
-        $device['device_id'] = $device_id;
-        // Discover things we need when linking this to other hosts.
-        discover_device($device, $options = array('m' => 'os,mibs,ports,ip-addresses'));
-        log_event("snmpEngineID -> ".$device['snmpEngineID'], $device, 'device', $device['device_id']);
-        // Reset `last_discovered` for full rediscover device by cron
-        dbUpdate(array('last_discovered' => 'NULL'), 'devices', '`device_id` = ?', array($device_id));
-        array_push($GLOBALS['devices'], $device_id); // FIXME, seems as $devices var not used anymore
-      }
-
-      // Request for clear WUI cache
-      set_cache_clear('wui');
-
-      return($device_id);
-    } else {
-      return FALSE;
-    }
-  } else {
-    return FALSE;
-  }
-}
-
 // Allows overwriting elements of an array of OIDs with replacement values from a private MIB.
 // Currently used by ports to replace OIDs with private ports tables.
 
-function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_oids = NULL)
-{
+function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_oids = NULL) {
   global $config;
 
-  foreach ($config['mibs'][$mib][$entity_type] as $table => $def)
-  {
+  $oids_limited = safe_count($limit_oids);
+
+  foreach ($config['mibs'][$mib][$entity_type] as $table => $def) {
 
     // Skip unknown definitions..
     if (!isset($def['oids']) || !is_array($def['oids'])) { continue; }
@@ -2666,11 +1974,9 @@ function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_
     $walked = array();
 
     // Walk to $entity_tmp, link to $entity_stats if we're not rewriting
-    if (isset($def['map']))
-    {
+    if (isset($def['map'])) {
       $entity_tmp = array();
-      if (isset($def['map']['oid']))
-      {
+      if (isset($def['map']['oid'])) {
         echo $def['map']['oid'] . ' ';
         $entity_tmp = snmpwalk_cache_oid($device, $def['map']['oid'], $entity_tmp, $mib);
 
@@ -2679,8 +1985,7 @@ function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_
 
         $walked[] = $def['map']['oid'];
       }
-      foreach ((array)$def['map']['oid_extra'] as $oid)
-      {
+      foreach ((array)$def['map']['oid_extra'] as $oid) {
         echo $oid . ' ';
         $entity_tmp = snmpwalk_cache_oid($device, $oid, $entity_tmp, $mib);
         $walked[] = $oid;
@@ -2690,10 +1995,9 @@ function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_
     }
 
     // Populated $entity_tmp
-    foreach ($def['oids'] as $oid => $entry)
-    {
+    foreach ($def['oids'] as $oid => $entry) {
       // Skip if there's an OID list and we're not on it.
-      if (is_array($limit_oids) && !in_array($oid, $limit_oids)) { continue; }
+      if ($oids_limited && !in_array($oid, (array)$limit_oids, TRUE)) { continue; }
 
       // If this OID is being used twice, don't walk it again.
       if (!isset($entry['oid']) || in_array($entry['oid'], $walked)) { continue; }
@@ -2710,19 +2014,15 @@ function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_
     print_debug_vars($entity_tmp);
 
     // Rewrite indexes using map from $entity_tmp to $entity_stats
-    if (isset($def['map']))
-    {
+    if (isset($def['map'])) {
       $entity_new = array();
       $map_tmp = array();
       // Generate mapping list
-      if (isset($def['map']['index']))
-      {
+      if (isset($def['map']['index'])) {
         // Index by tags
-        foreach ($entity_tmp as $index => $entry)
-        {
+        foreach ($entity_tmp as $index => $entry) {
           $entry['index'] = $index;
-          foreach (explode('.', $index) as $k => $idx)
-          {
+          foreach (explode('.', $index) as $k => $idx) {
             $entry['index'.$k] = $idx;
           }
           $map_index = array_tag_replace($entry, $def['map']['index']);
@@ -2730,22 +2030,17 @@ function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_
         }
       } else {
         // Mapping by Oid
-        foreach ($entity_tmp as $index => $entry)
-        {
-          if (isset($entry[$def['map']['oid']]))
-          {
+        foreach ($entity_tmp as $index => $entry) {
+          if (isset($entry[$def['map']['oid']])) {
             $map_tmp[$index] = $entry[$def['map']['oid']];
           }
         }
       }
       print_debug_vars($map_tmp);
 
-      foreach ($entity_tmp as $index => $entry)
-      {
-        if (isset($map_tmp[$index]))
-        {
-          foreach ($entry as $oid => $value)
-          {
+      foreach ($entity_tmp as $index => $entry) {
+        if (isset($map_tmp[$index])) {
+          foreach ($entry as $oid => $value) {
             $entity_new[$map_tmp[$index]][$oid] = $value;
           }
         }
@@ -2756,36 +2051,34 @@ function merge_private_mib(&$device, $entity_type, $mib, &$entity_stats, $limit_
 
     echo '['; // start change list
 
-    foreach ($entity_new as $index => $port)
-    {
-      foreach ($def['oids'] as $oid => $entry)
-      {
+    foreach ($entity_new as $index => $port) {
+      foreach ($def['oids'] as $oid => $entry) {
         // Skip if there's an OID list and we're not on it.
-        if (isset($limit_oids) && !in_array($oid, $limit_oids))
-        {
+        if ($oids_limited && !in_array($oid, (array)$limit_oids, TRUE)) {
           continue;
         }
 
         $mib_oid = $entry['oid'];
-        if (isset($entry['oid']) && isset($port[$mib_oid]))
-        {
-          $entity_stats[$index][$oid] = $port[$mib_oid];
+        if (isset($entry['oid']) && isset($port[$entry['oid']])) {
 
-          if (isset($entry['transform']))
-          {
+          if (isset($entry['transform'])) {
             $entry['transformations'] = $entry['transform'];
           }
-          if (isset($entry['transformations']))
-          {
+          if (isset($entry['transformations'])) {
             // Translate to standard IF-MIB values
-            $entity_stats[$index][$oid] = string_transform($entity_stats[$index][$oid], $entry['transformations']);
+            $port[$entry['oid']] = string_transform($port[$entry['oid']], $entry['transformations']);
             echo 'T';
           }
 
+          if (isset($entry['unit']) && str_ends($entry['unit'], 'ps')) { // bps, pps
+            // Set suffixied Oid instead main
+            // Currently used for Rate Oids, see SPECTRA-LOGIC-STRATA-MIB definition
+            $entity_stats[$index][$oid.'_rate'] = $port[$entry['oid']];
+          } else {
+            $entity_stats[$index][$oid] = $port[$entry['oid']];
+          }
           echo '.';
-        }
-        elseif (isset($entry['value']))
-        {
+        } elseif (isset($entry['value'])) {
           // Set fixed value
           $entity_stats[$index][$oid] = $entry['value'];
         } else {
@@ -2824,75 +2117,190 @@ function hex2binmap($hex)
   return $binary;
 }
 
-/**
- * Use this function to write to the eventlog table
- *
- * @param string        $text      Message text
- * @param integer|array $device    Device array or device id
- * @param string        $type      Entity type (ie port, device, global)
- * @param integer       $reference Reference ID to current entity type
- * @param integer       $severity  Event severity (0 - 8)
- * @return integer                 Event DB id
- */
-// TESTME needs unit testing
-function log_event($text, $device = NULL, $type = NULL, $reference = NULL, $severity = 6)
-{
-  if (is_null($device) && is_null($type))
-  {
+function log_event_process(&$text, &$device = NULL, &$type = NULL, &$reference = NULL, &$severity = 6) {
+  if (is_null($device) && is_null($type)) {
     // Without device and type - is global events
     $type = 'global';
   } else {
     $type = strtolower($type);
   }
+  $entity_id = $reference;
 
   // Global events not have device_id
-  if ($type != 'global')
-  {
-    if (!is_array($device)) { $device = device_by_id_cache($device); }
-    if ($device['ignore'] && $type != 'device') { return FALSE; } // Do not log events if device ignored
-  }
-
-  if ($type == 'port')
-  {
-    if (is_array($reference))
-    {
-      $port      = $reference;
-      $reference = $port['port_id'];
-    } else {
-      $port = get_port_by_id_cache($reference);
+  if (!in_array($type, [ 'global', 'info' ], TRUE)) {
+    if (!is_array($device) && is_intnum($device)) {
+      $device = device_by_id_cache($device);
     }
-    if ($port['ignore']) { return FALSE; } // Do not log events if interface ignored
-  }
-
-  $severity = priority_string_to_numeric($severity); // Convert named severities to numeric
-  if (($type == 'device' && $severity == 5) || isset($_SESSION['username'])) // Severity "Notification" additional log info about username or cli
-  {
-    $severity = ($severity == 6 ? 5 : $severity); // If severity default, change to notification
-    if (isset($_SESSION['username']))
-    {
-      $text .= ' (by user: '.$_SESSION['username'].')';
+    // Do not log events if device id not found
+    if (!is_array($device)) {
+      return FALSE;
     }
-    else if (is_cli())
-    {
-      if (is_cron())
-      {
-        $text .= ' (by cron)';
+    // Do not log events if device ignored
+    if ($device['ignore'] && $type !== 'device') {
+      return FALSE;
+    }
+
+    // Type is valid entity
+    if (isset($GLOBALS['config']['entities'][$type])) {
+      $translate = entity_type_translate_array($type);
+      if (is_array($reference)) {
+        $entity    = $reference;
+        $entity_id = $entity[$translate['id_field']];
+        //$reference = $entity[$translate['id_field']];
       } else {
-        $text .= ' (by console, user '  . $_SERVER['USER'] . ')';
+        $entity = get_entity_by_id_cache($type, $reference);
+      }
+      // Do not log events if entity ignored
+      if (isset($translate['ignore_field']) && $entity[$translate['ignore_field']]) {
+        return FALSE;
       }
     }
   }
 
-  $insert = array('device_id' => ($device['device_id'] ? $device['device_id'] : 0), // Currently db schema not allow NULL value for device_id
-                  'entity_id' => (is_numeric($reference) ? $reference : array('NULL')),
-                  'entity_type' => ($type ? $type : array('NULL')),
-                  'timestamp' => array("NOW()"),
-                  'severity' => $severity,
-                  'message' => $text);
+  $severity = priority_string_to_numeric($severity); // Convert named severities to numeric
+  if (($type === 'device' && $severity == 5) || isset($_SESSION['username'])) // Severity "Notification" additional log info about username or cli
+  {
+    $severity = ($severity == 6 ? 5 : $severity); // If severity default, change to notification
+    if (isset($_SESSION['username'])) {
+      $text .= ' (by user: ' . $_SESSION['username'] . ')';
+    } elseif (is_cli()) {
+      if (is_cron()) {
+        $text .= ' (by cron)';
+      } else {
+        $text .= ' (by console, user ' . get_localuser() . ')';
+      }
+    }
+  }
 
-  $id = dbInsert($insert, 'eventlog');
+  return [
+    'message'     => $text,
+    'device_id'   => $device['device_id'],
+    'entity_id'   => $entity_id,
+    'entity_type' => $type,
+    'severity'    => $severity
+  ];
+}
 
-  return $id;
+/**
+ * Use this function to write to the eventlog table
+ *
+ * @param string    $text      Message text
+ * @param int|array $device    Device array or device id
+ * @param string    $type      Entity type (ie port, device, global)
+ * @param int|array $reference Reference ID to current entity type
+ * @param int       $severity  Event severity (0 - 8)
+ * @return int                 Event DB id
+ */
+// TESTME needs unit testing
+function log_event($text, $device = NULL, $type = NULL, $reference = NULL, $severity = 6) {
+
+  $event = log_event_process($text, $device, $type, $reference, $severity);
+  if (!is_array($event)) { return $event; }
+
+  $insert = [
+    'device_id'   => ($event['device_id'] ?: 0), // Currently db schema not allow NULL value for device_id
+    'entity_id'   => (is_numeric($event['entity_id']) ? $event['entity_id'] : [ 'NULL' ]),
+    'entity_type' => ($event['entity_type'] ?: [ 'NULL' ]),
+    'timestamp'   => [ "NOW()" ],
+    'severity'    => $event['severity'],
+    'message'     => $event['message']
+  ];
+
+  return dbInsert($insert, 'eventlog');
+}
+
+/**
+ * Use this function to write to the eventlog table.
+ * Unlike the function log_event() this write events to cache and pull to db at end of process.
+ * Also many of the same log entries are combined into one with repeated counter.
+ *
+ * @param string    $text      Message text
+ * @param int|array $device    Device array or device id
+ * @param string    $type      Entity type (ie port, device, global)
+ * @param int|array $reference Reference ID to current entity type
+ * @param int       $severity  Event severity (0 - 8)
+ * @return int                 Event DB id
+ */
+function log_event_cache($text, $device = NULL, $type = NULL, $reference = NULL, $severity = 6) {
+  global $cache;
+
+  // Magic key for write/pull all cached events
+  if ($text === TRUE || in_array(strtolower($text), [ 'write', 'pull' ])) {
+    $insert = [];
+    foreach ($cache['log_events'] as $log_type => $e1) {
+      foreach ($e1 as $log_message => $e2) {
+
+        if ($log_type === 'global') {
+          $message = $e2['count'] > 1 ? $log_message . " (repeated ".$e2['count']." times)" : $log_message;
+
+          $insert[] = [
+            'device_id'   => 0, // Currently db schema not allow NULL value for device_id
+            'entity_id'   => [ 'NULL' ],
+            'entity_type' => $log_type,
+            'timestamp'   => [ "NOW()" ],
+            'severity'    => $e2['severity'],
+            'message'     => $message
+          ];
+        } else {
+          foreach ($e2 as $device_id => $e3) {
+            $message = $e3['count'] > 1 ? $log_message . " (repeated ".$e3['count']." times)" : $log_message;
+
+            $insert[] = [
+              'device_id'   => ($device_id ?: 0), // Currently db schema not allow NULL value for device_id
+              'entity_id'   => (is_numeric($e3['entity_id']) ? $e3['entity_id'] : [ 'NULL' ]),
+              'entity_type' => ($log_type ?: [ 'NULL' ]),
+              'timestamp'   => [ "NOW()" ],
+              'severity'    => $e3['severity'],
+              'message'     => $message
+            ];
+          }
+        }
+      }
+    }
+    print_debug_vars($insert);
+    // pull events to db
+    dbInsertMulti($insert, 'eventlog');
+
+    // clear cache after pull
+    unset($cache['log_events']);
+    return TRUE;
+  }
+
+  // Register shutdown function for write cached event logs (on first log_event_cache() call)
+  if (!isset($cache['log_events'])) {
+    register_shutdown_function('log_event_cache', TRUE); // log_event_cache(TRUE) writes cached logs to db
+  }
+
+  // Process log entries
+  $event = log_event_process($text, $device, $type, $reference, $severity);
+  if (!is_array($event)) { return $event; }
+
+  // Cache log entries
+  if ($type === 'global') {
+    if (!isset($cache['log_events'][$type][$text])) {
+      $cache['log_events'][$type][$text] = [
+        'count' => 0,
+        'severity' => $severity
+      ];
+    }
+    $cache['log_events'][$type][$text]['count']++;
+    $cache['log_events'][$type][$text]['severity'] = min($cache['log_events'][$type][$text]['severity'], $severity);
+
+    return $cache['log_events'][$type][$text];
+  } else {
+    $device_id = $event['device_id'] ?: 0;
+    if (!isset($cache['log_events'][$type][$text][$device_id])) {
+      $cache['log_events'][$type][$text][$device_id] = [
+        'count'     => 0,
+        'severity'  => $severity,
+        'entity_id' => $reference
+      ];
+    }
+    $cache['log_events'][$type][$text][$device_id]['count']++;
+    $cache['log_events'][$type][$text][$device_id]['severity'] = min($cache['log_events'][$type][$text][$device_id]['severity'], $severity);
+
+    return $cache['log_events'][$type][$text][$device_id];
+  }
 }
 
 // Parse string with emails. Return array with email (as key) and name (as value)
@@ -2940,18 +2348,17 @@ function parse_email($emails)
  * @return string
  */
 // MOVEME to includes/common.inc.php
-function str2hex($string)
-{
-  $hex='';
-  for ($i=0; $i < strlen($string); $i++)
-  {
+function str2hex($string) {
+  $hex = '';
+  $len = strlen($string);
+  for ($i = 0; $i < $len; $i++) {
     $char = dechex(ord($string[$i]));
-    if (strlen($char) === 1)
-    {
+    if (strlen($char) === 1) {
       $char = '0'.$char;
     }
     $hex .= $char;
   }
+
   return $hex;
 }
 
@@ -3164,38 +2571,78 @@ function parse_csv($content, $has_header = 1, $separator = ",")
   return $result;
 }
 
-function get_defined_settings()
-{
+function get_defined_settings($key = NULL) {
   $config = [];
   include($GLOBALS['config']['install_dir'] . "/config.php");
 
+  if ($key) {
+    // return specific setting if defined
+    return array_get_nested($config, $key);
+  }
+
+  // never store this option(s) in memory! Use get_defined_settings($key)
+  foreach ($GLOBALS['config']['hide_config'] as $opt) {
+    if (array_get_nested($config, $opt)) { unset($config[$opt]); }
+  }
+
   return $config;
 }
 
-function get_default_settings()
-{
+function get_default_settings($key = NULL) {
   $config = [];
   include($GLOBALS['config']['install_dir'] . "/includes/defaults.inc.php");
 
+  if ($key) {
+    // return specific setting if defined
+    return array_get_nested($config, $key);
+  }
+
   return $config;
 }
 
+function get_config_json($filter = NULL, $print = TRUE) {
+  global $config;
+
+  if (safe_empty($filter)) {
+    if ($print) {
+      echo safe_json_encode($config);
+      return;
+    }
+    return safe_json_encode($config);
+  }
+
+  if (!is_array($filter)) {
+    $filter = explode(',', $filter);
+  }
+  $json_config = [];
+  foreach ($filter as $key) {
+    if (array_key_exists($key, $config)) {
+      $json_config[$key] = $config[$key];
+    }
+  }
+
+  if ($print) {
+    echo safe_json_encode($json_config);
+  } else {
+    return safe_json_encode($json_config);
+  }
+}
+
 // Load configuration from SQL into supplied variable (pass by reference!)
-function load_sqlconfig(&$config)
-{
+function load_sqlconfig(&$config) {
   $config_defined = get_defined_settings(); // defined in config.php
 
   // Override some whitelisted definitions from config.php
-  foreach ($config_defined as $key => $definition)
-  {
-    if (in_array($key, $config['definitions_whitelist']) && version_compare(PHP_VERSION, '5.3.0') >= 0 &&
+  foreach ($config_defined as $key => $definition) {
+    //if (is_null($config['definitions_whitelist'])) { print_error("NULL on $key"); } else { print_warning("ARRAY on $key"); }
+    if (in_array($key, $GLOBALS['config']['definitions_whitelist']) && // Always use global config here!
         is_array($definition) && is_array($config[$key]))
     {
       /* Fix mib definitions for dumb users, who copied old defaults.php
          where mibs was just MIB => 1,
          This definition should be array */
       // Fetch first element and validate that this is array
-      if ($key == 'mibs' && !is_array(array_shift(array_values($definition)))) { continue; }
+      if ($key === 'mibs' && !is_array(array_shift(array_values($definition)))) { continue; }
 
       $config[$key] = array_replace_recursive($config[$key], $definition);
     }
@@ -3216,23 +2663,23 @@ function load_sqlconfig(&$config)
       case 1:
         //if (isset($config_defined[$tree[0]])) { continue; } // Note, false for null values
         if (array_key_exists($tree[0], $config_defined)) { break; }
-        $config[$tree[0]] = unserialize($item['config_value']);
+        $config[$tree[0]] = safe_unserialize($item['config_value']);
         break;
       case 2:
         if (isset($config_defined[$tree[0]][$tree[1]])) { break; } // Note, false for null values
-        $config[$tree[0]][$tree[1]] = unserialize($item['config_value']);
+        $config[$tree[0]][$tree[1]] = safe_unserialize($item['config_value']);
         break;
       case 3:
         if (isset($config_defined[$tree[0]][$tree[1]][$tree[2]])) { break; } // Note, false for null values
-        $config[$tree[0]][$tree[1]][$tree[2]] = unserialize($item['config_value']);
+        $config[$tree[0]][$tree[1]][$tree[2]] = safe_unserialize($item['config_value']);
         break;
       case 4:
         if (isset($config_defined[$tree[0]][$tree[1]][$tree[2]][$tree[3]])) { break; } // Note, false for null values
-        $config[$tree[0]][$tree[1]][$tree[2]][$tree[3]] = unserialize($item['config_value']);
+        $config[$tree[0]][$tree[1]][$tree[2]][$tree[3]] = safe_unserialize($item['config_value']);
         break;
       case 5:
         if (isset($config_defined[$tree[0]][$tree[1]][$tree[2]][$tree[3]][$tree[4]])) { break; } // Note, false for null values
-        $config[$tree[0]][$tree[1]][$tree[2]][$tree[3]][$tree[4]] = unserialize($item['config_value']);
+        $config[$tree[0]][$tree[1]][$tree[2]][$tree[3]][$tree[4]] = safe_unserialize($item['config_value']);
         break;
       default:
         print_error("Too many array levels for SQL configuration parser!");
@@ -3451,8 +2898,8 @@ function int_add($a, $b)
       break;
     case 'bc':
       // Convert values to string
-      $a = strval($a);
-      $b = strval($b);
+      $a = (string)$a;
+      $b = (string)$b;
       $sum = bcadd($a, $b);
       print_debug("BC ADD: $a + $b = $sum");
       break;
@@ -3490,8 +2937,8 @@ function int_sub($a, $b)
       break;
     case 'bc':
       // Convert values to string
-      $a = strval($a);
-      $b = strval($b);
+      $a = (string)$a;
+      $b = (string)$b;
       $sub = bcsub($a, $b);
       print_debug("BC SUB: $a - $b = $sub");
       break;
@@ -3521,42 +2968,39 @@ php > $sum = "1111111111111111111111111.1"; echo sprintf("%.0f", $sum)."\n"; ech
 1111111111111111111111111.1
 1111111111111111111111111.1
  */
-function gmp_init_float($value)
-{
-  if (is_int($value))
-  {
+function gmp_init_float($value) {
+  if (is_intnum($value)) {
     return $value;
   }
-  if (is_float($value))
-  {
+  if (is_float($value)) {
     return sprintf("%.0f", $value);
   }
-  if (strpos($value, '.') !== FALSE)
-  {
+  if (str_contains($value, '.')) {
     // Return int part of string
     list($value) = explode('.', $value);
-    return $value;
+    //return $value;
+  }
+  if (safe_empty($value)) {
+    return 0;
   }
 
-  return "$value";
+  return (string)$value;
 }
 
 // Translate syslog priorities from string to numbers
 // ie: ('emerg','alert','crit','err','warning','notice') >> ('0', '1', '2', '3', '4', '5')
 // Note, this is safe function, for unknown data return 15
 // DOCME needs phpdoc block
-function priority_string_to_numeric($value)
-{
+function priority_string_to_numeric($value) {
   $priority = 15; // Default priority for unknown data
-  if (!is_numeric($value))
-  {
-    foreach ($GLOBALS['config']['syslog']['priorities'] as $pri => $entry)
-    {
-      if (stripos($entry['name'], substr($value, 0, 3)) === 0) { $priority = $pri; break; }
+  if (!is_numeric($value)) {
+    foreach ($GLOBALS['config']['syslog']['priorities'] as $pri => $entry) {
+      if (is_string($value) && str_istarts($entry['name'], substr($value, 0, 3))) {
+        $priority = $pri;
+        break;
+      }
     }
-  }
-  else if ($value == (int)$value && $value >= 0 && $value < 16)
-  {
+  } elseif ($value == (int)$value && $value >= 0 && $value < 16) {
     $priority = (int)$value;
   }
 
@@ -3860,6 +3304,28 @@ function config_get_front_page_files()
 }
 
 /**
+ * Creates a list of php files available in the html/includes/authentication directory, to show in a
+ * dropdown on the web configuration page.
+ *
+ * @return array List of authentication modules available
+ */
+function config_get_auth_modules()
+{
+  global $config;
+
+  $authmodules = array();
+
+  foreach (get_recursive_directory_iterator($config['html_dir'] . '/includes/authentication') as $file => $info) {
+    if (str_ends($file, '.inc.php')) {
+      $auth = basename($file, '.inc.php');
+      $authmodules[$auth] = nicecase($auth);
+    }
+  }
+
+  return $authmodules;
+}
+
+/**
  * Triggers a rediscovery of the given device at the following discovery -h new run.
  *
  * @param array $device  Device array.
@@ -3868,39 +3334,33 @@ function config_get_front_page_files()
  * @return mixed Status of added or not force device discovery
  */
 // TESTME needs unit testing
-function force_discovery($device, $modules = array())
-{
+function force_discovery($device, $modules = []) {
   $return = FALSE;
 
-  if (count($modules) == 0)
-  {
+  if (safe_empty($modules)) {
     // Modules not passed, just full rediscover device
+    return dbUpdate([ 'force_discovery' => 1 ], 'devices', '`device_id` = ?', array($device['device_id']));
+  }
+
+  // Modules passed, check if modules valid and enabled
+  $modules = (array)$modules;
+  $forced_modules = get_entity_attrib('device', $device['device_id'], 'force_discovery_modules');
+  if ($forced_modules) {
+    // Already forced modules exist, merge it with new
+    $modules = array_unique(array_merge($modules, safe_json_decode($forced_modules)));
+  }
+
+  $valid_modules = [];
+  foreach ($GLOBALS['config']['discovery_modules'] as $module => $ok) {
+    // Filter by valid and enabled modules
+    if ($ok && in_array($module, $modules)) {
+      $valid_modules[] = $module;
+    }
+  }
+
+  if (count($valid_modules)) {
     $return = dbUpdate(array('force_discovery' => 1), 'devices', '`device_id` = ?', array($device['device_id']));
-  } else {
-    // Modules passed, check if modules valid and enabled
-    $modules = (array)$modules;
-    $forced_modules = get_entity_attrib('device', $device['device_id'], 'force_discovery_modules');
-    if ($forced_modules)
-    {
-      // Already forced modules exist, merge it with new
-      $modules = array_unique(array_merge($modules, json_decode($forced_modules, TRUE)));
-    }
-
-    $valid_modules = array();
-    foreach ($GLOBALS['config']['discovery_modules'] as $module => $ok)
-    {
-      // Filter by valid and enabled modules
-      if ($ok && in_array($module, $modules))
-      {
-        $valid_modules[] = $module;
-      }
-    }
-
-    if (count($valid_modules))
-    {
-      $return = dbUpdate(array('force_discovery' => 1), 'devices', '`device_id` = ?', array($device['device_id']));
-      set_entity_attrib('device', $device['device_id'], 'force_discovery_modules', json_encode($valid_modules));
-    }
+    set_entity_attrib('device', $device['device_id'], 'force_discovery_modules', safe_json_encode($valid_modules));
   }
 
   return $return;
@@ -3921,97 +3381,66 @@ function fix_path_slash($p)
  * This function also applies the scaling as requested.
  * Also works for storage.
  *
- * @param float $scale   Scaling to apply to the supplied values.
- * @param int   $used    Used value of mempool, before scaling, or NULL.
- * @param int   $total   Total value of mempool, before scaling, or NULL.
- * @param int   $free    Free value of mempool, before scaling, or NULL.
- * @param int   $perc    Used percentage value of mempool, or NULL.
+ * @param numeric $scale Scaling to apply to the supplied values.
+ * @param numeric $used  Used value of mempool, before scaling, or NULL.
+ * @param numeric $total Total value of mempool, before scaling, or NULL.
+ * @param numeric $free  Free value of mempool, before scaling, or NULL.
+ * @param numeric $perc  Used percentage value of mempool, or NULL.
  * @param array $options Additional options, ie separate scales for used/total/free
  *
  * @return array Array consisting of 'used', 'total', 'free' and 'perc' fields
  */
-function calculate_mempool_properties($scale, $used, $total, $free, $perc = NULL, $options = array())
-{
+function calculate_mempool_properties($scale, $used, $total, $free, $perc = NULL, $options = []) {
   // Scale, before maths!
   if ($scale == 0) { $scale = 1; }
-  foreach (array('total', 'used', 'free') as $param)
-  {
-    if (is_numeric($$param))
-    {
-      if (isset($options['scale_'.$param]))
-      {
-        // Separate sclae for current param
+
+  $numeric = [ 'perc' => is_numeric($perc) ];
+  foreach ([ 'total', 'used', 'free' ] as $param) {
+    $numeric[$param] = is_numeric($$param);
+    if ($numeric[$param]) {
+      if (isset($options['scale_'.$param])) {
+        // Separate scale for current param
         $$param *= $options['scale_'.$param];
-      }
-      elseif ($scale != 1)
-      {
+      } elseif ($scale != 1) {
         // Common scale
         $$param *= $scale;
       }
     }
   }
+  print_debug_vars($numeric);
 
-  if (is_numeric($total) && is_numeric($free))
-  {
+  if ($numeric['total'] && $numeric['free']) {
     $used = $total - $free;
-    $perc = round($used / $total * 100, 2);
-  }
-  elseif (is_numeric($used) && is_numeric($free))
-  {
+    $perc = $total != 0 ? round($used / $total * 100, 2) : 0;
+  } elseif ($numeric['used'] && $numeric['free']) {
     $total = $used + $free;
-    $perc = round($used / $total * 100, 2);
-  }
-  elseif (is_numeric($total) && is_numeric($perc))
-  {
+    $perc = $total != 0 ? round($used / $total * 100, 2) : 0;
+  } elseif ($numeric['total'] && $numeric['perc']) {
     $used = $total * $perc / 100;
     $free = $total - $used;
-  }
-  elseif (is_numeric($total) && is_numeric($used))
-  {
+  } elseif ($numeric['total'] && $numeric['used']) {
     $free = $total - $used;
-    $perc = round($used / $total * 100, 2);
-  }
-  elseif (is_numeric($perc))
-  {
+    $perc = $total != 0 ? round($used / $total * 100, 2) : 0;
+  } elseif ($numeric['perc']) {
     $total  = 100;
     $used   = $perc;
     $free   = 100 - $perc;
     //$scale  = 1; // Reset scale for percentage-only
   }
-  if (OBS_DEBUG && ($perc < 0 || $perc > 100))
-  {
+
+  if (OBS_DEBUG && ($perc < 0 || $perc > 100)) {
     print_error('Incorrect scales or passed params to function ' . __FUNCTION__ . '()');
   }
+  print_debug_vars([ 'used' => $used, 'total' => $total, 'free' => $free, 'perc' => $perc, 'units' => $scale, 'scale' => $scale ]);
 
-  return array('used' => $used, 'total' => $total, 'free' => $free, 'perc' => $perc, 'units' => $scale, 'scale' => $scale);
+  return [ 'used' => $used, 'total' => $total, 'free' => $free, 'perc' => $perc, 'units' => $scale, 'scale' => $scale ];
 }
 
-/**
- * Get all values from specific key in a multidimensional array
- *
- * @param $key string
- * @param $arr array
- * @return null|string|array
- */
-function array_value_recursive($key, array $arr)
-{
-  $val = array();
-  array_walk_recursive($arr, function($v, $k) use($key, &$val)
-  {
-    if($k == $key) array_push($val, $v);
-  });
-  return count($val) > 1 ? $val : array_pop($val);
-}
+function discovery_check_if_type_exist($entry, $entity_type, $entity = []) {
 
-function discovery_check_if_type_exist($entry, $entity_type)
-{
-
-  if (is_string($entry))
-  {
+  if (is_string($entry) || is_array_seq($entry)) {
     $skip_if_valid_exist = $entry;
-  }
-  elseif (isset($entry['skip_if_valid_exist']))
-  {
+  } elseif (isset($entry['skip_if_valid_exist'])) {
     $skip_if_valid_exist = $entry['skip_if_valid_exist'];
   } else {
     return FALSE;
@@ -4019,69 +3448,100 @@ function discovery_check_if_type_exist($entry, $entity_type)
 
   $valid = &$GLOBALS['valid'];
 
-  $tree = explode('->', $skip_if_valid_exist);
-  //print_vars($tree);
-  switch (count($tree))
-  {
-    case 1:
-      if (isset($valid[$entity_type][$tree[0]]) &&
-          count($valid[$entity_type][$tree[0]]))
-      {
-        print_debug("Excluded by valid exist: ".$skip_if_valid_exist);
-        return TRUE;
-      }
-      break;
-    case 2:
-      if (isset($valid[$entity_type][$tree[0]][$tree[1]]) &&
-          count($valid[$entity_type][$tree[0]][$tree[1]]))
-      {
-        print_debug("Excluded by valid exist: ".$skip_if_valid_exist);
-        return TRUE;
-      }
-      break;
-    case 3:
-      if (isset($valid[$entity_type][$tree[0]][$tree[1]][$tree[2]]) &&
-          count($valid[$entity_type][$tree[0]][$tree[1]][$tree[2]]))
-      {
-        print_debug("Excluded by valid exist: ".$skip_if_valid_exist);
-        return TRUE;
-      }
-      break;
-    default:
-      print_debug("Too many array levels for valid sensor!");
+  foreach ((array)$skip_if_valid_exist as $skip_entry) {
+    // use %index% tags
+    if (!empty($entity) && str_contains($skip_entry, '%')) {
+      $skip_entry = array_tag_replace($entity, $skip_entry);
+    }
+    // FIXME. Need switch to array_get_nested()
+    //array_get_nested($valid[$entity_type], $skip_entry);
+    $tree = explode('->', $skip_entry);
+    //print_vars($tree);
+    switch (count($tree)) {
+      case 1:
+        if (is_array($valid[$entity_type]) &&
+            array_key_exists($tree[0], $valid[$entity_type])) {
+
+          print_debug("Excluded by valid exist: " . $skip_entry);
+          return TRUE;
+        }
+        break;
+
+      case 2:
+        if (is_array($valid[$entity_type][$tree[0]]) &&
+            array_key_exists($tree[1], $valid[$entity_type][$tree[0]])) {
+
+          print_debug("Excluded by valid exist: " . $skip_entry);
+          return TRUE;
+        }
+        break;
+
+      case 3:
+        if (is_array($valid[$entity_type][$tree[0]][$tree[1]]) &&
+            array_key_exists($tree[2], $valid[$entity_type][$tree[0]][$tree[1]]))
+        {
+          print_debug("Excluded by valid exist: " . $skip_entry);
+
+          return TRUE;
+        }
+        break;
+      default:
+        print_debug("Too many array levels for valid sensor!");
+    }
   }
 
   return FALSE;
 }
 
-function discovery_check_requires_pre($device, $entry, $entity_type)
-{
+function discovery_check_requires_pre($device, $entry, $entity_type = NULL) {
 
-  if (isset($entry['pre_test']) && is_array($entry['pre_test']))
-  {
+  if (isset($entry['test_pre']) && !isset($entry['pre_test'])) {
+    // DERP. I keep forgetting how to do it right.
+    $entry['pre_test'] = $entry['test_pre'];
+    unset($entry['test_pre']);
+  }
+
+  if (isset($entry['pre_test']) && is_array($entry['pre_test'])) {
     // Convert single test condition to multi-level condition
     if (isset($entry['pre_test']['operator'])) {
       $entry['pre_test'] = array($entry['pre_test']);
     }
 
-    foreach ($entry['pre_test'] as $test)
-    {
-      if (isset($test['oid']))
-      {
+    foreach ($entry['pre_test'] as $test) {
+      if (isset($test['oid'])) {
         // Fetch just the value eof the OID.
-        $test['data'] = snmp_cache_oid($device, $test['oid'], NULL, NULL, OBS_SNMP_ALL);
-        $oid = $test['oid'];
-      }
-      else if (isset($test['field']))
-      {
+        if (isset($entry['mib']) && !str_contains($test['oid'], '::')) {
+          $test['data'] = snmp_cache_oid($device, $test['oid'], $entry['mib'], NULL, OBS_SNMP_ALL);
+          $oid = $entry['mib'] . '::' . $test['oid'];
+        } else {
+          $test['data'] = snmp_cache_oid($device, $test['oid'], NULL, NULL, OBS_SNMP_ALL);
+          $oid = $test['oid'];
+        }
+      } elseif (isset($test['field'])) {
         $test['data'] = $entry[$test['field']];
         $oid = $test['field'];
+      } elseif (isset($test['device_field']) && array_key_iexists($test['device_field'], $device)) {
+        // compare by device field(s), ie: sysObjectId, sysName
+        if (isset($device[$test['device_field']])) {
+          $test['data'] = $device[$test['device_field']];
+          $oid = 'Device ' . $test['device_field'];
+        } else {
+          // case-insensitive
+          $test['device_field'] = strtolower($test['device_field']);
+          foreach ($device as $key => $value) {
+            if (strtolower($key) === $test['device_field']) {
+              $test['data'] = $value;
+              $oid = 'Device ' . $key;
+              break;
+            }
+          }
+        }
       } else {
         print_debug("Not correct Field (".$test['field'].") passed to discovery_check_requires(). Need add it to 'oid_extra' definition.");
         return FALSE;
       }
-      if (test_condition($test['data'], $test['operator'], $test['value']) === FALSE)
-      {
+
+      if (test_condition($test['data'], $test['operator'], $test['value']) === FALSE) {
         print_debug("Excluded by not test condition: $oid [".$test['data']."] ".$test['operator']." [".implode(', ', (array)$test['value'])."]");
         return TRUE;
       }
@@ -4091,13 +3551,10 @@ function discovery_check_requires_pre($device, $entry, $entity_type)
   return FALSE;
 }
 
-function discovery_check_requires($device, $entry, $array, $entity_type)
-{
-  if (isset($entry['test']) && is_array($entry['test']))
-  {
+function discovery_check_requires($device, $entry, $array, $entity_type = NULL) {
+  if (isset($entry['test']) && is_array($entry['test'])) {
     // Convert single test condition to multi-level condition
-    if (isset($entry['test']['operator']))
-    {
+    if (isset($entry['test']['operator'])) {
       $entry['test'] = array($entry['test']);
     }
 
@@ -4107,19 +3564,19 @@ function discovery_check_requires($device, $entry, $array, $entity_type)
 
     //print_debug_vars($entry['test']);
     //print_debug_vars($array);
-    foreach ($entry['test'] as $test)
-    {
-      if (isset($test['oid']))
-      {
+    foreach ($entry['test'] as $test) {
+      if (isset($test['oid'])) {
         // Fetch just the value eof the OID.
-        $test['data'] = snmp_cache_oid($device, $test['oid'], NULL, NULL, OBS_SNMP_ALL);
-        $oid = $test['oid'];
-      }
-      elseif (isset($test['field']))
-      {
+        if (isset($entry['mib']) && !str_contains($test['oid'], '::')) {
+          $test['data'] = snmp_cache_oid($device, $test['oid'], $entry['mib'], NULL, OBS_SNMP_ALL);
+          $oid = $entry['mib'] . '::' . $test['oid'];
+        } else {
+          $test['data'] = snmp_cache_oid($device, $test['oid'], NULL, NULL, OBS_SNMP_ALL);
+          $oid = $test['oid'];
+        }
+      } elseif (isset($test['field'])) {
         $test['data'] = $array[$test['field']];
-        if (!isset($array[$test['field']]))
-        {
+        if (!isset($array[$test['field']]) && !str_contains($test['operator'], 'null')) {
           // Show debug error (some time Oid fetched, but not exist for current index)
           print_debug("Not correct Field (" . $test['field'] . ") passed to discovery_check_requires(). Need add it to 'oid_extra' definition.");
           //return FALSE;
@@ -4128,26 +3585,22 @@ function discovery_check_requires($device, $entry, $array, $entity_type)
       }
 
       // If 'and' is TRUE, check all conditions
-      if (isset($test['and']))
-      {
+      if (isset($test['and'])) {
         $test_and = $test_and || $test['and'];
       }
 
       $debug_array[] = "$oid [".$test['data']."] ".$test['operator']." [".implode(', ', (array)$test['value'])."]";
-      if (test_condition($test['data'], $test['operator'], $test['value']) === FALSE)
-      {
+      if (test_condition($test['data'], $test['operator'], $test['value']) === FALSE) {
         if ($test_and) { continue; }
 
         print_debug("Excluded by not test condition: $oid [".$test['data']."] ".$test['operator']." [".implode(', ', (array)$test['value'])."]");
         return TRUE;
-      } else {
-        $test_count--;
       }
+      $test_count--;
     }
   }
 
-  if ($test_and && $test_count > 0)
-  {
+  if ($test_and && $test_count > 0) {
     print_debug("Excluded by not all test conditions:\n  " . implode("\n  ", $debug_array));
     return TRUE;
   }

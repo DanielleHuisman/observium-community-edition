@@ -20,7 +20,7 @@ $sla_oids = array(
   'icmpjitter' => array('rttMonLatestIcmpJitterRTTMin', 'rttMonLatestIcmpJitterRTTMax', 'rttMonLatestIcmpJitterNumRTT', 'rttMonLatestIcmpJitterPktLoss'),
 );
 
-$sla_poll = snmpwalk_cache_multi_oid($device, "rttMonLatestRttOperEntry", array(), 'CISCO-RTTMON-MIB');
+$sla_poll = snmpwalk_cache_oid($device, "rttMonLatestRttOperEntry", array(), 'CISCO-RTTMON-MIB');
 foreach (dbFetchColumn("SELECT DISTINCT `rtt_type` FROM `slas` WHERE `device_id` = ? AND `rtt_type` != ? AND `deleted` = 0 AND `sla_status` = 'active';", array($device['device_id'], 'echo')) as $rtt_type)
 {
   switch ($rtt_type)
@@ -28,10 +28,10 @@ foreach (dbFetchColumn("SELECT DISTINCT `rtt_type` FROM `slas` WHERE `device_id`
     case 'jitter': // Additional data for Jitter
     case 'pathjitter':
     case 'ethernetJitter':
-      $sla_poll = snmpwalk_cache_multi_oid($device, "rttMonLatestJitterOperEntry", $sla_poll, 'CISCO-RTTMON-MIB');
+      $sla_poll = snmpwalk_cache_oid($device, "rttMonLatestJitterOperEntry", $sla_poll, 'CISCO-RTTMON-MIB');
       break;
     case 'icmpjitter': // Additional data for ICMP jitter
-      $sla_poll = snmpwalk_cache_multi_oid($device, "rttMonLatestIcmpJitterOperEntry", $sla_poll, 'CISCO-RTTMON-ICMP-MIB');
+      $sla_poll = snmpwalk_cache_oid($device, "rttMonLatestIcmpJitterOperEntry", $sla_poll, 'CISCO-RTTMON-ICMP-MIB');
       break;
   }
 }

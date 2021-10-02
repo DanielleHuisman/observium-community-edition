@@ -11,13 +11,13 @@
  *
  */
 
-$mempool_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingBuffer', NULL, $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'jnxOperatingBuffer', NULL, $mib);
 
 if (is_array($mempool_array))
 {
-  $mempool_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingMemory',   $mempool_array, $mib);
-  $mempool_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingDRAMSize', $mempool_array, $mib);
-  $mempool_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingDescr',    $mempool_array, $mib);
+  $mempool_array = snmpwalk_cache_oid($device, 'jnxOperatingMemory', $mempool_array, $mib);
+  $mempool_array = snmpwalk_cache_oid($device, 'jnxOperatingDRAMSize', $mempool_array, $mib);
+  $mempool_array = snmpwalk_cache_oid($device, 'jnxOperatingDescr', $mempool_array, $mib);
   foreach ($mempool_array as $index => $entry)
   {
     $descr = $entry['jnxOperatingDescr'];

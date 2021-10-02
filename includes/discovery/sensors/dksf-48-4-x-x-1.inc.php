@@ -13,7 +13,7 @@
 
 // FIXME migrate to definitions
 
-$cache_discovery['DKSF-48-4-X-X-1']['smoke'] = snmpwalk_cache_multi_oid($device, 'npSmokeTable', array(), 'DKSF-48-4-X-X-1');
+$cache_discovery['DKSF-48-4-X-X-1']['smoke'] = snmpwalk_cache_oid($device, 'npSmokeTable', array(), 'DKSF-48-4-X-X-1');
 foreach ($cache_discovery['DKSF-48-4-X-X-1']['smoke'] as $index => $entry)
 {
   if ($entry['npSmokePower'] == 'off') { continue; }
@@ -29,7 +29,7 @@ foreach ($cache_discovery['DKSF-48-4-X-X-1']['smoke'] as $index => $entry)
 }
 
 /*
-$cache_discovery['DKSF-48-4-X-X-1']['loop'] = snmpwalk_cache_multi_oid($device, 'npCurLoopTable', array(), 'DKSF-48-4-X-X-1');
+$cache_discovery['DKSF-48-4-X-X-1']['loop'] = snmpwalk_cache_oid($device, 'npCurLoopTable', array(), 'DKSF-48-4-X-X-1');
 foreach ($cache_discovery['DKSF-48-4-X-X-1']['loop'] as $index => $entry)
 {
   if ($entry['npCurLoopPower'] == 'off' || $entry['npCurLoopStatus'] == 'notPowered') { continue; }
@@ -74,7 +74,7 @@ foreach ($cache_discovery['DKSF-48-4-X-X-1']['loop'] as $index => $entry)
 }
 */
 
-$cache_discovery['DKSF-48-4-X-X-1']['temphum'] = snmpwalk_cache_multi_oid($device, 'npRelHumidity', array(), 'DKSF-48-4-X-X-1');
+$cache_discovery['DKSF-48-4-X-X-1']['temphum'] = snmpwalk_cache_oid($device, 'npRelHumidity', array(), 'DKSF-48-4-X-X-1');
 foreach ($cache_discovery['DKSF-48-4-X-X-1']['temphum'] as $index => $entry)
 {
   // Temperature
@@ -99,7 +99,7 @@ foreach ($cache_discovery['DKSF-48-4-X-X-1']['temphum'] as $index => $entry)
   }
 }
 
-$cache_discovery['DKSF-48-4-X-X-1']['thermo'] = snmpwalk_cache_multi_oid($device, 'npThermoTable', array(), 'DKSF-48-4-X-X-1');
+$cache_discovery['DKSF-48-4-X-X-1']['thermo'] = snmpwalk_cache_oid($device, 'npThermoTable', array(), 'DKSF-48-4-X-X-1');
 foreach ($cache_discovery['DKSF-48-4-X-X-1']['thermo'] as $index => $entry)
 {
   // Temperature
@@ -114,7 +114,7 @@ foreach ($cache_discovery['DKSF-48-4-X-X-1']['thermo'] as $index => $entry)
   }
 }
 
-$cache_discovery['DKSF-48-4-X-X-1']['io'] = snmpwalk_cache_multi_oid($device, 'npIoTable', array(), 'DKSF-48-4-X-X-1');
+$cache_discovery['DKSF-48-4-X-X-1']['io'] = snmpwalk_cache_oid($device, 'npIoTable', array(), 'DKSF-48-4-X-X-1');
 foreach ($cache_discovery['DKSF-48-4-X-X-1']['io'] as $index => $entry)
 {
   if ($entry['npIoLevelIn'] == '0') { continue; }

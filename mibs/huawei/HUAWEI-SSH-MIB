@@ -1,10 +1,10 @@
 
 -- ==================================================================
--- Copyright (C) 2018 by  HUAWEI TECHNOLOGIES. All rights reserved.
+-- Copyright (C) 2019 by  HUAWEI TECHNOLOGIES. All rights reserved.
 -- Description: This mib which contains objects manages the 
 --              SSH server and SSH client configuration. 
 -- Reference:  
--- Version: V2.23
+-- Version: V2.26
 -- ==================================================================
 -- ==================================================================
 -- 
@@ -25,7 +25,7 @@
     
         -- 1.3.6.1.4.1.2011.5.25.118
             hwSSH MODULE-IDENTITY 
-            LAST-UPDATED "201806070000Z"         
+            LAST-UPDATED "201902280000Z"         
             ORGANIZATION "Huawei Technologies Co.,Ltd."
             CONTACT-INFO                                        
                          "Huawei Industrial Base                
@@ -39,7 +39,17 @@
                 "This mib which contains objects manages the 
                 SSH server and SSH client configuration. 
                 "   
---  Revision history    
+--  Revision history
+            REVISION    "201902280000Z"
+            DESCRIPTION "V2.26, the description of hwSSHUserTable, hwSSHServerSessionTable, hwRSAPublicKeyTable, hwSSHServerInfoTable,
+						hwSSHUserAuthType,hwSSHUserServiceType were modified and supplemented."			
+			
+            REVISION    "201808040000Z"
+            DESCRIPTION "V2.25, modify hwRSAPublicKeyName range 1..40 "
+
+            REVISION    "201807110000Z"
+            DESCRIPTION "V2.24, add SM2 key authentication"
+
             REVISION    "201806070000Z"
             DESCRIPTION "V2.23, modify hwSNetConfMaxUserNum range 0..20 "
 
@@ -139,7 +149,7 @@
                 
              REVISION    "200609050000Z"
              DESCRIPTION "V1.00, completed the draft."
-            ::= { hwDatacomm 118 }
+            ::= { hwDatacomm 118}
 
 --
 -- Node definitions
@@ -321,6 +331,7 @@
             DESCRIPTION
                 "
                 This table is used for querying and setting the information about SSH user.
+                The index of this table is hwSSHUserIndex.
                 "
             ::= { hwSSHServer 11 }
 
@@ -409,7 +420,9 @@
                 authDSAandPASSWORD(7),
                 authAny(8),
                 authECC(9),
-                authECCandPASSWORD(10)
+                authECCandPASSWORD(10),
+                authSM2(11),
+                authSM2andPASSWORD(12)
                 }
             MAX-ACCESS read-create
             STATUS current
@@ -423,11 +436,13 @@
                 3. authRSA(3)            -RSA key authentication.
                 4. authRSAorPASSWORD(4)  -Password or RSA key authentication.
                 5. authRSAandPASSWORD(5) -Password and RSA key authentication.
-                6. authDSA(6),           -DSA key authentication.
-                7. authDSAandPASSWORD(7), -Password or DSA key authentication.
-                8. authAny(8),            -Any  authentication.
-                9. authECC(9),            -ECC key authentication.
+                6. authDSA(6)           -DSA key authentication.
+                7. authDSAandPASSWORD(7) -Password or DSA key authentication.
+                8. authAny(8)            -Any  authentication.
+                9. authECC(9)            -ECC key authentication.
                 10.authECCandPASSWORD(10) -Password and ECC key authentication.
+				11.authSM2(11)			  -SM2 key authentication.
+				12.authSM2andPASSWORD(12) -Password and SM2 key authentication.
                 "
             DEFVAL { authPASSWORD }
             ::= { hwSSHUserEntry 4 }
@@ -456,10 +471,11 @@
                 2. servicetypeSTELNET(2) -The service type of the SSH user is STELNET.
                 3. servicetypeSFTP(3)    -The service type of the SSH user is SFTP.
                 4. servicetypeALL(4)     -The service type of the SSH user is all. 
-                5. servicetypeSNetConf(5),      -The service type of the SSH user is SNetConf.
-                6. servicetypeSftpSNetConf(6),   -The service type of the SSH user is Sftp and SNetConf.
-                7. servicetypeSTelnetSftp(7),    -The service type of the SSH user is STelnet and Sftp.
-                8. servicetypeSTelnetSNetConf(8) -The service type of the SSH user is STelnet and SNetConf."
+                5. servicetypeSNetConf(5)       -The service type of the SSH user is SNetConf.
+                6. servicetypeSftpSNetConf(6)    -The service type of the SSH user is Sftp and SNetConf.
+                7. servicetypeSTelnetSftp(7)     -The service type of the SSH user is STelnet and Sftp.
+                8. servicetypeSTelnetSNetConf(8) -The service type of the SSH user is STelnet and SNetConf.
+				"
             DEFVAL { servicetypeNULL }
             ::= { hwSSHUserEntry 5 }
 
@@ -521,12 +537,20 @@
                 keyTypeNULL(0),
                 keyTypeRSA(1),
                 keyTypeDSA(2),
-                keyTypeECC(3)
+                keyTypeECC(3),
+                keyTypeSM2(5)
                 }
             MAX-ACCESS read-create
             STATUS current
             DESCRIPTION
-                "The object specifies the public key type of SSH user. "
+                "The object specifies the public key type of SSH user.
+				Options:
+				1. keyTypeNULL(0) -The public key type of SSH user is NULL.
+				2. keyTypeRSA(1)-The public key type of SSH user is RSA.
+				3. keyTypeDSA(2)-The public key type of SSH user is DSA
+				4. keyTypeECC(3)-The public key type of SSH user is ECC
+				5. keyTypeSM2(5)-The public key type of SSH user is SM2
+				"
             ::= { hwSSHUserEntry 9 }
 
         
@@ -539,6 +563,7 @@
                 "
                 The object shows current session information of the SSH server which includes username,
                 version information, retry times of online users currently.
+                The index of this table is hwSSHSessionIndex.
                 "
             ::= { hwSSHServer 12 }
 
@@ -653,7 +678,30 @@
             DESCRIPTION
                 "
                 The object specifies the line number supports a connection of SSH 
-                user which is in connection with SSH server. 
+                user which is in connection with SSH server.
+				Options:
+				1.none(0) -No specifies the line number.
+				2.vty0(1) -The line number is 1.
+				3.vty1(2) -The line number is 2.
+				4.vty2(3) -The line number is 3.
+				5.vty3(4) -The line number is 4.
+				6.vty4(5) -The line number is 5.
+				7.vty5(6) -The line number is 6.
+				8.vty6(7) -The line number is 7.
+				9.vty7(8) -The line number is 8.
+				10.vty8(9) -The line number is 9.
+				11.vty9(10) -The line number is 10.
+				12.vty10(11) -The line number is 11.
+				13.vty11(12) -The line number is 12.
+				14.vty12(13) -The line number is 13.
+				15.vty13(14) -The line number is 14.
+				16.vty14(15) -The line number is 15.
+				17.vty15(16) -The line number is 16.
+				18.vty16(17) -The line number is 17.
+				19.vty17(18) -The line number is 18.
+				20.vty18(19) -The line number is 19.
+				21.vty19(20) -The line number is 20.
+				22.vty20(21) -The line number is 21.	
                 "
             ::= { hwSSHServerSessionEntry 3 }
 
@@ -788,12 +836,19 @@
                 {
                 keyTypeRSA(1),
                 keyTypeDSA(2),
-                keyTypeECC(3)
+                keyTypeECC(3),
+                keyTypeSM2(5)
                 }
             MAX-ACCESS read-only
             STATUS current
             DESCRIPTION
-                "The object specifies the public key type of SSH session."
+                "The object specifies the public key type of SSH session.
+				Options:
+				1.keyTypeRSA(1) -The public key type of SSH session is RSA.
+				2.keyTypeDSA(2) -The public key type of SSH session is DSA.
+				3.keyTypeECC(3) -The public key type of SSH session is ECC.
+				4.keyTypeSM2(5) -The public key type of SSH session is SM2.
+				"
             ::= { hwSSHServerSessionEntry 14 }
 
         
@@ -835,6 +890,7 @@
             DESCRIPTION
                 "
                 A table of configuration about RSA Public Key.
+                The index of this table is hwRSAPublicKeyName.
                 hwRSAPublicKeyName is the name of RSA Public Key.              
                 "
             ::= { hwSSHServer 13 }
@@ -869,7 +925,7 @@
 
         -- 1.3.6.1.4.1.2011.5.25.118.1.13.1.1
         hwRSAPublicKeyName OBJECT-TYPE
-            SYNTAX OCTET STRING (SIZE (1..30))
+            SYNTAX OCTET STRING (SIZE (1..40))
             MAX-ACCESS not-accessible
             STATUS current
             DESCRIPTION
@@ -944,7 +1000,11 @@
             STATUS current
             DESCRIPTION
                 "The object specifies whether the SSH SNetConf Server is enable.
-                The default is disable(2)."
+				Options:
+                1. enable(1) -The SSH SNetConf Server is enable.
+                2. disable(2)-The SSH SNetConf Server is disable.					
+                The default is disable(2).
+				"
             ::= { hwSSHServer 15 }
 
         
@@ -959,7 +1019,11 @@
             STATUS current
             DESCRIPTION
                 "The object specifies whether the KeepAlive functionality on SSH Server is enable.
-                The default is 1."
+				Options:
+                1. enable(1) -The KeepAlive functionality on SSH Server is enable.
+                2. disable(2)-The KeepAlive functionality on SSH Server is disable.			
+                The default is 1.
+				"
             ::= { hwSSHServer 16 }
 
         
@@ -974,7 +1038,11 @@
             STATUS current
             DESCRIPTION
                 "The object specifies whether the SSH SCP Server is enable.
-                The default is 2."
+				Options:
+                1. enable(1) -The SSH  SCP server is enable.
+                2. disable(2)-The SSH  SCP server is disable.				
+                The default is 2.
+				"
             ::= { hwSSHServer 17 }
 
         
@@ -1100,8 +1168,12 @@
             MAX-ACCESS read-write
             STATUS current
             DESCRIPTION
-                "The object specifies whether the SCP IPv4 Server is enable. 
-                The default value is disable."
+                "The object specifies whether the SCP IPv4 Server is enable.
+				Options:
+                1.enable(1) -the SCP IPv4 Server is enable.
+                2.disable(2)-the SCP IPv4 Server is disable.				
+                The default value is disable.
+				"
             ::= { hwSSHServer 25 }
             
             
@@ -1116,6 +1188,9 @@
             STATUS current
             DESCRIPTION
                 "The object specifies whether the SCP IPv6 Server is enable.
+				Options:
+                1.enable(1) -the SCP IPv6 Server is enable.
+                2.disable(2)-the SCP IPv6 Server is disable.
                 The default value is disable."
             ::= { hwSSHServer 26 }
 
@@ -1191,8 +1266,9 @@
             STATUS current
             DESCRIPTION
                 "
-                This table describes SSH server information on the SSH client, 
-                including the table index, server name, RSA public key, and server status.
+                A table of configuration about the relation
+                between the SSH server and the rsa peerkey.
+                The index of this table is hwSSHServerIndex.
                 "
             ::= { hwSSHClient 2 }
 
@@ -1225,6 +1301,8 @@
                 hwSSHServerAssignDSAKey
                     OCTET STRING,
                 hwSSHServerAssignECCKey
+                    OCTET STRING,
+                hwSSHServerAssignSM2Key
                     OCTET STRING
              }
 
@@ -1299,7 +1377,15 @@
                 "The object specifies a ECC peer public key for a SSH server.This peer public key must exist."
             ::= { hwSSHServerInfoEntry 6 }
 
-        
+        -- 1.3.6.1.4.1.2011.5.25.118.2.2.1.7
+        hwSSHServerAssignSM2Key OBJECT-TYPE
+            SYNTAX OCTET STRING (SIZE (0..64))
+            MAX-ACCESS read-create
+            STATUS current
+            DESCRIPTION
+                "The object specifies a SM2 peer public key for a SSH server.This peer public key must exist."
+            ::= { hwSSHServerInfoEntry 7 }
+			
         -- 1.3.6.1.4.1.2011.5.25.118.2.3
         hwSSHKeepAliveInterval OBJECT-TYPE
             SYNTAX Integer32 (0..3600)

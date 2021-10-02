@@ -2,14 +2,15 @@
 
 //define('OBS_DEBUG', 2);
 
-$base_dir = realpath(dirname(__FILE__) . '/..');
+$base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
 
-include(dirname(__FILE__) . '/../includes/defaults.inc.php');
+include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
-include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '/../includes/definitions.inc.php');
-include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/common.inc.php');
+include(__DIR__ . '/../includes/definitions.inc.php');
+include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/functions.inc.php');
 
 // Notes about JSON precision:
 // php 7.0 and earlier use precision for floats in json_encode()
@@ -20,27 +21,95 @@ ini_set('serialize_precision', 17);
 class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 {
   /**
+   * @dataProvider providerSafeCount
+   * @group safe
+   */
+  public function testSafeCount($value, $result)
+  {
+    $this->assertSame($result, safe_count($value));
+  }
+
+  public function providerSafeCount()
+  {
+    return [
+      [ NULL,        0 ],
+      [ TRUE,        0 ],
+      [ FALSE,       0 ],
+      [ '3y',        0 ],
+      [ '',          0 ],
+      [ '1',         0 ],
+      [ '0',         0 ],
+      [ '-1',        0 ],
+      [ 1,           0 ],
+      [ 0,           0 ],
+      [ -1,          0 ],
+      // common format_uptime() strings
+      [ [],                                       0 ],
+      [ [ 1 ],                                    1 ],
+      [ [ '1234.5', 3, '1234' ],                  3 ],
+      [ new ArrayIterator([]),                    0 ],
+      [ new ArrayIterator(['foo', 'bar', 'baz']), 3 ]
+    ];
+  }
+
+  /**
+   * @dataProvider providerSafeEmpty
+   * @group safe
+   */
+  public function testSafeEmpty($value, $result)
+  {
+    $this->assertSame($result, safe_empty($value));
+  }
+
+  public function providerSafeEmpty()
+  {
+    return [
+      [ NULL,        TRUE ],
+      [ TRUE,        FALSE ],
+      [ FALSE,       FALSE ],
+      [ '3y',        FALSE ],
+      [ '',          TRUE ],
+      [ '1',         FALSE ],
+      [ '0',         FALSE ],
+      [ '00',        FALSE ],
+      [ 0x0,         FALSE ],
+      [ '-1',        FALSE ],
+      [ 1,           FALSE ],
+      [ 0,           FALSE ],
+      [ -1,          FALSE ],
+      // common format_uptime() strings
+      [ [],                                       TRUE ],
+      [ [ 1 ],                                    FALSE ],
+      [ [ '1234.5', 3, '1234' ],                  FALSE ],
+      [ new ArrayIterator([]),                    FALSE ],
+      [ new ArrayIterator(['foo', 'bar', 'baz']), FALSE ]
+    ];
+  }
+
+  /**
    * @dataProvider providerAgeToSeconds
    * @group datetime
    */
-  public function testAgeToSeconds($value, $result)
-  {
+  public function testAgeToSeconds($value, $result) {
     $this->assertSame($result, age_to_seconds($value));
   }
 
-  public function providerAgeToSeconds()
-  {
+  public function providerAgeToSeconds() {
     return array(
-      array('3y 4M 6w 5d 3h 1m 3s',  109191663),
-      array('3y4M6w5d3h1m3s',        109191663),
+      array('3y 4M 6w 5d 3h 1m 3s',         109191663),
+      array('3y4M6w5d3h1m3s',               109191663),
       array('184 days 22 hrs 02 min 38 sec', 15976958),
-      array('1.5w',                     907200),
-      array(-886732,                         0),
-      array('Star Wars',                     0),
+      array('1.5w',                            907200),
+      array('2Y',                            63072000),
+      array('315 days18:50:04',              27283804),
+      array('35 days, 06:58:01',              3049081),
       // common format_uptime() strings
-      array('2 years, 1 day, 1h 1m 1s', 63162061),
-      array('1 year, 1 day, 1h 1m 1s',  31626061),
-      array('2 hours 2 minutes 2 seconds',  7322)
+      array('2 years, 1 day, 1h 1m 1s',      63162061),
+      array('1 year, 1 day, 1h 1m 1s',       31626061),
+      array('2 hours 2 minutes 2 seconds',       7322),
+      // incorrect age
+      array(-886732,                                0),
+      array('Star Wars',                            0),
     );
   }
 
@@ -48,8 +117,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerFormatUptime
    * @group datetime
    */
-  public function providerAgeToSeconds2($result, $format, $value)
-  {
+  public function providerAgeToSeconds2($result, $format, $value) {
     $this->assertSame($result, age_to_seconds($value));
   }
 
@@ -57,17 +125,17 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerUptimeToSeconds
    * @group datetime
    */
-  public function testUptimeToSeconds($value, $result)
-  {
+  public function testUptimeToSeconds($value, $result) {
     $this->assertSame($result, uptime_to_seconds($value));
   }
 
-  public function providerUptimeToSeconds()
-  {
-    return array(
-      array('00:11:09',    669),
-      array('4d05h',    363600),
-    );
+  public function providerUptimeToSeconds() {
+    return [
+      [ '00:11:09',                  669 ],
+      [ '4d05h',                  363600 ],
+      [ '315 days18:50:04',     27283804 ],
+      [ 'up 35 days, 06:58:01',  3049081 ],
+    ];
   }
 
   /**
@@ -152,12 +220,12 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
                   'stdout'   => '')
             ),
       // normal stdout with special chars (tabs, eol in eof)
-      array('/bin/cat '.dirname(__FILE__).'/data/text.txt',
-            NULL,
-            array('command'  => '/bin/cat '.dirname(__FILE__).'/data/text.txt',
-                  'exitcode' => 0,
-                  'stderr'   => '',
-                  'stdout'   =>
+      array( '/bin/cat ' . __DIR__ . '/data/text.txt',
+             NULL,
+             array( 'command'  => '/bin/cat ' . __DIR__ . '/data/text.txt',
+                    'exitcode' => 0,
+                    'stderr'   => '',
+                    'stdout'   =>
 "Observium is an autodiscovering network monitoring platform
 \tsupporting a wide range of hardware platforms and operating systems
 \tincluding Cisco, Windows, Linux, HP, Juniper, Dell, FreeBSD, Brocade,
@@ -268,7 +336,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       $started[]    = str_replace(':', '', $timezone['system']); // Add system TZ to started time
       $started_rfc  = array_shift($started) . ','; // Sun
       // Reimplode and convert to RFC2822 started date 'Sun, 20 Mar 2016 18:01:53 +0300'
-      $started_rfc .= ' ' . $started[1]; // 20
+      $started_rfc .= ' ' . ltrim($started[1], '0'); // 20
       $started_rfc .= ' ' . $started[0]; // Mar
       $started_rfc .= ' ' . $started[3]; // 2016
       $started_rfc .= ' ' . $started[2]; // 18:01:53
@@ -276,7 +344,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       //$started_rfc .= implode(' ', $started);
       $entries[] = $started_rfc;
 
-      $entries[] = $command; // Readd command
+      $entries[] = $command; // Re-add command
       //print_vars($entries);
       //print_vars($started);
 
@@ -298,6 +366,12 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       ksort($test_pid_info[$ps_type]);
       ksort($pid_info);
 
+      $diff = abs($pid_info['STARTED_UNIX'] - $test_pid_info[$ps_type]['STARTED_UNIX']);
+      if ($diff > 0 && $diff < 5) {
+        // prevent false in time diff around 5 sec
+        $pid_info['STARTED_UNIX'] = $test_pid_info[$ps_type]['STARTED_UNIX'];
+        $pid_info['STARTED']      = ltrim($test_pid_info[$ps_type]['STARTED'], '0');
+      }
       $this->assertSame($test_pid_info[$ps_type], $pid_info);
     }
 
@@ -497,6 +571,9 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(31622460, 'short-3',  '1y 1d 1m'),
       array(31626000, 'short-3',  '1y 1d 1h'),
 
+      array(31626061, 'short-1',  '1y'),
+      array(31626061, 'short-4',  '1y 1d 1h 1m'),
+
       // format = short-2
       array(       1, 'short-2',  '1s'),                          // singulars
       array(      60, 'short-2',  '1m'),
@@ -537,6 +614,10 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(31536060, 'shorter',  '1y 1m'),
       array(31622400, 'shorter',  '1y 1d'),
 
+      // incorrect data
+      array(      '',    'long',     '0s'),
+      array(    NULL,    'long',     '0s'),
+      array(      [],    'long',     '0s'),
     );
   }
 
@@ -653,6 +734,10 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array('-1.234', 3,   '-1.2'),
 
       array('1.234b', 3,      '1'), // alpha in decimals
+
+      // < 0
+      array('0.0001234', 3,   '0.000123'),
+      array('0.0001235', 3,   '0.000124'),
     );
   }
 
@@ -680,7 +765,12 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testValueToSi($type, $unit, $value, $result)
   {
-    $this->assertEquals($result, value_to_si($value, $unit, $type), '', 0.0001);
+    if (method_exists($this, 'assertEqualsWithDelta')) {
+      // PHPUnit 8+
+      $this->assertEqualsWithDelta($result, value_to_si($value, $unit, $type), 0.0001);
+    } else {
+      $this->assertEquals($result, value_to_si($value, $unit, $type), '', 0.0001);
+    }
   }
 
   public function providerValueToSi()
@@ -693,21 +783,32 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array('temperature',   'K',      0, -273.15),
       array('temperature',   'K', 273.15,    0.0),
       array('temperature',   'K',    100, -173.15),
+      array('temperature',   'k',    100, -173.15),
       array('temperature',   'K',   -100,  FALSE),
       array('temperature',   'C',      0,    0.0),
       array('temperature',   'C',    100,  100.0),
       array(         NULL, 'psi',      0,    0.0),
       array(   'pressure', 'psi',      1, 6894.75729),
       array(   'pressure', 'psi',   -0.1, -689.4757),
+      array(   'pressure', 'Mpsi',  -0.1, -689475729.3168),
+      array(   'pressure', 'mpsi',  -0.1, -689475729.3168),
+      array(   'pressure', 'mmHg',     1, 133.3224),
+      array(   'pressure', 'mmhg',  -0.1, -13.3322),
+      array(   'pressure', 'inHg',     1, 3386.3867),
+      array(   'pressure', 'inhg',  -0.1, -338.6387),
+      array(   'pressure', 'atm',      1, 101325.0),
+      array(   'pressure', 'ATM',      1, 101325.0),
 
       array(        'dbm',   'W', 0.00001, -20.0),
       array(        'dbm',   'W',   0.001,   0.0),
       array(        'dbm',   'W',   10000,  70.0),
+      array(        'dbm',   'w',   10000,  70.0),
       array(        'dbm',   'W',       0, -99.0),
       array(        'dbm',   'W',    -0.1, FALSE),
       array(      'power', 'dBm',     -30,   0.000001),
       array(      'power', 'dBm',       0,   0.001),
       array(      'power', 'dBm',      50, 100.0),
+      array(      'power', 'dbm',      50, 100.0),
 
       // derp ekinops
       array(        'dbm', 'ekinops_dbm1',          0,     0.0),
@@ -794,8 +895,12 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   {
     $rv = generate_random_string($len, $chars);
 
-    $this->assertRegExp($regex, $rv);
-    $this->assertTrue($len == strlen($rv));
+    if (method_exists($this, 'assertMatchesRegularExpression')) {
+      $this->assertMatchesRegularExpression($regex, $rv);
+    } else {
+      $this->assertRegExp($regex, $rv);
+    }
+    $this->assertTrue($len === strlen($rv));
   }
 
   public function providerGenerateRandomString()
@@ -824,7 +929,42 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   }
 
   /**
+   * @dataProvider providerIsIntNum
+   * @group numbers
+   */
+  public function testIsIntNum($value, $result)
+  {
+    $this->assertSame($result, is_intnum($value));
+  }
+
+  public function providerIsIntNum()
+  {
+    return [
+      [ 23,          TRUE ], // ctype_digit() = FALSE
+      [ "23",        TRUE ], // is_int() = FALSE
+      [ -23,         TRUE ], // ctype_digit() = FALSE
+      [ "-23",       TRUE ], // is_int() = FALSE, ctype_digit() = FALSE
+      [ 01,          TRUE ], // ctype_digit() = FALSE
+      [ "01",        TRUE ], // is_int() = FALSE
+      [ 923874924209482482038402384,  FALSE ], // false, because greater than PHP_INT_MAX
+      [ '923874924209482482038402384', TRUE ],  // is_int() = FALSE
+      [ PHP_INT_MAX, TRUE ],
+      [ 23.5,       FALSE ],
+      [ "23.5",     FALSE ],
+      [ -23.5,      FALSE ],
+      [ "-23.5",    FALSE ],
+      [ "--2",      FALSE ],
+      [ '',         FALSE ],
+      [ null,       FALSE ],
+      [ true,       FALSE ],
+      [ false,      FALSE ],
+      [ [],         FALSE ],
+    ];
+  }
+
+  /**
    * @dataProvider providerZeropad
+   * @group numbers
    */
   public function testZeropad($value, $result)
   {
@@ -841,6 +981,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerFormatRates
+   * @group numbers
    */
   public function testFormatRates($value, $round, $sf, $result)
   {
@@ -860,6 +1001,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerFormatStorage
+   * @group numbers
    */
   public function testFormatStorage($value, $round, $sf, $result)
   {
@@ -879,6 +1021,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerFormatSi
+   * @group numbers
    */
   public function testFormatSi($value, $round, $sf, $result)
   {
@@ -927,11 +1070,17 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(-1000000000000000000, 2, 3,    '-1E'),
 
       // check base 1024
-      array(                1024, 2, 3,   '1.02k'),
-      array(             1024000, 2, 3,   '1.02M'),
+      array(                1024, 2, 3,  '1.02k'),
+      array(             1024000, 2, 3,  '1.02M'),
 
       // round & sf
-      array(             1024000, 4, 4,  '1.024M'),
+      array(             1024000, 4, 4, '1.024M'),
+      array(           '1024000', 4, 4, '1.024M'),
+
+      // incorrect data
+      array(                  '', 2, 3,      '0'),
+      array(                NULL, 2, 3,      '0'),
+      array(                  [], 2, 3,      '0'),
     );
   }
 
@@ -1315,15 +1464,24 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     $device['device_id'] = 13;
 
     // Empty sysORID MIBs
-    $GLOBALS['cache']['devices']['mibs_sysORID'][$device['device_id']] = array();
+    $GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID'] = '[]';
     $mibs = array_values(get_device_mibs($device, TRUE)); // Use array_values for reset keys
     $this->assertEquals($result, $mibs);
 
     // Any sysORID MIBs
-    $GLOBALS['cache']['devices']['mibs_sysORID'][$device['device_id']] = array('SOME-MIB', 'SOME2-MIB');
+    $GLOBALS['cache']['entity_attribs']['device'][$device['device_id']]['sysORID'] = '["SOME-MIB", "SOME2-MIB"]';
     $mibs = array_values(get_device_mibs($device, TRUE)); // Use array_values for reset keys
-    $result[] = 'SOME-MIB';
-    $result[] = 'SOME2-MIB';
+    if ($device['os'] === 'test_dlinkfw' && isset($device['sysObjectID'])) {
+      // model definition first
+      $new_result[] = array_shift($result);
+      $new_result[] = 'SOME-MIB';
+      $new_result[] = 'SOME2-MIB';
+      $result = array_merge($new_result, $result);
+    } else {
+      $result = array_merge([ 'SOME-MIB', 'SOME2-MIB' ], $result);
+    }
+    //$result[] = 'SOME-MIB';
+    //$result[] = 'SOME2-MIB';
     $this->assertEquals($result, $mibs);
   }
 
@@ -1794,6 +1952,52 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   }
 
   /**
+   * @dataProvider providerArrayGetNested
+   * @group arrays
+   */
+  public function testArrayGetNested($result, $array, $nest) {
+    $this->assertSame($result, array_get_nested($array, $nest));
+  }
+
+  public function providerArrayGetNested() {
+    $arr1 = [
+              [
+                'device_id' => 1,
+                'os'        => 'test_dlinkfw'
+              ],
+              [
+                'JUST-TEST-MIB',
+                'EtherLike-MIB',
+                'ENTITY-MIB',
+                'PW-STD-MIB',
+                'DISMAN-PING-MIB',
+                'BGP4-MIB',
+              ],
+    ];
+    $arr2 = [
+      'lev1-1' => [ 'lev2-1-1' => [], [ 'a', 'b', 'c' ] ],
+      'lev1-2' => [ 'lev2-2-1' => NULL, 'lev2-2-2' => 'asd', ],
+    ];
+    //print_vars($arr1);
+
+    return [
+      [ 'test_dlinkfw',    $arr1, '0->os' ],
+
+      [ [],                $arr2, 'lev1-1->lev2-1-1' ],
+      [ [ 'a', 'b', 'c' ], $arr2, 'lev1-1->0' ],
+      [ 'c',               $arr2, 'lev1-1->0->2' ],
+      [ NULL,              $arr2, 'lev1-1->0->2->unknown' ], // not exist key
+      [ 'asd',             $arr2, 'lev1-2->lev2-2-2' ],
+      [ NULL,              $arr2, 'lev1-2->lev2-2-1' ],
+
+      // Not array!
+      [ NULL, "string", 'lev1-1->lev2-1-1' ],
+      [ NULL,      243, 'lev1-1->lev2-1-1' ],
+      [ NULL,     TRUE, 'lev1-1->lev2-1-1' ],
+    ];
+  }
+  
+  /**
    * @dataProvider providerIsArrayAssoc
    * @group arrays
    */
@@ -1809,25 +2013,151 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(FALSE, array(array(), 1, 'c')),
       array(FALSE, array("0" => 'a', "1" => array(), "2" => 2)),
       array(FALSE, array("0" => 'a', "1" => 'b', "2" => 'c')),
+
       array(TRUE, array("1" => 'a', "0" => 'b', "2" => 'c')),
       array(TRUE, array("1" => 'a', "0" => 'b', "2" => 'c')),
       array(TRUE, array("a" => 'a', "b" => 'b', "c" => 'c')),
+
       // Not array!
       array(FALSE, "string"),
     );
   }
 
   /**
-   * @dataProvider providerStrContains
-   * @group string
+   * @dataProvider providerIsArraySeq
+   * @group arrays
    */
-  public function testStrContains($result, $incase, $string, $needle, $encoding = FALSE)
+  public function testIsArraySeq($result, $array)
   {
-    if ($incase)
+    $this->assertSame($result, is_array_seq($array));
+  }
+
+  public function providerIsArraySeq()
+  {
+    return array(
+      array(TRUE, array('a', 'b', 'c')),
+      array(TRUE, array(array(), 1, 'c')),
+      array(TRUE, array("0" => 'a', "1" => array(), "2" => 2)),
+      array(TRUE, array("0" => 'a', "1" => 'b', "2" => 'c')),
+
+      array(FALSE, array("1" => 'a', "0" => 'b', "2" => 'c')),
+      array(FALSE, array("1" => 'a', "0" => 'b', "2" => 'c')),
+      array(FALSE, array("a" => 'a', "b" => 'b', "c" => 'c')),
+
+      // Not array!
+      array(FALSE, "string"),
+    );
+  }
+
+  /**
+   * @dataProvider providerArrayPushAfter
+   * @group arrays
+   */
+  public function testArrayPushAfter($array, $key, $new, $result)
+  {
+    $this->assertSame($result, array_push_after($array, $key, $new));
+  }
+
+  public function providerArrayPushAfter()
+  {
+    return [
+      array([ 'a', 'b', 'c' ], 0, 'new', [ 'a', 'new', 'b', 'c' ]),
+      array([ 'a', 'b', 'c' ], 1, [ 'one', 'two' ], [ 'a', 'b', 'one', 'two', 'c' ]),
+      array([ 'a', 'b', 'c' ], FALSE, [ 'one', 'two' ], [ 'a', 'b', 'c', 'one', 'two' ]), // same as array_push()
+
+      array([ 1 => 'a', 3 => 'b', 8 => 'c' ], 0, 'new', [ 0 => 'a', 1 => 'b', 2 => 'c', 3 => 'new' ]),
+      array([ 1 => 'a', 3 => 'b', 8 => 'c' ], 1, [ 4 => 'one', 6 => 'two' ], [ 0 => 'a', 1 => 'one', 2 => 'two', 3 => 'b', 4 => 'c' ]),
+      array([ 1 => 'a', 3 => 'b', 8 => 'c' ], FALSE, [ 'one', 'two' ], [ 'a', 'b', 'c', 'one', 'two' ]), // same as array_push()
+
+      array([ 'k1' => 'a', 'k2' => 'b', 'k3' => 'c' ], 0, 'new', [ 'k1' => 'a', 'k2' => 'b', 'k3' => 'c', 0 => 'new' ]),
+      array([ 'k1' => 'a', 'k2' => 'b', 'k3' => 'c' ], 'k1', [ 4 => 'one', 6 => 'two' ], [ 'k1' => 'a', 0 => 'one', 1 => 'two', 'k2' => 'b', 'k3' => 'c' ]),
+      array([ 'k1' => 'a', 'k2' => 'b', 'k3' => 'c' ], FALSE, [ 'one', 'two' ], [ 'k1' => 'a', 'k2' => 'b', 'k3' => 'c', 'one', 'two' ]), // same as array_push()
+    ];
+  }
+
+  /**
+   * @dataProvider providerSafeJsonDecode
+   * @group json
+   */
+  public function testSafeJsonDecode($string, $result) {
+    $this->assertSame($result, safe_json_decode($string));
+  }
+
+  public function providerSafeJsonDecode() {
+    $array = [];
+    $array[] = [
+      '["QWERTYUIOPASDFGHJKLZXCVBNM"]',
+      [ 'QWERTYUIOPASDFGHJKLZXCVBNM' ]
+    ];
+    $array[] = [
+      '["ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ"]',
+      [ 'ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ' ]
+    ];
+    $array[] = [
+      '{"ALERT_STATE":"RECOVER","ALERT_EMOJI":"&#x2705;","ALERT_EMOJI_NAME":"white_check_mark","ALERT_STATUS":"1","ALERT_SEVERITY":"Critical","ALERT_COLOR":"","ALERT_URL":"https://observium/device/device=26/tab=alert/alert_entry=1/","ALERT_UNIXTIME":1624945593,"ALERT_TIMESTAMP":"2021-06-29 10:46:33 +05:00","ALERT_TIMESTAMP_RFC2822":"Tue, 29 Jun 2021 10:46:33 +0500","ALERT_TIMESTAMP_RFC3339":"2021-06-29T10:46:33+05:00","ALERT_ID":"1","ALERT_MESSAGE":"Внимание! Отключение отключение устройства.","CONDITIONS":"","METRICS":"device_status = 1","DURATION":"4m 49s (29-06-2021 10:41:44)","ENTITY_URL":"https://observium/device/device=26/","ENTITY_LINK":"<a href=\"https://observium/device/device=26/\" class=\"entity-popup \" data-eid=\"26\" data-etype=\"device\">hostname1</a>","ENTITY_NAME":"hostname1","ENTITY_ID":"26","ENTITY_TYPE":"device","ENTITY_DESCRIPTION":null,"DEVICE_HOSTNAME":"hostname1","DEVICE_SYSNAME":"hostname","DEVICE_DESCRIPTION":null,"DEVICE_ID":"26","DEVICE_URL":"https://observium/device/device=26/","DEVICE_LINK":"<a href=\"https://observium/device/device=26/\" class=\"entity-popup \" data-eid=\"26\" data-etype=\"device\">hostname1</a>","DEVICE_HARDWARE":"X440G2-48t-10G4","DEVICE_OS":"Extreme XOS 21.1.3.7 (ssh)","DEVICE_TYPE":"network","DEVICE_LOCATION":"Kirovsky District, Yekaterinburg, Sverdlovsk Region, Russia, 620049","DEVICE_UPTIME":"10 days, 1h 4m 59s","DEVICE_REBOOTED":"19-06-2021 09:35:42","TITLE":"RECOVER: [hostname1] [device] Внимание! Отключение отключение устройства."}',
+      [
+        'ALERT_STATE' => "RECOVER",
+        'ALERT_EMOJI' => "&#x2705;",
+        'ALERT_EMOJI_NAME' => "white_check_mark",
+        'ALERT_STATUS' => "1",
+        'ALERT_SEVERITY' => "Critical",
+        'ALERT_COLOR' => "",
+        'ALERT_URL' => "https://observium/device/device=26/tab=alert/alert_entry=1/",
+        'ALERT_UNIXTIME' => 1624945593,
+        'ALERT_TIMESTAMP' => "2021-06-29 10:46:33 +05:00",
+        'ALERT_TIMESTAMP_RFC2822' => "Tue, 29 Jun 2021 10:46:33 +0500",
+        'ALERT_TIMESTAMP_RFC3339' => "2021-06-29T10:46:33+05:00",
+        'ALERT_ID' => "1",
+        'ALERT_MESSAGE' => "Внимание! Отключение отключение устройства.",
+        'CONDITIONS' => "",
+        'METRICS' => "device_status = 1",
+        'DURATION' => "4m 49s (29-06-2021 10:41:44)",
+        'ENTITY_URL' => "https://observium/device/device=26/",
+        'ENTITY_LINK' => "<a href=\"https://observium/device/device=26/\" class=\"entity-popup \" data-eid=\"26\" data-etype=\"device\">hostname1</a>",
+        'ENTITY_NAME' => "hostname1",
+        'ENTITY_ID' => "26",
+        'ENTITY_TYPE' => "device",
+        'ENTITY_DESCRIPTION' => NULL,
+        'DEVICE_HOSTNAME' => "hostname1",
+        'DEVICE_SYSNAME' => "hostname",
+        'DEVICE_DESCRIPTION' => NULL,
+        'DEVICE_ID' => "26",
+        'DEVICE_URL' => "https://observium/device/device=26/",
+        'DEVICE_LINK' => "<a href=\"https://observium/device/device=26/\" class=\"entity-popup \" data-eid=\"26\" data-etype=\"device\">hostname1</a>",
+        'DEVICE_HARDWARE' => "X440G2-48t-10G4",
+        'DEVICE_OS' => "Extreme XOS 21.1.3.7 (ssh)",
+        'DEVICE_TYPE' => "network",
+        'DEVICE_LOCATION' => "Kirovsky District, Yekaterinburg, Sverdlovsk Region, Russia, 620049",
+        'DEVICE_UPTIME' => "10 days, 1h 4m 59s",
+        'DEVICE_REBOOTED' => "19-06-2021 09:35:42",
+        'TITLE' => "RECOVER: [hostname1] [device] Внимание! Отключение отключение устройства."
+      ]
+    ];
+    // smart (incorrect) quotes
+    $array[] = [
+      '[«ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ»]',
+      [ 'ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ' ]
+    ];
+    return $array;
+  }
+
+  /**
+   * @dataProvider providerStrContains
+   * @group        string
+   *
+   * @param      $result
+   * @param      $case
+   * @param      $string
+   * @param      $needle
+   * @param bool $encoding
+   */
+  public function testStrContains($result, $case, $string, $needle, $encoding = FALSE)
+  {
+    if ($case)
     {
-      $this->assertSame($result, str_iexists($string, $needle, $encoding));
+      $this->assertSame($result, str_icontains_array($string, $needle, $encoding));
     } else {
-      $this->assertSame($result, str_exists($string, $needle, $encoding));
+      $this->assertSame($result, str_contains_array($string, $needle, $encoding));
     }
   }
 
@@ -1876,9 +2206,11 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(FALSE, FALSE,  '1.2.3.1.2.3', 7),
       array( TRUE, FALSE,  '1.2.3.1.2.3', 3.1), // Hrm :)
       // Arrays (recursive)
+      array(FALSE, FALSE,            '', []),
       array( TRUE, FALSE, $test_string1, array(11,   'Observium is a ')),
       array(FALSE, FALSE, $test_string1, array(11,   'ObserviuM is a ')),
       array(FALSE, FALSE, $test_string1, array(11,   'observium is a ')),
+      array(FALSE,  TRUE,            '', []),
       array( TRUE,  TRUE, $test_string1, array(11,   'Observium is a ')),
       array( TRUE,  TRUE, $test_string1, array(11,   'ObserviuM is a ')),
       array( TRUE,  TRUE, $test_string1, array(11,   'bservium is a ')),
@@ -1948,9 +2280,11 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(FALSE, FALSE,  '1.2.3.1.2.3', 3),
       array( TRUE, FALSE,  '1.2.3.1.2.3', 1.2), // Hrm :)
       // Arrays (recursive)
+      array(FALSE, FALSE,            '', []),
       array( TRUE, FALSE, $test_string1, array(11,   'Observium is a ')),
       array(FALSE, FALSE, $test_string1, array(11,   'ObserviuM is a ')),
       array(FALSE, FALSE, $test_string1, array(11,   'observium is a ')),
+      array(FALSE,  TRUE,            '', []),
       array( TRUE,  TRUE, $test_string1, array(11,   'Observium is a ')),
       array( TRUE,  TRUE, $test_string1, array(11,   'ObserviuM is a ')),
       array( TRUE,  TRUE, $test_string1, array(11,   'observium is a ')),
@@ -2020,9 +2354,11 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(FALSE, FALSE,  '1.2.3.1.2.3', 1),
       array( TRUE, FALSE,  '1.2.3.1.2.3', 2.3), // Hrm :)
       // Arrays (recursive)
+      array(FALSE, FALSE,            '', []),
       array( TRUE, FALSE, $test_string1, array(11,   'monitoring platforM.')),
       array(FALSE, FALSE, $test_string1, array(11,   'Monitoring platforM.')),
       array(FALSE, FALSE, $test_string1, array(11,   'monitoring platform.')),
+      array(FALSE,  TRUE,            '', []),
       array( TRUE,  TRUE, $test_string1, array(11,   'monitoring platforM.')),
       array( TRUE,  TRUE, $test_string1, array(11,   'Monitoring platforM.')),
       array( TRUE,  TRUE, $test_string1, array(11,   'monitoring platform.')),
@@ -2031,6 +2367,68 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(FALSE, FALSE, $test_string1, NULL),
       array(FALSE, FALSE, $test_string1, array()),
     );
+  }
+
+  /**
+   * @dataProvider providerStrCompress
+   * @group string
+   */
+  public function testStrCompress($string, $result) {
+    $this->assertSame($result, str_compress($string));
+  }
+
+  /**
+   * @depends testStrCompress
+   * @dataProvider providerStrCompress
+   * @group string
+   */
+  public function testStrDecompress($result, $string) {
+    $this->assertSame($result, str_decompress($string));
+  }
+
+  /**
+   * @depends testStrCompress
+   * @dataProvider providerStrCompressRandom
+   * @group string
+   */
+  public function testStrCompressRandom($string) {
+    $encode = str_compress($string);
+    $decode = str_decompress($encode);
+    $this->assertSame($decode, $string);
+  }
+
+  /**
+   * @depends testStrDecompress
+   * @dataProvider providerStrDecompress
+   * @group string
+   */
+  public function testStrDecompressInvalid($string, $result) {
+    $this->assertSame($result, str_decompress($string));
+  }
+  public function providerStrCompress() {
+    return [
+      // 681 chars compress to 180 chars
+      [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.47 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.54 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.64 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.73 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.82 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.20',
+        '015500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01' ],
+    ];
+  }
+
+  public function providerStrCompressRandom() {
+    $charlist = ' 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~!@#$%^&*()_+-=[]{}\|/?,.<>;:"'."'";
+    $result = array();
+    for ($i=0; $i<20; $i++) {
+      $string = generate_random_string(mt_rand(200, 4000), $charlist);
+      $result[] = array($string);
+    }
+    return $result;
+  }
+
+  public function providerStrDecompress() {
+    return [
+      [ '15500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01', FALSE ],
+      [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40', FALSE ],
+      [ NULL, FALSE ],
+    ];
   }
 
   /**
@@ -2068,7 +2466,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(TRUE, 'success', TRUE, "  My test \n is simple",   "  My test \n is simple\n"),
       array(TRUE, 'warning', TRUE, "  My test \n is simple",   "  My test \n is simple\n"),
       array(TRUE, 'error',   TRUE, "  My test \n is simple",   "  My test \n is simple\n"),
-      array(TRUE, 'console', TRUE, "\n  My test \n is simple", "\n  My test \n is simple\033[0m\n"),
+      array(TRUE, 'console', TRUE, "\n  My test \n is simple", "\n  My test \n is simple\033[0m\n\033[0m"),
       // Note, global $debug var checked only in print_debug() function
       array(TRUE, 'debug',   TRUE, "  My test \n is simple",   "  My test \n is simple\n"),
       // CLI strip html ($cli=TRUE, $type='', $strip=TRUE)
@@ -2085,22 +2483,22 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(
         TRUE, 'color' , TRUE,
         '  <h1>My test</h1> <br /> <div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button></div>',
-        "  My test \n ×\033[0m\n"),
+        "  My test \n ×\033[0m\n\033[0m"),
       // CLI no strip html with color ($cli=TRUE, $type='color', $strip=FALSE)
       array(
         TRUE, 'color' , FALSE,
         '  <h1>My test</h1> <br /> <div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button></div>',
-        '  <h1>My test</h1> <br /> <div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button></div>'."\033[0m\n"),
+        '  <h1>My test</h1> <br /> <div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button></div>'."\033[0m\n\033[0m"),
       // CLI color codes ($cli=TRUE, $type='color', $strip=TRUE)
       array(
         TRUE, 'color' , TRUE,
       '%n, %y, %g, %r, %b, %c, %W, %k, %_, %U, %%, &',
-      "\033[0m, \033[0;33m, \033[0;32m, \033[0;31m, \033[0;34m, \033[0;36m, \033[1;37m, \033[0;30m, \033[1m, \033[4m, %, &\033[0m\n"),
+      "\033[0m, \033[0;33m, \033[0;32m, \033[0;31m, \033[0;34m, \033[0;36m, \033[1;37m, \033[0;30m, \033[1m, \033[4m, %, &\033[0m\n\033[0m"),
       // CLI color codes ($cli=TRUE, $type='color', $strip=FALSE)
       array(
         TRUE, 'color' , FALSE,
       '%n, %y, %g, %r, %b, %c, %W, %k, %_, %U, %%, &',
-      "\033[0m, \033[0;33m, \033[0;32m, \033[0;31m, \033[0;34m, \033[0;36m, \033[1;37m, \033[0;30m, \033[1m, \033[4m, %, &\033[0m\n"),
+      "\033[0m, \033[0;33m, \033[0;32m, \033[0;31m, \033[0;34m, \033[0;36m, \033[1;37m, \033[0;30m, \033[1m, \033[4m, %, &\033[0m\n\033[0m"),
 
       // Basic HTML output ($cli=FALSE, $type='', $strip=TRUE)
       array( // Actually not print anything
@@ -2242,7 +2640,12 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     $test = get_http_request($url);
     if (is_string($result))
     {
-      $this->assertContains($result, $test);
+      if (method_exists($this, 'assertStringContainsString')) {
+        // PHPUnit 9+
+        $this->assertStringContainsString($result, $test);
+      } else {
+        $this->assertContains($result, $test);
+      }
     } else {
       // This for wrong url, return FALSE
       $this->assertSame($result, $test);

@@ -1,0 +1,2404 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fspimcmn.mib,v 1.18 2012/10/29 12:01:31 siva Exp $
+-- Introduction
+
+-- This document explains the propreitary MIB implemented for the PIM (IPv4/IPv6)
+-- product.
+
+-- To Support the Ipv4 multicast MIB (RFC#2932) new objects are added to the
+-- fsPimCmnInterfaceTable,fsPimCmnIpMRouteTable and fsPimCmnIpMRouteNextHopTable 
+
+-- The proprietary MIB definitions, which mostly contains extra statistic
+-- objects and few objects for configuring the threshold to switch over to
+-- shortest path tree.
+
+-- To the Standard MIB RFC2934.txt, few scalars and few
+-- statistic objects are added. In each table AddressType to specify IPv4/IPv6 entry is added.
+
+
+-- The scalars in this MIB
+
+-- fsPimCmnVersionString		This scalar holds the Software Version
+--					number of the PIM protocol running in
+--	          		        the router.
+
+
+-- fsPimCmnJoinPruneInterval		This scalar is same as defined in the
+--					Standard MIB rfc2934.txt
+
+
+-- fsPimCmnSPTGroupThreshold		This scalar allows to configure the
+--					threshold for switching over to
+--					Shortest Path Tree. It is based
+--				        on Bits per second.
+
+-- fsPimCmnSPTSourceThreshold		This scalar allows to configure the
+--					threshold for switching over to
+--				        Shortest path Tree. It is based on
+--			                the Bits per Second.
+
+-- fsPimCmnSPTSwitchingPeriod		This scalar allows to configure the
+--					period for which the threshold is
+--				        computed.
+
+-- fsPimCmnSPTRpThreshold		This scalar allows to configure the
+--					threshold at which shortest path trees
+--				        are initiated for the RPT Route(s) that
+--				        match this entry.
+
+-- fsPimCmnSPTRpSwitchingPeriod		This scalar allows to configure the
+--					period for which the threshold is
+--			         	computed.
+
+-- fsPimCmnHAAdminStatus	This scalar shows whether high availabilty 
+--					feature is enabled or disabled.
+
+-- fsPimCmnHAState		This scalar shows the internal state of the 
+--					Active or Standby PIM instance
+
+-- fsPimCmnHADynamicBulkUpdStatus		This scalar shows the status of dynamic 
+--					Bulk Update.
+
+-- fsPimCmnHAForwardingTblEntryCnt        This scalar shows the Number of entries  
+--					in the shadowtable of the PIM instance.
+
+
+-- The Tables in the MIB
+
+-- fsPimCmnInterfaceTable    fsPimCmnnterfaceTable is same as given in Standard MIB
+--			     except for an object is added to monitor the number
+--			     of packets discarded as invalid packet in this
+--			     interface.
+
+-- fsPimCmnNeighborTable     fsPimCmnNeighborTable is same as given in Standard MIB
+--			     except for few objects added for knowing the GenId
+--	    		     and to monitor the number of packets discarded as
+--			     invalid.
+
+-- fsPimCmnIpMRouteTable     fsPimCmnIpMRouteTable is same as given in Standard MIB
+--			     except for few objects added for viewing the
+--			     Multicast Route Table as given in the IPv4
+--			     Multicast Routing MIB and an object to monitor
+--			     number packets routed.
+
+-- fsPimCmnIpMRouteNextHopTable   fsPimCmnIpMRouteNextHopTable is same as given in
+--			          Standard MIB except for few objects added for
+--			          viewing the next hop table.
+
+
+-- fsPimCmnCandidateRPTable	  fsPimCmnCandidateRPTable is same as given in Standard
+--			          MIB, except the RPPriority is added. 
+
+
+
+-- Management Information Base for PIM Product
+
+SUPERMICRO-PIMCMN-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,NOTIFICATION-TYPE,
+    Integer32, TimeTicks, Unsigned32,
+    Counter32, Counter64, enterprises	     FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, RowStatus,
+    TruthValue,  DisplayString		     FROM SNMPv2-TC
+    InetAddressType, InetAddress             FROM INET-ADDRESS-MIB
+    IANAipRouteProtocol, 
+    IANAipMRouteProtocol                     FROM IANA-RTPROTO-MIB
+    PortList                                 FROM Q-BRIDGE-MIB;
+
+
+fsPimCmnMIB MODULE-IDENTITY
+--    LAST-UPDATED "200006050000Z"
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "Super Micro Computer Inc."  
+    CONTACT-INFO "support@Supermicro.com" 
+    DESCRIPTION "The MIB module for management of PIM Routers
+                    Initial Version"
+    REVISION "201209050000Z"
+    DESCRIPTION "The MIB module for management of PIM Routers
+                    Initial Version"
+	 ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 111 }
+
+-- Textual Convention
+-- This Textual Convention enhance the readability of the specification.
+
+Status            ::=     TEXTUAL-CONVENTION
+        STATUS               current
+        DESCRIPTION
+                "The status of the fsPimCmnGlobalDebug"
+        SYNTAX               INTEGER    {
+                               enable(1),
+                               disable(2)
+                     }
+
+CompList          ::=     TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+            "Each octet within this value specifies a set of eight
+            components, with the first octet specifying components 
+            1 through 8, the second octet specifying components 9 
+            through 16, etc.  Within each octet, the most significant 
+            bit represents the lowest numbered component, and the 
+            least significant bit represents the highest numbered 
+            component.  Thus, each component is represented by a 
+            single bit within the value of this object.  If that bit 
+            has a value of '1', then that component is included in 
+            the set of components; the component is not included 
+            if its bit has a value of '0'."
+        SYNTAX      OCTET STRING
+
+
+fsPimCmnMIBObjects OBJECT IDENTIFIER ::= { fsPimCmnMIB 1 }
+
+futurePimCmnScalars     OBJECT IDENTIFIER ::= { fsPimCmnMIBObjects 1 }
+futurePimCmnTables     OBJECT IDENTIFIER ::= { fsPimCmnMIBObjects 2 }
+futurePimCmnTrapsControl     OBJECT IDENTIFIER ::= { fsPimCmnMIBObjects 3 }
+futurePimCmnTraps     OBJECT IDENTIFIER ::= { fsPimCmnMIBObjects 4 }
+
+
+-- SCALAR_TABLE_BEGIN
+
+fsPimCmnVersionString      OBJECT-TYPE
+    SYNTAX	    DisplayString
+    MAX-ACCESS	    read-only
+    STATUS	    current
+    DESCRIPTION
+	    "The version number of the PIM protocol in the router"
+    ::= { futurePimCmnScalars 1 }
+
+--
+-- Start of mib objects for data rate monitoring by the last hop router
+--
+
+fsPimCmnSPTGroupThreshold	OBJECT-TYPE
+    SYNTAX	      Integer32 (0..2147483647)
+    MAX-ACCESS	      read-write
+    STATUS	      current
+    DESCRIPTION
+	  "The threshold of data rate for any group when exceeded,
+	   source specific counters are initiated for that particular group
+	   It is based on number of bits per sec.
+	  To initiate SPT switching counter, this threshold MUST be
+	  configured"
+    DEFVAL     { 0 }
+    ::= { futurePimCmnScalars 2 }
+
+fsPimCmnSPTSourceThreshold	OBJECT-TYPE
+    SYNTAX	      Integer32 (0..2147483647)
+    MAX-ACCESS	      read-write
+    STATUS	      current
+    DESCRIPTION
+	  "The threshold of data rate for any source when exceeded,
+           switching to Shortest Path Tree is initiated.
+	   It is based on number of bits per sec.
+           To switch to SPT, this threshold MUST be configured"
+    DEFVAL     { 0 }
+    ::= { futurePimCmnScalars 3 }
+
+fsPimCmnSPTSwitchingPeriod  OBJECT-TYPE
+    SYNTAX		 Integer32 (0..2147483647)
+    MAX-ACCESS		 read-write
+    STATUS		 current
+    DESCRIPTION
+	   "The period (in seconds)over which the data rate
+            is to be monitored for intiating source specific
+	     counting or initiating switch to shortest path tree.
+	     Same period is used for monitoring data rate for
+	     both source and group.
+	  To switch to SPT, this period MUST be configured"
+    DEFVAL     { 0 }
+    ::= { futurePimCmnScalars 4 }
+
+--
+-- End of mib objects for data rate monitoring by the last hop router
+--
+
+
+--
+-- Start of mib objects for monitoring number of register message by the RP
+--
+
+fsPimCmnSPTRpThreshold OBJECT-TYPE
+    SYNTAX	      Integer32 (0..2147483647)
+    MAX-ACCESS	      read-write
+    STATUS	      current
+    DESCRIPTION
+      "The threshold at which the RP initiates switching to
+		Source specific shortest path.It is based on number
+		of registered packets received.
+	   To switch to SPT, this threshold MUST be configured"
+    DEFVAL     { 0 }
+    ::= { futurePimCmnScalars 5 }
+
+fsPimCmnSPTRpSwitchingPeriod OBJECT-TYPE
+    SYNTAX	      Integer32 (0..2147483647)
+    MAX-ACCESS	      read-write
+    STATUS	      current
+    DESCRIPTION
+       "The period (in seconds) over which RP monitors
+       register packets for switching to the source specific
+       shortest path tree.
+	    To switch to SPT, this period MUST be configured"
+    DEFVAL     { 0 }
+    ::= { futurePimCmnScalars 6 }
+
+--
+-- End of mib objects for monitoring number of register message by the RP
+--
+
+
+--
+-- Start of mib objects for Register stop rate limitation
+--
+
+
+fsPimCmnRegStopRateLimitingPeriod     OBJECT-TYPE
+    SYNTAX            Integer32(0..2147483647)
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+           "The period (in seconds) over which RP monitors number of
+            register packets after sending the register stop message
+            to the source of the register message for rate limiting the
+            sending of register stop message"
+    DEFVAL     { 5 }
+    ::= { futurePimCmnScalars 7 }
+
+--
+-- End of mib objects for register stop rate limitation
+--
+
+
+fsPimCmnMemoryAllocFailCount	     OBJECT-TYPE
+    SYNTAX	      Integer32
+    MAX-ACCESS	      read-only
+    STATUS	      current
+    DESCRIPTION
+	    " This counter holds the number of memory allocation failures "
+    ::= { futurePimCmnScalars 8 }
+
+fsPimCmnGlobalTrace	  OBJECT-TYPE
+	SYNTAX	      Integer32 (0..65535)
+	MAX-ACCESS    read-write
+	STATUS	      current
+	DESCRIPTION
+		" This is used to enable Trace Statements in PIM Module.
+		A four byte integer value is specified for enabling the level
+		of tracing.Each Bit in the four byte integer variable represents
+		a level of Trace. The bits represents the levels as
+		follows: 0 - Init and Shutdown, 1 - Management, 2 - Data Path,
+		3 - Control Plane, 4 - packet Dump, 5 - All resources except
+		buffer, 6 - All Failures, 7 - Buffer.  The remaining
+		bits are unused. The combination of levels are also allowed.
+		For example if the bits 1 and 2 are set, then the Trace
+		statements related to management and Data Path will be printed.
+		The administrator have to enter the corresponding integer value
+		 for the bits set. For example if bits 1 and 2 are set then
+		 admin has to give the value 6."
+	DEFVAL	{ 0 }
+	::= { futurePimCmnScalars 9 }
+
+fsPimCmnGlobalDebug	 OBJECT-TYPE
+	SYNTAX	      Integer32 (0..65535)
+	MAX-ACCESS    read-write
+	STATUS	      current
+	DESCRIPTION
+		" This is used to enable Debug statements in PIM.
+                  A Four byte integer value is specified for enabling the 
+                  level of debugging. Each bit in the four byte integer 
+                  variable represents a level of debugging. The combination of 
+                  levels are also allowed. The user have to enter the 
+                  corresponding integer value for the bit set.
+		  The following values enable Debugging in following different
+		  modules of PIM.
+		  PIM_NBR_MODULE	:0x00000001
+		  PIM_GRP_MODULE	:0x00000002
+		  PIM_JP_MODULE		:0x00000004
+		  PIM_AST_MODULE	:0x00000008
+		  PIM_BSR_MODULE	:0x00000010
+		  PIM_IO_MODULE		:0x00000020
+		  PIM_PMBR_MODULE	:0x00000040
+		  PIM_MRT_MODULE	:0x00000080
+		  PIM_MDH_MODULE	:0x00000100
+		  PIM_MGMT_MODULE	:0x00000200
+		  PIM_SRM_MODULE	:0x00000400
+		  PIM_HA_MODULE		:0x00000800
+		  PIM_ALL_MODULES	:0x0000ffff
+		  PIM_MAX_INT4		:0x7fffffff
+		  PIM_TRACE_DIS_FLAG	:0x80000000
+		  "
+	DEFVAL	{ 0 }
+	::= { futurePimCmnScalars 10 }
+
+fsPimCmnPmbrStatus          OBJECT-TYPE
+    SYNTAX            INTEGER { disable (1),enable (2) }
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            "The border bit which identifies the router as a border router"
+    DEFVAL   { 1 }
+    ::= { futurePimCmnScalars 11 }
+
+fsPimCmnRouterMode          OBJECT-TYPE
+    SYNTAX            INTEGER { ssmonly (1), smssm (2) }
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            "The Mode of the Pim-SM router (ssm_only or sm_ssm )"
+    DEFVAL   { 2 }
+    ::= { futurePimCmnScalars 12 }
+
+fsPimCmnStaticRpEnabled           OBJECT-TYPE
+    SYNTAX            INTEGER { disable (0),enable (1) }
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            "The flag which indicating that static configuration of RP is 
+available"
+
+    DEFVAL   { 0 }
+    ::= { futurePimCmnScalars 13 }
+
+fsPimCmnIpStatus           OBJECT-TYPE
+    SYNTAX     INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The enabled status of IPv4 Multicast Routing by PIM on this router."
+    ::= { futurePimCmnScalars 14 }
+
+fsPimCmnIpv6Status           OBJECT-TYPE
+    SYNTAX     INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The enabled status of IPv6 Multicast Routing by PIM on this router."
+    ::= { futurePimCmnScalars 15 }
+
+--
+-- start of Scalar MIB Objects related to State Refresh Module.
+--
+
+fsPimCmnSRProcessingStatus         OBJECT-TYPE
+    SYNTAX     INTEGER {
+                 disable (0),
+                           enable  (1)
+                  }
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            " The value indicates the whether to process and forward
+              the state Refresh message"
+
+    DEFVAL   { 1 }
+    ::= { futurePimCmnScalars 16 }
+
+fsPimCmnRefreshInterval OBJECT-TYPE
+    SYNTAX     Integer32 (-1 | 4..100)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The interval between successive State Refresh messages sent
+            by an Originator.  This timer period is called the
+            RefreshInterval in the PIM-DM specification.  This object is
+            used only by PIM-DM. Minus one indicates that Generation of
+            State Refresh Message is disabled"
+
+    REFERENCE "RFC 3973 section 4.8"
+    DEFVAL { -1 }
+    ::= { futurePimCmnScalars 17 }
+
+fsPimCmnSourceActiveInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (120..210)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The Period of time after receiving a multicast message
+            a Originator router (Directly connected to source)
+            will continue to send State Refresh Message"
+
+    DEFVAL { 210 }
+    ::= { futurePimCmnScalars 18 }
+
+-- End of Scalar MIB objects related to State Refresh Module
+--
+-- Start of Scalar MIB objectts related to PIM Hot-Standby Module
+--
+fsPimCmnHAAdminStatus OBJECT-TYPE
+	SYNTAX		INTEGER { disabled (0), enabled (1) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            " High Availabilty feature enabled or disabled in PIM."
+    DEFVAL   { 0 }
+    ::= { futurePimCmnScalars 19 }
+
+fsPimCmnHAState OBJECT-TYPE
+	SYNTAX		INTEGER {
+						init(1),
+						activeStandbyUp(2),
+						activeStandbyDown(3),
+						standby(4)
+						}
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+			"Internal State of the PIM instance.
+			 init(1) implies that the PIM instance is up, but is unaware 
+			 of the status of its peer.
+			 activeStandbyUp(2) implies that the current PIM instance is up
+			 and functioning as active node and its peer is functioning as the
+			 standby.
+			 activeStandbyDown(3) implies that the current PIM instance is up
+			 and functioning as active node but its peer is down/not 
+			 functioning.
+			 standby(4) implies that current PIM instance is the standby
+			 Instance. "
+	DEFVAL	{ 1 }
+	::= { futurePimCmnScalars 20}
+
+fsPimCmnHADynamicBulkUpdStatus OBJECT-TYPE
+	SYNTAX		INTEGER {
+				 notStarted(1),
+				 inProgress(2),
+				 completed(3),
+				 aborted(4)
+				}
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+			"Status of dynamic bulk update between active and
+			 dynamic PIM instance.
+			 notStarted(1): Dynamic Bulk Update has not yet been started.
+			 inProgress(2): Dynamic Bulk Update is in Progress.
+			 completed (3): Dynamic Bulk Update is complete.
+			 aborted   (4): dynamic Bulk Update is aborted."
+	DEFVAL	{ 1 }
+	::= { futurePimCmnScalars 21}
+	
+fsPimCmnHAForwardingTblEntryCnt	OBJECT-TYPE
+	SYNTAX		Integer32 (0..65535)			   
+	MAX-ACCESS  read-only
+	STATUS		current
+	DESCRIPTION
+		        "Number entries in the shadowtable of active 
+			 PIM instance."
+	::= { futurePimCmnScalars 22}
+
+
+--
+-- End of Scalar MIB objects related to PIM Hot-Standby Module
+--
+
+
+--
+-- Start of Scalar MIB objectts related to PIM RPF-Vector feature
+--
+fsPimCmnIpRpfVector           OBJECT-TYPE
+    SYNTAX     INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "The status of IPv4 Multicast RPF Vector Feature." 
+	DEFVAL	{ 2 }
+    ::= { futurePimCmnScalars 23 }
+
+--
+-- End of Scalar MIB objects related to PIM RPF Vector feature
+--
+ 
+--
+-- Start of Scalar MIB objectts related to Bidir-PIM feature
+--
+fsPimCmnIpBidirPIMStatus           OBJECT-TYPE
+    SYNTAX     INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "The status of Bidir-PIM Feature.Enabling/Disabling this feature 
+           is applicable for both PIMv4 and PIMv6" 
+	DEFVAL	{ 2 }
+    ::= { futurePimCmnScalars 24 }
+
+fsPimCmnIpBidirOfferInterval           OBJECT-TYPE
+    SYNTAX     Integer32 (1..20000000)
+    UNITS      "milliseconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The time interval between the DF election Offer messages to be sent."
+    DEFVAL  { 100 }
+    ::= { futurePimCmnScalars 25 }
+
+fsPimCmnIpBidirOfferLimit           OBJECT-TYPE
+    SYNTAX     Integer32 (3..100)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The number of unanswered offers before the router changes as the 
+         designated forwarder (DF)"
+    DEFVAL  { 3 }
+    ::= { futurePimCmnScalars 26 }
+
+--
+-- End of Scalar MIB objects related to Bidir-PIM feature
+--
+
+
+--
+-- SCALAR_TABLE_END
+--
+
+
+--
+-- The PIM Interface Table
+--
+
+fsPimCmnInterfaceTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnInterfaceEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table listing the router's PIM interfaces.
+	    IGMP and PIM are enabled on all interfaces listed in this
+	    table."
+    ::= { futurePimCmnTables 1 }
+
+fsPimCmnInterfaceEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnInterfaceEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnInterfaceTable."
+    INDEX      { fsPimCmnInterfaceIfIndex , fsPimCmnInterfaceAddrType}
+    ::= { fsPimCmnInterfaceTable 1 }
+
+FsPimCmnInterfaceEntry ::= SEQUENCE {
+    fsPimCmnInterfaceIfIndex		        Integer32,
+    fsPimCmnInterfaceAddrType		        InetAddressType,
+    fsPimCmnInterfaceCompId                 Integer32,
+    fsPimCmnInterfaceDRPriority             Unsigned32,
+    fsPimCmnInterfaceHelloHoldTime          Integer32,
+    fsPimCmnInterfaceLanPruneDelayPresent   INTEGER,
+    fsPimCmnInterfaceLanDelay               Integer32,
+    fsPimCmnInterfaceOverrideInterval       Integer32,
+    fsPimCmnInterfaceGenerationId           Integer32,
+    fsPimCmnInterfaceSuppressionInterval    Integer32,
+    fsPimCmnInterfaceAdminStatus            Integer32,
+    fsPimCmnInterfaceBorderBit              Integer32,
+    fsPimCmnInterfaceGraftRetryInterval     Unsigned32,
+    fsPimCmnInterfaceSRPriorityEnabled      TruthValue,
+    fsPimCmnInterfaceTtl                    Integer32, 
+    fsPimCmnInterfaceProtocol               IANAipMRouteProtocol,
+    fsPimCmnInterfaceRateLimit              Integer32,
+    fsPimCmnInterfaceInMcastOctets          Counter32,
+    fsPimCmnInterfaceOutMcastOctets         Counter32,
+    fsPimCmnInterfaceHCInMcastOctets        Counter64,
+    fsPimCmnInterfaceHCOutMcastOctets       Counter64,
+    fsPimCmnInterfaceCompIdList             CompList
+}
+
+fsPimCmnInterfaceIfIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..65535)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The ifIndex value of this PIM interface."
+    ::= { fsPimCmnInterfaceEntry 1 }
+
+fsPimCmnInterfaceAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP address type of the PIM Interface for which this entry
+	    contains information."
+    ::= { fsPimCmnInterfaceEntry 2 }
+
+fsPimCmnInterfaceCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          " This object is the component Id of the component to which the 
+          interface belongs to"   
+    DEFVAL     { 1 }
+    ::= { fsPimCmnInterfaceEntry 3 }      
+
+
+fsPimCmnInterfaceDRPriority    OBJECT-TYPE
+    SYNTAX            Unsigned32
+    MAX-ACCESS  read-write
+    STATUS            current
+    DESCRIPTION
+            "The DR priority value configured for Hello message for that     
+router per interface"
+    DEFVAL     { 1 }
+    ::= {fsPimCmnInterfaceEntry 4 }
+
+fsPimCmnInterfaceHelloHoldTime            OBJECT-TYPE
+    SYNTAX            Integer32 (1..65535)
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+            "The hold time configured for the Hello message for that     
+              router per interface"
+      ::= { fsPimCmnInterfaceEntry 5 }
+
+fsPimCmnInterfaceLanPruneDelayPresent     OBJECT-TYPE
+    SYNTAX            INTEGER {disable (0), enable (1)}
+    MAX-ACCESS  read-write
+    STATUS            current
+    DESCRIPTION
+            "The LanPruneDelayPresent bit configured for the router per  
+             interface"
+    DEFVAL     { 0 }
+    ::= { fsPimCmnInterfaceEntry 6 }
+
+fsPimCmnInterfaceLanDelay      OBJECT-TYPE
+    SYNTAX            Integer32 (0..65535)
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            "The LanPruneDelayPresent bit configured for the router per     
+             interface"
+    DEFVAL     { 0 }
+    ::= { fsPimCmnInterfaceEntry 7 }    
+
+fsPimCmnInterfaceOverrideInterval           OBJECT-TYPE
+    SYNTAX            Integer32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS            current
+    DESCRIPTION
+            "The Override Interval configured for the router per interface"
+    DEFVAL     { 0 }
+    ::= { fsPimCmnInterfaceEntry 8}
+
+fsPimCmnInterfaceGenerationId            OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The Generation identifier of the router. This is used by
+            neighbour routers to quickly detect router reboot and             
+            synchronize RP-Set information and forwarding states by triggering         
+            Bootstrap and Join/Prune messages to the rebooted router"
+    ::= { fsPimCmnInterfaceEntry 9 }
+
+fsPimCmnInterfaceSuppressionInterval OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The interface suppression period "
+    ::= { fsPimCmnInterfaceEntry 10 }    
+
+fsPimCmnInterfaceAdminStatus OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The interface Administrative Status "
+    ::= { fsPimCmnInterfaceEntry 11 }   
+ 
+fsPimCmnInterfaceBorderBit OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "This indicates this interface is border interface or not,
+             1-- border interface, 0(default value)-- Normal interface."
+    ::= { fsPimCmnInterfaceEntry 12 }    
+
+fsPimCmnInterfaceGraftRetryInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..10)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The minimum interval that must transpire between two
+            successive Grafts sent by a router.  This object corresponds
+            to the 'Graft_Retry_Period' timer value defined in the
+            PIM-DM specification.  This object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    DEFVAL { 3 }
+    ::= { fsPimCmnInterfaceEntry 13 }
+
+fsPimCmnInterfaceSRPriorityEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if all routers on this interface are
+            using the State Refresh option.  This object is used only by
+            PIM-DM."
+    ::= { fsPimCmnInterfaceEntry 14 }
+
+fsPimCmnInterfaceTtl OBJECT-TYPE
+    SYNTAX     Integer32 (0..255)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The datagram TTL threshold for the interface. Any IP
+            multicast datagrams with a TTL less than this threshold will
+            not be forwarded out the interface. The default value of 0
+            means all multicast packets are forwarded out the
+            interface."
+    ::= { fsPimCmnInterfaceEntry 15 }
+
+fsPimCmnInterfaceProtocol OBJECT-TYPE
+    SYNTAX     IANAipMRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing protocol running on this interface."
+    ::= { fsPimCmnInterfaceEntry 16}
+
+fsPimCmnInterfaceRateLimit OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The rate-limit, in kilobits per second, of forwarded
+            multicast traffic on the interface.  A rate-limit of 0
+            indicates that no rate limiting is done."
+    DEFVAL     { 0 }
+    ::= { fsPimCmnInterfaceEntry 17}
+
+fsPimCmnInterfaceInMcastOctets OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have arrived
+            on the interface, including framing characters.  This object
+            is similar to ifInOctets in the Interfaces MIB, except that
+            only multicast packets are counted."
+    ::= { fsPimCmnInterfaceEntry 18}
+
+fsPimCmnInterfaceOutMcastOctets OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have been
+            sent on the interface."
+    ::= { fsPimCmnInterfaceEntry 19}
+
+fsPimCmnInterfaceHCInMcastOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have arrived
+            on the interface, including framing characters.  This object
+            is a 64-bit version of fsPimCmnInterfaceInMcaestOctets.  It
+            is similar to ifHCInOctets in the Interfaces MIB, except
+            that only multicast packets are counted.  "
+    ::= { fsPimCmnInterfaceEntry 20}
+
+fsPimCmnInterfaceHCOutMcastOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets of multicast packets that have been
+             sent on the interface. This object is a 64-bit version of
+             fsPimCmnInterfaceOutMcastOctets."
+   ::= { fsPimCmnInterfaceEntry 21}
+fsPimCmnInterfaceCompIdList OBJECT-TYPE
+    SYNTAX     CompList
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          " This object is the component Id List of the components which are 
+            associated with this interface"   
+    ::= { fsPimCmnInterfaceEntry 22 }      
+--
+-- The PIM Neighbor Table
+--
+
+fsPimCmnNeighborTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnNeighborEntry
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+	    "The (conceptual) table listing the router's PIM neighbors.
+        This table has been superseded by fsPimCmnNeighborExtTable.
+        This table may be used as long as two neighbors on different
+        interfaces do not have the same IPv6 link-local address."
+    ::= { futurePimCmnTables 2 }
+
+fsPimCmnNeighborEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnNeighborEntry
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnNeighborTable."
+    INDEX      { fsPimCmnNeighborCompId, fsPimCmnNeighborAddrType, 
+                 fsPimCmnNeighborAddress }
+    ::= { fsPimCmnNeighborTable 1 }
+
+FsPimCmnNeighborEntry ::= SEQUENCE {
+
+    fsPimCmnNeighborCompId                Integer32,
+    fsPimCmnNeighborAddrType 	          InetAddressType,
+    fsPimCmnNeighborAddress	              InetAddress,
+    fsPimCmnNeighborIfIndex	              Integer32,
+    fsPimCmnNeighborUpTime	              TimeTicks,
+    fsPimCmnNeighborExpiryTime            TimeTicks,
+    fsPimCmnNeighborGenerationId          Integer32,
+    fsPimCmnNeighborLanDelay              Integer32,
+    fsPimCmnNeighborDRPriority            Unsigned32,
+    fsPimCmnNeighborOverrideInterval      Integer32,
+    fsPimCmnNeighborSRCapable             TruthValue,
+    fsPimCmnNeighborRPFCapable            TruthValue,
+    fsPimCmnNeighborBidirCapable          TruthValue
+}
+
+fsPimCmnNeighborCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+          " The component Id of this neighbor table "
+    ::= { fsPimCmnNeighborEntry 1 }      
+
+fsPimCmnNeighborAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+	    "The address Type of the PIM neighbor for which this entry
+	    contains information."
+    ::= { fsPimCmnNeighborEntry 2 }
+
+fsPimCmnNeighborAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+	    "The IP address of the PIM neighbor for which this entry
+	    contains information."
+    ::= { fsPimCmnNeighborEntry 3 }
+
+fsPimCmnNeighborIfIndex OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+	    "The value of ifIndex for the interface used to reach this
+	    PIM neighbor."
+    ::= { fsPimCmnNeighborEntry 4 }
+
+fsPimCmnNeighborUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+	    "The time since this PIM neighbor (last) became a neighbor
+	    of the local router."
+    ::= { fsPimCmnNeighborEntry 5 }
+
+fsPimCmnNeighborExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+	    "The minimum time remaining before this PIM neighbor will be
+	    aged out."
+    ::= { fsPimCmnNeighborEntry 6 }
+    
+fsPimCmnNeighborGenerationId OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+            "The Generation identifier of the router. This is used by
+             neighbour routers to quickly detect router reboot and synchronize
+             RP-Set information and forwarding states by triggering Bootstrap
+             and Join/Prune messages to the rebooted router"
+    ::= { fsPimCmnNeighborEntry 7 }
+
+
+fsPimCmnNeighborLanDelay           OBJECT-TYPE
+    SYNTAX            Integer32
+    MAX-ACCESS        read-only
+    STATUS            deprecated
+    DESCRIPTION
+            "The LanDelay configured for this PIM neighbor"
+    ::= { fsPimCmnNeighborEntry 8 }
+
+fsPimCmnNeighborDRPriority             OBJECT-TYPE
+    SYNTAX            Unsigned32
+    MAX-ACCESS        read-only
+    STATUS            deprecated
+    DESCRIPTION
+            "The DR priority value configured for this PIM neighbor"
+    ::= { fsPimCmnNeighborEntry 9 }
+
+fsPimCmnNeighborOverrideInterval           OBJECT-TYPE
+    SYNTAX            Integer32
+    MAX-ACCESS        read-only
+    STATUS            deprecated
+    DESCRIPTION
+            "The Override Interval configured for this PIM neighbor"
+    ::= { fsPimCmnNeighborEntry 10 }
+    
+fsPimCmnNeighborSRCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is using the State
+            Refresh Capable option.  This object is used only by
+            PIM-DM."
+    REFERENCE "RFC 3973 section 4.3.4"
+    ::= { fsPimCmnNeighborEntry 11 }
+
+fsPimCmnNeighborRPFCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is RPF Vector Capable."
+    ::= { fsPimCmnNeighborEntry 12 }    
+
+fsPimCmnNeighborBidirCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is Bidir-PIM Capable."
+    ::= { fsPimCmnNeighborEntry 13 }    
+
+
+--
+-- The PIM IP Multicast Route Table
+--
+
+fsPimCmnIpMRouteTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnIpMRouteEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table listing PIM multicast routing information"
+    ::= { futurePimCmnTables 3 }
+
+fsPimCmnIpMRouteEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnIpMRouteEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnIpMRouteTable.	 There
+	    is one entry for each incoming interface running PIM"
+    INDEX      { fsPimCmnIpMRouteCompId, fsPimCmnIpMRouteAddrType, 
+                 fsPimCmnIpMRouteGroup, fsPimCmnIpMRouteSource, 
+                 fsPimCmnIpMRouteSourceMasklen } 
+    ::= { fsPimCmnIpMRouteTable 1 }
+
+FsPimCmnIpMRouteEntry ::= SEQUENCE {
+    fsPimCmnIpMRouteCompId                    Integer32,
+    fsPimCmnIpMRouteAddrType	              InetAddressType,
+    fsPimCmnIpMRouteGroup	                  InetAddress,
+    fsPimCmnIpMRouteSource	                  InetAddress,
+    fsPimCmnIpMRouteSourceMasklen             Integer32,
+    fsPimCmnIpMRouteUpstreamNeighbor          InetAddress,
+    fsPimCmnIpMRouteInIfIndex	              Integer32,
+    fsPimCmnIpMRouteUpTime	                  TimeTicks,
+    fsPimCmnIpMRoutePkts		              Counter32,
+    fsPimCmnIpMRouteUpstreamAssertTimer       TimeTicks,
+    fsPimCmnIpMRouteAssertMetric	          Integer32,
+    fsPimCmnIpMRouteAssertMetricPref          Integer32,
+    fsPimCmnIpMRouteAssertRPTBit	          TruthValue,
+    fsPimCmnIpMRouteTimerFlags	              Integer32,
+    fsPimCmnIpMRouteFlags	                  Integer32,
+    fsPimCmnIpMRouteUpstreamPruneState        INTEGER,
+    fsPimCmnIpMRouteUpstreamPruneLimitTimer   TimeTicks,
+    fsPimCmnIpMRouteOriginatorState           INTEGER,
+    fsPimCmnIpMRouteSourceActiveTimer         TimeTicks,
+    fsPimCmnIpMRouteStateRefreshTimer         TimeTicks,
+    fsPimCmnIpMRouteExpiryTime                TimeTicks,
+    fsPimCmnIpMRouteDifferentInIfPackets      Counter32,
+    fsPimCmnIpMRouteOctets                    Counter32,
+    fsPimCmnIpMRouteProtocol                  IANAipMRouteProtocol,
+    fsPimCmnIpMRouteRtProto                   IANAipRouteProtocol,
+    fsPimCmnIpMRouteRtAddress                 InetAddress,
+    fsPimCmnIpMRouteRtMasklen                 Integer32,
+    fsPimCmnIpMRouteRtType                    INTEGER,
+    fsPimCmnIpMRouteHCOctets                  Counter64,
+    fsPimCmnIpMRouteOIfList                   PortList,
+    fsPimCmnIpMRouteRPFVectorAddr             InetAddress,
+    fsPimCmnIpMRoutePimMode                   INTEGER
+}
+
+fsPimCmnIpMRouteCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+         "The component Id of this table"
+    ::= { fsPimCmnIpMRouteEntry 1 }    
+ 
+fsPimCmnIpMRouteAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP family in which the route belongs to."
+    ::= { fsPimCmnIpMRouteEntry 2 }
+
+fsPimCmnIpMRouteGroup OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP multicast group address for which this entry
+	    contains multicast routing information."
+    ::= { fsPimCmnIpMRouteEntry 3 }
+
+fsPimCmnIpMRouteSource OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The network address which when combined with the
+	    corresponding value of ipMRouteSourceMask identifies the
+	    sources for which this entry contains multicast routing
+	    information."
+    ::= { fsPimCmnIpMRouteEntry 4 }
+
+fsPimCmnIpMRouteSourceMasklen OBJECT-TYPE
+    SYNTAX     Integer32(0..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The network mask which when combined with the corresponding
+	    value of ipMRouteSource identifies the sources for which
+	    this entry contains multicast routing information."
+    ::= { fsPimCmnIpMRouteEntry 5 }
+
+fsPimCmnIpMRouteUpstreamNeighbor OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The address of the upstream neighbor (e.g., RPF neighbor)
+	    from which IP datagrams from these sources to this multicast
+	    address are received."
+    ::= { fsPimCmnIpMRouteEntry 6 }
+
+fsPimCmnIpMRouteInIfIndex OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The value of ifIndex for the interface on which IP
+	    datagrams sent by these sources to this multicast address
+	    are received."
+    ::= { fsPimCmnIpMRouteEntry 7 }
+
+fsPimCmnIpMRouteUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The time since the multicast routing information
+	    represented by this entry was learned by the router."
+    ::= { fsPimCmnIpMRouteEntry 8 }
+
+fsPimCmnIpMRoutePkts OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The number of packets which this router has received from
+	    these sources and addressed to this multicast group
+	    address."
+    ::= { fsPimCmnIpMRouteEntry 9 }
+
+fsPimCmnIpMRouteUpstreamAssertTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The time remaining before the router changes its upstream
+	    neighbor back to its RPF neighbor.	This timer is called the
+	    Assert timer in the PIM Sparse and Dense mode specification.
+	    A value of 0 indicates that no Assert has changed the
+	    upstream neighbor away from the RPF neighbor."
+    ::= { fsPimCmnIpMRouteEntry 10 }
+
+fsPimCmnIpMRouteAssertMetric OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The metric advertised by the assert winner on the upstream
+	    interface, or 0 if no such assert is in received."
+    ::= { fsPimCmnIpMRouteEntry 11 }
+
+fsPimCmnIpMRouteAssertMetricPref OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The preference advertised by the assert winner on the
+	    upstream interface, or 0 if no such assert is in effect."
+    ::= { fsPimCmnIpMRouteEntry 12 }
+
+fsPimCmnIpMRouteAssertRPTBit OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The value of the RPT-bit advertised by the assert winner on
+	    the upstream interface, or false if no such assert is in
+	    effect."
+    ::= { fsPimCmnIpMRouteEntry 13 }
+
+fsPimCmnIpMRouteTimerFlags OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "This object describes PIM-specific Timer flags related to a
+	    Multicast Route Entry. If the bit is 1 indicates that timer 
+            is started for that entry.  The bits corresponding to the 
+            timers are as follows:
+            0 - JP Suppression Timer, 1 - Oif Timer, 2 - Entry Timer,
+            3 - Reg Suppression Timer, 4 - Assert Timer, 
+            5 - RandomDelayJoin Timer.
+            For example, If this object value is 3 (0000 0011), then
+            it means that JPSuppression timer and  Oif timer are running.
+            This is for both SM and DM. The bits which are not applicable 
+            to DM/SM will be filled with 0 "
+    ::= { fsPimCmnIpMRouteEntry 14 }
+
+fsPimCmnIpMRouteFlags OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "This object describes PIM-specific flags related to a
+	    multicast state entry.  See the PIM Sparse Mode
+	    specification for the meaning of the RPT and SPT bits."
+    ::= { fsPimCmnIpMRouteEntry 15 }
+
+fsPimCmnIpMRouteUpstreamPruneState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  forwarding (1),
+                  ackpending (2),
+                  pruned (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router has pruned itself from the tree.
+            This corresponds to the state of the upstream prune (S,G)
+            state machine in the PIM-DM specification.  This object is
+            used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.4.1"
+    ::= { fsPimCmnIpMRouteEntry 16 }
+
+fsPimCmnIpMRouteUpstreamPruneLimitTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router may send a (S,G)
+            Prune message on pimSGRPFIfIndex.  This timer is called the
+            (S,G) Prune Limit Timer in the PIM-DM specification.  This
+            object is zero if the timer is not running.  This object is
+            used only by PIM-DM."
+    REFERENCE "RFC 2973 section 4.8"
+    ::= { fsPimCmnIpMRouteEntry 17 }
+
+fsPimCmnIpMRouteOriginatorState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  notOriginator (1),
+                  originator (2)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the router is an originator for an (S,G) message
+            flow.  This corresponds to the state of the per-(S,G)
+            Originator state machine in the PIM-DM specification.  This
+            object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.5.2"
+    ::= { fsPimCmnIpMRouteEntry 18 }
+
+fsPimCmnIpMRouteSourceActiveTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If pimSGOriginatorState is 'originator', this is the time
+            remaining before the local router reverts to a notOriginator
+            state.  Otherwise, this is zero.  This timer is called the
+            Source Active Timer in the PIM-DM specification.  This
+            object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    ::= { fsPimCmnIpMRouteEntry 19 }
+
+fsPimCmnIpMRouteStateRefreshTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If pimSGOriginatorState is 'originator', this is the time
+            remaining before the local router sends a State Refresh
+            message.  Otherwise, this is zero.  This timer is called the
+            State Refresh Timer in the PIM-DM specification.  This
+            object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    ::= { fsPimCmnIpMRouteEntry 20 }
+
+fsPimCmnIpMRouteExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The minimum amount of time remaining before this entry will
+             be aged out."
+    ::= { fsPimCmnIpMRouteEntry 21 }
+
+fsPimCmnIpMRouteDifferentInIfPackets OBJECT-TYPE
+    SYNTAX     Counter32  
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            " The number of packets which this router has received from
+            these sources and addressed to this multicast group address,
+            which were dropped because they were not received on the
+            interface indicated by fsPimCmnIpMRouteInIfIndex."
+    ::= { fsPimCmnIpMRouteEntry 22 }
+
+fsPimCmnIpMRouteOctets OBJECT-TYPE
+    SYNTAX     Counter32    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            " The number of octets contained in IP datagrams which were
+            received from these sources and addressed to this multicast
+            group address, and which were forwarded by this router."
+    ::= { fsPimCmnIpMRouteEntry 23 }
+
+fsPimCmnIpMRouteProtocol OBJECT-TYPE
+    SYNTAX     IANAipMRouteProtocol   
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The multicast routing protocol via which this multicast
+             forwarding entry was learned."
+    ::= { fsPimCmnIpMRouteEntry 24 }
+
+fsPimCmnIpMRouteRtProto OBJECT-TYPE
+    SYNTAX     IANAipRouteProtocol 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing mechanism via which the route used to find the
+            upstream or parent interface for this multicast forwarding
+            entry was learned.  Inclusion of values for routing
+            protocols is not intended to imply that those protocols need
+            be supported."
+    ::= { fsPimCmnIpMRouteEntry 25}
+
+fsPimCmnIpMRouteRtAddress OBJECT-TYPE
+    SYNTAX     InetAddress 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address portion of the route used to find the upstream
+            or parent interface for this multicast forwarding entry."
+    ::= { fsPimCmnIpMRouteEntry 26 }
+
+fsPimCmnIpMRouteRtMasklen OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The mask associated with the route used to find the upstream
+            or parent interface for this multicast forwarding entry."
+    ::= { fsPimCmnIpMRouteEntry 27 }
+
+fsPimCmnIpMRouteRtType OBJECT-TYPE
+    SYNTAX     INTEGER {
+                unicast (1),  -- Unicast route used in multicast RIB
+                multicast (2) -- Multicast route
+               }   
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION
+            "Route type"
+    ::= { fsPimCmnIpMRouteEntry 28 }
+
+fsPimCmnIpMRouteHCOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of octets contained in IP datagrams which were
+            received from these sources and addressed to this multicast
+            group address, and which were forwarded by this router.
+            This object is a 64-bit version of fsPimCmnIpMRouteOctets."
+    ::= { fsPimCmnIpMRouteEntry 29 }
+
+fsPimCmnIpMRouteOIfList OBJECT-TYPE
+    SYNTAX     PortList
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "This object is the Outgoing Interface List of the mroute"
+    ::= { fsPimCmnIpMRouteEntry 30 }
+
+fsPimCmnIpMRouteRPFVectorAddr       OBJECT-TYPE 
+    SYNTAX     InetAddress
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "It shows the RPF vector Address to reach the actual destination:
+             either RP for creating (*,G) entry,
+             multicast Source for creating (S,G) entry.This Vector is stored
+             from the received Join/Prune Packet."
+    ::= { fsPimCmnIpMRouteEntry 31 }
+
+fsPimCmnIpMRoutePimMode OBJECT-TYPE
+    SYNTAX     INTEGER { 
+                        dm (1),
+                        sm (2),
+                        ssm (3),
+                        bidir (4) 
+                        }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The value shows the PIM mode of the group present
+         in the Mroute entry"
+    ::= { fsPimCmnIpMRouteEntry 32 }
+
+
+--
+-- The PIM Next Hop Table
+--
+
+fsPimCmnIpMRouteNextHopTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnIpMRouteNextHopEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table listing PIM information on the next hops
+	    on outgoing interfaces for forwarding multicast datagrams"
+    ::= { futurePimCmnTables 4 }
+
+fsPimCmnIpMRouteNextHopEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnIpMRouteNextHopEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnIpMRouteNextHopTable.
+	    There is one entry per entry in the ipMRouteNextHopTable
+	    whose interface is running PIM and whose
+	    fsPimCmnIpMRouteNextHopState is pruned(1)."
+    INDEX      { fsPimCmnIpMRouteNextHopCompId, fsPimCmnIpMRouteNextHopAddrType,
+                 fsPimCmnIpMRouteNextHopGroup, fsPimCmnIpMRouteNextHopSource,
+		 fsPimCmnIpMRouteNextHopSourceMasklen, fsPimCmnIpMRouteNextHopIfIndex,
+		 fsPimCmnIpMRouteNextHopAddress }
+    ::= { fsPimCmnIpMRouteNextHopTable 1 }
+
+FsPimCmnIpMRouteNextHopEntry ::= SEQUENCE {
+    fsPimCmnIpMRouteNextHopCompId           Integer32,
+    fsPimCmnIpMRouteNextHopAddrType         InetAddressType,
+    fsPimCmnIpMRouteNextHopGroup		 InetAddress,
+    fsPimCmnIpMRouteNextHopSource		 InetAddress,
+    fsPimCmnIpMRouteNextHopSourceMasklen	 Integer32,
+    fsPimCmnIpMRouteNextHopIfIndex		 Integer32,
+    fsPimCmnIpMRouteNextHopAddress		 InetAddress,
+    fsPimCmnIpMRouteNextHopPruneReason	 INTEGER,
+    fsPimCmnIpMRouteNextHopState	      INTEGER,
+    fsPimCmnIpMRouteNextHopUpTime             TimeTicks,
+    fsPimCmnIpMRouteNextHopExpiryTime         TimeTicks,
+    fsPimCmnIpMRouteNextHopProtocol           IANAipMRouteProtocol,
+    fsPimCmnIpMRouteNextHopPkts               Counter32
+}
+
+fsPimCmnIpMRouteNextHopCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+         " The component Id for this table "
+   ::= { fsPimCmnIpMRouteNextHopEntry 1 }
+ 
+fsPimCmnIpMRouteNextHopAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP family in which the Next hop address  belongs to."
+    ::= { fsPimCmnIpMRouteNextHopEntry  2 }
+    
+fsPimCmnIpMRouteNextHopGroup OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP multicast group for which this entry specifies a
+	    next-hop on an outgoing interface."
+    ::= { fsPimCmnIpMRouteNextHopEntry 3 }
+
+fsPimCmnIpMRouteNextHopSource OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The network address which when combined with the
+	    corresponding value of fsPimCmnIpMRouteNextHopSourceMask identifies
+	    the sources for which this entry specifies a next-hop on an
+	    outgoing interface."
+    ::= { fsPimCmnIpMRouteNextHopEntry 4 }
+
+fsPimCmnIpMRouteNextHopSourceMasklen OBJECT-TYPE
+    SYNTAX     Integer32(0..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The network mask which when combined with the corresponding
+	    value of fsPimCmnIpMRouteNextHopSource identifies the sources for
+	    which this entry specifies a next-hop on an outgoing interface"
+    ::= { fsPimCmnIpMRouteNextHopEntry 5 }
+
+fsPimCmnIpMRouteNextHopIfIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..65535)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The ifIndex value of the interface for the outgoing
+	    interface for this next-hop."
+    ::= { fsPimCmnIpMRouteNextHopEntry 6 }
+
+fsPimCmnIpMRouteNextHopAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The address of the next-hop specific to this entry.  For
+	    most interfaces, this is identical to fsPimCmnIpMRouteNextHopGroup.
+	    NBMA interfaces, however, may have multiple next-hop
+	    addresses out a single outgoing interface."
+    ::= { fsPimCmnIpMRouteNextHopEntry 7 }
+
+fsPimCmnIpMRouteNextHopPruneReason OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  forwarding (0),
+		  other (1),
+		  prune (2),
+		  assert (3)
+	       }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "This object indicates why the downstream interface was
+	    pruned, whether in response to a PIM prune message or due to
+	    PIM Assert processing."
+    ::= { fsPimCmnIpMRouteNextHopEntry 8 }
+
+fsPimCmnIpMRouteNextHopState OBJECT-TYPE
+    SYNTAX     INTEGER { pruned(1), forwarding(2) }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "An indication of whether the outgoing interface and next-
+	    hop represented by this entry is currently being used to
+	    forward IP datagrams.  The value 'forwarding' indicates it
+	    is currently being used; the value 'pruned' indicates it is
+	    not."
+    ::= { fsPimCmnIpMRouteNextHopEntry 9 }
+
+fsPimCmnIpMRouteNextHopUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+             "The time since the multicast routing information
+              represented by this entry was learned by the router"
+    ::= { fsPimCmnIpMRouteNextHopEntry 10 }
+
+fsPimCmnIpMRouteNextHopExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+             "The minimum amount of time remaining before this entry will
+            be aged out.  If ipMRouteNextHopState is pruned(1), the
+            remaining time until the prune expires and the state reverts
+            to forwarding(2).  Otherwise, the remaining time until this
+            entry is removed from the table.  The time remaining may be
+            copied from ipMRouteExpiryTime if the protocol in use for
+            this entry does not specify next-hop timers.  The value 0
+            indicates that the entry is not subject to aging."
+    ::= { fsPimCmnIpMRouteNextHopEntry 11 }
+
+fsPimCmnIpMRouteNextHopProtocol OBJECT-TYPE
+    SYNTAX     IANAipMRouteProtocol 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+             "The routing mechanism via which this next-hop was learned."
+    ::= { fsPimCmnIpMRouteNextHopEntry 12 }
+
+fsPimCmnIpMRouteNextHopPkts OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+             "The number of packets which have been forwarded using this
+              route."
+    ::= { fsPimCmnIpMRouteNextHopEntry 13 }
+
+    
+--
+-- The PIM Candidate-RP Table
+--
+
+fsPimCmnCandidateRPTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnCandidateRPEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table listing the IP multicast groups for
+	    which the local router is to advertise itself as a
+	    Candidate-RP when the value of fsPimCmnComponentCRPHoldTime is
+	    non-zero.  If this table is empty, then the local router
+	    will advertise itself as a Candidate-RP for all groups
+	    (providing the value of fsPimCmnComponentCRPHoldTime is non-
+	    zero)."
+    ::= { futurePimCmnTables 6 }
+
+fsPimCmnCandidateRPEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnCandidateRPEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnCandidateRPTable."
+    INDEX      { fsPimCmnCandidateRPCompId,
+                 fsPimCmnCandidateRPAddrType,
+                 fsPimCmnCandidateRPGroupAddress,
+		         fsPimCmnCandidateRPGroupMasklen,
+                 fsPimCmnCandidateRPAddress
+                 }
+    ::= { fsPimCmnCandidateRPTable 1 }
+
+FsPimCmnCandidateRPEntry ::= SEQUENCE {
+    fsPimCmnCandidateRPCompId        Integer32,
+    fsPimCmnCandidateRPAddrType    InetAddressType,
+    fsPimCmnCandidateRPGroupAddress  InetAddress,
+    fsPimCmnCandidateRPGroupMasklen  Integer32,
+    fsPimCmnCandidateRPAddress	  InetAddress,
+    fsPimCmnCandidateRPPriority      Integer32, 
+    fsPimCmnCandidateRPRowStatus	  RowStatus,
+    fsPimCmnCandidateRPPimMode        INTEGER
+}
+
+fsPimCmnCandidateRPCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Component Id for this table "
+    ::= { fsPimCmnCandidateRPEntry 1 }   
+ 
+fsPimCmnCandidateRPAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP Address type  in which the multicast group address, 
+            and RP address belong to."
+    ::= { fsPimCmnCandidateRPEntry 2 }
+
+fsPimCmnCandidateRPGroupAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP multicast group address which, when combined with
+	    fsPimCmnCandidateRPGroupMask, identifies a group prefix for which
+	    the local router will advertise itself as a Candidate-RP."
+    ::= { fsPimCmnCandidateRPEntry 3 }
+
+fsPimCmnCandidateRPGroupMasklen OBJECT-TYPE
+    SYNTAX     Integer32(0..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The multicast group address mask which, when combined with
+	    fsPimCmnCandidateRPGroupMask, identifies a group prefix for which
+	    the local router will advertise itself as a Candidate-RP."
+    ::= { fsPimCmnCandidateRPEntry 4 }
+
+fsPimCmnCandidateRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible 
+    STATUS     current
+    DESCRIPTION
+	    "The (unicast) address of the interface which will be
+	    advertised as a Candidate-RP."
+    ::= { fsPimCmnCandidateRPEntry 5 }
+
+
+fsPimCmnCandidateRPPriority OBJECT-TYPE
+    SYNTAX     Integer32  (0..255)
+    MAX-ACCESS read-write 
+    STATUS     current
+    DESCRIPTION
+	    "The priority of the interface which will be
+	    advertised as a Candidate-RP."
+    ::= { fsPimCmnCandidateRPEntry 6 }
+
+fsPimCmnCandidateRPRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+	    "The status of this row, by which new entries may be
+	    created, or old entries deleted from this table."
+    ::= { fsPimCmnCandidateRPEntry 7 }
+
+fsPimCmnCandidateRPPimMode OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        sm (2),
+                        bidir (4)
+                       }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+	    "The value shows the PIM mode of the group for
+         which candidate RP is configured."
+    ::= { fsPimCmnCandidateRPEntry 8 }
+
+
+--
+-- The PIM Static RP-Set Table
+--
+
+fsPimCmnStaticRPSetTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnStaticRPSetEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the IP multicast groups for
+            which the routers are available as the RP through static 
+configuration."
+
+    ::= { futurePimCmnTables 7 }
+
+fsPimCmnStaticRPSetEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnStaticRPSetEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the pimStaticRPSetTable."
+    INDEX      { fsPimCmnStaticRPSetCompId, fsPimCmnStaticRPAddrType, 
+                 fsPimCmnStaticRPSetGroupAddress,
+                 fsPimCmnStaticRPSetGroupMasklen}
+    ::= { fsPimCmnStaticRPSetTable 1 }
+
+FsPimCmnStaticRPSetEntry ::= SEQUENCE {
+    fsPimCmnStaticRPSetCompId         Integer32, 
+    fsPimCmnStaticRPAddrType          InetAddressType,
+    fsPimCmnStaticRPSetGroupAddress   InetAddress,
+    fsPimCmnStaticRPSetGroupMasklen   Integer32,
+    fsPimCmnStaticRPAddress           InetAddress,
+    fsPimCmnStaticRPRowStatus         RowStatus,
+    fsPimCmnStaticRPEmbdFlag          INTEGER,
+    fsPimCmnStaticRPPimMode           INTEGER
+}    
+
+fsPimCmnStaticRPSetCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Component Id for this table "
+    ::= { fsPimCmnStaticRPSetEntry 1 }   
+ 
+fsPimCmnStaticRPAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP address type in which the RP address belongs to."
+    ::= { fsPimCmnStaticRPSetEntry 2 }
+
+fsPimCmnStaticRPSetGroupAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group address which, when combined with
+            pimStaticRPSetGroupMask, gives the group prefix for which this
+            entry contains information about the RP."
+    ::= { fsPimCmnStaticRPSetEntry 3 }
+
+fsPimCmnStaticRPSetGroupMasklen OBJECT-TYPE
+    SYNTAX     Integer32 (0..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group address mask which, when combined with
+            pimStaticRPSetGroupAddress, gives the group prefix for which this
+            entry contains information about the RP."
+    ::= { fsPimCmnStaticRPSetEntry 4 }
+
+fsPimCmnStaticRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The  address of the interface which will be
+            static configured as the RP."
+    ::= { fsPimCmnStaticRPSetEntry 5 }
+
+fsPimCmnStaticRPRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The status of this row, by which new entries may be
+            created, or old entries deleted from this table."
+    ::= { fsPimCmnStaticRPSetEntry 6 }
+
+fsPimCmnStaticRPEmbdFlag OBJECT-TYPE
+    SYNTAX            INTEGER { disable (0), enable (1) }
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            "The value of the flag indicates if entry is configured 
+             for static RP or embedded-RP. 
+             disabled -  entry configured for Static RP
+             enabled  -  entry configured for Embedded RP."
+
+    DEFVAL   { 0 }
+    ::= { fsPimCmnStaticRPSetEntry 7 }
+
+fsPimCmnStaticRPPimMode OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        sm (2),
+                        bidir (4)
+                        }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+	    "The value shows the PIM mode of the group for
+         which static RP is configured."
+    ::= { fsPimCmnStaticRPSetEntry 8 }
+
+
+--
+-- fsPimCmnComponentModeTable
+--
+
+
+fsPimCmnComponentModeTable OBJECT-TYPE
+
+    SYNTAX     SEQUENCE OF FsPimCmnComponentModeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table listing the components modes)."
+    ::= { futurePimCmnTables 8 }
+
+fsPimCmnComponentModeEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnComponentModeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnComponentModeTable."
+    INDEX      { fsPimCmnComponentId }
+    ::= { fsPimCmnComponentModeTable 1 }
+
+FsPimCmnComponentModeEntry ::= SEQUENCE {
+    fsPimCmnComponentId          Integer32,    
+    fsPimCmnComponentMode	      INTEGER,
+    fsPimCmnCompGraftRetryCount  Integer32
+}
+
+fsPimCmnComponentId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Component Id for this table "
+    ::= { fsPimCmnComponentModeEntry 1 }    
+
+fsPimCmnComponentMode OBJECT-TYPE
+    SYNTAX     INTEGER {
+                 dense (1),
+		         sparse (2)
+	           }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+	    "This object indicates the mode of the component. A value of 
+         1 indicates the component is running in DM mode and value of 
+         2 indicated that the component is running in DM mode"
+
+    DEFVAL   { 2 }
+    ::= { fsPimCmnComponentModeEntry 2 }
+
+fsPimCmnCompGraftRetryCount         OBJECT-TYPE
+    SYNTAX            Integer32 (0..255)
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+            " The value indicates the number of retries that can be made to
+              send the graft message"
+
+    DEFVAL   { 1 }
+    ::= { fsPimCmnComponentModeEntry 3 }
+
+-- Register Checksum Config Table
+
+fsPimCmnRegChkSumCfgTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnRegChkSumCfgEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing RPs configured in CISCO Router"
+    ::= { futurePimCmnTables 9 }
+
+
+fsPimCmnRegChkSumCfgEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnRegChkSumCfgEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the fsPimCmnRegChkSumCfgTable."
+    INDEX      {fsPimCmnRegChkSumTblCompId, fsPimCmnRegChkSumTblRPAddrType, fsPimCmnRegChkSumTblRPAddress}
+    ::= { fsPimCmnRegChkSumCfgTable 1 }
+
+FsPimCmnRegChkSumCfgEntry ::= SEQUENCE {
+    fsPimCmnRegChkSumTblCompId     Integer32,
+    fsPimCmnRegChkSumTblRPAddrType  InetAddressType,
+    fsPimCmnRegChkSumTblRPAddress  InetAddress,
+    fsPimCmnRPChkSumStatus         INTEGER
+}
+
+fsPimCmnRegChkSumTblCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Component Id for this table, This configuration is valid
+        only for a sparse mode component."
+    ::= { fsPimCmnRegChkSumCfgEntry 1 }
+
+fsPimCmnRegChkSumTblRPAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP address type  of this entry"
+    ::= { fsPimCmnRegChkSumCfgEntry 2 }
+
+fsPimCmnRegChkSumTblRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The RP Address of the router to which the Register 
+             checksum should be calculated."
+    ::= { fsPimCmnRegChkSumCfgEntry 3 }
+
+fsPimCmnRPChkSumStatus OBJECT-TYPE
+    SYNTAX     INTEGER { enabled(1), disabled(2) }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The status of this Row, by which new entries may be created
+            If the RowStatus is set, then the Register Message checksum
+            should be calculated including the data packet other wise for
+            for any RP address not part of this table checksum
+            should be sent as per the draft-ietf-pim-sm-new-v2"
+    ::= { fsPimCmnRegChkSumCfgEntry 4 }
+
+--
+-- The BIDIR-PIM DF Table
+--
+
+fsPimCmnDFTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnDFEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table shows the Elected RP 
+        for the IP multicast group"
+    ::= { futurePimCmnTables 10 }
+
+fsPimCmnDFEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnDFEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnDFTable."
+    INDEX      { fsPimCmnDFIfAddrType,
+                 fsPimCmnDFElectedRP,
+                 fsPimCmnDFIfIndex
+                 }
+    ::= { fsPimCmnDFTable 1 }
+
+FsPimCmnDFEntry ::= SEQUENCE {
+    fsPimCmnDFIfAddrType             InetAddressType,
+    fsPimCmnDFElectedRP              InetAddress,
+    fsPimCmnDFIfIndex                Integer32,
+    fsPimCmnDFState                  INTEGER,
+    fsPimCmnDFWinnerAddr             InetAddress,
+    fsPimCmnDFWinnerUptime           TimeTicks,
+    fsPimCmnDFElectionStateTimer     TimeTicks,
+    fsPimCmnDFWinnerMetric           Unsigned32,
+    fsPimCmnDFWinnerMetricPref       Unsigned32,
+    fsPimCmnDFMessageCount           Integer32
+}
+fsPimCmnDFIfAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP family for which DF state to be retrieved."
+    ::= { fsPimCmnDFEntry  1 }
+
+
+fsPimCmnDFElectedRP OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible 
+    STATUS     current
+    DESCRIPTION
+	    "The (unicast) address of the Elected RP for which the DF state of the 
+         interface to be retrieved."
+    ::= { fsPimCmnDFEntry 2 }
+
+fsPimCmnDFIfIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..65535)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The ifIndex value of the interface for which the 
+         DF state to be retrieved."
+    ::= { fsPimCmnDFEntry 3 }
+
+
+fsPimCmnDFState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        offer (1),
+                        winner (2),
+                        backoff (3),
+                        lose (4)
+                       }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The DF state on the PIM interface for the Elected RP."
+    ::= { fsPimCmnDFEntry 4 }
+
+fsPimCmnDFWinnerAddr OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION
+	    "The (Link-Local) address of the DFWinner(the PIM neighbor)
+         for the Elected RP in the PIM interface"
+    ::= { fsPimCmnDFEntry 5 }
+
+fsPimCmnDFWinnerUptime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The time since this DF Winner got elected."
+    ::= { fsPimCmnDFEntry 6 }
+
+fsPimCmnDFElectionStateTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The timer for DF election state, on the expiry of this timer 
+        the existing DF state gets expired and changes to the appropriate state.
+        If the timer is not running, then the existing state is permanent, till
+        the occurence of next event."
+    ::= { fsPimCmnDFEntry 7 }
+
+fsPimCmnDFWinnerMetric OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The winner metric advertised by the DF winner or zero if there is no
+        DF exist"
+    ::= { fsPimCmnDFEntry 8 }
+
+fsPimCmnDFWinnerMetricPref OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The winner metric preference advertised by the DF winner 
+        or zero if there is no DF exist"
+    ::= { fsPimCmnDFEntry 9 }
+
+fsPimCmnDFMessageCount OBJECT-TYPE
+    SYNTAX     Integer32 (0..65535)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+    "The DF election Message Count(MC) for the DF state of RPA (I)"
+    ::= { fsPimCmnDFEntry 10 }
+
+
+--
+-- The PIM Elected-RP Table
+--
+
+fsPimCmnElectedRPTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnElectedRPEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The (conceptual) table shows the Elected RP 
+        for the IP multicast group"
+    ::= { futurePimCmnTables 11 }
+
+fsPimCmnElectedRPEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnElectedRPEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnElectedRPTable."
+    INDEX      { fsPimCmnElectedRPCompId,
+                 fsPimCmnElectedRPAddrType,
+                 fsPimCmnElectedRPGroupAddress,
+                 fsPimCmnElectedRPGroupMasklen
+                 }
+    ::= { fsPimCmnElectedRPTable 1 }
+
+FsPimCmnElectedRPEntry ::= SEQUENCE {
+    fsPimCmnElectedRPCompId        Integer32,
+    fsPimCmnElectedRPAddrType      InetAddressType,
+    fsPimCmnElectedRPGroupAddress  InetAddress,
+    fsPimCmnElectedRPGroupMasklen  Integer32,
+    fsPimCmnElectedRPAddress	   InetAddress,
+    fsPimCmnElectedRPPriority      Integer32, 
+    fsPimCmnElectedRPHoldTime      Integer32 
+}
+
+fsPimCmnElectedRPCompId OBJECT-TYPE
+    SYNTAX     Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Component Id for this table "
+    ::= { fsPimCmnElectedRPEntry 1 }   
+ 
+fsPimCmnElectedRPAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP Address type  in which the multicast group address, 
+            and RP address belong to."
+    ::= { fsPimCmnElectedRPEntry 2 }
+
+fsPimCmnElectedRPGroupAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP multicast group address for which
+	    the Elected RP to be identified."
+    ::= { fsPimCmnElectedRPEntry 3 }
+
+
+fsPimCmnElectedRPGroupMasklen OBJECT-TYPE
+    SYNTAX     Integer32(0..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The multicast group address mask which, when combined with
+	    fsPimCmnElectedRPGroupMask, identifies a group prefix for which
+	    Elected-RP to be identified."
+    ::= { fsPimCmnElectedRPEntry 4 }
+
+
+fsPimCmnElectedRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION
+	    "The (unicast) address of the interface which is
+	    Elected as RP for the IP multicast Group address."
+    ::= { fsPimCmnElectedRPEntry 5 }
+
+fsPimCmnElectedRPPriority OBJECT-TYPE
+    SYNTAX     Integer32  (0..255)
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION
+	    "The priority of the interface which is
+	    Elected as an RP for the IP multicast group address."
+    ::= { fsPimCmnElectedRPEntry 6 }
+
+fsPimCmnElectedRPHoldTime OBJECT-TYPE
+    SYNTAX            Integer32 (1..65535)
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+        "The HoldTime of the Elected RP for the IP multicast group address."
+    ::= { fsPimCmnElectedRPEntry 7 }
+
+
+--
+-- The PIM Extended Neighbor Table
+--
+
+fsPimCmnNeighborExtTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsPimCmnNeighborExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The extended (conceptual) table listing the router's PIM Neighbors. 
+        This table differs from fsPimCmnNeighborTable as it has 
+        fsPimCmnNeighborExtIfIndex as an index instead of the Component ID. This
+         is because in IPv6, two neighbors on different interfaces can have the 
+        same link-local address. A Component ID List is added as an interface 
+        can be associated with multiple components."
+    ::= { futurePimCmnTables 12 }
+
+fsPimCmnNeighborExtEntry OBJECT-TYPE
+    SYNTAX     FsPimCmnNeighborExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "An entry (conceptual row) in the fsPimCmnNeighborExtTable."
+    INDEX      { fsPimCmnNeighborExtIfIndex, fsPimCmnNeighborExtAddrType, 
+                 fsPimCmnNeighborExtAddress } 
+    ::= { fsPimCmnNeighborExtTable 1 }
+
+FsPimCmnNeighborExtEntry ::= SEQUENCE {
+
+    fsPimCmnNeighborExtIfIndex               Integer32,
+    fsPimCmnNeighborExtAddrType              InetAddressType,
+    fsPimCmnNeighborExtAddress               InetAddress,
+    fsPimCmnNeighborExtCompIdList            CompList,
+    fsPimCmnNeighborExtUpTime                TimeTicks,
+    fsPimCmnNeighborExtExpiryTime            TimeTicks,
+    fsPimCmnNeighborExtGenerationId          Integer32,
+    fsPimCmnNeighborExtLanDelay              Integer32,
+    fsPimCmnNeighborExtDRPriority            Unsigned32,
+    fsPimCmnNeighborExtOverrideInterval      Integer32,
+    fsPimCmnNeighborExtSRCapable             TruthValue,
+    fsPimCmnNeighborExtRPFCapable            TruthValue,
+    fsPimCmnNeighborExtBidirCapable          TruthValue
+}
+
+fsPimCmnNeighborExtIfIndex OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The value of ifIndex for the interface used to reach this
+	    PIM Neighbor."
+    ::= { fsPimCmnNeighborExtEntry 1 }
+
+fsPimCmnNeighborExtAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The address Type of the PIM Neighbor for which this entry
+	    contains information."
+    ::= { fsPimCmnNeighborExtEntry 2 }
+
+fsPimCmnNeighborExtAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+	    "The IP address of the PIM Neighbor for which this entry
+	    contains information."
+    ::= { fsPimCmnNeighborExtEntry 3 }
+
+fsPimCmnNeighborExtCompIdList OBJECT-TYPE
+    SYNTAX     CompList
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+          " The components associated with the interface on which the PIM
+            neighbor for this entry is found."
+    ::= { fsPimCmnNeighborExtEntry 4 }
+
+fsPimCmnNeighborExtUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The time since this PIM Neighbor (last) became a Neighbor
+	    of the local router."
+    ::= { fsPimCmnNeighborExtEntry 5 }
+
+fsPimCmnNeighborExtExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+	    "The minimum time remaining before this PIM Neighbor will be
+	    aged out."
+    ::= { fsPimCmnNeighborExtEntry 6 }
+    
+fsPimCmnNeighborExtGenerationId OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The Generation identifier of the router. This is used by
+             neighbour routers to quickly detect router reboot and synchronize
+             RP-Set information and forwarding states by triggering Bootstrap
+             and Join/Prune messages to the rebooted router"
+    ::= { fsPimCmnNeighborExtEntry 7 }
+
+
+fsPimCmnNeighborExtLanDelay           OBJECT-TYPE
+    SYNTAX            Integer32
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+            "The LanDelay configured for this PIM Neighbor"
+    ::= { fsPimCmnNeighborExtEntry 8 }
+
+fsPimCmnNeighborExtDRPriority             OBJECT-TYPE
+    SYNTAX            Unsigned32
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+            "The DR priority value configured for this PIM Neighbor"
+    ::= { fsPimCmnNeighborExtEntry 9 }
+
+fsPimCmnNeighborExtOverrideInterval           OBJECT-TYPE
+    SYNTAX            Integer32
+    MAX-ACCESS        read-only
+    STATUS            current
+    DESCRIPTION
+            "The Override Interval configured for this PIM Neighbor"
+    ::= { fsPimCmnNeighborExtEntry 10 }
+    
+fsPimCmnNeighborExtSRCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this Neighbor is using the State
+            Refresh Capable option.  This object is used only by
+            PIM-DM."
+    REFERENCE "RFC 3973 section 4.3.4"
+    ::= { fsPimCmnNeighborExtEntry 11 }
+
+fsPimCmnNeighborExtRPFCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this Neighbor is RPF Vector Capable."
+    ::= { fsPimCmnNeighborExtEntry 12 }    
+
+fsPimCmnNeighborExtBidirCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this Neighbor is Bidir-PIM Capable."
+    ::= { fsPimCmnNeighborExtEntry 13 }    
+
+--  ----------------
+--   TRAP MIB BEGIN
+--  ----------------
+
+fsPimcmnHARtrId OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  accessible-for-notify	
+   STATUS      current
+   DESCRIPTION
+        " The  MIB object fsPimcmnHARtrId,is the configured Router-Id for the 
+          router.This ID is obtained from IP module"
+   ::= { futurePimCmnTrapsControl 1 } 
+   
+   
+fsPimCmnHAEvent OBJECT-TYPE
+   SYNTAX 	INTEGER {
+                      standbyInstanceUP(1),
+                      standbyInstanceDown(2),
+                      instancesSwitchover(3),
+                      dynamicBulkupdateStart(4),
+                      dynamicBulkupdateComplete(5),
+                      dynamicBulkupdateAborted(6)
+                      }
+   MAX-ACCESS accessible-for-notify
+   STATUS	current
+   DESCRIPTION
+      "
+       Trap Events:
+
+       StandbyInstanceUP: generated when the Active PIM instance detects
+       Standby instance becoming Up.
+
+       StandbyInstanceDown: generated when the Active PIM instance detects
+       Standby instance going Down.
+
+       InstancesSwitchover: generated When both the Acive and Standby PIM
+       instances change their roles and transits to Standby and Active state
+       respectively.
+
+       DynamicBulkupdateStart: generated when the Active PIM instance starts 
+       sending dynamic Bulk updates to the Standby instance.
+
+       DynamicBulkupdateComplete: genreated when the Active PIM instance 
+       receives an event from Standby PIM instance indicating Completion of 
+       Bulk Update.
+
+       DynamicBulkupdateAborted: generated when Bulk Update is aborted."
+   ::= { futurePimCmnTrapsControl 3 }
+
+
+fsPimCmnTraps	OBJECT IDENTIFIER ::= { futurePimCmnTraps 0 }
+
+fsPimCmnHAEventTrap NOTIFICATION-TYPE
+  OBJECTS {
+           fsPimcmnHARtrId,
+           fsPimCmnHAEvent
+           }
+  STATUS  current
+  DESCRIPTION
+      "A notification is sent to the management entity whenever there is a 
+       state change in the PIM hotstandby Module."
+::= { fsPimCmnTraps 1 }
+
+fsPimCmnBidirEventTrap NOTIFICATION-TYPE
+  OBJECTS {
+           fsPimcmnHARtrId,
+           fsPimCmnNeighborAddress,
+           fsPimCmnNeighborIfIndex
+           }
+  STATUS  current
+  DESCRIPTION
+      "A notification is sent to the management entity whenever a Bidirectional 
+       mode enabled router receives a Hello Msg from a Bidirectional disabled
+       router, in a rate limited manner."
+::= { fsPimCmnTraps 2 }
+-- -----------------
+-- TRAP MIB END
+-- -----------------
+END

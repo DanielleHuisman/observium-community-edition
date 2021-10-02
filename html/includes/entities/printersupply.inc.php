@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,6 +24,11 @@ function build_printersupplies_query($vars)
       case "group_id":
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'printersupplies.supply_id');
+        break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'printersupplies.device_id');
         break;
       case "device":
       case "device_id":
@@ -298,14 +302,12 @@ function print_printersupplies_form($vars, $single_device = FALSE)
                       'url'   => generate_url($vars));
 
   // Clean grids
-  foreach (array_keys($form['row'][0]) as $param)
-  {
-    unset($form['row'][0][$param]['grid']);
+  foreach ($form['row'] as $row => $rows) {
+    foreach (array_keys($rows) as $param) {
+      if (isset($form['row'][$row][$param]['grid'])) { unset($form['row'][$row][$param]['grid']); }
+    }
   }
-  foreach (array_keys($form['row'][1]) as $param)
-  {
-    unset($form['row'][1][$param]['grid']);
-  }
+
   // Copy forms
   $panel_form['row'][0]['device_id']      = $form['row'][0]['device_id'];
   $panel_form['row'][0]['group']          = $form['row'][0]['group'];

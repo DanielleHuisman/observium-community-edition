@@ -1,32 +1,28 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Global write permissions required.
-if ($_SESSION['userlevel'] < 10)
-{
+if ($_SESSION['userlevel'] < 10) {
   print_error_permission();
   return;
 }
 
 register_html_title("Delete devices");
 
-if (is_numeric($vars['id']))
-{
+if (is_intnum($vars['id'])) {
   $device = device_by_id_cache($vars['id']);
-  $confirm = array('confirm', 'yes', 'on', '1');
-  if ($device && in_array($vars['confirm'], $confirm))
-  {
-    $delete_rrd = in_array($vars['deleterrd'], $confirm);
+
+  if ($device && get_var_true($vars['confirm'], 'confirm')) {
+    $delete_rrd = get_var_true($vars['deleterrd'], 'confirm');
     print_message(delete_device($vars['id'], $delete_rrd), 'console');
     //echo('<div class="btn-group ">
     //        <button type="button" class="btn btn-default"><a href="/"><i class="oicon-globe-model"></i> Overview</a></button>

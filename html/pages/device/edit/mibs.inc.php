@@ -48,24 +48,25 @@ if ($vars['submit'])
 // Count critical errors into DB (only for poller)
 $mib_grid = 12;
 $snmp_errors = [];
-if ($config['snmp']['errors'])
-{
+if ($config['snmp']['errors']) {
   //$poll_period = 300;
   $error_codes = $GLOBALS['config']['snmp']['errorcodes'];
   $poll_period = $GLOBALS['config']['rrd']['step'];
 
   $sql         = 'SELECT * FROM `snmp_errors` WHERE `device_id` = ?;';
-  foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry)
-  {
+  foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry) {
     $timediff   = $entry['updated'] - $entry['added'];
     $poll_count = round($timediff / $poll_period) + 1;
 
     $entry['error_rate']          = $entry['error_count'] / $poll_count; // calculate error rate
+    if ($oid = str_decompress($entry['oid'])) {
+      // 512 long oid strings is compressed
+      $entry['oid'] = $oid;
+    }
     $snmp_errors[$entry['mib']][] = $entry;
   }
   ksort($snmp_errors);
-  if (count($snmp_errors))
-  {
+  if (count($snmp_errors)) {
     $mib_grid = 5;
   }
 }

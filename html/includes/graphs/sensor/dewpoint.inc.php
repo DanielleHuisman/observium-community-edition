@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -34,7 +33,7 @@ if (is_numeric($sensor['sensor_limit'])) $rrd_options .= " HRULE:".$sensor['sens
 if (is_numeric($sensor['sensor_limit_low'])) $rrd_options .= " HRULE:".$sensor['sensor_limit_low']."#999999::dashes";
 
 #wtfbroken code.
-if ($vars['previous'] == 'yes')
+if (get_var_true($vars['previous']))
 {
   $rrd_options .= " DEF:sensorX=$rrd_filename_escape:sensor:AVERAGE:start=".$prev_from.":end=".$from;
   $rrd_options .= " LINE1.5:sensorX#0000cc:'Prev " . rrdtool_escape($sensor['sensor_descr'],18)."'";

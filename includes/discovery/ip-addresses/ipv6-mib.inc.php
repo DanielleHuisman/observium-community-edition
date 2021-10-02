@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,13 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $ip_version = 'ipv6';
+if ($check_ipv6_mib || !safe_count($ip_data[$ip_version])) { // Note, $check_ipv6_mib set in IP-MIB discovery
 
-if ($check_ipv6_mib || !count($ip_data[$ip_version])) // Note, $check_ipv6_mib set in IP-MIB discovery
-{
   // Get IP addresses from IPV6-MIB
   //ipv6AddrPfxLength.20.254.192.0.0.0.0.0.0.0.10.0.0.0.0.0.4 = 64
   //ipv6AddrPfxLength.573.42.1.183.64.0.1.130.32.0.0.0.0.0.0.0.2 = 126

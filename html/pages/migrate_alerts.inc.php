@@ -166,9 +166,9 @@ foreach($checkers as $alert)
         print_error("Migration results don't match for group ".$alert['alert_name'].". Please report this to the Observium developers. (<b>DB</b>: ". $c_exist ." | <b>Old</b>: ".$c_legacy." | <b>New</b>: ".$c_new.")");
 
         echo '<pre>';
-         print_r($alert['assocs']);
+         //print_r($alert['assocs']);
          echo '</pre>';
-         echo '<pre>' . _json_encode($ruleset, JSON_PRETTY_PRINT) . '</pre>';
+         echo '<pre>' . safe_json_encode($ruleset, JSON_PRETTY_PRINT) . '</pre>';
 
          r($query);
 
@@ -196,3 +196,5 @@ foreach($checkers as $alert)
    }
    echo generate_box_close();
 }
+
+// EOF

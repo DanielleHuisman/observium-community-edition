@@ -21,10 +21,10 @@
 // LSI-MegaRAID-SAS-MIB::temperature.0 = STRING: "35 (Normal)"
 
 //echo('physicalDriveTable ');
-//$cache['megaraid']['pd'] = snmpwalk_cache_multi_oid($device, 'physicalDriveTable', array(), 'LSI-MegaRAID-SAS-MIB');
+//$cache['megaraid']['pd'] = snmpwalk_cache_oid($device, 'physicalDriveTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 echo('enclosureTable ');
-$cache['megaraid']['encl'] = snmpwalk_cache_multi_oid($device, 'enclosureTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['encl'] = snmpwalk_cache_oid($device, 'enclosureTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 /*
 FIXME
@@ -98,7 +98,7 @@ foreach ($cache['megaraid']['pd'] as $index => $pd)
 // LSI-MegaRAID-SAS-MIB::powerSupplyStatus.1 = INTEGER: status-ok(2)
 
 echo(' enclosurePowerSupplyTable ');
-$cache['megaraid']['psu'] = snmpwalk_cache_multi_oid($device, 'enclosurePowerSupplyTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['psu'] = snmpwalk_cache_oid($device, 'enclosurePowerSupplyTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 foreach ($cache['megaraid']['psu'] as $index => $psu)
 {
@@ -133,7 +133,7 @@ foreach ($cache['megaraid']['psu'] as $index => $psu)
 // LSI-MegaRAID-SAS-MIB::enclosureTemperature.2 = INTEGER: 211
 
 echo(' enclosureTempSensorTable ');
-$cache['megaraid']['temp'] = snmpwalk_cache_multi_oid($device, 'enclosureTempSensorTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['temp'] = snmpwalk_cache_oid($device, 'enclosureTempSensorTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 foreach ($cache['megaraid']['temp'] as $index => $temp)
 {
@@ -165,7 +165,7 @@ foreach ($cache['megaraid']['temp'] as $index => $temp)
 // LSI-MegaRAID-SAS-MIB::fanStatus.0 = INTEGER: status-ok(2)
 
 echo(' enclosureFanTable ');
-$cache['megaraid']['fan'] = snmpwalk_cache_multi_oid($device, 'enclosureFanTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['fan'] = snmpwalk_cache_oid($device, 'enclosureFanTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 foreach ($cache['megaraid']['fan'] as $index => $fan)
 {

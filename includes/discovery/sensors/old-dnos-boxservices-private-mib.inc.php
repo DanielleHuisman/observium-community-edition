@@ -40,7 +40,7 @@ $boxServicesStackTempSensorsTable = FALSE;
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesStackTempSensorTemperature.1.0 = INTEGER: 28
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesStackTempSensorTemperature.2.0 = INTEGER: 27
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesStackTempSensorsTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesStackTempSensorsTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
@@ -77,7 +77,7 @@ foreach ($oids as $index => $entry)
 if (!$boxServicesStackTempSensorsTable)
 {
   // This table has been obsoleted by boxServicesStackTempSensorsTable - run it only if we didn't find that table.
-  $oids = snmpwalk_cache_multi_oid($device, 'boxServicesTempSensorsTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
+  $oids = snmpwalk_cache_oid($device, 'boxServicesTempSensorsTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
 
   // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorIndex.0 = INTEGER: 0
   // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorType.0 = INTEGER: fixed(1)
@@ -126,7 +126,7 @@ if (!$boxServicesStackTempSensorsTable)
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.3 = INTEGER: 0
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.4 = INTEGER: 0
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesFansTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesFansTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
@@ -134,7 +134,7 @@ foreach ($oids as $index => $entry)
   $oid   = ".1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.6.1.3.$index";
   $value = $entry['boxServicesFanItemState'];
 
-  if ($entry['boxServicesFanItemState'] != 'notpresent')
+  if ($entry['boxServicesFanItemState'] !== 'notpresent')
   {
      discover_status($device, $oid, "boxServicesFanItemState.$index", 'fastpath-boxservices-private-state', $descr, $value, array('entPhysicalClass' => 'fan'));
 
@@ -154,7 +154,7 @@ foreach ($oids as $index => $entry)
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.0 = INTEGER: operational(2)
 // OLD-DNOS-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.1 = INTEGER: operational(2)
 
-$oids = snmpwalk_cache_multi_oid($device, 'boxServicesPowSuppliesTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
+$oids = snmpwalk_cache_oid($device, 'boxServicesPowSuppliesTable', array(), 'OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
@@ -162,10 +162,13 @@ foreach ($oids as $index => $entry)
   $oid   = ".1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.7.1.3.$index";
   $value = $entry['boxServicesPowSupplyItemState'];
 
-  if ($entry['boxServicesPowSupplyItemState'] != 'notpresent')
+  if ($entry['boxServicesPowSupplyItemState'] === 'notpresent' ||
+      ($entry['boxServicesPowSupplyItemType'] == 0 && $entry['boxServicesPowSupplyItemState'] === 'failed')) // This sensor not really exist
   {
-    discover_status($device, $oid, "boxServicesPowSupplyItemState.$index", 'fastpath-boxservices-private-state', $descr, $value, array('entPhysicalClass' => 'power'));
+    continue;
   }
+
+  discover_status($device, $oid, "boxServicesPowSupplyItemState.$index", 'fastpath-boxservices-private-state', $descr, $value, array('entPhysicalClass' => 'power'));
 }
 
 // EOF

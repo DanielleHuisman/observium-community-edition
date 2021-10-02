@@ -12,7 +12,7 @@
  */
 
 //FIXME. Need sysDescr examples
-if (str_exists($poll_device['sysDescr'], array( 'DSR', 'AV3')))
+if (str_contains_array($poll_device['sysDescr'], array( 'DSR', 'AV3')))
 {
   list($hardware, $version) = explode(' ', $poll_device['sysDescr']);
   $hardware = trim($hardware);

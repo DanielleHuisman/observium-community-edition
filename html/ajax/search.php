@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,10 +23,12 @@ include($config['html_dir'] . "/includes/cache-data.inc.php");
 
 $query_limit = 8; // Limit per query
 
+$vars = get_vars([ 'POST', 'GET' ]);
+
 // Is there a POST/GET query string?
-if (isset($_REQUEST['queryString']))
+if (isset($vars['queryString']))
 {
-  $queryString = trim($_REQUEST['queryString']);
+  $queryString = trim($vars['queryString']);
 
   // Is the string length greater than 0?
   if (strlen($queryString) > 0)
@@ -57,26 +59,31 @@ if (isset($_REQUEST['queryString']))
 
     foreach ($search_results as $results)
     {
-      $display_count = count($results['results']);
+      $display_count = safe_count($results['results']);
 
       // If there are more results than query_limit (can happen, as we ++'d above), cut array to desired size and add + to counter
-      if (count($results['results']) > $query_limit)
+      if ($display_count > $query_limit)
       {
         $results['results'] = array_slice($results['results'], 0, $query_limit);
-        $display_count = count($results['results']) . '+';
+        $display_count .= '+';
       }
 
       echo('<li class="nav-header">' . $results['descr'] . ': '. $display_count . '</li>' . PHP_EOL);
 
       foreach ($results['results'] as $result)
       {
+        $data = [];
+        foreach ($result['data'] as $str) {
+          $str = str_replace('| |', '|', $str);
+          $data[] = rtrim($str, ' |');
+        }
         echo('<li class="divider" style="margin: 0px;"></li>' . PHP_EOL);
         echo('<li style="margin: 0px;">' . PHP_EOL . '  <a href="'.$result['url'].'">' . PHP_EOL);
         echo('    <dl style="border-left: 10px solid '.$result['colour'].'; " class="dl-horizontal dl-search">' . PHP_EOL);
         echo('  <dt style="width: 64px; text-align: center; line-height: 41.5px;">' . get_icon($result['icon']) . '</dt>' . PHP_EOL);
         echo('    <dd>' . PHP_EOL);
         echo('      <strong>'.html_highlight(escape_html($result['name']), $queryString) . PHP_EOL);
-        echo('        <small>'.  implode('<br />', $result['data']) . '</small>' . PHP_EOL);
+        echo('        <small>'.  implode('<br />', $data) . '</small>' . PHP_EOL);
         echo('      </strong>' . PHP_EOL);
         echo('    </dd>' . PHP_EOL);
         echo('</dl>' . PHP_EOL);
@@ -85,7 +92,7 @@ if (isset($_REQUEST['queryString']))
       }
     }
 
-    if (!count($search_results))
+    if (!safe_count($search_results))
     {
       echo('<li class="nav-header">No search results.</li>');
     }

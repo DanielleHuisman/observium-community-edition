@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -10,6 +9,8 @@
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
  *
  */
+
+print_error("MySQL extension is deprecated since PHP 5.5, we unsupported it anymore. Use mysqli extension instead!");
 
 /*
 This code based on original non-OO version of dbFacile version 0.4.3

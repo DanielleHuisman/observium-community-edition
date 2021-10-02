@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -18,7 +17,7 @@ $i = 0;
 foreach (dbFetchRows("SELECT * FROM `devices`") AS $device)
 {
 
-  $device['state'] = unserialize($device['device_state']);
+  $device['state'] = safe_unserialize($device['device_state']);
 
   $devices[$device['device_id']] = $device;
 
@@ -65,6 +64,4 @@ $nototal = 1;
 
 include($config['html_dir']."/includes/graphs/generic_multi_group_simplex_separated.inc.php");
 
-
-
-?>
+// EOF

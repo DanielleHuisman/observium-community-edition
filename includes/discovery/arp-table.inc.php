@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -19,12 +18,11 @@
 // CISCO-IETF-IP-MIB      -- based on an early draft of the revised IP-MIB
 //  cInetNetToMediaTable
 
-unset ($mac_table);
+unset($mac_table);
 
 // Caching ifIndex
 $query = 'SELECT `port_id`, `ifIndex` FROM `ports` WHERE `device_id` = ? GROUP BY `port_id`';
-foreach (dbFetchRows($query, array($device['device_id'])) as $entry)
-{
+foreach (dbFetchRows($query, array($device['device_id'])) as $entry) {
   $entry_if = $entry['ifIndex'];
   $interface[$entry_if] = $entry['port_id'];
 }
@@ -43,7 +41,7 @@ if ($ipNetToPhysicalPhysAddress_oid)
   print_debug("Used IP-MIB::ipNetToPhysicalPhysAddress");
 } else {
   $oid_data = '';
-  if ($device['os_group'] == 'cisco')
+  if ($device['os_group'] === 'cisco')
   {
     // Last check CISCO-IETF-IP-MIB::cInetNetToMediaPhysAddress (IPv6 only, Cisco only)
     //cInetNetToMediaPhysAddress[167][ipv6]["20:01:0b:08:0b:08:0b:08:00:00:00:00:00:00:00:b1"] 0:24:c4:db:9b:40:0:0
@@ -118,7 +116,7 @@ foreach (explode("\n", $oid_data) as $data)
   $if = $matches[1];
   $port_id = $interface[$if];
 
-  if ($ip & $port_id)
+  if ($ip && $port_id)
   {
     if ($matches[3] === '' && $matches[4] === '')
     {

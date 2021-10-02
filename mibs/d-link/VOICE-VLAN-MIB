@@ -1,24 +1,37 @@
 -- -----------------------------------------------------------------------------
 -- MIB NAME : Voice VLAN Common mib
 -- FILE NAME: VoiceVLAN.mib
--- DATE     : 2009/10/21
--- VERSION  : 1.02
--- PURPOSE  : To construct the MIB structure of VoiceVLAN
+-- DATE     : 2010/10/12
+-- VERSION  : 1.04
+-- PURPOSE  : To construct the MIB structure of Voice VLAN
 --            for proprietary enterprise
 -- -----------------------------------------------------------------------------
 -- MODIFICTION HISTORY:
 -- -----------------------------------------------------------------------------
 -- Version, Date, Author
 -- Description:
---  [New Object]
---  [Modification]
+-- [New Object]
+-- [Modification]
 -- Notes: (Requested by who and which project)
+--
+-- Version 1.04, 2010/10/012, Wang Yu
+-- Description:
+-- [New Object]
+-- Add swVoiceVlanPortTagged to configure port voice VLAN tag mode.    
+-- [Modification]
+-- Requested by SNR-20100813-001(DLINK voice VLAN 2.1).doc 
+--
+-- Version 1.03, 2010/05/25, Wang Yu
+-- Description:
+-- [New Object]
+-- 1. Add swVoiceVlanlldpMedDeviceTable for supporting voice devices learned through LLDP-MED.
+-- Notes: Requested by Wang Yu for project DGS3120. 
 --
 -- Version 1.02, 2009/10/21, Tom Jin
 -- [Modification]
 -- 1. Change the SYNTAX of swVoiceVlanId from 'VlanId' to 'VlanIdOrNone'.
 -- 2. Modify the description of swVoiceVlanId.
--- Requested by Tom for project DES3810.
+-- Notes: Requested by Tom for project DES3810.
 --
 -- Version 1.01, 2009/08/17, Tony Tang
 -- [Modification]
@@ -34,16 +47,18 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 	IMPORTS
 	    MODULE-IDENTITY,OBJECT-TYPE,Integer32
 	        FROM SNMPv2-SMI
-	    DateAndTime,MacAddress,RowStatus,DisplayString
+	    DateAndTime, MacAddress, RowStatus, DisplayString, TimeInterval, TruthValue
 	        FROM SNMPv2-TC
 	    dlink-common-mgmt	
 	        FROM DLINK-ID-REC-MIB
 	    PortList,VlanIdOrNone
-	    	FROM Q-BRIDGE-MIB;
+	    	FROM Q-BRIDGE-MIB
+     	LldpChassisIdSubtype, LldpChassisId, LldpPortIdSubtype, LldpPortId
+        	FROM LLDP-MIB;
 
 
 	swVoiceVLANMIB MODULE-IDENTITY
-	    LAST-UPDATED "0910210000Z"
+	    LAST-UPDATED "201010120000Z"
 	    ORGANIZATION "D-Link Corp."
 	    CONTACT-INFO
 	        "http://support.dlink.com"
@@ -64,9 +79,9 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
         	MAX-ACCESS  read-write
         	STATUS  current
         	DESCRIPTION
-            		"The VLAN ID of the voice VLAN. The voice VLAN is used to asssign 
-					VLAN for untagged voice packets.
-					If the value zero is for display only and not configurable, which 
+            		"The VLAN ID of the voice VLAN. The voice VLAN is used to assign 
+					VLANs for untagged voice packets.
+					The value zero is for display only and not configurable, which 
 					means there is no voice VLAN on the switch."  		
         	::= { swVoiceVlanCtrl 1 }
         	
@@ -78,8 +93,8 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 	        MAX-ACCESS  read-write
 	        STATUS  current
 	        DESCRIPTION
-	           	 "This object indicates the global status of the Voice VLAN. if we enable the voice vlan,
-	           	 we should set the vid first."
+	           	 "This object indicates the global status of the voice VLAN. If we enable the voice VLAN,
+	           	 we should set the VID first."
 	        ::= { swVoiceVlanCtrl 2 }
     
 		swVoiceVlanPriority OBJECT-TYPE
@@ -87,7 +102,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
         	MAX-ACCESS  read-write
         	STATUS  current
         	DESCRIPTION
-            		"The priority for the voice VLAN ,which is used to distinguish
+            		"The priority for the voice VLAN, which is used to distinguish
             		 the QoS of the voice traffic from data traffic."
         	::= { swVoiceVlanCtrl 3 }
         
@@ -96,7 +111,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
         	MAX-ACCESS  read-write
         	STATUS  current
         	DESCRIPTION
-            		"The aging time for the voice VLAN ,which is used to remove a 
+            		"The aging time for the voice VLAN, which is used to remove a 
             		port from a voice VLAN when the working mode is auto."
         	::= { swVoiceVlanCtrl 4 }
         
@@ -137,7 +152,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 			MAX-ACCESS not-accessible
 	        STATUS current
 	        DESCRIPTION
-	                   "The Management information of a voice VLAN member ports'device."
+	                   "The management information of a voice VLAN member ports device."
 	
                 ::= { swVoiceVlanInfo 3 }
 
@@ -193,6 +208,120 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 	    	DESCRIPTION
 	        	"The active time of the voice device."
 	    	::= { swVoiceVlanDeviceEntry 4}	
+-- -----------------------------------------------------------------------------  
+-- Voice Device learned through LLDP-MED      
+-- -----------------------------------------------------------------------------  	
+	
+         swVoiceVlanlldpMedDeviceTable OBJECT-TYPE
+	 	SYNTAX  SEQUENCE OF SwVoiceVlanlldpMedDeviceEntry
+		MAX-ACCESS not-accessible
+	        STATUS current
+	        DESCRIPTION
+	              "This table contains the voice devices that are learned through LLDP-MED."
+                ::= { swVoiceVlanInfo 4 }
+
+	swVoiceVlanlldpMedDeviceEntry OBJECT-TYPE
+		SYNTAX SwVoiceVlanlldpMedDeviceEntry
+		MAX-ACCESS not-accessible
+		STATUS current
+		DESCRIPTION
+		        "Information about the voice device learned through LLDP-MED."
+		INDEX {swVoiceVlanlldpMedDeviceIndex}
+		::= { swVoiceVlanlldpMedDeviceTable 1 }
+
+	SwVoiceVlanlldpMedDeviceEntry ::=
+		SEQUENCE {
+		    	swVoiceVlanlldpMedDeviceIndex
+				INTEGER,
+			swVoiceVlanlldpMedDeviceLocalPort
+				INTEGER,
+		        swVoiceVlanlldpMedDeviceChassisIdSubtype
+				LldpChassisIdSubtype,
+		        swVoiceVlanlldpMedDeviceChassisId
+				LldpChassisId,
+		        swVoiceVlanlldpMedDevicePortIdSubtype
+		        	LldpPortIdSubtype,
+		        swVoiceVlanlldpMedDevicePortId
+		        	LldpPortId,				
+			swVoiceVlanlldpMedDeviceCreateTime
+				DateAndTime,
+			swVoiceVlanlldpMedDeviceRemainTime
+				TimeInterval
+		    }
+         	
+	swVoiceVlanlldpMedDeviceIndex OBJECT-TYPE
+		SYNTAX      INTEGER
+	    	MAX-ACCESS  not-accessible
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The local index used to identify the voice device."
+	    	::= { swVoiceVlanlldpMedDeviceEntry 1 }
+ 
+ 	swVoiceVlanlldpMedDeviceLocalPort OBJECT-TYPE
+		SYNTAX      INTEGER
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"This object indicates the local port number on which the voice device is learned."
+	    	::= { swVoiceVlanlldpMedDeviceEntry 2 }
+
+         swVoiceVlanlldpMedDeviceChassisIdSubtype OBJECT-TYPE
+		SYNTAX      LldpChassisIdSubtype
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The type of encoding used to identify the chassis associated with the voice device."  
+    		REFERENCE 
+            	"IEEE Std 802.1AB-2005 9.5.2.2"
+	    	::= { swVoiceVlanlldpMedDeviceEntry 3 }   
+	    	
+       	 swVoiceVlanlldpMedDeviceChassisId OBJECT-TYPE
+            	SYNTAX      LldpChassisId
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The string value used to identify the chassis component associated with the voice device."
+	     	 REFERENCE 
+            	"IEEE Std 802.1AB-2005 9.5.2.3"
+ 	    	::= { swVoiceVlanlldpMedDeviceEntry 4 }
+   
+         swVoiceVlanlldpMedDevicePortIdSubtype OBJECT-TYPE
+	 	SYNTAX      LldpPortIdSubtype
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The type of port identifier encoding used to identify the port component associated with the voice device " 
+    		REFERENCE 
+            	"IEEE Std 802.1AB-2005 9.5.3.2"
+	    	::= { swVoiceVlanlldpMedDeviceEntry 5 }   
+	    	
+       	 swVoiceVlanlldpMedDevicePortId OBJECT-TYPE
+            	SYNTAX      LldpPortId
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The string value used to identify the port component associated with the voice device."  
+    		REFERENCE 
+            	"IEEE Std 802.1AB-2005 9.5.3.3"
+	    	::= { swVoiceVlanlldpMedDeviceEntry 6 }
+
+         swVoiceVlanlldpMedDeviceCreateTime OBJECT-TYPE
+            	SYNTAX      DateAndTime
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The creation time of the voice device."
+	    	::= { swVoiceVlanlldpMedDeviceEntry 7}	
+	    	
+         swVoiceVlanlldpMedDeviceRemainTime OBJECT-TYPE
+            SYNTAX      TimeInterval
+	    	MAX-ACCESS  read-only
+	    	STATUS      current
+	    	DESCRIPTION
+	        	"The Time To Live remaining for the voice device. 
+	        	If the Remain Time decreases to 0, the voice device will be deleted."
+	    	::= { swVoiceVlanlldpMedDeviceEntry 8}		    
+	
 -- -----------------------------------------------------------------------------
 -- swVoiceVlanMgmt
 -- -----------------------------------------------------------------------------
@@ -202,7 +331,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    MAX-ACCESS not-accessible
 		    STATUS current
 		    DESCRIPTION
-		        "The Management information of the voice VLAN OUI." 
+		        "The management information of the voice VLAN OUI." 
 		        
 		    ::= { swVoiceVlanMgmt 1 }
 	
@@ -212,8 +341,8 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    STATUS current
 		    DESCRIPTION
 		        "The management information of the OUI of a voice VLAN domain.
-		        An OUI contains information about the type of ip-phone .that can make use of the OUI
-		        to check the voice traffic ."
+		        An OUI contains information about the type of IP phone that can make use of the OUI
+		        to check the voice traffic."
 		    INDEX { swVoiceVlanOuiAddr}
 	
 		    ::= { swVoiceVlanOuiTable 1 }
@@ -268,8 +397,8 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    MAX-ACCESS not-accessible
 		    STATUS current
 		    DESCRIPTION
-		        "The Management of the voice VLAN function on all bridge ports. Some ports are not
-		        member ports of a voice VLAN, but they may be added in auto mode, so this function enables both current voice VLAN member ports and non-VLAN member ports to be managed." 
+		        "The management of the voice VLAN function on all bridge ports. Some ports are not
+		        member ports of a voice VLAN, but they may be added in auto mode. Therefore, this function enables both current voice VLAN member ports and non-VLAN member ports to be managed." 
 		        
 		    ::= { swVoiceVlanMgmt 2 }
 	
@@ -278,7 +407,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    MAX-ACCESS not-accessible
 		    STATUS current
 		    DESCRIPTION
-		        "The Management of the voice VLAN function on ports"
+		        "The management of the voice VLAN function on ports"
 		    INDEX { swVoiceVlanPortNumber}
 	
 		    ::= { swVoiceVlanPortTable 1 }
@@ -290,7 +419,9 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		        swVoiceVlanPortState
 		            	INTEGER,
 		        swVoiceVlanPortMode
-		            	INTEGER    				
+		            	INTEGER,
+		        swVoiceVlanPortTagged 
+		        		TruthValue			
 		    }
 		    
 		swVoiceVlanPortNumber OBJECT-TYPE
@@ -298,7 +429,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    	MAX-ACCESS  read-only
 		    	STATUS      current
 		    	DESCRIPTION
-		        	"Bridge ports, can be configured with voice VLAN function."
+		        	"Bridge ports can be configured with voice VLAN function."
 		    	::= { swVoiceVlanPortEntry 1 }	
 		    	
 		swVoiceVlanPortState OBJECT-TYPE
@@ -310,8 +441,7 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    	MAX-ACCESS  read-write
 		    	STATUS      current
 		    	DESCRIPTION
-		        	"Port state here indicates whether the port supports the voice VLAN function,
-		        	we can enable/disable voice vlan function on port."
+		        	"The port state here indicates whether the port supports the voice VLAN function. We can enable/disable the voice VLAN function on the port."
 		    	::= { swVoiceVlanPortEntry 2 }
 	
 		swVoiceVlanPortMode OBJECT-TYPE
@@ -324,9 +454,20 @@ VOICE-VLAN-MIB DEFINITIONS ::= BEGIN
 		    	STATUS      current
 		    	DESCRIPTION
 		        	"Port mode just indicates which mode of voice VLAN function is supported by port. 
-		        	If in auto mode ,the port can be added in to voice vlan automatically when it connect
-		        	a ip-phone,else the port just added by mannual."
+		        	If in auto mode, the port can be added in to voice VLAN automatically when it connects to an IP  phone. 
+		        	Otherwise, the port is just added manually."
 		    	::= { swVoiceVlanPortEntry 3 }
 
+		swVoiceVlanPortTagged OBJECT-TYPE
+		    	SYNTAX     TruthValue
+			MAX-ACCESS  read-write
+		    	STATUS      current
+		    	DESCRIPTION
+		        	"This object used to configure port voice VLAN tag mode.
+		        	If the object is true (1), and the port mode is auto, 
+		        	when learned a new voice device, the port will join to voice VLAN as tagged member.
+		        	Otherwise, the port will join to voice VLAN as untagged member."
+		        DEFVAL   { false }
+		    	::= { swVoiceVlanPortEntry 4 }
 
 END

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -43,6 +43,9 @@
 
 error_reporting(E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR);
 
+/** @global array $config */
+//$config = [];
+
 // Database settings
 
 // FIXME. Migrate to $config['db']['option']
@@ -77,6 +80,7 @@ $config['db']['debug']      = TRUE;        // If TRUE store errors in DB queries
 #$config['log_dir']       = $config['install_dir'] . "/logs";
 #$config['temp_dir']      = "/tmp";
 #$config['cache_dir']     = $config['temp_dir']    . "/observium_cache";
+#$config['nagplug_dir']   = '/usr/lib/nagios/plugins';
 
 // What is my own hostname (used so observium can identify its host in its own database)
 #$config['own_hostname'] = "localhost"; // By default equals `hostname -f`
@@ -85,7 +89,7 @@ $config['db']['debug']      = TRUE;        // If TRUE store errors in DB queries
 
 $config['rrdtool']        = "/usr/bin/rrdtool";
 $config['fping']          = "/usr/bin/fping";
-$config['fping6']         = "/usr/bin/fping6";
+$config['fping6']         = "/usr/bin/fping6"; // Note, for version 4+ not required
 $config['snmpwalk']       = "/usr/bin/snmpwalk";
 $config['snmpget']        = "/usr/bin/snmpget";
 $config['snmpgetnext']    = "/usr/bin/snmpgetnext";
@@ -163,6 +167,7 @@ $config['snmp']['errors']         = TRUE;    // Collect and (auto)disable snmp q
 $config['debug_port']['spikes']   = FALSE;   // Additional only spikes debug, written to /tmp/port_debug_spikes.txt
 $config['check_process']['alerter'] = TRUE;  // Ability for skip process checking. USE AT OWN RISK.
 $config['web_debug_unprivileged'] = FALSE;   // Allow show debug information for Unprivileged (userlevel < 7) users in Web UI
+$config['php_debug']              = FALSE;   // Store all php errors in logs/php-error.log
 
 $config['require_hostname']       = FALSE;   // If TRUE, devices must have valid resolvable hostname (in DNS or /etc/hosts)
 
@@ -186,10 +191,12 @@ $config['web_mouseover']     = TRUE;        // Enable or disable mouseover popup
 $config['web_mouseover_mobile'] = FALSE;    // Enable mouseover popups on Mobile phones and tablets. Disabled by default.
 $config['web_show_disabled'] = TRUE;        // Show or not disabled devices on major pages.
 $config['web_pagesize']      = 100;         // Default pagesize for tables (items per page)
+$config['web_theme_default'] = 'light';     // Default theme 'light', 'dark', 'darkblue' or 'system' (based on MacOS/Windows system settings)
 
-$config['web_session_lifetime'] = 86400;    // Default user sessions lifetime in seconds (86400 - one day). This lifetime actual for sessions without "remember me" checkbox.
-$config['web_session_ip']       = TRUE;     // Bind user sessions to his IP address
-$config['web_session_cidr']     = array();  // Allow user authorisation from certain IP ranges (if empty allow from any)
+$config['web_session_lifetime']     = 86400;     // Default user sessions lifetime in seconds (86400 - one day). This lifetime actual for sessions without "remember me" checkbox.
+$config['web_session_ip']           = TRUE;      // Bind user sessions to his IP address
+$config['web_session_ipv6_prefix']  = 128;       // Bind user session to prefix limited IPv6 address
+$config['web_session_cidr']         = [];        // Allow user authorisation from certain IP ranges (if empty allow from any)
 $config['web_session_ip_by_header'] = FALSE;     // Allow to use alternative Remote Address header for Session Auth (DANGEROUS)
 $config['web_remote_addr_header']   = 'default'; // Remote Address header for Web session logging (CF-Connecting-IP, X-Real-IP, Client-IP, X-Forwarded-For)
 
@@ -203,7 +210,6 @@ $config['overview_show_sysDescr'] = TRUE;   // FIXME. Not sure, still required?
 
 // Graphs Settings
 
-$config['old_graphs']                     = 0;         // RRDfiles from before the great rra reform. Set this to 1 if you have old RRDs.
 $config['rrdgraph_real_95th']             = FALSE;     // Set to TRUE if you want to display the 95% based on the highest value. (aka real 95%)
 $config['graphs']['style']                = "default"; // Possible values: default, mrtg
 $config['graphs']['ports_scale_force']    = 1;         // Force scale also if real data more than selected scale
@@ -242,9 +248,9 @@ $config['snmp']['v3'] = array();
 // $config['snmp']['v3'][0]['authlevel']  = "noAuthNoPriv"; // noAuthNoPriv | authNoPriv | authPriv
 // $config['snmp']['v3'][0]['authname']   = "observium";    // User Name (required even for noAuthNoPriv)
 // $config['snmp']['v3'][0]['authpass']   = "";             // Auth Passphrase
-// $config['snmp']['v3'][0]['authalgo']   = "MD5";          // MD5 | SHA
+// $config['snmp']['v3'][0]['authalgo']   = "MD5";          // MD5 | SHA | SHA-224 | SHA-256 | SHA-384 | SHA-512
 // $config['snmp']['v3'][0]['cryptopass'] = "";             // Privacy (Encryption) Passphrase
-// $config['snmp']['v3'][0]['cryptoalgo'] = "AES";          // AES | DES
+// $config['snmp']['v3'][0]['cryptoalgo'] = "AES";          // DES | AES | AES-192 | AES-192-C | AES-256 | AES-256-C
 
 // Autodiscovery Settings
 
@@ -268,8 +274,9 @@ $config['email']['enable']          = TRUE;                 // Enable/Disable em
 $config['email']['from']            = NULL;                 // Mail from. Default: "Observium" <observium@`hostname`>
 $config['email']['default']         = NULL;                 // Default alert recipient
 $config['email']['default_only']    = FALSE;                // Only use default recipient (all alerts send to default recipient)
-$config['email']['graphs']                = TRUE;                 // Allow graphs in mail body
-$config['email']['backend']         = 'mail';               // Mail backend. Allowed: "mail" (PHP's built-in), "sendmail", "smtp".
+$config['email']['default_syscontact'] = FALSE;             // By default always sent alerts by device sysContact email
+$config['email']['graphs']          = TRUE;                 // Allow graphs in mail body
+$config['email']['backend']         = 'mail';               // Mail backend. Allowed: "mail" (PHP's built-in), "sendmail", "smtp", "mx".
 // sendmail backend specific options
 $config['email']['sendmail_path']   = '/usr/sbin/sendmail'; // The location of the sendmail program.
 // smtp backend specific options
@@ -326,7 +333,7 @@ $config['statsd']['port']                  = '8125';
 // Data caching
 $config['cache']['enable']                 = FALSE;     // Can enable/disable caching (currently only in WUI)
 $config['cache']['ttl']                    = 300;       // Default time to live for cache objects (5 min)
-$config['cache']['driver']                 = 'auto';    // Driver for use caching (auto, zendshm, apcu, xcache, sqlite, files)
+$config['cache']['driver']                 = 'auto';    // Driver for use caching (auto, zendshm, apcu, sqlite, files)
 
 // amqp Configuration
 // This is very alpha, please do not use it unless you want it to eat your children
@@ -390,7 +397,7 @@ $config['rrdgraph']['light']  = "-c BACK#EEEEEE00 -c SHADEA#EEEEEE00 -c SHADEB#E
 $config['rrdgraph']['light'] .= " -c GRID#a5a5a5 -c MGRID#FF9999 -c FRAME#5e5e5e -c ARROW#5e5e5e -R normal";
 
 $config['rrdgraph']['dark']  = "-c BACK#00000000 -c SHADEA#00000000 -c SHADEB#00000000 -c FONT#CCCCCC -c CANVAS#00000000";
-$config['rrdgraph']['dark'] .= " -c GRID#555555 -c MGRID#993333 -c FRAME#CCCCCC -c AXIS#BBBBBB -c ARROW#BBBBBB -R normal";
+$config['rrdgraph']['dark'] .= " -c GRID#ffffff00 -c MGRID#ffffff10 -c FRAME#CCCCCC -c AXIS#BBBBBB -c ARROW#BBBBBB -R normal";
 
 #$config['graph_colours'] = array("000066","330066","990066","990066","CC0033","FF0000"); // Purple to Red
 #$config['graph_colours'] = array("006600","336600","996600","996600","CC3300","FF0000"); // Green to Red
@@ -430,11 +437,11 @@ $config['graph_colours']['percents']  = array('55FF00', '00FFD5', '00D5FF', '00A
 
 // Uniform "data" graph colours
 
-$config['colours']['graphs']['data'] = ['in_area'  => '84BB5C', 'in_line'  => '357F44', 'in_max'  => 'C4E5AC',
-                                        'out_area' => '7394CB', 'out_line' => '284C7F', 'out_max' => 'ACC2E5'];
+$config['colours']['graphs']['data'] = ['in_area'  => '84BB5C', 'in_line'  => '357F44', 'in_max'  => 'C4E5AC60',
+                                        'out_area' => '7394CB', 'out_line' => '284C7F', 'out_max' => 'ACC2E560'];
 
-$config['colours']['graphs']['pkts'] = ['in_area'  => 'AA66AA', 'in_line'  => '553355', 'in_max'  => 'CC88CC',
-                                        'out_area' => 'FFDD88', 'out_line' => 'FF6600', 'out_max' => 'FFEFAA'];
+$config['colours']['graphs']['pkts'] = ['in_area'  => 'AA66AA', 'in_line'  => '553355', 'in_max'  => 'CC88CC60',
+                                        'out_area' => 'FFDD88', 'out_line' => 'FF6600', 'out_max' => 'FFEFAA60'];
 
 $config['group_colours'][] = array('in' => 'blues',  'out' => 'purples');
 $config['group_colours'][] = array('in' => 'greens', 'out' => 'greens');
@@ -550,6 +557,9 @@ $config['smokeping']['split_char']      = '_';
 #$config['smokeping']['suffix']          = '.yourdomain.com';
 #$config['smokeping']['slaves'][] = 'slave01'; // Used in the generate-smokeping script only
 
+// Weathermap Builtin
+//$config['weathermap']['enable']          = TRUE; // Enable Builtin PHP Weathermap
+
 // NFSen RRD dir.
 $config['nfsen_enable'] = 0;
 #$config['nfsen_split_char']   = "_";
@@ -559,10 +569,41 @@ $config['nfsen_enable'] = 0;
 
 // Entities specific config options
 
-$config['devices']['serverscheck']['temp_f'] = FALSE; // Specifies that any ServersCheck devices will return temperature sensors in Fahrenheit.
+$config['devices']['serverscheck']['temp_f']  = FALSE; // Specifies that any ServersCheck devices will return temperature sensors in Fahrenheit.
 
-$config['sensors']['port']['power_to_dbm']   = FALSE; // Convert power Port DOM sensors to dBm
-$config['sensors']['port']['ignore_shutdown'] = TRUE; // Set ignore sensor state instead alert for entities in shutdown state (admin down)
+// Ignore sysNames in discovery or associations
+$config['devices']['ignore_sysname'][]        = '(none)';
+$config['devices']['ignore_sysname'][]        = 'unknown';
+$config['devices']['ignore_sysname'][]        = '(unknown)';
+$config['devices']['ignore_sysname'][]        = 'default';
+$config['devices']['ignore_sysname'][]        = 'default_config';
+$config['devices']['ignore_sysname'][]        = 'defaultname';
+$config['devices']['ignore_sysname'][]        = 'defaulthost';
+$config['devices']['ignore_sysname'][]        = 'host';
+$config['devices']['ignore_sysname'][]        = 'localhost';
+$config['devices']['ignore_sysname'][]        = 'target';
+$config['devices']['ignore_sysname'][]        = 'vxtarget';
+$config['devices']['ignore_sysname'][]        = 'tp-link';
+$config['devices']['ignore_sysname'][]        = 'd-link';
+$config['devices']['ignore_sysname'][]        = 'mikrotik';
+$config['devices']['ignore_sysname'][]        = 'heartofgold';
+$config['devices']['ignore_sysname'][]        = 'openwrt';
+$config['devices']['ignore_sysname'][]        = 'rt-is-prober';
+$config['devices']['ignore_sysname'][]        = 'dd-wrt';
+$config['devices']['ignore_sysname'][]        = 'router';
+$config['devices']['ignore_sysname'][]        = 'switch';
+$config['devices']['ignore_sysname'][]        = 'ubnt';
+$config['devices']['ignore_sysname'][]        = 'ubnt edgeswitch';
+$config['devices']['ignore_sysname'][]        = 'huawei';
+$config['devices']['ignore_sysname'][]        = 'internet';
+$config['devices']['ignore_sysname'][]        = 'sonicwall';
+$config['devices']['ignore_sysname'][]        = 'firewall';
+$config['devices']['ignore_sysname'][]        = 'm0n0wall';
+$config['devices']['ignore_sysname'][]        = 'zywall';
+
+$config['sensors']['port']['power_to_dbm']    = FALSE; // Convert power Port DOM sensors to dBm
+$config['sensors']['port']['ignore_shutdown'] = TRUE;  // Set ignore sensor state instead alert for entities in shutdown state (admin down)
+$config['sensors']['limits_events']           = FALSE; // Store sensors limit changes in eventlog
 
 // Ignores & Allows
 // Has to be lowercase
@@ -727,9 +768,11 @@ $config['ignore_common_subnet'][] = '127.0.0.0/16';   // Common on ZyXEL
 $config['ignore_common_subnet'][] = '169.254.0.0/16'; // DHCP fallback range
 #$config['ignore_common_subnet'][] = '128.0.0.1/32';  // Common on Juniper
 #$config['ignore_common_subnet'][] = '128.0.1.16/32'; // Common on Juniper
+$config['ignore_common_subnet'][] = '::/0';
+$config['ignore_common_subnet'][] = '::/64';
 $config['ignore_common_subnet'][] = '::1/128';        // Common on Linux
 
-// Per-device interface graph filters
+// Per-device interface graph filters (this regex always case-insensitive)
 
 $config['device_traffic_iftype'][] = '/loopback/';
 $config['device_traffic_iftype'][] = '/tunnel/';
@@ -744,7 +787,8 @@ $config['device_traffic_descr'][]  = '/loopback/';
 $config['device_traffic_descr'][]  = '/vlan/';
 $config['device_traffic_descr'][]  = '/tunnel/';
 #$config['device_traffic_descr'][]  = '/:\d+/';   #// this breaks on xos (ifName = 1:1)
-$config['device_traffic_descr'][]  = '/bond/';
+$config['device_traffic_descr'][]  = '/^bond\d+/'; // Linux
+$config['device_traffic_descr'][]  = '/^team\d+/'; // Linux
 $config['device_traffic_descr'][]  = '/null/';
 $config['device_traffic_descr'][]  = '/dummy/';
 $config['device_traffic_descr'][]  = '/^dwdm/';
@@ -759,7 +803,7 @@ $config['ip-address']['ignore_type'][] = 'link-local';  // IPv6 Link Local fe80:
 
 $config['irc_host'] = "irc.oftc.net";
 $config['irc_port'] = 6667;
-$config['irc_nick'] = "Observium".rand(99999);
+$config['irc_nick'] = "Observium" . mt_rand(1, 99999);
 $config['irc_chan'][] = "";
 $config['irc_chankey'] = "";
 $config['irc_ssl'] = FALSE;
@@ -866,7 +910,10 @@ $config['housekeeping']['authlog']['age'] = '1Y';        // Maximum age of authl
 $config['housekeeping']['inventory']['age'] = '1M';      // Maximum age of deleted inventory entries; 0 to disable
 $config['housekeeping']['deleted_ports']['age'] = '1M';  // Maximum age of deleted ports before automatically purging; 0 to disable
 $config['housekeeping']['rrd']['age'] = '3M';            // Maximum age of unused rrd files before automatically purging; 0 to disable
+$config['housekeeping']['rrd']['notmodified'] = TRUE;    // Delete .rrd files not modified more than age (eg removed entities)
 $config['housekeeping']['rrd']['invalid'] = TRUE;        // Delete .rrd files that are not valid RRD files (eg created with a full disk)
+$config['housekeeping']['rrd']['deleted'] = FALSE;       // Delete rrd dirs for not exist hostnames (deleted from db)
+$config['housekeeping']['rrd']['disabled'] = FALSE;      // Delete rrd dirs for disabled devices (device still in db, but disabled by some reasons)
 
 // Virtualization
 
@@ -958,11 +1005,11 @@ $config['poller_modules']['probes']                       = 1;
 
 $config['discovery_modules']['os']                        = 1;
 $config['discovery_modules']['mibs']                      = 1; // Discovery supported additional MIBs by sysORID or definition checks
+$config['discovery_modules']['vrf']                       = 1; // Must be before all other modules (ie ports, ip-addresses)
 $config['discovery_modules']['ports']                     = 1;
 $config['discovery_modules']['ports-stack']               = 1;
 $config['discovery_modules']['vlans']                     = 1;
 $config['discovery_modules']['oids']                      = 1;
-$config['discovery_modules']['cisco-vrf']                 = 1; // Must be before ip-addresses
 $config['discovery_modules']['ip-addresses']              = 1;
 $config['discovery_modules']['processors']                = 1;
 $config['discovery_modules']['mempools']                  = 1;
@@ -986,7 +1033,6 @@ $config['discovery_modules']['ucd-diskio']                = 1;
 $config['discovery_modules']['wifi']                      = 1;
 $config['discovery_modules']['p2p-radios']                = 1;
 $config['discovery_modules']['graphs']                    = 1;
-//$config['discovery_modules']['services']                  = 0;
 $config['discovery_modules']['raid']                      = 0;
 
 // Ports extension modules
@@ -1005,7 +1051,6 @@ $config['enable_ports_separate_walk']                  = 0; // Walk separate IF-
 
 // Observium WIP API Settings
 $config['api']['enable']                        = FALSE;        // Enable or disable the API
-//$config['api']['encryption']['key']             = "I_Need_To_Change_This_Key"; // (DEPRECATED) Set a random encryption/decryption key
 
 // Enable or disable specific API endpoint
 $config['api']['endpoints']['alerts']           = 1;
@@ -1014,7 +1059,8 @@ $config['api']['endpoints']['devices']          = 1;
 $config['api']['endpoints']['ports']            = 1;
 $config['api']['endpoints']['sensors']          = 1;
 $config['api']['endpoints']['status']           = 1;
-$config['api']['endpoints']['counter']          = 0;
+$config['api']['endpoints']['probes']           = 1;
+$config['api']['endpoints']['counters']         = 1;
 $config['api']['endpoints']['storage']          = 1;
 $config['api']['endpoints']['mempools']         = 1;
 $config['api']['endpoints']['processors']       = 1;
@@ -1022,6 +1068,7 @@ $config['api']['endpoints']['address']          = 1;
 $config['api']['endpoints']['printersupplies']  = 1;
 $config['api']['endpoints']['inventory']        = 1;
 $config['api']['endpoints']['neighbours']       = 1;
+$config['api']['endpoints']['vlans']            = 1;
 
 // InfluxDB export
 

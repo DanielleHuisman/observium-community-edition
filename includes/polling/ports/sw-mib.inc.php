@@ -15,10 +15,10 @@
 // See: http://jira.observium.org/browse/OBSERVIUM-1043
 //      http://jira.observium.org/browse/OBSERVIUM-854
 
-$port_sw = snmpwalk_cache_multi_oid($device, "swFCPortSpecifier", array(), "SW-MIB");
+$port_sw = snmpwalk_cache_oid($device, "swFCPortSpecifier", array(), "SW-MIB");
 if (!$GLOBALS['snmp_status']) { return; } // Break walk if not exist data from SW-MIB
 
-$port_sw = snmpwalk_cache_multi_oid($device, "swFCPortName",     $port_sw, "SW-MIB");
+$port_sw = snmpwalk_cache_oid($device, "swFCPortName", $port_sw, "SW-MIB");
 
 foreach($port_stats as $ifIndex => $port)
 {

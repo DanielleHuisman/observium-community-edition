@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -88,7 +87,7 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
         continue;
       }
 
-      $oid_cache = snmp_walk_multipart_oid($device, $object, $oid_cache, $mib, NULL, $snmp_flags);
+      $oid_cache = snmpwalk_multipart_oid($device, $object, $oid_cache, $mib, NULL, $snmp_flags);
       $GLOBALS['cache']['snmp_object_polled'][$mib][$object] = 1;
     }
   } else {
@@ -113,7 +112,7 @@ function poll_device($device, $options)
   $alert_metrics = array();
   $oid_cache = array();
   $device_state = array();
-  //$old_device_state = unserialize($device['device_state']);
+  //$old_device_state = safe_unserialize($device['device_state']);
   $attribs = get_entity_attribs('device', $device['device_id']);
   $model = get_model_array($device);
 
@@ -154,17 +153,22 @@ function poll_device($device, $options)
   $update_array = array();
 
   $host_rrd_dir = $config['rrd_dir'] . "/" . $device['hostname'];
-  if (!is_dir($host_rrd_dir)) { mkdir($host_rrd_dir); echo("Created directory : $host_rrd_dir\n"); }
-
-  $flags = OBS_DNS_ALL;
-  if ($device['snmp_transport'] == 'udp6' || $device['snmp_transport'] == 'tcp6') // Exclude IPv4 if used transport 'udp6' or 'tcp6'
+  if (!is_dir($host_rrd_dir))
   {
-    $flags = $flags ^ OBS_DNS_A;
+    mkdir($host_rrd_dir);
+    echo("Created directory : $host_rrd_dir\n");
+  }
+
+  /* moved to device_status_array()
+  $flags = OBS_DNS_ALL;
+  if ($device['snmp_transport'] === 'udp6' || $device['snmp_transport'] === 'tcp6') // Exclude IPv4 if used transport 'udp6' or 'tcp6'
+  {
+    $flags ^= OBS_DNS_A;
   }
   $attribs['ping_skip'] = isset($attribs['ping_skip']) && $attribs['ping_skip'];
   if ($attribs['ping_skip'])
   {
-    $flags = $flags | OBS_PING_SKIP; // Add skip ping flag
+    $flags |= OBS_PING_SKIP; // Add skip ping flag
   }
   $device['pingable'] = isPingable($device['hostname'], $flags);
   if ($device['pingable'])
@@ -186,23 +190,27 @@ function poll_device($device, $options)
     print_cli_data("Device status", "Device is not responding to PINGs", 1);
     $status = "0";
     print_vars(get_status_var('ping_dns'));
-    if (isset_status_var('ping_dns') && get_status_var('ping_dns') != 'ok')
+    if (isset_status_var('ping_dns') && get_status_var('ping_dns') !== 'ok')
     {
       $status_type = 'dns';
     } else {
       $status_type = 'ping';
     }
   }
+  */
+  $device_status = device_status_array($device);
+  $status        = $device_status['status'];
+  $status_type   = $device_status['status_type'];
+  print_cli_data("Device status", $device_status['message'], 1);
 
-
+  // Device status
   if ($device['status'] != $status)
   {
     dbUpdate(array('status' => $status), 'devices', 'device_id = ?', array($device['device_id']));
     // dbInsert(array('importance' => '0', 'device_id' => $device['device_id'], 'message' => "Device is " .($status == '1' ? 'up' : 'down')), 'alerts');
 
     $event_msg = 'Device status changed to ';
-    if ($status == '1')
-    {
+    if ($status == '1') {
       // Device Up, Severity Warning (4)
       $event_msg .= 'Up';
       $event_severity = 4;
@@ -211,24 +219,25 @@ function poll_device($device, $options)
       $event_msg .= 'Down';
       $event_severity = 3;
     }
-    if ($status_type != 'ok') { $event_msg .= ' (' . $status_type . ')'; }
+    if ($status_type !== 'ok') { $event_msg .= ' (' . $status_type . ')'; }
     log_event($event_msg, $device, 'device', $device['device_id'], $event_severity);
+    $device['status'] = $status;
   }
   // Device status type
-  if (isset($device['status_type']) && $device['status_type'] != $status_type)
-  {
+  if (isset($device['status_type']) && $device['status_type'] != $status_type) {
     dbUpdate(array('status_type' => $status_type), 'devices', 'device_id = ?', array($device['device_id']));
-    if ($status == '0' && $device['status_type'] != 'ok')
+    if ($status == '0' && $device['status_type'] !== 'ok')
     {
       // Write eventlog entry (only if status Down)
       log_event('Device status changed to Down ('.$device['status_type'].' -> '.$status_type.')', $device, 'device', $device['device_id'], 3);
     }
+    $device['status_type'] = $status_type;
   }
 
   rrdtool_update_ng($device, 'status', array('status' => $status));
+  //print_vars(rrdtool_export_ng($device, 'status'));
 
-  if (!$attribs['ping_skip'])
-  {
+  if (!$attribs['ping_skip']) {
     // Ping response RRD database.
     rrdtool_update_ng($device, 'ping', array('ping' => ($device['pingable'] ? $device['pingable'] : 'U')));
   }
@@ -241,18 +250,15 @@ function poll_device($device, $options)
   $alert_metrics['device_ping'] = $device['pingable']; // FIXME, when ping skipped, here always 0.001
   $alert_metrics['device_snmp'] = $device['snmpable'];
 
-  if ($status == "1")
-  {
+  if ($status == "1") {
     // Arrays for store and check enabled/disabled graphs
     $graphs    = array();
     $graphs_db = array();
     $graphs_insert = array();
     $graphs_delete = array();
-    foreach (dbFetchRows("SELECT * FROM `device_graphs` WHERE `device_id` = ?", array($device['device_id'])) as $entry)
-    {
+    foreach (dbFetchRows("SELECT * FROM `device_graphs` WHERE `device_id` = ?", array($device['device_id'])) as $entry) {
       // Not know how empty was here
-      if (empty($entry['graph']))
-      {
+      if (empty($entry['graph'])) {
         $graphs_delete[] = $entry['device_graph_id'];
       }
 
@@ -261,8 +267,7 @@ function poll_device($device, $options)
 
     $graphs['availability'] = TRUE; // Everything has this!
 
-    if (!$attribs['ping_skip'])
-    {
+    if (!$attribs['ping_skip']) {
       // Enable Ping graphs
       $graphs['ping'] = TRUE;
     }
@@ -273,8 +278,7 @@ function poll_device($device, $options)
     // Run these base modules always and before all other modules!
     $poll_modules = array('system', 'os');
 
-    if (isset($options['m']) && $options['m'] == 'none')
-    {
+    if (isset($options['m']) && $options['m'] === 'none') {
       unset($poll_modules);
     }
 
@@ -296,21 +300,16 @@ function poll_device($device, $options)
         }
       }
     } else {
-      foreach ($config['poller_modules'] as $module => $module_status)
-      {
+      foreach ($config['poller_modules'] as $module => $module_status) {
         if (!is_module_enabled($device, $module) || // Skip disabled/blacklisted modules
-            in_array($module, $poll_modules))       // Skip already added modules
-        {
+            in_array($module, $poll_modules)) {     // Skip already added modules
           continue;
         }
 
-        if (in_array($module, [ 'unix-agent', 'wmi' ]))
-        {
+        if (in_array($module, [ 'unix-agent', 'wmi' ])) {
           // Add 'unix-agent' or 'wmi' before all
           array_unshift($poll_modules, $module);
-        }
-        elseif (is_file($config['install_dir'] . "/includes/polling/$module.inc.php"))
-        {
+        } elseif (is_file($config['install_dir'] . "/includes/polling/$module.inc.php")) {
           $poll_modules[] = $module;
         }
       }
@@ -318,15 +317,14 @@ function poll_device($device, $options)
       // Modules enabled stats:
       $modules_stat = $GLOBALS['cache']['devices']['poller_modules'][$device['device_id']];
 
-      if (count($modules_stat['excluded'])) { print_cli_data("Modules Excluded", implode(", ", $modules_stat['excluded']), 1); }
-      if (count($modules_stat['disabled'])) { print_cli_data("Modules Disabled", implode(", ", $modules_stat['disabled']), 1); }
-      if (count($modules_stat['enabled']))  { print_cli_data("Modules Enabled",  implode(", ", $modules_stat['enabled']), 1); }
+      if (safe_count($modules_stat['excluded'])) { print_cli_data("Modules Excluded", implode(", ", $modules_stat['excluded']), 1); }
+      if (safe_count($modules_stat['disabled'])) { print_cli_data("Modules Disabled", implode(", ", $modules_stat['disabled']), 1); }
+      if (safe_count($modules_stat['enabled']))  { print_cli_data("Modules Enabled",  implode(", ", $modules_stat['enabled']), 1); }
     }
 
     echo(PHP_EOL);
 
-    foreach ($poll_modules as $module)
-    {
+    foreach ($poll_modules as $module) {
       print_debug(PHP_EOL . "including: includes/polling/$module.inc.php");
 
       print_cli_heading("Module Start: %R".$module."");
@@ -341,9 +339,13 @@ function poll_device($device, $options)
       $device_state['poller_mod_perf'][$module] = $m_run;
       print_cli_data("Module time", number_format($m_run, 4)."s");
 
-      if (!isset($options['m']))
-      {
+      if (!isset($options['m'])) {
         rrdtool_update_ng($device, 'perf-pollermodule', array('val' => $m_run), $module);
+
+        if ($device['status'] == 0) {
+          log_event("WARNING! Stopped polling of other modules because device became unavailable in $module module.", $device, 'device', $device['device_id'], 7);
+          break;
+        }
       }
 
       echo(PHP_EOL);
@@ -355,8 +357,7 @@ function poll_device($device, $options)
     // Check and update graphs DB
     $graphs_stat = array();
 
-    if (!isset($options['m']))
-    {
+    if (!isset($options['m'])) {
       // Hardcoded poller performance
       $graphs['poller_perf'] = TRUE;
       $graphs['pollersnmp_count']    = TRUE;
@@ -385,33 +386,27 @@ function poll_device($device, $options)
     {
       if (!$graph) { continue; } // Not know how here can empty
 
-      if (!isset($graphs_db[$graph]))
-      {
+      if (!isset($graphs_db[$graph])) {
         //dbInsert(array('device_id' => $device['device_id'], 'graph' => $graph, 'enabled' => $value), 'device_graphs');
         $graphs_insert[] = array('device_id' => $device['device_id'], 'graph' => $graph, 'enabled' => $value);
         $graphs_stat['added'][] = $graph;
-      }
-      else if ($value != $graphs_db[$graph]['enabled'])
-      {
+      } elseif ($value != $graphs_db[$graph]['enabled']) {
         dbUpdate(array('enabled' => $value), 'device_graphs', '`device_graph_id` = ?', array($device['device_id'], $graph));
         $graphs_stat['updated'][] = $graph;
       } else {
         $graphs_stat['checked'][] = $graph;
       }
     }
-    if (count($graphs_insert))
-    {
+    if (safe_count($graphs_insert)) {
       dbInsertMulti($graphs_insert, 'device_graphs');
     }
-    if (count($graphs_delete))
-    {
+    if (safe_count($graphs_delete)) {
       dbDelete('device_graphs', generate_query_values($graphs_delete, 'device_graph_id', NULL, FALSE));
     }
 
     // Print graphs stats
-    foreach ($graphs_stat as $key => $stat)
-    {
-      if (count($stat)) { print_cli_data('Graphs ['.$key.']', implode(', ', $stat), 1); }
+    foreach ($graphs_stat as $key => $stat) {
+      if (safe_count($stat)) { print_cli_data('Graphs ['.$key.']', implode(', ', $stat), 1); }
     }
 
     $device_end  = utime();
@@ -432,10 +427,10 @@ function poll_device($device, $options)
 
       // Fetch previous device state (do not use $device array here, for exclude update history collisions)
       $old_device_state = dbFetchCell('SELECT `device_state` FROM `devices` WHERE `device_id` = ?;', array($device['device_id']));
-      $old_device_state = unserialize($old_device_state);
+      $old_device_state = safe_unserialize($old_device_state);
 
       // Add first entry
-      $poller_history = array(intval($device_start) => $device_time); // start => duration
+      $poller_history = [ (int)$device_start => $device_time ]; // start => duration
       // Add and keep not more than 288 (24 hours with 5min interval) last entries
       if (isset($old_device_state['poller_history']))
       {
@@ -463,8 +458,7 @@ function poll_device($device, $options)
       rrdtool_update_ng($device, 'perf-poller', array('val' => $device_time));
     }
 
-    if (OBS_DEBUG)
-    {
+    if (OBS_DEBUG) {
       echo("Updating " . $device['hostname'] . " - ");
       print_vars($update_array);
       echo(" \n");
@@ -488,7 +482,7 @@ function poll_device($device, $options)
     unset($cache_storage); // Clear cache of hrStorage ** MAYBE FIXME? ** (ok, later)
     unset($cache); // Clear cache (unify all things here?)
 
-  } else if (!$options['m']) {
+  } elseif (!$options['m']) {
     // State is 0, also collect poller time for down devices, since it not zero!
 
     $device_end  = utime();
@@ -516,16 +510,14 @@ function poller_module_excluded($device, $module)
   global $config;
 
   ///FIXME. rename module: 'wmi' -> 'windows-wmi'
-  if ($module == 'wmi'  && $device['os'] != 'windows') { return TRUE; }
+  if ($module === 'wmi'  && $device['os'] !== 'windows') { return TRUE; }
 
-  if ($module == 'ipmi' &&
+  if ($module === 'ipmi' &&
       (!isset($config['os'][$device['os']]['ipmi']) || $config['os'][$device['os']]['ipmi'] == FALSE)) { return TRUE; }
-  if ($module == 'unix-agent' && !($device['os_group'] == 'unix' || $device['os'] == 'generic')) { return TRUE; }
+  if ($module === 'unix-agent' && !($device['os_group'] === 'unix' || $device['os'] === 'generic')) { return TRUE; }
 
-  if (isset($config['os'][$device['os']]['poller_blacklist']))
-  {
-    if (in_array($module, $config['os'][$device['os']]['poller_blacklist']))
-    {
+  if (isset($config['os'][$device['os']]['poller_blacklist'])) {
+    if (in_array($module, (array)$config['os'][$device['os']]['poller_blacklist'])) {
       return TRUE;
     }
   }
@@ -535,7 +527,7 @@ function poller_module_excluded($device, $module)
   list($os_test) = $os_test;
 
   ///FIXME. rename module: 'cipsec-tunnels' -> 'cisco-ipsec-tunnels'
-  if (($os_test == 'cisco' || $os_test == 'cipsec') && $device['os_group'] != 'cisco') { return TRUE; }
+  if (($os_test === 'cisco' || $os_test === 'cipsec') && $device['os_group'] !== 'cisco') { return TRUE; }
   //$os_groups = array('cisco', 'unix');
   //foreach ($os_groups as $os_group)
   //{
@@ -543,8 +535,7 @@ function poller_module_excluded($device, $module)
   //}
 
   $oses = array('junose', 'arista_eos', 'netscaler', 'arubaos');
-  foreach ($oses as $os)
-  {
+  foreach ($oses as $os) {
     if (strpos($os, $os_test) !== FALSE && $device['os'] != $os) { return TRUE; }
   }
 
@@ -586,17 +577,17 @@ function poller_module_excluded($device, $module)
  *  )
  *
  */
-function collect_table($device, $oids_def, &$graphs)
-{
+function collect_table($device, $oids_def, &$graphs) {
   $rrd      = array();
   $mib      = NULL;
   $mib_dirs = NULL;
   $use_walk = isset($oids_def['table']) && $oids_def['table']; // Use snmpwalk by default
   $call_function = strtolower($oids_def['call_function']);
-  switch ($call_function)
-  {
+  switch ($call_function) {
     case 'snmp_get':
+    case 'snmp_get_oid':
     case 'snmp_get_multi':
+    case 'snmp_get_multi_oid':
       $use_walk = FALSE;
       break;
     case 'snmpwalk_cache_bare_oid':
@@ -604,21 +595,17 @@ function collect_table($device, $oids_def, &$graphs)
     case 'snmpwalk_cache_oid':
     default:
       $call_function = 'snmpwalk_cache_oid';
-      if (!$use_walk)
-      {
+      if (!$use_walk) {
         // Break because we should use snmpwalk, but walking table not set
         return FALSE;
       }
   }
   if (isset($oids_def['numeric'])) { $oids_def['numeric'] = '.'.trim($oids_def['numeric'], '. '); } // Remove trailing dot
   if (isset($oids_def['mib']))     { $mib      = $oids_def['mib']; }
-  if (isset($oids_def['mib_dir'])) { $mib_dirs = mib_dirs($oids_def['mib_dir']); }
-  if (isset($oids_def['file']))
-  {
+  //if (isset($oids_def['mib_dir'])) { $mib_dirs = mib_dirs($oids_def['mib_dir']); }
+  if (isset($oids_def['file'])) {
     $rrd_file = $oids_def['file'];
-  }
-  elseif ($mib && isset($oids_def['table']))
-  {
+  } elseif ($mib && isset($oids_def['table'])) {
     // Try to use MIB & tableName as rrd_file
     $rrd_file = strtolower(safename($mib.'_'.$oids_def['table'])).'.rrd';
   } else {
@@ -626,13 +613,15 @@ function collect_table($device, $oids_def, &$graphs)
     return FALSE; // Not have RRD filename
   }
 
+  if (discovery_check_requires_pre($device, $oids_def, 'graphs')) {
+    return FALSE;
+  }
+
   // Get MIBS/Tables/OIDs permissions
-  if ($use_walk)
-  {
-    // if use table walk, than check only this table disabled (not oids)
+  if ($use_walk) {
+    // if use table walk, then check only this table disabled (not oids)
     $disabled_tables = get_device_objects_disabled($device, $mib);
-    if (in_array($oids_def['table'], $disabled_tables))
-    {
+    if (in_array($oids_def['table'], $disabled_tables)) {
       print_debug("  WARNING, table '".$oids_def['table']."' for '$mib' disabled and skipped.");
       return FALSE; // table disabled, exit
     }
@@ -640,8 +629,7 @@ function collect_table($device, $oids_def, &$graphs)
     // if use multi_get, than check all oids disabled
     $disabled_oids = get_device_objects_disabled($device, $mib);
     $oids_ok = array_diff(array_keys($oids_def['oids']), $disabled_oids);
-    if (count($oids_ok) == 0)
-    {
+    if (safe_count($oids_ok) == 0) {
       print_debug("  WARNING, oids '".implode("', '", array_keys($oids_def['oids']))."' for '$mib' disabled and skipped.");
       return FALSE;  // All oids disabled, exit
     }
@@ -649,10 +637,8 @@ function collect_table($device, $oids_def, &$graphs)
 
   $search  = array();
   $replace = array();
-  if (is_array($oids_def['ds_rename']))
-  {
-    foreach ($oids_def['ds_rename'] as $s => $r)
-    {
+  if (is_array($oids_def['ds_rename'])) {
+    foreach ($oids_def['ds_rename'] as $s => $r) {
       $search[]  = $s;
       $replace[] = $r;
     }
@@ -663,25 +649,19 @@ function collect_table($device, $oids_def, &$graphs)
 
   $oids       = array();
   $oids_index = array();
-  foreach ($oids_def['oids'] as $oid => $entry)
-  {
-    if (is_numeric($entry['numeric']) && isset($oids_def['numeric']))
-    {
+  foreach ($oids_def['oids'] as $oid => $entry) {
+    if (is_numeric($entry['numeric']) && isset($oids_def['numeric'])) {
       $entry['numeric'] = $oids_def['numeric'] . '.' . $entry['numeric']; // Numeric oid, for future using
     }
-    if (!isset($entry['index']) && isset($oids_def['index']))
-    {
+    if (!isset($entry['index']) && isset($oids_def['index'])) {
       $entry['index'] = $oids_def['index'];
-    }
-    elseif (!isset($entry['index']))
-    {
+    } elseif (!isset($entry['index'])) {
       $entry['index'] = '0';
     }
     if (!isset($entry['ds_type'])) { $entry['ds_type'] = 'COUNTER'; }
     if (!isset($entry['ds_min']))  { $entry['ds_min']  = 'U'; }
     if (!isset($entry['ds_max']))  { $entry['ds_max']  = '100000000000'; }
-    if (!isset($entry['ds_name']))
-    {
+    if (!isset($entry['ds_name'])) {
       // Convert OID name to DS name
       $ds_name = $oid;
       if (is_array($oids_def['ds_rename'])) { $ds_name = str_replace($search, $replace, $ds_name); }
@@ -690,8 +670,7 @@ function collect_table($device, $oids_def, &$graphs)
     }
     if (strlen($ds_name) > $ds_len) { $ds_name = truncate($ds_name, $ds_len, ''); }
 
-    if (isset($oids_def['no_index']) && $oids_def['no_index'] == TRUE)
-    {
+    if (isset($oids_def['no_index']) && $oids_def['no_index']) {
       $oids[]       = $oid;
     } else {
       $oids[]       = $oid.'.'.$entry['index'];
@@ -702,22 +681,21 @@ function collect_table($device, $oids_def, &$graphs)
     if (OBS_DEBUG) { $rrd['ds_list'][] = $ds_name; } // Make DS lists for compare with RRD file in debug
   }
 
-  switch ($call_function)
-  {
+  switch ($call_function) {
     case 'snmpwalk_cache_oid':
-      $data = snmpwalk_cache_oid($device, $oids_def['table'], array(), $mib, $mib_dirs);
+      $data = snmpwalk_cache_oid($device, $oids_def['table'], array(), $mib);
       break;
     case 'snmpwalk_cache_bare_oid':
-      $data = snmpwalk_cache_bare_oid($device, $oids_def['table'], array(), $mib, $mib_dirs);
+      $data = snmpwalk_cache_bare_oid($device, $oids_def['table'], array(), $mib);
       break;
     case 'snmp_get':
+    case 'snmp_get_oid':
     case 'snmp_get_multi':
     case 'snmp_get_multi_oid':
-      $data = snmp_get_multi_oid($device, $oids, array(), $mib, $mib_dirs);
+      $data = snmp_get_multi_oid($device, $oids, array(), $mib);
       break;
   }
-  if (!snmp_status())
-  {
+  if (!snmp_status()) {
     // Break because latest snmp walk/get return not good exitstatus (wrong mib/timeout/error/etc)
     print_debug("  WARNING, latest snmp walk/get return not good exitstatus for '$mib', RRD update skipped.");
     return FALSE;
@@ -725,30 +703,24 @@ function collect_table($device, $oids_def, &$graphs)
 
   //print_debug_vars($data);
 
-  if (isset($oids_def['no_index']) && $oids_def['no_index'] == TRUE || $call_function == 'snmpwalk_cache_double_oid')
-  {
+  if ((isset($oids_def['no_index']) && $oids_def['no_index']) || $call_function === 'snmpwalk_cache_double_oid') {
     $data[0] = $data[''];
-  }
-  elseif ( $call_function == 'snmpwalk_cache_bare_oid')
-  {
+  } elseif ($call_function === 'snmpwalk_cache_bare_oid') {
     $data[0] = $data;
   }
 
   print_debug_vars($data);
 
-  foreach ($oids_index as $entry)
-  {
+  foreach ($oids_index as $entry) {
     $index = $entry['index'];
     $oid   = $entry['oid'];
 
-    if (is_numeric($data[$index][$oid]))
-    {
+    if (is_numeric($data[$index][$oid])) {
       // The original OID definition from the table.
       $def = $oids_def['oids'][$oid];
 
       // Apply multiplier value from the entry
-      if (isset($def['multiplier']) && $def['multiplier'] != 0)
-      {
+      if (isset($def['multiplier']) && $def['multiplier'] != 0) {
         $data[$index][$oid] = scale_value($data[$index][$oid], $def['multiplier']);
       }
 
@@ -760,22 +732,19 @@ function collect_table($device, $oids_def, &$graphs)
   }
 
   // Ok, all previous checks done, update RRD, table/oids permissions, $graphs
-  if (isset($rrd['ok']) && $rrd['ok'])
-  {
+  if (isset($rrd['ok']) && $rrd['ok']) {
     // Create/update RRD file
     $rrd_create = implode('', $rrd['rrd_create']);
     $rrd_update = 'N:'.implode(':', $rrd['rrd_update']);
     rrdtool_create($device, $rrd_file, $rrd_create);
     rrdtool_update($device, $rrd_file, $rrd_update);
 
-    foreach ($oids_def['graphs'] as $graph)
-    {
+    foreach ($oids_def['graphs'] as $graph) {
       $graphs[$graph] = TRUE; // Set all graphs to TRUE
     }
 
     // Compare DSes form RRD file with DSes from array
-    if (OBS_DEBUG)
-    {
+    if (OBS_DEBUG) {
       $graph_template  = "\$config['graph_types']['device']['GRAPH_CHANGE_ME'] = array(\n";
       $graph_template .= "  'file'      => '$rrd_file',\n";
       $graph_template .= "  'ds'        => array(\n";
@@ -800,9 +769,7 @@ function collect_table($device, $oids_def, &$graphs)
       // Print example for graph template using rrd_file and ds list
       print_message($graph_template);
     }
-  }
-  else if ($use_walk)
-  {
+  } elseif ($use_walk) {
     // Table NOT exist on device!
     // Disable polling table (only if table not enabled manually in DB)
 

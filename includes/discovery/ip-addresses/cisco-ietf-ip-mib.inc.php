@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,12 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $ip_version = 'ipv6';
-
-if (!count($ip_data[$ip_version]))
-{
+if (!safe_count($ip_data[$ip_version])) {
   // Get IP addresses from CISCO-IETF-IP-MIB
   //cIpAddressIfIndex.ipv6."20:01:04:70:00:15:00:bb:00:00:00:00:00:00:00:02" = 450
   //cIpAddressPrefix.ipv6."20:01:04:70:00:15:00:bb:00:00:00:00:00:00:00:02" = cIpAddressPfxOrigin.450.ipv6."20:01:04:70:00:15:00:bb:00:00:00:00:00:00:00:00".64

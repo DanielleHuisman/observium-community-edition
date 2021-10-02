@@ -13,11 +13,11 @@
 
 // CISCO-STACK-MIB
 
-$port_stack = snmpwalk_cache_multi_oid($device, "portIfIndex",    array(), "CISCO-STACK-MIB");
+$port_stack = snmpwalk_cache_oid($device, "portIfIndex", array(), "CISCO-STACK-MIB");
 if (!$GLOBALS['snmp_status']) { return; } // Break walk if not exist data from CISCO-STACK-MIB
 
-$port_stack = snmpwalk_cache_multi_oid($device, "portName",   $port_stack, "CISCO-STACK-MIB");
-$port_stack = snmpwalk_cache_multi_oid($device, "portDuplex", $port_stack, "CISCO-STACK-MIB");
+$port_stack = snmpwalk_cache_oid($device, "portName", $port_stack, "CISCO-STACK-MIB");
+$port_stack = snmpwalk_cache_oid($device, "portDuplex", $port_stack, "CISCO-STACK-MIB");
 
 foreach($port_stack as $key => $data)
 {

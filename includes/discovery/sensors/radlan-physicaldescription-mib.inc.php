@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,14 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Detect old/new MIB used, this OIDs exist only for old firmware
-if (strlen(snmp_get($device, '.1.3.6.1.4.1.89.53.15.1.18.1', '-Oqv')) || // RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Value.1
-    strlen(snmp_get($device, '.1.3.6.1.4.1.89.53.15.1.19.1', '-Oqv')))   // RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Status.1
-{
+if (!safe_empty(snmp_get_oid($device, '.1.3.6.1.4.1.89.53.15.1.18.1')) || // RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Value.1
+    !safe_empty(snmp_get_oid($device, '.1.3.6.1.4.1.89.53.15.1.19.1')) || // RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Status.1
+    snmp_get_oid($device, '.1.3.6.1.4.1.89.53.15.1.9.1') > 10) {          // RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensorValue.1
   /*
 RlPhdUnitEnvParamEntry ::= SEQUENCE {
     rlPhdUnitEnvParamStackUnit                   INTEGER,
@@ -60,22 +59,18 @@ RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Value.1 = INTEGE
 RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Status.1 = INTEGER: 4
    */
   $mib = 'RADLAN-Physicaldescription-old-MIB';
-  $oids  = snmpwalk_cache_multi_oid($device, 'rlPhdUnitEnvParamEntry',  array(), $mib, mib_dirs('radlan')); // Leave mib_dirs() here!
-  $count = count($oids);
+  $oids  = snmpwalk_cache_oid($device, 'rlPhdUnitEnvParamEntry', array(), $mib, mib_dirs('radlan')); // Leave mib_dirs() here!
+  $count = safe_count($oids);
 
-  foreach ($oids as $index => $entry)
-  {
+  foreach ($oids as $index => $entry) {
     // Temperature
     $name = 'Sensor';
-    for ($i = 1; $i <= 5; $i++)
-    {
+    for ($i = 1; $i <= 5; $i++) {
       $descr    = $name . ' ' . $i;
-      if ($count > 1)
-      {
+      if ($count > 1) {
         $descr .= ' Unit ' . $index;
       }
-      if ($i == 1)
-      {
+      if ($i == 1) {
         $oid_name = 'rlPhdUnitEnvParamTempSensorValue';
         $oid_num  = ".1.3.6.1.4.1.89.53.15.1.9.$index";
       } else {
@@ -85,14 +80,14 @@ RADLAN-Physicaldescription-old-MIB::rlPhdUnitEnvParamTempSensor5Status.1 = INTEG
       $type     = $mib . '-' . $oid_name;
       $scale    = 1;
       $value    = $entry[$oid_name];
-      if ($value != 0)
-      {
+      if ($value != 0) {
         discover_sensor('temperature', $device, $oid_num, $index, $type, $descr, $scale, $value);
       }
     }
 
     // Skip other if sensors detected by RADLAN-HWENVIROMENT
-    if (isset($valid['status']['radlan-hwenvironment-state'])) { continue; }
+    if (isset($valid['status']['RADLAN-HWENVIROMENT']['radlan-hwenvironment-state']) ||
+        isset($valid['status']['Dell-Vendor-MIB']['dell-vendor-state'])) { continue; }
 
     $descr    = 'Power Supply 1';
     if ($count > 1)
@@ -158,10 +153,9 @@ RlPhdUnitEnvParamEntry ::= SEQUENCE {
 }
  */
   $mib = 'RADLAN-Physicaldescription-MIB';
-  $oids  = snmpwalk_cache_multi_oid($device, 'rlPhdUnitEnvParamEntry',  array(), $mib);
+  $oids  = snmpwalk_cache_oid($device, 'rlPhdUnitEnvParamEntry', array(), $mib);
 
-  foreach ($oids as $index => $entry)
-  {
+  foreach ($oids as $index => $entry) {
     // Temperature
     $descr    = 'Unit ' . $index;
 
@@ -175,13 +169,13 @@ RlPhdUnitEnvParamEntry ::= SEQUENCE {
     $options = array();
     $options['limit_high_warn'] = $entry['rlPhdUnitEnvParamTempSensorWarningThresholdValue'];
     $options['limit_high']      = $entry['rlPhdUnitEnvParamTempSensorCriticalThresholdValue'];
-    if ($value != 0)
-    {
+    if ($value != 0) {
       discover_sensor('temperature', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
     }
 
     // Skip other if sensors detected by RADLAN-HWENVIROMENT
-    if (isset($valid['status']['radlan-hwenvironment-state'])) { continue; }
+    if (isset($valid['status']['RADLAN-HWENVIROMENT']['radlan-hwenvironment-state']) ||
+        isset($valid['status']['Dell-Vendor-MIB']['dell-vendor-state'])) { continue; }
 
     $descr    = 'Power Supply 1';
     if ($count > 1)

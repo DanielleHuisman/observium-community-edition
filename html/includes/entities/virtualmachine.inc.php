@@ -25,6 +25,11 @@ function generate_vm_query($vars)
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'vm_id');
         break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'device_id');
+        break;
       case "device":
       case "device_id":
         $sql .= generate_query_values($value, 'device_id');
@@ -193,7 +198,7 @@ function generate_vm_row($vm, $vars)
   }
 
   $out .= '<td>'. format_bi($vm['vm_memory'] * 1024 * 1024, 3, 3) .'B</td>';
-  $out .= '<td>'. nicecase($vm['vm_cpucount']) .'</td>';
+  $out .= '<td>'. $vm['vm_cpucount'] .'</td>';
   $out .= '</tr>';
 
   return $out;

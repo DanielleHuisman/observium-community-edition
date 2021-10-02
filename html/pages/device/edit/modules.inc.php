@@ -1,20 +1,19 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-include($config['install_dir'] . '/includes/polling/functions.inc.php');
-include($config['install_dir'] . '/includes/discovery/functions.inc.php');
+include_once($config['install_dir'] . '/includes/polling/functions.inc.php');
+include_once($config['install_dir'] . '/includes/discovery/functions.inc.php');
 
-$ports_ignored_count = intval(get_entity_attrib('device', $device, 'ports_ignored_count')); // Cache last ports ignored count
+$ports_ignored_count = (int)get_entity_attrib('device', $device, 'ports_ignored_count'); // Cache last ports ignored count
 $ports_total_count   = $ports_ignored_count + dbFetchCell('SELECT COUNT(*) FROM `ports` WHERE `device_id` = ? AND `deleted` = ?', array($device['device_id'], 0));
 
 if ($vars['submit'])
@@ -277,7 +276,7 @@ foreach (array_keys($config) as $module)
       $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';
       $value  = 'Disable';
     }
-    elseif (intval($device['state']['poller_mod_perf']['ports']) < 20 && $ports_total_count <= 10)
+    elseif ((int)$device['state']['poller_mod_perf']['ports'] < 20 && $ports_total_count <= 10)
     {
       $attrib_status = '<span class="label label-default">excluded</span>';
       $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
@@ -368,7 +367,7 @@ foreach ($config['discovery_modules'] as $module => $module_status)
   $toggle = 'Enable'; $btn_class = 'btn-success'; $btn_icon = 'icon-ok';
   $disabled = FALSE;
 
-  if (in_array($module, $config['os'][$device['os']]['discovery_blacklist']))
+  if (in_array($module, (array)$config['os'][$device['os']]['discovery_blacklist']))
   {
     $attrib_status = '<span class="label label-disabled">excluded</span>';
     $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';

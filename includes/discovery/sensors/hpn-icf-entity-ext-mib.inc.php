@@ -17,7 +17,7 @@ $oids = array('hpnicfEntityExtStateTable', 'entPhysicalName');
 $entity_array = array();
 foreach ($oids as $oid)
 {
-  $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, 'ENTITY-MIB:HPN-ICF-ENTITY-EXT-MIB');
+  $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, 'ENTITY-MIB:HPN-ICF-ENTITY-EXT-MIB');
 }
 
 foreach ($entity_array as $index => $entry)

@@ -21,6 +21,8 @@ require_once('includes/collectd/functions.php');
 require_once('includes/collectd/definitions.php');
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
+
+
 // Process input arguments
 #$host   = read_var('host', $vars, null);
 $host   = $device['hostname'];
@@ -54,7 +56,6 @@ else if (strlen($type) == 0)
 $tinst  = read_var('c_type_instance', $vars, '');
 
 $graph_identifier = $host.'/'.$plugin.(strlen($pinst) ? '-'.$pinst : '').'/'.$type.(strlen($tinst) ? '-'.$tinst : '-*');
-
 $timespan = read_var('timespan', $vars, $config['timespan'][0]['name']);
 $timespan_ok = false;
 foreach ($config['timespan'] as &$ts)
@@ -68,7 +69,7 @@ $tinylegend = (boolean)read_var('tinylegend', $vars, false);
 
 // Check that at least 1 RRD exists for the specified request
 $all_tinst = collectd_list_tinsts($host, $plugin, $pinst, $type);
-if (count($all_tinst) == 0)
+if (safe_count($all_tinst) == 0)
   return error404($graph_identifier, "No rrd file found for graphing");
 
 // Now that we are read, do the bulk work
@@ -108,12 +109,13 @@ if(isset($rrd_cmd))
    $rrd_cmd .= " -s " . escapeshellarg($from) . " -e " . escapeshellarg($to);
 }
 
+/*
 if ($vars['legend'] == "no")  { $rrd_cmd .= " -g "; }
 
 if ($vars['height'] < "99")  { $rrd_cmd .= " --only-graph "; }
 if ($vars['width'] <= "300") { $rrd_cmd .= " --font LEGEND:7:" . $config['mono_font'] . " --font AXIS:6:" . $config['mono_font'] . " "; }
 else {                         $rrd_cmd .= " --font LEGEND:8:" . $config['mono_font'] . " --font AXIS:7:" . $config['mono_font'] . " "; }
-
+*/
 $rt = 0;
 $rrd_options .= $rrd_cmd;
 

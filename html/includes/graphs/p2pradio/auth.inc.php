@@ -20,7 +20,7 @@ if (is_numeric($vars['id']))
 
     $device = device_by_id_cache($radio['device_id']);
 
-    $rrd_filename = get_rrd_path($device, "p2p_radio-" . strtolower($radio['radio_mib']) . "-" . $radio['radio_index'] . ".rrd");
+    $rrd_filename = get_rrd_path($device, "p2p_radio-" . $radio['radio_mib'] . "-" . $radio['radio_index'] . ".rrd");
 
     $title  = generate_device_link($device);
     $title .= " :: P2P Radio :: " . escape_html($radio['radio_name']);

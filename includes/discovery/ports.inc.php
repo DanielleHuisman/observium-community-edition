@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -100,16 +99,19 @@ foreach ($port_stats as $ifIndex => $port)
     if (isset($port[$oid_fix])) { $port[$oid_fix] = snmp_fix_string($port[$oid_fix]); }
   }
 
+  // On some Brocade NOS
+  if ($port['ifOperStatus'] === '-1') {
+    $port['ifOperStatus'] = 'unknown';
+  }
+
   $table_row = array($ifIndex, truncate($port['ifDescr'], 30), $port['ifName'], truncate($port['ifAlias'], 20), $port['ifType'], $port['ifOperStatus']);
   // Check the port against our filters.
-  if (is_port_valid($port, $device))
-  {
+  if (is_port_valid($port, $device)) {
     // Not ignored ports
 
     $table_row[]  = '%gno%n';
 
-    if (!isset($ports_db[$key]))
-    {
+    if (!isset($ports_db[$key])) {
       // New port
       process_port_label($port, $device); // Process ifDescr if needed
       $table_row[1] = truncate($port['ifDescr'], 30);
@@ -126,9 +128,7 @@ foreach ($port_stats as $ifIndex => $port)
       //$port_id = dbInsert(array('device_id' => $device['device_id'], 'ifIndex' => $ifIndex, 'ifAlias' => $port['ifAlias'], 'ifDescr' => $port['ifDescr'], 'ifName' => $port['ifName'], 'ifType' => $port['ifType']), 'ports');
       //$ports_db[$ifIndex] = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?", array($device['device_id'], $ifIndex));
       echo(" ".$port['port_label']."(".$ifIndex.")");
-    }
-    elseif ($ports_db[$key]['deleted'] == "1")
-    {
+    } elseif ($ports_db[$key]['deleted'] == "1") {
       // Undeleted port
       dbUpdate(array('deleted' => '0'), 'ports', '`port_id` = ?', array($ports_db[$key]['port_id']));
       log_event("Interface DELETED mark removed", $device, 'port', $ports_db[$key]);
@@ -141,6 +141,25 @@ foreach ($port_stats as $ifIndex => $port)
     } else {
       echo(".");
 
+      // Update RRD DS max for ports 40G+
+      if (isset($ports_db[$key]['ifSpeed']) && $ports_db[$key]['ifSpeed'] > 40000000000) {
+        //$rrd_options['speed'] += 20000000000; // DEBUG
+        //$rrd_options['update_max'] = TRUE;
+        $filename = rrdtool_generate_filename($config['rrd_types']['port'], $key);
+        $fsfilename = get_rrd_path($device, $filename);
+        $rrd_info = rrdtool_file_info($fsfilename);
+        //print_vars($rrd_info);
+        if ($rrd_info && is_numeric($rrd_info['DS']['INOCTETS']['max'])) {
+          $max = (float)$rrd_info['DS']['INOCTETS']['max'];
+          //print_vars($max);
+          //print_vars($ports_db[$key]['ifSpeed'] / 8);
+          if ($max < ($ports_db[$key]['ifSpeed'] / 8)) {
+            $rrd_options = [ 'speed' => $ports_db[$key]['ifSpeed'], 'update_max' => TRUE ];
+            rrdtool_update_ds($device, 'port', $key, $rrd_options);
+            log_event("Interface RRD updated MAX DSes", $device, 'port', $ports_db[$key], 7);
+          }
+        }
+      }
       // We've seen it. Remove it from the cache.
       $port_id = $ports_db[$key]['port_id'];
       unset($ports_ids[$port_id]);

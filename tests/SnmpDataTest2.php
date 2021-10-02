@@ -356,7 +356,7 @@ DI-1705 (RISC)
     $test = array();
     foreach ((array)$oids as $oid)
     {
-      $test = snmp_walk_multipart_oid($device, $oid, $test, $mib, NULL, $flags);
+      $test = snmpwalk_multipart_oid($device, $oid, $test, $mib, NULL, $flags);
     }
     //echo PHP_EOL . json_encode($test, JSON_PRETTY_PRINT) . PHP_EOL;
     //var_dump($test);

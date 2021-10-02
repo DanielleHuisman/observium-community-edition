@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,97 +6,12 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-// FIXME - maybe this one should also be using table walks instead of $outlet_index and $outletsuffix hacks. (but I don't have a device) -TL
-
-// FIXME - needs rewrite, hard to follow.
-
-/////////////////////////////////
-// Check for per-outlet polling
-$outlet_oids = snmp_walk($device, "outletIndex", "-Osqn", "PDU-MIB");
-$outlet_oids = trim($outlet_oids);
-
-if ($outlet_oids) echo("PDU Outlet ");
-
-$ratedvoltage = snmp_get($device,"ratedVoltage.0", "-Ovq", "PDU-MIB");
-
-foreach (explode("\n", $outlet_oids) as $outlet_data)
-{
-  $outlet_data = trim($outlet_data);
-  if ($outlet_data)
-  {
-    $scale = 0.001;
-    list($outlet_oid,$outlet_descr) = explode(" ", $outlet_data,2);
-    $outlet_split_oid = explode('.',$outlet_oid);
-    $index = $outlet_split_oid[count($outlet_split_oid)-1];
-
-    // outletLoadValue: "A non-negative value indicates the measured load in milli Amps"
-    $outlet_oid     = ".1.3.6.1.4.1.13742.4.1.2.2.1.4.$index";
-    $outlet_descr   = snmp_get($device, "outletLabel.$index", "-Ovq", "PDU-MIB");
-    $limits         = array('limit_high'      => snmp_get($device, "outletCurrentUpperCritical.$index", "-Ovq", "PDU-MIB") * $scale,
-                            'limit_low'       => snmp_get($device, "outletCurrentLowerCritical.$index", "-Ovq", "PDU-MIB") * $scale,
-                            'limit_high_warn' => snmp_get($device, "outletCurrentUpperWarning.$index", "-Ovq", "PDU-MIB") * $scale,
-                            'limit_low_warn'  => snmp_get($device, "outletCurrentLowerWarning.$index", "-Ovq", "PDU-MIB") * $scale);
-    $outlet_current = snmp_get($device, "outletCurrent.$index", "-Ovq", "PDU-MIB");
-
-    if ($outlet_current >= 0)
-    {
-      $limits['rename_rrd'] = "raritan-$index";
-      discover_sensor_ng($device, 'current', $mib, 'outletCurrent', $outlet_oid, $index, NULL, $outlet_descr, $scale, $outlet_current, $limits);
-    }
-
-    $outlet_oid     = ".1.3.6.1.4.1.13742.4.1.2.2.1.8.$index";
-    $outlet_descr   = snmp_get($device, "outletLabel.$index", "-Ovq", "PDU-MIB");
-    $limits         = array('limit_high'      => intval((snmp_get($device, "outletCurrentUpperCritical.$index", "-Ovq", "PDU-MIB") * $scale) * $ratedvoltage),
-                            'limit_low'       => intval((snmp_get($device, "outletCurrentLowerCritical.$index", "-Ovq", "PDU-MIB") * $scale) * $ratedvoltage),
-                            'limit_high_warn' => intval((snmp_get($device, "outletCurrentUpperWarning.$index", "-Ovq", "PDU-MIB") * $scale) * $ratedvoltage),
-                            'limit_low_warn'  => intval((snmp_get($device, "outletCurrentLowerWarning.$index", "-Ovq", "PDU-MIB") * $scale) * $ratedvoltage));
-    $outlet_current = snmp_get($device, "outletApparentPower.$index", "-Ovq", "PDU-MIB");
-
-    if ($outlet_current >= 0)
-    {
-      // FIXME. can be apower? and why limits with scale, but current without?
-      $limits['rename_rrd'] = "raritan-$index";
-      discover_sensor_ng($device, 'power', $mib, 'outletApparentValue', $outlet_oid, $index, NULL, $outlet_descr, 1, $outlet_current, $limits);
-    }
-  } // if ($outlet_data)
-} // foreach (explode("\n", $outlet_oids) as $outlet_data)
-
-$scale          = 0.1;
-$outlet_oid     = ".1.3.6.1.4.1.13742.4.1.3.1.5.0";
-$outlet_descr   = "CPU Temperature";
-$limits         = array('limit_high'      => snmp_get($device,"unitTempUpperCritical.0", "-Ovq", "PDU-MIB"),
-                        'limit_low'       => snmp_get($device,"unitTempLowerCritical.0", "-Ovq", "PDU-MIB"),
-                        'limit_high_warn' => snmp_get($device,"unitTempUpperWarning.0",  "-Ovq", "PDU-MIB"),
-                        'limit_low_warn'  => snmp_get($device,"unitTempLowerWarning.0",  "-Ovq", "PDU-MIB"));
-$outlet_current = snmp_get($device,"unitCpuTemp.0", "-Ovq", "PDU-MIB"); // Yeah, current scale is different from limits...
-
-if ($outlet_current >= 0)
-{
-  $limits['rename_rrd'] = "raritan-0";
-  discover_sensor_ng($device,'temperature', $mib, 'unitCpuTemp', $outlet_oid, 0, NULL, $outlet_descr, $scale, $outlet_current, $limits);
-}
-
-$scale          = 0.001;
-$outlet_oid     = ".1.3.6.1.4.1.13742.4.1.3.1.2.0";
-$outlet_descr   = "Input Feed";
-$limits         = array('limit_high'      => snmp_get($device,"unitOrLineVoltageUpperCritical.0", "-Ovq", "PDU-MIB") * $scale,
-                        'limit_low'       => snmp_get($device,"unitOrLineVoltageLowerCritical.0", "-Ovq", "PDU-MIB") * $scale,
-                        'limit_high_warn' => snmp_get($device,"unitOrLineVoltageUpperWarning.0",  "-Ovq", "PDU-MIB") * $scale,
-                        'limit_low_warn'  => snmp_get($device,"unitOrLineVoltageLowerWarning.0",  "-Ovq", "PDU-MIB") * $scale);
-$outlet_current = snmp_get($device,"unitVoltage.0", "-Ovq", "PDU-MIB");
-
-if ($outlet_current >= 0)
-{
-  $limits['rename_rrd'] = "raritan-0";
-  discover_sensor_ng($device,'voltage', $mib, 'unitVoltage', $outlet_oid, 0, NULL, $outlet_descr, $scale, $outlet_current, $limits);
-}
-
 // Raritan External Environmental Sensors
-$oids = snmpwalk_cache_multi_oid($device, "externalSensorTable", array(), "PDU-MIB");
+$oids = snmpwalk_cache_oid($device, "externalSensorTable", array(), "PDU-MIB");
 
 // PDU-MIB::sensorID.1 = INTEGER: 1
 // PDU-MIB::sensorID.2 = INTEGER: 2
@@ -131,37 +45,77 @@ $oids = snmpwalk_cache_multi_oid($device, "externalSensorTable", array(), "PDU-M
 // PDU-MIB::externalSensorValue.1 = INTEGER: 0
 // PDU-MIB::externalSensorValue.2 = INTEGER: 0
 
-foreach ($oids as $index => $entry)
-{
+$sensor_types = [
+  'rmsCurrent'     => 'current',
+  //'peakCurrent', 'unbalancedCurrent',
+  'rmsVoltage'     => 'voltage',
+  'activePower'    => 'power',
+  'apparentPower'  => 'apower',
+  'powerFactor'    => 'powerfactor',
+  'activeEnergy'   => 'energy',
+  'apparentEnergy' => 'energy',
+  'temperature'    => 'temperature',
+  'humidity'       => 'humidity',
+  'airFlow'        => 'velocity', // No one know, but seems as this is LFM unit
+  //'airPressure', 'onOff', 'trip', 'vibration', 'waterDetection', 'smokeDetection', 'binary', 'contact', 'other', 'none'
+];
+$sensor_units = [
+  //none(-1), other(0),
+  'volt' => 'voltage',
+  'amp'  => 'current',
+  'watt' => 'power',
+  'voltamp' => 'apower',
+  'wattHour' => 'energy',
+  'voltampHour' => 'aenergy',
+  'degreeC' => 'temperature',
+  'hertz' => 'frequency',
+  //'percent' => 'humidity',
+  //meterpersec(10),
+  'pascal' => 'pressure',
+  'psi' => 'pressure',
+  //g(13),
+  'degreeF' => 'temperature',
+  //feet(15),
+  //inches(16),
+  //cm(17),
+  //meters(18)
+];
+foreach ($oids as $index => $entry) {
   $descr   = $entry['externalSensorName']; // The name set by the device's admin through Raritan's web interface.
   $oid     = ".1.3.6.1.4.1.13742.4.3.3.1.41.$index";
-  $scale   = si_to_scale('units', $entry['externalSensorDecimalDigits']); // FIXME. other scale for externalSensorUnits = degreeF
-  $options = array('limit_high'      => $entry['externalSensorUpperWarningThreshold']  * $scale,
-                   'limit_low'       => $entry['externalSensorLowerCriticalThreshold'] * $scale,
-                   'limit_high_warn' => $entry['externalSensorUpperCriticalThreshold'] * $scale,
-                   'limit_low_warn'  => $entry['externalSensorLowerWarningThreshold']  * $scale);
+  $scale   = si_to_scale('units', $entry['externalSensorDecimalDigits']);
   $value   = $entry['externalSensorValue'];
-  $r_types = array(
-    'rmsCurrent'     => 'current',
-    //'peakCurrent', 'unbalancedCurrent',
-    'rmsVoltage'     => 'voltage',
-    'activePower'    => 'power',
-    'apparentPower'  => 'apower',
-    //'powerFactor', 'activeEnergy', 'apparentEnergy',
-    'temperature'    => 'temperature',
-    'humidity'       => 'humidity',
-    'airFlow'        => 'velocity', // No one know, but seems as this is LFM unit
-    //'airPressure', 'onOff', 'trip', 'vibration', 'waterDetection', 'smokeDetection', 'binary', 'contact', 'other', 'none'
-  );
 
-  if (isset($r_types[$entry['externalSensorType']]) && is_numeric($value))
-  {
+  if (isset($sensor_types[$entry['externalSensorType']])) {
+    $type = $sensor_types[$entry['externalSensorType']];
+  } elseif (isset($sensor_units[$entry['externalSensorUnits']])) {
+    $type = $sensor_units[$entry['externalSensorUnits']];
+  } else {
+    // FIXME. Statuses
+    continue;
+  }
+
+  if (in_array($type, [ 'energy', 'aenergy' ])) {
+    // Counters
+    discover_counter($device, $type, $mib, 'externalSensorValue', $oid, $index, $descr, $scale, $value);
+  } elseif (isset($sensor_types[$entry['externalSensorType']]) && is_numeric($value)) {
+    // Sensors
+    $options = [
+      'limit_high'      => $entry['externalSensorUpperWarningThreshold']  * $scale,
+      'limit_low'       => $entry['externalSensorLowerCriticalThreshold'] * $scale,
+      'limit_high_warn' => $entry['externalSensorUpperCriticalThreshold'] * $scale,
+      'limit_low_warn'  => $entry['externalSensorLowerWarningThreshold']  * $scale
+    ];
     $options['rename_rrd'] = "raritan-0";
-    if ($r_types[$entry['externalSensorType']] == 'velocity')
-    {
-      $options['sensor_unit'] = "LFM";
+    // Units
+    if ($sensor_types[$entry['externalSensorType']] === 'velocity') {
+      //$options['sensor_unit'] = "LFM";
     }
-    discover_sensor_ng($device, $r_types[$entry['externalSensorType']], $mib, 'externalSensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
+    if ($entry['externalSensorUnits'] === 'degreeF') {
+      $options['sensor_unit'] = "F";
+    }
+
+    discover_sensor_ng($device, $sensor_types[$entry['externalSensorType']], $mib, 'externalSensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
   }
 }
 

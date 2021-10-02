@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,10 +15,8 @@ $results = dbFetchRows("SELECT * FROM `wifi_accesspoints`
                         WHERE `name` LIKE ? $query_permitted_device
                         ORDER BY `name` LIMIT $query_limit", array($query_param));
 
-if (count($results))
-{
-  foreach ($results as $result)
-  {
+if (safe_count($results)) {
+  foreach ($results as $result) {
     $name = $result['name'];
     if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
 

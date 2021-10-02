@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -47,6 +46,7 @@ $tz = get_timezone();
       <td style="width: 12%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_URL; ?>"><i style="font-size: small;" class="icon-globe"></i>&nbsp; Web</a></td>
       <td style="width: 12%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_DOCS_URL; ?>"><i style="font-size: small;" class="icon-info"></i>&nbsp; Docs</a></td>
       <td style="width: 18%; text-align: center;"><a class="btn btn" target="_blank" href="https://jira.observium.org/"><i style="font-size: small;" class="icon-bug"></i>&nbsp; Bugtracker</a></td>
+      <td style="width: 19%; text-align: center;"><a class="btn btn" target="_blank" href="https://discord.gg/GjpNXKWm8W"><i class="icon-gamepad"></i> Discord</a></td>
       <!-- <td style="width: 19%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_URL; ?>/docs/mailinglists"><i class="icon-envelope"></i>&nbsp; Mailing&nbsp;List</a></td> -->
       <td style="width: 17%; text-align: center;"><a class="btn btn" target="_blank" href="https://twitter.com/observium"><i style="font-size: small;" class="icon-twitter-sign"></i>&nbsp; Twitter</a></td>
       <td style="width: 16%; text-align: center;"><a class="btn btn" target="_blank" href="https://www.facebook.com/pages/Observium/128354461353"><i style="font-size: small;" class="icon-facebook-sign"></i>&nbsp; Facebook</a></td>
@@ -95,7 +95,6 @@ if (!$_SESSION['user_limited'])
     $stats['syslog']             = dbFetchCell('SELECT COUNT(*) FROM `syslog`');
     $stats['events']             = dbFetchCell('SELECT COUNT(*) FROM `eventlog`');
     $stats['applications']       = dbFetchCell('SELECT COUNT(*) FROM `applications`');
-    $stats['services']           = dbFetchCell('SELECT COUNT(*) FROM `services`');
     $stats['storage']            = dbFetchCell('SELECT COUNT(*) FROM `storage`');
     $stats['diskio']             = dbFetchCell('SELECT COUNT(*) FROM `ucd_diskio`');
     $stats['processors']         = dbFetchCell('SELECT COUNT(*) FROM `processors`');

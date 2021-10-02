@@ -11,7 +11,7 @@
  *
  */
 
-$mempool_array = snmpwalk_cache_multi_oid($device, 'ceqfpMemoryResourceEntry', array(), $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'ceqfpMemoryResourceEntry', array(), $mib);
 
 if (is_array($mempool_array))
 {

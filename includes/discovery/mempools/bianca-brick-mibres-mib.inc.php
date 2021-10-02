@@ -41,7 +41,7 @@ BIANCA-BRICK-MIBRES-MIB::memoryNFails.dram.1 = Wrong Type (should be Gauge32 or 
 BIANCA-BRICK-MIBRES-MIB::memoryNFails.dpool.2 = Wrong Type (should be Gauge32 or Unsigned32): INTEGER: 0
 */
 
-$mempool_array = snmpwalk_cache_multi_oid($device, 'memoryTable', array(), 'BIANCA-BRICK-MIBRES-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$mempool_array = snmpwalk_cache_oid($device, 'memoryTable', array(), 'BIANCA-BRICK-MIBRES-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 
 foreach ($mempool_array as $index => $entry)
 {

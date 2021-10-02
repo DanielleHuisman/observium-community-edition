@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -97,6 +96,7 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
       }
     }
 
+    $ucd_ss_cpu = [];
     foreach ($cpu_oids as $oid)
     {
       if ($ss_cpu_valid[$oid])
@@ -112,7 +112,7 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
     }
 
     // WHY
-    if (count($ucd_ss_cpu))
+    if (safe_count($ucd_ss_cpu))
     {
       $device_state['ucd_ss_cpu']  = $ucd_ss_cpu;
     }

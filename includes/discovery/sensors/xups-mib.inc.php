@@ -11,10 +11,10 @@
  */
 
 $xups_array = array();
-$xups_array = snmpwalk_cache_multi_oid($device, "xupsInput",  $xups_array, "XUPS-MIB");
-$xups_array = snmpwalk_cache_multi_oid($device, "xupsOutput", $xups_array, "XUPS-MIB");
-$xups_array = snmpwalk_cache_multi_oid($device, "xupsBypass", $xups_array, "XUPS-MIB");
-$xups_array = snmpwalk_cache_multi_oid($device, "xupsConfig", $xups_array, "XUPS-MIB");
+$xups_array = snmpwalk_cache_oid($device, "xupsInput", $xups_array, "XUPS-MIB");
+$xups_array = snmpwalk_cache_oid($device, "xupsOutput", $xups_array, "XUPS-MIB");
+$xups_array = snmpwalk_cache_oid($device, "xupsBypass", $xups_array, "XUPS-MIB");
+$xups_array = snmpwalk_cache_oid($device, "xupsConfig", $xups_array, "XUPS-MIB");
 
 // XUPS-MIB::xupsConfigOutputVoltage.0 = INTEGER: 230 RMS Volts
 // XUPS-MIB::xupsConfigInputVoltage.0 = INTEGER: 230 RMS Volts
@@ -291,8 +291,8 @@ discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, 
 // XUPS-MIB::xupsEnvNumContacts.0 = INTEGER: 0
 
 $xups_array = array();
-$xups_array = snmpwalk_cache_multi_oid($device, "xupsBattery",     $xups_array, "XUPS-MIB");
-$xups_array = snmpwalk_cache_multi_oid($device, "xupsEnvironment", $xups_array, "XUPS-MIB");
+$xups_array = snmpwalk_cache_oid($device, "xupsBattery", $xups_array, "XUPS-MIB");
+$xups_array = snmpwalk_cache_oid($device, "xupsEnvironment", $xups_array, "XUPS-MIB");
 
 $entry = $xups_array[0];
 

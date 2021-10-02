@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,15 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
+ */
+
+/**
+ * @var array $config
+ * @var array $device
+ * @var string $module
+ * @global array $ip_data
  */
 
 global $ip_data;
@@ -20,7 +26,7 @@ $ip_data = array('ipv4' => array(),
 $include_dir   = 'includes/discovery/ip-addresses';
 $include_order = 'default'; // Use MIBs from default os definitions by first!
 
-include($config['install_dir']."/includes/include-dir-mib.inc.php");
+include($config['install_dir'] . "/includes/include-dir-mib.inc.php");
 
 foreach (get_device_mibs_permitted($device) as $mib)
 {
@@ -34,6 +40,34 @@ foreach (get_device_mibs_permitted($device) as $mib)
     }
     print_cli(PHP_EOL);
   }
+}
+
+// Try discovery IP addresses in VRF SNMP contexts (currently actual only on Cisco Nexus)
+if (empty($device['snmp_context']) && // Device not already with context
+    isset($config['os'][$device['os']]['snmp']['context']) && $config['os'][$device['os']]['snmp']['context'] && // Context permitted for os
+    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) // SNMP VRF context discovered for device
+{
+  // Keep original device array
+  $device_original = $device;
+
+  foreach ($vrf_contexts as $vrf_name => $snmp_context)
+  {
+    print_message("Addresses in VRF: $vrf_name...");
+
+    $device['snmp_context'] = $snmp_context;
+    if (!$device['snmp_retries']) {
+      // force less retries on vrf requests.. if not set in db
+      $device['snmp_retries'] = 1;
+    }
+
+    $include_dir   = 'includes/discovery/ip-addresses';
+    $include_order = 'default'; // Use MIBs from default os definitions by first!
+    include($config['install_dir']."/includes/include-dir-mib.inc.php");
+  }
+
+  // Clean
+  $device = $device_original;
+  unset($device_original);
 }
 
 // Process IP Addresses
@@ -57,7 +91,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
     }
     $old_table[$ip_version][$ifIndex][$entry[$ip_version.'_address']] = $entry;
   }
-  if (!count($ip_data[$ip_version]) && !count($old_table[$ip_version]))
+  if (!safe_count($ip_data[$ip_version]) && !safe_count($old_table[$ip_version]))
   {
     // Skip if walk and DB empty
     continue;
@@ -82,7 +116,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
     foreach ($addresses as $ip_address => $entry)
     {
 
-      if ($ip_version == 'ipv4')
+      if ($ip_version === 'ipv4')
       {
         // IPv4
         $ip_prefix = $entry['prefix'];
@@ -156,12 +190,12 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
         $params = array_diff(array_keys($old_address), [ 'device_id', $ip_version.'_address_id' ]);
         foreach ($params as $param)
         {
-          if ($param == 'ipv6_binary')
+          if ($param === 'ipv6_binary')
           {
             // Compare decoded binary IPv6 address
             if (inet_ntop($old_address[$param]) != $new_address['ipv6_compressed']) { $update_array[$param] = $new_address[$param]; }
           }
-          elseif ($param == 'ipv4_binary')
+          elseif ($param === 'ipv4_binary')
           {
             // Compare decoded binary IPv4 address
             if (inet_ntop($old_address[$param]) != $new_address['ipv4_address'])    { $update_array[$param] = $new_address[$param]; }
@@ -232,7 +266,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
     $ip_address_id = $entry[$ip_version.'_address_id'];
     if (!isset($valid[$ip_version][$ip_address_id]))
     {
-      $full_address = ($ip_version == 'ipv4' ? $entry['ipv4_address'] : $entry['ipv6_compressed']);
+      $full_address = ($ip_version === 'ipv4' ? $entry['ipv4_address'] : $entry['ipv6_compressed']);
       $full_address .= '/' . $entry[$ip_version.'_prefixlen'];
 
       // Delete IP

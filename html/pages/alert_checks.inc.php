@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -36,8 +35,8 @@ $where = ' WHERE 1' . generate_query_permitted(array('alert'));
 foreach (dbFetchRows("SELECT * FROM `alert_assoc` WHERE 1") as $entry)
 {
   $alert_assoc[$entry['alert_test_id']][$entry['alert_assoc_id']]['entity_type'] = $entry['entity_type'];
-  $alert_assoc[$entry['alert_test_id']][$entry['alert_assoc_id']]['entity_attribs'] = json_decode($entry['entity_attribs'], TRUE);
-  $alert_assoc[$entry['alert_test_id']][$entry['alert_assoc_id']]['device_attribs'] = json_decode($entry['device_attribs'], TRUE);
+  $alert_assoc[$entry['alert_test_id']][$entry['alert_assoc_id']]['entity_attribs'] = safe_json_decode($entry['entity_attribs']);
+  $alert_assoc[$entry['alert_test_id']][$entry['alert_assoc_id']]['device_attribs'] = safe_json_decode($entry['device_attribs']);
 }
 
 $navbar['class'] = "navbar-narrow";
@@ -75,6 +74,12 @@ $navbar['options']['export']['userlevel'] = 7;
 
 // Print out the navbar defined above
 print_navbar($navbar);
+
+// Generate contacts cache array for use in table
+$contacts = [];
+$sql = "SELECT * FROM `alert_contacts_assoc` LEFT JOIN `alert_contacts` ON `alert_contacts`.`contact_id` = `alert_contacts_assoc`.`contact_id`";
+$contacts_db = dbFetchRows($sql, $params);
+foreach($contacts_db as $db_contact) { $contacts[$db_contact['alert_checker_id']][] = $db_contact; }
 
 if ($templates_export)
 {
@@ -147,7 +152,7 @@ foreach (dbFetchRows("SELECT * FROM `alert_table`" . $where) as $entry)
 
   echo generate_box_open();
 
-  echo '<table class="table table-condensed  table-striped  table-hover">
+  echo '<table class="table table-striped table-hover">
   <thead>
     <tr>
     <th class="state-marker"></th>
@@ -189,10 +194,12 @@ foreach ($alert_check as $check)
   // Loop the tests used by this alert
   echo '<td>';
   $text_block = array();
+  //r($check);
   foreach ($check['conditions'] as $condition)
   {
     $text_block[] = escape_html($condition['metric'].' '.$condition['condition'].' '.$condition['value']);
   }
+  echo('<span class="label">'.($check['and'] ? 'ALL' : 'ANY').'</span><br />');
   echo('<code>'.implode('<br />', $text_block).'</code>');
   echo('</td>');
 
@@ -201,7 +208,7 @@ foreach ($alert_check as $check)
   if(!is_null($check['alert_assoc']))
   {
 
-     $check['assoc'] = json_decode($check['alert_assoc'], TRUE);
+     $check['assoc'] = safe_json_decode($check['alert_assoc']);
      echo render_qb_rules($check['entity_type'], $check['assoc']);
 
   } else {
@@ -261,9 +268,21 @@ foreach ($alert_check as $check)
   // We assume each row here is going to be two lines, so we just <br /> them.
   echo '<td style="text-align: right;">';
   #echo overlib_link('#', count($entities), $entities_content,  NULL));
-  echo '<span class="label label-primary">', $check['num_entities'], '</span>';
-  echo '<br />';
+  echo '<span class="label label-primary">', $check['num_entities'], '</span>&nbsp;';
+  //echo '<br />';
   echo $check['status_numbers'];
+
+  echo '<br />';
+
+  if ($notifiers_count = safe_count($contacts[$check['alert_test_id']]))
+  {
+    $content = "";
+    foreach($contacts[$check['alert_test_id']] as $contact) { $content .= '<span class="label">'.$contact['contact_method'].'</span> '.$contact['contact_descr'].'<br />'; }
+    echo generate_tooltip_link('', '<span class="label label-success">'.$notifiers_count.' Notifiers</span>', $content);
+  } else {
+    echo '<span class="label label-primary">Default Notifier</span>';
+  }
+
   echo '</td>';
 
 }

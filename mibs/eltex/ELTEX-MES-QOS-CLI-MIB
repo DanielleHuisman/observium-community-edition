@@ -1,20 +1,25 @@
 ELTEX-MES-QOS-CLI-MIB DEFINITIONS ::= BEGIN
 
 -- Title:      Eltex MES QoS Configuration
--- Version:    1.5
--- Date:       23-Jan-2017
+-- Version:    1.6
+-- Date:       04-Feb-2020
 --
 -- 05-Aug-2015 Added eltQosClassMapActionCfgTable
 -- 28-Jan-2016 Added eltQosDscpToCosTable
 -- 28-Dec-2016 Added eltQosCosToDscpTable
 -- 23-Jan-2017 Added eltQosAceTidxTable and expanded eltQosOffsetListTable
+-- 04-Feb-2020 Added access list candidate configuration tables
 
 IMPORTS
-    MODULE-IDENTITY, OBJECT-TYPE                FROM SNMPv2-SMI
-    RowStatus, TruthValue                       FROM SNMPv2-TC
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32    FROM SNMPv2-SMI
+    RowStatus, TruthValue, DisplayString        FROM SNMPv2-TC
+    rlQosPolicerEntry,
     rlQosIfPolicyEntry, ClassMapAction,
     rlQosClassMapIndex, rlQosIfPolicyEntry,
-    rlQosAceTidxEntry                           FROM RADLAN-QOS-CLI-MIB
+    rlQosAceTidxEntry, rlQosTupleEntry,
+    BinaryStatus, AceActionType, AceObjectType,
+    InterfaceType, AclDefaultAction,
+    RlQosAceTidxActionDropType, AclObjectType   FROM RADLAN-QOS-CLI-MIB
     eltMesQosCliMib                             FROM ELTEX-MES;
 
 EltQosIfTrustMode ::= TEXTUAL-CONVENTION
@@ -45,6 +50,54 @@ EltQosMappingType ::= TEXTUAL-CONVENTION
         cos-dscp(0),
         dscp-cos(1)
 }
+
+EltQosAclConfMode ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Indicates global ACL configuration mode."
+    SYNTAX  INTEGER {
+        default(1),
+        commit(2)
+}
+
+EltQosAceTidxCommitAction  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "The action that will be applied to entry in main table."
+   SYNTAX INTEGER {
+      none(0),
+      add(1),
+      delete(2)
+}
+
+EltQosTupleState  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "The status of tuple.
+                   permanent - ACE using this tuple in committed state.
+                   temporary - ACE using this tuple in non-committed state"
+   SYNTAX INTEGER {
+      permanent(0),
+      temporary(1)
+}
+
+EltQosTrafficLimiterMode  ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Types of traffic measurement in kbps or pps."
+    SYNTAX INTEGER {
+       kbps(0),
+       pps(1)
+    }
+
+EltPolicerAction ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies one of 3 Policer Action:
+         1- No Action
+         2- Drop out of profile packets.
+         3- Remark out of profile packets."
+    SYNTAX  INTEGER {
+        none(1),
+        drop(2),
+        remark(3)
+    }
 
 --------------------------------------------------------------------------------
 -- eltQosOffsetListTable
@@ -405,7 +458,9 @@ eltQosIfConfigEntry OBJECT-TYPE
     ::= { eltQosIfConfigTable 1 }
 
 EltQosIfConfigEntry ::= SEQUENCE {
-	eltQosIfTrustMode      EltQosIfTrustMode
+	eltQosIfTrustMode                EltQosIfTrustMode,
+    eltQosIfCirPortRateLimitPps      Unsigned32,
+    eltQosIfCbsPortRateLimitPackets  Unsigned32
 }
 
 eltQosIfTrustMode OBJECT-TYPE
@@ -415,6 +470,25 @@ eltQosIfTrustMode OBJECT-TYPE
     DESCRIPTION
        "Defines the interface qos trust operation mode relevant for qos basic mode."
     ::= { eltQosIfConfigEntry 1 }
+
+eltQosIfCirPortRateLimitPps OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Block the flooding of packets when the value in pps specified is reached.
+         Rate equal to 0 means that the rate limit does not apply to traffic."
+    DEFVAL { 0 }
+    ::= { eltQosIfConfigEntry 2 }
+
+eltQosIfCbsPortRateLimitPackets OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Committed burst in packets."
+    DEFVAL { 0 }
+    ::= { eltQosIfConfigEntry 3 }
 
 --------------------------------------------------------------------------------
 -- eltQosMappingCfgTable
@@ -617,5 +691,1070 @@ eltQosAceTidxTuple15 OBJECT-TYPE
     DESCRIPTION
         "ACE Tuple pointer."
     ::= { eltQosAceTidxEntry 15 }
+
+--------------------------------------------------------------------------------
+-- eltQosTupleTable
+--------------------------------------------------------------------------------
+
+eltQosTupleTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltQosTupleEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+       "This table specifies Tuple Table information."
+    ::= { eltMesQosCliMib 12 }
+
+eltQosTupleEntry OBJECT-TYPE
+    SYNTAX  EltQosTupleEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Augments rlQosTupleEntry to determine the state of Tuple."
+    AUGMENTS { rlQosTupleEntry }
+    ::= { eltQosTupleTable 1 }
+
+EltQosTupleEntry ::= SEQUENCE {
+    eltQosTupleState   EltQosTupleState
+}
+
+eltQosTupleState OBJECT-TYPE
+    SYNTAX     EltQosTupleState
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "State of tuple. If tuple connected to ACE which not commited
+         then state must be temporary otherwise permanent."
+    DEFVAL{ permanent }
+    ::= { eltQosTupleEntry 1 }
+
+
+--------------------------------------------------------------------------------
+-- Access lists configuration by commit
+--------------------------------------------------------------------------------
+
+  eltMesQosCandidateConfigMib    OBJECT IDENTIFIER ::= { eltMesQosCliMib 13 }
+
+--------------------------------------------------------------------------------
+-- eltQosIfConfigTempTable
+--------------------------------------------------------------------------------
+
+eltQosIfConfigTempTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltQosIfConfigTempEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+       "This table stores information about the interfaces to which ACL
+        was bound for a period of time when ACL is modified."
+    ::= { eltMesQosCandidateConfigMib 1 }
+
+eltQosIfConfigTempEntry OBJECT-TYPE
+    SYNTAX  EltQosIfConfigTempEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Each entry contains information about one entry from
+         rlQosIfPolicyTable."
+    INDEX { eltQosIfConfigTempIndex,
+               eltQosIfConfigTempType }
+    ::= { eltQosIfConfigTempTable 1 }
+
+EltQosIfConfigTempEntry ::= SEQUENCE {
+    eltQosIfConfigTempIndex                 INTEGER,
+    eltQosIfConfigTempType                  InterfaceType,
+    eltQosIfConfigRowStatus                 RowStatus,
+    eltQosIfConfigTempAclIn                 INTEGER,
+    eltQosIfConfigTempAclOut                INTEGER,
+    eltQosIfConfigTempIpv6AclIn             INTEGER,
+    eltQosIfConfigTempIpv6AclOut            INTEGER,
+    eltQosIfConfigTempAclDefaultAction      AclDefaultAction,
+    eltQosIfConfigTempAclDefaultActionOut   AclDefaultAction
+}
+
+eltQosIfConfigTempIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Interface Index."
+    ::= { eltQosIfConfigTempEntry 1 }
+
+eltQosIfConfigTempType OBJECT-TYPE
+    SYNTAX InterfaceType
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Interface Type(vlan/port)."
+    ::= { eltQosIfConfigTempEntry 2 }
+
+eltQosIfConfigRowStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "The status of a table entry.
+        It is used to delete/Add an entry from this table."
+    ::= { eltQosIfConfigTempEntry 3 }
+
+eltQosIfConfigTempAclIn OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Index of an ACL in the rlQosAclTable, which is applied
+         to the ingress of an interface.
+         0 - means no ACL applied."
+    DEFVAL {0}
+    ::= { eltQosIfConfigTempEntry 4 }
+
+eltQosIfConfigTempAclOut OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Index of an ACL in the rlQosAclTable, which is applied
+         to the egress of an interface.
+         0 - means no ACL applied."
+    DEFVAL {0}
+    ::= { eltQosIfConfigTempEntry 5 }
+
+eltQosIfConfigTempIpv6AclIn OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Index of an IPv6 ACL in the rlQosAclTable, which is applied
+         to the ingress of an interface.
+         0 - means no ACL applied."
+    DEFVAL {0}
+    ::= { eltQosIfConfigTempEntry 6 }
+
+eltQosIfConfigTempIpv6AclOut OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Index of an IPv6 ACL in the rlQosAclTable, which is applied
+         to the egress of an interface.
+         0 - means no ACL applied."
+    DEFVAL {0}
+    ::= { eltQosIfConfigTempEntry 7 }
+
+eltQosIfConfigTempAclDefaultAction OBJECT-TYPE
+    SYNTAX AclDefaultAction
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        " When one ACL is enterd then what to do for the last rull."
+    ::= { eltQosIfConfigTempEntry 8 }
+
+eltQosIfConfigTempAclDefaultActionOut OBJECT-TYPE
+    SYNTAX AclDefaultAction
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        " When one egress ACL is enterd then what to do for the last rull."
+    ::= { eltQosIfConfigTempEntry 9 }
+
+
+--------------------------------------------------------------------------------
+-- eltQosAclConfMode
+--------------------------------------------------------------------------------
+
+eltQosAclConfMode OBJECT-TYPE
+    SYNTAX      EltQosAclConfMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates global Access list configuration mode. 
+         In default configuration mode any changes can be applied only if
+         Access list is not connected to any interfaces. 
+         In configuration mode by commit all Access list changes can be applied
+         with delay by commit command."
+    DEFVAL{ default }
+    ::= { eltMesQosCandidateConfigMib 2 }
+
+--------------------------------------------------------------------------------
+-- eltQosAceTidxTempTable
+--------------------------------------------------------------------------------
+
+eltQosAceTidxTempTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltQosAceTidxTempEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table specifies temporary ACE which will be applied by commit"
+    ::= { eltMesQosCandidateConfigMib 3 }
+
+eltQosAceTidxTempEntry OBJECT-TYPE
+    SYNTAX     EltQosAceTidxTempEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Each entry in this table contains information about one ACE. The 
+         information includes all tuples connected to this ACE. This entry can 
+         be created to add or delete new Entry in rlQosAceTidxTable when it
+         will be commited."
+    INDEX { eltQosAceTidxTempAclIndex,
+            eltQosAceTidxTempIndex}
+    ::= { eltQosAceTidxTempTable 1 }
+
+EltQosAceTidxTempEntry ::= SEQUENCE {
+    eltQosAceTidxTempAclIndex       INTEGER,
+    eltQosAceTidxTempIndex          INTEGER,
+    eltQosAceTidxTempStatus         RowStatus,
+    eltQosAceTidxTempAction         AceActionType,
+    eltQosAceTidxTempType           AceObjectType,
+    eltQosAceTidxTempActionDropType RlQosAceTidxActionDropType,
+    eltQosAceTidxTempAccount        BinaryStatus,
+    eltQosAceTidxTempTimeRange      DisplayString,
+    eltQosAceTidxTempCommitAction   EltQosAceTidxCommitAction,
+    eltQosAceTidxTempTuple1         INTEGER,
+    eltQosAceTidxTempTuple2         INTEGER,
+    eltQosAceTidxTempTuple3         INTEGER,
+    eltQosAceTidxTempTuple4         INTEGER,
+    eltQosAceTidxTempTuple5         INTEGER,
+    eltQosAceTidxTempTuple6         INTEGER,
+    eltQosAceTidxTempTuple7         INTEGER,
+    eltQosAceTidxTempTuple8         INTEGER,
+    eltQosAceTidxTempTuple9         INTEGER,
+    eltQosAceTidxTempTuple10        INTEGER,
+    eltQosAceTidxTempTuple11        INTEGER,
+    eltQosAceTidxTempTuple12        INTEGER,
+    eltQosAceTidxTempTuple13        INTEGER,
+    eltQosAceTidxTempTuple14        INTEGER,
+    eltQosAceTidxTempTuple15        INTEGER,
+    eltQosAceTidxTempTuple16        INTEGER,
+    eltQosAceTidxTempTuple17        INTEGER,
+    eltQosAceTidxTempTuple18        INTEGER,
+    eltQosAceTidxTempTuple19        INTEGER,
+    eltQosAceTidxTempTuple20        INTEGER,
+    eltQosAceTidxTempTuple21        INTEGER,
+    eltQosAceTidxTempTuple22        INTEGER,
+    eltQosAceTidxTempTuple23        INTEGER,
+    eltQosAceTidxTempTuple24        INTEGER,
+    eltQosAceTidxTempTuple25        INTEGER,
+    eltQosAceTidxTempTuple26        INTEGER
+    }
+
+eltQosAceTidxTempAclIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An arbitrary incremental Index for the ACL ACE connection."
+    ::= { eltQosAceTidxTempEntry 1 }
+
+eltQosAceTidxTempIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An arbitrary incremental Index for the ACE table."
+    ::= { eltQosAceTidxTempEntry 2 }
+
+eltQosAceTidxTempStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "The status of a table entry.
+        It is used to delete/Add an entry from this table."
+    ::= { eltQosAceTidxTempEntry 3 }
+
+eltQosAceTidxTempAction OBJECT-TYPE
+    SYNTAX AceActionType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Action to take."
+    ::= { eltQosAceTidxTempEntry 4 }
+
+eltQosAceTidxTempType OBJECT-TYPE
+    SYNTAX AceObjectType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Type"
+    ::= { eltQosAceTidxTempEntry 5 }
+
+eltQosAceTidxTempActionDropType OBJECT-TYPE
+    SYNTAX RlQosAceTidxActionDropType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This field is valid only if AceActionType is
+        deny or deny-DisablePort."
+    ::= { eltQosAceTidxTempEntry 6 }
+
+eltQosAceTidxTempAccount OBJECT-TYPE
+    SYNTAX BinaryStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Accounting state.
+         When set to 'enabled' than appropriate statistic's
+         counter is provided for an ACE."
+    ::= { eltQosAceTidxTempEntry 7 }
+
+eltQosAceTidxTempTimeRange OBJECT-TYPE
+    SYNTAX     DisplayString( SIZE(0..32))
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "ACE time range name."
+    ::= { eltQosAceTidxTempEntry 8 }
+
+eltQosAceTidxTempCommitAction OBJECT-TYPE
+    SYNTAX EltQosAceTidxCommitAction
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The action that will be performed when committing."
+    ::= { eltQosAceTidxTempEntry 9 }
+
+eltQosAceTidxTempTuple1 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 10 }
+
+eltQosAceTidxTempTuple2 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 11 }
+
+eltQosAceTidxTempTuple3 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 12 }
+
+eltQosAceTidxTempTuple4 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 13 }
+
+eltQosAceTidxTempTuple5 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 14 }
+
+eltQosAceTidxTempTuple6 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 15 }
+
+eltQosAceTidxTempTuple7 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 16 }
+
+eltQosAceTidxTempTuple8 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 17 }
+
+eltQosAceTidxTempTuple9 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 18 }
+
+eltQosAceTidxTempTuple10 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 19 }
+
+eltQosAceTidxTempTuple11 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 20 }
+
+eltQosAceTidxTempTuple12 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 21 }
+
+eltQosAceTidxTempTuple13 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 22 }
+
+eltQosAceTidxTempTuple14 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 23 }
+
+eltQosAceTidxTempTuple15 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 24 }
+
+eltQosAceTidxTempTuple16 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 25 }
+
+eltQosAceTidxTempTuple17 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 26 }
+
+eltQosAceTidxTempTuple18 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 27 }
+
+eltQosAceTidxTempTuple19 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 28 }
+
+eltQosAceTidxTempTuple20 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 29 }
+
+eltQosAceTidxTempTuple21 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 30 }
+
+eltQosAceTidxTempTuple22 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 31 }
+
+eltQosAceTidxTempTuple23 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 32 }
+
+eltQosAceTidxTempTuple24 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 33 }
+
+eltQosAceTidxTempTuple25 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 34 }
+
+eltQosAceTidxTempTuple26 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxTempEntry 35 }
+
+
+--------------------------------------------------------------------------------
+-- eltQosAceTidxCandidateTable
+--------------------------------------------------------------------------------
+
+eltQosAceTidxCandidateTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltQosAceTidxCandidateEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table specifies candidate ACE table information. In this table
+         includes only those ACEs that are connected to the ACL 
+         with non-committed changes."
+    ::= { eltMesQosCandidateConfigMib 4 }
+
+eltQosAceTidxCandidateEntry OBJECT-TYPE
+    SYNTAX     EltQosAceTidxCandidateEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Each entry in this table contains information about one ACE. The 
+         information includes all tuples connected to this ACE. Each entry in
+         this table contains a copy of one entry from rlQosAceTidxTable or
+         eltQosAceTidxTempTable."
+    INDEX { eltQosAceTidxCandidateAclIndex,
+            eltQosAceTidxCandidateIndex}
+    ::= { eltQosAceTidxCandidateTable 1 }
+
+EltQosAceTidxCandidateEntry ::= SEQUENCE {
+    eltQosAceTidxCandidateAclIndex           INTEGER,
+    eltQosAceTidxCandidateIndex              INTEGER,
+    eltQosAceTidxCandidateAction             AceActionType,
+    eltQosAceTidxCandidateType               AceObjectType,
+    eltQosAceTidxCandidateTuple1             INTEGER,
+    eltQosAceTidxCandidateTuple2             INTEGER,
+    eltQosAceTidxCandidateTuple3             INTEGER,
+    eltQosAceTidxCandidateTuple4             INTEGER,
+    eltQosAceTidxCandidateTuple5             INTEGER,
+    eltQosAceTidxCandidateTuple6             INTEGER,
+    eltQosAceTidxCandidateTuple7             INTEGER,
+    eltQosAceTidxCandidateTuple8             INTEGER,
+    eltQosAceTidxCandidateAccount            BinaryStatus,
+    eltQosAceTidxCandidateStatus             RowStatus,
+    eltQosAceTidxCandidateTimeRange          DisplayString,
+    eltQosAceTidxCandidateTimeRangeIsActive  TruthValue,
+    eltQosAceTidxCandidateTuple9             INTEGER,
+    eltQosAceTidxCandidateTuple10            INTEGER,
+    eltQosAceTidxCandidateTuple11            INTEGER,
+    eltQosAceTidxCandidateActionDropType     RlQosAceTidxActionDropType,
+    eltQosAceTidxCandidateTuple12            INTEGER,
+    eltQosAceTidxCandidateTuple13            INTEGER,
+    eltQosAceTidxCandidateTuple14            INTEGER,
+    eltQosAceTidxCandidateTuple15            INTEGER,
+    eltQosAceTidxCandidateTuple16            INTEGER,
+    eltQosAceTidxCandidateTuple17            INTEGER,
+    eltQosAceTidxCandidateTuple18            INTEGER,
+    eltQosAceTidxCandidateTuple19            INTEGER,
+    eltQosAceTidxCandidateTuple20            INTEGER,
+    eltQosAceTidxCandidateTuple21            INTEGER,
+    eltQosAceTidxCandidateTuple22            INTEGER,
+    eltQosAceTidxCandidateTuple23            INTEGER,
+    eltQosAceTidxCandidateTuple24            INTEGER,
+    eltQosAceTidxCandidateTuple25            INTEGER,
+    eltQosAceTidxCandidateTuple26            INTEGER
+    }
+
+eltQosAceTidxCandidateAclIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An arbitrary incremental Index for the ACL ACE connection."
+    ::= { eltQosAceTidxCandidateEntry 1 }
+
+eltQosAceTidxCandidateIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An arbitrary incremental Index for the ACE table."
+    ::= { eltQosAceTidxCandidateEntry 2 }
+
+eltQosAceTidxCandidateAction OBJECT-TYPE
+    SYNTAX AceActionType
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Action to take."
+    ::= { eltQosAceTidxCandidateEntry 3 }
+
+eltQosAceTidxCandidateType OBJECT-TYPE
+    SYNTAX AceObjectType
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Type"
+    ::= { eltQosAceTidxCandidateEntry 4 }
+
+eltQosAceTidxCandidateTuple1 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 5 }
+
+eltQosAceTidxCandidateTuple2 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 6 }
+
+eltQosAceTidxCandidateTuple3 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 7 }
+
+eltQosAceTidxCandidateTuple4 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 8 }
+
+eltQosAceTidxCandidateTuple5 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 9 }
+
+eltQosAceTidxCandidateTuple6 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 10 }
+
+eltQosAceTidxCandidateTuple7 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 11 }
+
+eltQosAceTidxCandidateTuple8 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 12 }
+
+eltQosAceTidxCandidateAccount OBJECT-TYPE
+    SYNTAX BinaryStatus
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Accounting state.
+         When set to 'enabled' than appropriate statistic's
+         counter is provided for an ACE."
+    ::= { eltQosAceTidxCandidateEntry 13 }
+
+eltQosAceTidxCandidateStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The status of a table entry.
+        It is used to delete/Add an entry from this table."
+    ::= { eltQosAceTidxCandidateEntry 14 }
+
+eltQosAceTidxCandidateTimeRange OBJECT-TYPE
+    SYNTAX     DisplayString( SIZE(0..32))
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "ACE time range name."
+    ::= { eltQosAceTidxCandidateEntry 15 }
+
+eltQosAceTidxCandidateTimeRangeIsActive OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION "ACE time range is rule active state shows is ACE
+                 currently active or not."
+    ::= { eltQosAceTidxCandidateEntry 16 }
+
+eltQosAceTidxCandidateTuple9 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 17 }
+
+eltQosAceTidxCandidateTuple10 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 18 }
+
+eltQosAceTidxCandidateTuple11 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 19 }
+
+eltQosAceTidxCandidateActionDropType OBJECT-TYPE
+    SYNTAX RlQosAceTidxActionDropType
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This field is valid only if AceActionType is
+        deny or deny-DisablePort."
+    ::= { eltQosAceTidxCandidateEntry 20 }
+
+eltQosAceTidxCandidateTuple12 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 21 }
+
+eltQosAceTidxCandidateTuple13 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 22 }
+
+eltQosAceTidxCandidateTuple14 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 23 }
+
+eltQosAceTidxCandidateTuple15 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 24 }
+
+eltQosAceTidxCandidateTuple16 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 25 }
+
+eltQosAceTidxCandidateTuple17 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 26 }
+
+eltQosAceTidxCandidateTuple18 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 27 }
+
+eltQosAceTidxCandidateTuple19 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 28 }
+
+eltQosAceTidxCandidateTuple20 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 29 }
+
+eltQosAceTidxCandidateTuple21 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 30 }
+
+eltQosAceTidxCandidateTuple22 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 31 }
+
+eltQosAceTidxCandidateTuple23 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 32 }
+
+eltQosAceTidxCandidateTuple24 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 33 }
+
+eltQosAceTidxCandidateTuple25 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 34 }
+
+eltQosAceTidxCandidateTuple26 OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACE Tuple pointer."
+    ::= { eltQosAceTidxCandidateEntry 35 }
+
+
+eltQosAclCandidateTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltQosAclCandidateEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table specifies candidate ACL table information. In this table
+         includes only ACLs with non-committed changes."
+    ::= { eltMesQosCandidateConfigMib 5 }
+
+eltQosAclCandidateEntry OBJECT-TYPE
+    SYNTAX EltQosAclCandidateEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Each entry in this table contains information about one ACL. Each
+         entry in this table contains a copy of one entry from rlQosAclTable."
+    INDEX { eltQosAclCandidateIndex }
+    ::= { eltQosAclCandidateTable 1 }
+
+EltQosAclCandidateEntry ::= SEQUENCE {
+    eltQosAclCandidateIndex               INTEGER,
+    eltQosAclCandidateName                DisplayString,
+    eltQosAclCandidateType                AclObjectType,
+    eltQosAclCandidateStatus              RowStatus,
+    eltQosAclCandidateNumOfAces           INTEGER
+    }
+
+eltQosAclCandidateIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An arbitrary incremental Index
+                 for the ACE table."
+    ::= { eltQosAclCandidateEntry 1 }
+
+eltQosAclCandidateName OBJECT-TYPE
+    SYNTAX DisplayString(SIZE(0..32))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Name ACL."
+    ::= { eltQosAclCandidateEntry 2 }
+
+
+eltQosAclCandidateType OBJECT-TYPE
+    SYNTAX AclObjectType
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "ACL Type."
+    ::= { eltQosAclCandidateEntry 3 }
+
+eltQosAclCandidateStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The status of a table entry.
+        It is used to delete/Add an entry from this table."
+    ::= { eltQosAclCandidateEntry 4 }
+
+eltQosAclCandidateNumOfAces OBJECT-TYPE
+    SYNTAX  INTEGER
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "Holds number of aces in the acl."
+    ::= { eltQosAclCandidateEntry 5 }
+
+eltQosDeleteCandidateAction OBJECT-TYPE
+    SYNTAX       INTEGER
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Delete candidate Access lists configuration.
+                  0 for delete all changes; ACL-id to delete certain
+                  access list." 
+    DEFVAL{ 0 }
+  ::= { eltMesQosCandidateConfigMib 6 }
+
+--------------------------------------------------------------------------------
+-- eltQosTrafficLimiterMode
+--------------------------------------------------------------------------------
+
+eltQosTrafficLimiterMode OBJECT-TYPE
+    SYNTAX      EltQosTrafficLimiterMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The scalar indicates in which units of measurement
+         the traffic speed and bucket size will be measured in
+         storm-control and rate-limit."
+    DEFVAL { kbps }
+    ::= { eltMesQosCliMib 14 }
+
+--------------------------------------------------------------------------------
+-- eltQosPolicerConfigTable
+--------------------------------------------------------------------------------
+
+eltQosPolicerConfigTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltQosPolicerConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table specifies additional the policers to rlQosPolicerTable."
+    ::= { eltMesQosCliMib 15 }
+
+eltQosPolicerConfigEntry OBJECT-TYPE
+    SYNTAX  EltQosPolicerConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "This entry specifies additional the policers to rlQosPolicerTable."
+    AUGMENTS { rlQosPolicerEntry }
+    ::= { eltQosPolicerConfigTable 1 }
+
+EltQosPolicerConfigEntry ::= SEQUENCE {
+    eltQosPolicerConfigCirPps         Unsigned32,
+    eltQosPolicerConfigCbsPakets      Unsigned32,
+    eltQosPolicerConfigPpsAction      EltPolicerAction,
+    eltQosPolicerConfigPirPps         Unsigned32,
+    eltQosPolicerConfigPbsPakets      Unsigned32,
+    eltQosPolicerConfigPpsPeakAction  EltPolicerAction
+}
+
+eltQosPolicerConfigCirPps OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Committed rate value in packets per second.
+         Rate equal to 0 means that the rate limit does not apply
+         to traffic."
+    DEFVAL { 0 }
+    ::= { eltQosPolicerConfigEntry 1 }
+
+eltQosPolicerConfigCbsPakets OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Committed burst in packets."
+    DEFVAL { 0 }
+    ::= { eltQosPolicerConfigEntry 2 }
+
+eltQosPolicerConfigPpsAction OBJECT-TYPE
+    SYNTAX EltPolicerAction
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Out of profile in pps Action."
+    ::= { eltQosPolicerConfigEntry 3 }
+
+eltQosPolicerConfigPirPps OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Peak rate value in packets per second.
+         When both this and eltQosPolicerConfigPbsPakets
+         are 0 this means the mode is Single Rate and 
+         when they are both non 0 this means the mode is
+         Two Rate."
+    DEFVAL { 0 }
+    ::= { eltQosPolicerConfigEntry 4 }
+
+eltQosPolicerConfigPbsPakets OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Peak burst value in packets.
+         When both this and eltQosPolicerConfigPirPps are
+         0 this means the mode is Single Rate and when 
+         they are both non 0 this means the mode is Two Rate."
+    DEFVAL { 0 }
+    ::= { eltQosPolicerConfigEntry 5 }
+
+eltQosPolicerConfigPpsPeakAction OBJECT-TYPE
+    SYNTAX EltPolicerAction
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Out of profile in pps peak action."
+    ::= { eltQosPolicerConfigEntry 6 }
 
 END

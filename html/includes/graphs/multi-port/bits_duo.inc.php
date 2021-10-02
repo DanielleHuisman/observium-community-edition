@@ -57,10 +57,10 @@ foreach ($vars['idb'] as $ifid)
 if ($inverse) { $in = 'out'; $out = 'in'; } else { $in = 'in'; $out = 'out'; }
 $in_thing   = implode(',', $rrd_multi['in_thing']);
 $out_thing  = implode(',', $rrd_multi['out_thing']);
-$pluses     = str_repeat(',ADDNAN', count($rrd_multi['in_thing']) - 1);
+$pluses     = str_repeat(',ADDNAN', safe_count($rrd_multi['in_thing']) - 1);
 $in_thingb  = implode(',', $rrd_multi['in_thingb']);
 $out_thingb = implode(',', $rrd_multi['out_thingb']);
-$plusesb    = str_repeat(',ADDNAN', count($rrd_multi['in_thingb']) - 1);
+$plusesb    = str_repeat(',ADDNAN', safe_count($rrd_multi['in_thingb']) - 1);
 $rrd_options .= " CDEF:".$in."octets=" . $in_thing . $pluses;
 $rrd_options .= " CDEF:".$out."octets=" . $out_thing . $pluses;
 $rrd_options .= " CDEF:".$in."octetsb=" . $in_thingb . $plusesb;

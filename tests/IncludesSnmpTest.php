@@ -1,15 +1,16 @@
 <?php
 
-$base_dir = realpath(dirname(__FILE__) . '/..');
+$base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
 
 //define('OBS_DEBUG', 2);
 
-include(dirname(__FILE__) . '/../includes/defaults.inc.php');
+include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
-include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '/../includes/definitions.inc.php');
+include(__DIR__ . '/../includes/common.inc.php');
+include(__DIR__ . '/../includes/definitions.inc.php');
 //include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/functions.inc.php');
 
 class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
 {
@@ -105,7 +106,7 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       // Expand
       array($device_linux, 'ENTITY-MIB', 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB'),
       array($device_ios,   'ENTITY-MIB', 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB'),
-      array($device_vrp,   'ENTITY-MIB', 'ENTITY-MIB:HUAWEI-TC-MIB'),
+      array($device_vrp,   'ENTITY-MIB', 'ENTITY-MIB:HUAWEI-TC-MIB:H3C-ENTITY-VENDORTYPE-OID-MIB'),
     );
     return $results;
   }
@@ -188,9 +189,11 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       array('-0.00(A-)', 0.0),
       // Convert some passed units
       array('512 MB', 512),
-      array('512 MB', 536870912, 'bytes'),
+      array('512 MB', 536870912.0, 'bytes'),
       array('119.1 GB', 119.1),
       array('119.1 GB', 127882651238.4, 'bytes'),
+      array('0x01', 1, 'hex'),
+      array('0x00', 0, 'hex'),
       // More complex
       array('CPU Temperature-Ctlr B: 58 C 136.40F',   58),
       array('Capacitor Cell 1 Voltage-Ctlr B: 2.04V', 2.04),
@@ -258,8 +261,16 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       array('49 6E 70 75 74 20 31 0',   '49 6E 70 75 74 20 31 0'),
       array('Simple String',            'Simple String'),
       array('49 6E 70 75 74 20 31 0R ', '49 6E 70 75 74 20 31 0R '),
-      array('10',                       '10'),
-      array('99',                       '99'),
+      // 2char strings
+      array('10',                       '10'), // string
+      array('10 ',                      hex2str('10', '')), // hex
+      array('99',                       '99'), // string
+      array('99 ',                      hex2str('99', '')), // hex
+      array('A1',                       'A1'), // string
+      array('A1 ',                      hex2str('A1', '')), // hex
+      array('B3',                       'B3'), // string
+      array('B3 ',                      hex2str('B3', '')), // hex
+      array('FF',                       'FF'), // string
     );
   }
 
@@ -335,6 +346,16 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
                   'index_parts' => array('0', 'wes'),
                   'index_count' => 2,
                   'index'     => '0.wes',
+            ),
+      ),
+      array($flags,
+            'nodeUuid.\'WSLNetapp02-01\' = d924dfcf-418e-11eb-91eb-d039ea255860',
+            array('oid'       => 'nodeUuid.\'WSLNetapp02-01\'',
+                  'value'     => 'd924dfcf-418e-11eb-91eb-d039ea255860',
+                  'oid_name'  => 'nodeUuid',
+                  'index_parts' => array('WSLNetapp02-01'),
+                  'index_count' => 1,
+                  'index'     => 'WSLNetapp02-01',
             ),
       ),
       array($flags,

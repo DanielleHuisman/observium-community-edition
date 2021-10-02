@@ -13,11 +13,11 @@
 
 $srx_spu_array = array();
 
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringNodeDescr', $srx_spu_array, $mib);
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringFPCIndex', $srx_spu_array, $mib);
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringMemoryUsage', $srx_spu_array, $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringNodeDescr', $srx_spu_array, $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringFPCIndex', $srx_spu_array, $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringMemoryUsage', $srx_spu_array, $mib);
 
-$srx_spu_array = snmpwalk_cache_multi_oid($device, 'jnxJsSPUMonitoringNodeDescr', $srx_spu_array, $mib);
+$srx_spu_array = snmpwalk_cache_oid($device, 'jnxJsSPUMonitoringNodeDescr', $srx_spu_array, $mib);
 foreach ($srx_spu_array as $index => $entry)
 {
   if (is_numeric($entry['jnxJsSPUMonitoringMemoryUsage']))

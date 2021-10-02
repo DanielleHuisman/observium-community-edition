@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@
  *   print_navbar(array('brand' => "Apps", 'class' => "navbar-narrow", 'options' => array('mysql' => array('text' => "MySQL", 'url' => generate_url($vars, 'app' => "mysql")))))
  *
  * @param array $vars
- * @return none
+ * @return null
  *
  */
 function print_tabbar($tabbar)
@@ -51,16 +50,14 @@ function print_tabbar($tabbar)
  *   print_navbar(array('brand' => "Apps", 'class' => "navbar-narrow", 'options' => array('mysql' => array('text' => "MySQL", 'url' => generate_url($vars, 'app' => "mysql")))))
  *
  * @param array $vars
- * @return none
+ * @return void
  *
  */
-function print_navbar($navbar)
-{
+function print_navbar($navbar) {
   global $config;
 
-  if (OBSERVIUM_EDITION == 'community' && isset($navbar['community']) && $navbar['community'] === FALSE)
-  {
-    // Skip nonexistant features on community edition
+  if (OBSERVIUM_EDITION === 'community' && isset($navbar['community']) && $navbar['community'] === FALSE) {
+    // Skip nonexistent features on community edition
     return;
   }
 
@@ -96,13 +93,13 @@ function print_navbar($navbar)
           // skip not permitted menu items
           continue;
         }
-        if (OBSERVIUM_EDITION == 'community' && isset($array['community']) && $array['community'] === FALSE)
+        if (OBSERVIUM_EDITION === 'community' && isset($array['community']) && $array['community'] === FALSE)
         {
           // Skip not exist features on community
           continue;
         }
 
-        if (strstr($array['class'], 'pull-right') || $array_name == 'options_right' || $array['right'] == TRUE)
+        if ($array_name === 'options_right' || $array['right'] || str_contains($array['class'], 'pull-right'))
         {
           $array['class'] = str_replace('pull-right', '', $array['class']);
           $newbar['options_right'][$option] = $array;
@@ -115,7 +112,7 @@ function print_navbar($navbar)
 
   foreach (array('options', 'options_right') as $array_name)
   {
-    if ($array_name == 'options_right')
+    if ($array_name === 'options_right')
     {
       if (!$newbar[$array_name]) { break; }
       echo('<ul class="nav pull-right">');
@@ -131,12 +128,24 @@ function print_navbar($navbar)
       {
         echo('<li class="'.$array['class'].'">');
 
-        $link_opts = '';
+        $attribs = [];
+        if (isset($array['tooltip']))
+        {
+          $array['alt'] = $array['tooltip'];
+        }
+        if (isset($array['alt']))
+        {
+          $attribs['data-rel'] = 'tooltip';
+          $attribs['data-tooltip'] = $array['alt'];
+        }
+        if (isset($array['id']))
+        {
+          $attribs['id'] = $array['id'];
+        }
+        $link_opts = generate_html_attribs($attribs);
         if (isset($array['link_opts'])) { $link_opts .= ' ' . $array['link_opts']; }
-        if (isset($array['alt']))       { $link_opts .= ' data-rel="tooltip" data-tooltip="'.$array['alt'].'"'; }
-        if (isset($array['id']))        { $link_opts .= ' id="'.$array['id'].'"'; }
 
-        if (empty($array['url']) || $array['url'] == '#') { $array['url'] = 'javascript:void(0)'; }
+        if (empty($array['url']) || $array['url'] === '#') { $array['url'] = 'javascript:void(0)'; }
         echo('<a href="'.$array['url'].'" '.$link_opts.'>');
 
         if (isset($array['icon']))
@@ -162,55 +171,46 @@ function print_navbar($navbar)
       } else {
         echo('  <li class="dropdown '.$array['class'].'">');
 
-        $link_opts = '';
+        $attribs = [
+          'class' => 'dropdown-toggle',
+          'data-hover' => "dropdown",
+          /*'data-toggle' => "dropdown", */ // -- Disables clicking the navbar entry. May need enabling only in touch mode?
+        ];
+        if (get_var_true($_SESSION['touch'])) {
+          // Enable dropdown click on mobile & tablets
+          $attribs['data-toggle'] = "dropdown";
+        }
+        if (isset($array['tooltip']))
+        {
+          $array['alt'] = $array['tooltip'];
+        }
+        if (isset($array['alt']))
+        {
+          $attribs['data-rel'] = 'tooltip';
+          $attribs['data-tooltip'] = $array['alt'];
+        }
+        if (isset($array['id']))
+        {
+          $attribs['id'] = $array['id'];
+        }
+        $link_opts = generate_html_attribs($attribs);
         if (isset($array['link_opts'])) { $link_opts .= ' ' . $array['link_opts']; }
-        if (isset($array['alt']))       { $link_opts .= ' data-rel="tooltip" data-tooltip="'.$array['alt'].'"'; }
-        if (isset($array['id']))        { $link_opts .= ' id="'.$array['id'].'"'; }
 
-        if (empty($array['url']) || $array['url'] == '#') { $array['url'] = 'javascript:void(0)'; }
-        echo('    <a class="dropdown-toggle" data-hover="dropdown" data-toggle="dropdown" href="'.$array['url'].'" '.$link_opts.'>');
+        if (empty($array['url']) || $array['url'] === '#') { $array['url'] = 'javascript:void(0)'; }
+        echo('    <a href="'.$array['url'].'" '.$link_opts.'>');
         if (isset($array['icon'])) { echo('<i class="'.$array['icon'].'"></i> '); }
         echo($array['text'].'
             <strong class="caret"></strong>
           </a>
         <ul class="dropdown-menu">');
 
-        foreach ($array['suboptions'] as $suboption => $subentry)
-        {
+        foreach ($array['suboptions'] as $suboption => $subentry) {
 
-          if (count($subentry['entries']))
-          {
+          if (safe_count($subentry['entries'])) {
             navbar_submenu($subentry, $level+1);
           } else {
             navbar_entry($subentry, $level+2);
           }
-
-
-            /*
-
-          if(isset($subarray['divider']) && $subarray['divider'])
-          {
-            echo '<li class="divider"></li>';
-          } else {
-            echo('<li class="'.$subarray['class'].'">');
-            $link_opts = '';
-            if (isset($subarray['link_opts'])) { $link_opts .= ' ' . $subarray['link_opts']; }
-            if (isset($subarray['alt']))       { $link_opts .= ' data-rel="tooltip" data-tooltip="'.$subarray['alt'].'"'; }
-            if (isset($subarray['id']))        { $link_opts .= ' id="'.$subarray['id'].'"'; }
-
-            if (empty($subarray['url']) || $subarray['url'] == '#') { $subarray['url'] = 'javascript:void(0)'; }
-            echo('<a href="'.$subarray['url'].'" '.$link_opts.'>');
-            if (isset($subarray['icon']))
-            {
-              echo('<i class="'.$subarray['icon'].'"></i>&nbsp;');
-              $subarray['text'] = '<span>'.$subarray['text'].'</span>'; // Added span for allow hide by class 'icon'
-            }
-            echo($subarray['text'].'</a>');
-
-            echo('</li>');
-          }
-
-            */
 
         }
         echo('    </ul>
@@ -232,32 +232,29 @@ function print_navbar($navbar)
 
 
 // DOCME needs phpdoc block
-function navbar_location_menu($array)
-{
-  global $config;
-
+function navbar_location_menu($array) {
   ksort($array['entries']);
 
   echo('<ul role="menu" class="dropdown-menu">');
 
-  if (count($array['entries']) > "5")
+  if (safe_count($array['entries']) > "5")
   {
     foreach ($array['entries'] as $entry => $entry_data)
     {
       $image = get_icon('location');
-      if ($entry_data['level'] == "location_country")
+      if ($entry_data['level'] === "location_country")
       {
         $entry = country_from_code($entry);
         $image = get_icon_country($entry);
       }
-      elseif ($entry_data['level'] == "location")
+      elseif ($entry_data['level'] === "location")
       {
         $name = ($entry === '' ? OBS_VAR_UNSET : escape_html($entry));
         echo('            <li>' . generate_menu_link(generate_location_url($entry), $image . '&nbsp;' . $name, $entry_data['count']) . '</li>');
         continue;
       }
 
-      if ($entry_data['level'] == "location_country")
+      if ($entry_data['level'] === "location_country")
       {
         $url = $entry;
         // Attach country code to sublevel
@@ -283,12 +280,12 @@ function navbar_location_menu($array)
     foreach ($array['entries'] as $new_entry => $new_entry_data)
     {
       $image = get_icon('location');
-      if ($new_entry_data['level'] == "location_country")
+      if ($new_entry_data['level'] === "location_country")
       {
         $new_entry = country_from_code($new_entry);
         $image = get_icon_country($new_entry);
       }
-      elseif ($new_entry_data['level'] == "location")
+      elseif ($new_entry_data['level'] === "location")
       {
         $name = ($new_entry === '' ? OBS_VAR_UNSET : escape_html($new_entry));
         echo('            <li>' . generate_menu_link(generate_location_url($new_entry), $image . '&nbsp;' . $name, $new_entry_data['count']) . '</li>');
@@ -322,13 +319,12 @@ function navbar_submenu($entry, $level = 1)
 
   if(isset($entry['text'])) { $entry['title'] = $entry['text']; }
 
+  // autoscroll set by navbar-narrow + dropdown-menu, but override max-height
   echo(str_pad('',($level-1)*2) . '                <li class="dropdown-submenu">' . generate_menu_link($entry['url'], '<i class="' . $entry['icon'] . '"></i>&nbsp;' . $entry['title'], $entry['count'], 'label', NULL, $entry['alert_count']) . PHP_EOL);
-  echo(str_pad('',($level-1)*2) . '                  <ul role="menu" class="dropdown-menu">' . PHP_EOL);
+  echo(str_pad('',($level-1)*2) . '                  <ul role="menu" class="dropdown-menu" style="max-height: 85vh;">' . PHP_EOL);
 
-  foreach ($entry['entries'] as $subentry)
-  {
-    if (isset($subentry['entries']) && count($subentry['entries']))
-    {
+  foreach ($entry['entries'] as $subentry) {
+    if (safe_count($subentry['entries'])) {
       navbar_submenu($subentry, $level+1);
     } else {
       navbar_entry($subentry, $level+2);
@@ -349,15 +345,15 @@ function navbar_entry($entry, $level = 1)
   {
     echo(str_pad('',($level-1)*2) . '                <li class="divider"></li>' . PHP_EOL);
   }
-  else if (isset($entry['userlevel']) && isset($_SESSION['userlevel']) && $_SESSION['userlevel'] < $entry['userlevel'])
+  elseif (isset($entry['userlevel']) && isset($_SESSION['userlevel']) && $_SESSION['userlevel'] < $entry['userlevel'])
   {
      // skip not permitted menu items
-     //continue;
+     return;
   }
-  else if (OBSERVIUM_EDITION == 'community' && isset($entry['community']) && $entry['community'] === FALSE)
+  elseif (OBSERVIUM_EDITION === 'community' && isset($entry['community']) && $entry['community'] === FALSE)
   {
      // Skip not exist features on community
-     //continue;
+     return;
   }
   else if ($entry['locations']) // Workaround until the menu builder returns an array instead of echo()
   {

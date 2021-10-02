@@ -33,7 +33,7 @@ if ($auth || $is_permitted || $_SESSION['userlevel'] >= 5)
 {
   $title_array   = array();
   $title_array[] = array('text' => 'Multiple Ports');
-  $title_array[] = array('text' => count($vars['id']) . ' Ports');
+  $title_array[] = array('text' => safe_count($vars['id']) . ' Ports');
 
   $auth = TRUE;
 }

@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -69,9 +68,9 @@ $form['row'][0]['priority'] = array(
                               'values'      => $form_items['priorities']);
 
 // Program field
-dbQuery('SET SESSION MAX_EXECUTION_TIME=5000;'); // Set 5 sec maximum query execution time
+dbSetVariable('MAX_EXECUTION_TIME', 5000); // Set 5 sec maximum query execution time
 $form_filter = dbFetchColumn('SELECT DISTINCT `program` FROM `syslog` WHERE 1 ' . $query_devices);
-dbQuery('SET SESSION MAX_EXECUTION_TIME=0;'); // Reset maximum query execution time
+dbSetVariable('MAX_EXECUTION_TIME', 0); // Reset maximum query execution time
 if (count($form_filter))
 {
   // Use full multiselect form

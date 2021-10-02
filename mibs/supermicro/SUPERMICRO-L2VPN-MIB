@@ -1,0 +1,1762 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsl2vpn.mib,v 1.4 2013/09/27 07:26:38 siva Exp $
+
+SUPERMICRO-L2VPN-MIB  DEFINITIONS ::= BEGIN
+
+      IMPORTS
+      NOTIFICATION-TYPE,MODULE-IDENTITY, OBJECT-TYPE,
+      Unsigned32, Counter32, enterprises, IpAddress
+         FROM SNMPv2-SMI                    -- RFC2578
+
+      DisplayString, TruthValue, RowStatus, StorageType,
+      TEXTUAL-CONVENTION
+         FROM SNMPv2-TC                     -- RFC2579
+
+      MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+         FROM SNMPv2-CONF
+
+      SnmpAdminString
+         FROM SNMP-FRAMEWORK-MIB            -- RFC3411
+
+      InetAddress, InetAddressType
+         FROM INET-ADDRESS-MIB              -- RFC4001
+
+      MplsLdpIdentifier
+         FROM MPLS-TC-STD-MIB               -- RFC3811
+
+      PwIndexOrZeroType, PwIDType, PwGroupID,
+      PwOperStatusTC
+        FROM PW-TC-STD-MIB                  -- RFC5542
+
+      MplsLsrIdentifier
+        FROM MPLS-TC-STD-MIB                -- RFC3811
+
+       pwIndex
+               FROM PW-STD-MIB;
+
+   fsL2VpnMIB  MODULE-IDENTITY
+      LAST-UPDATED "201209050000Z"
+      ORGANIZATION "Super Micro Computer Inc."
+      CONTACT-INFO "support@Supermicro.com"
+
+      DESCRIPTION
+          "All rights reserved"
+
+      REVISION "201209050000Z"
+      DESCRIPTION
+          "The Proprietary MIB is based on the MPLS draft 
+           draft-ietf-l2vpn-vpls-mib-06.This mib will change when 
+           the OID is located for this draft as standard mib.
+           Added objects for the management of PW Redundancy Group as per
+           draft-ietf-pwe3-redundancy-07, draft-ietf-pwe3-redundancy-bit-07 and
+           draft-ietf-pwe3-iccp-07."
+
+     ::= {  enterprises supermicro-computer-inc(10876) super-switch(101) basic(2) 72 }
+
+    -- Vpls BGP Autodiscovery specific Textual Convention
+
+     VplsBgpRouteDistinguisher ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+          "Syntax for a route distinguisher. For a complete
+           definition of a route distinguisher, see [RFC4364].
+           For more details on use of a route distinguisher
+           for a VPLS service, see [RFC4761]"
+      REFERENCE
+          "[RFC4364]"
+      SYNTAX  OCTET STRING(SIZE (0..256))
+
+    VplsBgpRouteTarget ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+          "Syntax for a route target. For a complete
+           definition of a route target, see [RFC4364]."
+      REFERENCE
+          "[RFC4364]"
+      SYNTAX  OCTET STRING(SIZE (0..256))
+
+    VplsBgpRouteTargetType ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+       "Used to define the type of a route target usage.
+        Route targets can be specified to be imported,
+        exported, or both.  For a complete definition of a
+        route target, see [RFC4364]."
+      REFERENCE
+        "[RFC4364]"
+      SYNTAX INTEGER { import(1), 
+                       export(2), 
+                       both(3) }
+   
+    VPNIdOrZero ::= TEXTUAL-CONVENTION
+       STATUS            current
+       DESCRIPTION
+           "This textual convention is an extension of the
+            VPNId textual convention that defines a non-zero-length
+            OCTET STRING to identify a physical entity.  This extension
+            permits the additional value of a zero-length OCTET STRING.
+            The semantics of the value zero-length OCTET STRING are
+            object-specific and must therefore be defined
+            as part of the description of any object that uses this
+            syntax.  Examples of usage of this extension are
+            situations where none or all VPN IDs need to be
+            referenced."
+       SYNTAX    OCTET STRING (SIZE (0 | 7))
+
+    FsL2VpnPwStatus ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION
+        "Indicates the status of the PW and the interfaces affecting
+         this PW.  If none of the first 5 bits are set, it indicates no faults
+         are reported."
+    SYNTAX          BITS
+                    {
+                        pwNotForwarding (0),
+                        servicePwRxFault (1),
+                        servicePwTxFault (2),
+                        psnPwRxFault (3),
+                        psnPwTxFault (4),
+                        pwForwardingStandby (5),
+                        pwSwitchoverRequest (6)
+                    }
+
+   -- Notifications
+   vplsNotifications OBJECT IDENTIFIER
+                                 ::= { fsL2VpnMIB  0 }
+   -- Tables, Scalars
+   vplsObjects       OBJECT IDENTIFIER
+                                 ::= { fsL2VpnMIB 1 }
+   -- Conformance
+   vplsConformance   OBJECT IDENTIFIER
+                                 ::= { fsL2VpnMIB 2 }
+
+   pwRedundancyScalar OBJECT IDENTIFIER
+                                 ::= { fsL2VpnMIB 3 } 
+
+   pwRedundancyObjects OBJECT IDENTIFIER
+                                 ::= { fsL2VpnMIB 4 }
+
+   fsL2VpnPwRedTraps  OBJECT IDENTIFIER
+                                 ::= { pwRedundancyObjects 0 }
+
+   fsL2VpnPwRedTestObjects  OBJECT IDENTIFIER
+                                 ::= { pwRedundancyObjects 5 }
+ 
+   -- PW Virtual Connection Table
+
+   vplsConfigIndexNext OBJECT-TYPE
+      SYNTAX            Unsigned32
+      MAX-ACCESS        read-only
+      STATUS            current
+      DESCRIPTION
+          "This object contains an appropriate value to be used
+           for vplsConfigIndex when creating entries in the
+           vplsConfigTable. The value 0 indicates that no
+           unassigned entries are available.  To obtain the
+           value of vplsConfigIndex for a new entry in the
+           vplsConfigTable, the manager issues a management
+           protocol retrieval operation to obtain the current
+           value of vplsConfigIndex.  After each retrieval
+           operation, the agent should modify the value to
+           reflect the next unassigned index.  After a manager
+           retrieves a value the agent will determine through
+           its local policy when this index value will be made
+           available for reuse."
+      ::= { vplsObjects 1 }
+
+      vplsConfigTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF VplsConfigEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table specifies information for configuring
+                and monitoring Virtual Private Lan Services(VPLS).
+                "
+          ::= { vplsObjects 2 }
+
+      vplsConfigEntry OBJECT-TYPE
+          SYNTAX          VplsConfigEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+           "A row in this table represents a Virtual Private Lan
+            Service(VPLS) in a packet network. It is indexed by
+            vplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row is created by the operator or by the agent if a
+            VPLS service is created by non-SNMP application or
+            due to autodiscovery process.
+
+            None of the read-create objects values can be
+            changed when vplsConfigRowStatus is in the active(1)
+            state. Changes are allowed when the vplsConfigRowStatus
+            is in notInService(2) or notReady(3) states only.
+            If the operator need to change one of the values
+            for an active row the vplsConfigRowStatus should be
+            first changed to notInService(2), the objects may
+            be changed now, and later to active(1) in order to
+            re-initiate the signaling process with the new
+            values in effect.
+            "
+          INDEX           { vplsConfigIndex }
+          ::= { vplsConfigTable 1 }
+
+     VplsConfigEntry ::=
+        SEQUENCE {
+         vplsConfigIndex                                Unsigned32,
+         vplsConfigName                                 SnmpAdminString,
+         vplsConfigDescr                                SnmpAdminString,
+         vplsConfigAdminStatus                          INTEGER,
+         vplsConfigMacLearning                          TruthValue,
+         vplsConfigDiscardUnknownDest                   TruthValue,
+         vplsConfigMacAging                             TruthValue,
+         vplsConfigFwdFullHighWatermark                 Unsigned32,
+         vplsConfigFwdFullLowWatermark                  Unsigned32,
+         vplsConfigRowStatus                            RowStatus,
+         vplsConfigMtu                                  Unsigned32,
+         vplsConfigVpnId                                VPNIdOrZero,
+         vplsConfigServiceType                          INTEGER,
+         vplsConfigStorageType                          StorageType
+          }
+
+      vplsConfigIndex  OBJECT-TYPE
+          SYNTAX          Unsigned32 (1.. 2147483647)
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Unique index for the conceptual row identifying
+                a VPLS service."
+          ::= { vplsConfigEntry 1 }
+
+      vplsConfigName  OBJECT-TYPE
+          SYNTAX          SnmpAdminString
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "A textual name of the VPLS.
+                If there is no local name, or this object is
+                otherwise not applicable, then this object MUST
+                contain a zero-length octet string."
+          DEFVAL           { "" }
+          ::= { vplsConfigEntry 2 }
+
+      vplsConfigDescr  OBJECT-TYPE
+          SYNTAX          SnmpAdminString
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "A textual string containing information about the
+               VPLS service. If there is no information for this VPLS
+               service, then this object MUST contain a zero-length
+               octet string."
+          DEFVAL           { "" }
+          ::= { vplsConfigEntry 3 }
+
+      vplsConfigAdminStatus OBJECT-TYPE
+          SYNTAX          INTEGER {
+                              up(1),
+                              down(2),
+                              testing(3)   -- in some test mode
+                          }
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The desired administrative state of the VPLS
+                service. If the administrative status of the
+                Vpls service is changed to enable then this
+                service is able to utilize the pseudo wire to
+                perform the tasks of a VPLS service.
+                The testing(3) state indicates that no operational
+                packets can be passed. "
+          DEFVAL           { down }
+          ::= { vplsConfigEntry 4 }
+
+      vplsConfigMacLearning OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies if MAC Learning is enabled
+                in this service. If this object is true then Mac
+                Learning is enabled. If false, then Mac Learning is
+                disabled."
+          DEFVAL          { true }
+          ::= { vplsConfigEntry 6 }
+
+      vplsConfigDiscardUnknownDest OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "If the value of this object is 'true', then frames
+                received with an unknown destination MAC are discarded
+                in this VPLS. If 'false', then the packets are
+                processed."
+          DEFVAL          { false }
+          ::= { vplsConfigEntry 7 }
+
+      vplsConfigMacAging OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "If the value of this object is 'true'
+                then the MAC ageing process is enabled in
+                this VPLS. If 'false', then the MAC ageing process
+                is disabled"
+          DEFVAL          { true }
+          ::= { vplsConfigEntry 8 }
+
+      vplsConfigFwdFullHighWatermark OBJECT-TYPE
+          SYNTAX          Unsigned32 (0..100)
+          UNITS           "percentage"
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies the utilization of the
+                forwarding database for this VPLS instance at
+                which the vplsFwdFullAlarmRaised notification
+                will be sent."
+          DEFVAL          { 95 }
+          ::= { vplsConfigEntry 10 }
+
+      vplsConfigFwdFullLowWatermark OBJECT-TYPE
+          SYNTAX          Unsigned32 (0..100)
+          UNITS           "percentage"
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies the utilization of the
+                forwarding database for this VPLS instance
+                at which the vplsFwdFullAlarmCleared
+                notification will be sent."
+          DEFVAL          { 90 }
+          ::= { vplsConfigEntry 11 }
+
+      vplsConfigRowStatus OBJECT-TYPE
+          SYNTAX          RowStatus
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "For creating, modifying, and deleting this row.
+                None of the read-create objects in the
+                conceptual rows may be changed when this
+                object is in the active(1) state."
+          ::= { vplsConfigEntry 12 }
+
+      vplsConfigMtu OBJECT-TYPE
+          SYNTAX          Unsigned32 (64..1518)
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The value of this object specifies the MTU of this
+                vpls instance."
+          DEFVAL          { 1518 }
+          ::= { vplsConfigEntry 13 }
+
+      vplsConfigVpnId OBJECT-TYPE
+          SYNTAX          VPNIdOrZero
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "This objects indicates the IEEE 802-1990
+                VPN ID of the associated VPLS service."
+-- Ed note: Should we import the VPNIdOrZero TC or
+--              define a new TC?
+          ::= { vplsConfigEntry 14 }
+
+      vplsConfigServiceType OBJECT-TYPE
+          SYNTAX          INTEGER {
+                           vlan     (1),
+                           ethernet (2)
+                          }
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The value of this object specifies the type of
+                service emulated by this vpls instance."
+          DEFVAL          { vlan }
+          ::= { vplsConfigEntry 15 }
+
+  vplsConfigStorageType OBJECT-TYPE
+          SYNTAX        StorageType
+          MAX-ACCESS    read-create
+          STATUS        current
+          DESCRIPTION
+               "This variable indicates the storage type for this row."
+          DEFVAL { volatile }
+          ::= { vplsConfigEntry 16 }
+
+-- VPLS Status table
+
+      vplsStatusTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF VplsStatusEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+                "This table provides information for monitoring
+                Virtual Private Lan Services(VPLS).
+                "
+          ::= { vplsObjects 3 }
+
+      vplsStatusEntry OBJECT-TYPE
+          SYNTAX          VplsStatusEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+           "A row in this table represents a Virtual Private Lan
+            Service(VPLS) in a packet network. It is indexed by
+            vplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row in this table is automatically created by the agent
+            when a VPLS service is configured.
+            "
+          INDEX           { vplsConfigIndex }
+          ::= { vplsStatusTable 1 }
+
+     VplsStatusEntry ::=
+        SEQUENCE {
+         vplsStatusOperStatus                        INTEGER,
+         vplsStatusPeerCount                         Counter32
+          }
+
+      vplsStatusOperStatus OBJECT-TYPE
+          SYNTAX          INTEGER {
+                              other(0),
+                              up(1),
+                              down(2)
+                          }
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "The current operational state of this VPLS Service."
+          ::= { vplsStatusEntry 1 }
+
+      vplsStatusPeerCount OBJECT-TYPE
+          SYNTAX          Counter32
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "This objects specifies the number of peers
+                present in this vpls instance."
+          ::= { vplsStatusEntry 2 }
+
+
+      -- VPLS PW Binding Table
+
+      vplsPwBindTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF VplsPwBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table provides an association between a
+                VPLS service and the corresponding Pseudo
+                Wires. A service can have more than one Pseudo
+                Wire association. Pseudo Wires are defined in
+                the pwTable"
+          ::= { vplsObjects 4 }
+
+      vplsPwBindEntry OBJECT-TYPE
+          SYNTAX          VplsPwBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Each row represents an association between a
+                VPLS instance and one or more Pseudo Wires
+                defined in the pwTable. Each index is unique
+                in describing an entry in this table. However
+                both indexes are required to define the one
+                to many association of service to
+                pseudowire."
+          INDEX  { vplsConfigIndex, pwIndex }
+          ::= { vplsPwBindTable 1 }
+
+      VplsPwBindEntry ::=
+          SEQUENCE {
+              vplsPwBindConfigType              INTEGER,
+              vplsPwBindType                  INTEGER,
+              vplsPwBindRowStatus             RowStatus,
+              vplsPwBindStorageType             StorageType
+          }
+
+      vplsPwBindConfigType   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   manual        (1),
+                                   autodiscovery (2)
+                           }
+           MAX-ACCESS      read-create
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 whether the Pseudo Wire binding was created
+                 manually or via autodiscovery.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { vplsPwBindEntry 1 }
+
+      vplsPwBindType   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   mesh  (1),
+                                   spoke (2)
+                           }
+           MAX-ACCESS      read-create
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 whether the Pseudo Wire binding is of
+                 type mesh or spoke.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { vplsPwBindEntry 2 }
+
+      vplsPwBindRowStatus  OBJECT-TYPE
+           SYNTAX          RowStatus
+           MAX-ACCESS      read-create
+           STATUS          current
+           DESCRIPTION
+                "For creating, modifying, and deleting this row.
+                 None of the read-create objects in the
+                 conceptual rows may be changed when this
+                 object is in the active(1) state"
+          ::= { vplsPwBindEntry 3 }
+
+      vplsPwBindStorageType OBJECT-TYPE
+           SYNTAX        StorageType
+           MAX-ACCESS    read-create
+           STATUS        current
+           DESCRIPTION
+               "This variable indicates the storage type for this row."
+           DEFVAL { volatile }
+           ::= { vplsPwBindEntry 4 }
+
+
+      vplsBgpADConfigTable OBJECT-TYPE
+            SYNTAX          SEQUENCE OF VplsBgpADConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "This table specifies information for configuring
+             BGP Auto-discovery parameters for a given Vpls service.
+            "
+            ::= { vplsObjects 5 }
+
+      vplsBgpADConfigEntry OBJECT-TYPE
+            SYNTAX          VplsBgpADConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "A row in this table represents BGP based autodiscovery
+             is in use for this instance of Vpls.
+             A row in this table is indexed by vplsConfigIndex, which
+             uniquely identifies a single VPLS.
+             None of the read-create objects can be changed when
+             vplsBGPADConfigRowStatus is in active(1) state. Changes
+             are allowed when the vplsBGPADConfigRowStatus is in
+             notInService(2) or notReady(3) states only.
+             If the operator need to change one of the values
+             for an active row the vplsConfigRowStatus should be
+             first changed to notInService(2), the objects may
+             be changed now, and later to active(1) in order to
+             re-initiate the signaling process with the new
+             values in effect.
+            "
+            INDEX      { vplsConfigIndex }
+            ::= { vplsBgpADConfigTable 1 }
+
+      VplsBgpADConfigEntry ::=
+         SEQUENCE {
+          vplsBgpADConfigRouteDistinguisher   VplsBgpRouteDistinguisher,
+          vplsBgpADConfigPrefix               Unsigned32,
+          vplsBgpADConfigVplsId               VplsBgpRouteDistinguisher,
+          vplsBgpADConfigRowStatus            RowStatus
+         }
+
+      vplsBgpADConfigRouteDistinguisher OBJECT-TYPE
+            SYNTAX          VplsBgpRouteDistinguisher
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " The route distinguisher for this VPLS. See [RFC4364]
+            for a complete definition of a route distinguisher.
+            for more details on use of a route distinguisher
+            for a VPLS service, see [RFC4761]
+            "
+            ::= { vplsBgpADConfigEntry 1 }
+
+            vplsBgpADConfigPrefix      OBJECT-TYPE
+            SYNTAX          Unsigned32
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " In case of auto-discovery the default prefix advertised
+            is the ip address of the loopback. In case the user wants
+            to override the loopback address, vplsBgpADConfigPrefix
+            should be set. When this value if non-zero it is used
+            as the advertised IP address in the NLRI.
+            "
+            DEFVAL { 0 }
+            ::= { vplsBgpADConfigEntry 2 }
+
+      vplsBgpADConfigVplsId          OBJECT-TYPE
+            SYNTAX          VplsBgpRouteDistinguisher
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " VplsId is a unique identifier for all VSIs belonging to
+            the same VPLS. It is advertised as an extended community
+            "
+            ::= { vplsBgpADConfigEntry 3 }
+
+      vplsBgpADConfigRowStatus OBJECT-TYPE
+            SYNTAX          RowStatus
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " For creating, modifying, and deleting this row.
+            None of the read-create objects in the
+            conceptual rows may be changed when this
+            object is in the active(1) state.
+            "
+            ::= { vplsBgpADConfigEntry 4 }
+
+
+    -- vplsBgpRteTargetTable
+
+      vplsBgpRteTargetTable   OBJECT-TYPE
+            SYNTAX          SEQUENCE OF VplsBgpRteTargetEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            " This table specifies the list of Route Targets
+              imported or exported by BGP during auto-discovery of VPLS.
+            "
+            ::= { vplsObjects 6 }
+
+      vplsBgpRteTargetEntry   OBJECT-TYPE
+            SYNTAX          VplsBgpRteTargetEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+              "An entry in this table specifies the value of the
+               Route Target being used by BGP. Depending on the value
+               of vplsBgpRteTargetType an RT might be exported or
+               imported or both. Every VPLS which
+              uses auto-discovery for finding peer nodes can import and
+              export multiple Route Targets. This representation allows
+              support for hierarchical VPLS."
+            INDEX     { vplsConfigIndex, vplsBgpRteTargetIndex }
+            ::= { vplsBgpRteTargetTable 1 }
+
+      VplsBgpRteTargetEntry ::=
+         SEQUENCE {
+          vplsBgpRteTargetIndex          Unsigned32,
+          vplsBgpRteTargetRTType         VplsBgpRouteTargetType,
+          vplsBgpRteTargetRT             VplsBgpRouteTarget,
+          vplsBgpRteTargetRTRowStatus    RowStatus
+         }
+
+      vplsBgpRteTargetIndex   OBJECT-TYPE
+            SYNTAX          Unsigned32
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "This index along with vplsConfigIndex,identifies one entry
+             in the vplsBgpRteTargetTable. By keeping vplsConfigIndex
+             constant and using new value of vplsBgpRteTargetIndex user
+              can configure multiple Route Targets for the same Vpls.
+            "
+            ::= { vplsBgpRteTargetEntry 1 }
+
+      vplsBgpRteTargetRTType  OBJECT-TYPE
+            SYNTAX          VplsBgpRouteTargetType
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " Used to define the type of a route target usage.
+              Route targets can be specified to be imported,
+              exported, or both.  For a complete definition of a
+              route target, see [RFC4364]."
+            ::= { vplsBgpRteTargetEntry 2 }
+
+      vplsBgpRteTargetRT     OBJECT-TYPE
+            SYNTAX          VplsBgpRouteTarget
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " The route target associated with the VPLS service.
+              For more details on use of route targets
+              for a VPLS service, see [RFC4761]"
+
+            ::= { vplsBgpRteTargetEntry 3 }
+
+      vplsBgpRteTargetRTRowStatus     OBJECT-TYPE
+            SYNTAX          RowStatus
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            "This variable is used to create, modify, and/or
+             delete a row in this table.  When a row in this
+             table is in active(1) state, no objects in that row
+             can be modified
+            "
+            ::= { vplsBgpRteTargetEntry 4 }
+
+      vplsStatusNotifEnable  OBJECT-TYPE
+            SYNTAX      TruthValue
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+            "If this object is set to true(1), then it enables
+             the emission of vplsStatusChanged
+             notification; otherwise this notification is not
+             emitted."
+            REFERENCE
+            "See also [RFC3413] for explanation that
+            notifications are under the ultimate control of the
+            MIB module in this document."
+            DEFVAL { false }
+            ::= { vplsObjects 7 }
+
+       vplsNotificationMaxRate OBJECT-TYPE
+          SYNTAX       Unsigned32
+          MAX-ACCESS   read-write
+          STATUS       current
+          DESCRIPTION
+           "This object indicates the maximum number of
+            notifications issued per second. If events occur
+            more rapidly, the implementation may simply fail to
+            emit these notifications during that period, or may
+            queue them until an appropriate time. A value of 0
+            means no throttling is applied and events may be
+            notified at the rate at which they occur."
+          DEFVAL       { 0 }
+          ::= { vplsObjects 8 }
+
+      -- VPLS Service Notifications
+
+      vplsStatusChanged NOTIFICATION-TYPE
+          OBJECTS {
+              vplsConfigVpnId,
+              vplsConfigAdminStatus,
+              vplsStatusOperStatus
+          }
+          STATUS          current
+          DESCRIPTION
+               "The vplsStatusChanged notification is generated
+                when there is a change in the administrative or
+                operating status of a VPLS service."
+          ::= { vplsNotifications 1 }
+
+      vplsFwdFullAlarmRaised NOTIFICATION-TYPE
+          OBJECTS {
+              vplsConfigVpnId,
+              vplsConfigFwdFullHighWatermark,
+              vplsConfigFwdFullLowWatermark
+          }
+          STATUS          current
+          DESCRIPTION
+               "The vplsFwdFullAlarmRaised notification is
+                generated when the utilization of the Forwarding
+                database is above the value specified by
+                vplsConfigFwdFullHighWatermark."
+          ::= { vplsNotifications 2 }
+
+      vplsFwdFullAlarmCleared NOTIFICATION-TYPE
+          OBJECTS {
+              vplsConfigVpnId,
+              vplsConfigFwdFullHighWatermark,
+              vplsConfigFwdFullLowWatermark
+          }
+          STATUS          current
+          DESCRIPTION
+               "The vplsFwdFullAlarmCleared notification is
+                generated when the utilization of the Forwarding
+                database is below the value specified by
+                vplsConfigFwdFullLowWatermark."
+          ::= { vplsNotifications 3 }
+
+   -- Compliance requirement for read-only implementations.
+
+   vplsCompliances
+     OBJECT IDENTIFIER ::= { vplsConformance 1 }
+
+   vplsModuleFullCompliance MODULE-COMPLIANCE
+      STATUS current
+      DESCRIPTION
+           "Compliance requirement for implementations that
+            provide full support for VPLS-GENERIC-DRAFT-01-MIB.
+            Such devices can then be monitored and configured using
+            this MIB module."
+      MODULE -- this module
+
+          MANDATORY-GROUPS {
+               vplsGroup,
+               vplsPwBindGroup,
+               vplsNotificationGroup
+           }
+
+      ::= { vplsCompliances 1 }
+
+
+   vplsModuleReadOnlyCompliance MODULE-COMPLIANCE
+      STATUS current
+      DESCRIPTION
+           "Compliance requirement for implementations that only
+            provide read-only support for VPLS-GENERIC-DRAFT-01-MIB.
+            Such devices can then be monitored but cannot be
+            configured using this MIB modules."
+
+      MODULE -- this module
+
+          MANDATORY-GROUPS {
+               vplsGroup,
+               vplsPwBindGroup,
+               vplsNotificationGroup
+           }
+
+           OBJECT          vplsConfigName
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+
+           OBJECT          vplsConfigDescr
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigAdminStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigMacLearning
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigDiscardUnknownDest
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigMacAging
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigFwdFullHighWatermark
+           MIN-ACCESS      read-only
+           DESCRIPTION
+
+               "Write access is not required."
+
+           OBJECT          vplsConfigFwdFullLowWatermark
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigRowStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigMtu
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsConfigServiceType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsPwBindConfigType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsPwBindType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          vplsPwBindRowStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+      ::= { vplsCompliances 2 }
+
+-- Units of conformance.
+
+      vplsGroups
+        OBJECT IDENTIFIER ::= { vplsConformance 2 }
+
+
+      vplsGroup OBJECT-GROUP
+          OBJECTS {
+              vplsConfigName,
+              vplsConfigDescr,
+              vplsConfigAdminStatus,
+              vplsConfigMacLearning,
+              vplsConfigDiscardUnknownDest,
+              vplsConfigMacAging,
+              vplsConfigVpnId,
+              vplsConfigFwdFullHighWatermark,
+              vplsConfigFwdFullLowWatermark,
+              vplsConfigRowStatus,
+              vplsConfigIndexNext,
+              vplsConfigMtu,
+              vplsConfigServiceType,
+              vplsConfigStorageType,
+              vplsStatusOperStatus,
+              vplsStatusPeerCount,
+              vplsStatusNotifEnable,
+              vplsNotificationMaxRate
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of objects supporting
+                management of L2VPN VPLS services"
+          ::= { vplsGroups 1 }
+
+      vplsPwBindGroup OBJECT-GROUP
+          OBJECTS {
+              vplsPwBindConfigType,
+              vplsPwBindType,
+              vplsPwBindRowStatus,
+              vplsPwBindStorageType
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of objects supporting
+                management of
+                Pseudo Wire (PW) Binding to VPLS."
+          ::= { vplsGroups 2 }
+
+      vplsNotificationGroup NOTIFICATION-GROUP
+          NOTIFICATIONS   {
+              vplsStatusChanged,
+              vplsFwdFullAlarmRaised,
+              vplsFwdFullAlarmCleared
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of notifications supporting
+                the  Notifications generated for
+                VPLS Services"
+          ::= { vplsGroups 3 }
+--- End of vplsNotification Table
+
+
+-- PW Redundancy parameters
+
+fsL2VpnPwRedundancyStatus OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                        enable (1),
+                        disable (2)
+                    }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+    "This object is for enabling or disabling the pseudowire redundancy feature.
+    User can disable the pseudowire redundancy if the Peer PE node does not
+    support pseudowire redundancy."
+    DEFVAL          { enable }
+    ::= { pwRedundancyScalar 1 }
+
+fsL2VpnPwRedNegotiationTimeOut OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..65535)
+    UNITS           "seconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "MAXIMUM permissible time allowed to negotiate the FORWARDING/
+            SWITCHOVER status with peer PEs. After expiry of this time operator
+            notification will be triggered."
+    DEFVAL          { 60 }
+    ::= { pwRedundancyScalar 2 }
+
+fsL2VpnPwRedundancySyncFailNotifyEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Enable notification for PW FORWARDING/SWITCHOVER status negotiation
+            failures."
+    DEFVAL          { false }
+    ::= { pwRedundancyScalar 3 }
+
+fsL2VpnPwRedundancyPwStatusNotifyEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Notify PW_STATUS change (AC_FAULT, PSN_FAULT, FORWARDING, SWITCHOVER)."
+    DEFVAL          { false }
+    ::= { pwRedundancyScalar 4 }
+
+
+-- Redundancy Set is created here
+
+fsL2VpnPwRedGroupTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsL2VpnPwRedGroupEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "The PW Redundancy Group table for pseudo-wire. Each entry in this
+         table corresponds to a configured Redundancy Group. This table
+         contains the group specific attributes. The entry in this table
+         are derived in reference from the (draft draft-ietf-pwe3-redundancy-07
+         & draft-ietf-pwe3-redundancy-bit-07)."
+    ::= { pwRedundancyObjects 1 }
+
+fsL2VpnPwRedGroupEntry OBJECT-TYPE
+    SYNTAX          FsL2VpnPwRedGroupEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "The PW Redundancy Group table entry. This table allows the user to
+         configure the Redundancy Group related parameters. Once the redundancy
+         entries are created then the pseudo-wires can be associated to each
+         Group. The switching of data will be done within the pseudo-wires in a
+         Redundancy entry"
+    INDEX
+    {
+        fsL2VpnPwRedGroupIndex
+    }
+    ::= { fsL2VpnPwRedGroupTable 1 }
+
+FsL2VpnPwRedGroupEntry ::= SEQUENCE
+{
+    fsL2VpnPwRedGroupIndex                          Unsigned32,
+    fsL2VpnPwRedGroupProtType                       INTEGER,
+    fsL2VpnPwRedGroupReversionType                  INTEGER,
+    fsL2VpnPwRedGroupContentionResolutionMethod     INTEGER,
+    fsL2VpnPwRedGroupMasterSlaveMode                INTEGER,
+    fsL2VpnPwRedGroupDualHomeApps                   BITS,
+    fsL2VpnPwRedGroupName                           DisplayString,
+    fsL2VpnPwRedGroupStatus                         BITS,
+    fsL2VpnPwRedGroupOperActivePw                   PwIndexOrZeroType,
+    fsL2VpnPwRedGroupWtrTimer                       Unsigned32,
+    fsL2VpnPwRedGroupAdminCmd                       INTEGER,
+    fsL2VpnPwRedGroupAdminActivePw                  PwIndexOrZeroType,
+    fsL2VpnPwRedGroupAdminCmdStatus                 INTEGER,
+    fsL2VpnPwRedGroupRowStatus                      RowStatus
+}
+
+fsL2VpnPwRedGroupIndex OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+        "The unique identifier for the pseudowire redundancy protection group."
+    ::= { fsL2VpnPwRedGroupEntry 1 }
+
+fsL2VpnPwRedGroupProtType OBJECT-TYPE
+    SYNTAX              INTEGER
+                        {
+                            onePlusOne (1),
+                            oneIsToOne (2),
+                            oneIsToN (3)
+                        }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "This object is used to indicate the protection architecture type of the
+         redundancy group. Protection architecture types supported are give below:
+
+         - 'onePlusOneWithLdp(1),provides 1+1 support for the pseudowires.
+             currently this is not supported
+         - 'oneIsToOneWithLdp(2)',  provides 1:1 support (i.e)the
+             selector bridging is established at the time of protection switching
+             based on signaling negotiation as per the Draft
+         'draft-ietf-pwe3-redundancy-07'
+         - 'oneIsToNWithLdp(3)',provides 1:n support (i.e) the selector bridging
+             is established at the time of protection switching from 'n'
+             available pseudowires"
+    DEFVAL              { oneIsToOne }
+    ::= { fsL2VpnPwRedGroupEntry 2 }
+
+fsL2VpnPwRedGroupReversionType OBJECT-TYPE
+    SYNTAX              INTEGER
+                        {
+                            revertive (1),
+                            nonRevertive (2)
+                        }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "This object is used to indicate the operation type/mode of the
+         protection group entry. If the value is set to 'revertive(1)', then
+         normal traffic will be shifted from the protection entity back to the
+         working entity upon recovery of the working entity from the fault. If
+         the value is set to 'nonRevertive(2)', then the normal traffic will not
+         be shifted from the protection entity back to the working entity even
+         after the recovery of the working entity from the fault."
+    DEFVAL              { nonRevertive }
+    ::= { fsL2VpnPwRedGroupEntry 3 }
+
+fsL2VpnPwRedGroupContentionResolutionMethod OBJECT-TYPE
+    SYNTAX              INTEGER
+                        {
+                            independent (1),
+                            masterslave (2)
+                        }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "This object is used to indicate the mode of operation of the
+         pseudo-wire group. If the mode is configured as independent then the PW
+         endpoint nodes independently select which PW they intend to make active
+         and which PWs they intend to make standby. If it is configured as
+         Master/Slave mode, Then the endpoint node of the redundant set of PWs
+         which is designated the Master is responsible for selecting which PW
+         both endpoints must use to forward user traffic."
+    DEFVAL              { independent }
+    ::= { fsL2VpnPwRedGroupEntry 4 }
+
+fsL2VpnPwRedGroupMasterSlaveMode OBJECT-TYPE
+    SYNTAX              INTEGER {
+                            master (1),
+                            slave (2)
+                        }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "This value is applicable only if the
+         fsL2VpnPwRedGroupContentionResolutionMethod is selected as 'masterSlave'.
+         Then the user can specify if this group is acting as Master or Slave.
+         When the Redundancy Group is configured as Master it has the choice to
+         select the forwarding state. i.e. the Active/Standby pseudo-wire. The
+         slave node is expected to follow the decision of the master"
+    DEFVAL              { slave }
+    ::= { fsL2VpnPwRedGroupEntry 5 }
+
+fsL2VpnPwRedGroupDualHomeApps OBJECT-TYPE
+    SYNTAX              BITS
+                        {
+                            lagg (0)
+                        }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "Enables the reflection of the attachment circuit status onto both the
+         primary and secondary pseudowires. This condition is necessary if the
+         peer PEs are connected to a dual-homed device"
+    DEFVAL              { 0 }
+    ::= { fsL2VpnPwRedGroupEntry 6 }
+
+fsL2VpnPwRedGroupName OBJECT-TYPE
+    SYNTAX              DisplayString (SIZE (0..32))
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "The name given to the protection group entry. This object is used to
+         refer the protection group in addition to the protection group Id. The
+         default value for this object will be the null string."
+    ::= { fsL2VpnPwRedGroupEntry 7 }
+
+fsL2VpnPwRedGroupStatus OBJECT-TYPE
+    SYNTAX              BITS
+                        {
+                            forwardingNegotiaton (0),
+                            switchoverNegotiaton (1),
+                            negotiatonSuccess (2),
+                            waitingToRestore (3),
+                            redundancyUnAvailable (4)
+                        }
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+        "This parameter indicate the current status of the PW Redundancy
+         Group."
+    ::= { fsL2VpnPwRedGroupEntry 8 }
+
+fsL2VpnPwRedGroupOperActivePw OBJECT-TYPE
+    SYNTAX              PwIndexOrZeroType
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+        "This object is used for indicating the pseudo-wire which is currently
+         active in a PW Redundancy Group. This parameter will contain reference
+         to a valid pwEntry when one of the local PW is forwarding the user
+         traffic.
+
+         When none of the pseudo-wires qualify to be ACTIVE on this node; this
+         parameter shall indicate zero.This object is configured after the
+         PwSignaling is completed at L2VPN and when the active PW is selected."
+    ::= { fsL2VpnPwRedGroupEntry 9 }
+
+fsL2VpnPwRedGroupWtrTimer OBJECT-TYPE
+    SYNTAX              Unsigned32 (1..180)
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "This column is used to configure the wait-to-restore timer for the
+         pseudowire redundancy group.
+
+         This column is used to configure the wait-to-restore timer for the
+         the revertive mode of operation. In the non-revertive mode of operation,
+         any value configured for this object will not be used. 
+         In the revertive mode of operation, default value for this object will
+         be 1"
+    ::= { fsL2VpnPwRedGroupEntry 10}
+
+fsL2VpnPwRedGroupAdminCmd OBJECT-TYPE
+    SYNTAX              INTEGER
+                        {
+                            lockOutProtection (1),      
+                            clear (2)
+                        }
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+        "This column is used by the operator to perform some administrative
+         operation.  The operator requests a command by writing the command
+         value to this column.The action for the command issued may or maynot
+         happen depending on the protection state.
+         The configuration of this object to value (lockOutProtection (1),
+         forceSwitchToProtection(2),manualSwitchToWorking (3) are allowed and
+         meaningful only when the fsL2VpnPwRedGroupOperActivePw is available.
+
+         The default value for this object will be 'clear' command indicating
+         that no command has been issued."
+    DEFVAL              { clear}
+    ::= { fsL2VpnPwRedGroupEntry 11 }
+
+fsL2VpnPwRedGroupAdminActivePw OBJECT-TYPE
+    SYNTAX              PwIndexOrZeroType
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+        "This object is used by the operator to forcefully switchover the
+         traffic to the specified pseudowire. This operation may or may-not
+         succeed depending on the redundancy state machine. Also if this value is
+         set, when the fsL2VpnPwRedGroupMasterSlaveMode is set as slave,it
+         is expected to throw an error,As slave cannot trigger switchover.
+
+         This parameter is not saved in non-volatile storage. "
+    ::= { fsL2VpnPwRedGroupEntry 12 }
+
+fsL2VpnPwRedGroupAdminCmdStatus OBJECT-TYPE
+    SYNTAX              INTEGER
+                        {
+                            accepted (1),
+                            notApplicable(2),
+                            rejected(3)
+                        }
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+        "This column indicates the status of the most recent administrative
+         command issued to this protection group through the fsL2VpnPwRedGroupAdminCmd
+         object."
+    ::= { fsL2VpnPwRedGroupEntry 13 }
+
+fsL2VpnPwRedGroupRowStatus OBJECT-TYPE
+    SYNTAX              RowStatus
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "This object defines the status of this row. The valid option supported
+         for this table are 'createAndGo' and 'destroy'.Entries in this table
+         cannot be modified by the user when the row is active"
+    ::= { fsL2VpnPwRedGroupEntry 14}
+
+
+-- Redundancy Set Nodes are added here
+
+fsL2VpnPwRedNodeTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsL2VpnPwRedNodeEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "List of sibling PE nodes in PW Redundancy Group. For each node
+         corresponding TLDP entity also has to be created in
+         MPLS-LDP-STD-MIB::mplsLdpEntityTable."
+    ::= { pwRedundancyObjects 2 }
+
+fsL2VpnPwRedNodeEntry OBJECT-TYPE
+    SYNTAX          FsL2VpnPwRedNodeEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Information about a sibling PE node participating the same PW
+         Redundancy Group."
+    INDEX
+    {
+        fsL2VpnPwRedGroupIndex,
+        fsL2VpnPwRedNodeAddrType,
+        fsL2VpnPwRedNodeAddr
+    }
+    ::= { fsL2VpnPwRedNodeTable 1 }
+
+FsL2VpnPwRedNodeEntry ::= SEQUENCE
+{
+    fsL2VpnPwRedNodeAddrType                InetAddressType,
+    fsL2VpnPwRedNodeAddr                    InetAddress,
+    fsL2VpnPwRedNodeLocalLdpID              MplsLdpIdentifier,
+    fsL2VpnPwRedNodeLocalLdpEntityIndex     Unsigned32,
+    fsL2VpnPwRedNodePeerLdpID               MplsLdpIdentifier,
+    fsL2VpnPwRedNodeStatus                  BITS,
+    fsL2VpnPwRedNodeRowStatus               RowStatus
+}
+
+fsL2VpnPwRedNodeAddrType OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "The type of the internetwork layer address used for ICCP handshaking.
+         This object indicates how the value of fsL2VpnPwRedNodeAddr is
+         to be interpreted. This parameter will be same as
+         MPLS-LDP-STD-MIB::mplsLdpEntityTargetPeerAddrType."
+    ::= { fsL2VpnPwRedNodeEntry 1 }
+
+fsL2VpnPwRedNodeAddr OBJECT-TYPE
+    SYNTAX          InetAddress (SIZE (4|16))
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "The value of the internetwork layer address used for the ICCP
+         handshaking. The value of fsL2VpnPwRedNodeAddrType specifies how
+         this address is to be interpreted. This parameter will be same as
+         MPLS-LDP-STD-MIB::mplsLdpEntityTargetPeerAddr."
+    ::= { fsL2VpnPwRedNodeEntry 2 }
+
+fsL2VpnPwRedNodeLocalLdpID OBJECT-TYPE
+    SYNTAX          MplsLdpIdentifier
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This read-only parameter indicates the currently used LDP session for
+         ICCP signaling from MPLS-LDP-STD-MIB::mplsLdpSessionTable."
+    ::= { fsL2VpnPwRedNodeEntry 3 }
+
+fsL2VpnPwRedNodeLocalLdpEntityIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This read-only parameter indicates the currently used LDP session for
+         ICCP signaling from MPLS-LDP-STD-MIB::mplsLdpSessionTable."
+    ::= { fsL2VpnPwRedNodeEntry 4 }
+
+fsL2VpnPwRedNodePeerLdpID OBJECT-TYPE
+    SYNTAX          MplsLdpIdentifier
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This read-only parameter indicates the currently used LDP session for
+         ICCP signaling from MPLS-LDP-STD-MIB::mplsLdpSessionTable."
+    ::= { fsL2VpnPwRedNodeEntry 5 }
+
+fsL2VpnPwRedNodeStatus OBJECT-TYPE
+    SYNTAX          BITS
+                    {
+                        connected (0),
+                        localSync (1)
+                    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This read-only parameter indicates the sibling node status."
+    ::= { fsL2VpnPwRedNodeEntry 6 }
+
+fsL2VpnPwRedNodeRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "For creating, modifying, and deleting this row. None of the read-create
+         objects in the conceptual rows may be changed when this object is in
+         the active(1) state."
+    ::= { fsL2VpnPwRedNodeEntry 7 }
+
+
+-- PW Attributes in a redundant set
+
+fsL2VpnPwRedPwTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsL2VpnPwRedPwEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This tables gives the information of the pseudowires associated with 
+         a particular redundancy group and allows to modify/remove PWs in the 
+         group. The switching of active to standby will occur within the
+         pseudowires that are within the redundancy group.
+
+         This object is derived based on the drafts
+         (draft-ietf-pwe3-redundancy-07 & draft-ietf-pwe3-redundancy-bit-07)."
+    ::= { pwRedundancyObjects 3 }
+
+fsL2VpnPwRedPwEntry OBJECT-TYPE
+    SYNTAX          FsL2VpnPwRedPwEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This tables allows the user to configure the pseudowire parameters
+         specific to redundancy group."
+    INDEX
+    {
+        fsL2VpnPwRedGroupIndex,
+        fsL2VpnPwRedPwIndex
+    }
+    ::= { fsL2VpnPwRedPwTable 1 }
+
+FsL2VpnPwRedPwEntry ::= SEQUENCE
+{
+    fsL2VpnPwRedPwIndex             PwIndexOrZeroType,
+    fsL2VpnPwRedPwPreferance        INTEGER,
+    fsL2VpnPwRedPwLocalStatus       FsL2VpnPwStatus,
+    fsL2VpnPwRedPwRemoteStatus      FsL2VpnPwStatus,
+    fsL2VpnPwRedPwOperStatus        PwOperStatusTC,
+    fsL2VpnPwRedPwRowStatus         RowStatus
+}
+
+fsL2VpnPwRedPwIndex OBJECT-TYPE
+    SYNTAX          PwIndexOrZeroType
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "The pwIndex of a PW in Redundancy group"
+    ::= { fsL2VpnPwRedPwEntry 1 }
+
+fsL2VpnPwRedPwPreferance OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                        primary (1),
+                        secondary (2)
+                    }
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The preference of the pseudowire. If the pseudowire is configured as 
+         primary it has more chance of becoming active when more than one PW 
+         qualify for secondary"
+    DEFVAL         { secondary }
+    ::= { fsL2VpnPwRedPwEntry 2 }
+
+fsL2VpnPwRedPwLocalStatus OBJECT-TYPE
+    SYNTAX          FsL2VpnPwStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The pwLocalStatus of the PW including the preferential FORWARDING and 
+         SWITCHOVER bit."
+    ::= { fsL2VpnPwRedPwEntry 3 }
+
+fsL2VpnPwRedPwRemoteStatus OBJECT-TYPE
+    SYNTAX          FsL2VpnPwStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This object indicates the PFS bit status received from the remote peer 
+         via LDP signalling."
+    ::= { fsL2VpnPwRedPwEntry 4 }
+
+fsL2VpnPwRedPwOperStatus OBJECT-TYPE
+    SYNTAX          PwOperStatusTC
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This object indicates the PW operational status with the Preferential
+         Forwarding status under consideration. When PFS is indicates status as
+         'STANDBY' the OPER.STATUS will be 'dormant'."
+    ::= { fsL2VpnPwRedPwEntry 5 }
+
+fsL2VpnPwRedPwRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "For creating, modifying, and deleting this row. None of the read-create 
+         objects in the conceptual rows may be changed when this object is in
+         the active(1) state"
+    ::= { fsL2VpnPwRedPwEntry 6 }
+
+
+-- ICCP PW Attributes in a redundant set
+
+fsL2VpnPwRedIccpPwTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsL2VpnPwRedIccpPwEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This tables gives the information of the pseudowires associated with
+         a particular redundancy group and allows to modify/remove PWs in the
+         group. The switching of active to standby will occur within the
+         pseudowires that are within the redundancy group.
+
+         This object is derived based on the drafts
+         (draft-ietf-pwe3-redundancy-07 & draft-ietf-pwe3-redundancy-bit-07)."
+    ::= { pwRedundancyObjects 4 }
+
+fsL2VpnPwRedIccpPwEntry OBJECT-TYPE
+    SYNTAX          FsL2VpnPwRedIccpPwEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This tables allows the user to configure the pseudowire parameters
+         specific to redundancy group."
+    INDEX
+    {
+        fsL2VpnPwRedIccpPwRgIndex,
+        fsL2VpnPwRedIccpPwHeadLsr,
+        fsL2VpnPwRedIccpPwFecType,
+        fsL2VpnPwRedIccpPwTailLsr,
+        fsL2VpnPwRedIccpPwGroup,
+        fsL2VpnPwRedIccpPwId,
+        fsL2VpnPwRedIccpPwAgiType,
+        fsL2VpnPwRedIccpPwAgi,
+        fsL2VpnPwRedIccpPwLocalAiiType,
+        fsL2VpnPwRedIccpPwLocalAii,
+        fsL2VpnPwRedIccpPwRemoteAiiType,
+        fsL2VpnPwRedIccpPwRemoteAii
+    }
+    ::= { fsL2VpnPwRedIccpPwTable 1 }
+
+FsL2VpnPwRedIccpPwEntry ::= SEQUENCE
+{
+    fsL2VpnPwRedIccpPwRgIndex           Unsigned32,
+    fsL2VpnPwRedIccpPwHeadLsr           MplsLsrIdentifier,
+    fsL2VpnPwRedIccpPwFecType           INTEGER,
+    fsL2VpnPwRedIccpPwTailLsr           MplsLsrIdentifier,
+    fsL2VpnPwRedIccpPwGroup             PwGroupID,
+    fsL2VpnPwRedIccpPwId                PwIDType,
+    fsL2VpnPwRedIccpPwAgiType           INTEGER,
+    fsL2VpnPwRedIccpPwAgi               OCTET STRING,
+    fsL2VpnPwRedIccpPwLocalAiiType      INTEGER,
+    fsL2VpnPwRedIccpPwLocalAii          OCTET STRING,
+    fsL2VpnPwRedIccpPwRemoteAiiType     INTEGER,
+    fsL2VpnPwRedIccpPwRemoteAii         OCTET STRING,
+    fsL2VpnPwRedIccpPwRoId              OCTET STRING,
+    fsL2VpnPwRedIccpPwPriority          Unsigned32,
+    fsL2VpnPwRedIccpPwStatus            BITS
+}
+
+fsL2VpnPwRedIccpPwRgIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 1 }
+
+fsL2VpnPwRedIccpPwHeadLsr OBJECT-TYPE
+    SYNTAX          MplsLsrIdentifier
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 2 }
+
+fsL2VpnPwRedIccpPwFecType OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                        manual (1), -- TODO
+                        pwIdFecSignaling (2),
+                        genFecSignaling (3)
+                    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 3 }
+
+fsL2VpnPwRedIccpPwTailLsr OBJECT-TYPE
+    SYNTAX          MplsLsrIdentifier
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 4 }
+
+fsL2VpnPwRedIccpPwGroup OBJECT-TYPE
+    SYNTAX          PwGroupID
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 5 }
+
+fsL2VpnPwRedIccpPwId OBJECT-TYPE
+    SYNTAX          PwIDType
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 6 }
+
+fsL2VpnPwRedIccpPwAgiType OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                        type1 (1)
+                    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 7 }
+
+fsL2VpnPwRedIccpPwAgi OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (8))
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 8 }
+
+fsL2VpnPwRedIccpPwLocalAiiType OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                        type1 (1),
+                        type2 (2)
+                    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 9 }
+
+fsL2VpnPwRedIccpPwLocalAii OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (4..12))
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 10 }
+
+fsL2VpnPwRedIccpPwRemoteAiiType OBJECT-TYPE
+    SYNTAX          INTEGER
+                    {
+                        type1 (1),
+                        type2 (2)
+                    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 11 }
+
+fsL2VpnPwRedIccpPwRemoteAii OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (4..12))
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 12 }
+
+fsL2VpnPwRedIccpPwRoId OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (8))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 13 }
+
+fsL2VpnPwRedIccpPwPriority OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..65535)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 14 }
+
+fsL2VpnPwRedIccpPwStatus OBJECT-TYPE
+    SYNTAX          BITS
+                    {
+                        localForward (0),
+                        localStandby (1),
+                        localSwitchover (2),
+                        remoteSwitchover (3),
+                        remoteAwaited (4),
+                        nodeSwitchover (6),
+                        localUpdated (7)
+                    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        " "
+    ::= { fsL2VpnPwRedIccpPwEntry 15 }
+
+-- End of ICCP PW attrbutes in a redundant set
+
+
+-- Definitions of PW Redundancy Notifications - Starts
+
+fsL2VpnPwRedSyncFail NOTIFICATION-TYPE
+    OBJECTS
+    {
+        fsL2VpnPwRedGroupAdminActivePw,
+        fsL2VpnPwRedGroupOperActivePw 
+    }
+    STATUS          current
+    DESCRIPTION
+        "This notification is generated when the PW FORWARDING/SWITCHOVER status
+         negotiation has exceeded the configured fsL2VpnPwRedNegotiationTimeOut
+         on a PW Redundancy group."
+    ::= { fsL2VpnPwRedTraps  1 }
+
+fsL2VpnPwRedPwStatus NOTIFICATION-TYPE
+    OBJECTS
+    {
+        fsL2VpnPwRedPwLocalStatus,
+        fsL2VpnPwRedPwRemoteStatus
+    }
+    STATUS          current
+    DESCRIPTION
+        "This notification is generated when the PW status changes for a PW in a
+         redundancy group."
+    ::= { fsL2VpnPwRedTraps 2 }
+
+-- Definitions of PW Redundancy Notifications - Ends
+
+-- MIB objects for testing L2VPN Redundancy
+
+fsL2VpnPwRedSimulateFailure OBJECT-TYPE
+
+    SYNTAX      INTEGER 
+                { 
+                    noRgIdTlv (1),
+                    invalidRgIdTlvLen (2),
+                    rqstNumZero (3),
+                    cAndSBitClear(4),
+                    noPwIdOrGenPwIdTlv (5)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This MIB object is added to trigger Invaid LDP-ICCP message
+
+          1. noRgIdTlv - Send a RG Application Data Message without RG ID TLV
+          2. invalidRgIdTlvLen - Send a RG Application Data Message with Invalid RG ID 
+                                 TLV Length (value other than 4)
+          3. rqstNumZero - Send a RG Application Data Message with PW-RED Synchronization Request TLV
+                           with Request number set to zero.
+          4. cAndSBitClear - Send a RG Application Data Message with PW-RED Synchronization Request TLV
+                             with 'C' and 'S' bit clear
+          5. noPwIdOrGenPwIdTlv -  Send a RG Application Data Message without PW-ID TLV and GEN PW-ID TLV"
+
+::= { fsL2VpnPwRedTestObjects 1 }
+
+fsL2VpnPwRedSimulateFailureForNbr OBJECT-TYPE
+
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This MIB object is added to configure the Peer address to which the Inavlid
+          packet to be transmitted"
+
+::= { fsL2VpnPwRedTestObjects 2 }
+
+END

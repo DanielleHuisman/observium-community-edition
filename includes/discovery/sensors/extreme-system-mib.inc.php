@@ -13,7 +13,7 @@
 
 if (!isset($GLOBALS['cache']['entity-mib']))
 {
-  $entity_array = snmpwalk_cache_multi_oid($device, 'entPhysicalDescr', array(), 'ENTITY-MIB');
+  $entity_array = snmpwalk_cache_oid($device, 'entPhysicalDescr', array(), 'ENTITY-MIB');
 } else {
   $entity_array = $GLOBALS['cache']['entity-mib'];
 }

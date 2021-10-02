@@ -30,7 +30,7 @@
 // Skip this processors discovery if HOST-RESOURCES-MIB discovered and exist
 if (isset($valid['processor']['hr']) || isset($valid['processor']['hr-average'])) { return; }
 
-$processors_array = snmpwalk_cache_multi_oid($device, 'nodePerCPUIdle', array(), 'ISILON-MIB');
+$processors_array = snmpwalk_cache_oid($device, 'nodePerCPUIdle', array(), 'ISILON-MIB');
 //print_vars($processors_array);
 
 $processors_count = count($processors_array);

@@ -33,11 +33,13 @@ if (!$noheader)
 {
   if ($width > "500")
   {
-    $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+5),0,$descr_len+5)."    Current      Average     Maximum      '";
-    if (!$nototal) { $rrd_options .= " COMMENT:'Total      '"; }
+    $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+0),0,$descr_len+5)."      Current   Average    Maximum  '";
+    if (!$nototal) {
+      $rrd_options .= " COMMENT:'95th  '";
+      $rrd_options .= " COMMENT:'Total'"; }
     $rrd_options .= " COMMENT:'\l'";
   } else {
-    $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+5),0,$descr_len+5)."     Now         Avg         Max\l'";
+    $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+0),0,$descr_len+5)."     Now         Avg         Max\l'";
   }
 }
 
@@ -67,16 +69,27 @@ foreach ($rrd_list as $rrd)
 
   $rrd_options .= " DEF:".$in.$i."=".$rrd_filename_escape.":".$ds_in.":AVERAGE ";
   $rrd_options .= " DEF:".$out.$i."=".$rrd_filename_escape.":".$ds_out.":AVERAGE ";
-  $rrd_options .= " CDEF:inB".$i."=in".$i.",$multiplier,* ";
-  $rrd_options .= " CDEF:outB".$i."=out".$i.",$multiplier,*";
-  $rrd_options .= " CDEF:outB".$i."_neg=outB".$i.",-1,*";
-  $rrd_options .= " CDEF:octets".$i."=inB".$i.",outB".$i.",+";
+
+  $rrd_options .= " DEF:".$in.$i."_max=".$rrd_filename_escape.":".$ds_in.":MAX ";
+  $rrd_options .= " DEF:".$out.$i."_max=".$rrd_filename_escape.":".$ds_out.":MAX ";
+  $rrd_options .= " DEF:".$in.$i."_min=".$rrd_filename_escape.":".$ds_in.":MIN ";
+  $rrd_options .= " DEF:".$out.$i."_min=".$rrd_filename_escape.":".$ds_out.":MIN ";
+
+
+  $RRAs = array('ave' => '', 'min' => '_min', 'max' => '_max');
+
+  foreach($RRAs AS $label => $rra) {
+      $rrd_options .= " CDEF:inB" . $i . $rra."=in" . $i . $rra.",$multiplier,* ";
+      $rrd_options .= " CDEF:outB" . $i . $rra."=out" . $i . $rra.",$multiplier,*";
+      $rrd_options .= " CDEF:outB" . $i . $rra."_neg=outB" . $i . $rra.",-1,*";
+      $rrd_options .= " CDEF:octets" . $i . $rra."=inB" . $i . $rra.",outB" . $i . $rra.",+";
+  }
 
   $rrd_multi['in_thing'][]  = $in.$i;
   $rrd_multi['out_thing'][] = $out.$i;
 
-  $rrd_options .= " VDEF:totin".$i."=inB".$i.",TOTAL";
-  $rrd_options .= " VDEF:totout".$i."=outB".$i.",TOTAL";
+  $rrd_options .= " VDEF:totin".$i."=in".$i.",TOTAL";
+  $rrd_options .= " VDEF:totout".$i."=out".$i.",TOTAL";
   $rrd_options .= " VDEF:tot".$i."=octets".$i.",TOTAL";
 
   if ($i) { $stack = ":STACK"; }
@@ -89,9 +102,13 @@ foreach ($rrd_list as $rrd)
   }
   $rrd_options .= " GPRINT:inB".$i.":LAST:%6.2lf%s$units";
   $rrd_options .= " GPRINT:inB".$i.":AVERAGE:%6.2lf%s$units";
-  $rrd_options .= " GPRINT:inB".$i.":MAX:%6.2lf%s$units";
+  $rrd_options .= " GPRINT:inB".$i."_max:MAX:%6.2lf%s$units";
 
-  if (!$nototal && $width > "500") { $rrd_options .= " GPRINT:totin".$i.":%6.2lf%s$total_units"; }
+  if (!$nototal && $width > "500") {
+    $rrd_options .= " VDEF:95thin".$i."=inB".$i.",95,PERCENT";
+    $rrd_options .= " GPRINT:95thin".$i.":%6.2lf%s";
+    $rrd_options .= " GPRINT:totin".$i.":%6.2lf%s$total_units";
+  }
 
   $rrd_options .= " COMMENT:'\\l'";
 
@@ -104,9 +121,13 @@ foreach ($rrd_list as $rrd)
   }
   $rrd_options  .= " GPRINT:outB".$i.":LAST:%6.2lf%s$units";
   $rrd_options  .= " GPRINT:outB".$i.":AVERAGE:%6.2lf%s$units";
-  $rrd_options  .= " GPRINT:outB".$i.":MAX:%6.2lf%s$units";
+  $rrd_options  .= " GPRINT:outB".$i."_max:MAX:%6.2lf%s$units";
 
-  if (!$nototal && $width > "500") { $rrd_options .= " GPRINT:totout".$i.":%6.2lf%s$total_units"; }
+  if (!$nototal && $width > "500") {
+    $rrd_options .= " VDEF:95thout".$i."=outB".$i.",95,PERCENT";
+    $rrd_options .= " GPRINT:95thout".$i.":%6.2lf%s";
+    $rrd_options .= " GPRINT:totout".$i.":%6.2lf%s$total_units";
+  }
   $rrd_options .= " 'COMMENT:\\n'";
 
   $i++; $iter++;

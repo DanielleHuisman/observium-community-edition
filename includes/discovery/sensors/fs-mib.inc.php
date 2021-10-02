@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -14,13 +14,13 @@
 // fs-MIB::switchThermalActionRisingThreshold.1.1.1 = INTEGER: 50
 // fs-MIB::switchThermalActionFallingThreshold.1.1.1 = INTEGER: 40
 
-$oids = snmp_walk_multipart_oid($device, 'switchThermalTempValue', array(), 'fs-MIB');
+$oids = snmpwalk_multipart_oid($device, 'switchThermalTempValue', array(), 'fs-MIB');
 if (!count($oids))
 {
   return;
 }
-$limit_oids = snmp_walk_multipart_oid($device, 'switchThermalActionRisingThreshold',      array(), 'fs-MIB');
-$limit_oids = snmp_walk_multipart_oid($device, 'switchThermalActionFallingThreshold', $limit_oids, 'fs-MIB');
+$limit_oids = snmpwalk_multipart_oid($device, 'switchThermalActionRisingThreshold', array(), 'fs-MIB');
+$limit_oids = snmpwalk_multipart_oid($device, 'switchThermalActionFallingThreshold', $limit_oids, 'fs-MIB');
 print_debug_vars($oids);
 print_debug_vars($limit_oids);
 
@@ -37,7 +37,9 @@ foreach ($oids as $unit => $entries)
     $value    = $entry[$oid_name];
 
     // Limits
-    $entry = array_merge($entry, array_shift($limit_oids[$unit][$i]));
+    if (isset($port_sw[$entry['connUnitPortIndex']])) {
+      $entry = array_merge($entry, array_shift($limit_oids[$unit][$i]));
+    }
     $limits = [
       'limit_high'      => $entry['switchThermalActionRisingThreshold'],
       'limit_high_warn' => $entry['switchThermalActionFallingThreshold']

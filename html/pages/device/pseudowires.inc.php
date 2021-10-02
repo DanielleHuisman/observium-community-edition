@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -32,15 +30,14 @@ $vars_filter = $vars;
 unset($vars_filter['pwtype']); // Do not filter type
 
 $sql = generate_pseudowire_query($vars_filter);
-
+$pw_types = [];
 foreach (dbFetchRows($sql) as $pw)
 {
     $pw_type  = $pw['pwType'];
     $pw_label = nicecase($pw_type);
 
-    // Combinate different types with same label
-    if (!in_array($pw_type, $pw_types[$pw_label]))
-    {
+    // Combine different types with same label
+    if (!isset($pw_types[$pw_label]) || !in_array($pw_type, $pw_types[$pw_label])) {
       $pw_types[$pw_label][] = $pw_type;
     }
 }

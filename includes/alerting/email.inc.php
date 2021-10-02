@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,15 @@
  *
  * @package    observium
  * @subpackage alerting
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Find local hostname
 $localhost = get_localhost();
 
-$emails = array();
+$emails = [];
+$mail_params = [];
 
 $emails[$endpoint['email']] = $endpoint['contact_descr'];
 
@@ -28,7 +28,7 @@ switch ($backend)
   case 'smtp':
     $mail_params['host']      = $config['email']['smtp_host'];
     $mail_params['port']      = $config['email']['smtp_port'];
-    if ($config['email']['smtp_secure'] == 'ssl')
+    if ($config['email']['smtp_secure'] === 'ssl')
     {
       $mail_params['host']    = 'ssl://'.$config['email']['smtp_host'];
       if ($config['email']['smtp_port'] == 25)
@@ -42,6 +42,16 @@ switch ($backend)
     $mail_params['password']  = $config['email']['smtp_password'];
     $mail_params['localhost'] = $localhost;
     if (OBS_DEBUG) { $mail_params['debug'] = TRUE; }
+    break;
+  case 'smtpmx':
+  case 'mx':
+    $mail_params['mailname']  = $localhost;
+    $mail_params['netdns']    = FALSE;
+
+    $mail_params['timeout']   = $config['email']['smtp_timeout'];
+    if (OBS_DEBUG) { $mail_params['debug'] = TRUE; }
+
+    $backend = 'smtpmx';
     break;
   case 'mail':
   default:
@@ -62,7 +72,7 @@ if (empty($config['email']['from']))
   // Validate configured mail from
   foreach (parse_email($config['email']['from']) as $from => $from_name)
   {
-    $headers['From'] = (empty($from_name) ? $from : '"'.$from_name.'" <'.$from.'>'); // From:
+    $headers['From'] = (empty($from_name) ? $from : '"' . $from_name . '" <' . $from . '>'); // From:
     $headers['Return-Path'] = $from;
     break; // use only first entry
   }
@@ -171,20 +181,18 @@ foreach ($message as $part => $part_body)
 $body = $mime->get();
 
 // Prepare headers
-foreach ($headers as $name => $value)
-{
+foreach ($headers as $name => $value) {
   $headers[$name] = $mime->encodeHeader($name, $value, 'utf-8', 'quoted-printable');
 }
 $headers = $mime->headers($headers);
 //var_dump($headers);
 
 // Create mailer instance
-$mail =& Mail::factory($backend, $mail_params);
+$mail = Mail::factory($backend, $mail_params);
 // Sending email
 $status = $mail->send($rcpts, $headers, $body);
 
-if (PEAR::isError($status))
-{
+if (PEAR::isError($status)) {
   //print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
   $notify_status['success'] = FALSE;
   $notify_status['error']   = $status->getMessage();

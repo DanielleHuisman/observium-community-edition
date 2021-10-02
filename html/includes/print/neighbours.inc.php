@@ -37,7 +37,7 @@ function print_neighbours($vars)
   } else {
     // Entries have been returned. Print the table.
     $list = array('device' => FALSE);
-    if ($vars['page'] != 'device') { $list['device'] = TRUE; }
+    if ($vars['page'] !== 'device') { $list['device'] = TRUE; }
     if (in_array($vars['graph'], array('bits', 'upkts', 'nupkts', 'pktsize', 'percent', 'errors', 'etherlike', 'fdb_count')))
     {
       $graph_types = array($vars['graph']);
@@ -168,17 +168,14 @@ function get_neighbours_array($vars)
 
   // Active by default
   if (!isset($vars['active'])) { $vars['active'] = '1'; }
-  elseif ($vars['active'] == 'any') { unset($vars['active']); }
+  elseif ($vars['active'] === 'any') { unset($vars['active']); }
 
   // Begin query generate
   $param = array();
   $where = ' WHERE 1 ';
-  foreach ($vars as $var => $value)
-  {
-    if ($value != '')
-    {
-      switch ($var)
-      {
+  foreach ($vars as $var => $value) {
+    if ($value != '') {
+      switch ($var) {
         case 'device':
         case 'device_a':
           $where .= generate_query_values($value, 'device_id');
@@ -207,8 +204,7 @@ function get_neighbours_array($vars)
           $where .= generate_query_values($value, 'active');
           break;
         case 'remote_port_id':
-          if ($value == 'NULL' || $value == 0)
-          {
+          if ($value === 'NULL' || $value == 0) {
             $where .= ' AND isnull(`remote_port_id`)';
           } else {
             $where .= ' AND !isnull(`remote_port_id`)';
@@ -222,9 +218,14 @@ function get_neighbours_array($vars)
   //$query_permitted = $GLOBALS['cache']['where']['ports_permitted'];
   $query_permitted = generate_query_permitted(array('ports', 'devices'));
 
-  $query  = 'SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime` ';
-  $query .= 'FROM `neighbours` ';
-  //$query .= 'FROM `neighbours` LEFT JOIN `ports` USING(`port_id`,`device_id`) ';
+  if ($vars['sort'] === 'port_a') {
+    $query  = 'SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime`, `ports`.`port_label` ';
+    $query .= 'FROM `neighbours` LEFT JOIN `ports` USING(`port_id`,`device_id`) ';
+  } else {
+    $query  = 'SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime` ';
+    $query .= 'FROM `neighbours` ';
+  }
+
   $query .= $where . ' ' . $query_permitted;
 
   // Query neighbours
@@ -251,8 +252,7 @@ function get_neighbours_array($vars)
 
   // Sorting
   // FIXME. Sorting can be as function, but in must before print_table_header and after get table from db
-  switch ($vars['sort_order'])
-  {
+  switch ($vars['sort_order']) {
     case 'desc':
       $sort_order = SORT_DESC;
       $sort_neg   = SORT_ASC;

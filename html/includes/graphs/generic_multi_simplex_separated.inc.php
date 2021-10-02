@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -46,7 +45,7 @@ if ($width > "500")
 $colour_iter = 0;
 $rrd_multi = array();
 
-$count = count($rrd_list);
+$count = safe_count($rrd_list);
 
 if (isset($colours) && $colours != "mixed" && strpos("mixed", $colours) !== FALSE)
 {

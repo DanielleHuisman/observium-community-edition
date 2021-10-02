@@ -136,8 +136,7 @@ function get_fdbtable_array($vars)
           $join_ports = TRUE;
           break;
         case 'trunk':
-          if (in_array($value, array('ok', 'yes', '1')))
-          {
+          if (get_var_true($value)) {
             $where .= " AND (`I`.`ifTrunk` IS NOT NULL AND `I`.`ifTrunk` != '')";
             $join_ports = TRUE;
           }
@@ -154,7 +153,7 @@ function get_fdbtable_array($vars)
           $where .= generate_query_values($value, 'V.vlan_name');
           break;
         case 'address':
-          if (str_exists($value, array( '*', '?')))
+          if (str_contains_array($value, array( '*', '?')))
           {
             $like = 'LIKE';
           } else {

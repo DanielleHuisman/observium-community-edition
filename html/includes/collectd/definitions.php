@@ -1719,7 +1719,7 @@ function meta_graph_cpu($host, $plugin, $plugin_instance, $type, $type_instances
 
 	$files = array();
 	$opts['colors'] = array(
-		'idle'      => 'ffffff',
+		'idle'      => 'FFFFFFFF',
 		'nice'      => '00e000',
 		'user'      => '0000ff',
 		'wait'      => 'ffb000',

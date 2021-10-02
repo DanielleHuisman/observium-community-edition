@@ -34,7 +34,7 @@ foreach ($sensorTables as $table)
 
   foreach ($sensorElements as $element)
   {
-    $cache['rittal'][$tablename] = snmpwalk_cache_multi_oid($device, $tableprefix.$element, $cache['rittal'][$tablename],$mib);
+    $cache['rittal'][$tablename] = snmpwalk_cache_oid($device, $tableprefix . $element, $cache['rittal'][$tablename], $mib);
   }
 
   $unit_name = trim(snmp_get($device,$table['info'], "-Ovq", $mib),'"');

@@ -14,7 +14,7 @@
 // FIXME migrate to definitions
 
 /*
-$cache_discovery['DKSF-60-4-X-X-X']['pwr'] = snmpwalk_cache_multi_oid($device, 'npPwrTable', array(), 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['pwr'] = snmpwalk_cache_oid($device, 'npPwrTable', array(), 'DKSF-60-4-X-X-X');
 foreach ($cache_discovery['DKSF-60-4-X-X-X']['pwr'] as $index => $entry)
 {
   if ($entry['npSmokePower'] == 'off') { continue; }
@@ -30,7 +30,7 @@ foreach ($cache_discovery['DKSF-60-4-X-X-X']['pwr'] as $index => $entry)
 }
 */
 
-$cache_discovery['DKSF-60-4-X-X-X']['loop'] = snmpwalk_cache_multi_oid($device, 'npCurLoopTable', array(), 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['loop'] = snmpwalk_cache_oid($device, 'npCurLoopTable', array(), 'DKSF-60-4-X-X-X');
 foreach ($cache_discovery['DKSF-60-4-X-X-X']['loop'] as $index => $entry)
 {
   if ($entry['npCurLoopPower'] == 'off' || $entry['npCurLoopStatus'] == 'notPowered') { continue; }
@@ -78,9 +78,9 @@ foreach ($cache_discovery['DKSF-60-4-X-X-X']['loop'] as $index => $entry)
 //DKSF-60-4-X-X-X::npRelHumSensorStatus.0 = INTEGER: ok(1)
 //DKSF-60-4-X-X-X::npRelHumSensorValueT.0 = INTEGER: 0
 
-$cache_discovery['DKSF-60-4-X-X-X']['temphum'] = snmpwalk_cache_multi_oid($device, 'npRelHumSensorValueH', array(), 'DKSF-60-4-X-X-X');
-$cache_discovery['DKSF-60-4-X-X-X']['temphum'] = snmpwalk_cache_multi_oid($device, 'npRelHumSensorValueT', $cache_discovery['DKSF-60-4-X-X-X']['temphum'], 'DKSF-60-4-X-X-X');
-$cache_discovery['DKSF-60-4-X-X-X']['temphum'] = snmpwalk_cache_multi_oid($device, 'npRelHumSensorStatus', $cache_discovery['DKSF-60-4-X-X-X']['temphum'], 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['temphum'] = snmpwalk_cache_oid($device, 'npRelHumSensorValueH', array(), 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['temphum'] = snmpwalk_cache_oid($device, 'npRelHumSensorValueT', $cache_discovery['DKSF-60-4-X-X-X']['temphum'], 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['temphum'] = snmpwalk_cache_oid($device, 'npRelHumSensorStatus', $cache_discovery['DKSF-60-4-X-X-X']['temphum'], 'DKSF-60-4-X-X-X');
 foreach ($cache_discovery['DKSF-60-4-X-X-X']['temphum'] as $index => $entry)
 {
   // Temperature
@@ -110,7 +110,7 @@ foreach ($cache_discovery['DKSF-60-4-X-X-X']['temphum'] as $index => $entry)
   }
 }
 
-$cache_discovery['DKSF-60-4-X-X-X']['thermo'] = snmpwalk_cache_multi_oid($device, 'npThermoTable', array(), 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['thermo'] = snmpwalk_cache_oid($device, 'npThermoTable', array(), 'DKSF-60-4-X-X-X');
 foreach ($cache_discovery['DKSF-60-4-X-X-X']['thermo'] as $index => $entry)
 {
   // Temperature
@@ -125,7 +125,7 @@ foreach ($cache_discovery['DKSF-60-4-X-X-X']['thermo'] as $index => $entry)
   }
 }
 
-$cache_discovery['DKSF-60-4-X-X-X']['io'] = snmpwalk_cache_multi_oid($device, 'npIoTable', array(), 'DKSF-60-4-X-X-X');
+$cache_discovery['DKSF-60-4-X-X-X']['io'] = snmpwalk_cache_oid($device, 'npIoTable', array(), 'DKSF-60-4-X-X-X');
 foreach ($cache_discovery['DKSF-60-4-X-X-X']['io'] as $index => $entry)
 {
   if ($entry['npIoLevelIn'] == '0') { continue; }
@@ -139,10 +139,7 @@ foreach ($cache_discovery['DKSF-60-4-X-X-X']['io'] as $index => $entry)
   discover_counter($device, 'counter', $mib, $oid_name, $oid, $index, $descr, 1, $value);
 }
 
-if (OBS_DEBUG > 1 && count($cache_discovery['DKSF-60-4-X-X-X']))
-{
-  print_vars($cache_discovery['DKSF-60-4-X-X-X']);
-}
+print_debug_vars($cache_discovery['DKSF-60-4-X-X-X']);
 
 unset($cache_discovery['DKSF-60-4-X-X-X']);
 

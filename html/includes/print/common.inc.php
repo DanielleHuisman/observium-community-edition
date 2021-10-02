@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,38 +6,74 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
+function build_table($array, $options = []) {
 
-function build_table($array, $options = [])
-{
+  // start table
+  $html = '<table class="table table-condensed table-striped">';
 
-   // start table
-   $html = '<table class="table table-condensed table-striped">';
-   // header row
-   $html .= '<thead><tr>';
-   foreach($array[0] as $key => $value)
-   {
-      $html .= '<th>' . $key . '</th>';
-   }
-   $html .= '</tr></thead>';
+  // header row
+  if (isset($options['columns'])) {
+    $html .= get_table_header($options['columns']);
+    unset($options['columns']);
+  } else {
+    $html .= '<thead><tr>';
+    foreach ($array[0] as $key => $value) {
+      $html .= '<th>' . escape_html(nicecase($key)) . '</th>';
+    }
+    $html .= '</tr></thead>';
+  }
 
    // data rows
-   foreach($array as $key => $value)
-   {
+   foreach($array as $key => $value) {
       $html .= '<tr>';
-      foreach($value as $key2 => $value2)
-      {
-        switch ($options[$key2])
-        {
+      foreach($value as $key2 => $value2) {
+        // Entry defaults
+        $escape = TRUE;
+        $style  = '';
+        $class  = '';
+
+        if (isset($options[$key2])) {
+          $options2 = $options[$key2];
+          if (is_array($options2)) {
+            $type = $options2['type'];
+            // Allow extra options
+            if (isset($options2['escape'])) {
+              $escape = $options2['escape'];
+            }
+            if (isset($options2['style'])) {
+              $style = $options2['style'];
+            }
+            if (isset($options2['class'])) {
+              $class = $options2['class'];
+            }
+          } else {
+            $type = $options2;
+          }
+        } else {
+          $type = NULL;
+        }
+        switch ($type) {
           case 'unixtime':
             $value2 = format_unixtime($value2);
             break;
           case 'device':
             $value2 = generate_device_link($value2);
             break;
+          case 'json':
+            $json = safe_json_encode(safe_json_decode($value2), JSON_PRETTY_PRINT);
+            $value2 = '<pre>'.$json.'</pre>';
+            break;
+          default:
+            if ($escape) {
+              $value2 = escape_html($value2);
+            }
+        }
+        if ($style || $class) {
+          $value2 = '<span class="'.$class.'" style="'.$style.'">'.$value2.'</span>';
         }
         $html .= '<td>' . $value2 . '</td>';
       }
@@ -184,29 +219,24 @@ function print_refresh($vars)
  * @param array $vars Array with current selected column ID and/or variables for generate column link
  * @return string $string
  */
-function get_table_header($cols, $vars = array())
-{
+function get_table_header($cols, $vars = array()) {
   // Always clean sort vars
   $sort       = $vars['sort'];
   $sort_order = strtolower($vars['sort_order']);
-  if (!in_array($sort_order, array('asc', 'desc', 'reset')))
-  {
-    $sort_order = 'acs';
+  if (!in_array($sort_order, array('asc', 'desc', 'reset'))) {
+    $sort_order = 'asc';
   }
   unset($vars['sort'], $vars['sort_order']);
 
-  if (isset($vars['show_header']) && !$vars['show_header'])
-  {
+  if (isset($vars['show_header']) && !$vars['show_header']) {
     // Do not show any table header if show_header == FALSE
     $string  = '  <thead style="line-height: 0; visibility: collapse;">' . PHP_EOL;
   } else {
     $string  = '  <thead>' . PHP_EOL;
   }
   $string .= '    <tr>' . PHP_EOL;
-  foreach ($cols as $id => $col)
-  {
-    if (is_array($col))
-    {
+  foreach ($cols as $id => $col) {
+    if (is_array($col)) {
       $name  = $col[0];
       $style = ' '.$col[1]; // Column styles/classes
     } else {
@@ -214,21 +244,14 @@ function get_table_header($cols, $vars = array())
       $style = '';
     }
     $string .= '      <th'.$style.'>';
-    if ($name == NULL)
-    {
+    if ($name == NULL) {
       $string .= '';         // Column without Name and without Sort
-    }
-    else if (is_int($id) || stristr($id, "!") != FALSE)
-    {
+    } elseif (is_intnum($id) || str_contains($id, "!")) {
       $string .= $name;      // Column without Sort
-    }
-    else if (!empty($vars) || $sort)
-    {
+    } elseif (!empty($vars) || $sort) {
       // Sort order cycle: asc -> desc -> reset
-      if ($sort == $id)
-      {
-        switch ($sort_order)
-        {
+      if ($sort == $id) {
+        switch ($sort_order) {
           case 'desc':
             $name .= '&nbsp;&nbsp;<i class="small glyphicon glyphicon-triangle-top"></i>';
             $sort_array = array();
@@ -412,6 +435,31 @@ function get_button_group($params = [], $opt = [], $escape = TRUE) {
 }
 
 /**
+ * Generate html by Markdown formatted text.
+ *
+ * @param string $markdown Markdown formatted text
+ * @param bool   $escape   Escape html entities
+ * @param bool   $extra    Allow Extra Markdown syntax
+ *
+ * @return string HTML formatted text
+ */
+function get_markdown($markdown, $escape = TRUE, $extra = FALSE) {
+  if ($extra) {
+    // Allow Extra Markdown syntax
+    //$parsedown = new ParsedownExtra();
+    $parsedown = new ParsedownExtraPlugin();
+  } else {
+    $parsedown = new Parsedown();
+  }
+  $html = $parsedown
+    ->setMarkupEscaped($escape) # escapes markup (HTML)
+    ->setBreaksEnabled(TRUE) # enables automatic line breaks
+    ->line($markdown);
+  //print_vars($html);
+  return '<span style="min-width: 150px;">'.$html.'</span>';
+}
+
+/**
  * Generate icon html tag
  *
  * @param string $icon  Icon name in definitions (ie: flag) or by css class (ie: sprite-flag)
@@ -425,7 +473,7 @@ function get_icon($icon, $class = '', $attribs = [])
   global $config;
 
   // Passed already html icon tag, return as is
-  if (str_exists($icon, [ '<', '>' ])) { return $icon; }
+  if (str_contains_array($icon, [ '<', '>' ])) { return $icon; }
 
   $icon = trim(strtolower($icon));
   if (isset($config['icon'][$icon]))
@@ -529,6 +577,24 @@ function get_icon_country($country)
   }
 
   return '<i class="flag flag-'.$code.'"></i>';
+}
+
+function print_json_status($status, $message = '', $array = []) {
+  if (!in_array($status, [ 'ok', 'failed', 'warning' ])) {
+    $status = 'failed';
+  }
+
+  $return = [ 'status' => $status, 'message' => $message ];
+  if (safe_count($array)) {
+    if (isset($array['message']) && empty($message)) {
+      // prefer not empty message
+      unset($return['message']);
+    }
+    $return = array_merge($return, $array);
+  }
+
+  header('Content-Type: application/json');
+  print safe_json_encode($return);
 }
 
 // EOF

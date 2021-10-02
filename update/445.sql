@@ -1,0 +1,3 @@
+CREATE TABLE `observium_actions` ( `action_id` INT NOT NULL AUTO_INCREMENT , `poller_id` INT NOT NULL , `action` VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL , `vars` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL , `added` INT UNSIGNED NOT NULL DEFAULT '0' , PRIMARY KEY (`action_id`)) ENGINE = InnoDB;
+ALTER TABLE `observium_actions` ADD `identifier` VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `action`;
+ALTER TABLE `observium_actions` ADD UNIQUE `ident` (`poller_id`, `action`, `identifier`);

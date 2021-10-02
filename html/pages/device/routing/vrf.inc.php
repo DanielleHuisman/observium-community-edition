@@ -1,20 +1,21 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-$link_array = array('page'    => 'device',
-                    'device'  => $device['device_id'],
-                    'tab'     => 'routing',
-                    'proto'   => 'vrf');
+$link_array = [
+  'page'    => 'device',
+  'device'  => $device['device_id'],
+  'tab'     => 'routing',
+  'proto'   => 'vrf'
+];
 
 $navbar = array('brand' => "VRFs", 'class' => "navbar-narrow");
 
@@ -48,13 +49,13 @@ unset($navbar);
 
 echo generate_box_open();
 
-echo('<table class="table  table-striped">');
+echo '<table class="table table-striped">';
 foreach (dbFetchRows("SELECT * FROM `vrfs` WHERE `device_id` = ? ORDER BY `vrf_name`", array($device['device_id'])) as $vrf)
 {
   include($config['html_dir']."/includes/print-vrf.inc.php");
 }
 
-echo("</table>");
+echo "</table>";
 
 echo generate_box_close();
 

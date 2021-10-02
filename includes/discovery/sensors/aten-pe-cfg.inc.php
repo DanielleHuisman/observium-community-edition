@@ -24,8 +24,8 @@
 //ATEN-PE-CFG::deviceMaxPMT.1 = INTEGER: -3000
 //ATEN-PE-CFG::deviceMaxPDMT.1 = INTEGER: -3000
 
-$oids  = snmpwalk_cache_multi_oid($device, "deviceIntegerValueEntry", array(), 'ATEN-PE-CFG');
-$oids  = snmpwalk_cache_multi_oid($device, "deviceConfigEntry",         $oids, 'ATEN-PE-CFG');
+$oids  = snmpwalk_cache_oid($device, "deviceIntegerValueEntry", array(), 'ATEN-PE-CFG');
+$oids  = snmpwalk_cache_oid($device, "deviceConfigEntry", $oids, 'ATEN-PE-CFG');
 $count = count($oids);
 $scale = 0.001;
 
@@ -147,8 +147,8 @@ foreach ($oids as $index => $entry)
 //ATEN-PE-CFG::sensorMaxPressMT.5 = INTEGER: -2000000
 //ATEN-PE-CFG::sensorMaxPressMT.6 = INTEGER: -2000000
 
-$oids = snmpwalk_cache_multi_oid($device, "sensorIntegerValueEntry", array(), 'ATEN-PE-CFG');
-$oids = snmpwalk_cache_multi_oid($device, "deviceSensorTresholdEntry", $oids, 'ATEN-PE-CFG');
+$oids = snmpwalk_cache_oid($device, "sensorIntegerValueEntry", array(), 'ATEN-PE-CFG');
+$oids = snmpwalk_cache_oid($device, "deviceSensorTresholdEntry", $oids, 'ATEN-PE-CFG');
 $scale = 0.001;
 
 if (OBS_DEBUG > 1 && count($oids)) { var_dump($oids); }

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -18,11 +17,11 @@ $mib = 'HOST-RESOURCES-MIB';
 if (!isset($cache_discovery['host-resources-mib']))
 {
   $cache_discovery['host-resources-mib'] = snmpwalk_cache_oid($device, "hrStorageEntry", array(), "HOST-RESOURCES-MIB:HOST-RESOURCES-TYPES");
-  if (OBS_DEBUG > 1 && count($cache_discovery['host-resources-mib'])) { print_vars($cache_discovery['host-resources-mib']); }
+  print_debug_vars($cache_discovery['host-resources-mib']);
 }
 
-if (count($cache_discovery['host-resources-mib']))
-{
+$dsk_done = [];
+if (safe_count($cache_discovery['host-resources-mib'])) {
   foreach ($cache_discovery['host-resources-mib'] as $index => $storage)
   {
     $hc = 0;
@@ -131,8 +130,7 @@ if (count($cache_discovery['host-resources-mib']))
   }
 }
 
-if (count($cache_discovery['ucd-snmp-mib']))
-{
+if (safe_count($cache_discovery['ucd-snmp-mib'])) {
   // Discover 'UCD-SNMP-MIB' if 'HOST-RESOURCES-MIB' empty.
   $mib = 'UCD-SNMP-MIB';
 

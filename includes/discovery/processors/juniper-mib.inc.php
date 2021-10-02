@@ -11,12 +11,12 @@
  *
  */
 
-$processors_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingCPU',      array(), $mib);
+$processors_array = snmpwalk_cache_oid($device, 'jnxOperatingCPU', array(), $mib);
 
 if (is_array($processors_array))
 {
-  $processors_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingDRAMSize', $processors_array, $mib);
-  $processors_array = snmpwalk_cache_multi_oid($device, 'jnxOperatingDescr',    $processors_array, $mib);
+  $processors_array = snmpwalk_cache_oid($device, 'jnxOperatingDRAMSize', $processors_array, $mib);
+  $processors_array = snmpwalk_cache_oid($device, 'jnxOperatingDescr', $processors_array, $mib);
 
   foreach ($processors_array as $index => $entry)
   {

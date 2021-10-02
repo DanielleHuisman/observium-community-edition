@@ -1,0 +1,671 @@
+TROPIC-PHMNOTIFICATION-MIB DEFINITIONS ::= BEGIN
+
+-- (c) Copyright 2019 Nokia Networks.  All rights reserved.
+-- This software is the confidential and proprietary property of
+-- Nokia and may only be used in accordance with the terms of the
+-- license agreement provided with this software.
+
+IMPORTS
+      SnmpAdminString                         FROM SNMP-FRAMEWORK-MIB
+      MODULE-IDENTITY,
+      NOTIFICATION-TYPE                       FROM SNMPv2-SMI
+      tnTrapTime,
+      tnTrapCategory,
+      tnTrapDescr,
+      tnTrapData                              FROM TROPIC-NOTIFICATION-MIB
+      tnSystemModules, tnPhMNotificationMIB   FROM TROPIC-GLOBAL-REG;
+
+  tnPhMNotificationMIBModule MODULE-IDENTITY
+      LAST-UPDATED    "201802231200Z"
+      ORGANIZATION    "Nokia"
+      CONTACT-INFO    "Nokia
+                       Attn: Jeff Donnelly
+                       600 Mountain Avenue
+                       New Providence, NJ 07974
+
+                       Phone: +1 732 221 6408
+                       Email: jeff.donnelly@nokia.com"
+
+      DESCRIPTION "The PhM notification MIB."
+
+      REVISION    "201802231200Z"
+      DESCRIPTION "Updated the contact info."
+
+      REVISION    "201707071200Z"
+      DESCRIPTION "Fixed MIB compile issues."
+
+      REVISION    "201611161200Z"
+      DESCRIPTION "Updated the contact info."
+
+      REVISION    "201011081200Z"
+      DESCRIPTION "Changed tnNotificationMIB to tnPhMNotificationMIB in
+                   IMPORTS section."
+
+    ::= { tnSystemModules 9 }
+
+    tnPhMNotificationConf        OBJECT IDENTIFIER ::= { tnPhMNotificationMIB  1 }
+    tnPhMNotificationGroups      OBJECT IDENTIFIER ::= { tnPhMNotificationConf 1 }
+    tnPhMNotificationCompliances OBJECT IDENTIFIER ::= { tnPhMNotificationConf 2 }
+    tnPhMNotificationObjs        OBJECT IDENTIFIER ::= { tnPhMNotificationMIB  2 }
+    tnPhMNotifications           OBJECT IDENTIFIER ::= { tnPhMNotificationObjs 1 }
+
+-- -------------------------------------------------------------
+-- Breakdown of MIB attributes tnTrapObjectID/tnTrapObjectIDType
+-- -------------------------------------------------------------
+--
+-- primaryObjectIdData == tnTrapObjectID;
+-- extraObjectIdData == (tnTrapObjectIDType & 0xFFFF0000) >> 16;
+-- objectIdType == tnTrapObjectIDType & 0x0000FFFF;
+--
+-- valid objectIdTypes:
+-- physicalObjectId == 1  // physical location
+-- iPaddrObjectId == 2  // IP address
+-- connectionObjectId == 5  // cross connection
+-- ifIdObjectId == 6  // control network link
+-- l1protectionObjectId == 7  // protection group or member
+-- pmProfileObjectId == 9  // performance monitoring profile
+-- pmIntervalObjectId == 11 // performance monitoring interval
+-- ipStaticRouteObjectId == 12 // control network static route
+--
+-- valid directions:
+-- nil == 0
+-- Tx/Out == 1
+-- Rx/In == 2
+--
+-- valid portTypes:
+-- nil == 0
+-- optical == 1
+-- backplanePort == 2
+--
+-- band range: 1-8
+--
+-- channel range: 1-4
+--
+-- valid pmGroups:
+-- ethernetStats == 1
+-- sonetStats == 3
+-- opticalDcPwrInStats == 4
+-- cardStats == 5
+-- opticalDcPwrTxStats == 6
+-- opticalDcPwrRxStats == 7
+-- opticalWtPwrOutStats == 8
+-- interfaceStats == 9
+-- opticalWtPwrInStats == 10
+-- l1pStats == 11
+-- opticalDcPwrOutStats == 12
+-- digitalWrapperStats == 13
+--
+-- switch (objectIdType) {
+--     case physicalObjectId: // physical location
+--         shelf     = (primaryObjectIdData & 0xFF000000) >> 24;
+--         slot      = (primaryObjectIdData & 0x00FF0000) >> 16; // if the MSB is set, the slot is a B slot
+--         port      = (primaryObjectIdData & 0x0000FF00) >> 8;
+--         direction = (primaryObjectIdData & 0x000000C0) >> 6;
+--         band      = (primaryObjectIdData & 0x0000003C) >> 2;
+--         portType  = primaryObjectIdData & 0x00000003;
+--         channel   = extraObjectIdData;
+--         break;
+--
+--     case IPaddrObjectId: // IP address
+--         IPaddr1 = (primaryObjectIdData & 0xFF000000) >> 24;
+--         IPaddr2 = (primaryObjectIdData & 0x00FF0000) >> 16;
+--         IPaddr3 = (primaryObjectIdData & 0x0000FF00) >> 8;
+--         IPaddr4 = primaryObjectIdData & 0x000000FF;
+--         break;
+--
+--     case connectionObjectId // cross connection
+--         connectionId = primaryObjectIdData;
+--         break;
+--
+--     case ifIdObjectId: // control network link
+--         ifId = primaryObjectIdData;
+--         break;
+--
+--     case l1protectionObjectId: // protection group or member
+--         groupId = extraObjectIdData;
+--         shelf   = (primaryObjectIdData & 0xFF000000) >> 24;
+--         slot    = (primaryObjectIdData & 0x00FF0000) >> 16; // if the MSB is set, the slot is a B slot
+--         port    = (primaryObjectIdData & 0x0000FF00) >> 8;
+--         break;
+--
+--     case pmProfileObjectId: // performance monitoring profile
+--         pmGroup   = (primaryObjectIdData & 0xFF000000) >> 24;
+--         pmProfile = (primaryObjectIdData & 0x00FF0000) >> 16;
+--         pmMember  = primaryObjectIdData & 0x0000FFFF;
+--         break;
+--
+--     case pmIntervalObjectId: // performance monitoring interval
+--         shelf      = (primaryObjectIdData & 0xFF000000) >> 24;
+--         slot       = (primaryObjectIdData & 0x00FF0000) >> 16; // if the MSB is set, the slot is a B slot
+--         port       = (primaryObjectIdData & 0x0000FF00) >> 8;
+--         pmGroup    = primaryObjectIdData & 0x000000FF;
+--         pmInterval = extraObjectIdData;
+--         break;
+--
+--     case ipStaticRouteObjectId: // control network static route
+--         destinationIp = primaryObjectIdData;
+--         break;
+-- }
+
+-- -------------------------------------------------------------
+-- PhM Notifications
+-- -------------------------------------------------------------
+   tnSystemPhMNotifications OBJECT IDENTIFIER ::= { tnPhMNotifications 1 }
+   tnV2SystemPhMNotifications OBJECT IDENTIFIER ::= { tnSystemPhMNotifications 0 }
+
+   tnEmsUndefinedConditionRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 1 }	
+   		
+   tnEmsUndefinedConditionClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 2 }	
+   		
+   tnEmsTrapRegistrationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 3 }	
+   		
+   tnEmsTrapRegistrationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 4 }	
+   		
+   tnEmsActiveAlarmResyncFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 5 }	
+
+   tnEmsActiveAlarmResyncFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 6 }	
+
+   tnEmsHistoricalAlarmResyncFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 7 }	
+
+   tnEmsHistoricalAlarmResyncFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 8 }	
+
+   tnEmsCardOutOfSyncRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 9 }	
+
+   tnEmsCardOutOfSyncClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 10 }	
+
+   tnEmsTopologyOutOfSyncRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 11 }	
+
+   tnEmsTopologyOutOfSyncClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 12 }	
+
+   tnEmsUnknownNETypeRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 13 }	
+
+   tnEmsUnknownNETypeClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 14 }	
+
+   tnEmsTunnelCreationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 15 }	
+
+   tnEmsTunnelCreationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 16 }	
+
+   tnEmsTunnelDeletionFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 17 }	
+
+   tnEmsTunnelDeletionFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 18 }	
+
+   tnEmsSetEmsAsNTPServerFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 19 }	
+
+   tnEmsSetEmsAsNTPServerFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 20 }	
+
+   tnEmsPowerCommissionInProgressRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 21 }	
+
+   tnEmsPowerCommissionInProgressClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 22 }	
+   		
+   tnEmsDuplicateNEMgmtIPAddressRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 23 }	
+
+   tnEmsDuplicateNEMgmtIPAddressClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 24 }	
+
+   tnEmsDiscoveryFailedRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 25 }	
+
+   tnEmsDiscoveryFailedClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 26 }
+
+   tnEmsStandbyServerUnavailableRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 27 }	
+
+   tnEmsStandbyServerUnavailableClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 28 }
+
+   tnEmsLocalToRemoteDbReplicationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 29 }	
+
+   tnEmsLocalToRemoteDbReplicationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 30 }
+
+   tnEmsRemoteToLocalDbReplicationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 31 }	
+
+   tnEmsRemoteToLocalDbReplicationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 32 }
+
+   tnEmsNeBackupFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 33 }	
+
+   tnEmsNeBackupFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 34 }
+
+   tnEmsNeBackupReplicationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 35 }	
+
+   tnEmsNeBackupReplicationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 36 }
+
+   tnEmsNeSwdlFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 37 }	
+
+   tnEmsNeSwdlFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 38 }
+
+   tnEmsNeSwdlPreactivationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 39 }	
+
+   tnEmsNeSwdlPreactivationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 40 }
+
+   tnEmsServiceDefinitionDeletedRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 41 }	
+
+   tnEmsServiceDefinitionDeletedClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 42 }
+
+   tnEmsFileReplicationFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 43 }	
+
+   tnEmsFileReplicationFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 44 }
+
+   tnEmsCommFailureRaisedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 45 }	
+
+   tnEmsCommFailureClearedNotif NOTIFICATION-TYPE
+   		OBJECTS {
+            tnTrapTime,
+            tnTrapCategory,
+            tnTrapDescr,
+            tnTrapData
+   	}
+   	STATUS  current
+   	DESCRIPTION "."
+   	::= { tnV2SystemPhMNotifications 46 }
+
+
+-- ----------------------------------------------------------------------------
+-- Conformance Group Definitions
+-- ----------------------------------------------------------------------------
+
+-- -------------------------------------------------------------
+-- Compliance Statements
+-- -------------------------------------------------------------
+
+END -- DEFINITION OF TROPIC-PHMNOTIFICATION-MIB

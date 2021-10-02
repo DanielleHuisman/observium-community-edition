@@ -170,28 +170,6 @@ function print_status_old($options)
     }
   }
 
-  // Services
-  if ($options['services'])
-  {
-    $query = 'SELECT * FROM `services` AS S ';
-    $query .= 'LEFT JOIN `devices` AS D ON S.`device_id` = D.`device_id` ';
-    $query .= "WHERE S.`service_status` = 'down' AND S.`service_ignore` = 0";
-    $query .= $query_device_permitted;
-    $query .= 'ORDER BY D.`hostname` ASC';
-    $entries = dbFetchRows($query);
-    foreach ($entries as $service)
-    {
-      $string .= '  <tr>' . PHP_EOL;
-      $string .= '    <td class="entity">' . generate_device_link($service, short_hostname($service['hostname'])) . '</td>' . PHP_EOL;
-      // $string .= '    <td><span class="badge">Service</span></td>' . PHP_EOL;
-      $string .= '    <td><span class="label label-important">Service Down</span></td>' . PHP_EOL;
-      $string .= '    <td>' . $service['service_type'] . '</td>' . PHP_EOL;
-      // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($service['location'], 30)) . '</td>' . PHP_EOL;
-      $string .= '    <td style="white-space: nowrap">Down for ' . format_uptime($config['time']['now'] - strtotime($service['service_changed']), 'short') . '</td>' . PHP_EOL; // This is like deviceUptime()
-      $string .= '  </tr>' . PHP_EOL;
-    }
-  }
-
   // BGP
   if ($options['bgp'])
   {
@@ -499,7 +477,8 @@ function get_status_array($options)
       $device = device_by_id_cache($port['device_id']);
       humanize_port($port);
 
-      if ($port['ifInErrors_delta'])  { $port['text'][]  = 'Rx: ' . format_number($port['ifInErrors_delta']) . ' (' . format_number($port['ifInErrors_rate']) . '/s)'; }
+      $port['text'] = [];
+      if ($port['ifInErrors_delta'])  { $port['text'][] = 'Rx: ' . format_number($port['ifInErrors_delta']) . ' (' . format_number($port['ifInErrors_rate']) . '/s)'; }
       if ($port['ifOutErrors_delta']) { $port['text'][] = 'Tx: ' . format_number($port['ifOutErrors_delta']) . ' ('  . format_number($port['ifOutErrors_rate']) . '/s)'; }
 
       $port['string'] = implode(', ', $port['text']);
@@ -514,28 +493,6 @@ function get_status_array($options)
                        'time' => $port['string'],
                        'location' => $device['location'],
                        'icon_tag' => '<i class="' . $config['entities']['port']['icon'] . '"></i>');
-    }
-  }
-
-  // Services
-  if ($options['services'])
-  {
-    $query = 'SELECT * FROM `services` AS S ';
-    $query .= 'LEFT JOIN `devices` AS D ON S.`device_id` = D.`device_id` ';
-    $query .= "WHERE S.`service_status` = 'down' AND S.`service_ignore` = 0";
-    $query .= $query_device_permitted;
-    $query .= 'ORDER BY D.`hostname` ASC';
-    $entries = dbFetchRows($query);
-    foreach ($entries as $service)
-    {
-      $boxes[] = array('sev' => 50,
-                       'class' => 'Service',
-                       'event' => 'Down',
-                       'device_link' => generate_device_link($service, short_hostname($service['hostname'])),
-                       'entity_link' => $service['service_type'],
-                       'time' => format_uptime($config['time']['now'] - strtotime($service['service_changed']), 'short'),
-                       'location' => $device['location'],
-                       'icon_tag' => '<i class="' . $config['entities']['service']['icon'] . '"></i>');
     }
   }
 

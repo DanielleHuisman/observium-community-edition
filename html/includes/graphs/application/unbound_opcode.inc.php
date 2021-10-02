@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -28,7 +27,7 @@ $colours = $config['graph_colours']['mixed']; # needs moar colours!
 
 foreach ($dns_opcode as $opcode)
 {
-  $array["opcode$opcode"] = array('descr' => strtoupper($opcode), 'colour' => $colours[(count($array) % count($colours))]);
+  $array["opcode$opcode"] = array('descr' => strtoupper($opcode), 'colour' => $colours[(safe_count($array) % safe_count($colours))]);
 }
 
 if (is_file($rrd_filename))

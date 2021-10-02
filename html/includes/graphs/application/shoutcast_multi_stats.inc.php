@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -87,7 +86,7 @@ foreach ($rrd_list as $rrd)
       $totpeak   .= ",peak".$x.",+";
       $totunique .= ",unique".$x.",+";
     }
-    $x            = (($x<count($config['graph_colours'][$colours])-1) ? $x+1 : 0);
+    $x            = (($x < safe_count($config['graph_colours'][$colours]) - 1) ? $x+1 : 0);
     //$x++;
 }
 

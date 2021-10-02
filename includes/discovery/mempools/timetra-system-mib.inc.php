@@ -27,8 +27,8 @@
   FIXME: sgiKbMemoryUsed, sgiKbMemoryAvailable, sgiKbMemoryPoolAllocated (use HC bit)
 */
 
-$mempool_array = snmpwalk_cache_multi_oid($device, 'sgiMemoryAvailable', array(), $mib);
-$mempool_array = snmpwalk_cache_multi_oid($device, 'sgiMemoryUsed', $mempool_array, $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryAvailable', array(), $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryUsed', $mempool_array, $mib);
 
 if (is_numeric($mempool_array[0]['sgiMemoryUsed']))
 {

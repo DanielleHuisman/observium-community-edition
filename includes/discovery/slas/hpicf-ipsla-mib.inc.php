@@ -41,13 +41,13 @@
 // HPICF-IPSLA-MIB::hpicfIpSlaRowStatus.1 = INTEGER: active(1)
 // HPICF-IPSLA-MIB::hpicfIpSlaRowStatus.2 = INTEGER: active(1)
 
-$oids = snmpwalk_cache_multi_oid($device, "hpicfIpSlaTable", array(), 'HPICF-IPSLA-MIB', NULL, OBS_SNMP_ALL_MULTILINE);
+$oids = snmpwalk_cache_oid($device, "hpicfIpSlaTable", array(), 'HPICF-IPSLA-MIB', NULL, OBS_SNMP_ALL_MULTILINE);
 
 // Add extended source/target info
 // HPICF-IPSLA-MIB::hpicfIpSlaMsgResTimeout.1 = Gauge32: 0
 // HPICF-IPSLA-MIB::hpicfIpSlaMsgResTimeout.2 = Gauge32: 736
 
-$oids = snmpwalk_cache_multi_oid($device, "hpicfIpSlaMsgResTimeout",  $oids, 'HPICF-IPSLA-MIB');
+$oids = snmpwalk_cache_oid($device, "hpicfIpSlaMsgResTimeout", $oids, 'HPICF-IPSLA-MIB');
 
 print_debug_vars($oids);
 
@@ -67,7 +67,7 @@ foreach ($oids as $sla_index => $entry)
   );
 
   // Use jitter or simple echo graph for SLA
-  if (str_iexists($data['rtt_type'], 'jitter'))
+  if (str_icontains_array($data['rtt_type'], 'jitter'))
   {
     $data['sla_graph'] = 'jitter';
   } else {

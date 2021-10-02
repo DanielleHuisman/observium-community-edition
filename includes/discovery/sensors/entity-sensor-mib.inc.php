@@ -6,17 +6,17 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-$entity_array = snmpwalk_cache_multi_oid($device, 'entPhySensorValue', $entity_array, 'ENTITY-MIB:ENTITY-SENSOR-MIB');
-if ($GLOBALS['snmp_status'])
+$entity_array = snmpwalk_cache_oid($device, 'entPhySensorValue', $entity_array, 'ENTITY-MIB:ENTITY-SENSOR-MIB');
+if (snmp_status())
 {
   $oids = array('entPhySensorType', 'entPhySensorScale', 'entPhySensorPrecision', 'entPhySensorOperStatus');
   foreach ($oids as $oid)
   {
-    $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, 'ENTITY-MIB:ENTITY-SENSOR-MIB');
+    $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, 'ENTITY-MIB:ENTITY-SENSOR-MIB');
   }
 
   if (is_array($GLOBALS['cache']['snmp'][$mib][$device['device_id']]))
@@ -33,28 +33,55 @@ if ($GLOBALS['snmp_status'])
     }
     print_debug('ENTITY-MIB already cached');
   } else {
-    $oids = array('entPhysicalDescr', 'entPhysicalName', 'entPhysicalClass', 'entPhysicalContainedIn', 'entPhysicalParentRelPos');
+    $entity_mibs = snmp_mib_entity_vendortype($device, 'ENTITY-MIB');
+
+    $snmp_flags = OBS_SNMP_ALL;
+    snmp_log_error(OBS_SNMP_ERROR_OID_NOT_INCREASING, FALSE); // disable log error for next snmpwalk
+    $entity_array = snmpwalk_cache_oid($device, "entPhysicalDescr", $entity_array, $entity_mibs);
+    if (!snmp_status() && snmp_error_code() === OBS_SNMP_ERROR_OID_NOT_INCREASING) {
+
+      // Try refetch with NOINCREASE
+      $snmp_flags |= OBS_SNMP_NOINCREASE;
+      print_debug("WARNING! snmpwalk error 'OID not increasing' detected, try snmpwalk with -Cc option.");
+
+      $entity_array = snmpwalk_cache_oid($device, "entPhysicalDescr", $entity_array, $entity_mibs, NULL, $snmp_flags);
+    }
+
+    $oids = [ 'entPhysicalName', 'entPhysicalClass', 'entPhysicalContainedIn', 'entPhysicalParentRelPos' ];
     if (is_device_mib($device, 'ARISTA-ENTITY-SENSOR-MIB'))
     {
       $oids[] = 'entPhysicalAlias';
     }
-    foreach ($oids as $oid)
-    {
-      $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB');
-      if (!$GLOBALS['snmp_status']) { break; }
+
+    if (snmp_status()) {
+      foreach ($oids as $oid) {
+        $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, $entity_mibs, NULL, $snmp_flags);
+        if (!snmp_status()) {
+          break;
+        }
+      }
+      $entity_array = snmpwalk_cache_twopart_oid($device, 'entAliasMappingIdentifier', $entity_array, 'ENTITY-MIB:IF-MIB', NULL, $snmp_flags);
+      $GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']] = $entity_array;
     }
-    $entity_array = snmpwalk_cache_twopart_oid($device, 'entAliasMappingIdentifier', $entity_array, 'ENTITY-MIB:IF-MIB');
-    $GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']] = $entity_array;
   }
 
-  if (is_device_mib($device, 'ARISTA-ENTITY-SENSOR-MIB'))
-  {
-    $oids_arista = array('aristaEntSensorThresholdLowWarning', 'aristaEntSensorThresholdLowCritical',
-                         'aristaEntSensorThresholdHighWarning', 'aristaEntSensorThresholdHighCritical');
-    foreach ($oids_arista as $oid)
+  // Extra thresholds
+  if (is_device_mib($device, 'CISCO-ENTITY-SENSOR-EXT-MIB')) {
+    $oids_limits = [ 'ceSensorExtThresholdValue', 'ceSensorExtThresholdSeverity', 'ceSensorExtThresholdRelation' ];
+    $t_entity_array = [];
+    foreach ($oids_limits as $oid)
     {
-      $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, 'ARISTA-ENTITY-SENSOR-MIB');
-      if (!$GLOBALS['snmp_status']) { break; }
+      $t_entity_array = snmpwalk_cache_twopart_oid($device, $oid, $t_entity_array, 'CISCO-ENTITY-SENSOR-EXT-MIB');
+      if (!snmp_status()) { break; }
+    }
+
+  } elseif (is_device_mib($device, 'ARISTA-ENTITY-SENSOR-MIB')) {
+    $oids_limits = [ 'aristaEntSensorThresholdLowWarning', 'aristaEntSensorThresholdLowCritical',
+                     'aristaEntSensorThresholdHighWarning', 'aristaEntSensorThresholdHighCritical' ];
+    foreach ($oids_limits as $oid)
+    {
+      $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, 'ARISTA-ENTITY-SENSOR-MIB');
+      if (!snmp_status()) { break; }
     }
   }
 
@@ -76,41 +103,40 @@ if ($GLOBALS['snmp_status'])
     if (isset($entitysensor[$entry['entPhySensorType']]) &&
         is_numeric($entry['entPhySensorValue']) &&
         is_numeric($index) &&
-        $entry['entPhySensorOperStatus'] != 'unavailable' &&
-        $entry['entPhySensorOperStatus'] != 'nonoperational')
+        $entry['entPhySensorOperStatus'] !== 'unavailable' &&
+        $entry['entPhySensorOperStatus'] !== 'nonoperational')
     {
       $ok      = TRUE;
-      $options = array('entPhysicalIndex' => $index);
+      $options = [ 'entPhysicalIndex' => $index ];
 
       $oid   = ".1.3.6.1.2.1.99.1.1.1.4.$index";
       $type  = $entitysensor[$entry['entPhySensorType']];
 
       $descr = rewrite_entity_name($entry['entPhysicalDescr']);
-      if ($entry['entPhysicalDescr'] && $entry['entPhysicalName'])
-      {
+      if ($entry['entPhysicalDescr'] && $entry['entPhysicalName']) {
         // Check if entPhysicalDescr equals entPhysicalName,
         // Also compare like this: 'TenGigabitEthernet2/1 Bias Current' and 'Te2/1 Bias Current'
-        if (strpos($entry['entPhysicalDescr'], substr($entry['entPhysicalName'], 2)) === FALSE)
-        {
+        if (!str_contains($entry['entPhysicalDescr'], substr($entry['entPhysicalName'], 2))) {
           $descr = rewrite_entity_name($entry['entPhysicalDescr']) . ' - ' . rewrite_entity_name($entry['entPhysicalName']);
         }
-      }
-      elseif (!$entry['entPhysicalDescr'] && $entry['entPhysicalName'])
-      {
+      } elseif (!$entry['entPhysicalDescr'] && $entry['entPhysicalName']) {
         $descr = rewrite_entity_name($entry['entPhysicalName']);
-      }
-      elseif (!$entry['entPhysicalDescr'] && !$entry['entPhysicalName'])
-      {
+      } elseif (!$entry['entPhysicalDescr'] && !$entry['entPhysicalName']) {
         // This is also trick for some retard devices like NetMan Plus
         $descr = nicecase($type) . " $index";
       }
 
-      if ($device['os'] == 'asa' && $entry['entPhySensorScale'] == 'yocto' && $entry['entPhySensorPrecision'] == '0')
-      {
-        // Hardcoded fix for Cisco ASA 9.1.5 (can be other) bug when all scales equals yocto (OBSERVIUM-1110)
+      if ($device['os'] === 'fortiswitch' && $entry['entPhySensorScale'] === 'units' &&
+          $entry['entPhySensorPrecision'] == '1') {
+        // https://jira.observium.org/browse/OBS-3658
+        $entry['entPhySensorPrecision'] = 0;
+      }
+      if ($device['os'] === 'asa' && $entry['entPhySensorScale'] === 'yocto' &&
+          $entry['entPhySensorPrecision'] == '0') {
+        // Hardcoded fix for Cisco ASA 9.1.5 (can be other) bug when all scales equals yocto (OBS-1110)
         $scale = 1;
       }
-      elseif ($device['os'] == 'netman' && $type == 'temperature')
+      elseif ($device['os'] === 'netman' && $type === 'temperature')
       {
         $scale = 0.1;
       }
@@ -120,17 +146,18 @@ if ($GLOBALS['snmp_status'])
       } else {
         // Some devices not report scales, like NetMan Plus. But this is really HACK
         // Heh, I not know why only ups.. I'm not sure that this for all ups.. just I see this only on NetMan Plus.
-        $scale = ($device['os_group'] == 'ups' && $type == 'temperature') ? 0.1 : 1;
+        $scale = ($device['os_group'] === 'ups' && $type === 'temperature') ? 0.1 : 1;
       }
       $value = $entry['entPhySensorValue'];
 
-      if ($type == 'temperature')
+      if ($type === 'temperature')
       {
         if ($value * $scale > 200 || $value == 0) { $ok = FALSE; }
       }
-      if ($value == -127 ||
-          $value == -1000000000)  // Optic RX/TX watt sensors on Arista
-      {
+      if ($value == -127 || $value == -1000000000) {
+        // Optic RX/TX watt sensors on Arista
+        $ok = FALSE;
+      } elseif ($value == 0 && !$entry['entPhysicalDescr'] && !$entry['entPhysicalName']) {
         $ok = FALSE;
       }
 
@@ -147,7 +174,7 @@ if ($GLOBALS['snmp_status'])
           $options['entPhysicalIndex_measured'] = $port['ifIndex'];
 
           // Append port label for Extreme XOS, while it not have port information in descr
-          if ($device['os_group'] == 'extremeware' && !str_exists($descr, [ $port['port_label'], $port['port_label_short'] ]))
+          if ($device['os_group'] === 'extremeware' && !str_contains_array($descr, [ $port['port_label'], $port['port_label_short'] ]))
           {
             $descr = $port['port_label'] . ' ' . $descr;
           }
@@ -155,24 +182,90 @@ if ($GLOBALS['snmp_status'])
       }
 
       // Set thresholds for numeric sensors
-      $limits = array();
-      if (isset($entry['aristaEntSensorThresholdHighCritical']))
-      {
-        foreach (array('limit_high' => 'aristaEntSensorThresholdHighCritical', 'limit_low' => 'aristaEntSensorThresholdLowCritical',
-                       'limit_low_warn' => 'aristaEntSensorThresholdLowWarning', 'limit_high_warn' => 'aristaEntSensorThresholdHighWarning') as $limit => $limit_oid)
-        {
-          if (abs($entry[$limit_oid]) != 1000000000)
-          {
+      $limits = [];
+      if (isset($entry['aristaEntSensorThresholdHighCritical'])) {
+        foreach ([ 'limit_high'      => 'aristaEntSensorThresholdHighCritical',
+                   'limit_low'       => 'aristaEntSensorThresholdLowCritical',
+                   'limit_low_warn'  => 'aristaEntSensorThresholdLowWarning',
+                   'limit_high_warn' => 'aristaEntSensorThresholdHighWarning' ] as $limit => $limit_oid) {
+          if (abs($entry[$limit_oid]) != 1000000000) {
             $limits[$limit] = $entry[$limit_oid] * $scale;
           } else {
             // The MIB can return -1000000000 or +1000000000, if there should be no threshold there.
             $limits['limit_auto'] = FALSE;
           }
         }
+      } elseif (isset($t_entity_array[$index])) {
+        // CISCO-ENTITY-SENSOR-EXT-MIB
+
+        // Check thresholds for this entry
+        foreach ($t_entity_array[$index] as $t_index => $t_entry)
+        {
+          if ($t_entry['ceSensorExtThresholdValue'] == "-32768") { continue; }
+
+          // CISCO-ENTITY-SENSOR-EXT-MIB::ceSensorExtThresholdSeverity.13.1 = INTEGER: critical(30)
+          // CISCO-ENTITY-SENSOR-EXT-MIB::ceSensorExtThresholdSeverity.14.1 = INTEGER: critical(30)
+          // CISCO-ENTITY-SENSOR-EXT-MIB::ceSensorExtThresholdRelation.13.1 = INTEGER: lessOrEqual(2)
+          // CISCO-ENTITY-SENSOR-EXT-MIB::ceSensorExtThresholdRelation.14.1 = INTEGER: greaterOrEqual(4)
+          // CISCO-ENTITY-SENSOR-EXT-MIB::ceSensorExtThresholdValue.13.1 = INTEGER: 2150
+          // CISCO-ENTITY-SENSOR-EXT-MIB::ceSensorExtThresholdValue.14.1 = INTEGER: 55
+
+          switch ($t_entry['ceSensorExtThresholdSeverity'])
+          {
+
+            case 'critical':
+              // Prefer critical over major
+              if (in_array($t_entry['ceSensorExtThresholdRelation'], [ 'greaterOrEqual', 'greaterThan' ]))
+              {
+                if (isset($limits['limit_high'])) { break; } // Use first threshold entry
+                $limits['limit_high'] = $t_entry['ceSensorExtThresholdValue'] * $scale;
+              }
+              elseif (in_array($t_entry['ceSensorExtThresholdRelation'], [ 'lessOrEqual', 'lessThan' ]))
+              {
+                if (isset($limits['limit_low'])) { break; } // Use first threshold entry
+                $limits['limit_low'] = $t_entry['ceSensorExtThresholdValue'] * $scale;
+              }
+              // FIXME. Not used: equalTo, notEqualTo
+              break;
+
+            case 'major':
+              // Prefer critical over major,
+              if (in_array($t_entry['ceSensorExtThresholdRelation'], [ 'greaterOrEqual', 'greaterThan' ]))
+              {
+                if (isset($limits['limit_high_major'])) { break; } // Use first threshold entry
+                $limits['limit_high_major'] = $t_entry['ceSensorExtThresholdValue'] * $scale;
+              }
+              elseif (in_array($t_entry['ceSensorExtThresholdRelation'], [ 'lessOrEqual', 'lessThan' ]))
+              {
+                if (isset($limits['limit_low_major'])) { break; } // Use first threshold entry
+                $limits['limit_low_major'] = $t_entry['ceSensorExtThresholdValue'] * $scale;
+              }
+              break;
+
+            case 'minor':
+              if (in_array($t_entry['ceSensorExtThresholdRelation'], [ 'greaterOrEqual', 'greaterThan' ]))
+              {
+                if (isset($limits['limit_high_warn'])) { break; } // Use first threshold entry
+                $limits['limit_high_warn'] = $t_entry['ceSensorExtThresholdValue'] * $scale;
+              }
+              elseif (in_array($t_entry['ceSensorExtThresholdRelation'], [ 'lessOrEqual', 'lessThan' ]))
+              {
+                if (isset($limits['limit_low_warn'])) { break; } // Use first threshold entry
+                $limits['limit_low_warn'] = $t_entry['ceSensorExtThresholdValue'] * $scale;
+              }
+              // FIXME. Not used: equalTo, notEqualTo
+              break;
+
+            case 'other':
+              // Probably here should be equalTo, notEqualTo.. never saw
+              break;
+          }
+        }
+
       }
 
       // Check to make sure we've not already seen this sensor via cisco's entity sensor mib
-      if ($type == 'state')
+      if ($type === 'state')
       {
         //if (isset($valid['status']['CISCO-ENTITY-SENSOR-MIB']['cisco-entity-sensor'][$index]))
         if (is_device_mib($device, 'CISCO-ENTITY-SENSOR-MIB')) // Complete ignore truthvalue on Cisco devices

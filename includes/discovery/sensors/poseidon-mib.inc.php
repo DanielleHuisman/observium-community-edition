@@ -116,9 +116,9 @@ POSEIDON-MIB::sensHysteresis.10 = INTEGER: 0
 POSEIDON-MIB::sensHysteresis.11 = INTEGER: 0
  */
 
-$oids = snmpwalk_cache_multi_oid($device, "sensTable",  array(), "POSEIDON-MIB");
-$oids = snmpwalk_cache_multi_oid($device, "sensLimitMin", $oids, "POSEIDON-MIB");
-$oids = snmpwalk_cache_multi_oid($device, "sensLimitMax", $oids, "POSEIDON-MIB");
+$oids = snmpwalk_cache_oid($device, "sensTable", array(), "POSEIDON-MIB");
+$oids = snmpwalk_cache_oid($device, "sensLimitMin", $oids, "POSEIDON-MIB");
+$oids = snmpwalk_cache_oid($device, "sensLimitMax", $oids, "POSEIDON-MIB");
 
 foreach ($oids as $index => $entry)
 {

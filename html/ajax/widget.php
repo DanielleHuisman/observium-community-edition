@@ -61,9 +61,31 @@ function print_dash_mod ($mod)
         echo '</div>';
         break;
 
+    case "weathermap":
+
+      echo '<div class="box box-solid do-not-update">';
+
+      $wmap = dbFetchRow("SELECT * FROM `weathermaps` WHERE `wmap_name` = ?", array($mod['vars']['mapname']));
+
+      echo '  <div class="hover-hide widget-title" style="z-index: 900; position: absolute; overflow: hidden;" class="widget-title"><h4 style="wwriting-mode: vertical-lr; ttext-orientation: mixed;" class="box-title">' .
+        '' . htmlentities($wmap['wmap_name']) . '</h4>' .
+        '</div>' . PHP_EOL;
+
+      echo '  <div class="box-content" style="overflow: hidden">';
+      echo '<div style="height:100%; overflow:hidden; width: 110%;">';
+      echo '<a href="'.generate_url(['page' => 'wmap', 'mapname' => $wmap['map_name']]).'">';
+      echo '<img src="/weathermap.php?mapname=' . htmlentities($wmap['wmap_name']) . '&action=draw&unique=' . time() . '&width='.$width.'&height='.$height.'">';
+      echo '</a>';
+
+      echo '</div>';
+      echo '  </div>';
+
+      echo '</div>';
+      break;
+
     case "map":
       echo '<div class="box box-solid do-not-update">';
-      print_dash_map($mod['vars'], $width, $height);
+      print_dash_map($mod, $width, $height);
       echo '</div>';
       break;
 
@@ -155,6 +177,15 @@ function print_dash_mod ($mod)
       echo '</div>';
       break;
 
+    case "syslog_alerts":
+        echo '  <div class="box box-solid" style="overflow: hidden; height: auto; max-height: 100%">';
+        echo '    <div class="box-header" style="cursor: hand;"><h3 class="box-title"><a href="/syslog_alerts/">Syslog Alerts</a></h3></div>';
+        echo '    <div class="box-content" style="overflow: hidden; overflow-x:scroll;">';
+        print_logalert_log(array('short' => TRUE, 'pagesize' => ($height - 36) / 26) );
+        echo '  </div>';
+        echo '</div>';
+        break;
+
     case "alertlog":
       echo '  <div class="box box-solid" style="overflow: hidden; height: auto; max-height: 100%">';
       echo '    <div class="box-header" style="cursor: hand;"><h3 class="box-title"><a href="/alert_log/">Alert Log</a></h3></div>';
@@ -215,16 +246,16 @@ function print_dash_map ($vars, $width, $height)
 
   ?>
     <style type="text/css">
-        #map label {
+        #map<?php echo $vars['widget_id']; ?> label {
             width: auto;
             display: inline;
         }
 
-        #map img {
+        #map<?php echo $vars['widget_id']; ?> img {
             max-width: none;
         }
 
-        #map {
+        #map<?php echo $vars['widget_id']; ?> {
             height: 100%;
             width: 100%;
         }
@@ -232,7 +263,7 @@ function print_dash_map ($vars, $width, $height)
 
   <?php
 
-  echo '<div id="map"></div>';
+  echo '<div id="map'.$vars['widget_id'].'"></div>';
 
   include($config['html_dir']. '/includes/map/leaflet.inc.php');
 
@@ -265,6 +296,10 @@ function print_dash_graph ($mod, $width, $height)
     $vars['to'] = strtotime($vars['timestamp_to']);
     unset($vars['timestamp_to']);
   }
+
+  // Period alone is sufficient
+
+  /*
   if (isset($vars['period']))
   {
     $vars['to']   = "now";
@@ -279,6 +314,7 @@ function print_dash_graph ($mod, $width, $height)
   {
     $vars['to'] = $config['time']['now'];
   }
+  */
 
   preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>.+)/', $vars['type'], $graphtype);
 
@@ -369,16 +405,19 @@ function print_dash_graph ($mod, $width, $height)
     $graph_array['draw_all'] = 'yes';
   }
     $t_len = $vars['width'] / 10;
+
+  $subtype_text = (isset($config['graph_types'][$type][$subtype]) ? $config['graph_types'][$type][$subtype]['descr'] : nicecase($subtype));
+
   if(!isset($graph_array['title']))
   {
     if($type == 'global')
     {
-      $title = "Global :: " . nicecase($subtype);
+      $title = "Global :: " . $subtype_text;
     } elseif(strstr($type, "multi")){
       $count = count($graph_array['id']);
-      $title = $count . ' ' . nicecase(str_replace("multi-", '', $type)) . ' :: ' .nicecase($subtype);
+      $title = $count . ' ' . nicecase(str_replace("multi-", '', $type)) . ' :: ' . $subtype_text;
     }else{
-      $title = short_hostname($device['hostname'], $t_len / 2 - 2) . ($type == "device" ? ' :: ' : ' :: ' . truncate($entity['entity_shortname'], 32) . ' :: ' ) . nicecase($subtype);
+      $title = short_hostname($device['hostname'], $t_len / 2 - 2) . ($type == "device" ? ' :: ' : ' :: ' . truncate($entity['entity_shortname'], 32) . ' :: ' ) . $subtype_text;
     }
   } else {
     $title = $graph_array['title'];

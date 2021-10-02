@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,12 +6,12 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Exit if already founded fdb entries
-if (count($fdbs)) { return; }
+if (safe_count($fdbs)) { return; }
 
 /*
 RAPID-CITY::rcBridgeNewFdbStatus[0:1:59:2:36:40][6] = learned

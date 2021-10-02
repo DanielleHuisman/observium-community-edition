@@ -17,7 +17,7 @@ if (!is_array($cache_storage[$mib]))
 {
   foreach (array('memoryTotal', 'memoryInuse') as $oid)
   {
-    $cache_mempool = snmpwalk_cache_multi_oid($device, $oid, $cache_mempool, $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+    $cache_mempool = snmpwalk_cache_oid($device, $oid, $cache_mempool, $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   }
   $cache_storage[$mib] = $cache_mempool;
 } else {

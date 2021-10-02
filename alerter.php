@@ -6,66 +6,53 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage poller
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @subpackage cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
-$options = getopt("h:i:m:n:dqrsV");
+$options = getopt("h:i:m:n:p:dqrsV");
 
 include("includes/sql-config.inc.php");
 
 include("includes/polling/functions.inc.php");
 include("html/includes/functions.inc.php");
 
-$scriptname = basename($argv[0]);
-
 $start = utime();
 
-if (isset($options['V']))
-{
+if (isset($options['V'])) {
   print_message(OBSERVIUM_PRODUCT." ".OBSERVIUM_VERSION);
   exit;
 }
 
-if (isset($options['s']))
-{
+if (isset($options['s'])) {
   // User has asked for spam. LETS MAKE THE SPAM. (sends alerts even if they have already been sent)
   $spam = TRUE;
 }
 
-if (!isset($options['q']))
-{
+if (!isset($options['q'])) {
   print_cli_banner();
 }
 
-if ($options['h'] === "all")
-{
+if ($options['h'] === "all") {
   $where = " ";
   $doing = "all";
-}
-elseif ($options['h'])
-{
+} elseif ($options['h']) {
   $params = array();
-  if (is_numeric($options['h']))
-  {
+  if (is_numeric($options['h'])) {
     $where = "AND `device_id` = ?";
     $doing = $options['h'];
     $params[] = $options['h'];
-  }
-  else
-  {
+  } else {
     $where = "AND `hostname` LIKE ?";
     $doing = $options['h'];
     $params[] = str_replace('*','%', $options['h']);
   }
 }
 
-if (!$where)
-{
+if (!$where) {
   print_message("%n
 USAGE:
 $scriptname [-drqV] [-i instances] [-n number] [-m module] [-h device]
@@ -108,9 +95,12 @@ $alert_assoc = cache_alert_assoc();
 // Allow the URL building code to build URLs with proper links.
 $_SESSION['userlevel'] = 10;
 
+// FIXME. Not sure, should notifications will send on every node or on main node only?
+//$where .= ' AND `poller_id` = ?';
+//$params[] = $config['poller_id'];
+
 $query = "SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER BY `device_id` ASC";
-foreach (dbFetch($query, $params) as $device)
-{
+foreach (dbFetch($query, $params) as $device) {
 
   humanize_device($device);
 

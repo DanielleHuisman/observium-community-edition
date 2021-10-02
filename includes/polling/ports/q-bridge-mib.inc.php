@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -172,11 +171,11 @@ elseif ($is_juniper)
 
   foreach ($dot1q_ports as $index => $entry)
   {
-    if (is_device_mib($device, 'JUNIPER-VLAN-MIB'))
-    {
+    if (is_device_mib($device, 'JUNIPER-VLAN-MIB')) {
       $vlan_num = $entry['jnxExVlanTag'];
     } else {
-      $vlan_num = end(explode('.', $index)); // need explode for dot1qVlanCurrentUntaggedPorts.0
+      $index_array = explode('.', $index);
+      $vlan_num    = end($index_array); // need explode for dot1qVlanCurrentUntaggedPorts.0
     }
 
     // Convert hex to binary map
@@ -184,8 +183,7 @@ elseif ($is_juniper)
 
     $trunk  = ''; // unknown
 
-    if ($device['os'] == 'ftos') // FTOS specific
-    {
+    if ($device['os'] === 'ftos') { // FTOS specific
       // FTOS devices use harder way for detect VLANs and associate ports
       // See: https://www.force10networks.com/CSPortal20/TechTips/0041B_displaying_vlan_ports.aspx
       // Q-BRIDGE-MIB::dot1qVlanStaticUntaggedPorts.1107787777, where 1107787777 is ifIndex for Vlan interface

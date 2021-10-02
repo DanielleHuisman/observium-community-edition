@@ -30,7 +30,7 @@
   STE-MIB::sensID.2 = INTEGER: 29068
  */
 
-$oids = snmpwalk_cache_multi_oid($device, "sensTable", array(), "STE-MIB");
+$oids = snmpwalk_cache_oid($device, "sensTable", array(), "STE-MIB");
 
 foreach ($oids as $index => $entry)
 {

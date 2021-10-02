@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,27 +22,24 @@
  *
  */
 // TESTME needs unit testing
-function humanize_sensor(&$sensor)
-{
-  global $config;
+function humanize_sensor(&$sensor) {
+  global $config, $cache;
 
   // Exit if already humanized
   if ($sensor['humanized']) { return; }
 
   $sensor['sensor_symbol'] = $GLOBALS['config']['sensor_types'][$sensor['sensor_class']]['symbol'];
-  $sensor['sensor_format'] = strval($GLOBALS['config']['sensor_types'][$sensor['sensor_class']]['format']);
+  $sensor['sensor_format'] = (string)$GLOBALS['config']['sensor_types'][$sensor['sensor_class']]['format'];
   $sensor['state_class']   = ''; //'text-success';
 
   // Generate "pretty" thresholds
-  if (is_numeric($sensor['sensor_limit_low']))
-  {
+  if (is_numeric($sensor['sensor_limit_low'])) {
     $sensor_threshold_low = format_value($sensor['sensor_limit_low'], $sensor['sensor_format']) . $sensor['sensor_symbol'];
   } else {
     $sensor_threshold_low = "&infin;";
   }
 
-  if (is_numeric($sensor['sensor_limit_low_warn']))
-  {
+  if (is_numeric($sensor['sensor_limit_low_warn'])) {
     $sensor_warn_low = format_value($sensor['sensor_limit_low_warn'], $sensor['sensor_format']) . $sensor['sensor_symbol'];
   } else {
     $sensor_warn_low = NULL;
@@ -51,15 +47,13 @@ function humanize_sensor(&$sensor)
 
   if ($sensor_warn_low) { $sensor_threshold_low = $sensor_threshold_low . " (".$sensor_warn_low.")"; }
 
-  if (is_numeric($sensor['sensor_limit']))
-  {
+  if (is_numeric($sensor['sensor_limit'])) {
     $sensor_threshold_high = format_value($sensor['sensor_limit'], $sensor['sensor_format']) . $sensor['sensor_symbol'];
   } else {
     $sensor_threshold_high = "&infin;";
   }
 
-  if (is_numeric($sensor['sensor_limit_warn']))
-  {
+  if (is_numeric($sensor['sensor_limit_warn'])) {
     $sensor_warn_high = format_value($sensor['sensor_limit_warn'], $sensor['sensor_format']) . $sensor['sensor_symbol'];
   } else {
     $sensor_warn_high = "&infin;";
@@ -70,48 +64,49 @@ function humanize_sensor(&$sensor)
   $sensor['sensor_thresholds'] = $sensor_threshold_low . ' - ' . $sensor_threshold_high;
 
   // generate pretty value
-  if (!is_numeric($sensor['sensor_value']))
-  {
+  if (!is_numeric($sensor['sensor_value'])) {
     $sensor['human_value'] = 'NaN';
     $sensor['sensor_symbol'] = '';
   } else {
     $sensor['human_value'] = format_value($sensor['sensor_value'], $sensor['sensor_format'], 2, 4);
   }
 
-  if (isset($config['entity_events'][$sensor['sensor_event']]))
-  {
+  if (isset($config['entity_events'][$sensor['sensor_event']])) {
     $sensor = array_merge($sensor, $config['entity_events'][$sensor['sensor_event']]);
   } else {
     $sensor['event_class'] = 'label label-primary';
     $sensor['row_class']   = '';
   }
-  //r($sensor);
-  if ($sensor['sensor_deleted'])
-  {
+
+  if (device_is_ignored($sensor['device_id']) &&
+      ($sensor['row_class'] === "error" || $sensor['row_class'] === "warning")) {
+      $sensor['row_class'] = 'suppressed';
+  }
+
+  if ($sensor['sensor_deleted']) {
     $sensor['row_class']   = 'disabled';
   }
 
+  /* We shouldn't pass through the parent status.
   $device = &$GLOBALS['cache']['devices']['id'][$sensor['device_id']];
   if ((isset($device['status']) && !$device['status']) || (isset($device['disabled']) && $device['disabled']))
   {
-    $sensor['row_class']     = 'error';
+    //$sensor['row_class']     = 'error';
   }
+  */
 
   // Set humanized entry in the array so we can tell later
   $sensor['humanized'] = TRUE;
 }
 
-function build_sensor_query($vars, $query_count = FALSE)
-{
+function build_sensor_query($vars, $query_count = FALSE) {
 
-  if ($query_count)
-  {
+  if ($query_count) {
     $sql = "SELECT COUNT(*) FROM `sensors`";
   } else {
     $sql  = "SELECT * FROM `sensors`";
 
-    if ($vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id')
-    {
+    if ($vars['sort'] === 'hostname' || $vars['sort'] === 'device' || $vars['sort'] === 'device_id') {
       $sql .= ' LEFT JOIN `devices` USING(`device_id`)';
     }
   }
@@ -127,6 +122,11 @@ function build_sensor_query($vars, $query_count = FALSE)
       case "group_id":
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'sensors.sensor_id');
+        break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'sensors.device_id');
         break;
       case "device":
       case "device_id":
@@ -148,8 +148,7 @@ function build_sensor_query($vars, $query_count = FALSE)
         break;
       case "metric":
         // old metric param not allow array
-        if (!isset($GLOBALS['config']['sensor_types'][$value]))
-        {
+        if (!isset($GLOBALS['config']['sensor_types'][$value])) {
           break;
         }
       case 'class':
@@ -170,18 +169,15 @@ function build_sensor_query($vars, $query_count = FALSE)
         break;
     }
   }
-  // $sql .= $GLOBALS['cache']['where']['devices_permitted'];
 
   $sql .= generate_query_permitted(array('device', 'sensor'));
 
   // If need count, just return sql without sorting
-  if ($query_count)
-  {
+  if ($query_count) {
     return $sql;
   }
 
-  switch ($vars['sort_order'])
-  {
+  switch ($vars['sort_order']) {
     case 'desc':
       $sort_order = 'DESC';
       $sort_neg   = 'ASC';
@@ -212,8 +208,7 @@ function build_sensor_query($vars, $query_count = FALSE)
       // $sql .= ' ORDER BY `hostname` '.$sort_order.', `sensor_descr` '.$sort_order;
   }
 
-  if(isset($vars['pageno']))
-  {
+  if (isset($vars['pageno'])) {
     $start = $vars['pagesize'] * ($vars['pageno'] - 1);
     $sql .= ' LIMIT '.$start.','.$vars['pagesize'];
   }
@@ -221,8 +216,7 @@ function build_sensor_query($vars, $query_count = FALSE)
   return $sql;
 }
 
-function print_sensor_table($vars)
-{
+function print_sensor_table($vars, $default_order = []) {
 
   pagination($vars, 0, TRUE); // Get default pagesize/pageno
 
@@ -233,13 +227,26 @@ function print_sensor_table($vars)
 
   $sensors = array();
   //foreach(dbFetchRows($sql, NULL, TRUE) as $sensor)
-  foreach(dbFetchRows($sql) as $sensor)
-  {
+  foreach(dbFetchRows($sql) as $sensor) {
     //if (isset($GLOBALS['cache']['devices']['id'][$sensor['device_id']]))
     //{
       $sensor['hostname'] = $GLOBALS['cache']['devices']['id'][$sensor['device_id']]['hostname'];
-      $sensors[] = $sensor;
+      $sensors[$sensor['sensor_class']][] = $sensor;
     //}
+  }
+  //r($sensors);
+  // order dom sensors always by temperature, voltage, current, dbm, power
+  $order = [];
+  if (safe_count($sensors)) {
+    if (safe_count($default_order)) {
+      $types = array_keys($sensors);
+      //r($types);
+      $order = array_intersect($default_order, $types);
+      $order = array_merge($order, array_diff($types, $order));
+      //r($order);
+    } else {
+      $order = array_keys($sensors);
+    }
   }
 
   //$sensors_count = count($sensors); // This is count incorrect, when pagination used!
@@ -253,10 +260,11 @@ function print_sensor_table($vars)
   echo generate_box_open();
 
   print_sensor_table_header($vars);
-
-  foreach($sensors as $sensor)
-  {
-    print_sensor_row($sensor, $vars);
+  
+  foreach ($order as $type) {
+    foreach ($sensors[$type] as $sensor) {
+      print_sensor_row($sensor, $vars);
+    }
   }
 
   echo("</tbody></table>");
@@ -266,10 +274,8 @@ function print_sensor_table($vars)
   echo $pagination_html;
 }
 
-function print_sensor_table_header($vars)
-{
-  if ($vars['view'] == "graphs" || $vars['graph'] || isset($vars['id']))
-  {
+function print_sensor_table_header($vars) {
+  if ($vars['view'] === "graphs" || get_var_true($vars['graph']) || isset($vars['id'])) {
     $stripe_class = "table-striped-two";
   } else {
     $stripe_class = "table-striped";
@@ -365,23 +371,21 @@ function generate_sensor_row($sensor, $vars)
   }
 
   // FIXME -- Generify this. It's not just for sensors.
-  if ($vars['page'] == "device" && $vars['tab'] != "overview")
-  {
+  if ($vars['page'] === "device" && $vars['tab'] !== "overview") {
     $row .= '        <td>' .  (strlen($sensor['sensor_mib']) ? '<a href="https://mibs.observium.org/mib/'.$sensor['sensor_mib'].'/" target="_blank">' .nicecase($sensor['sensor_mib']) .'</a>' : '') . ( ( strlen($sensor['sensor_mib']) && strlen($sensor['sensor_object'])) ? '::' : '') .(strlen($sensor['sensor_mib']) ? '<a href="https://mibs.observium.org/mib/'.$sensor['sensor_mib'].'/#'.$sensor['sensor_object'].'" target="_blank">' .$sensor['sensor_object'] .'</a>' : ''). '.'.$sensor['sensor_index'].'</td>' . PHP_EOL;
     $table_cols++;
-
   }
 
 
-  if ($vars['tab'] != 'overview')
-  {
-    $row .= '        <td><span class="label ' . ($sensor['sensor_custom_limit'] ? 'label-warning' : '') . '">' . $sensor['sensor_thresholds'] . '</span></td>' . PHP_EOL;
+  if ($vars['tab'] !== 'overview') {
+    $sensor_thresholds_class = $sensor['sensor_custom_limit'] ? ' label-suppressed' : '';
+    $sensor_thresholds = $sensor['sensor_custom_limit'] ? generate_tooltip_link(NULL, $sensor['sensor_thresholds'], 'Custom thresholds') : $sensor['sensor_thresholds'];
+    $row .= '        <td><span class="label' . $sensor_thresholds_class . '">' . $sensor_thresholds . '</span></td>' . PHP_EOL;
     $table_cols++;
   }
   $row .= '        <td style="width: 90px; text-align: right;">' . generate_entity_link('sensor', $sensor, $mini_graph, NULL, FALSE) . '</td>';
 
-  if ($vars['tab'] != 'overview')
-  {
+  if ($vars['tab'] !== 'overview') {
     $row .= '        <td style="white-space: nowrap">' . ($sensor['sensor_last_change'] == '0' ? 'Never' : generate_tooltip_link(NULL, format_uptime(($config['time']['now'] - $sensor['sensor_last_change']), 'short-2') . ' ago', format_unixtime($sensor['sensor_last_change']))) . '</td>';
     $table_cols++;
     $row .= '        <td style="text-align: right;"><strong>' . generate_tooltip_link('', $sensor['sensor_event'], $sensor['event_descr'], $sensor['event_class']) . '</strong></td>';
@@ -569,14 +573,12 @@ function print_sensor_form($vars, $single_device = FALSE)
                       'url'   => generate_url($vars));
 
   // Clean grids
-  foreach (array_keys($form['row'][0]) as $param)
-  {
-    unset($form['row'][0][$param]['grid']);
+  foreach ($form['row'] as $row => $rows) {
+    foreach (array_keys($rows) as $param) {
+      if (isset($form['row'][$row][$param]['grid'])) { unset($form['row'][$row][$param]['grid']); }
+    }
   }
-  foreach (array_keys($form['row'][1]) as $param)
-  {
-    unset($form['row'][1][$param]['grid']);
-  }
+
   // Copy forms
   $panel_form['row'][0]['device_id']      = $form['row'][0]['device_id'];
   $panel_form['row'][0]['sensor_class']   = $form['row'][0]['sensor_class'];

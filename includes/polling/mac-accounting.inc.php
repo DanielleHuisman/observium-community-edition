@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -34,10 +33,7 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $acc)
   $acc_id_db[$acc['ma_id']] = $acc['ma_id'];
 }
 
-if (OBS_DEBUG > 1 && count($ma_db_array))
-{
-  print_vars($ma_db_array);
-}
+print_debug_vars($ma_db_array);
 
 if (is_device_mib($device, 'JUNIPER-MAC-MIB'))
 {
@@ -74,7 +70,7 @@ if (is_device_mib($device, 'CISCO-IP-STAT-MIB'))
   echo('Cisco ');
 
   $device_context = $device;
-  if (!count($ma_db_array))
+  if (!safe_count($ma_db_array))
   {
     // Set retries to 0 for speedup first walking, only if previously polling also empty (DB empty)
     $device_context['snmp_retries'] = 0;
@@ -84,7 +80,7 @@ if (is_device_mib($device, 'CISCO-IP-STAT-MIB'))
   if ($GLOBALS['snmp_status'])
   {
     $datas = snmp_walk($device, 'cipMacHCSwitchedBytes', '-OUqsX', 'CISCO-IP-STAT-MIB');
-    if ($GLOBALS['snmp_status'])
+    if (snmp_status())
     {
       $datas .= "\n".snmp_walk($device, 'cipMacHCSwitchedPkts', '-OUqsX', 'CISCO-IP-STAT-MIB');
     } else {
@@ -131,7 +127,7 @@ if (is_device_mib($device, 'CISCO-IP-STAT-MIB'))
 #}
 
 $acc_id = array(); // Count exist ma_ids
-if (count($ma_array))
+if (safe_count($ma_array))
 {
   if (OBS_DEBUG > 1) { print_vars($ma_array); }
   $polled = time();

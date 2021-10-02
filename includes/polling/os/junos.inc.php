@@ -10,7 +10,7 @@
  *
  */
 
-if (strpos($poll_device['sysDescr'], 'olive'))
+if (str_contains($poll_device['sysDescr'], 'olive'))
 {
   $hardware = 'Olive';
 }
@@ -30,7 +30,7 @@ elseif (preg_match('/^Juniper Networks, Inc\. ([a-z]+ )?(?<hw>[\w-][^,]+), kerne
 
 if (empty($hardware))
 {
-  $hw = snmp_get($device, 'jnxBoxDescr.0', '-Ovqsn', 'JUNIPER-MIB');
+  $hw = snmp_get_oid($device, 'jnxBoxDescr.0', 'JUNIPER-MIB');
   if (preg_match('/^([a-z]+ )?(?<hw>[\w\ -]+)/i', $hw, $matches))
   {
     //Juniper SRX100H2 Internet Router
@@ -39,6 +39,31 @@ if (empty($hardware))
     $features = ucwords($features);
   } else {
     $hardware = $hw;
+  }
+}
+
+if ((empty($hardware) || str_icontains_array($hardware, 'Virtual')) &&
+    is_device_mib($device, 'JUNIPER-VIRTUALCHASSIS-MIB'))
+{
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberSerialnumber.0 = STRING: PE3715410287
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberSerialnumber.1 = STRING: PE3715410286
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberRole.0 = INTEGER: master(1)
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberRole.1 = INTEGER: backup(2)
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberSWVersion.0 = STRING: 14.1X53-D35.3
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberSWVersion.1 = STRING: 14.1X53-D35.3
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberModel.0 = STRING: ex4300-48t
+  // JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisMemberModel.1 = STRING: ex4300-48t
+  foreach (snmp_cache_table($device, 'jnxVirtualChassisMemberRole', [], 'JUNIPER-VIRTUALCHASSIS-MIB') as $member => $chassis)
+  {
+    if ($chassis['jnxVirtualChassisMemberRole'] === 'master')
+    {
+      $data = snmp_get_multi_oid($device, [ 'jnxVirtualChassisMemberModel.'.$member,
+                                            'jnxVirtualChassisMemberSWVersion.'.$member ], [], 'JUNIPER-VIRTUALCHASSIS-MIB');
+      $hardware = $data[$member]['jnxVirtualChassisMemberModel'];
+      $version  = $data[$member]['jnxVirtualChassisMemberSWVersion'];
+      //$serial   = $data[$member]['jnxVirtualChassisMemberSerialnumber']; // Serial polled by JUNIPER-MIB
+      break;
+    }
   }
 }
 

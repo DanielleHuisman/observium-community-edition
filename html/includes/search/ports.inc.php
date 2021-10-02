@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -24,18 +24,16 @@ $results = dbFetchRows("SELECT * FROM `ports`
                         WHERE ($where) $query_permitted_port
                         ORDER BY `ifDescr` LIMIT $query_limit", $params);
 
-if (count($results))
-{
-  foreach ($results as $result)
-  {
+if (safe_count($results)) {
+  foreach ($results as $result) {
     humanize_port($result);
+
+    //FIXME - messy
 
     $name = truncate($result['port_label'], 35);
     $description = strlen($result['ifAlias']) ? truncate($result['ifAlias'], 80) : '';
     $type = rewrite_iftype($result['ifType']);
-    if ($description) { $type .= ' | '; }
-    if (strlen($result['ifPhysAddress']))
-    {
+    if (strlen($result['ifPhysAddress'])) {
       $mac = ' | ' . html_highlight(format_mac($result['ifPhysAddress']), $queryString);
     } else {
       $mac = '';
@@ -47,8 +45,8 @@ if (count($results))
       'colour' => $result['table_tab_colour'],
       'icon' => $config['icon']['port'],
       'data' => array(
-        '| ' . escape_html($result['hostname']),
-        $type . $mac . html_highlight(escape_html($description), $queryString)),
+        '' . escape_html($result['hostname']),
+        $type . $mac . ' | ' . html_highlight(escape_html($description), $queryString)),
     );
   }
 

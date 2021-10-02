@@ -1,10 +1,10 @@
 IGNITENET-MIB DEFINITIONS ::= BEGIN
 
     IMPORTS
-        MODULE-IDENTITY, OBJECT-TYPE, Integer32, Counter32, Counter64, IpAddress,
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32, Counter32, Counter64,
         enterprises FROM SNMPv2-SMI
-        DisplayString, TruthValue, MacAddress FROM SNMPv2-TC
-        OBJECT-GROUP FROM SNMPv2-CONF;
+        DisplayString FROM SNMPv2-TC
+    TEXTUAL-CONVENTION FROM SNMPv2-TC;
 
     ignitenetMIB MODULE-IDENTITY
         LAST-UPDATED "201602240000Z"
@@ -19,8 +19,9 @@ IGNITENET-MIB DEFINITIONS ::= BEGIN
 
     product         OBJECT IDENTIFIER ::= { ignitenetMIB 1 }
     ethernetPorts   OBJECT IDENTIFIER ::= { ignitenetMIB 2 }
-    radios          OBJECT IDENTIFIER ::= { ignitenetMIB 3 }
     metrolinqRadios OBJECT IDENTIFIER ::= { ignitenetMIB 4 }
+    metrolinqVaps   OBJECT IDENTIFIER ::= { ignitenetMIB 5 }
+    metrolinqPeers  OBJECT IDENTIFIER ::= { ignitenetMIB 6 }
 
 
 -- ===========================================================
@@ -84,7 +85,7 @@ ethInfoEntry OBJECT-TYPE
     STATUS      current
     DESCRIPTION
             "An entry containing ethernet port status information."
-    INDEX   { ethNumber }
+    INDEX   { ethInfoIndex }
     ::= { ethInfoTable 1 }
 
 EthInfoEntry ::=
@@ -164,7 +165,7 @@ mlRadioInfoEntry OBJECT-TYPE
     DESCRIPTION
             "An entry containing management information applicable to a
             particular interface."
-    INDEX   { mlRadioNumber }
+    INDEX   { mlRadioInfoIndex }
     ::= { mlRadioInfoTable 1 }
 
 MlRadioInfoEntry ::=
@@ -173,15 +174,13 @@ MlRadioInfoEntry ::=
         mlRadioInfoEnabled    INTEGER,
         mlRadioInfoRegDomain  DisplayString,
         mlRadioInfoFrequency  FrequencyGHz,
-        mlRadioInfomcs        RadioMcsRate,
+        mlRadioInfoMCS        RadioMCSRate,
         mlRadioInfoAckTimeout Integer32,
         mlRadioInfoTxPower    Integer32,
         mlRadioInfoAMSDU      INTEGER,
         mlRadioInfoAMPDU      INTEGER,
         mlRadioInfoRSSILocal  Integer32,
         mlRadioInfoRSSIRemote Integer32,
-        mlRadioInfoEncryption INTEGER,
-        mlRadioInfoSSID       DisplayString,
         mlRadioInfoFailover   INTEGER
     }
 
@@ -220,8 +219,8 @@ mlRadioInfoFrequency OBJECT-TYPE
             "Frequency, raw value expressed in MHz, displayed in GHz"
     ::= { mlRadioInfoEntry 4 }
 
-mlRadioInfomcs OBJECT-TYPE
-    SYNTAX      RadioMcsRate
+mlRadioInfoMCS OBJECT-TYPE
+    SYNTAX      RadioMCSRate
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -229,11 +228,11 @@ mlRadioInfomcs OBJECT-TYPE
     ::= { mlRadioInfoEntry 5 }
 
 mlRadioInfoAckTimeout OBJECT-TYPE
-    SYNTAX      Integer32
+    SYNTAX      Integer32 { auto(0) }
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-            "Radio ack timeout in µs"
+            "Radio ack timeout in us"
     ::= { mlRadioInfoEntry 6 }
 
 mlRadioInfoTxPower OBJECT-TYPE
@@ -268,6 +267,7 @@ mlRadioInfoAMPDU OBJECT-TYPE
 
 mlRadioInfoRSSILocal OBJECT-TYPE
     SYNTAX      Integer32
+    UNITS       "dBm"
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -276,31 +276,12 @@ mlRadioInfoRSSILocal OBJECT-TYPE
 
 mlRadioInfoRSSIRemote OBJECT-TYPE
     SYNTAX      Integer32
+    UNITS       "dBm"
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
             "Radio received signal strength indicator of the remote site"
     ::= { mlRadioInfoEntry 11 }
-
-mlRadioInfoEncryption OBJECT-TYPE
-    SYNTAX       INTEGER {
-                off(0),
-                on(1)
-            }
-    MAX-ACCESS  read-only
-    STATUS      current
-    DESCRIPTION
-            "Encryption use on the radio"
-    ::= { mlRadioInfoEntry 12 }
-
-mlRadioInfoSSID OBJECT-TYPE
-    SYNTAX      DisplayString (SIZE (0..255))
-    MAX-ACCESS  read-only
-    STATUS      current
-    DESCRIPTION
-            "Setting to failover to 5 GHz radio if 60 GHz is not available or out of range."
-    ::= { mlRadioInfoEntry 13 }
-
 
 mlRadioInfoFailover OBJECT-TYPE
     SYNTAX INTEGER {
@@ -310,10 +291,8 @@ mlRadioInfoFailover OBJECT-TYPE
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
-            "Setting to failover to 5 GHz radio if 60 GHz is not available or out of range."
+            "Setting to failover to 5 GHz radio if 60 GHz is not available or out of range (valid for 802.11ad devices)."
     ::= { mlRadioInfoEntry 14 }
-
--- Radio Status table
 
 mlRadioStatusTable OBJECT-TYPE
     SYNTAX      SEQUENCE OF MlRadioStatusEntry
@@ -330,17 +309,17 @@ mlRadioStatusEntry OBJECT-TYPE
     STATUS      current
     DESCRIPTION
             "An entry containing radio status information."
-    INDEX   { mlRadioNumber }
+    INDEX   { mlRadioStatusIndex }
     ::= { mlRadioStatusTable 1 }
 
 MlRadioStatusEntry ::=
     SEQUENCE {
         mlRadioStatusIndex          RadioIndex,
         mlRadioStatusFailoverStatus INTEGER,
-        mlRadioStatusFailoverStats  Integer32,
-        mlRadioStatusCRCErrors      Integer32,
-        mlRadioStatusDrops          Integer32,
-        mlRadioStatusRetries        Integer32
+        mlRadioStatusFailoverStats  Counter32,
+        mlRadioStatusCRCErrors      Counter32,
+        mlRadioStatusDrops          Counter32,
+        mlRadioStatusRetries        Counter32
     }
 
 mlRadioStatusIndex OBJECT-TYPE
@@ -363,7 +342,7 @@ mlRadioStatusFailoverStatus OBJECT-TYPE
     ::= { mlRadioStatusEntry 2 }
 
 mlRadioStatusFailoverStats OBJECT-TYPE
-    SYNTAX      Integer32
+    SYNTAX      Counter32
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -371,7 +350,7 @@ mlRadioStatusFailoverStats OBJECT-TYPE
     ::= { mlRadioStatusEntry 3 }
 
 mlRadioStatusCRCErrors OBJECT-TYPE
-    SYNTAX      Integer32
+    SYNTAX      Counter32
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -379,7 +358,7 @@ mlRadioStatusCRCErrors OBJECT-TYPE
     ::= { mlRadioStatusEntry 4 }
 
 mlRadioStatusDrops OBJECT-TYPE
-    SYNTAX      Integer32
+    SYNTAX      Counter32
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -388,12 +367,271 @@ mlRadioStatusDrops OBJECT-TYPE
 
 
 mlRadioStatusRetries OBJECT-TYPE
-    SYNTAX      Integer32
+    SYNTAX      Counter32
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
             "Number of radio retries."
     ::= { mlRadioStatusEntry 6 }
+
+
+-- ================================================================
+-- IgniteNet MetroLinq VAP (Virtual Access Point) info descriptions
+-- ================================================================
+
+mlVapNumber  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of vaps (regardless of their
+            current state) present on this system."
+    ::= { metrolinqVaps 1 }
+
+-- Vap info table
+
+mlVapInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MlVapInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A list of vap entries.  The number of entries is
+            given by the value of vapNumber."
+    ::= { metrolinqVaps 2 }
+
+mlVapInfoEntry OBJECT-TYPE
+    SYNTAX      MlVapInfoEntrySyntax
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry containing management information applicable to a
+            particular interface."
+    INDEX   { mlVapInfoIndex }
+    ::= { mlVapInfoTable 1 }
+
+MlVapInfoEntrySyntax ::=
+    SEQUENCE {
+        mlVapInfoIndex      VapIndex,
+        mlVapInfoEnabled    INTEGER,
+        mlVapInfoName       DisplayString,
+        mlVapInfoPhyname    DisplayString,
+        mlVapInfoSSID       DisplayString,
+        mlVapInfoEncryption INTEGER,
+        mlVapInfoPeerCount  Counter32
+    }
+
+mlVapInfoIndex OBJECT-TYPE
+    SYNTAX      VapIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "A unique value, greater than zero, for each VAP, starting from one."
+    ::= { mlVapInfoEntry 1 }
+
+mlVapInfoEnabled OBJECT-TYPE
+    SYNTAX  INTEGER {
+                disabled(0),
+                enabled(1)       -- ready to pass packets
+            }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The enabled or disabled state of the VAP."
+    ::= { mlVapInfoEntry 2 }
+
+mlVapInfoName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Describes the VAP interface name."
+    ::= { mlVapInfoEntry 3 }
+
+mlVapInfoPhyname OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Describes the actual physical radio which 'hosts' the VAP."
+    ::= { mlVapInfoEntry 4 }
+
+mlVapInfoSSID OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "SSID of the Wireless Network."
+    ::= { mlVapInfoEntry 5 }
+
+mlVapInfoEncryption OBJECT-TYPE
+    SYNTAX  INTEGER {
+                off(0),
+                on(1)
+            }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Encryption use on the VAP."
+    ::= { mlVapInfoEntry 6 }
+
+mlVapInfoPeerCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Number of peers connected to VAP."
+    ::= { mlVapInfoEntry 7 }
+
+-- ================================================================
+-- IgniteNet MetroLinq peers info descriptions
+-- ================================================================
+
+mlPeerNumber  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of peers (regardless of their
+            current state) present on this system."
+    ::= { metrolinqPeers 1 }
+
+-- Peer info table
+
+mlPeerInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MlPeerInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A list of peer entries.  The number of entries is
+            given by the value of peerNumber."
+    ::= { metrolinqPeers 2 }
+
+mlPeerInfoEntry OBJECT-TYPE
+    SYNTAX      MlPeerInfoEntrySyntax
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry containing management information applicable to a
+            particular interface."
+    INDEX   { mlPeerInfoIndex }
+    ::= { mlPeerInfoTable 1 }
+
+MlPeerInfoEntrySyntax ::=
+    SEQUENCE {
+        mlPeerInfoIndex          PeerIndex,
+        mlPeerInfoMAC            DisplayString,
+        mlPeerInfoWirelessIfname DisplayString,
+        mlPeerInfoLinkTime       Counter32,
+        mlPeerInfoSSID           DisplayString,
+        mlPeerInfoRxBytes        Counter64,
+        mlPeerInfoTxBytes        Counter64,
+        mlRadioInfoRSSILocal     Integer32,
+        mlRadioInfoRSSIRemote    Integer32,
+        mlPeerInfoRSSIPerAntenna Integer32,
+        mlPeerInfoTxRate         Integer32,
+        mlPeerInfoRxRate         Integer32
+    }
+
+mlPeerInfoIndex OBJECT-TYPE
+    SYNTAX      PeerIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "A unique value, greater than zero, for each peer, starting from one."
+    ::= { mlPeerInfoEntry 1 }
+
+mlPeerInfoMAC OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Describes the MAC  of the peer."
+    ::= { mlPeerInfoEntry 2 }
+
+mlPeerInfoWirelessIfname OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Describes the wireless interface which the peer is conneted to."
+    ::= { mlPeerInfoEntry 3 }
+
+mlPeerInfoLinkTime OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Time the current peer connection exists in seconds."
+    ::= { mlPeerInfoEntry 4 }
+
+mlPeerInfoSSID OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "SSID of the Wireless Network the peer is connected to."
+    ::= { mlPeerInfoEntry 5 }
+
+mlPeerInfoRxBytes OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Number of packets tjat have received from the peer."
+    ::= { mlPeerInfoEntry 6 }
+
+mlPeerInfoTxBytes OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Number of packets that have been sent to the peer."
+    ::= { mlPeerInfoEntry 7 }
+
+mlPeerInfoLocalRSSI OBJECT-TYPE
+    SYNTAX  INTEGER (-100..0)
+    UNITS   "dBm"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "RSSI of the peer measured by this device."
+    ::= { mlPeerInfoEntry 8 }
+
+mlPeerInfoRemoteRSSI OBJECT-TYPE
+    SYNTAX  INTEGER (-100..0)
+    UNITS   "dBm"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "RSSI of the peer measured by the peer itself."
+    ::= { mlPeerInfoEntry 9 }
+
+mlPeerInfoRSSIPerAntenna OBJECT-TYPE
+    SYNTAX      INTEGER (-100..0)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Average RSSI of the peer measured by all the antennas."
+    ::= { mlPeerInfoEntry 10 }
+
+mlPeerInfoTxRate OBJECT-TYPE
+    SYNTAX      INTEGER
+    UNITS       "Mbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Maximum Tx Rate of the peer."
+    ::= { mlPeerInfoEntry 11 }
+
+mlPeerInfoRxRate OBJECT-TYPE
+    SYNTAX      INTEGER
+    UNITS       "Mbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Maximum Rx Rate of the peer."
+    ::= { mlPeerInfoEntry 12 }
 
 -- ===========================================================
 -- Textual Conventions
@@ -406,19 +644,27 @@ RadioIndex ::= TEXTUAL-CONVENTION
             "A unique value, greater than zero, for each radio, starting from one."
     SYNTAX       Integer32 (1..2147483647)
 
-EthernetIndex ::= TEXTUAL-CONVENTION
+VapIndex ::= TEXTUAL-CONVENTION
     DISPLAY-HINT "d"
     STATUS       current
     DESCRIPTION
-            "A unique value, greater than zero, for each ethernet port, starting from one."
+            "A unique value, greater than zero, for each VAP (Virtual Access Point), starting from one."
+    SYNTAX       Integer32 (1..2147483647)
+
+
+PeerIndex ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+            "A unique value, greater than zero, for each peer, starting from one."
     SYNTAX       Integer32 (1..2147483647)
 
 EthernetIndex ::= TEXTUAL-CONVENTION
     DISPLAY-HINT "d"
     STATUS       current
     DESCRIPTION
-            "A unique value, greater or equal to zero, for each radio, starting from zero."
-    SYNTAX       Integer32 (0..2147483647)
+            "A unique value, greater than zero, for each ethernet port, starting from one."
+    SYNTAX       Integer32 (1..2147483647)
 
 FrequencyGHz ::= TEXTUAL-CONVENTION
     DISPLAY-HINT "d-3"
@@ -427,57 +673,56 @@ FrequencyGHz ::= TEXTUAL-CONVENTION
             "Frequency, raw value expressed in MHz, displayed in GHz"
     SYNTAX       Integer32 (0..100000000)
 
-RadioMcsRate ::= TEXTUAL-CONVENTION
+RadioMCSRate ::= TEXTUAL-CONVENTION
     STATUS       current
     DESCRIPTION
             "A value of the radio Modulation and Coding Scheme"
     SYNTAX INTEGER {
         auto(0),
-        mcs-6m(4),
-        mcs-9M(5),
-        mcs-12M(6),
-        mcs-18M(7),
-        mcs-24M(8),
-        mcs-36M(9),
-        mcs-48M(10),
-        mcs-54M(11),
+        mcs6m(4),
+        mcs9m(5),
+        mcs12m(6),
+        mcs18m(7),
+        mcs24m(8),
+        mcs36m(9),
+        mcs48m(10),
+        mcs54m(11),
         mcs0(12),
-        mcs1(13),
-        mcs2(14),
-        mcs3(15),
-        mcs4(16),
-        mcs5(17),
-        mcs6(18),
-        mcs7(19),
-        mcs8(20),
-        mcs9(21),
+        mcs1bpsk385mbps(13),
+        mcs2bpsk770mbps(14),
+        mcs3bpsk9625mbps(15),
+        mcs4bpsk1155mbps(16),
+        mcs5bpsk125125mbps(17),
+        mcs6qpsk1540mbps(18),
+        mcs7qpsk1925mbps(19),
+        mcs8qpsk2310mbps(20),
+        mcs9qpsk25025mbps(21),
         mcs10(22),
         mcs11(23),
         mcs12(24),
         mcs13(25),
         mcs14(26),
         mcs15(27),
-        nss1-mcs0(30),
-        nss1-mcs1(31),
-        nss1-mcs2(32),
-        nss1-mcs3(33),
-        nss1-mcs4(34),
-        nss1-mcs5(35),
-        nss1-mcs6(36),
-        nss1-mcs7(37),
-        nss1-mcs8(38),
-        nss1-mcs9(39),
-        nss2-mcs1(40),
-        nss2-mcs2(41),
-        nss2-mcs3(42),
-        nss2-mcs4(43),
-        nss2-mcs5(44),
-        nss2-mcs6(45),
-        nss2-mcs7(46),
-        nss2-mcs8(47),
-        nss2-mcs9(49)
+        nss1mcs0(30),
+        nss1mcs1(31),
+        nss1mcs2(32),
+        nss1mcs3(33),
+        nss1mcs4(34),
+        nss1mcs5(35),
+        nss1mcs6(36),
+        nss1mcs7(37),
+        nss1mcs8(38),
+        nss1mcs9(39),
+        nss2mcs1(40),
+        nss2mcs2(41),
+        nss2mcs3(42),
+        nss2mcs4(43),
+        nss2mcs5(44),
+        nss2mcs6(45),
+        nss2mcs7(46),
+        nss2mcs8(47),
+        nss2mcs9(48)
     }
 
 END
-
 

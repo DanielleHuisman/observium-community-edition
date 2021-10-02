@@ -2,7 +2,7 @@
 
 //define('OBS_DEBUG', 2);
 
-include(dirname(__FILE__) . '/../includes/sql-config.inc.php');
+include(__DIR__ . '/../includes/sql-config.inc.php');
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');
@@ -88,7 +88,7 @@ class IncludesEncryptTest extends \PHPUnit\Framework\TestCase
   public function testEncrypt($string, $key, $result)
   {
     // Fot tests use static nonce
-    if (OBS_ENCRYPT_MODULE == 'sodium')
+    if (OBS_ENCRYPT_MODULE === 'sodium')
     {
       $nonce = 'test';
     } else {
@@ -105,7 +105,7 @@ class IncludesEncryptTest extends \PHPUnit\Framework\TestCase
   public function testDecrypt($result, $key, $string)
   {
     // Fot tests use static nonce
-    if (OBS_ENCRYPT_MODULE == 'sodium')
+    if (OBS_ENCRYPT_MODULE === 'sodium')
     {
       $nonce = 'test';
     } else {
@@ -150,7 +150,7 @@ class IncludesEncryptTest extends \PHPUnit\Framework\TestCase
 
   public function providerEncrypt()
   {
-    if (OBS_ENCRYPT_MODULE == 'sodium')
+    if (OBS_ENCRYPT_MODULE === 'sodium')
     {
       $result = array(
         array('1)AEo@^Cq&n[i&K5Rbk)YmYto|iK6&:j,3w.9',  '1e78V2',   'po1Yr3rjOhi04wDOsyt2W-DEbObyBNLtssRuIxENOe3worH1MiuqNr5ZGmbAElwoU76DFho'),
@@ -204,7 +204,7 @@ class IncludesEncryptTest extends \PHPUnit\Framework\TestCase
 
   public function providerEncryptIncorrect()
   {
-    if (OBS_ENCRYPT_MODULE == 'sodium')
+    if (OBS_ENCRYPT_MODULE === 'sodium')
     {
       $result = array(
         array('1)AEo@^Cq&n[i&K5Rbk)YmYto|iK6&:j,3w.9',  '1e78V2',   'po1Yr3rjOhi04wDOsyt2W-DEbObyBNLtssRuIxENOe3wH1MiuqNr5ZGmbAElwoU76DFho'),

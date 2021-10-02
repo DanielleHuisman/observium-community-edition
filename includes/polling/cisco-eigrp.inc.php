@@ -36,7 +36,7 @@ if (is_device_mib($device, 'CISCO-EIGRP-MIB'))
 
   $table = array();
 
-  $vpn_poll = snmp_walk_multipart_oid($device, 'cEigrpVpnEntry', array(), 'CISCO-EIGRP-MIB');
+  $vpn_poll = snmpwalk_multipart_oid($device, 'cEigrpVpnEntry', array(), 'CISCO-EIGRP-MIB');
 
   foreach ($vpn_poll as $vpn_id => $vpn)
   {
@@ -104,7 +104,7 @@ if (is_device_mib($device, 'CISCO-EIGRP-MIB'))
   // Only poll ASes if we found a VPN
   if(count($vpn_poll))
   {
-    $as_poll = snmp_walk_multipart_oid($device, 'cEigrpTraffStatsEntry', array(), 'CISCO-EIGRP-MIB');
+    $as_poll = snmpwalk_multipart_oid($device, 'cEigrpTraffStatsEntry', array(), 'CISCO-EIGRP-MIB');
   }
 
   foreach ($as_poll as $vpn => $as_list)
@@ -209,7 +209,7 @@ if (is_device_mib($device, 'CISCO-EIGRP-MIB'))
   // Only poll ports if we found a VPN
   if(count($vpn_poll))
   {
-    $ports_poll = snmp_walk_multipart_oid($device, 'CEigrpInterfaceEntry', array(), 'CISCO-EIGRP-MIB');
+    $ports_poll = snmpwalk_multipart_oid($device, 'CEigrpInterfaceEntry', array(), 'CISCO-EIGRP-MIB');
   }
 
   foreach ($ports_poll as $vpn => $as_list)
@@ -312,7 +312,7 @@ if (is_device_mib($device, 'CISCO-EIGRP-MIB'))
   // Only poll peers if we found a VPN
   if(count($vpn_poll))
   {
-    $peers_poll = snmp_walk_multipart_oid($device, 'cEigrpPeerEntry', array(), 'CISCO-EIGRP-MIB');
+    $peers_poll = snmpwalk_multipart_oid($device, 'cEigrpPeerEntry', array(), 'CISCO-EIGRP-MIB');
   }
 
   foreach ($peers_poll as $vpn => $as_list)

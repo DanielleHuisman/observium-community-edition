@@ -18,15 +18,13 @@ $sql  = 'SELECT * FROM `mempools`';
 //$sql .= ' LEFT JOIN `mempools-state` USING (`mempool_id`)';
 $sql .= ' WHERE `device_id` = ?';
 
-foreach (dbFetchRows($sql, array($device['device_id'])) as $mempool)
-{
+foreach (dbFetchRows($sql, array($device['device_id'])) as $mempool) {
   $mib_lower = strtolower($mempool['mempool_mib']);
   $file = $config['install_dir'].'/includes/polling/mempools/'.$mib_lower.'.inc.php';
 
   if (!$mempool['mempool_multiplier']) { $mempool['mempool_multiplier'] = 1; }
 
-  if (is_file($file))
-  {
+  if (is_file($file)) {
     $cache_mempool = NULL;
     $index         = $mempool['mempool_index'];
 
@@ -35,61 +33,63 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $mempool)
     // Merge calculated used/total/free/perc array keys into $mempool variable
     $mempool = array_merge($mempool, calculate_mempool_properties($mempool['mempool_multiplier'], $mempool['used'], $mempool['total'], $mempool['free'], $mempool['perc']));
 
-  } else {
+  } elseif (!safe_empty($mempool['mempool_table'])) {
     // Check if we can poll the device ourselves with generic code using definitions.
-    // Table is always set when defintions add mempools.
-    if ($mempool['mempool_table'] != '')
-    {
-      $table_def = $config['mibs'][$mempool['mempool_mib']]['mempool'][$mempool['mempool_table']];
+    // Table is always set when definitions add mempools.
+    $table_def = $config['mibs'][$mempool['mempool_mib']]['mempool'][$mempool['mempool_table']];
 
-      if ($table_def['type'] == 'static')
-      {
+    if ($table_def['type'] === 'static') {
 
-        if      (isset($table_def['oid_perc_num']))  { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc_num']); }
-        else if (isset($table_def['oid_perc']))      { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc'], $mempool['mempool_mib']); }
+      if     (isset($table_def['oid_perc_num']))  { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc_num']); }
+      elseif (isset($table_def['oid_perc']))      { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc'], $mempool['mempool_mib']); }
 
-        if      (isset($table_def['oid_free_num']))  { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free_num']); }
-        else if (isset($table_def['oid_free']))      { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free'], $mempool['mempool_mib']); }
+      if     (isset($table_def['oid_free_num']))  { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free_num']); }
+      elseif (isset($table_def['oid_free']))      { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free'], $mempool['mempool_mib']); }
 
-        if      (isset($table_def['oid_used_num']))  { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used_num']); }
-        else if (isset($table_def['oid_used']))      { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used'], $mempool['mempool_mib']); }
+      if     (isset($table_def['oid_used_num']))  { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used_num']); }
+      elseif (isset($table_def['oid_used']))      { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used'], $mempool['mempool_mib']); }
 
-        if      (isset($table_def['total']))         { $mempool['total'] = $table_def['total']; }
-        else if (isset($table_def['oid_total_num'])) { $mempool['total'] = snmp_get_oid($device, $table_def['oid_total_num']); }
-        else if (isset($table_def['oid_total']))     { $mempool['total'] = snmp_get_oid($device, $table_def['oid_total'], $mempool['mempool_mib']); }
+      if     (isset($table_def['total']))         { $mempool['total'] = $table_def['total']; }
+      elseif (isset($table_def['oid_total_num'])) { $mempool['total'] = snmp_get_oid($device, $table_def['oid_total_num']); }
+      elseif (isset($table_def['oid_total']))     { $mempool['total'] = snmp_get_oid($device, $table_def['oid_total'], $mempool['mempool_mib']); }
 
-      } else {
-         // FIXME. Need pre-cache same as for sensors
-         if      (isset($table_def['oid_perc_num']))  { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc_num'].'.'.$mempool['mempool_index']); }
-         else if (isset($table_def['oid_perc']))      { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
-
-         if      (isset($table_def['oid_free_num']))  { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free_num'].'.'.$mempool['mempool_index']); }
-         else if (isset($table_def['oid_free']))      { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
-
-         if      (isset($table_def['oid_used_num']))  { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used_num'].'.'.$mempool['mempool_index']); }
-         else if (isset($table_def['oid_used']))      { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
-
-         if      (isset($table_def['total']))         { $mempool['total'] = $table_def['total']; }
-         else if (isset($table_def['oid_total_num'])) { $mempool['total'] = snmp_get_oid($device, $table_def['oid_total_num'].'.'.$mempool['mempool_index']); }
-         else if (isset($table_def['oid_total']))     { $mempool['total'] = snmp_get_oid($device, $table_def['oid_total'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
-
-      }
-      // Clean not numeric symbols from snmp output
-      foreach (array('perc', 'free', 'used', 'total') as $param)
-      {
-        // Convert strings '3.40 TB' to value
-        // See QNAP NAS-MIB or HIK-DEVICE-MIB
-        $unit = ($param != 'perc' && isset($table_def['unit'])) ? $table_def['unit'] : NULL;
-
-        if (isset($mempool[$param])) { $mempool[$param] = snmp_fix_numeric($mempool[$param], $unit); }
-      }
-
-      // Merge calculated used/total/free/perc array keys into $mempool variable (with additional options)
-      $mempool = array_merge($mempool, calculate_mempool_properties($mempool['mempool_multiplier'], $mempool['used'], $mempool['total'], $mempool['free'], $mempool['perc'], $table_def));
     } else {
-      // Unknown, so force rediscovery as there's a broken mempool
-      force_discovery($device, 'mempools');
+       // FIXME. Need pre-cache same as for sensors
+       if     (isset($table_def['oid_perc_num']))  { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc_num'].'.'.$mempool['mempool_index']); }
+       elseif (isset($table_def['oid_perc']))      { $mempool['perc'] = snmp_get_oid($device, $table_def['oid_perc'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
+
+       if     (isset($table_def['oid_free_num']))  { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free_num'].'.'.$mempool['mempool_index']); }
+       elseif (isset($table_def['oid_free']))      { $mempool['free'] = snmp_get_oid($device, $table_def['oid_free'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
+
+       if     (isset($table_def['oid_used_num']))  { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used_num'].'.'.$mempool['mempool_index']); }
+       elseif (isset($table_def['oid_used']))      { $mempool['used'] = snmp_get_oid($device, $table_def['oid_used'].'.'.$mempool['mempool_index'], $mempool['mempool_mib']); }
+
+       if (isset($table_def['oid_total'])) {
+         // Static Total Oid, NMS-CHASSIS
+         $oid = str_contains($table_def['oid_total'], '.') ? $table_def['oid_total'] : $table_def['oid_total'].'.'.$mempool['mempool_index'];
+         $mempool['total'] = snmp_get_oid($device, $oid, $mempool['mempool_mib']);
+       } elseif (isset($table_def['oid_total_num'])) {
+         $mempool['total'] = snmp_get_oid($device, $table_def['oid_total_num'].'.'.$mempool['mempool_index']);
+       }
+       if (safe_empty($mempool['total']) && isset($table_def['total'])) {
+         $mempool['total'] = $table_def['total'];
+       }
+
     }
+    // Clean not numeric symbols from snmp output
+    foreach (array('perc', 'free', 'used', 'total') as $param) {
+      // Convert strings '3.40 TB' to value
+      // See QNAP NAS-MIB or HIK-DEVICE-MIB
+      $unit = ($param !== 'perc' && isset($table_def['unit'])) ? $table_def['unit'] : NULL;
+
+      if (isset($mempool[$param])) { $mempool[$param] = snmp_fix_numeric($mempool[$param], $unit); }
+    }
+
+    // Merge calculated used/total/free/perc array keys into $mempool variable (with additional options)
+    $mempool = array_merge($mempool, calculate_mempool_properties($mempool['mempool_multiplier'], $mempool['used'], $mempool['total'], $mempool['free'], $mempool['perc'], $table_def));
+  } else {
+    // Unknown, so force rediscovery as there's a broken mempool
+    force_discovery($device, 'mempools');
   }
 
   $hc = ($mempool['mempool_hc'] ? ' (HC)' : '');
@@ -102,8 +102,7 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $mempool)
   }
 
   // Need to handle multiple mempools from the same MIB
-  if(isset($mempool['mempool_table']))
-  {
+  if (isset($mempool['mempool_table'])) {
     $filename = $mib_lower . '-' . $mempool['mempool_table'] . '-' . $mempool['mempool_index'];
     rename_rrd($device, 'mempool-'.$mib_lower . '-' . $mempool['mempool_index'], 'mempool-'.$mib_lower . '-' . $mempool['mempool_table'] . '-' . $mempool['mempool_index'] );
   } else {

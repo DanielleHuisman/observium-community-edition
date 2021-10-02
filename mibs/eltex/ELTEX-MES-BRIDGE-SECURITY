@@ -12,7 +12,11 @@ IMPORTS
     DisplayString, TruthValue                       FROM SNMPv2-TC
     VlanId                                          FROM Q-BRIDGE-MIB
     eltMes, eltMesBridgeSecurity                    FROM ELTEX-MES
-    rndErrorDesc, rndErrorSeverity                  FROM RADLAN-DEVICEPARAMS-MIB;
+    rndErrorDesc, rndErrorSeverity                  FROM RADLAN-DEVICEPARAMS-MIB
+    rlIpDhcpSnoopVLANTag,
+    rlIpSourceGuardPortEntry,
+    rlIpDhcpSnoopMACAddress                         FROM RADLAN-BRIDGE-SECURITY
+    VlanList1, VlanList2, VlanList3, VlanList4      FROM RADLAN-BRIDGEMIBOBJECTS-MIB;
 
 eltMesBridgeSecurityNotifications OBJECT IDENTIFIER ::= { eltMesBridgeSecurity 0 }
 
@@ -21,6 +25,10 @@ eltMesIpDhcpSnoop                 OBJECT IDENTIFIER ::= { eltMesBridgeSecurity 1
 eltMesPppoeIa                     OBJECT IDENTIFIER ::= { eltMesBridgeSecurity 6 }
 
 eltMesIpDhcpSnoopNotif            OBJECT IDENTIFIER ::= { eltMesIpDhcpSnoop 0}
+
+eltMesIpSourceGuard               OBJECT IDENTIFIER ::= { eltMesBridgeSecurity 8 }
+
+eltMesIpArpInspect                OBJECT IDENTIFIER ::= { eltMesBridgeSecurity 7 }
 
 --
 -- Common types
@@ -367,6 +375,22 @@ eltIpDhcpSnoopDynamicEntriesPortDownAction OBJECT-TYPE
           when a link down event occurred on the client's port."
     DEFVAL { retain }
     ::= { eltMesIpDhcpSnoop 24 } 
+
+eltIpDhcpSnoopMacVerificationFailedNotificationsEnabled OBJECT-TYPE
+     SYNTAX          TruthValue
+     MAX-ACCESS      read-write
+     STATUS          current
+     DESCRIPTION
+         "Specifies whether eltIpDhcpSnoopMacVerificationFailedTrap notifications
+          will or will not be sent when MAC address in ethernet header differ from the DHCP header.
+
+          Setting this object to false(2) will not send the
+          eltIpDhcpSnoopMacVerificationFailedTrap notifications.
+
+          Setting this object to true(1) will send the
+          eltIpDhcpSnoopMacVerificationFailedTrap notifications."
+    DEFVAL { false }
+    ::= { eltMesIpDhcpSnoop 25 }
 
 --
 -- PPPoE Intermediate Agent
@@ -733,6 +757,18 @@ eltIpDhcpSnoopClientLimitTrap NOTIFICATION-TYPE
          clients reached configured limit on interface."
     ::= { eltMesIpDhcpSnoopNotif 2 }
 
+eltIpDhcpSnoopMacVerificationFailedTrap NOTIFICATION-TYPE
+    OBJECTS {
+        ifIndex,
+        rlIpDhcpSnoopVLANTag,
+        rlIpDhcpSnoopMACAddress,
+        rndErrorDesc
+    }
+    STATUS current
+    DESCRIPTION
+        "A eltIpDhcpSnoopMacVerificationFailedTrap is genered when
+         MAC address in Ether-header differ from the DHCP-header."
+    ::= { eltMesIpDhcpSnoopNotif 3 }
 --
 -- DHCPv6 LDRA/RelayAgent options
 --
@@ -849,4 +885,112 @@ eltIpv6DhcpLdraMessageDropTrap NOTIFICATION-TYPE
         "Warning trap indicating that IPv6 LDRA has dropped a message."
     ::=  { eltMesBridgeSecurityNotifications 1 }
 
-END
+
+--
+-- eltMesIpSourceGuard
+--
+
+eltIpSourceGuardPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltIpSourceGuardPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "IP Source Guard ports entry per vlan."
+    ::= { eltMesIpSourceGuard 1 }
+
+eltIpSourceGuardPortEntry OBJECT-TYPE
+    SYNTAX      EltIpSourceGuardPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A Source Guard entry "
+    AUGMENTS   { rlIpSourceGuardPortEntry }
+    ::= { eltIpSourceGuardPortTable 1 }
+
+EltIpSourceGuardPortEntry ::= SEQUENCE {
+    eltIpSourceGuardPortVlanList1to1024              VlanList1,
+    eltIpSourceGuardPortVlanList1025to2048           VlanList2,
+    eltIpSourceGuardPortVlanList2049to3072           VlanList3,
+    eltIpSourceGuardPortVlanList3073to4094           VlanList4
+    }
+
+eltIpSourceGuardPortVlanList1to1024 OBJECT-TYPE
+   SYNTAX      VlanList1
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "The Ip Source Guard port vlan list 1. Default value is {0}"
+   DEFVAL {'00'H}
+   ::= { eltIpSourceGuardPortEntry 1 }
+
+eltIpSourceGuardPortVlanList1025to2048 OBJECT-TYPE
+   SYNTAX      VlanList2
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "The Ip Source Guard port vlan list 2. Default value is {0}"
+   DEFVAL {'00'H}
+   ::= { eltIpSourceGuardPortEntry 2 }
+
+eltIpSourceGuardPortVlanList2049to3072 OBJECT-TYPE
+   SYNTAX      VlanList3
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "The Ip Source Guard port vlan list 3. Default value is {0}"
+   DEFVAL {'00'H}
+   ::= { eltIpSourceGuardPortEntry 3 }
+
+eltIpSourceGuardPortVlanList3073to4094 OBJECT-TYPE
+   SYNTAX      VlanList4
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+     "The Ip Source Guard port vlan list 4. Default value is {0}"
+   DEFVAL {'00'H}
+   ::= { eltIpSourceGuardPortEntry 4 }
+
+
+--
+-- ARP Inspection ports configurations table
+--
+
+eltIpArpInspectPortConfigTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF EltIpArpInspectPortConfigEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "A table contain the configuration of Dynamic ARP 
+        Inspection at each interface capable of this feature." 
+    ::= { eltMesIpArpInspect 4 }
+ 
+eltIpArpInspectPortConfigEntry OBJECT-TYPE
+    SYNTAX       EltIpArpInspectPortConfigEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "A row instance contains the configuration of Dynamic ARP 
+        Inspection at each interface capable of this feature." 
+    INDEX { ifIndex }
+    ::= { eltIpArpInspectPortConfigTable 1 }
+
+EltIpArpInspectPortConfigEntry ::= SEQUENCE {  
+    eltIpArpInspectPortRateLimit INTEGER 
+}
+ 
+eltIpArpInspectPortRateLimit OBJECT-TYPE
+    SYNTAX      INTEGER (0..2048)
+    UNITS       "packet per second"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates rate limit value for Dynamic ARP
+         Inspection purpose. If the incoming rate of ARP packets
+         exceeds the value of this object, interface will be put
+         into errdisable state. If the field has the value of 0, 
+         no limiting is performed"
+    DEFVAL { 0 }
+    ::= { eltIpArpInspectPortConfigEntry 1 }
+
+
+END     

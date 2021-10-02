@@ -134,17 +134,17 @@ foreach ($sensors_def as $entry)
   {
     // Sensor description
     $descr = snmp_get_oid($device, $entry['oid_descr'] . $dot_index, 'ServersCheck');
-    if ($descr == "-" || str_exists($descr, 'Ping')) { continue; }
+    if ($descr == "-" || str_contains_array($descr, 'Ping')) { continue; }
 
     if (is_numeric($value))
     {
       // Class based on descr
-      if     (str_exists($descr, "Temp"))      { $class = "temperature"; }
-      elseif (str_exists($descr, "Humidity"))  { $class = "humidity"; }
-      elseif (str_exists($descr, "Dew Point")) { $class = "dewpoint"; }
-      elseif (str_exists($descr, "Airflow"))   { $class = "airflow"; }
-      elseif (str_exists($descr, "Dust"))      { $class = "dust"; }
-      elseif (str_exists($descr, "Sound"))     { $class = "sound"; }
+      if     (str_contains_array($descr, "Temp"))      { $class = "temperature"; }
+      elseif (str_contains_array($descr, "Humidity"))  { $class = "humidity"; }
+      elseif (str_contains_array($descr, "Dew Point")) { $class = "dewpoint"; }
+      elseif (str_contains_array($descr, "Airflow"))   { $class = "airflow"; }
+      elseif (str_contains_array($descr, "Dust"))      { $class = "dust"; }
+      elseif (str_contains_array($descr, "Sound"))     { $class = "sound"; }
       else                                       { $class = "temperature"; }
 
       $options = [];

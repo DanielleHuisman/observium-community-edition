@@ -21,13 +21,12 @@ function discover_ip_address_definition($device, $mib, $entry)
   //if (discovery_check_requires_pre($device, $entry, 'ip-address')) { echo '!]'; return; }
 
   // Fetch table or Oids
-  $table_oids = array('oid_address', 'oid_ifIndex', 'oid_prefix', 'oid_mask', // 'oid_version',
-                      'oid_origin', 'oid_type', 'oid_vrf', 'oid_extra');
+  $table_oids = array('oid_address', 'oid_ifIndex', 'oid_prefix', 'oid_mask', 'oid_gateway', // 'oid_version',
+                      'oid_origin', 'oid_type', 'oid_vrf', 'oid_mac', 'oid_extra');
   $ip_array = discover_fetch_oids($device, $mib, $entry, $table_oids);
 
   // Just append mib name to definition entry, for simple pass to external functions
-  if (empty($entry['mib']))
-  {
+  if (empty($entry['mib'])) {
     $entry['mib'] = $mib;
   }
 
@@ -35,34 +34,48 @@ function discover_ip_address_definition($device, $mib, $entry)
   // I.e. in HUAWEI-IF-EXT-MIB, CISCOSB-IPv6
   $index_delimiter = is_flag_set(OBS_SNMP_INDEX_PARTS, $entry['snmp_flags']) ? '->' : '.';
 
+  // not indexed part, see CPI-UNIFIED-MIB
+  if (is_flag_set(OBS_SNMP_NOINDEX, $entry['snmp_flags']) &&
+      isset($ip_array['']) && count($ip_array) > 1) {
+    $ip_array_extra = $ip_array[''];
+    unset($ip_array['']);
+  }
+
   //$ips_count = count($ip_array);
-  foreach ($ip_array as $index => $ip_address)
-  {
+  foreach ($ip_array as $index => $ip_address) {
     // add index and index parts for tags replace
     $ip_address['index'] = $index;
-    foreach (explode($index_delimiter, $index) as $i => $part)
-    {
+    foreach (explode($index_delimiter, $index) as $i => $part) {
       $ip_address['index' . $i] = $part;
+    }
+    // append extra (not indexed) array
+    if (isset($ip_array_extra)) {
+      $ip_address = array_merge($ip_address, $ip_array_extra);
     }
     print_debug_vars($ip_address);
     
     // ifIndex
     $ifIndex = set_value_param_definition('ifIndex', $entry, $ip_address);
-    if (strpos($ifIndex, '%') !== FALSE)
-    {
+    if (str_contains($ifIndex, '%')) {
       // I.e. in CISCOSB-IPv6, for addresses with ifIndex parts:
       // ipv6z->ff:02:00:00:00:00:00:00:00:00:00:01:ff:a3:3f:49%100000
       list(, $ifIndex) = explode('%', $ifIndex);
     }
     // Rule-based entity linking
     if (!is_numeric($ifIndex) &&
-        $measured = entity_measured_match_definition($device, $entry, $ip_address, 'ip-address'))
-    {
+        $measured = entity_measured_match_definition($device, $entry, $ip_address, 'ip-address')) {
       $ifIndex = $measured['ifIndex'];
       //print_debug_vars($measured);
     }
-    if (!is_numeric($ifIndex))
-    {
+    // Link by MAC
+    if (!is_numeric($ifIndex) || $ifIndex == 0) {
+      $mac = set_value_param_definition('mac', $entry, $ip_address);
+      if (strlen($mac) && $port_id = get_port_id_by_mac($device, $mac)) {
+        $port = get_port_by_id_cache($port_id);
+        $ifIndex = $port['ifIndex'];
+      }
+    }
+    if (!is_numeric($ifIndex)) {
       print_debug("Excluded by unknown ifIndex [$ifIndex]");
       continue;
     }
@@ -72,19 +85,16 @@ function discover_ip_address_definition($device, $mib, $entry)
 
     // IP address
     $ip = set_value_param_definition('address', $entry, $ip_address);
-    if (strpos($ip, '%') !== FALSE)
-    {
+    if (str_contains($ip, '%')) {
       // I.e. in CISCOSB-IPv6, for addresses with ifIndex parts:
       // ipv6z->ff:02:00:00:00:00:00:00:00:00:00:01:ff:a3:3f:49%100000
       list($ip) = explode('%', $ip);
     }
     // IP address with prefix
-    if (strpos($ip, '/'))
-    {
+    if (str_contains($ip, '/')) {
       // I.e. VIPTELA-OPER-VPN address+prefix: 10.123.10.69/32
       list($ip, $prefix) = explode('/', $ip);
-      if (is_numeric($prefix))
-      {
+      if (is_numeric($prefix)) {
         $data['prefix'] = $prefix;
       } else {
         $data['mask'] = $prefix;
@@ -95,12 +105,9 @@ function discover_ip_address_definition($device, $mib, $entry)
     $data['ip'] = $ip;
 
     // Other ip params: origin, type, prefix, mask
-    foreach ([ 'origin', 'type', 'prefix', 'mask', 'vrf' ] as $param)
-    {
-      if (!isset($data[$param]) && $value = set_value_param_definition($param, $entry, $ip_address))
-      {
-        if ($param == 'prefix' && !is_numeric($value))
-        {
+    foreach ([ 'origin', 'type', 'prefix', 'mask', 'gateway', 'vrf' ] as $param) {
+      if (!isset($data[$param]) && $value = set_value_param_definition($param, $entry, $ip_address)) {
+        if ($param === 'prefix' && !is_numeric($value)) {
           // Always explode prefix part from oid value, ie:
           // cIpAddressPrefix.ipv6."20:01:04:70:00:15:00:bb:00:00:00:00:00:00:00:02" = cIpAddressPfxOrigin.450.ipv6."20:01:04:70:00:15:00:bb:00:00:00:00:00:00:00:00".64
           $tmp_prefix = explode('.', $value);
@@ -120,13 +127,11 @@ function discover_ip_address_definition($device, $mib, $entry)
 
 }
 
-function discover_add_ip_address($device, $mib, $entry)
-{
+function discover_add_ip_address($device, $mib, $entry) {
   global $ip_data;
 
   $ip      = $entry['ip'];
-  if (isset($entry['prefix']) && ($entry['prefix'] == 'zeroDotZero' || !strlen($entry['prefix'])))
-  {
+  if (isset($entry['prefix']) && ($entry['prefix'] === 'zeroDotZero' || safe_empty($entry['prefix']))) {
     unset($entry['prefix']);
   }
 
@@ -135,15 +140,12 @@ function discover_add_ip_address($device, $mib, $entry)
   $ip_version = 'ipv' . $ip_version;
 
   // ifIndex
-  if ($entry['ifIndex'] == 0 && !isset($ip_data[$ip_version][0]))
-  {
+  if ($entry['ifIndex'] == 0 && !isset($ip_data[$ip_version][0])) {
     // When used system table/oids without known ifIndex,
     // try to find correct ifIndex and update entry
     // ie: SWSYSTEM-MIB, ENVIROMUX16D
-    foreach ($ip_data[$ip_version] as $ind => $tmp)
-    {
-      if (isset($tmp[$ip]))
-      {
+    foreach ($ip_data[$ip_version] as $ind => $tmp) {
+      if (isset($tmp[$ip])) {
         print_debug("Found ifIndex $ind for IP $ip");
         $entry['ifIndex'] = $ind;
         break;
@@ -152,46 +154,25 @@ function discover_add_ip_address($device, $mib, $entry)
   }
   $ifIndex = $entry['ifIndex'];
 
-  switch ($ip_version)
-  {
+  switch ($ip_version) {
     case 'ipv4':
       // IPv4
-      if (isset($entry['prefix']))
-      {
-        if (!is_numeric($entry['prefix']))
-        {
-          if (strlen($entry['mask']))
-          {
-            // Yeah, passed empty prefix, but with correct mask
-            $entry['prefix'] = $entry['mask'];
-          } else {
-            $entry['prefix'] = '32';
-          }
-        }
-      }
-      elseif (strlen($entry['mask']))
-      {
-        $entry['prefix'] = $entry['mask'];
-      } else {
-        $entry['prefix'] = '32';
-      }
-      $prefix = $entry['prefix'];
-      if (is_ipv4_valid($ip, $prefix) === FALSE)
-      {
+      $prefix = get_ip_prefix($entry);
+      if (!is_ipv4_valid($ip, $prefix)) {
         print_debug("Address '$ip/$prefix' skipped as invalid.");
         return;
       }
+      $entry['prefix'] = $prefix;
       break;
 
     case 'ipv6':
       // IPv6
-      if (!is_numeric($entry['prefix'])) { $entry['prefix'] = '128'; }
-      $prefix = $entry['prefix'];
-      if (is_ipv6_valid($ip, $prefix) === FALSE)
-      {
+      $prefix = get_ip_prefix($entry);
+      if (!is_ipv6_valid($ip, $prefix)) {
         print_debug("Address '$ip/$prefix' skipped as invalid.");
         return;
       }
+      $entry['prefix'] = $prefix;
       break;
 
     default:
@@ -199,13 +180,12 @@ function discover_add_ip_address($device, $mib, $entry)
       return;
   }
 
-  if (empty($entry['type']) || $entry['type'] == 'unicast') // Always re-detect unicast type, while device can report it incorrectly
-  {
+  // Always re-detect unicast type, while device can report it incorrectly
+  if (empty($entry['type']) || $entry['type'] === 'unicast') {
     $entry['type'] = get_ip_type("$ip/$prefix");
   }
 
-  if (!isset($ip_data[$ip_version][$ifIndex][$ip]))
-  {
+  if (!isset($ip_data[$ip_version][$ifIndex][$ip])) {
     $ip_data[$ip_version][$ifIndex][$ip] = $entry;
     print_debug("Added $ip");
     print_debug_vars($entry);
@@ -213,32 +193,26 @@ function discover_add_ip_address($device, $mib, $entry)
   } else {
     // Compare both and merge best
     $old_entry = $ip_data[$ip_version][$ifIndex][$ip];
-    if (isset($old_entry['prefix']) && $old_entry['prefix'] == 'zeroDotZero')
-    {
+    if (isset($old_entry['prefix']) && $old_entry['prefix'] === 'zeroDotZero') {
       unset($old_entry['prefix']);
     }
-    $check_prefix = $old_entry['prefix'] == 0 ||
-                    ($ip_version == 'ipv4' && $old_entry['prefix'] == '32') ||
-                    ($ip_version == 'ipv6' && $old_entry['prefix'] == '128');
+    $check_prefix = $old_entry['prefix'] < 3 ||
+                    ($ip_version === 'ipv4' && $old_entry['prefix'] == '32') ||
+                    ($ip_version === 'ipv6' && $old_entry['prefix'] == '128');
     $updated = [];
-    foreach (array_keys($entry) as $param)
-    {
+    foreach (array_keys($entry) as $param) {
       //print_debug_vars($old_entry);
       //print_debug_vars($entry);
-      if (!isset($old_entry[$param]) || !strlen($old_entry[$param]))
-      {
+      if (!isset($old_entry[$param]) || safe_empty($old_entry[$param])) {
         $ip_data[$ip_version][$ifIndex][$ip][$param] = $entry[$param];
         $updated[] = $param;
-      }
-      elseif ( ($param == 'type' && $old_entry[$param] == 'anycast' && strlen($entry[$param])) ||
-               ($param == 'prefix' && $check_prefix && $entry[$param] > 0))
-      {
+      } elseif (($param === 'type' && $old_entry[$param] === 'anycast' && strlen($entry[$param])) ||
+              ($param === 'prefix' && $check_prefix && $entry[$param] > 0)) {
         $ip_data[$ip_version][$ifIndex][$ip][$param] = $entry[$param];
         $updated[] = $param;
       }
     }
-    if (count($updated))
-    {
+    if (count($updated)) {
       print_debug("Already exist $ip, updated params [".implode(', ', $updated)."]");
     } else {
       print_debug("Already exist $ip, skip");
@@ -249,6 +223,101 @@ function discover_add_ip_address($device, $mib, $entry)
 }
 
 /**
+ * Convert IPv4 netmask to CIDR
+ *
+ * @param string $netmask
+ *
+ * @return string|null
+ */
+function netmask2cidr($netmask) {
+  $addr = Net_IPv4::parseAddress("1.2.3.4/$netmask");
+  return is_intnum($addr->bitmask) ? $addr->bitmask : NULL;
+}
+
+/**
+ * Convert CIDR to IPv4 netmask
+ * @param $cidr
+ *
+ * @return string|null
+ */
+function cidr2netmask($cidr) {
+  if (!is_intnum($cidr) || $cidr < 0 || $cidr > 32) {
+    return NULL;
+  }
+  return long2ip(ip2long("255.255.255.255") << (32 - $cidr));
+}
+
+function get_ip_prefix($entry) {
+  if (!is_array($entry)) {
+    // Convert ip/prefix string to common array
+    $address = $entry;
+    $entry = [];
+    list($entry['ip'], $prefix) = explode('/', $address);
+    if (!safe_empty($prefix)) {
+      if (is_numeric($prefix)) {
+        $entry['prefix'] = $prefix;
+      } else {
+        $entry['mask'] = $prefix;
+      }
+    }
+  }
+  print_debug_vars($entry);
+
+  switch (get_ip_version($entry['ip'])) {
+    case 4:
+      if (!safe_empty($entry['prefix']) && $entry['prefix'] !== 'zeroDotZero') {
+        $prefix = netmask2cidr($entry['prefix']);
+      } else { //if (!safe_empty($entry['mask']) && $entry['mask'] !== 'zeroDotZero') {
+        $prefix = netmask2cidr($entry['mask']);
+      }
+      if (!is_intnum($prefix)) {
+        if (isset($entry['gateway']) && get_ip_version($entry['gateway']) === 4) {
+          // Derp way for detect prefix by gateway (limit by /24 - /32)
+          $prefix = 24;
+          while ($prefix < 32) {
+            $net = Net_IPv4::parseAddress($entry['ip'].'/'.$prefix);
+            if (Net_IPv4::ipInNetwork($entry['gateway'], $net->network.'/'.$prefix)) {
+              // Gateway IP in network, stop loop
+              print_debug("Prefix '$prefix' detected by IP '${entry['ip']}' and Gateway '${entry['gateway']}'.");
+              break;
+            }
+            $prefix++;
+          }
+          // Still not found prefix, try increase now /23 - /8
+          if ($prefix === 32 && $entry['ip'] !== $entry['gateway']) {
+            $tmp_prefix = 23;
+            while ($tmp_prefix >= 8) {
+              $net = Net_IPv4::parseAddress($entry['ip'].'/'.$tmp_prefix);
+              if (Net_IPv4::ipInNetwork($entry['gateway'], $net->network.'/'.$tmp_prefix)) {
+                // Gateway IP in network, stop loop
+                $prefix = $tmp_prefix;
+                print_debug("Prefix '$prefix' detected by IP '${entry['ip']}' and Gateway '${entry['gateway']}'.");
+                break;
+              }
+              $tmp_prefix--;
+            }
+          }
+        } else {
+          $prefix = 32;
+        }
+      }
+      return (int) $prefix;
+    case 6:
+      if (!safe_empty($entry['prefix']) && $entry['prefix'] !== 'zeroDotZero') {
+        $prefix = $entry['prefix'];
+      }
+      if (!is_intnum($prefix) || $prefix < 0 || $prefix > 128) {
+        $prefix = 128;
+      }
+      return (int) $prefix;
+  }
+
+  // Incorrect IP
+  print_debug("Incorrect: ${entry['ip']}");
+  return NULL;
+}
+
+/**
  * Returns IP version for string or FALSE if string not an IP
  *
  * Examples:
@@ -256,7 +325,7 @@ function discover_add_ip_address($device, $mib, $entry)
  *  get_ip_version('::1')         === 6
  *  get_ip_version('my_hostname') === FALSE
  *
- * @param sting $address IP address string
+ * @param string $address IP address string
  * @return mixed IP version or FALSE if passed incorrect address
  */
 function get_ip_version($address)
@@ -284,14 +353,20 @@ function get_ip_version($address)
  * Function for compress IPv6 address and keep as is IPv4 (already compressed)
  *
  * @param string $address IPv4 or IPv6 address
+ * @param bool   $force If true, an already compressed IP address will be compressed again
  *
  * @return string Compressed address string
  */
-function ip_compress($address)
+function ip_compress($address, $force = TRUE)
 {
-  if (get_ip_version($address) === 6)
+  list($ip, $net) = explode('/', $address);
+  if (get_ip_version($ip) === 6)
   {
-    $address = Net_IPv6::compress($address, TRUE);
+    $address = Net_IPv6::compress($ip, $force);
+    if (is_numeric($net) && ($net >= 0) && ($net <= 128))
+    {
+      $address .= '/'.$net;
+    }
   }
   return $address;
 }
@@ -300,14 +375,20 @@ function ip_compress($address)
  * Function for uncompress IPv6 address and keep as is IPv4
  *
  * @param string $address IPv4 or IPv6 address
+ * @param bool   $leading_zeros If true, the uncompressed address has a fixed length
  *
  * @return string Uncompressed address string
  */
-function ip_uncompress($address)
+function ip_uncompress($address, $leading_zeros = TRUE)
 {
-  if (get_ip_version($address) === 6)
+  list($ip, $net) = explode('/', $address);
+  if (get_ip_version($ip) === 6)
   {
-    $address = Net_IPv6::uncompress($address, TRUE);
+    $address = Net_IPv6::uncompress($ip, $leading_zeros);
+    if (is_numeric($net) && ($net >= 0) && ($net <= 128))
+    {
+      $address .= '/'.$net;
+    }
   }
   return $address;
 }
@@ -359,7 +440,7 @@ function safe_ip_hostname_key(&$hostname, &$ip = NULL)
 function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
 {
 
-  if (str_exists($ipv4_address, '/'))
+  if (str_contains_array($ipv4_address, '/'))
   {
     list($ipv4_address, $ipv4_prefixlen) = explode('/', $ipv4_address);
   }
@@ -413,8 +494,7 @@ function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
 // TESTME needs unit testing
 function is_ipv6_valid($ipv6_address, $ipv6_prefixlen = NULL)
 {
-  if (str_exists($ipv6_address, '/'))
-  {
+  if (str_contains_array($ipv6_address, '/')) {
     list($ipv6_address, $ipv6_prefixlen) = explode('/', $ipv6_address);
   }
   $ip_full = $ipv6_address . '/' . $ipv6_prefixlen;
@@ -653,8 +733,7 @@ function parse_network($network)
     $array['ip_version'] = 4;
     $array['ip_type']    = 'ipv4';
     $array['address']    = $network;
-    if (str_exists($network, array( '?', '*')))
-    {
+    if (str_contains_array($network, [ '?', '*' ])) {
       // If network contains * or !
       $array['query_type'] = 'like';
     } else {
@@ -668,8 +747,7 @@ function parse_network($network)
     $array['ip_version'] = 6;
     $array['ip_type']    = 'ipv6';
     $array['address']    = $network;
-    if (str_exists($network, array( '?', '*')))
-    {
+    if (str_contains_array($network, [ '?', '*' ])) {
       // If network contains * or !
       $array['query_type'] = 'like';
     } else {
@@ -712,18 +790,15 @@ function match_network($ip, $nets, $first = FALSE)
   $ip_version = get_ip_version($ip);
   if ($ip_version)
   {
-    if (!is_array($nets)) { $nets = array($nets); }
-    foreach ($nets as $net)
+    foreach ((array)$nets as $net)
     {
-      $ip_in_net = FALSE;
-
-      $revert    = (preg_match('/^\!/', $net) ? TRUE : FALSE); // NOT match network
+      $revert = (bool) preg_match('/^\!/', $net); // NOT match network
       if ($revert)
       {
         $net     = preg_replace('/^\!/', '', $net);
       }
 
-      if ($ip_version == 4)
+      if ($ip_version === 4)
       {
         if (strpos($net, '.') === FALSE) { continue; }      // NOT IPv4 net, skip
         if (strpos($net, '/') === FALSE) { $net .= '/32'; } // NET without mask as single IP
@@ -757,25 +832,21 @@ function match_network($ip, $nets, $first = FALSE)
  *
  * @return string IP address or original input string if not contains IP address
  */
-function hex2ip($ip_hex)
-{
+function hex2ip($ip_hex) {
   //$ip = trim($ip_hex, "\"\t\n\r\0\x0B"); // Strange case, cleaned incorrectly
   $ip = trim($ip_hex, "\"\t\n\r\0");
 
   // IPv6z, ie: 2a:02:a0:10:80:03:00:00:00:00:00:00:00:00:00:01%503316482
-  if (str_exists($ip, '%'))
-  {
+  if (str_contains_array($ip, '%')) {
     list($ip) = explode('%', $ip);
   }
 
   $len = strlen($ip);
-  if ($len === 5 && $ip[0] === ' ')
-  {
+  if ($len === 5 && $ip[0] === ' ') {
     $ip  = substr($ip, 1);
     $len = 4;
   }
-  if ($len === 4)
-  {
+  if ($len === 4) {
     // IPv4 hex string converted to SNMP string
     $ip  = str2hex($ip);
     $len = strlen($ip);
@@ -783,25 +854,28 @@ function hex2ip($ip_hex)
 
   $ip  = str_replace(' ', '', $ip);
 
-  if ($len > 8)
-  {
+  if ($len > 8) {
     // For IPv6
     $ip = str_replace(':', '', $ip);
     $len = strlen($ip);
   }
 
-  if (!ctype_xdigit($ip))
-  {
+  if (!ctype_xdigit($ip)) {
     return $ip_hex;
   }
 
-  switch ($len)
-  {
+  if ($len === 6) {
+    // '90 7F 8A ', should be '90 7F 8A 00 ' ?
+    $ip .= '00';
+    $len = 8;
+  }
+
+  //print_cli("IP: '$ip', LEN: $len\n");
+  switch ($len) {
     case 8:
       // IPv4
       $ip_array = array();
-      foreach (str_split($ip, 2) as $entry)
-      {
+      foreach (str_split($ip, 2) as $entry) {
         $ip_array[] = hexdec($entry);
       }
       $separator = '.';
@@ -827,8 +901,7 @@ function hex2ip($ip_hex)
     default:
       // Try convert hex string to string
       $ip = snmp_hexstring($ip_hex);
-      if (get_ip_version($ip))
-      {
+      if (get_ip_version($ip)) {
         return $ip;
       }
       return $ip_hex;

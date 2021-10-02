@@ -7,36 +7,13 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-// If only there was a valid (syntactically correct) MIB (and not one per controller sharing OIDs!)...
-// This file would have been a lot cleaner, walking a complete sensor table, and picking values...
-
-// This is the SATA MIB.
-$oids = snmp_walk($device, ".1.3.6.1.4.1.18928.1.2.2.1.9.1.2", "-OsqnU", "");
-if ($debug) { echo($oids."\n"); }
-if ($oids) echo("Areca Controller ");
-foreach (explode("\n", $oids) as $data)
-{
-  $data = trim($data);
-  if ($data)
-  {
-    list($oid,$descr) = explode(" ", $data,2);
-    $split_oid = explode('.',$oid);
-    $index = $split_oid[count($split_oid)-1];
-    $oid  = ".1.3.6.1.4.1.18928.1.2.2.1.9.1.3." . $index;
-    $value = snmp_get($device, $oid, "-Oqv", "");
-
-    discover_sensor_ng($device,'fanspeed', $mib, 'hwControllerBoardFanSpeed', $oid, $index, 'areca', trim($descr,'"'), 1, $value, ['rename_rrd' => 'areca-$index']);
-
-  }
-}
-
 // This is the SATA MIB.
 $oids = snmp_walk($device, ".1.3.6.1.4.1.18928.1.1.2.14.1.2", "-Osqn", "");
-if ($debug) { echo($oids."\n"); }
+print_debug($oids);
 $oids = trim($oids);
 if ($oids) echo("Areca Harddisk ");
 foreach (explode("\n", $oids) as $data)
@@ -54,50 +31,6 @@ foreach (explode("\n", $oids) as $data)
     {
       discover_sensor_ng($device,'temperature', $mib, '', $temperature_oid, zeropad($temperature_id), 'areca', $descr, 1, $temperature);
     }
-  }
-}
-
-// FIXME does this work on SAS as well? (battery status) if not, need SAS battery status check too.
-$oids = snmp_walk($device, ".1.3.6.1.4.1.18928.1.2.2.1.8.1.2", "-OsqnU", "");
-if ($debug) { echo($oids."\n"); }
-if ($oids) echo("Areca ");
-foreach (explode("\n", $oids) as $data)
-{
-  $data = trim($data);
-  if ($data)
-  {
-    list($oid,$descr) = explode(" ", $data,2);
-    $split_oid = explode('.',$oid);
-    $index = $split_oid[count($split_oid)-1];
-    $oid  = ".1.3.6.1.4.1.18928.1.2.2.1.8.1.3." . $index;
-    $value = snmp_get($device, $oid, "-Oqv", "");
-    if (trim($descr,'"') == 'Battery Status') # Battery Status is charge percentage, or 255 when no BBU
-    {
-      if ($value != 255)
-      {
-        discover_sensor('capacity', $device, $oid, $index, 'areca', trim($descr,'"'), 1, $value);
-      }
-    } else { # Not a battery
-      discover_sensor('voltage', $device, $oid, $index, 'areca', trim($descr,'"'), 0.001, $value);
-    }
-  }
-}
-
-$oids = snmp_walk($device, ".1.3.6.1.4.1.18928.1.2.2.1.10.1.2", "-OsqnU", "");
-if ($debug) { echo($oids."\n"); }
-if ($oids) echo("Areca Controller ");
-foreach (explode("\n", $oids) as $data)
-{
-  $data = trim($data);
-  if ($data)
-  {
-    list($oid,$descr) = explode(" ", $data,2);
-    $split_oid = explode('.',$oid);
-    $index = $split_oid[count($split_oid)-1];
-    $oid  = ".1.3.6.1.4.1.18928.1.2.2.1.10.1.3." . $index;
-    $value = snmp_get($device, $oid, "-Oqv", "");
-
-    discover_sensor('temperature', $device, $oid, $index, 'areca', trim($descr,'"'), 1, $value);
   }
 }
 
@@ -122,52 +55,87 @@ foreach (explode("\n", $oids) as $data)
 // hwEnclosure02PowerDesc.1 = STRING: "PowerSupply01"
 // hwEnclosure02PowerState.1 = INTEGER: Ok(1)
 
-for ($encNum = 1; $encNum <= 8; $encNum++)
-{
-  $cache['areca']["hwEnclosure$encNum"] = snmpwalk_cache_multi_oid($device, "hwEnclosure$encNum", array(), "ARECA-SNMP-MIB");
-
-  foreach ($cache['areca']["hwEnclosure$encNum"] as $index => $entry)
-  {
+for ($encNum = 1; $encNum <= 8; $encNum++) {
+  $table = "hwEnclosure$encNum";
+  $enclosures = snmpwalk_cache_oid($device, $table, [], "ARECA-SNMP-MIB");
+  if (!isset($enclosures[0]) || !$enclosures[0]["hwEnclosure0${encNum}Installed"]) {
     // Index 0 is the main enclosure data, we check if the enclosure is connected, but it will
     // not have any sensors of its own, so we skip index 0.
-    if ($index != 0 && $cache['areca']["hwEnclosure$encNum"][0]["hwEnclosure0${encNum}Installed"])
-    {
-      if ($entry["hwEnclosure0${encNum}VolIndex"])
-      {
-        $descr = $cache['areca']["hwEnclosure$encNum"][0]["hwEnclosure0${encNum}Description"] . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}VolDesc"];
-        $value = $entry["hwEnclosure0${encNum}VolValue"];
-        $oid   = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".8.1.3.$index";
+    continue;
+  }
+  $enclosure = $enclosures[0];
+  unset($enclosures[0]);
+  $name = $enclosure["hwEnclosure0${encNum}Description"];
 
-        discover_sensor('voltage', $device, $oid, "hwEnclosure0${encNum}VolValue.$index", 'areca', $descr, 0.001, $value);
-      }
+  foreach ($enclosures as $index => $entry) {
+    if ($entry["hwEnclosure0${encNum}VolIndex"]) {
+      $descr    = $name . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}VolDesc"];
+      $oid_num  = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".8.1.3.$index";
+      $oid_name = "hwEnclosure0${encNum}VolValue";
+      $value    = $entry[$oid_name];
 
-      if ($entry["hwEnclosure0${encNum}FanIndex"])
-      {
-        $descr = $cache['areca']["hwEnclosure$encNum"][0]["hwEnclosure0${encNum}Description"] . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}FanDesc"];
-        $value = $entry["hwEnclosure0${encNum}FanSpeed"];
-        $oid   = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".9.1.3.$index";
-
-        discover_sensor('fanspeed', $device, $oid, "hwEnclosure0${encNum}FanSpeed.$index", 'areca', $descr, 1, $value);
-      }
-
-      if ($entry["hwEnclosure0${encNum}TempIndex"])
-      {
-        $descr = $cache['areca']["hwEnclosure$encNum"][0]["hwEnclosure0${encNum}Description"] . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}TempDesc"];
-        $value = $entry["hwEnclosure0${encNum}TempValue"];
-        $oid   = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".10.1.3.$index";
-
-        discover_sensor('temperature', $device, $oid, "hwEnclosure0${encNum}TempValue.$index", 'areca', $descr, 1, $value);
-      }
-
-      if ($entry["hwEnclosure0${encNum}PowerIndex"])
-      {
-        $descr = $cache['areca']["hwEnclosure$encNum"][0]["hwEnclosure0${encNum}Description"] . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}PowerDesc"];
-        $value = $entry["hwEnclosure0${encNum}PowerState"];
-        $oid   = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".7.1.3.$index";
-
-        discover_status($device, $oid, "hwEnclosure0${encNum}PowerState.$index", 'areca-power-state', $descr, $value, array('entPhysicalClass' => 'power'));
-      }
+      //discover_sensor('voltage', $device, $oid_num, "$oid_name.$index", 'areca', $descr, 0.001, $value);
+      $options = [ 'rename_rrd' => "areca-$oid_name.%index%" ];
+      discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $index, NULL, $descr, 0.001, $value, $options);
     }
+
+    if ($entry["hwEnclosure0${encNum}FanIndex"]) {
+      $descr    = $name . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}FanDesc"];
+      $oid_num  = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".9.1.3.$index";
+      $oid_name = "hwEnclosure0${encNum}FanSpeed";
+      $value    = $entry[$oid_name];
+
+      //discover_sensor('fanspeed', $device, $oid_num, "$oid_name.$index", 'areca', $descr, 1, $value);
+      $options = [ 'rename_rrd' => "areca-$oid_name.%index%" ];
+      discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+    }
+
+    if ($entry["hwEnclosure0${encNum}TempIndex"]) {
+      $descr    = $name . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}TempDesc"];
+      $oid_num  = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".10.1.3.$index";
+      $oid_name = "hwEnclosure0${encNum}TempValue";
+      $value    = $entry[$oid_name];
+
+      //discover_sensor('temperature', $device, $oid_num, "$oid_name.$index", 'areca', $descr, 1, $value);
+      $options = [ 'rename_rrd' => "areca-$oid_name.%index%" ];
+      discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+    }
+
+    if ($entry["hwEnclosure0${encNum}PowerIndex"]) {
+      $descr = $name . ' (' . $encNum  . ') ' . $entry["hwEnclosure0${encNum}PowerDesc"];
+      $oid_num   = ".1.3.6.1.4.1.18928.1.2.2." . ($encNum+1) . ".7.1.3.$index";
+      $oid_name  = "hwEnclosure0${encNum}PowerState";
+      $value     = $entry[$oid_name];
+
+      //discover_status($device, $oid, "hwEnclosure0${encNum}PowerState.$index", 'areca-power-state', $descr, $value, array('entPhysicalClass' => 'power'));
+      discover_status_ng($device, $mib, $oid_name, $oid_num, $index, 'areca-power-state', $descr, $value, [ 'entPhysicalClass' => 'power' ]);
+    }
+  }
+}
+
+// SAS HDD enclosure statuses
+
+for ($encNum = 1; $encNum <= 8; $encNum++) {
+  $table      = "hddEnclosure$encNum";
+  $enclosures = snmpwalk_cache_oid($device, $table, [], "ARECA-SNMP-MIB");
+  if (!isset($enclosures[0]) || !$enclosures[0]["hddEnclosure0${encNum}Installed"]) {
+    // Index 0 is the main enclosure data, we check if the enclosure is connected, but it will
+    // not have any sensors of its own, so we skip index 0.
+    continue;
+  }
+  $enclosure = $enclosures[0];
+  unset($enclosures[0]);
+  $name = $enclosure["hddEnclosure0${encNum}Description"];
+
+  foreach ($enclosures as $index => $entry) {
+    if ($entry["hddEnclosure0${encNum}Name"] === 'N.A.') { continue; }
+
+    $descr    = 'Slot ' . $entry["hddEnclosure0${encNum}Slots"] . ', ' . trim($entry["hddEnclosure0${encNum}Name"]) . ' (SN: ' . trim($entry["hddEnclosure0${encNum}Serial"]) . ", $name)";
+    $oid_num   = ".1.3.6.1.4.1.18928.1.2.3." . $encNum . ".4.1.8.$index";
+    $oid_name  = "hddEnclosure0${encNum}State";
+    $value     = $entry[$oid_name];
+
+    discover_status_ng($device, $mib, $oid_name, $oid_num, $index, 'areca-hdd-state', $descr, $value, [ 'entPhysicalClass' => 'storage' ]);
   }
 }
 

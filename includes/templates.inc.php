@@ -1,16 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- *   These functions perform operations with templates.
- *
  * @package    observium
  * @subpackage templates
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -49,8 +45,7 @@ function get_template($type, $subtype, $name = '')
       // Examples:
       //  /opt/observium/templates/alert/device_myname.xml
       //  /opt/observium/templates/notification/email_html.tpl
-      if ($type == 'notification')
-      {
+      if ($type === 'notification') {
         $ext = '.tpl';
       } else {
         $ext = '.xml';
@@ -97,8 +92,7 @@ function get_templates_list($types)
       case 'alert':
       case 'group':
       case 'notification':
-        if ($type == 'notification')
-        {
+        if ($type === 'notification') {
           $ext = '.tpl';
         } else {
           $ext = '.xml';
@@ -207,7 +201,8 @@ function simple_template($template, $tags, $options = array('is_file' => FALSE, 
   }
    */
 
-  $string = $template;
+  // convert windows end lines to unix
+  $string = preg_replace('/\r\n/', "\n", $template);
 
   // Removes multi-line comments and does not create
   // a blank line, also treats white spaces/tabs
@@ -222,7 +217,7 @@ function simple_template($template, $tags, $options = array('is_file' => FALSE, 
   // Strip blank lines
   //$string = preg_replace('/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/', PHP_EOL, $string);
 
-  // Replace keys, loops and other template sintax
+  // Replace keys, loops and other template syntax
   $string = simple_template_replace($string, $tags);
 
   /**

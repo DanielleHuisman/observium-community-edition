@@ -1,0 +1,1234 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsdh6s.mib,v 1.9 2012/09/07 09:52:05 siva Exp $
+
+SUPERMICRO-DHCPv6-SERVER-MIB DEFINITIONS ::= BEGIN
+-- ******************************************************************
+-- RFC-3736 Stateless DHCPv6 Server MIB
+-- ******************************************************************
+IMPORTS
+    MODULE-IDENTITY, 
+    OBJECT-TYPE, 
+    NOTIFICATION-TYPE,
+    Counter32, enterprises,
+    Unsigned32, Integer32                          FROM SNMPv2-SMI
+    DisplayString, TruthValue, 
+    RowStatus,TEXTUAL-CONVENTION                   FROM SNMPv2-TC
+    ;
+fsdhcpv6srv MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "Super Micro Computer Inc."
+    CONTACT-INFO "support@Supermicro.com" 
+    DESCRIPTION 
+       "This MIB is a proprietary MIB for Stateless-DHCPv6 server
+        and conforms to RFC 3736(04/2004)."
+    REVISION "201209050000Z" 
+    DESCRIPTION 
+       "This MIB is a proprietary MIB for Stateless-DHCPv6 server
+        and conforms to RFC 3736(04/2004)."
+::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(2) 42 }
+-- ******************************************************************
+-- Groups in the Stateless DHCPv6 Server MIB Module
+-- ******************************************************************
+
+fsDhcp6SrvNotify            OBJECT IDENTIFIER ::= { fsdhcpv6srv 0 }
+fsDhcp6SrvSystem            OBJECT IDENTIFIER ::= { fsdhcpv6srv 1 } 
+fsDhcp6SrvConfig            OBJECT IDENTIFIER ::= { fsdhcpv6srv 2 }
+
+-- ******************************************************************
+-- Textual conventions
+-- ******************************************************************
+FsDhcp6SrvDuidValue ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Each DHCP server has a unique DUID. DHCP servers use DUIDs to identify 
+        clients for the selection of configuration parameters and in the 
+        association of IAs with clients.  DHCP clients use DUIDs to Identify 
+        a server in messages where a server needs to be identified.
+        Servers MUST treat DUIDs as opaque values and MUST only compare DUIDs 
+        for equality Clients and servers MUST NOT in any Other way interpret 
+        DUIDs. The DUID is carried in an option because it may be variable length 
+        and because it is not required in all DHCP messages.  The DUID is 
+        designed to be unique across all DHCP clients and servers, and stable
+        for any specific client or server - that is, the DUID used by a client 
+        or server SHOULD NOT change over time if at all possible; for example, 
+        a device's DUID should not change as a result of a change in
+        the device's network hardware.
+        The motivation for having more than one type of DUID is that the DUID 
+        must be globally unique, and must also be easy to generate. The sort of 
+        globally-unique identifier that is easy to generate for any given device 
+        can differ quite widely. Also, some devices may not contain any 
+        persistent storage. Retaining a generated DUID in such a device is not 
+        possible, so the DUID scheme must accommodate such devices. A DUID can be
+        no more than 128 octets"
+    REFERENCE
+        "Section 9. DHCP Unique Identifier (DUID) RFC 3315"
+    SYNTAX  OCTET STRING (SIZE(1..128)) 
+
+FsDhcp6SrvDuidType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "A DUID consists of a two-octet type code represented in network byte
+        order, followed by a variable number of octets that make up the
+        actual identifier. The following types are currently defined:
+
+        1   Link-layer address plus time
+        2   Vendor-assigned unique ID based on Enterprise Number
+        3   Link-layer address
+
+        DUID Based on Link-layer Address plus Time [DUID-LLT]
+
+        This type of DUID consists of a two octet type field containing the
+        value 1, a two octet hardware type code, four octets containing a
+        time value, followed by link-layer address of any one network
+        interface that is connected to the DHCP device at the time
+        that the DUID is generated.  The time value is the time that the
+        DUID is generated represented in seconds since midnight
+        (UTC), January 1, 2000, modulo 2^32.
+
+        The following diagram illustrates the format of a DUID-LLT:
+
+        0                   1                   2                   3
+        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |               1               |    hardware type (16 bits)    |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |                        time (32 bits)                         |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        .                                                               .
+        .             link-layer address (variable length)              .
+        .                                                               .
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+        The choice of network interface can be completely arbitrary, as long
+        as that interface provides a globally unique link-layer address for
+        the link type, and the same DUID-LLT SHOULD be used in configuring
+        all network interfaces connected to the device, regardless of which
+        interface's link-layer address was used to generate the DUID-LLT.
+
+        Clients and servers using this type of DUID MUST store the
+        DUID-LLT in stable storage, and MUST continue to use this DUID-LLT even
+        if the network interface used to generate the DUID-LLT is removed.
+        Clients and servers that do not have any stable storage MUST NOT
+        use this type of DUID.
+
+        Clients and servers that use this DUID SHOULD attempt to configure
+        the time prior to generating the DUID, if that is possible, and MUST
+        use some sort of time source (for example, a real-time clock) in
+        generating the DUID, even if that time source could not be configured
+        prior to generating the DUID.  The use of a time source makes it
+        unlikely that two identical DUID-LLTs will be generated if the
+        network interface is removed from the client and another client then
+        uses the same network interface to generate a DUID-LLT.  A collision
+        between two DUID-LLTs is very unlikely even if the clocks have not
+        been configured prior to generating the DUID.
+
+        This method of DUID generation is recommended for all general purpose
+        computing devices such as desktop computers and laptop computers, and
+        also for devices such as printers, routers, and so on, that contain
+        some form of writable non-volatile storage.
+
+        DUID Assigned by Vendor Based on Enterprise Number [DUID-EN]
+
+        This form of DUID is assigned by the vendor to the device.  It
+        consists of the vendor's registered Private Enterprise Number as
+        maintained by IANA [6] followed by a unique identifier assigned by
+        the vendor. 
+
+        The following diagram summarizes the structure of a DUID-EN:
+
+        0                   1                   2                   3
+        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |               2               |       enterprise-number       |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |   enterprise-number (contd)   |                               |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
+        .                           identifier                          .
+        .                       (variable length)                       .
+        .                                                               .
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        The source of the identifier is left up to the vendor defining it,
+        but each identifier part of each DUID-EN MUST be unique to the
+        device that is using it, and MUST be assigned to the device at the time
+        it is manufactured and stored in some form of non-volatile
+        storage. The generated DUID SHOULD be recorded in non-erasable storage. 
+
+        DUID Based on Link-layer Address [DUID-LL]:-
+
+        This type of DUID consists of two octets containing the DUID type 3,
+        a two octet network hardware type code, followed by the link-layer
+        address of any one network interface that is permanently connected to
+        the client or server device.
+
+        The following diagram illustrates the format of a DUID-LL:
+
+        0                   1                   2                   3
+        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |               3               |    hardware type (16 bits)    |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        .                                                               .
+        .             link-layer address (variable length)              .
+        .                                                               .
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        The choice of network interface can be completely arbitrary, as long
+        as that interface provides a unique link-layer address and is
+        permanently attached to the device on which the DUID-LL is being
+        generated.  The same DUID-LL SHOULD be used in configuring all
+        network interfaces connected to the device, regardless of which
+        interface's link-layer address was used to generate the DUID.
+
+        DUID-LL is recommended for devices that have a permanently-connected
+        network interface with a link-layer address, and do not have
+        nonvolatile, writable stable storage.  DUID-LL MUST NOT be used by
+        DHCP clients or servers that cannot tell whether or not a network
+        interface is permanently attached to the device on which the DHCP
+        client is running."
+    REFERENCE
+        "Section 9. DHCP Unique Identifier (DUID) RFC 3315"
+    SYNTAX  INTEGER {
+             dtLlt     (1),
+             dtEn      (2),
+             dtLl      (3)
+            }
+-- ******************************************************************
+-- Start the Scalars definition
+-- ******************************************************************
+fsDhcp6SrvDebugTrace OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..255))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This object stores the trace option string input given by the user.
+        Based on the input to this object, trace statements corresponding
+        to the given options are displayed. To enable particular trace the 
+        user has to enter the corresponding string(given below) assigned 
+        for that. For enabling more than one traces the user has to enter 
+        the corresponding strings with SPACE (delimiter) between each string.
+             For example, 
+             To enable the below traces:
+                 - Init and Shutdown traces
+                 - Management traces
+                 - Data path traces
+                 - Control plane traces and
+                 - Packet Dump traces 
+             The input should be fed as follows:
+             enable init-shut mgmt data ctrl pkt-dump
+             To disable the below traces:
+                 - Init and Shutdown traces
+                 - Data path traces
+                 - Control plane traces
+             The input should be,
+             disable init-shut data ctrl 
+             The entered input string is parsed to get the trace options.
+             enable          - Enables the corresponding option.
+             disable         - Disables the corresponding option.
+             init-shut       - Init and Shutdown traces
+             mgmt            - Management traces
+             ctrl            - Control Plane traces
+             pkt-dump        - Packet Dump traces
+             resource        - Traces related to all
+                               resources except buffers
+             all-fail        - All Failure traces
+             buffer          - Buffer allocation/
+                               release traces
+             critical        - Sl-DHCPv6 Server Critical traces"
+             
+    DEFVAL  { "critical" }
+    ::= { fsDhcp6SrvSystem 1 }
+
+fsDhcp6SrvRealmTableNextIndex OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This object contains an unused value for fsDhcp6SrvRealmIndex in
+        the fsDhcp6SrvRealmTable, or a zero to indicate that next index
+        does not exists. This object will give the first empty index value for 
+        example when user create the four rows of fsDhcp6SrvRealmTable 
+        with index 2,5,6,8. Then GET operation of fsDhcp6SrvRealmTableNextIndex 
+        object will return the value 1 as next unused Index."
+    ::= { fsDhcp6SrvSystem 2 }
+
+fsDhcp6SrvClientTableNextIndex OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This object contains an unused value for fsDhcp6SrvClientIndex in
+        the fsDhcp6SrvClientTable, or a zero to indicate that next index
+        does not exists. This object will give the first empty index value for 
+        example when user create the four rows of fsDhcp6SrvClientTable 
+        with index 2,5,6,8. Then GET operation of fsDhcp6SrvClientTableNextIndex 
+        object will return the value 1 as next unused Index."
+    ::= { fsDhcp6SrvSystem 3 }
+
+fsDhcp6SrvPoolTableNextIndex OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This object contains an first unused value for fsDhcp6SrvPoolIndex in
+        the fsDhcp6SrvPoolTableTable, or a zero to indicate that next index
+        does not exists. This object will give the first empty index value for 
+        example when user create the four rows of fsDhcp6SrvPoolTable
+        with index 2,5,6,8.Then fsDhcp6SrvPoolTableNextIndex object will 
+        return the value 1 as next unused Index."
+    ::= { fsDhcp6SrvSystem 4 }
+
+fsDhcp6SrvIncludePrefixTableNextIndex OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This object contains an first unused value for fsDhcp6SrvIncludePrefixIndex in
+        the fsDhcp6SrvIncludePrefixTable, or a zero to indicate that next index
+        does not exists. This object will give the first empty index value for 
+        example when user create the four rows of fsDhcp6SrvIncludePrefixTable 
+        with index 2,5,6,8.Then fsDhcp6SrvIncludePrefixTableNextIndex object will 
+        return the value 1 as next unused Index."
+    ::= { fsDhcp6SrvSystem 5 }
+
+fsDhcp6SrvTrapAdminControl OBJECT-TYPE
+    SYNTAX     BITS{
+                    none(0),
+                    trapUnknownTlv(1),
+                    trapInvalidPacketIn(2),
+                    trapHmacAuthFail(3)
+                   }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+       "The Object is used to enable or disable the transmission of 
+        TRAP notification messages. A vector of Boolean notification types, 
+        used to enable or disable the server notification types:
+        none (0)
+        trapUnknownTlv(1)   
+        trapInvalidPacketIn(2)   
+        trapHmacAuthFail(3)  
+
+        when server declares the received message contains the unknown TLV then 
+        the SNMP trap notification will come only when bit 1 of 
+        fsDhcp6SrvTrapAdminControl is set.
+        when server declares the received message as invalid then 
+        the SNMP trap notification will come only when bit 2 of fsDhcp6SrvTrapAdminControl 
+        is set.
+        When server declares the received message is unauthenticated then  
+        the SNMP trap notification will come only when bit 3 fsDhcp6SrvTrapAdminControl 
+        is set.
+        "
+    DEFVAL { "\0" }
+    ::= { fsDhcp6SrvSystem 6 }
+
+fsDhcp6SrvSysLogAdminStatus OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        enabled (1),
+                        disabled (2)
+                       }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+       "This Object is used to enable or disable the transmission of
+        syslog notification messages. 
+        DHCPv6 server will generate the syslog messages only when 
+        fsDhcp6SrvSysLogAdminStatus is set as enabled (1).
+
+        disabled (2) means that DHCP server will not generate any 
+        syslog messages."
+    DEFVAL { disabled }
+    ::= { fsDhcp6SrvSystem 7 }
+
+fsDhcp6SrvListenPort OBJECT-TYPE
+    SYNTAX      Integer32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This Object contains the UDP listen Port Number. 
+       Server process the received information request message 
+       and relay-forward only when destination port number in
+       UDP Header is equal to configured 
+       fsDhcp6SrvListenPort value."
+    DEFVAL { 547 }
+    ::= { fsDhcp6SrvSystem 8 }
+
+fsDhcp6SrvClientTransmitPort OBJECT-TYPE
+    SYNTAX      Integer32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This Object contains the UDP transmit port number. 
+       Server sets this as the destination Port Number in UDP 
+       header of reply message. Default value of source Port 
+       Number is 546."
+    DEFVAL { 546 }
+    ::= { fsDhcp6SrvSystem 9 }
+
+fsDhcp6SrvRelayTransmitPort OBJECT-TYPE
+    SYNTAX      Integer32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This Object contains the UDP transmit port number. 
+       Server sets this as the destination Port Number in UDP 
+       header of relay-reply message. Default value of source Port 
+       Number is 547."
+    DEFVAL { 547 }
+    ::= { fsDhcp6SrvSystem 10 }
+
+-- ******************************************************************
+-- End the Scalars defination
+-- ******************************************************************
+
+-- ******************************************************************
+-- Start the Configuration Pool Table (fsDhcp6SrvPoolTable)
+-- ******************************************************************
+
+fsDhcp6SrvPoolTable   OBJECT-TYPE 
+    SYNTAX SEQUENCE OF FsDhcp6SrvPoolEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION 
+       "The Configuration Pool Table. Each row in the table represents a 
+        different Configured Pool. The DHCPv6 server can provide those configuration
+        parameters that do not require the server to maintain any dynamic state for
+        individual clients, such as DNS server addresses and domain search list
+        options. 
+
+        A DHCPv6 configuration information pool is a named entity that includes
+        information about available configuration parameters and policies that control
+        assignment of the parameters to clients from the pool. A pool is configured
+        independently of the DHCPv6 service. 
+
+        Each Row of the fsDhcp6SrvOptionTable contains the configuration 
+        information configured by user. 
+        Rows of the fsDhcp6SrvOptionTable are  mapped using fsDhcp6SrvPoolIndex.
+
+        Each configuration pool Row can be mapped to either Interface table or the
+        client table."
+    ::= { fsDhcp6SrvConfig 1 }
+
+fsDhcp6SrvPoolEntry   OBJECT-TYPE 
+    SYNTAX        FsDhcp6SrvPoolEntry 
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION 
+       "The Configuration Pool table entry. This entry is not lost
+        upon reboot. It is backed up by stable storage. Each entry in this table
+        contains the required attribute values which define the Configuration
+        Pool Entry."
+    INDEX { fsDhcp6SrvPoolIndex }
+    ::= { fsDhcp6SrvPoolTable 1 }
+
+FsDhcp6SrvPoolEntry ::= SEQUENCE {
+    fsDhcp6SrvPoolIndex                 Unsigned32,
+    fsDhcp6SrvPoolName                  DisplayString,
+    fsDhcp6SrvPoolPreference            Integer32,
+    fsDhcp6SrvPoolDuidType              FsDhcp6SrvDuidType,
+    fsDhcp6SrvPoolDuid                  FsDhcp6SrvDuidValue,
+    fsDhcp6SrvPoolDuidIfIndex           Integer32,
+    fsDhcp6SrvPoolOptionTableNextIndex  Unsigned32,
+    fsDhcp6SrvPoolRowStatus             RowStatus
+    }
+
+fsDhcp6SrvPoolIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The unique identifier Index for the Configuration Pool Table .This is also
+        the index of the fsDhcp6SrvOptionTable Table."
+    ::= { fsDhcp6SrvPoolEntry 1 }
+
+fsDhcp6SrvPoolName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..64))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The object indicates the Configuration pool name .The format pool name
+        is string of maximum 32 characters. This name must be unique and NULL 
+        terminated string." 
+    ::= { fsDhcp6SrvPoolEntry 2 }
+
+fsDhcp6SrvPoolPreference OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The object indicates the preference value of the pool.
+        This value is used by client to select the best information when it
+        receives multiple reply messages from different servers. The default 
+        value is zero means lowest Preference pool." 
+    DEFVAL { 0 }
+    ::= { fsDhcp6SrvPoolEntry 3 }
+
+fsDhcp6SrvPoolDuidType OBJECT-TYPE
+    SYNTAX     FsDhcp6SrvDuidType
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+       "This Object contains the type of DUID. 
+        Server always sends the Server Identifier TLV in the reply message. 
+        The value dtLlt(1) indicates that DHCP server will use the Link layer address
+        of the interface and current system time value for the Server Identifier
+        option TLV value.
+        The value dtEn (2) indicates that DHCP server will use the Vendor-assigned
+        unique ID based on Enterprise Number for the Server Identifier
+        option TLV value.
+        The value dtLl (3) indicates that DHCP server will use the link layer address 
+        for the Server Identifier option TLV value."
+    DEFVAL { dtLlt }
+    ::= { fsDhcp6SrvPoolEntry 4 }
+
+fsDhcp6SrvPoolDuid OBJECT-TYPE
+    SYNTAX     FsDhcp6SrvDuidValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This Object contains the value of DUID used as server ID. Depending upon
+        the fsDhcp6SrvPoolDuidType this will return the current value of the
+        server identifier."
+    ::= { fsDhcp6SrvPoolEntry 5 }
+
+fsDhcp6SrvPoolDuidIfIndex OBJECT-TYPE
+    SYNTAX     Integer32 (1..2147483647)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION 
+       "Interface which will be used for formation of DUID Based on
+        Link-layer Address plus Time and DUID based on Link-layer 
+        Address, if not specified then an arbitrary interface value 
+        will be used."
+    DEFVAL { 1 }
+    ::=  { fsDhcp6SrvPoolEntry 6 }
+
+fsDhcp6SrvPoolOptionTableNextIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object contains an first unused value for fsDhcp6SrvOptionIndex in
+        the fsDhcp6SrvOptionTable or a zero value to indicate that next index
+        does not exists. This object will give the first empty index value for
+        example when user create the four rows of fsDhcp6SrvOptionTable with index
+        1.2,1.5,1.6,1.8.Then fsDhcp6SrvOptionIndex object will return the value
+        1 as first unused Index." 
+    ::= { fsDhcp6SrvPoolEntry 7 }
+
+fsDhcp6SrvPoolRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object is the status of the row.
+        The writable columns in a row can not be changed if the row
+        is active. All fsDhcp6SrvPoolName column must have a valid 
+        value before a row can be activated.
+        "
+    ::= { fsDhcp6SrvPoolEntry 8 }
+
+-- ******************************************************************
+-- End of Configuration Pool Table (fsDhcp6SrvPoolTable)
+-- ******************************************************************
+
+-- ******************************************************************
+-- Start of Include link prefix Table {fsDhcp6SrvIncludePrefixTable)
+-- ******************************************************************
+fsDhcp6SrvIncludePrefixTable   OBJECT-TYPE 
+    SYNTAX SEQUENCE OF FsDhcp6IncludePrefixEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION 
+       "This table contains the list of link prefixes which are to be used by
+        the server to map an information-request/relay-forward message to a pool. 
+
+        When an address on the incoming interface or a link-address in the
+        packet matches the specified IPv6-prefix, the server uses the
+        configuration information pool."
+    ::= { fsDhcp6SrvConfig 2 }
+
+fsDhcp6SrvIncludePrefixEntry   OBJECT-TYPE 
+    SYNTAX FsDhcp6IncludePrefixEntry 
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION 
+       "The include prefix Table entry. This entry is not lost upon reboot.
+        It is backed up by stable storage. Each entry in this table
+        contains the required attribute values." 
+    INDEX { fsDhcp6SrvIncludePrefixContextId, fsDhcp6SrvIncludePrefixIndex }
+    ::= { fsDhcp6SrvIncludePrefixTable 1 }
+
+FsDhcp6IncludePrefixEntry ::=  SEQUENCE {
+    fsDhcp6SrvIncludePrefixContextId  Integer32,
+    fsDhcp6SrvIncludePrefixIndex      Integer32,
+    fsDhcp6SrvIncludePrefix           OCTET STRING,
+    fsDhcp6SrvIncludePrefixPool       Integer32,
+    fsDhcp6SrvIncludePrefixRowStatus  RowStatus
+    }
+
+fsDhcp6SrvIncludePrefixContextId OBJECT-TYPE
+    SYNTAX          Integer32 (0..2147483647)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "A 32-bit unique context id for each entry. Minimum value is 0
+       and Maximum depends upon system configuration. Default value
+       is 0 which will be initialized during bootup"
+    ::= { fsDhcp6SrvIncludePrefixEntry 1 }
+
+fsDhcp6SrvIncludePrefixIndex OBJECT-TYPE
+    SYNTAX          Integer32 (1..2147483647)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+       "The unique identifier Index for the IPv6 prefix Table."
+    ::= { fsDhcp6SrvIncludePrefixEntry 2 }
+
+fsDhcp6SrvIncludePrefix OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (16))
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+       "This object identifies the IPv6 prefix to which the configuration pool
+       has to be mapped."
+    ::= { fsDhcp6SrvIncludePrefixEntry 3 }
+
+fsDhcp6SrvIncludePrefixPool OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the unique Pool Index value mapped to this 
+        IPv6 Prefix. 
+        Server will send the configuration information associated with 
+        the related pool in reply message for all the information-request 
+        messages received with this particular IPv6 address prefix."
+    ::= { fsDhcp6SrvIncludePrefixEntry 4 }
+
+fsDhcp6SrvIncludePrefixRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object is the status of the row Object, only creatAndGo and 
+        destroy values are applicable for this object."
+    ::= { fsDhcp6SrvIncludePrefixEntry 5 }
+
+-- ******************************************************************
+-- End of Include link prefix Table {fsDhcp6SrvIncludePrefixTable)
+-- ******************************************************************
+
+-- ******************************************************************
+-- Start of Global Option Table {fsDhcp6SrvOptionTable)
+-- ******************************************************************
+fsDhcp6SrvOptionTable   OBJECT-TYPE 
+    SYNTAX SEQUENCE OF FsDhcp6SrvOptionEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION 
+       "This table contains the global  options that are
+        to be used by the server to respond to a DHCP
+        information-request message.
+        Following are valid options user can configure:- 
+        1 Vendor-specific Information with type fsDhcp6SrvOptionType 17
+        2 SIP server domain name list with type fsDhcp6SrvOptionType 21
+        3 SIP server IPV6 address list with type fsDhcp6SrvOptionType 22
+        4 DNS recursive name server with type fsDhcp6SrvOptionType 23
+        5 Domain search list with type fsDhcp6SrvOptionType 24
+        6 Information refresh timer fsDhcp6SrvOptionType 32
+        option table row can not be created until row status of pool table with
+        same fsDhcp6SrvPoolIndex becomes active.
+               
+        Row status with ffsDhcp6SrvPoolIndex becomes not in service when row 
+        status of fsDhcp6SrvPoolTable with the same index becomes 
+        Not in service."
+    ::= { fsDhcp6SrvConfig 3 }
+
+fsDhcp6SrvOptionEntry   OBJECT-TYPE 
+    SYNTAX FsDhcp6SrvOptionEntry 
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION 
+       "The Server Option Table entry. This entry is not lost upon reboot.
+        It is backed up by stable storage. Each entry in this table
+        contains the required attribute values."
+    INDEX { fsDhcp6SrvPoolIndex, fsDhcp6SrvOptionIndex}
+    ::= { fsDhcp6SrvOptionTable 1 }
+
+FsDhcp6SrvOptionEntry ::=  SEQUENCE {
+    fsDhcp6SrvOptionIndex              Unsigned32,
+    fsDhcp6SrvOptionType               Integer32,
+    fsDhcp6SrvOptionLength             Integer32,
+    fsDhcp6SrvOptionValue              OCTET STRING,
+    fsDhcp6SrvOptionPreference         Integer32,
+    fsDhcp6SrvOptionRowStatus          RowStatus
+    }
+
+fsDhcp6SrvOptionIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the unique Option Index value mapped to this option
+        Table. "
+    ::= { fsDhcp6SrvOptionEntry 1}
+
+fsDhcp6SrvOptionType OBJECT-TYPE
+    SYNTAX      Integer32 (1..65535)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The object identifies the option, this is the tag octet of the DHCP 
+    option.
+        "
+    ::= { fsDhcp6SrvOptionEntry 2}
+
+fsDhcp6SrvOptionLength OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the length of the option
+        indicated by the option type. This length does not
+        include the octets specifying the type and length."
+    ::= { fsDhcp6SrvOptionEntry 3}
+
+fsDhcp6SrvOptionValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..128)) 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the octets of data, of length
+        specified by fsDhcp6SrvOptionLength for that entry.
+        "
+    ::= { fsDhcp6SrvOptionEntry 4}
+
+fsDhcp6SrvOptionPreference OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the preference value of the Option.
+        This preference value is used by server while adding multiple 
+        options in the Reply message, higher preference option TLV will be go
+        first in reply message. Lower the number lower the preference value.
+        The default value is zero which means lowest preference.
+        For example three Option TLVs are configured with preference option
+        value 4,8 and 9 respectively then server will send the reply message 
+        with Option TLV having preference value 9 then 8 and then 4." 
+    DEFVAL { 0 }
+    ::= { fsDhcp6SrvOptionEntry 5 }
+
+fsDhcp6SrvOptionRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the Row status of this entry. The
+        writable columns in a row can not be changed if the row
+        is active."
+    ::= { fsDhcp6SrvOptionEntry 6}
+
+-- ******************************************************************
+-- End of Global Option Table {fsDhcp6SrvOptionTable)
+-- ******************************************************************
+
+-- ******************************************************************
+-- Start of Server SubOption Table {fsDhcp6SrvSubOptionTable)
+-- ******************************************************************
+fsDhcp6SrvSubOptionTable   OBJECT-TYPE 
+    SYNTAX SEQUENCE OF FsDhcp6SrvSubOptionEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION 
+       "This table contains the vendor specific options which the server
+        will reply in response to a information-request or relay-forward
+        message.
+        This table will contain the various sub-option associated with
+        a specific option"
+    ::= { fsDhcp6SrvConfig 4 }
+
+fsDhcp6SrvSubOptionEntry   OBJECT-TYPE 
+    SYNTAX FsDhcp6SrvSubOptionEntry 
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION 
+       "The SubOption Table entry. This entry is not lost upon reboot.
+        It is backed up by stable storage. Each entry in this table
+        contains the required attribute values."
+    INDEX { fsDhcp6SrvPoolIndex, fsDhcp6SrvOptionIndex, 
+            fsDhcp6SrvSubOptionType}
+    ::= { fsDhcp6SrvSubOptionTable 1 }
+
+FsDhcp6SrvSubOptionEntry ::=  SEQUENCE {
+    fsDhcp6SrvSubOptionType               Unsigned32,
+    fsDhcp6SrvSubOptionLength             Integer32,
+    fsDhcp6SrvSubOptionValue              OCTET STRING,
+    fsDhcp6SrvSubOptionRowStatus          RowStatus
+    }
+fsDhcp6SrvSubOptionType OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the unique sub-option type."
+    ::= { fsDhcp6SrvSubOptionEntry 1}
+
+fsDhcp6SrvSubOptionLength OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the length of the option indicated 
+        by the sub-option type. This length does not include the 
+        octets specifying the type and length."
+    ::= { fsDhcp6SrvSubOptionEntry 2}
+
+fsDhcp6SrvSubOptionValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..128)) 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the octets of data, of length
+        specified by fsDhcp6SrvSubOptionLength for that entry.
+        "
+    ::= { fsDhcp6SrvSubOptionEntry 3}
+
+fsDhcp6SrvSubOptionRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the Row status of this entry. The
+        writable columns in a row can not be changed if the row
+        is active."
+    ::= { fsDhcp6SrvSubOptionEntry 4}
+
+-- ******************************************************************
+-- End of Server SubOption Table {fsDhcp6SrvSubOptionTable)
+-- ******************************************************************
+-- ******************************************************************
+-- Start of Client Table {fsDhcp6SrvClientTable)
+-- ******************************************************************
+fsDhcp6SrvClientTable OBJECT-TYPE  
+    SYNTAX SEQUENCE OF FsDhcp6SrvClientEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+       "The server and client have a shared key. When one wants to send a
+        message to another, the source creates a digest value by using the
+        shared key and the message contents as inputs to a keyed hashing
+        function (MD5 by default). The source then includes the digest value in
+        the authentication option. When the message arrives at the destination,
+        the destination searches for the shared key and generates the digest
+        value itself. If the digest value in the authentication option of the
+        message matches the digest value generated by the destination, then the
+        message is secure and comes from a trusted source.
+       
+        This table is used to define containers for keys to be used for a 
+        single client."
+    ::=  { fsDhcp6SrvConfig 7 }  
+  
+fsDhcp6SrvClientEntry OBJECT-TYPE  
+    SYNTAX FsDhcp6SrvClientEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+       "The Entries of the fsDhcp6SrvClientTable used to authenticate the
+        received information-request message."
+    INDEX {fsDhcp6SrvClientIndex}
+    ::=  { fsDhcp6SrvClientTable 1 }  
+
+FsDhcp6SrvClientEntry ::= SEQUENCE {  
+    fsDhcp6SrvClientIndex         Unsigned32,
+    fsDhcp6SrvClientId            FsDhcp6SrvDuidValue,
+    fsDhcp6SrvClientIdType        FsDhcp6SrvDuidType,
+    fsDhcp6SrvClientRealm         Unsigned32,
+    fsDhcp6SrvClientRowStatus     RowStatus
+    }
+
+fsDhcp6SrvClientIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+       "The Index of the server client table."
+   ::= { fsDhcp6SrvClientEntry 1}
+
+fsDhcp6SrvClientId OBJECT-TYPE
+    SYNTAX      FsDhcp6SrvDuidValue
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+        "This Objects contains the client DUID value. "
+    ::= { fsDhcp6SrvClientEntry 2}
+
+fsDhcp6SrvClientIdType OBJECT-TYPE
+    SYNTAX      FsDhcp6SrvDuidType
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+       "This Object contains type of client DUID."
+    DEFVAL  { dtLlt }
+    ::= { fsDhcp6SrvClientEntry 3}
+
+fsDhcp6SrvClientRealm OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+       "This Object contains the index of the associated realm table row."
+    ::= { fsDhcp6SrvClientEntry 4}
+
+fsDhcp6SrvClientRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the Row status of this entry. The
+        writable columns in a row can not be changed if the row
+        is active."
+    ::= { fsDhcp6SrvClientEntry 5}
+
+-- ******************************************************************
+-- End of Client Table {fsDhcp6SrvClientTable)
+-- ******************************************************************
+-- ******************************************************************
+-- Start of Realm Table {fsDhcp6SrvRealmTable)
+-- ******************************************************************
+
+fsDhcp6SrvRealmTable OBJECT-TYPE  
+    SYNTAX SEQUENCE OF FsDhcp6SrvRealmEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+       "Server authenticate the received information request with 
+        HMAC MD5 algorithm when received message contains the 
+        Authentication option tlv .Realms are container for 
+        authentication information. For the Authentication key id is required.
+        Keys are assigned to clients. This table is used to create 
+        the Realm Row and the fsDhcp6SrvRealmIndex index is also used
+        by the fsDhcp6SrvAuthClntTable. Following is an example
+        of a server authentication hierarchy:
+
+        realm testrealm01.private.com 
+        {
+           key 1 TESTREALMKEY01
+           key 2 TESTREALMKEY02
+        }
+        realm testrealm02.private.com 
+        {
+           key 1 TESTREALMKEY01
+        }"
+    ::=  { fsDhcp6SrvConfig 6 }  
+  
+fsDhcp6SrvRealmEntry OBJECT-TYPE  
+    SYNTAX FsDhcp6SrvRealmEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+        "The Authentication Realm table entry."
+    INDEX { fsDhcp6SrvRealmIndex }
+    ::=  { fsDhcp6SrvRealmTable 1 }  
+
+FsDhcp6SrvRealmEntry ::= SEQUENCE {  
+    fsDhcp6SrvRealmIndex              Unsigned32,
+    fsDhcp6SrvRealmName               OCTET STRING,
+    fsDhcp6SrvRealmKeyTableNextIndex Unsigned32,
+    fsDhcp6SrvRealmRowStatus          RowStatus
+    }
+
+fsDhcp6SrvRealmIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+       "The index of the Realm Authentication table."
+    ::= { fsDhcp6SrvRealmEntry 1}
+
+fsDhcp6SrvRealmName OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..128))
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+       "This object contains the unique name of the container used to store the keys 
+        for example testrealm01.private.com is the realm name described in 
+        fsDhcp6SrvRealmTable"
+    ::= { fsDhcp6SrvRealmEntry 2}
+
+fsDhcp6SrvRealmKeyTableNextIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object contains an unused value for fsDhcp6SrvKeyIndex in
+        the fsDhcp6SrvKeyTable, or a zero to indicate that next
+        index does not exists. This object will give the first empty
+        index value for example when user create the four rows of
+        fsDhcp6SrvKeyIndex with index 2,5,6,8.Then
+        fsDhcp6SrvRealmKeyTableNextIndex object will return the value
+        1 as next unused Index."
+    ::= { fsDhcp6SrvRealmEntry 3}
+
+fsDhcp6SrvRealmRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the Row status of this entry. The
+        writable columns in a row can not be changed if the row
+        is active."
+    ::= { fsDhcp6SrvRealmEntry 4}
+
+-- ******************************************************************
+-- End of Realm Table {fsDhcp6SrvRealmTable)
+-- ******************************************************************
+
+-- ******************************************************************
+-- Start of Server Key Table {fsDhcp6SrvKeyTable)
+-- ******************************************************************
+
+fsDhcp6SrvKeyTable OBJECT-TYPE  
+    SYNTAX SEQUENCE OF FsDhcp6SrvKeyEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+       "This table is used to define the various keys used for authentication 
+        the information-request."         
+    ::=  { fsDhcp6SrvConfig 8 }  
+  
+fsDhcp6SrvKeyEntry OBJECT-TYPE  
+    SYNTAX FsDhcp6SrvKeyEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+        "Entries of the fsDhcp6SrvKeyTable"
+    INDEX { fsDhcp6SrvRealmIndex,
+            fsDhcp6SrvKeyIdentifier}
+    ::=  {  fsDhcp6SrvKeyTable 1 }  
+
+FsDhcp6SrvKeyEntry ::= SEQUENCE {  
+    fsDhcp6SrvKeyIdentifier    Unsigned32,
+    fsDhcp6SrvKey              OCTET STRING,
+    fsDhcp6SrvKeyRowStatus     RowStatus
+    } 
+    
+fsDhcp6SrvKeyIdentifier OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "This is the Index of the Aut key Table."
+    ::= { fsDhcp6SrvKeyEntry 1}
+
+fsDhcp6SrvKey OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..64))
+    MAX-ACCESS  read-create 
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the key string which will be used to authenticate
+         the information-request message."
+    ::= { fsDhcp6SrvKeyEntry 2}
+ 
+fsDhcp6SrvKeyRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create 
+    STATUS      current
+    DESCRIPTION
+       "This object indicates the Row status of this entry. The
+        Row status can not be set active until Row Status of fsDhcp6SrvRealmEntry
+        with fsDhcp6SrvRealmIndex Index become active."
+    ::= { fsDhcp6SrvKeyEntry 3}
+
+-- ******************************************************************
+-- End of Server Key Table {fsDhcp6SrvKeyTable)
+-- ******************************************************************
+-- ******************************************************************
+-- Start of Server Interface Table {fsDhcp6SrvIfTable)
+-- ******************************************************************
+
+fsDhcp6SrvIfTable OBJECT-TYPE  
+    SYNTAX SEQUENCE OF FsDhcp6SrvIfEntry
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+       "This table contains the statistics of DHCPv6 Server on each 
+        interface. It will give the Number of Information Request messages, Relay
+        Forward messages received on the interface and Number of Relay reply,
+        reply messages transmitted from the interface.
+
+        This table also contains the per interface configuration column 
+        fsDhcp6SrvIfPool contains the pool id associated with the interface."
+    ::= { fsDhcp6SrvConfig 5 }  
+
+fsDhcp6SrvIfEntry OBJECT-TYPE  
+    SYNTAX FsDhcp6SrvIfEntry  
+    MAX-ACCESS not-accessible  
+    STATUS current  
+    DESCRIPTION  
+       "Entries of the fsDhcp6SrvIfTable"
+    INDEX {fsDhcp6SrvIfIndex}
+    ::=  { fsDhcp6SrvIfTable 1 }  
+
+FsDhcp6SrvIfEntry ::= SEQUENCE {  
+    fsDhcp6SrvIfIndex           Integer32,
+    fsDhcp6SrvIfPool            Integer32,
+    fsDhcp6SrvIfInformIn        Counter32,
+    fsDhcp6SrvIfRelayForwIn     Counter32,
+    fsDhcp6SrvIfReplyOut        Counter32,
+    fsDhcp6SrvIfRelayReplyOut   Counter32,
+    fsDhcp6SrvIfInvalidPktIn    Counter32,
+    fsDhcp6SrvIfUnknownTlvType  Integer32,
+    fsDhcp6SrvIfHmacFailCount   Counter32,
+    fsDhcp6SrvIfCounterReset    TruthValue,
+    fsDhcp6SrvIfRowStatus       RowStatus
+    } 
+
+fsDhcp6SrvIfIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..2147483647) 
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the unique index value mapped 
+        to this IPv6 Interface."
+   ::= { fsDhcp6SrvIfEntry 1 }
+
+fsDhcp6SrvIfPool OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the unique Pool Index
+        value mapped to this Interface Table. Server will send the configuration
+        information associated with the fsDhcp6SrvIfPool in reply message for all
+        the information-request messages received in this particular interface."
+   ::= { fsDhcp6SrvIfEntry 2 }
+
+fsDhcp6SrvIfInformIn OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the number of INFORMATION REQUEST messages
+        received on the Interface."
+   ::= { fsDhcp6SrvIfEntry 3 }
+
+fsDhcp6SrvIfRelayForwIn OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the number of RELAY FORWARD messages
+        received on the Interface."
+   ::= { fsDhcp6SrvIfEntry 4 }
+
+fsDhcp6SrvIfReplyOut OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the number of REPLY messages
+        transmitted from the Interface."
+    ::= { fsDhcp6SrvIfEntry 5 }
+
+fsDhcp6SrvIfRelayReplyOut OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the number of RELAY REPLY messages
+        transmitted from the Interface."
+    ::= { fsDhcp6SrvIfEntry 6 }
+
+fsDhcp6SrvIfInvalidPktIn OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the number of Invalid messages
+        received on the Interface."
+    ::= { fsDhcp6SrvIfEntry 7 }
+
+fsDhcp6SrvIfUnknownTlvType OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the Last unknown Type received in the INFORMATION
+        REQUEST or RELAY FORWARD message."
+   ::= { fsDhcp6SrvIfEntry 8 }
+
+fsDhcp6SrvIfHmacFailCount OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "This object identifies the number of unauthenticated messages received on the interface
+        This counter increment only when Authentication TLV is present in the received
+        message and Digest calculated by the realm and key id does not match with
+        received digest present in the Authentication TLV."
+    ::= { fsDhcp6SrvIfEntry 9 }
+
+fsDhcp6SrvIfCounterReset OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object is used to reset all the statistics counter objects present
+        in this table. This will be done by setting the value of this column to
+        'true(1)'.
+        This column always reads back to 'false(2)'."
+    ::= { fsDhcp6SrvIfEntry 10 }
+
+fsDhcp6SrvIfRowStatus OBJECT-TYPE 
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object is used to create/delete a row in the interface table.
+        when the interface is deleted from the system the corresponding
+        row from this table will also be deleted."
+    ::= { fsDhcp6SrvIfEntry 11 } 
+
+-- ******************************************************************
+-- End of Server Interface Table {fsDhcp6SrvIfTable)
+-- ******************************************************************
+
+-- *****************************************************************************
+--              fsDhcp6SrvNotify sub tree
+-- *****************************************************************************
+
+fsDhcp6SrvUnknownTlvTrap NOTIFICATION-TYPE
+    OBJECTS {
+             fsDhcp6SrvIfUnknownTlvType
+            }
+    STATUS      current
+    DESCRIPTION
+       "This trap is generated when received Information Request or Relay
+        Forward Message contains the Invalid TLV type."
+    ::= {fsDhcp6SrvNotify 1}
+fsDhcp6SrvInvalidPacketTrap NOTIFICATION-TYPE
+    OBJECTS {
+             fsDhcp6SrvIfInvalidPktIn
+            }
+    STATUS      current
+    DESCRIPTION
+       "This trap is generated when received Information Request or Relay
+        Forward Message is Invalid."
+    ::= {fsDhcp6SrvNotify 2}
+fsDhcp6SrvHmacAuthenticationFailTrap NOTIFICATION-TYPE
+    OBJECTS {
+             fsDhcp6SrvIfHmacFailCount
+            }
+    STATUS      current
+    DESCRIPTION
+       "This trap is generated when received information-request or relay
+        forward Message contains the authentication TLV and the Digest
+        calculated at the server side with the realm and key id value does not
+        match with received digest value."
+    ::= {fsDhcp6SrvNotify 3}
+
+END

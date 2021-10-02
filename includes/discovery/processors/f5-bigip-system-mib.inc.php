@@ -11,7 +11,7 @@
  *
  */
 
-$tmm_processor = snmpwalk_cache_multi_oid($device, 'sysTmmStatTmUsageRatio5m', array(), $mib);
+$tmm_processor = snmpwalk_cache_oid($device, 'sysTmmStatTmUsageRatio5m', array(), $mib);
 
 foreach ($tmm_processor as $index => $entry)
 {

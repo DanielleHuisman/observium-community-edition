@@ -15,8 +15,8 @@ $mib = 'HPN-ICF-ENTITY-EXT-MIB';
 
 if (!is_array($cache_storage[$mib]))
 {
-  $cache_storage[$mib] = snmpwalk_cache_multi_oid($device, 'hpnicfEntityExtMemUsage', array(), $mib);
-  $cache_storage[$mib] = snmpwalk_cache_multi_oid($device, 'hpnicfEntityExtMemSize', $cache_storage[$mib], $mib);
+  $cache_storage[$mib] = snmpwalk_cache_oid($device, 'hpnicfEntityExtMemUsage', array(), $mib);
+  $cache_storage[$mib] = snmpwalk_cache_oid($device, 'hpnicfEntityExtMemSize', $cache_storage[$mib], $mib);
 } else {
   print_debug("Cached!");
 }

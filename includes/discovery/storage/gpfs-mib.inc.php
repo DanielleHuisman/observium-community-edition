@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,15 +6,14 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2015 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $mib = 'GPFS-MIB';
 $cache_discovery['gpfs-mib'] = snmpwalk_cache_oid($device, "gpfsFileSystemStatusTable", array(), $mib);
 
-if (count($cache_discovery['gpfs-mib']))
-{
+if (safe_count($cache_discovery['gpfs-mib'])) {
   echo(" $mib ");
 
   /*

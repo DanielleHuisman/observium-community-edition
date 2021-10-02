@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,11 +24,11 @@
 //FOUNDRY-POE-MIB::snAgentPoeUnitPowerAllocationsRequestsHonored.1 = Gauge32: 94
 
 $oids = snmpwalk_cache_oid($device, 'snAgentPoeUnitEntry', array(), $mib);
-if (count($oids))
-{
+if (safe_count($oids)) {
   // Stacked devices
-  foreach ($oids as $index => $entry)
-  {
+  foreach ($oids as $index => $entry) {
+    if ($entry['snAgentPoeUnitPowerCapacityTotal'] == 0) { continue; } // skip zero sensors
+
     $descr    = "PoE Allocated Power Unit $index";
     $oid_name = 'snAgentPoeUnitPowerCapacityFree';
     $oid_num  = ".1.3.6.1.4.1.1991.1.1.2.14.4.1.1.3.$index";
@@ -39,8 +38,7 @@ if (count($oids))
     $negative = -1;
 
     // Options
-    $options = array('limit_high' => $entry['snAgentPoeUnitPowerCapacityTotal'] * $scale,
-                     'limit_low'  => 0); // Hardcode 0 as lower limit. Low warning limit will be calculated.
+    $options = array('limit_high' => $entry['snAgentPoeUnitPowerCapacityTotal'] * $scale);
 
     $options['limit_high_warn'] = $options['limit_high'] * 0.9; // Warning at 90% of power limit - FIXME should move to centralized smart calculation function
 
@@ -49,15 +47,13 @@ if (count($oids))
     // 740 - 440 === -1 * (-740 + 440)
     $options['sensor_addition'] = $entry['snAgentPoeUnitPowerCapacityTotal'] * $negative;
 
-
     // Warning, negative scale here!
     discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $negative * $scale, $value, $options);
   }
 } else {
   // All other
   $oids = snmp_get_multi_oid($device, 'snAgentPoeGblPowerCapacityTotal.0 snAgentPoeGblPowerCapacityFree.0', array(), $mib);
-  if (is_array($oids[0]))
-  {
+  if (is_array($oids[0]) && $oids[0]['snAgentPoeGblPowerCapacityTotal'] != 0) {
     $index = 0;
     $entry = $oids[$index];
 
@@ -70,8 +66,7 @@ if (count($oids))
     $negative = -1;
 
     // Options
-    $options = array('limit_high' => $entry['snAgentPoeGblPowerCapacityTotal'] * $scale,
-                     'limit_low'  => 0); // Hardcode 0 as lower limit. Low warning limit will be calculated.
+    $options = array('limit_high' => $entry['snAgentPoeGblPowerCapacityTotal'] * $scale); // Hardcode 0 as lower limit. Low warning limit will be calculated.
 
     $options['limit_high_warn'] = $options['limit_high'] * 0.9; // Warning at 90% of power limit - FIXME should move to centralized smart calculation function
 
@@ -85,10 +80,7 @@ if (count($oids))
   }
 }
 
-if (OBS_DEBUG > 1 && count($oids))
-{
-  print_vars($oids);
-}
+print_debug_vars($oids);
 
 ////// Per-port Statistics
 

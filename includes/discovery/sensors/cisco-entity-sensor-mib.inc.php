@@ -6,11 +6,11 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-$entity_array = snmpwalk_cache_multi_oid($device, 'entSensorValueEntry', $entity_array, 'CISCO-ENTITY-SENSOR-MIB');
+$entity_array = snmpwalk_cache_oid($device, 'entSensorValueEntry', $entity_array, 'CISCO-ENTITY-SENSOR-MIB');
 if ($GLOBALS['snmp_status'])
 {
   if (is_array($GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']]))
@@ -27,14 +27,31 @@ if ($GLOBALS['snmp_status'])
     }
     print_debug("ENTITY-MIB already cached");
   } else {
-    $oids = array('entPhysicalDescr', 'entPhysicalName', 'entPhysicalClass', 'entPhysicalContainedIn', 'entPhysicalParentRelPos');
-    foreach ($oids as $oid)
-    {
-      $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, "ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB");
-      if (!$GLOBALS['snmp_status']) { break; }
+    $entity_mibs = snmp_mib_entity_vendortype($device, 'ENTITY-MIB');
+
+    $snmp_flags = OBS_SNMP_ALL;
+    snmp_log_error(OBS_SNMP_ERROR_OID_NOT_INCREASING, FALSE); // disable log error for next snmpwalk
+    $entity_array = snmpwalk_cache_oid($device, "entPhysicalDescr", $entity_array, $entity_mibs);
+    if (!snmp_status() && snmp_error_code() === OBS_SNMP_ERROR_OID_NOT_INCREASING) {
+
+      // Try refetch with NOINCREASE
+      $snmp_flags |= OBS_SNMP_NOINCREASE;
+      print_debug("WARNING! snmpwalk error 'OID not increasing' detected, try snmpwalk with -Cc option.");
+
+      $entity_array = snmpwalk_cache_oid($device, "entPhysicalDescr", $entity_array, $entity_mibs, NULL, $snmp_flags);
     }
-    $entity_array = snmpwalk_cache_twopart_oid($device, "entAliasMappingIdentifier", $entity_array, "ENTITY-MIB:IF-MIB");
-    $GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']] = $entity_array;
+
+    if (snmp_status()) {
+      $oids = [ 'entPhysicalName', 'entPhysicalClass', 'entPhysicalContainedIn', 'entPhysicalParentRelPos', 'entPhysicalVendorType' ];
+      foreach ($oids as $oid) {
+        $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, $entity_mibs, NULL, $snmp_flags);
+        if (!snmp_status()) {
+          break;
+        }
+      }
+      $entity_array = snmpwalk_cache_twopart_oid($device, 'entAliasMappingIdentifier', $entity_array, 'ENTITY-MIB:IF-MIB', NULL, $snmp_flags);
+      $GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']] = $entity_array;
+    }
   }
 
   $t_oids = array('entSensorThresholdSeverity', 'entSensorThresholdRelation', 'entSensorThresholdValue');
@@ -78,47 +95,37 @@ if ($GLOBALS['snmp_status'])
   );
 
   $i = [];
-  foreach ($entity_array as $index => $entry)
-  {
+  foreach ($entity_array as $index => $entry) {
     if (is_numeric($index) && isset($c_entitysensor[$entry['entSensorType']]) &&
-        is_numeric($entry['entSensorValue']) && $entry['entSensorStatus'] == 'ok')
-    {
+        is_numeric($entry['entSensorValue']) && $entry['entSensorStatus'] === 'ok') {
       $ok = TRUE;
       $options = array('entPhysicalIndex' => $index);
 
       $descr = rewrite_entity_name($entry['entPhysicalDescr']);
-      if ($device['os'] == 'cisco-firepower')
-      {
+      if ($device['os'] === 'cisco-firepower') {
         $descr = $entry['entPhysicalName'];
-      }
-      elseif ($entry['entPhysicalDescr'] && $entry['entPhysicalName'])
-      {
+      } elseif ($entry['entPhysicalDescr'] && $entry['entPhysicalName']) {
         // Check if entPhysicalDescr equals entPhysicalName,
         // Also compare like this: 'TenGigabitEthernet2/1 Bias Current' and 'Te2/1 Bias Current'
-        if (strpos($entry['entPhysicalDescr'], substr($entry['entPhysicalName'], 2)) === FALSE)
-        {
-          $descr = rewrite_entity_name($entry['entPhysicalDescr']) . " - " . rewrite_entity_name($entry['entPhysicalName']);
+        if (!str_starts($entry['entPhysicalDescr'], substr($entry['entPhysicalName'], 0, 2))) {
+          $descr .= " - " . rewrite_entity_name($entry['entPhysicalName']);
         }
-      }
-      elseif (!$entry['entPhysicalDescr'])
-      {
+      } elseif (safe_empty($entry['entPhysicalDescr'])) {
         $descr = rewrite_entity_name($entry['entPhysicalName']);
       }
 
       // Set description based on measured entity if it exists
-      if (is_numeric($entry['entSensorMeasuredEntity']) && $entry['entSensorMeasuredEntity'])
-      {
-        if ($device['os'] == 'cisco-firepower')
-        {
+      if (is_numeric($entry['entSensorMeasuredEntity']) && $entry['entSensorMeasuredEntity']) {
+        if ($device['os'] === 'cisco-firepower') {
           // FirePOWER has next to useless layout of ENTITY-SENSOR-MIB. Sensors don't have an ENTITY-MIB entry, so there is no way to tell apart individual sensors on the same entity.
           // We just use the index to make them look less identical. It sucks, though.
           $descr = rewrite_entity_name($entity_array[$entry['entSensorMeasuredEntity']]['entPhysicalName']) . ' ('.$index.')';
         } else {
           $measured_descr = rewrite_entity_name($entity_array[$entry['entSensorMeasuredEntity']]['entPhysicalDescr']);
-          if (!$measured_descr) {
+          if (safe_empty($measured_descr)) {
             $measured_descr = rewrite_entity_name($entity_array[$entry['entSensorMeasuredEntity']]['entPhysicalName']);
           }
-          if ($measured_descr) {
+          if ($measured_descr && !str_starts($measured_descr, substr($descr, 0, 2))) {
             $descr = $measured_descr . " - " . $descr;
           }
         }
@@ -126,8 +133,7 @@ if ($GLOBALS['snmp_status'])
 
       $oid = ".1.3.6.1.4.1.9.9.91.1.1.1.1.4.$index";
       $value = $entry['entSensorValue'];
-      switch ($c_entitysensor[$entry['entSensorType']])
-      {
+      switch ($c_entitysensor[$entry['entSensorType']]) {
         case 'state':
           // Statuses
           $type = 'state';
@@ -148,20 +154,19 @@ if ($GLOBALS['snmp_status'])
           // Normal sensors
           $type = $c_entitysensor[$entry['entSensorType']];
           $sensor_type = 'cisco-entity-sensor';
-          if ($entry['entSensorType'] == 'cmm')
-          {
+          if ($entry['entSensorType'] === 'cmm') {
             $options['sensor_unit'] = 'CMM';
           }
       }
 
       // Returning blatantly broken value. IGNORE.
-      if ($value == "-32768" || $value == "-127") { $ok = FALSE; }
-      // Empty description. Lots of these on Nexus and Cisco APIC
-      elseif (empty($descr))
-      {
+      if ($value == "-32768" || $value == "-127") {
+        $ok = FALSE;
+      } elseif (safe_empty($descr)) {
+        // Empty description. Lots of these on Nexus and Cisco APIC
         $i[$type]++;
         $descr = 'Sensor ' . $i[$type];
-        //$ok = FALSE;
+        if ($value == 0) { $ok = FALSE; }
       }
 
       print_debug_vars($descr);
@@ -169,16 +174,36 @@ if ($GLOBALS['snmp_status'])
       print_debug_vars($entry);
 
       // Now try to search port bounded with sensor by ENTITY-MIB
-      if ($ok && in_array($type, array('temperature', 'voltage', 'current', 'dbm', 'power')))
-      {
+      if ($ok && in_array($type, array('temperature', 'voltage', 'current', 'dbm', 'power'))) {
         $port    = get_port_by_ent_index($device, $index);
         $options['entPhysicalIndex'] = $index;
-        if (is_array($port))
-        {
-          $entry['ifDescr']            = $port['ifDescr'];
-          $options['measured_class']   = 'port';
-          $options['measured_entity']  = $port['port_id'];
+        if (is_array($port)) {
+          $entry['ifDescr']                     = $port['port_label'];
+          $options['measured_class']            = 'port';
+          $options['measured_entity']           = $port['port_id'];
+          $options['measured_entity_label']     = $port['port_label'];
           $options['entPhysicalIndex_measured'] = $port['ifIndex'];
+
+          // Fix Port description based on vendor type
+          if ($entry['entPhysicalVendorType'] && !str_icontains_array($descr, [ 'Power', 'Current', 'Voltage', 'Temperature' ])) {
+            switch ($entry['entPhysicalVendorType']) {
+              case 'cevSensorTransceiverVoltage':
+                $descr .= ' Transceiver Voltage';
+                break;
+              case 'cevSensorTransceiverCurrent':
+                $descr .= ' Transceiver Bias Current';
+                break;
+              case 'cevSensorTransceiverTemp':
+                $descr .= ' Transceiver Temperature';
+                break;
+              case 'cevSensorTransceiverRxPwr':
+                $descr .= ' Transceiver Receive Power';
+                break;
+              case 'cevSensorTransceiverTxPwr':
+                $descr .= ' Transceiver Transmit Power';
+                break;
+            }
+          }
         }
 
       }
@@ -186,21 +211,20 @@ if ($GLOBALS['snmp_status'])
       // Set thresholds for numeric sensors
       $limits = array();
       $scale  = NULL;
-      if ($c_entitysensor[$entry['entSensorType']] != 'state')
-      {
+      if ($c_entitysensor[$entry['entSensorType']] !== 'state') {
         $precision = $entry['entSensorPrecision'];
         // See: https://jira.observium.org/browse/OBS-3026
         // Note, issue not actual on firmware less than 16.11, not sure if fixed on more newer firmwares
-        if ($device['os'] == 'iosxe' && version_compare($device['version'], '16.11', '>=') && $precision > 0)
-        {
+        // Seems as not actual on 16.12.x, see: https://jira.observium.org/browse/OBS-3707
+        if ($device['os'] === 'iosxe' && $precision > 0 &&
+            version_compare($device['version'], '16.11', '>=') && version_compare($device['version'], '16.12', '<')) {
           // I not sure that this fully correct, but for issue case - works
           $precision -= 1;
         }
         $scale = si_to_scale($entry['entSensorScale'], $precision);
 
         // Check thresholds for this entry
-        foreach ($t_entity_array[$index] as $t_index => $t_entry)
-        {
+        foreach ($t_entity_array[$index] as $t_index => $t_entry) {
           if ($t_entry['entSensorThresholdValue'] == "-32768") { continue; }
 
           /* Sometime thresholds have duplicate limits, see:
@@ -265,18 +289,14 @@ if ($GLOBALS['snmp_status'])
             entSensorThresholdValue.2224410.5 = -1459670
             entSensorThresholdValue.2224410.6 = 749999
            */
-          switch ($t_entry['entSensorThresholdSeverity'])
-          {
+          switch ($t_entry['entSensorThresholdSeverity']) {
 
             case 'critical':
               // Prefer critical over major
-              if      (in_array($t_entry['entSensorThresholdRelation'], array('greaterOrEqual', 'greaterThan')))
-              {
+              if      (in_array($t_entry['entSensorThresholdRelation'], [ 'greaterOrEqual', 'greaterThan' ])) {
                 if (isset($limits['limit_high'])) { break; } // Use first threshold entry
                 $limits['limit_high']      = $t_entry['entSensorThresholdValue'] * $scale;
-              }
-              else if (in_array($t_entry['entSensorThresholdRelation'], array('lessOrEqual', 'lessThan')))
-              {
+              } elseif (in_array($t_entry['entSensorThresholdRelation'], [ 'lessOrEqual', 'lessThan' ])) {
                 if (isset($limits['limit_low'])) { break; } // Use first threshold entry
                 $limits['limit_low']       = $t_entry['entSensorThresholdValue'] * $scale;
               }
@@ -285,26 +305,20 @@ if ($GLOBALS['snmp_status'])
 
             case 'major':
               // Prefer critical over major,
-              if      (in_array($t_entry['entSensorThresholdRelation'], array('greaterOrEqual', 'greaterThan')))
-              {
+              if      (in_array($t_entry['entSensorThresholdRelation'], [ 'greaterOrEqual', 'greaterThan' ])) {
                 if (isset($limits['limit_high_major'])) { break; } // Use first threshold entry
                 $limits['limit_high_major'] = $t_entry['entSensorThresholdValue'] * $scale;
-              }
-              else if (in_array($t_entry['entSensorThresholdRelation'], array('lessOrEqual', 'lessThan')))
-              {
+              } elseif (in_array($t_entry['entSensorThresholdRelation'], [ 'lessOrEqual', 'lessThan' ])) {
                 if (isset($limits['limit_low_major'])) { break; } // Use first threshold entry
                 $limits['limit_low_major'] = $t_entry['entSensorThresholdValue'] * $scale;
               }
               break;
 
             case 'minor':
-              if      (in_array($t_entry['entSensorThresholdRelation'], array('greaterOrEqual', 'greaterThan')))
-              {
+              if      (in_array($t_entry['entSensorThresholdRelation'], [ 'greaterOrEqual', 'greaterThan' ])) {
                 if (isset($limits['limit_high_warn'])) { break; } // Use first threshold entry
                 $limits['limit_high_warn'] = $t_entry['entSensorThresholdValue'] * $scale;
-              }
-              else if (in_array($t_entry['entSensorThresholdRelation'], array('lessOrEqual', 'lessThan')))
-              {
+              } elseif (in_array($t_entry['entSensorThresholdRelation'], [ 'lessOrEqual', 'lessThan' ])) {
                 if (isset($limits['limit_low_warn'])) { break; } // Use first threshold entry
                 $limits['limit_low_warn']  = $t_entry['entSensorThresholdValue'] * $scale;
               }
@@ -318,43 +332,35 @@ if ($GLOBALS['snmp_status'])
         }
 
         // Fixes for high thresholds issues in IOS-XR (and others)
-        if (!isset($limits['limit_high']) && isset($limits['limit_high_major']))
-        {
+        if (!isset($limits['limit_high']) && isset($limits['limit_high_major'])) {
           // Use major thresholds if critical not set
           $limits['limit_high'] = $limits['limit_high_major'];
           unset($limits['limit_high_major']);
-        }
-        else if (isset($limits['limit_high'])       && $limits['limit_high'] == 0 &&
-                 isset($limits['limit_high_major']) && $limits['limit_high_major'] != 0)
-        {
+        } elseif (isset($limits['limit_high'])       && $limits['limit_high'] == 0 &&
+                  isset($limits['limit_high_major']) && $limits['limit_high_major'] != 0) {
           // critical limit is zero, use major
           $limits['limit_high'] = $limits['limit_high_major'];
           unset($limits['limit_high_major']);
         }
         if (isset($limits['limit_high_warn'])  && $limits['limit_high_warn'] == 0 &&
-            isset($limits['limit_high_major']) && $limits['limit_high_major'] != 0)
-        {
+            isset($limits['limit_high_major']) && $limits['limit_high_major'] != 0) {
           // minor limit is zero, use major
           $limits['limit_high_warn'] = $limits['limit_high_major'];
         }
 
         // Fixes for low thresholds issues in IOS-XR (and others)
-        if (!isset($limits['limit_low']) && isset($limits['limit_low_major']))
-        {
+        if (!isset($limits['limit_low']) && isset($limits['limit_low_major'])) {
           // Use major thresholds if critical not set
           $limits['limit_low'] = $limits['limit_low_major'];
           unset($limits['limit_low_major']);
-        }
-        else if (isset($limits['limit_low'])       && $limits['limit_low'] == 0 &&
-                 isset($limits['limit_low_major']) && $limits['limit_low_major'] != 0)
-        {
+        } elseif (isset($limits['limit_low'])       && $limits['limit_low'] == 0 &&
+                  isset($limits['limit_low_major']) && $limits['limit_low_major'] != 0) {
           // critical limit is zero, use major
           $limits['limit_low'] = $limits['limit_low_major'];
           unset($limits['limit_low_major']);
         }
         if (isset($limits['limit_low_warn'])  && $limits['limit_low_warn'] == 0 &&
-            isset($limits['limit_low_major']) && $limits['limit_low_major'] != 0)
-        {
+            isset($limits['limit_low_major']) && $limits['limit_low_major'] != 0) {
           // minor limit is zero, use major
           $limits['limit_low_warn'] = $limits['limit_low_major'];
         }
@@ -406,34 +412,33 @@ if ($GLOBALS['snmp_status'])
           entSensorThresholdValue.2134256.5 = 0
           entSensorThresholdValue.2134256.6 = 0
          */
-        if ($options['measured_class'] == 'port' && $value == 0 &&
+        if ($options['measured_class'] === 'port' && $value == 0 &&
             $limits['limit_high'] == 0 && $limits['limit_high_warn'] == 0 &&
-            $limits['limit_low'] == 0 && $limits['limit_low_warn'] == 0)
-        {
-          $ok = FALSE;
+            $limits['limit_low'] == 0 && $limits['limit_low_warn'] == 0) {
+          unset($limits['limit_high'], $limits['limit_high_warn'], $limits['limit_low'], $limits['limit_low_warn']);
+          if (!($type === 'dbm' || $port['ifOperStatus'] === 'up')) {
+            $ok = FALSE;
+          }
         }
 
-        // Some Cisco sensors have all limits as same value (f.u. cisco), than leave only one limit
+        // Some Cisco sensors have all limits as same value (f.u. cisco), then leave only one limit
         if ((float_cmp($limits['limit_high'],      $limits['limit_low'])       === 0) &&
             (float_cmp($limits['limit_high_warn'], $limits['limit_low_warn'])  === 0) &&
-            (float_cmp($limits['limit_high'],      $limits['limit_high_warn']) === 0))
-        {
+            (float_cmp($limits['limit_high'],      $limits['limit_high_warn']) === 0)) {
           unset($limits['limit_high_warn'], $limits['limit_low_warn'], $limits['limit_low']);
         }
+
+        // https://jira.observium.org/browse/OBS-3597
         // End Threshold code
       }
 
-      if ($ok)
-      {
+      if ($ok) {
         $options = array_merge($limits, $options);
-        if ($type == 'state')
-        {
+        if ($type === 'state') {
           //truthvalue
           $options['rename_rrd'] = 'cisco-entity-state-' . $index;
           discover_status_ng($device, $mib, 'entSensorValue', $oid, $index, $sensor_type, $descr, $value, $options);
-        }
-        elseif ($type == 'counter')
-        {
+        } elseif ($type === 'counter') {
           discover_counter($device, $entry['entPhysicalClass'], $mib, 'entSensorValue', $oid, $index, $descr, $scale, $value, $options);
         } else {
           $options['rename_rrd'] = 'cisco-entity-sensor-'.$index;

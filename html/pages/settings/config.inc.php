@@ -16,7 +16,7 @@ if ($_SESSION['userlevel'] < 10)
   return;
 }
 
-print_warning("This is a dump of your Observium configuration. To adjust it, please modify your <strong>config.php</strong> file.");
+print_warning('This is a full dump of your Observium configuration. To adjust it, please use the <a href="/settings/">configuration editor</a> and/or modify your <strong>config.php</strong> file.');
 print_vars($config);
 
 // EOF

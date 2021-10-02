@@ -20,7 +20,7 @@ $oids = array('hh3cEntityExtCpuUsage', 'entPhysicalName');
 $processors_array = array();
 foreach ($oids as $oid)
 {
-  $processors_array = snmpwalk_cache_multi_oid($device, $oid, $processors_array, 'ENTITY-MIB:HH3C-ENTITY-EXT-MIB');
+  $processors_array = snmpwalk_cache_oid($device, $oid, $processors_array, 'ENTITY-MIB:HH3C-ENTITY-EXT-MIB');
 }
 
 foreach ($processors_array as $index => $entry)

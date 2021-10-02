@@ -1,19 +1,17 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 //r(auth_user_level_permissions($_SESSION['userlevel']));
-if ($_SESSION['userlevel'] >= 7)
-{
+if ($_SESSION['userlevel'] >= 7) {
   // Enable google code prettify
   register_html_resource('js', 'google-code-prettify.js');
   register_html_resource('css', 'google-code-prettify.css');
@@ -25,24 +23,20 @@ if ($_SESSION['userlevel'] >= 7)
 
   $cmd_file = escapeshellarg($device_config_file);
   $rev = array('count' => 0);
-  if (is_executable($config['svn']))
-  {
+  if (is_executable($config['svn'])) {
     //$svnlogs = external_exec($config['svn'] . ' log -q -l 8 ' . $device_config_file); // Last 8 entries
     $svnlogs = external_exec($config['svn'] . ' log -q ' . $cmd_file);
-    foreach (explode("\n", $svnlogs) as $line)
-    {
+    foreach (explode("\n", $svnlogs) as $line) {
       // r1884 | rancid | 2014-09-19 19:50:12 +0400 (Fri, 19 Sep 2014)
       // ------------------------------------------------------------------------
-      if (preg_match('/r(?<rev>\d+) \| .+? \| (?<date>[\d\-]+ [\d:]+ [\+\-]?\d+)/', $line, $matches))
-      {
+      if (preg_match('/r(?<rev>\d+) \| .+? \| (?<date>[\d\-]+ [\d:]+ [\+\-]?\d+)/', $line, $matches)) {
         $rev['list'][] = array('rev' => $matches['rev'], 'date' => format_timestamp(trim($matches['date'])));
         $rev['count']++;
       }
     }
     if ($rev['count']) { $rev['type'] = 'svn'; }
   }
-  if (!$rev['count'] && is_executable($config['git']))
-  {
+  if (!$rev['count'] && is_executable($config['git'])) {
     // You should know, I hate git!
     // Why git commands should be as:
     // git --git-dir='/rancid_path/git_dir/.git' --work-tree='/rancid_path/git_dir' log --pretty=format:"%h %ci" 'absolute_config_path'
@@ -51,13 +45,10 @@ if ($_SESSION['userlevel'] >= 7)
     // and nothing else formats, else git return error
     $file_base = basename($device_config_file);
     $file_dir  = dirname($device_config_file);
-    if (is_dir($file_dir . '/.git'))
-    {
+    if (is_dir($file_dir . '/.git')) {
       // Ok, do nothing
       $git_file = escapeshellarg($file_base);
-    }
-    else if (is_dir($file_dir . '/../.git'))
-    {
+    } elseif (is_dir($file_dir . '/../.git')) {
       // Rancid >= 3.2
       $file_array = explode('/', $file_dir);
       $end = array_pop($file_array);
@@ -67,12 +58,10 @@ if ($_SESSION['userlevel'] >= 7)
     $cmd_dir = escapeshellarg($file_dir);
     $git_dir = escapeshellarg($file_dir . '/.git');
     $gitlogs = external_exec($config['git'].' --git-dir='. $git_dir .' --work-tree='.$cmd_dir.' log --pretty=format:"%h %ci" '.$cmd_file);
-    foreach (explode("\n", $gitlogs) as $line)
-    {
+    foreach (explode("\n", $gitlogs) as $line) {
       // b6989b9 2014-11-10 00:16:53 +0100
       // 66840ee 2014-11-02 23:34:18 +0100
-      if (preg_match('/(?<rev>\w+) (?<date>[\d\-]+ [\d:]+ [\+\-]?\d+)/', $line, $matches))
-      {
+      if (preg_match('/(?<rev>\w+) (?<date>[\d\-]+ [\d:]+ [\+\-]?\d+)/', $line, $matches)) {
         $rev['list'][] = array('rev' => $matches['rev'], 'date' => format_timestamp($matches['date']));
         $rev['count']++;
       }
@@ -80,39 +69,28 @@ if ($_SESSION['userlevel'] >= 7)
     if ($rev['count']) { $rev['type'] = 'git'; }
   }
 
-  $navbar['options']['latest']['url']   = generate_url(array('page'=>'device','device'=>$device['device_id'],'tab'=>'showconfig'));
+  $navbar['options']['latest']['url']   = generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'showconfig' ]);
   $navbar['options']['latest']['class'] = 'active';
-  if ($rev['count'])
-  {
+  if ($rev['count']) {
     $rev_active_index = 0;
-    $rev_max = intval($config['rancid_revisions']);
-    if ($rev_max <= 0)
-    {
+    $rev_max = (int)$config['rancid_revisions'];
+    if ($rev_max <= 0) {
       $rev_max = 1;
-    }
-    else if ($rev_max > 32)
-    {
+    } elseif ($rev_max > 32) {
       $rev_max = 32;
     }
-    foreach ($rev['list'] as $i => $entry)
-    {
-      $rev_name = ($rev['type'] == 'svn' ? 'r'.$entry['rev'] : $entry['rev']);
-      if ($i > ($rev_max - 1))
-      {
+    foreach ($rev['list'] as $i => $entry) {
+      $rev_name = ($rev['type'] === 'svn' ? 'r'.$entry['rev'] : $entry['rev']);
+      if ($i > ($rev_max - 1)) {
         break; // Show only last 10 revisions
-      }
-      else if ($i > 0)
-      {
+      } elseif ($i > 0) {
         $navbar['options'][$rev_name]['text'] = '['.$rev_name.', '.$entry['date'].']';
-        $navbar['options'][$rev_name]['url']  = generate_url(array('page'=>'device','device'=>$device['device_id'],'tab'=>'showconfig','rev'=>$entry['rev']));
-        if ($vars['rev'] == $entry['rev'])
-        {
+        $navbar['options'][$rev_name]['url']  = generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'showconfig', 'rev' => $entry['rev'] ]);
+        if ($vars['rev'] == $entry['rev']) {
           unset($navbar['options']['latest']['class']);
           $navbar['options'][$rev_name]['class'] = 'active';
           $rev_active_index = $i;
-        }
-        else if ($rev['count'] > 4)
-        {
+        } elseif ($rev['count'] > 4) {
           // Simplify too long revisions list
           $navbar['options'][$rev_name]['alt'] = $navbar['options'][$rev_name]['text'];
           $navbar['options'][$rev_name]['text'] = '['.$rev_name.']';
@@ -130,18 +108,14 @@ if ($_SESSION['userlevel'] >= 7)
   print_navbar($navbar);
   unset($navbar);
 
-  if ($rev['count'])
-  {
+  if ($rev['count']) {
     $rev['curr'] = $rev['list'][$rev_active_index]['rev'];
-    if (isset($rev['list'][$rev_active_index + 1]))
-    {
+    if (isset($rev['list'][$rev_active_index + 1])) {
       $rev['prev'] = $rev['list'][$rev_active_index + 1]['rev'];
     }
-    switch ($rev['type'])
-    {
+    switch ($rev['type']) {
       case 'svn':
-        if ($rev['count'] === 1)
-        {
+        if ($rev['count'] === 1) {
           // SVN not show initial revision in cat
           $cmd_cat   = $config['svn'] . ' cat -rHEAD '.$cmd_file;
         } else {
@@ -150,23 +124,21 @@ if ($_SESSION['userlevel'] >= 7)
         $cmd_diff  = $config['svn'] . ' diff -r'.$rev['prev'].':'.$rev['curr'].' '.$cmd_file;
         $prev_name = 'r'.$rev['prev'];
         break;
+
       case 'git':
         $cmd_cat   = $config['git'].' --git-dir='. $git_dir .' --work-tree='.$cmd_dir.' show '.$rev['curr'].':'.$git_file;
         $cmd_diff  = $config['git'].' --git-dir='. $git_dir .' --work-tree='.$cmd_dir.' diff '.$rev['prev'].' '.$rev['curr'].' '.$cmd_file;
         $prev_name = $rev['prev'];
     }
     $device_config = external_exec($cmd_cat);
-    if (!isset($rev['prev']))
-    {
+    if (!isset($rev['prev'])) {
       $diff = '';
-      if (empty($device_config))
-      {
+      if (empty($device_config)) {
         $device_config = '# Initial device added.';
       }
     } else {
       $diff = external_exec($cmd_diff);
-      if (!$diff)
-      {
+      if (!$diff) {
         $diff = 'No Difference';
       }
     }
@@ -176,10 +148,8 @@ if ($_SESSION['userlevel'] >= 7)
     fclose($fh);
   }
 
-  if ($config['rancid_ignorecomments'])
-  {
-    if (isset($config['os'][$device['os']]['comments']))
-    {
+  if ($config['rancid_ignorecomments']) {
+    if (isset($config['os'][$device['os']]['comments'])) {
       $comments_pattern = $config['os'][$device['os']]['comments'];
     } else {
       // Default pattern
@@ -187,21 +157,18 @@ if ($_SESSION['userlevel'] >= 7)
       //$comments_pattern = '/^\s*#/';
     }
     $lines = explode(PHP_EOL, $device_config);
-    foreach ($lines as $i => $line)
-    {
+    foreach ($lines as $i => $line) {
       if (@preg_match($comments_pattern, $line)) { unset($lines[$i]); }
     }
     $device_config = implode(PHP_EOL, $lines);
   }
 
-  if ($rev['count'])
-  {
+  if ($rev['count']) {
     $text = '';
     ?>
 <div class="panel-group" id="accordion">
     <?php
-    if (isset($rev['prev']))
-    {
+    if (isset($rev['prev'])) {
     ?>
   <div class="panel panel-default">
     <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" data-target="#diff">

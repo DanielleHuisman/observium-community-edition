@@ -36,7 +36,7 @@
 
 
 #BUILT-IN Sensors
-$cache['itwatchdogs']['climateTable'] = snmpwalk_cache_multi_oid($device, 'climateTable',array(), 'IT-WATCHDOGS-MIB');
+$cache['itwatchdogs']['climateTable'] = snmpwalk_cache_oid($device, 'climateTable', array(), 'IT-WATCHDOGS-MIB');
 
 foreach ($cache['itwatchdogs']['climateTable'] as $index => $entry)
 {
@@ -73,7 +73,7 @@ foreach ($cache['itwatchdogs']['climateTable'] as $index => $entry)
 
 #Add-on sensors
 
-$cache['itwatchdogs']['tempSensorTable'] = snmpwalk_cache_multi_oid($device, 'tempSensorTable', array(), 'IT-WATCHDOGS-MIB');
+$cache['itwatchdogs']['tempSensorTable'] = snmpwalk_cache_oid($device, 'tempSensorTable', array(), 'IT-WATCHDOGS-MIB');
 
 foreach ($cache['itwatchdogs']['tempSensorTable'] as $index => $entry)
 {

@@ -3,7 +3,7 @@
 	 IMPORTS
 		TPRowStatus
 				FROM TPLINK-TC-MIB 							
-		OBJECT-TYPE,MODULE-IDENTITY,IpAddress
+		OBJECT-TYPE,MODULE-IDENTITY,IpAddress,NOTIFICATION-TYPE
 				FROM SNMPv2-SMI
 		tplinkMgmt
 				FROM TPLINK-MIB
@@ -11,7 +11,7 @@
 				FROM TPLINK-ACL-MIB;
 				
 	tpAclRuleConfigure				OBJECT IDENTIFIER ::= {tplinkAclMIBObjects 1}			
-	
+	tplinkAclNotifications 			OBJECT IDENTIFIER ::= {tplinkAclMIBObjects 2}	
 	--MAC RULE LIST
 	
 	tpMacRuleTable OBJECT-TYPE
@@ -38,7 +38,11 @@
 			INTEGER,
 		tpMacRuleId
 			INTEGER,
+		tpMacAclName
+			OCTET STRING,
 		tpMacSecOperation
+			INTEGER,
+		tpMacCounterLogging
 			INTEGER,
 		tpMacSmacAddress
 			OCTET STRING,
@@ -76,6 +80,15 @@
 			"MAC ACL rule ID."
 		::= { tpMacRuleEntry 2 }
 
+	tpMacAclName OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"MAC ACL name, NULL string will give this ACL a default name as 'ACL_n', n stands for ACL ID.
+			 The first rule created in an ACL entry will set the ACL name field, however the following rules can never change the ACL name anymore."
+		::= {tpMacRuleEntry 3}
+		
 	tpMacSecOperation OBJECT-TYPE
 		SYNTAX  INTEGER
 		{permit(0),deny(1)}
@@ -83,7 +96,16 @@
 		STATUS  current
 		DESCRIPTION
 			"MAC ACL Security Operation."
-		::= {tpMacRuleEntry 3}
+		::= {tpMacRuleEntry 4}
+		
+	tpMacCounterLogging OBJECT-TYPE
+		SYNTAX	INTEGER
+		{disable(0),enable(1)}
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"MAC ACL rule counter logging operation."
+		::={tpMacRuleEntry 5}
 		
 	tpMacSmacAddress OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -91,7 +113,7 @@
 		STATUS current
 		DESCRIPTION
 			"Source MAC address, string length setting to zero means that the source MAC address is disabled."
-		::= {tpMacRuleEntry 4}
+		::= {tpMacRuleEntry 6}
 	
 	tpMacSmacMask OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -99,7 +121,7 @@
 		STATUS current
 		DESCRIPTION
 			"Source Mac Mask, string length setting to zero means that every bit of the mask is 1."
-		::= {tpMacRuleEntry 5}
+		::= {tpMacRuleEntry 7}
 	
 	tpMacDmacAddress OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -107,7 +129,7 @@
 		STATUS current
 		DESCRIPTION
 			"Destination MAC address, string length setting to zero means that the destination MAC address is disabled."
-		::= {tpMacRuleEntry 6}
+		::= {tpMacRuleEntry 8}
 
 	tpMacDmacMask OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -115,7 +137,7 @@
 		STATUS current
 		DESCRIPTION
 			"Destination Mac Mask, string length setting to zero means that every bit of the mask is 1."
-		::= {tpMacRuleEntry 7}
+		::= {tpMacRuleEntry 9}
 
 	tpMacVlanId OBJECT-TYPE
 		SYNTAX INTEGER
@@ -123,7 +145,7 @@
 		STATUS current
 		DESCRIPTION
 			"VLAN ID, 0-4094, value '0' means that the vid field is disabled."
-		::= {tpMacRuleEntry 8}	
+		::= {tpMacRuleEntry 10}	
 
 	tpMacEtherType OBJECT-TYPE
 		SYNTAX INTEGER
@@ -132,7 +154,7 @@
 		DESCRIPTION
 			"Ethernet protocol type, 0x0-0x10000.
 			Value '65536' or '0x10000' means that the EtherType field is disabled."
-		::= {tpMacRuleEntry 9}		
+		::= {tpMacRuleEntry 11}		
 
 	tpMacPri OBJECT-TYPE
 		SYNTAX INTEGER
@@ -140,7 +162,7 @@
 		STATUS current
 		DESCRIPTION
 			"802.1P priority, 0-8, value '8' means that the priority field is disabled."
-		::= {tpMacRuleEntry 10}		
+		::= {tpMacRuleEntry 12}		
 
 	tpMacTimeSegment OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -148,7 +170,7 @@
 		STATUS current
 		DESCRIPTION
 			"MAC ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
-		::= {tpMacRuleEntry 11}
+		::= {tpMacRuleEntry 13}
 
 	tpMacRuleStatus OBJECT-TYPE
 		SYNTAX  TPRowStatus
@@ -170,262 +192,158 @@
 			createAndGo(4),
 			createAndWait(5),
 			destroy(6)"
-		::= {tpMacRuleEntry 12}    		
+		::= {tpMacRuleEntry 14}    		
 
-	--STDIP RULE LIST	
-		
-	tpStdipRuleTable OBJECT-TYPE
-	SYNTAX  SEQUENCE OF TPSTDIPRULEENTRY
+	--IP RULE LIST
+	
+	tpIpRuleTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF TPIPRULEENTRY
 	MAX-ACCESS  not-accessible
 	STATUS  current
 	DESCRIPTION
-		"A list of standard IP rule entries.
-		 Here you can add standard IP ACL rules for further ACL configuration."
+		"A list of IP rule entries.
+		 Here you can add IP ACL rules for further ACL configuration."
 	::= {tpAclRuleConfigure 2}
 
-	tpStdipRuleEntry OBJECT-TYPE
-	SYNTAX  TPSTDIPRULEENTRY
+	tpIpRuleEntry OBJECT-TYPE
+	SYNTAX  TPIPRULEENTRY
 	MAX-ACCESS  not-accessible
 	STATUS  current
 	DESCRIPTION
-		"An entry contains of the information of STDIP ACL."
-	INDEX   {tpStdipAclId,tpStdipRuleId}
-	::= {tpStdipRuleTable 1}
-	
-	TPSTDIPRULEENTRY ::=
-	SEQUENCE {	
-		tpStdipAclId
-			INTEGER,
-		tpStdipRuleId
-			INTEGER,
-		tpStdipSecOperation
-			INTEGER,
-		tpStdipSipAddress
-			IpAddress,
-		tpStdipSipMask
-			IpAddress,
-		tpStdipDipAddress
-			IpAddress,
-		tpStdipDipMask
-			IpAddress,
-		tpStdipTimeSegment
-			OCTET STRING,
-		tpStdipRuleStatus
-			TPRowStatus
-	}
-	
-	tpStdipAclId OBJECT-TYPE
-		SYNTAX  INTEGER 
-		MAX-ACCESS  read-only
-		STATUS  current
-		DESCRIPTION
-			"Standard IP ACL ID."
-		::= {tpStdipRuleEntry 1}
+		"An entry contains of the information of IP ACL."
+	INDEX   {tpIpAclId,tpIpRuleId}
+	::= {tpIpRuleTable 1}	
 
-	tpStdipRuleId OBJECT-TYPE
-		SYNTAX  INTEGER
-		MAX-ACCESS  read-only
-		STATUS  current
-		DESCRIPTION
-			"Standard IP ACL rule ID."
-		::= {tpStdipRuleEntry 2}
-
-	tpStdipSecOperation OBJECT-TYPE
-		SYNTAX  INTEGER
-		{permit(0),deny(1)}
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"Standard IP ACL Security Operation."
-		::= {tpStdipRuleEntry 3}	
-	
-	tpStdipSipAddress OBJECT-TYPE
-		SYNTAX  IpAddress 
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"Source IP address, value '0.0.0.0' means that the source IP address is disabled."
-		::= {tpStdipRuleEntry 4}
-
-	tpStdipSipMask OBJECT-TYPE
-		SYNTAX  IpAddress 
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"Source IP Mask, value '0.0.0.0' or zero length means that the mask is 255.255.255.255."
-		::= {tpStdipRuleEntry 5}		
-	
-	tpStdipDipAddress OBJECT-TYPE
-		SYNTAX  IpAddress 
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"Destination IP address, value '0.0.0.0' means that the destination IP address is disabled."
-		::= {tpStdipRuleEntry 6}
-
-	tpStdipDipMask OBJECT-TYPE
-		SYNTAX  IpAddress 
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"Destination IP Mask, value '0.0.0.0' or zero length means that the mask is 255.255.255.255."
-		::= {tpStdipRuleEntry 7}
-
-	tpStdipTimeSegment OBJECT-TYPE
-		SYNTAX  OCTET STRING 
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"STDIP ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
-		::= {tpStdipRuleEntry 8}
-		
-	tpStdipRuleStatus OBJECT-TYPE
-		SYNTAX  TPRowStatus
-		MAX-ACCESS  read-create
-		STATUS  current
-		DESCRIPTION
-			"the following two values are states:
-			these values may be read or written
-			active(1),
-			notInService(2),
-
-			the following value is a state:
-			this value may be read, but not written
-			notReady(3),
-
-			the following three values are
-			actions: these values may be written,
-			but are never read
-			createAndGo(4),
-			createAndWait(5),
-			destroy(6)"
-		::= {tpStdipRuleEntry 9}
-
-	--EXTIP RULE LIST
-	
-	tpExtipRuleTable OBJECT-TYPE
-	SYNTAX  SEQUENCE OF TPEXTIPRULEENTRY
-	MAX-ACCESS  not-accessible
-	STATUS  current
-	DESCRIPTION
-		"A list of extended IP rule entries.
-		 Here you can add extended IP ACL rules for further ACL configuration."
-	::= {tpAclRuleConfigure 3}
-
-	tpExtipRuleEntry OBJECT-TYPE
-	SYNTAX  TPEXTIPRULEENTRY
-	MAX-ACCESS  not-accessible
-	STATUS  current
-	DESCRIPTION
-		"An entry contains of the information of EXTIP ACL."
-	INDEX   {tpExtipAclId,tpExtipRuleId}
-	::= {tpExtipRuleTable 1}	
-
-	TPEXTIPRULEENTRY ::=
+	TPIPRULEENTRY ::=
 	SEQUENCE {				
-		tpExtipAclId
+		tpIpAclId
 			INTEGER,
-		tpExtipRuleId
+		tpIpRuleId
 			INTEGER,
-		tpExtipSecOperation
-			INTEGER,
-		tpExtipFragment
-			INTEGER,
-		tpExtipSipAddress
-			IpAddress,
-		tpExtipSipMask
-			IpAddress,
-		tpExtipDipAddress
-			IpAddress,
-		tpExtipDipMask
-			IpAddress,
-		tpExtipProtocol
-			INTEGER,
-		tpExtipTcpFlag
-			INTEGER,
-		tpExtipSourcePort
-			INTEGER,
-		tpExtipDestPort
-			INTEGER,
-		tpExtipDscp
-			INTEGER,
-		tpExtipTos
-			INTEGER,
-		tpExtipPre
-			INTEGER,
-		tpExtipTimeSegment
+		tpIpAclName
 			OCTET STRING,
-		tpExtipRuleStatus
+		tpIpSecOperation
+			INTEGER,
+		tpIpCounterLogging
+			INTEGER,
+		tpIpFragment
+			INTEGER,
+		tpIpSipAddress
+			IpAddress,
+		tpIpSipMask
+			IpAddress,
+		tpIpDipAddress
+			IpAddress,
+		tpIpDipMask
+			IpAddress,
+		tpIpProtocol
+			INTEGER,
+		tpIpTcpFlag
+			INTEGER,
+		tpIpSourcePort
+			INTEGER,
+		tpIpSourcePortMask
+			OCTET STRING,
+		tpIpDestPort
+			INTEGER,
+		tpIpDestPortMask
+			OCTET STRING,
+		tpIpDscp
+			INTEGER,
+		tpIpTos
+			INTEGER,
+		tpIpPre
+			INTEGER,
+		tpIpTimeSegment
+			OCTET STRING,
+		tpIpRuleStatus
 			TPRowStatus
 	}
 		
-	tpExtipAclId OBJECT-TYPE
+	tpIpAclId OBJECT-TYPE
 		SYNTAX  INTEGER 
 		MAX-ACCESS  read-only
 		STATUS  current
 		DESCRIPTION
-			"Extended IP ACL ID."
-		::= {tpExtipRuleEntry 1}
+			"IP ACL ID."
+		::= {tpIpRuleEntry 1}
 
-	tpExtipRuleId OBJECT-TYPE
+	tpIpRuleId OBJECT-TYPE
 		SYNTAX  INTEGER
 		MAX-ACCESS  read-only
 		STATUS  current
 		DESCRIPTION
-			"Extended IP ACL rule ID."
-		::= {tpExtipRuleEntry 2}
+			"IP ACL rule ID."
+		::= {tpIpRuleEntry 2}
 
-	tpExtipSecOperation OBJECT-TYPE
+	tpIpAclName OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP ACL name, NULL string will give this ACL a default name as 'ACL_n', n stands for ACL ID."
+		::= {tpIpRuleEntry 3}
+		
+	tpIpSecOperation OBJECT-TYPE
 		SYNTAX  INTEGER
 		{permit(0),deny(1)}
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
-			"Extended IP ACL Security Operation."
-		::= {tpExtipRuleEntry 3}		
+			"IP ACL Security Operation."
+		::= {tpIpRuleEntry 4}		
+
+	tpIpCounterLogging OBJECT-TYPE
+		SYNTAX	INTEGER
+		{disable(0),enable(1)}
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP ACL rule counter logging operation."
+		::={tpIpRuleEntry 5}
 		
-	tpExtipFragment OBJECT-TYPE
+	tpIpFragment OBJECT-TYPE
 		SYNTAX  INTEGER
 		{disable(0),enable(1)}
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
-			"Extended IP fragment, conflicts with all the L4 feature."
-		::= {tpExtipRuleEntry 4}		
+			"IP fragment, conflicts with all the L4 feature."
+		::= {tpIpRuleEntry 6}		
 	
-	tpExtipSipAddress OBJECT-TYPE
+	tpIpSipAddress OBJECT-TYPE
 		SYNTAX  IpAddress
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
 			"Source IP address, value '0.0.0.0' means that the source IP address is disabled."
-		::= {tpExtipRuleEntry 5}		
+		::= {tpIpRuleEntry 7}		
 
-	tpExtipSipMask OBJECT-TYPE
+	tpIpSipMask OBJECT-TYPE
 		SYNTAX  IpAddress
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
 			"Source IP Mask, value '0.0.0.0' or zero length means that the mask is 255.255.255.255."
-		::= {tpExtipRuleEntry 6}		
+		::= {tpIpRuleEntry 8}		
 
-	tpExtipDipAddress OBJECT-TYPE
+	tpIpDipAddress OBJECT-TYPE
 		SYNTAX  IpAddress
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
 			"Destination IP address, value '0.0.0.0' means that the Destination IP address is disabled."
-		::= {tpExtipRuleEntry 7}		
+		::= {tpIpRuleEntry 9}		
 
-	tpExtipDipMask OBJECT-TYPE
+	tpIpDipMask OBJECT-TYPE
 		SYNTAX  IpAddress
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
 			"Destination IP Mask, value '0.0.0.0' or zero length means that the mask is 255.255.255.255."
-		::= {tpExtipRuleEntry 8}
+		::= {tpIpRuleEntry 10}
 
-	tpExtipProtocol OBJECT-TYPE
+	tpIpProtocol OBJECT-TYPE
 		SYNTAX INTEGER
 		MAX-ACCESS read-create
 		STATUS current
@@ -433,72 +351,88 @@
 			"L4 protocol type, 0-255, value '0' means this field is disabled.
 			This field conflicts with the TCP Flags or the source/destination port numbers 
 			when it is not the value '6'(TCP), or '17'(UDP)."
-		::= {tpExtipRuleEntry 9}
+		::= {tpIpRuleEntry 11}
 		
-	tpExtipTcpFlag OBJECT-TYPE
+	tpIpTcpFlag OBJECT-TYPE
 		SYNTAX INTEGER
 		MAX-ACCESS read-create
 		STATUS current
 		DESCRIPTION
-			"Extended IP TCP flag, this field is described as a bit-map structure:
+			"IP TCP flag, this field is described as a bit-map structure:
 			There are 12 bits of this field, the higher 6 bits show us whether these TCP flags are enabled(1) or disabled(0).
 			The lower 6 bits show us the 6 kind of TCP flags' value (0-1).
 			From the highest bit(bit11) to the lowest bit(0), each bit stands for a TCP flag:
 			bit11 & bit5 -- URG flag		bit10 & bit4 -- ACK flag
 			bit9  & bit3 -- PSH flag		bit8  & bit2 -- RST flag
 			bit7  & bit1 -- SYN flag		bit6  & bit0 -- FIN flag"
-		::= {tpExtipRuleEntry 10}
+		::= {tpIpRuleEntry 12}
 
-	tpExtipSourcePort OBJECT-TYPE
+	tpIpSourcePort OBJECT-TYPE
 		SYNTAX INTEGER
 		MAX-ACCESS read-create
 		STATUS current
 		DESCRIPTION
-			"Extended IP TCP/UDP source port, 0-65536, value '65536' means that this field is disabled."
-		::= {tpExtipRuleEntry 11}
-			
-	tpExtipDestPort OBJECT-TYPE
-		SYNTAX INTEGER
-		MAX-ACCESS read-create
-		STATUS current
-		DESCRIPTION
-			"Extended IP TCP/UDP destination port, 0-65536, value '65536' means that this field is disabled."			
-		::= {tpExtipRuleEntry 12}
+			"IP TCP/UDP source port, 0-65536, value '65536' means that this field is disabled."
+		::= {tpIpRuleEntry 13}
 
-	tpExtipDscp OBJECT-TYPE
-		SYNTAX INTEGER
+	tpIpSourcePortMask OBJECT-TYPE
+		SYNTAX OCTET STRING
 		MAX-ACCESS read-create
 		STATUS current
 		DESCRIPTION
-			"Extended IP DSCP, 0-64, value '64' means this field is disabled.
-			conflicts with the Tos and Pre."			
-		::= {tpExtipRuleEntry 13}
-
-	tpExtipTos OBJECT-TYPE
-		SYNTAX INTEGER
-		MAX-ACCESS read-create
-		STATUS current
-		DESCRIPTION
-			"Extended IP type of service(ToS), 0-16, value '16' means this field is disabled."			
-		::= {tpExtipRuleEntry 14}		
+			"IP TCP/UDP source port mask, 0000-ffff, 4 hex number, NULL string will set this mask to a default value ffff."
+		::= {tpIpRuleEntry 14}
 		
-	tpExtipPre OBJECT-TYPE
+	tpIpDestPort OBJECT-TYPE
 		SYNTAX INTEGER
 		MAX-ACCESS read-create
 		STATUS current
 		DESCRIPTION
-			"Extended IP pre, 0-8, value '8' means this field is disabled."			
-		::= {tpExtipRuleEntry 15}
+			"IP TCP/UDP destination port, 0-65536, value '65536' means that this field is disabled."			
+		::= {tpIpRuleEntry 15}
 
-	tpExtipTimeSegment OBJECT-TYPE
+	tpIpDestPortMask OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP TCP/UDP destination port mask, 0000-ffff, 4 hex number, NULL string will set this mask to a default value ffff."
+		::= {tpIpRuleEntry 16}
+		
+	tpIpDscp OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP DSCP, 0-64, value '64' means this field is disabled.
+			conflicts with the Tos and Pre."			
+		::= {tpIpRuleEntry 17}
+
+	tpIpTos OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP type of service(ToS), 0-16, value '16' means this field is disabled."			
+		::= {tpIpRuleEntry 18}		
+		
+	tpIpPre OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP pre, 0-8, value '8' means this field is disabled."			
+		::= {tpIpRuleEntry 19}
+
+	tpIpTimeSegment OBJECT-TYPE
 		SYNTAX  OCTET STRING 
 		MAX-ACCESS  read-create
 		STATUS  current
 		DESCRIPTION
-			"EXTIP ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
-		::= {tpExtipRuleEntry 16}
+			"IP ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
+		::= {tpIpRuleEntry 20}
 		
-	tpExtipRuleStatus OBJECT-TYPE
+	tpIpRuleStatus OBJECT-TYPE
 		SYNTAX  TPRowStatus
 		MAX-ACCESS  read-create
 		STATUS  current
@@ -518,7 +452,7 @@
 			createAndGo(4),
 			createAndWait(5),
 			destroy(6)"
-		::= {tpExtipRuleEntry 17}
+		::= {tpIpRuleEntry 21}
 
 	--CombRuleList
 	tpCombRuleTable OBJECT-TYPE
@@ -528,7 +462,7 @@
 	DESCRIPTION
 		"A list of combined MAC+IP rule entries.
 		 Here you can add combined ACL rules for further ACL configuration."
-	::= {tpAclRuleConfigure 4}
+	::= {tpAclRuleConfigure 3}
 
 	tpCombRuleEntry OBJECT-TYPE
 	SYNTAX  TPCOMBRULEENTRY
@@ -545,7 +479,11 @@
 			INTEGER,
 		tpCombRuleId
 			INTEGER,
+		tpCombAclName
+			OCTET STRING,
 		tpCombSecOperation
+			INTEGER,
+		tpCombCounterLogging
 			INTEGER,
 		tpCombSmacAddress
 			OCTET STRING,
@@ -569,6 +507,26 @@
 			IpAddress,
 		tpCombDipMask
 			IpAddress,
+		tpCombDscp
+			INTEGER,
+		tpCombTos
+			INTEGER,
+		tpCombPre
+			INTEGER,
+		tpCombFragment
+			INTEGER,
+		tpCombProtocol
+			INTEGER,
+		tpCombSourcePort
+			INTEGER,
+		tpCombSourcePortMask
+			OCTET STRING,
+		tpCombDestPort
+			INTEGER,
+		tpCombDestPortMask
+			OCTET STRING,
+		tpCombTcpFlag
+			INTEGER,
 		tpCombTimeSegment
 			OCTET STRING,
 		tpCombRuleStatus
@@ -591,6 +549,14 @@
 			"Combined ACL rule ID."
 		::= {tpCombRuleEntry 2}
 
+	tpCombAclName OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Combined ACL name, NULL string will give this ACL a default name as 'ACL_n', n stands for ACL ID."
+		::= {tpCombRuleEntry 3}
+		
 	tpCombSecOperation OBJECT-TYPE
 		SYNTAX  INTEGER
 		{permit(0),deny(1)}
@@ -598,15 +564,24 @@
 		STATUS  current
 		DESCRIPTION
 			"Combined ACL Security Operation."
-		::= {tpCombRuleEntry 3}		
-	
+		::= {tpCombRuleEntry 4}		
+
+	tpCombCounterLogging OBJECT-TYPE
+		SYNTAX	INTEGER
+		{disable(0),enable(1)}
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Combined ACL rule counter logging operation."
+		::={tpCombRuleEntry 5}
+		
 	tpCombSmacAddress OBJECT-TYPE
 		SYNTAX OCTET STRING
 		MAX-ACCESS read-create
 		STATUS current
 		DESCRIPTION
 			"Source MAC address, string length setting to zero means that the source MAC address is disabled."
-		::= {tpCombRuleEntry 4}
+		::= {tpCombRuleEntry 6}
 		
 	tpCombSmacMask OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -614,7 +589,7 @@
 		STATUS current
 		DESCRIPTION
 			"Source MAC Mask, string length setting to zero means that every bit of the mask is 1."
-		::= {tpCombRuleEntry 5}	
+		::= {tpCombRuleEntry 7}	
 		
 	tpCombDmacAddress OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -622,7 +597,7 @@
 		STATUS current
 		DESCRIPTION
 			"Destination MAC address, string length setting to zero means that the destination MAC address is disabled."
-		::= {tpCombRuleEntry 6}
+		::= {tpCombRuleEntry 8}
 		
 	tpCombDmacMask OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -630,7 +605,7 @@
 		STATUS current
 		DESCRIPTION
 			"Destination MAC Mask, string length setting to zero means that every bit of the mask is 1."
-		::= {tpCombRuleEntry 7}	
+		::= {tpCombRuleEntry 9}	
 		
 	tpCombVlanId OBJECT-TYPE
 		SYNTAX INTEGER
@@ -638,7 +613,7 @@
 		STATUS current
 		DESCRIPTION
 			"VLAN ID, 0-4094, value '0' means that the vid field is disabled."
-		::= {tpCombRuleEntry 8}	
+		::= {tpCombRuleEntry 10}	
 		
 	tpCombEtherType OBJECT-TYPE
 		SYNTAX INTEGER
@@ -647,7 +622,7 @@
 		DESCRIPTION
 			"Ethernet protocol type, 0x0-0x10000.
 			Value '65536' or '0x10000' means that the EtherType field is disabled."
-		::= {tpCombRuleEntry 9}
+		::= {tpCombRuleEntry 11}
 
 	tpCombPri OBJECT-TYPE
 		SYNTAX INTEGER
@@ -655,7 +630,7 @@
 		STATUS current
 		DESCRIPTION
 			"802.1P priority, 0-8, value '8' means that the priority field is disabled."
-		::= {tpCombRuleEntry 10}
+		::= {tpCombRuleEntry 12}
 
 	tpCombSipAddress OBJECT-TYPE
 		SYNTAX IpAddress
@@ -663,7 +638,7 @@
 		STATUS current
 		DESCRIPTION
 			"Source IP address, value '0.0.0.0' means that the source IP address is disabled."
-		::= {tpCombRuleEntry 11}
+		::= {tpCombRuleEntry 13}
 	
 	tpCombSipMask OBJECT-TYPE
 		SYNTAX IpAddress
@@ -671,7 +646,7 @@
 		STATUS current
 		DESCRIPTION
 			"Source IP mask, value '0.0.0.0' or zero length means that the mask is 255.255.255.255."
-		::= {tpCombRuleEntry 12}
+		::= {tpCombRuleEntry 14}
 
 	tpCombDipAddress OBJECT-TYPE
 		SYNTAX IpAddress
@@ -679,7 +654,7 @@
 		STATUS current
 		DESCRIPTION
 			"Destination IP address, value '0.0.0.0' means that the destination IP address is disabled."
-		::= {tpCombRuleEntry 13}
+		::= {tpCombRuleEntry 15}
 	
 	tpCombDipMask OBJECT-TYPE
 		SYNTAX IpAddress
@@ -687,15 +662,105 @@
 		STATUS current
 		DESCRIPTION
 			"Destination IP mask, value '0.0.0.0' or zero length means that the mask is 255.255.255.255."
-		::= {tpCombRuleEntry 14}	
+		::= {tpCombRuleEntry 16}	
 
+	tpCombDscp OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP DSCP, 0-64, value '64' means this field is disabled.
+			conflicts with the Tos and Pre."			
+		::= {tpCombRuleEntry 17}
+
+	tpCombTos OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP type of service(ToS), 0-16, value '16' means this field is disabled."			
+		::= {tpCombRuleEntry 18}		
+		
+	tpCombPre OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP pre, 0-8, value '8' means this field is disabled."	
+		::= {tpCombRuleEntry 19}
+
+	tpCombFragment OBJECT-TYPE
+		SYNTAX  INTEGER
+		{disable(0),enable(1)}
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"IP fragment, conflicts with all the L4 feature."
+		::= {tpCombRuleEntry 20}
+
+	tpCombProtocol OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"L4 protocol type, 0-255, value '0' means this field is disabled.
+			This field conflicts with the TCP Flags or the source/destination port numbers 
+			when it is not the value '6'(TCP), or '17'(UDP)."
+		::= {tpCombRuleEntry 21}
+		
+	tpCombSourcePort OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP TCP/UDP source port, 0-65536, value '65536' means that this field is disabled."
+		::= {tpCombRuleEntry 22}
+
+	tpCombSourcePortMask OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP TCP/UDP source port mask, 0000-ffff, 4 hex number, NULL string will set this mask to a default value ffff."
+		::= {tpCombRuleEntry 23}
+		
+	tpCombDestPort OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP TCP/UDP destination port, 0-65536, value '65536' means that this field is disabled."			
+		::= {tpCombRuleEntry 24}
+
+	tpCombDestPortMask OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP TCP/UDP destination port mask, 0000-ffff, 4 hex number, NULL string will set this mask to a default value ffff."
+		::= {tpCombRuleEntry 25}
+
+	tpCombTcpFlag OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IP TCP flag, this field is described as a bit-map structure:
+			There are 12 bits of this field, the higher 6 bits show us whether these TCP flags are enabled(1) or disabled(0).
+			The lower 6 bits show us the 6 kind of TCP flags' value (0-1).
+			From the highest bit(bit11) to the lowest bit(0), each bit stands for a TCP flag:
+			bit11 & bit5 -- URG flag		bit10 & bit4 -- ACK flag
+			bit9  & bit3 -- PSH flag		bit8  & bit2 -- RST flag
+			bit7  & bit1 -- SYN flag		bit6  & bit0 -- FIN flag"
+		::= {tpCombRuleEntry 26}
+		
 	tpCombTimeSegment OBJECT-TYPE
 		SYNTAX OCTET STRING
 		MAX-ACCESS read-create
 		STATUS current
 		DESCRIPTION
 			"Combined ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
-		::= {tpCombRuleEntry 15}
+		::= {tpCombRuleEntry 27}
 		
 	tpCombRuleStatus OBJECT-TYPE
 		SYNTAX  TPRowStatus
@@ -717,7 +782,7 @@
 			createAndGo(4),
 			createAndWait(5),
 			destroy(6)"
-		::= {tpCombRuleEntry 16}
+		::= {tpCombRuleEntry 28}
 		
 	--IPv6 Rule List
 	
@@ -728,7 +793,7 @@
 	DESCRIPTION
 		"A list of IPv6 rule entries.
 		 Here you can add IPv6 ACL rules for further ACL configuration."
-	::= {tpAclRuleConfigure 5}
+	::= {tpAclRuleConfigure 4}
 
 	tpIPv6RuleEntry OBJECT-TYPE
 	SYNTAX  TPIPV6RULEENTRY
@@ -745,7 +810,11 @@
 			INTEGER,
 		tpIPv6RuleId
 			INTEGER,
+		tpIPv6AclName
+			OCTET STRING,
 		tpIPv6SecOperation
+			INTEGER,
+		tpIPv6CounterLogging
 			INTEGER,
 		tpIPv6TrafficClass
 			INTEGER,
@@ -759,6 +828,8 @@
 			OCTET STRING,
 		tpIPv6DipMask
 			OCTET STRING,
+		tpIPv6Protocol
+			INTEGER,
 		tpIPv6SourcePort
 			INTEGER,
 		tpIPv6DestPort
@@ -784,6 +855,14 @@
 		DESCRIPTION
 			"IPv6 ACL rule ID."
 		::= {tpIPv6RuleEntry 2}
+	
+	tpIPv6AclName OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IPv6 ACL name, NULL string will give this ACL a default name as 'ACL_n', n stands for ACL ID."
+		::= {tpIPv6RuleEntry 3}
 
 	tpIPv6SecOperation OBJECT-TYPE
 		SYNTAX  INTEGER
@@ -792,7 +871,16 @@
 		STATUS  current
 		DESCRIPTION
 			"IPv6 ACL Security Operation."
-		::= {tpIPv6RuleEntry 3}		
+		::= {tpIPv6RuleEntry 4}		
+
+	tpIPv6CounterLogging OBJECT-TYPE
+		SYNTAX	INTEGER
+		{disable(0),enable(1)}
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"IPv6 ACL rule counter logging operation."
+		::={tpIPv6RuleEntry 5}
 		
 	tpIPv6TrafficClass OBJECT-TYPE
 		SYNTAX  INTEGER
@@ -800,7 +888,7 @@
 		STATUS  current
 		DESCRIPTION
 			"Traffic Class DSCP, 0-64, value '64' means that this field is disabled."
-		::= {tpIPv6RuleEntry 4}	
+		::= {tpIPv6RuleEntry 6}	
 
 	tpIPv6FlowLabel OBJECT-TYPE
 		SYNTAX INTEGER
@@ -808,7 +896,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 Flow Label, 0x0-0x100000, value '0x100000' or '1048576' means that this field is disabled."
-		::= {tpIPv6RuleEntry 5}
+		::= {tpIPv6RuleEntry 7}
 		
 	tpIPv6SipAddress OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -816,7 +904,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 source IP address, only upper 64 bits supported; the all-zero address means that the source IPv6 address is disabled."
-		::= {tpIPv6RuleEntry 6}
+		::= {tpIPv6RuleEntry 8}
 	
 	tpIPv6SipMask OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -824,7 +912,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 source IP mask, 64 bits, format: ffff:ffff:ffff:ffff; zero length means that every bit of the mask is 1."
-		::= {tpIPv6RuleEntry 7}
+		::= {tpIPv6RuleEntry 9}
 		
 	tpIPv6DipAddress OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -832,7 +920,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 destination IP address, only upper 64 bits supported; the all-zero address means that the destination IPv6 address is disabled."
-		::= {tpIPv6RuleEntry 8}
+		::= {tpIPv6RuleEntry 10}
 	
 	tpIPv6DipMask OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -840,7 +928,15 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 destination IP mask, 64 bits, format: ffff:ffff:ffff:ffff; zero length means that every bit of the mask is 1."
-		::= {tpIPv6RuleEntry 9}
+		::= {tpIPv6RuleEntry 11}
+
+	tpIPv6Protocol OBJECT-TYPE
+		SYNTAX  INTEGER
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"IPv6 Protocol, 0-255, value '0' means that this field is disabled."
+		::= {tpIPv6RuleEntry 12}	
 		
 	tpIPv6SourcePort OBJECT-TYPE
 		SYNTAX INTEGER
@@ -848,7 +944,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 L4 source port, 0-65536, value '65536' means that this field is disabled."
-		::= {tpIPv6RuleEntry 10}		
+		::= {tpIPv6RuleEntry 13}		
 			
 	tpIPv6DestPort OBJECT-TYPE
 		SYNTAX INTEGER
@@ -856,7 +952,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 L4 destination port, 0-65536, value '65536' means that this field is disabled."
-		::= {tpIPv6RuleEntry 11}
+		::= {tpIPv6RuleEntry 14}
 		
 	tpIPv6TimeSegment OBJECT-TYPE
 		SYNTAX OCTET STRING
@@ -864,7 +960,7 @@
 		STATUS current
 		DESCRIPTION
 			"IPv6 ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
-		::= {tpIPv6RuleEntry 12}
+		::= {tpIPv6RuleEntry 15}
 		
 	tpIPv6RuleStatus OBJECT-TYPE
 		SYNTAX  TPRowStatus
@@ -886,8 +982,307 @@
 			createAndGo(4),
 			createAndWait(5),
 			destroy(6)"
-		::= {tpIPv6RuleEntry 13}
+		::= {tpIPv6RuleEntry 16}
 		
+	--PktCntnt Rule List
+
+	tpPktCntntOffsetProfile OBJECT IDENTIFIER ::= {tpAclRuleConfigure 5}
+	
+	tpPktCntntOffset0 OBJECT-TYPE
+		SYNTAX  INTEGER
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL chunk0 offset(0-31), the offset value will be set into the switch only after all the 4 chunks' offset being configured."
+		::= {tpPktCntntOffsetProfile 1}	
+		
+	tpPktCntntOffset1 OBJECT-TYPE
+		SYNTAX  INTEGER
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL chunk1 offset(0-31)."
+		::= {tpPktCntntOffsetProfile 2}	
+		
+	tpPktCntntOffset2 OBJECT-TYPE
+		SYNTAX  INTEGER
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL chunk2 offset(0-31)."
+		::= {tpPktCntntOffsetProfile 3}	
+
+	tpPktCntntOffset3 OBJECT-TYPE
+		SYNTAX  INTEGER
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL chunk3 offset(0-31)."
+		::= {tpPktCntntOffsetProfile 4}	
+	
+	tpPktCntntRuleTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF TPPKTCNTNTRULEENTRY
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+		"A list of Packet Content rule entries.
+		 Here you can add Packet Content ACL rules for further ACL configuration."
+	::= {tpAclRuleConfigure 6}
+
+	tpPktCntntRuleEntry OBJECT-TYPE
+	SYNTAX  TPPKTCNTNTRULEENTRY
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+		"An entry contains of the information of Packet Content ACL."
+	INDEX   {tpPktCntntAclId,tpPktCntntRuleId}
+	::= {tpPktCntntRuleTable 1}	
+		
+	TPPKTCNTNTRULEENTRY ::=
+	SEQUENCE {	
+		tpPktCntntAclId
+			INTEGER,
+		tpPktCntntRuleId
+			INTEGER,
+		tpPktCntntAclName
+			OCTET STRING,
+		tpPktCntntSecOperation
+			INTEGER,
+		tpPktCntntCounterLogging
+			INTEGER,
+		tpPktCntntChunkValue0
+			OCTET STRING,
+		tpPktCntntChunkMask0
+			OCTET STRING,
+		tpPktCntntChunkValue1
+			OCTET STRING,
+		tpPktCntntChunkMask1
+			OCTET STRING,
+		tpPktCntntChunkValue2
+			OCTET STRING,
+		tpPktCntntChunkMask2
+			OCTET STRING,
+		tpPktCntntChunkValue3
+			OCTET STRING,
+		tpPktCntntChunkMask3
+			OCTET STRING,
+		tpPktCntntTimeSegment
+			OCTET STRING,
+		tpPktCntntRuleStatus
+			TPRowStatus
+	}	
+		
+	tpPktCntntAclId OBJECT-TYPE
+		SYNTAX  INTEGER 
+		MAX-ACCESS  read-only
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL ID."
+		::= {tpPktCntntRuleEntry 1}
+
+	tpPktCntntRuleId OBJECT-TYPE
+		SYNTAX  INTEGER
+		MAX-ACCESS  read-only
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL rule ID."
+		::= {tpPktCntntRuleEntry 2}
+
+	tpPktCntntAclName OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet content ACL name, NULL string will give this ACL a default name as 'ACL_n', n stands for ACL ID."
+		::= {tpPktCntntRuleEntry 3}		
+		
+	tpPktCntntSecOperation OBJECT-TYPE
+		SYNTAX  INTEGER
+		{permit(0),deny(1)}
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"Packet Content ACL Security Operation."
+		::= {tpPktCntntRuleEntry 4}	
+		
+	tpPktCntntCounterLogging OBJECT-TYPE
+		SYNTAX	INTEGER
+		{disable(0),enable(1)}
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL rule counter logging operation."
+		::={tpPktCntntRuleEntry 5}
+		
+	tpPktCntntChunkValue0 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk0 value(32bit), a hex string such as eafff3, this maximum value of a chunk is 0xffffffff."
+		::= { tpPktCntntRuleEntry 6 }	
+		
+	tpPktCntntChunkMask0 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk0 mask(32bit), an 8 hex string such as ffffffff, if mask is set to NULL(zero length), it means ffffffff."
+		::= { tpPktCntntRuleEntry 7 }	
+		
+	tpPktCntntChunkValue1 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk1 value(32bit)."
+		::= { tpPktCntntRuleEntry 8 }	
+		
+	tpPktCntntChunkMask1 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk1 mask(32bit)."
+		::= { tpPktCntntRuleEntry 9 }	
+		
+	tpPktCntntChunkValue2 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk2 value(32bit)."
+		::= { tpPktCntntRuleEntry 10 }	
+		
+	tpPktCntntChunkMask2 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk2 mask(32bit)."
+		::= { tpPktCntntRuleEntry 11 }
+		
+	tpPktCntntChunkValue3 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk3 value(32bit)."
+		::= { tpPktCntntRuleEntry 12 }	
+		
+	tpPktCntntChunkMask3 OBJECT-TYPE
+		SYNTAX	OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL chunk3 mask(32bit)."
+		::= { tpPktCntntRuleEntry 13 }	
+
+	tpPktCntntTimeSegment OBJECT-TYPE
+		SYNTAX OCTET STRING
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"Packet Content ACL time segment name(max length: 16), the time segment name must be configured previously and string length setting to zero means that this field is disabled."
+		::= { tpPktCntntRuleEntry 14 }
+		
+	tpPktCntntRuleStatus OBJECT-TYPE
+		SYNTAX  TPRowStatus
+		MAX-ACCESS  read-create
+		STATUS  current
+		DESCRIPTION
+			"the following two values are states:
+			these values may be read or written
+			active(1),
+			notInService(2),
+
+			the following value is a state:
+			this value may be read, but not written
+			notReady(3),
+
+			the following three values are
+			actions: these values may be written,
+			but are never read
+			createAndGo(4),
+			createAndWait(5),
+			destroy(6)"
+		::= { tpPktCntntRuleEntry 15 }
+
+	tpAclRuleCounterTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF TPACLRULECOUNTERENTRY
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+		"A list of ACL rule counter entries.
+		 Here you can view the matched packets counter of the specified ACL rule."
+	::= {tpAclRuleConfigure 7}
+
+	tpAclRuleCounterEntry OBJECT-TYPE
+	SYNTAX  TPACLRULECOUNTERENTRY
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+		"An entry contains of the matched counter of an ACL rule."
+	INDEX   {tpAclCounterAclId,tpAclCounterRuleId}
+	::= {tpAclRuleCounterTable 1}	
+		
+	TPACLRULECOUNTERENTRY ::=
+	SEQUENCE {	
+		tpAclCounterAclId
+			INTEGER,
+		tpAclCounterRuleId
+			INTEGER,
+		tpAclCounterLoggingEnable
+			INTEGER,
+		tpAclCounterNum
+			INTEGER
+	}		
+	tpAclCounterAclId OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The ACL ID."
+	::= {tpAclRuleCounterEntry 1}
+	
+	tpAclCounterRuleId	OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The ACL rule ID."
+	::= {tpAclRuleCounterEntry 2}
+	
+	tpAclCounterLoggingEnable OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The counter logging enable/disable status of the specified ACL rule."
+	::= {tpAclRuleCounterEntry 3}
+
+	tpAclCounterNum OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The matched packets counter of the specified ACL rule."
+	::= {tpAclRuleCounterEntry 4}	
+
+	tpAclLoggingCounter NOTIFICATION-TYPE
+	OBJECTS
+	{
+		tpAclCounterAclId,
+		tpAclCounterRuleId,
+		tpAclCounterNum
+	}
+	STATUS current
+	DESCRIPTION
+	"ACL matched counter notification.
+	Note that if you need this notification, the 'logging' must be set enable.
+	The transmission of ACL counte notifications are throttled by the agent every 5 minutes."
+	::= {tplinkAclNotifications 1}
+	
 END
 
 

@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,8 +22,7 @@ $navbar['options']['devices']['text']        = 'Per-Device';
 $navbar['options']['modules']['text']        = 'Per-Module';
 
 //if (dbFetchCell("SELECT COUNT(*) FROM `pollers`"))
-if (dbExist('pollers'))
-{
+if (dbExist('pollers')) {
   $navbar['options']['pollers']['text']        = 'Pollers';
 
 }
@@ -41,8 +39,13 @@ unset($navbar);
 
 // Generate statistics
 
-$proc['avg']['poller']    = round($cache['devices']['timers']['polling']   / $cache['devices']['stat']['count'], 2);
-$proc['avg']['discovery'] = round($cache['devices']['timers']['discovery'] / $cache['devices']['stat']['count'], 2);
+if (isset($cache['devices']['stat']['count']) && $cache['devices']['stat']['count'] > 0) {
+  $proc['avg']['poller']    = round($cache['devices']['timers']['polling'] / $cache['devices']['stat']['count'], 2);
+  $proc['avg']['discovery'] = round($cache['devices']['timers']['discovery'] / $cache['devices']['stat']['count'], 2);
+} else {
+  $proc['avg']['poller']    = 0;
+  $proc['avg']['discovery'] = 0;
+}
 $proc['avg2']['poller']    = 0;
 $proc['avg2']['discovery'] = 0;
 $proc['max']['poller']    = 0;
@@ -58,13 +61,16 @@ foreach ($cache['devices']['hostname'] as $hostname => $id)
   if ($device['disabled'] == 1 && !$config['web_show_disabled']) { continue; }
 
   // Find max poller/discovery times
-  if ($device['status'])
-  {
-    if ($device['last_polled_timetaken'] > $proc['max']['poller'])        { $proc['max']['poller'] = $device['last_polled_timetaken']; }
-    if ($device['last_discovered_timetaken'] > $proc['max']['discovery']) { $proc['max']['discovery'] = $device['last_discovered_timetaken']; }
+  if ($device['status']) {
+    if ($device['last_polled_timetaken'] > $proc['max']['poller']) {
+      $proc['max']['poller'] = $device['last_polled_timetaken'];
+    }
+    if ($device['last_discovered_timetaken'] > $proc['max']['discovery']) {
+      $proc['max']['discovery'] = $device['last_discovered_timetaken'];
+    }
   }
-  $proc['avg2']['poller']    += pow($device['last_polled_timetaken'], 2);
-  $proc['avg2']['discovery'] += pow($device['last_discovered_timetaken'], 2);
+  $proc['avg2']['poller']    += $device['last_polled_timetaken'] ** 2;
+  $proc['avg2']['discovery'] += $device['last_discovered_timetaken'] ** 2;
 
   $poller_table[] = array(
     'html_row_class'            => $device['html_row_class'],
@@ -88,7 +94,7 @@ foreach ($cache['devices']['hostname'] as $hostname => $id)
 
 // End generate statistics
 
-if ($vars['view'] == "modules")
+if ($vars['view'] === "modules")
 {
 
   if ($_SESSION['userlevel'] >= 7)
@@ -309,7 +315,7 @@ unset($poller_table, $proc, $row);
 
 echo generate_box_close();
 
-} elseif($view = 'pollers') {
+} elseif ($view = 'pollers') {
 
   $pollers = dbFetchRows("SELECT * FROM `pollers`");
 
@@ -317,17 +323,23 @@ echo generate_box_close();
 
   echo '<table class="'.OBS_CLASS_TABLE_STRIPED.'">' . PHP_EOL;
 
-  echo '<tr><td>Poller Name</td><td>Assigned Devices</td></tr>';
+  echo get_table_header([
+    [ 'ID',              'style="width: 20px;"' ],
+    [ 'Poller Name',     'style="width: 10%;"' ],
+    [ 'Host ID / Uname', 'style="width: 30%;"' ],
+    'Assigned Devices'
+    ]);
+  //echo '<tr><td>Poller Name</td><td>Assigned Devices</td></tr>';
 
-  foreach($pollers as $poller)
-  {
+  foreach($pollers as $poller) {
       $device_list = array();
       echo '<tr>';
+      echo '<td class="entity-name">'.$poller['poller_id'].'</td>';
       echo '<td class="entity-name">'.$poller['poller_name'].'</td>';
+      echo '<td><small>'.$poller['host_id'].'<br /><i>'.$poller['host_uname'].'</i></small></td>';
       echo '<td>';
 
-      foreach(dbFetchRows("SELECT * FROM `devices` WHERE `poller_id` = ?", array($poller['poller_id'])) as $device)
-      {
+      foreach(dbFetchRows("SELECT * FROM `devices` WHERE `poller_id` = ?", array($poller['poller_id'])) as $device) {
           $device_list[] = generate_device_link($device);
       }
 
@@ -341,33 +353,49 @@ echo generate_box_close();
 
   echo generate_box_close();
 
-  foreach ($pollers as $poller)
-  {
+  foreach ($pollers as $poller) {
     echo generate_box_open(array('header-border' => TRUE, 'title' => 'Poller Wrapper ('.$poller['poller_name'].') History'));
 
-    $graph_array = array('type'   => 'poller_partitioned_wrapper_threads',
-                         //'operation' => 'poll',
-                         'id' => $poller['poller_id'],
-    //                     'width'  => 1158,
-                         'height' => 100,
-                         'from'   => $config['time']['week'],
-                         'to'     => $config['time']['now'],
-                         );
+    //r($poller);
+    $graph_array = [
+      'type'   => 'poller_partitioned_wrapper_threads',
+      //'operation' => 'poll',
+      'id' => $poller['poller_id'],
+      // 'width'  => 1158,
+      'height' => 100,
+      'from'   => $config['time']['week'],
+      'to'     => $config['time']['now'],
+    ];
     //echo(generate_graph_tag($graph_array));
     print_graph_row($graph_array);
 
-    $graph_array = array('type'   => 'poller_partitioned_wrapper_times',
-                         //'operation' => 'poll',
-                         'id' => $poller['poller_id'],
-  //                       'width'  => 1158,
-                         'height' => 100,
-                         'from'   => $config['time']['week'],
-                         'to'     => $config['time']['now'],
-                         );
+    $graph_array = [
+      'type'   => 'poller_partitioned_wrapper_times',
+      //'operation' => 'poll',
+      'id' => $poller['poller_id'],
+      // 'width'  => 1158,
+      'height' => 100,
+      'from'   => $config['time']['week'],
+      'to'     => $config['time']['now'],
+    ];
     //echo(generate_graph_tag($graph_array));
     print_graph_row($graph_array);
 
     echo generate_box_close();
+
+    if ($actions = dbFetchRows('SELECT * FROM `observium_actions` WHERE `poller_id` = ?', [ $poller['poller_id'] ])) {
+      echo generate_box_open(array('header-border' => TRUE, 'title' => 'Poller Actions ('.$poller['poller_name'].')'));
+      $options = [
+        'columns' => [
+          'ID', 'Poller', 'Action', 'Identifier', 'Variables', 'Added'
+        ],
+        'vars' => 'json',
+        'added' => 'unixtime'
+      ];
+      echo build_table($actions, $options);
+      echo generate_box_close();
+    }
+
   }
 }
 

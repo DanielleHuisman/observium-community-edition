@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -21,12 +21,13 @@ if ($entry = get_alert_entry_by_id($vars['alert_entry']))
   } else {
 
   // Run actions
-  if ($vars['submit'] == 'update-alert-entry' && !$readonly)
+  if ($vars['submit'] === 'update-alert-entry' && !$readonly)
   {
 
     if (isset($vars['ignore_until_ok']) && ($vars['ignore_until_ok'] == '1' || $entry['ignore_until_ok'] == '1'))
     {
       $update_state['ignore_until_ok'] = '1';
+      if ($entry['alert_status'] == 0)    { $update_state['alert_status']    = '3'; }
     } else {
       $update_state['ignore_until_ok'] = '0';
     }
@@ -35,7 +36,9 @@ if ($entry = get_alert_entry_by_id($vars['alert_entry']))
 
     if (isset($vars['ignore_until']) && $vars['ignore_until_enable'])
     {
+      $vars['ignore_unixtime'] = strtotime($vars['ignore_until']);
       $update_state['ignore_until'] = $vars['ignore_until'];
+      if ($entry['alert_status'] == 0 && $vars['ignore_unixtime'] > time()) { $update_state['alert_status']    = '3'; }
     } else {
       $update_state['ignore_until'] = array('NULL');
     }
@@ -55,8 +58,8 @@ if ($entry = get_alert_entry_by_id($vars['alert_entry']))
 
   $alert_rules = cache_alert_rules();
   $alert       = $alert_rules[$entry['alert_test_id']];
-  $state       = json_decode($entry['state'], TRUE);
-  $conditions  = json_decode($alert['conditions'], TRUE);
+  $state       = safe_json_decode($entry['state']);
+  $conditions  = safe_json_decode($alert['conditions']);
   $entity      = get_entity_by_id_cache($entry['entity_type'], $entry['entity_id']);
 
 //  r($entry);
@@ -96,29 +99,29 @@ if ($entry = get_alert_entry_by_id($vars['alert_entry']))
           <tr><td colspan=2>
 <?php
 
-    $state = json_decode($entry['state'], true);
+    $state = safe_json_decode($entry['state']);
 
     $alert['state_popup'] = '';
 
     // FIXME - rewrite this, it's shit
 
-    if ($alert['alert_status'] != '1' && count($state['failed']))
+    if ($alert['alert_status'] != '1' && safe_count($state['failed']))
     {
       $alert['state_popup'] .= '<table class="table table-striped table-condensed">';
       $alert['state_popup'] .= '<thead><tr><th>Metric</th><th>Cond</th><th>Value</th><th>Measured</th></tr></thead>';
 
       foreach($state['failed'] as $test)
       {
-        $alert['state_popup'] .= '<tr><td><strong>'.$test['metric'].'</strong></td><td>'.$test['condition'].'</td><td>'.$test['value'].'</td><td><i class="red">'.$state['metrics'][$test['metric']].'</i></td></tr>';
+        $alert['state_popup'] .= '<tr><td><strong>'.$test['metric'].'</strong></td><td>'.$test['condition'].'</td><td>'.format_value($test['value']).'</td><td><i class="red">'.format_value($state['metrics'][$test['metric']]).'</i></td></tr>';
       }
       $alert['state_popup'] .= '</table>';
 
-    } elseif(count($state['metrics'])) {
+    } elseif (safe_count($state['metrics'])) {
       $alert['state_popup'] .= '<table class="table table-striped table-condensed">';
       $alert['state_popup'] .= '<thead><tr><th>Metric</th><th>Value</th></tr></thead>';
       foreach($state['metrics'] as $metric => $value)
       {
-        $alert['state_popup'] .= '<tr><td><strong>'.$metric.'</strong></td><td>'.$value.'</td></tr>';
+        $alert['state_popup'] .= '<tr><td><strong>'.$metric.'</strong></td><td>'.format_value($value).'</td></tr>';
       }
       $alert['state_popup'] .= '</table>';
 

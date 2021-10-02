@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     webinterface
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -18,26 +16,19 @@ include_once($config['html_dir'] . "/includes/functions.inc.php");
 
 // Preflight checks
 
-if (!is_dir($config['rrd_dir']))
-{
+if (!is_dir($config['rrd_dir'])) {
   print_error("RRD Directory is missing ({$config['rrd_dir']}).  Graphing may fail.");
 }
 
-if (!is_dir($config['log_dir']))
-{
+if (!is_dir($config['log_dir'])) {
   print_error("Log Directory is missing ({$config['log_dir']}).  Logging may fail.");
 }
 
-if (!is_dir($config['temp_dir']))
-{
+if (!is_dir($config['temp_dir'])) {
   print_error("Temp Directory is missing ({$config['temp_dir']}).  Graphing may fail.");
-}
-
-if (!is_writable($config['temp_dir']))
-{
+} elseif (!is_writable($config['temp_dir'])) {
   print_error("Temp Directory is not writable ({$config['tmp_dir']}).  Graphing may fail.");
 }
-
 
 // verify if PHP supports session, die if it does not
 check_extension_exists('session', '', TRUE);
@@ -73,10 +64,26 @@ ob_start('html_callback');
 
   include($config['html_dir'] . "/includes/authenticate.inc.php");
 
-
+  $theme_default = isset($_SESSION['theme_default']) ? $_SESSION['theme_default'] : $config['web_theme_default'];
+  if (isset($_SESSION['theme'], $_COOKIE['screen_scheme']) &&
+      $theme_default === 'system' &&
+      $_SESSION['theme'] !== $_COOKIE['screen_scheme'])
+  {
+    // Reset session theme if system theme changed
+    session_unset_var('theme');
+  }
   if (!isset($_SESSION['theme']) || !isset($config['themes'][$_SESSION['theme']]))
   {
-    $_SESSION['theme'] = "light";
+    // Set default theme
+    if ($theme_default === 'system' && isset($_COOKIE['screen_scheme']))
+    {
+      // Cookie screen_scheme sets by js, only light or dark
+      $theme = $_COOKIE['screen_scheme'];
+    } else {
+      $theme = $theme_default;
+    }
+    //$_SESSION['theme'] = isset($config['themes'][$theme]) ? $theme : 'light';
+    session_set_var('theme', isset($config['themes'][$theme]) ? $theme : 'light');
   }
   $_SESSION['mode'] = $config['themes'][$_SESSION['theme']]['type'];
 
@@ -92,6 +99,7 @@ ob_start('html_callback');
   register_html_resource('css', 'sprite.css');
 
   register_html_resource('js', 'jquery.min.js');
+  register_html_resource('js', 'jquery-migrate.min.js'); // required for unsupported js libs (ie qtip2)
   // register_html_resource('js', 'jquery-ui.min.js'); // FIXME. We don't use JQueryUI or am I wrong? (mike)
   register_html_resource('js', 'bootstrap.min.js');
 
@@ -134,24 +142,18 @@ ob_start('html_callback');
     }
   }
 
-  if ($vars['widescreen'] == "yes")
-  {
+  if ($vars['widescreen'] === "yes") {
     session_set_var('widescreen', 1);
     unset($vars['widescreen']);
-  }
-  if ($vars['widescreen'] == "no")
-  {
+  } elseif ($vars['widescreen'] === "no") {
     session_unset_var('widescreen');
     unset($vars['widescreen']);
   }
 
-  if ($vars['big_graphs'] == "yes")
-  {
+  if ($vars['big_graphs'] === "yes") {
     session_set_var('big_graphs', 1);
     unset($vars['big_graphs']);
-  }
-  if ($vars['big_graphs'] == "no")
-  {
+  } elseif ($vars['big_graphs'] === "no") {
     session_unset_var('big_graphs');
     unset($vars['big_graphs']);
   }
@@ -170,22 +172,17 @@ ob_start('html_callback');
 <?php
 // Determine type of web browser.
 $browser_type = detect_browser_type();
-if ($browser_type == 'mobile' || $browser_type == 'tablet')
-{
+if ($browser_type === 'mobile' || $browser_type === 'tablet') {
   session_set_var('touch', 'yes');
 }
-if ($vars['touch'] == "yes")
-{
+if ($vars['touch'] === "yes") {
   session_set_var('touch', 'yes');
-}
-if ($vars['touch'] == "no")
-{
+} elseif ($vars['touch'] === "no") {
   unset($vars['touch']);
   session_unset_var('touch');
 }
 
-if ($_SESSION['authenticated'])
-{
+if ($_SESSION['authenticated']) {
   $allow_mobile = (in_array(detect_browser_type(), array('mobile', 'tablet')) ? $config['web_mouseover_mobile'] : TRUE);
   if ($config['web_mouseover'] && $allow_mobile)
   {
@@ -205,15 +202,14 @@ if ($_SESSION['authenticated'])
   include($config['html_dir'] . "/includes/notifications.inc.php");
 
   // Include navbar
-  if ($vars['bare'] != "yes")
-  {
+  if (!get_var_true($vars['bare'])) {
     include($config['html_dir'] . "/includes/navbar.inc.php");
   }
 
 }
 ?>
 
-<div id="main_container" class="container" <?php echo($vars['bare'] == 'yes' ? 'style="padding-top: 10px;"' : ''); ?> >
+<div id="main_container" class="container" <?php echo(get_var_true($vars['bare']) ? 'style="padding-top: 10px;"' : ''); ?> >
 
   <?php
 
@@ -221,7 +217,7 @@ if ($_SESSION['authenticated'])
   {
 
     // Execute form actions
-    if (isset($vars['action']) && !strstr("..", $vars['action']) &&
+    if (isset($vars['action']) && is_alpha($vars['action']) &&
         is_file($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php"))
     {
       include($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php");
@@ -231,12 +227,11 @@ if ($_SESSION['authenticated'])
     echo '##UI_ALERTS##';
 
     // Authenticated. Print a page.
-    if (isset($vars['page']) && strpos("..", $vars['page']) === FALSE && is_file($config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php"))
+    if (isset($vars['page']) && is_alpha($vars['page']) &&
+        is_file($config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php"))
     {
       $page_file = $config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php";
-    }
-    else
-    {
+    } else {
       $vars['page'] = 'dashboard';
       $page_file    = $config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php";
     }
@@ -278,12 +273,10 @@ if ($_SESSION['authenticated'])
     // Register default panel if custom not set
     if (!isset($GLOBALS['cache_html']['page_panel']))
     {
-      if (is_file($config['html_dir'] . "/includes/panels/" . $vars['page'] . ".inc.php"))
-      {
+      if (is_alpha($vars['page']) &&
+          is_file($config['html_dir'] . "/includes/panels/" . $vars['page'] . ".inc.php")) {
         $panel_file = $config['html_dir'] . "/includes/panels/" . $vars['page'] . ".inc.php";
-      }
-      else
-      {
+      } else {
         $panel_file = $config['html_dir'] . "/includes/panels/default.inc.php";
       }
       ob_start();
@@ -294,15 +287,11 @@ if ($_SESSION['authenticated'])
       register_html_panel($panel_html);
     }
 
-  }
-  elseif ($config['auth_mechanism'] == 'cas' || $config['auth_mechanism'] == 'remote')
-  {
+  } elseif ($config['auth_mechanism'] === 'cas' || $config['auth_mechanism'] === 'remote') {
     // Not Authenticated. CAS logon.
     echo('Not authorized.');
     exit;
-  }
-  else
-  {
+  } else {
     // Not Authenticated. Print login.
     include($config['html_dir'] . "/pages/logon.inc.php");
     exit;
@@ -324,8 +313,7 @@ if ($_SESSION['authenticated'])
 
 <?php
 
-if ($vars['bare'] != 'yes')
-{
+if (!get_var_true($vars['bare'])) {
   ?>
 
     <footer class="navbar navbar-fixed-bottom">
@@ -340,13 +328,10 @@ if ($vars['bare'] != 'yes')
                     <ul class="nav">
                         <li class="dropdown"><?php
 
-                          if (isset($config['web']['logo']))
-                          {
+                          if (isset($config['web']['logo'])) {
                             echo '    <a class="brand brand-observium" href="/" class="dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">&nbsp;</a> ' .
                                  OBSERVIUM_VERSION_LONG;
-                          }
-                          else
-                          {
+                          } else {
                             echo '<a href="' . OBSERVIUM_URL . '" class="dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">';
                             echo OBSERVIUM_PRODUCT . ' ' . OBSERVIUM_VERSION_LONG;
                             echo '</a>';
@@ -366,8 +351,8 @@ if ($vars['bare'] != 'yes')
 
                         <li class="dropdown">
                           <?php
-                          $notification_count = count($notifications);
-                          if (count($notifications)) // FIXME level 10 only, maybe? (answer: just do not add notifications for this users. --mike)
+                          $notification_count = safe_count($notifications);
+                          if ($notification_count) // FIXME level 10 only, maybe? (answer: just do not add notifications for this users. --mike)
                           {
                             $div_class = 'dropdown-menu';
                             if ($notification_count > 5)
@@ -580,8 +565,9 @@ clear_duplicate_cookies();
 // Generate UI alerts to be inserted at ##UI_ALERTS##
 
 // Display warning about requiring alerting rebuild
-if (get_obs_attrib('alerts_require_rebuild'))
-{
+if (get_obs_attrib('alerts_require_rebuild')) {
+  del_obs_attrib('alerts_require_rebuild');
+  /* not required anymore
   $tmp_notif = array('text'     => '<h4>Alerting requires rebuild</h4>' .
                                    'Changes have been made to the alerting system which require a rebuild before they are effective. <a href="' .
                                    generate_url(array('page' => 'alert_regenerate', 'action' => 'update')) . '">Rebuild now.</a>',
@@ -590,30 +576,20 @@ if (get_obs_attrib('alerts_require_rebuild'))
   $alerts[]        = $tmp_notif;
   $notifications[] = $tmp_notif;
   unset($tmp_notif);
+  */
 }
 
-$ui_alerts = '';
-foreach ($alerts as $alert)
-{
-  // FIXME handle severity parameter with colour or icon?
-  $ui_alerts .= '<div width="100%" class="alert alert-' . $alert['severity'] . '">';
-  if (isset($alert['title']))
-  {
-    $ui_alerts .= '<h4>' . $alert['title'] . '</h4>';
-  }
-  $ui_alerts .= $alert['text'] . '</div>';
+foreach ($alerts as $alert) {
+  register_html_alert($alert['text'], $alert['title'], $alert['severity']);
 }
-
 
 // No dropdowns on touch gadgets
-if ($_SESSION['touch'] != 'yes')
-{
+if (!get_var_true($_SESSION['touch'])) {
   register_html_resource('js', 'twitter-bootstrap-hover-dropdown.min.js');
 }
 
-// FIXME vvvv change to register_html_resource(), but maybe better to keep them at the bottom? Function has no way to do this right now
+// FIXME. change to register_html_resource(), but maybe better to keep them at the bottom? Function has no way to do this right now
 register_html_resource('js', 'bootstrap-select.min.js');
-register_html_resource('js', 'bootstrap-switch.min.js');
 ?>
 
 <script type="text/javascript">

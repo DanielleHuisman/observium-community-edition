@@ -18,7 +18,7 @@
 if (!is_array($nsaarray))
 {
   $nsarray = array();
-  $nsarray = snmpwalk_cache_multi_oid($device, 'nsCPUTable', $nsarray, $mib);
+  $nsarray = snmpwalk_cache_oid($device, 'nsCPUTable', $nsarray, $mib);
 }
 
 foreach ($nsarray as $descr => $data)

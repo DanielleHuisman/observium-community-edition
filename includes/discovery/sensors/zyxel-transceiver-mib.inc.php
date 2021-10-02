@@ -18,7 +18,7 @@ if (!snmp_status()) { return; }
 $dot1dBasePortIfIndex        = snmp_cache_table($device, 'dot1dBasePortIfIndex', array(), 'BRIDGE-MIB');
 print_debug_vars($dot1dBasePortIfIndex);
 
-$zyxelTransceiverDdmiEntry   = snmp_walk_multipart_oid($device, 'zyxelTransceiverDdmiEntry', array(), 'ZYXEL-TRANSCEIVER-MIB');
+$zyxelTransceiverDdmiEntry   = snmpwalk_multipart_oid($device, 'zyxelTransceiverDdmiEntry', array(), 'ZYXEL-TRANSCEIVER-MIB');
 print_debug_vars($zyxelTransceiverDdmiEntry);
 
 foreach ($zyxelTransceiverDdmiEntry as $baseport => $transeiver)

@@ -15,7 +15,7 @@ $mib = 'DISMAN-PING-MIB';
 echo("$mib ");
 
 // Base results table
-$sla_poll = snmpwalk_cache_multi_oid($device, "pingResultsEntry", array(), $mib);
+$sla_poll = snmpwalk_cache_oid($device, "pingResultsEntry", array(), $mib);
 
 // Additional mibs for vendor specific Types
 $vendor_mib = FALSE;
@@ -24,16 +24,16 @@ if (is_device_mib($device, 'JUNIPER-PING-MIB', FALSE))
   // JUNIPER-PING-MIB
   echo("JUNIPER-PING-MIB ");
   $vendor_mib = 'JUNIPER-PING-MIB';
-  $sla_poll = snmpwalk_cache_multi_oid($device, "jnxPingResultsEntry", $sla_poll, $vendor_mib);
-  //$sla_poll = snmpwalk_cache_multi_oid($device, "jnxPingResultsStatus", $sla_poll, $vendor_mib);
-  //$sla_poll = snmpwalk_cache_multi_oid($device, "jnxPingResultsTime", $sla_poll, $vendor_mib);
+  $sla_poll = snmpwalk_cache_oid($device, "jnxPingResultsEntry", $sla_poll, $vendor_mib);
+  //$sla_poll = snmpwalk_cache_oid($device, "jnxPingResultsStatus", $sla_poll, $vendor_mib);
+  //$sla_poll = snmpwalk_cache_oid($device, "jnxPingResultsTime", $sla_poll, $vendor_mib);
 }
 elseif (is_device_mib($device, 'HH3C-NQA-MIB', FALSE))
 {
   // HH3C-NQA-MIB
   echo("HH3C-NQA-MIB ");
   $vendor_mib = 'HH3C-NQA-MIB';
-  $sla_poll = snmpwalk_cache_multi_oid($device, "hh3cNqaResultsEntry", $sla_poll, $vendor_mib);
+  $sla_poll = snmpwalk_cache_oid($device, "hh3cNqaResultsEntry", $sla_poll, $vendor_mib);
 
   //$flags = OBS_SNMP_ALL ^ OBS_QUOTES_STRIP;
   //$sla_history = snmpwalk_cache_threepart_oid($device, "Hh3cNqaStatisticsResultsEntry", array(), $vendor_mib, NULL, $flags);
@@ -58,11 +58,11 @@ elseif (is_device_mib($device, 'HUAWEI-DISMAN-PING-MIB', FALSE))
   echo("HUAWEI-DISMAN-PING-MIB ");
   $vendor_mib = 'HUAWEI-DISMAN-PING-MIB';
   /* Hrm, not sure if we require extended stats there
-  $sla_poll = snmpwalk_cache_multi_oid($device, "hwpingResultsEntry", $sla_poll, $vendor_mib);
+  $sla_poll = snmpwalk_cache_oid($device, "hwpingResultsEntry", $sla_poll, $vendor_mib);
   // HUAWEI Jitter Statistics
   if (dbExist('slas', '`device_id` = ? AND `rtt_type` = ? AND `deleted` = 0 AND `sla_status` = ?', [$device['device_id'], 'jitter', 'active']))
   {
-    $sla_poll = snmpwalk_cache_multi_oid($device, "hwPingJitterStatsEntry", $sla_poll, $vendor_mib);
+    $sla_poll = snmpwalk_cache_oid($device, "hwPingJitterStatsEntry", $sla_poll, $vendor_mib);
   }
   */
 } else {

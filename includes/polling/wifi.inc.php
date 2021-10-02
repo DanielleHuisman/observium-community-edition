@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -33,55 +32,49 @@ if ($device['type'] == 'network' || $device['type'] == 'firewall' || $device['ty
   $include_dir = "includes/polling/wifi";
   include("includes/include-dir-mib.inc.php");
 
-  /// FIXME : everything below this point is horrible shit that needs to be moved elsewhere. These aren't wireless entities, they're just graphs. They go in graphs.
+  /// FIXME : everything below this point is horrible shit that needs to be moved elsewhere.
+  /// These aren't wireless entities, they're just graphs. They go in graphs.
 
-  /// FIXME. Move this to MIB based includes
-  if ($device['os'] == 'trapeze')
-  {
-    echo("Checking Trapeze Wireless clients... ");
-    $wificlients1 = snmp_get($device, "trpzClSessTotalSessions.0", "-OUqnv", "TRAPEZE-NETWORKS-CLIENT-SESSION-MIB");
-    echo($wificlients1 . " clients\n");
-  }
-
-  # Senao/Engenius
-  if ($device['os'] == 'engenius')
-  {
-    echo("Checking Engenius Wireless clients... ");
-
-    $wificlients1 = count(explode("\n",snmp_walk($device, "entCLInfoIndex", "-OUqnv", "SENAO-ENTERPRISE-INDOOR-AP-CB-MIB")));
-
-    echo(($wificlients1 +0) . " clients\n");
-  }
-
-  if ($device['os'] == 'symbol' AND (stristr($device['hardware'],"AP")))
-  {
-    echo("Checking Symbol Wireless clients... ");
-
-    $wificlients1 = snmp_get($device, ".1.3.6.1.4.1.388.11.2.4.2.100.10.1.18.1", "-Ovq", "\"\"");
-
-    echo(($wificlients1 +0) . " clients on wireless connector, ");
-  }
-
-  // RRD Filling Code
+  // Convert old variables to array
+  $poll_wifi = [];
   if (isset($wificlients1) && is_numeric($wificlients1))
   {
-    rrdtool_update_ng($device, 'wificlients', array('wificlients' => $wificlients1), 'radio1');
-
-    $graphs['wifi_clients'] = TRUE;
+    $poll_wifi['wifi_clients1'] = $wificlients1;
   }
-
   if (isset($wificlients2) && is_numeric($wificlients2))
   {
-    rrdtool_update_ng($device, 'wificlients', array('wificlients' => $wificlients2), 'radio2');
-
-    $graphs['wifi_clients'] = TRUE;
+    $poll_wifi['wifi_clients2'] = $wificlients2;
   }
-
   if (isset($wifi_ap_count) && is_numeric($wifi_ap_count))
   {
-    rrdtool_update_ng($device, 'wifi_ap_count', array('value' => $wifi_ap_count));
+    $poll_wifi['wifi_ap_count'] = $wifi_ap_count;
+  }
 
-    $graphs['wifi_ap_count'] = TRUE;
+  // Find MIB-specific SNMP data via OID fetch: wifi_clients (or wifi_clients1, wifi_clients2), wifi_ap_count
+  $wifi_metatypes = [ 'wifi_clients', 'wifi_clients1', 'wifi_clients2', 'wifi_ap_count' ];
+  foreach (poll_device_mib_metatypes($device, $wifi_metatypes, $poll_wifi) as $metatype => $value)
+  {
+    if (!is_numeric($value)) { continue; } // Skip not numeric entries
+
+    // RRD Filling Code
+    switch ($metatype)
+    {
+      case 'wifi_clients':
+      case 'wifi_clients1':
+        rrdtool_update_ng($device, 'wificlients', [ 'wificlients' => $value ], 'radio1');
+        $graphs['wifi_clients'] = TRUE;
+        break;
+
+      case 'wifi_clients2':
+        rrdtool_update_ng($device, 'wificlients', [ 'wificlients' => $value ], 'radio2');
+        $graphs['wifi_clients'] = TRUE;
+        break;
+
+      case 'wifi_ap_count':
+        rrdtool_update_ng($device, 'wifi_ap_count', [ 'value' => $value ]);
+        $graphs['wifi_ap_count'] = TRUE;
+        break;
+    }
   }
 
   unset($wificlients2, $wificlients1, $wifi_ap_count);

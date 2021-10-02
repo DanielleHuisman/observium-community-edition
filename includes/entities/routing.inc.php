@@ -6,8 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
- *
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -71,8 +70,8 @@ function is_bgp_as_private($as)
  */
 function bgp_asplain_to_asdot($as)
 {
-  if (strpos($as, '.') || // Already asdot format
-    ($as < 65536))      // 16bit ASn no need to formatting
+  if (str_contains($as, '.') || // Already asdot format
+      ($as < 65536))            // 16bit ASn no need to formatting
   {
     return $as;
   }
@@ -91,7 +90,7 @@ function bgp_asplain_to_asdot($as)
  */
 function bgp_asdot_to_asplain($as)
 {
-  if (strpos($as, '.') === FALSE)   // Already asplain format
+  if (!str_contains($as, '.'))   // Already asplain format
   {
     return $as;
   }
@@ -287,7 +286,7 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
         $peer['jnxBgpM2PeerLocalAddrType'] = $address_types[$peer['jnxBgpM2PeerLocalAddrType']];
       }
       // 3. length of the local IP address
-      $ip_len = (strstr($peer['jnxBgpM2PeerLocalAddrType'], 'ipv6') ? 16 : 4);
+      $ip_len = str_contains($peer['jnxBgpM2PeerLocalAddrType'], 'ipv6') ? 16 : 4;
       // 4. IP address
       $ip_parts = array_slice($index_parts, 0, $ip_len);
 
@@ -315,7 +314,7 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
         $peer['jnxBgpM2PeerRemoteAddrType'] = $address_types[$peer['jnxBgpM2PeerRemoteAddrType']];
       }
       // 7. length of the remote IP address
-      $ip_len = (strstr($peer['jnxBgpM2PeerRemoteAddrType'], 'ipv6') ? 16 : 4);
+      $ip_len = str_contains($peer['jnxBgpM2PeerRemoteAddrType'], 'ipv6') ? 16 : 4;
       // 8. IP address
       $ip_parts = array_slice($index_parts, 0, $ip_len);
 
@@ -345,7 +344,7 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
         $peer['f10BgpM2PeerLocalAddrType'] = $address_types[$peer['f10BgpM2PeerLocalAddrType']];
       }
       // 3. length of the local IP address
-      $ip_len = (strstr($peer['f10BgpM2PeerLocalAddrType'], 'ipv6') ? 16 : 4);
+      $ip_len = str_contains($peer['f10BgpM2PeerLocalAddrType'], 'ipv6') ? 16 : 4;
       // 4. IP address
       $ip_parts = array_slice($index_parts, 0, $ip_len);
 
@@ -373,7 +372,7 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB')
         $peer['f10BgpM2PeerRemoteAddrType'] = $address_types[$peer['f10BgpM2PeerRemoteAddrType']];
       }
       // 7. length of the remote IP address
-      $ip_len = (strstr($peer['f10BgpM2PeerRemoteAddrType'], 'ipv6') ? 16 : 4);
+      $ip_len = str_contains($peer['f10BgpM2PeerRemoteAddrType'], 'ipv6') ? 16 : 4;
       // 8. IP address
       $ip_parts = array_slice($index_parts, 0, $ip_len);
 
@@ -446,6 +445,143 @@ function get_astext($asn)
     }
 
     return $cache['astext'][$asn];
+  }
+}
+
+function discover_vrf($device, $vrf)
+{
+  global $cache_discovery, $valid, $table_rows;
+
+  $module = 'vrf';
+
+  if (empty($vrf['vrf_name'])) { return; }
+  $vrf_name = $vrf['vrf_name'];
+
+  // Pre-cache VRFs from DB
+  if (!isset($cache_discovery['vrf_db']))
+  {
+    $cache_discovery['vrf_db'] = [];
+    foreach (dbFetchRows("SELECT * FROM `vrfs` WHERE `device_id` = ?", [ $device['device_id'] ]) as $entry)
+    {
+      // Strange case with duplicate entries: https://jira.observium.org/browse/OBS-3600
+      if (isset($cache_discovery['vrf_db'][$entry['vrf_name']])) {
+        print_debug("Duplicate VRF entry in DB found: ".$entry['vrf_name']);
+        print_debug_vars($entry);
+        dbDelete('vrfs', '`vrf_id` = ?', [ $entry['vrf_id'] ]);
+        continue;
+      }
+      $cache_discovery['vrf_db'][$entry['vrf_name']] = $entry;
+    }
+  }
+
+  $params_main = [ 'vrf_mib', 'vrf_name', 'vrf_descr', 'vrf_rd' ];
+  $params_state = [ 'vrf_admin_status', 'vrf_oper_status',
+                    'vrf_active_ports', 'vrf_total_ports',
+                    'vrf_added_routes', 'vrf_deleted_routes', 'vrf_total_routes' ];
+
+  $insert_array = [ 'device_id' => $device['device_id'] ];
+  foreach ($params_main as $param)
+  {
+    $insert_array[$param] = isset($vrf[$param]) ? $vrf[$param] : '';
+  }
+
+  // Set added/changed params
+  $current_time = (int)time();
+  $param = 'vrf_added';
+  $insert_array[$param] = isset($vrf[$param]) && $vrf[$param] < $current_time ? (int)$vrf[$param] : $device['last_rebooted'];
+
+  if (!isset($cache_discovery['vrf_db'][$vrf['vrf_name']]))
+  {
+    // Added
+    $param = 'vrf_last_change';
+    $insert_array[$param] = isset($vrf[$param]) && $vrf[$param] < $current_time ? (int)$vrf[$param] : $current_time;
+
+    // When insert, also add state params
+    foreach ($params_state as $param)
+    {
+      if (isset($vrf[$param]))
+      {
+        // When not set, use db default
+        $insert_array[$param] = $vrf[$param];
+      }
+    }
+
+    $vrf_id = dbInsert($insert_array, 'vrfs');
+    $GLOBALS['module_stats'][$module]['added']++; //echo "+";
+  } else {
+    // Compare/update
+
+    $update_array = [];
+    $entry = $cache_discovery['vrf_db'][$vrf['vrf_name']];
+    $vrf_id = $entry['vrf_id'];
+
+    foreach ($params_main as $param)
+    {
+      if ($insert_array[$param] !== $entry[$param])
+      {
+        $update_array[$param] = $insert_array[$param];
+      }
+    }
+
+    // Update old entries (after migrate)
+    if (empty($entry['vrf_added']))
+    {
+      // State params
+      foreach ($params_state as $param)
+      {
+        if (isset($vrf[$param]))
+        {
+          // When not set, use db default
+          $update_array[$param] = $vrf[$param];
+        }
+      }
+
+      $update_array['vrf_added'] = $insert_array['vrf_added'];
+      $update_array['vrf_last_change'] = isset($vrf['vrf_last_change']) && $vrf['vrf_last_change'] < $current_time ? (int)$vrf['vrf_last_change'] : $current_time;
+    } else {
+
+      if (count($update_array)) {
+        $update_array['vrf_last_change'] = isset($vrf['vrf_last_change']) && $vrf['vrf_last_change'] < $current_time ? (int)$vrf['vrf_last_change'] : $current_time;
+      }
+      // For old entries only validate added/changed times (more than 60 sec)
+      /*foreach ([ 'vrf_added', 'vrf_last_change' ] as $param) {
+      foreach ([ 'vrf_last_change' ] as $param) {
+        if (abs($insert_array[$param] - $entry[$param]) > 60)
+        {
+          $update_array[$param] = $insert_array[$param];
+          print_debug("$param: ".$insert_array[$param]." - ".$entry[$param]." = ".($insert_array[$param] - $entry[$param]));
+        }
+      }
+      */
+    }
+
+    if (safe_count($update_array))
+    {
+      dbUpdate($update_array, 'vrfs', '`vrf_id` = ?', [ $vrf_id ]);
+
+      $GLOBALS['module_stats'][$module]['updated']++;
+    } else {
+      $GLOBALS['module_stats'][$module]['unchanged']++;
+    }
+  }
+
+  $valid['vrf'][$vrf_name] = $vrf_id;
+
+  // VRF ports
+  if (safe_count($vrf['ifIndex']))
+  {
+    $db_update = [];
+    foreach ($vrf['ifIndex'] as $ifIndex)
+    {
+      if ($port = get_port_by_index_cache($device, $ifIndex))
+      {
+        $db_update[] = [ 'port_id' => $port['port_id'], 'ifIndex' => $port['ifIndex'], 'device_id' => $device['device_id'], 'ifVrf' => $vrf_id ];
+
+        $valid['vrf-ports'][$vrf_name][$port['port_id']] = $vrf_id;
+      }
+    }
+
+    dbUpdateMulti($db_update, 'ports', [ 'ifVrf' ]);
   }
 }
 

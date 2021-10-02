@@ -60,7 +60,7 @@ class Flight {
 
     // Don't allow object instantiation
     private function __construct() {}
-    //private function __destruct() {} // Visibility for magic method __destruct must be public.
+    private function __destruct() {}
     private function __clone() {}
 
     /**

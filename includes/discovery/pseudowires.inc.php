@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -44,7 +43,7 @@ if (!$config['enable_pseudowires']) { return; }
     }
   }
 
-  $GLOBALS['module_stats'][$module]['status'] = count($valid[$module]);
+  $GLOBALS['module_stats'][$module]['status'] = safe_count($valid[$module]);
   if (OBS_DEBUG && $GLOBALS['module_stats'][$module]['status']) { print_vars($valid[$module]); }
 
   // Clean

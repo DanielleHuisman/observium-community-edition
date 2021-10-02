@@ -2,14 +2,15 @@
 
 //define('OBS_DEBUG', 1);
 
-$base_dir = realpath(dirname(__FILE__) . '/..');
+$base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
 
-include(dirname(__FILE__) . '/../includes/defaults.inc.php');
+include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
-include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '/../includes/definitions.inc.php');
+include(__DIR__ . '/../includes/common.inc.php');
+include(__DIR__ . '/../includes/definitions.inc.php');
 //include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/functions.inc.php');
 
 class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
 {
@@ -56,10 +57,12 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
             // discovery definition, additional array level
             foreach ($def as $disovery)
             {
-              foreach ($disovery as $discovery_param => $pattern)
+              foreach ($disovery as $discovery_param => $patterns)
               {
                 if (in_array($discovery_param, [ 'sysObjectID', 'os', 'os_group', 'type', 'vendor' ])) { continue; } // All except sysObjectID is regexp
-                $array[] = [$type, $name, $param.'->'.$discovery_param, $pattern];
+                foreach ((array)$patterns as $pattern) {
+                  $array[] = [ $type, $name, $param . '->' . $discovery_param, $pattern ];
+                }
               }
             }
           }
@@ -74,20 +77,17 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerDefinitionPatterns
    * @group constants
    */
-  public function testDefinitionPatterns($pattern, $string, $result, $match = NULL)
-  {
+  public function testDefinitionPatterns($pattern, $string, $result, $match = NULL) {
     $test = preg_match($pattern, $string, $matches);
     //var_dump($matches);
     $this->assertSame($result, (bool)$test);
-    if ($test)
-    {
+    if ($test && !is_null($match)) {
       // Validate $match
       $this->assertSame($match, $matches[1]);
     }
   }
 
-  public function providerDefinitionPatterns()
-  {
+  public function providerDefinitionPatterns() {
     $array = array();
 
     $pattern = OBS_PATTERN_IPV4_FULL;
@@ -327,9 +327,16 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
                                'https://www.get.no/v3/bredb%C3%A5nd/tr%C3%A5dl%C3%B8st-modem');
     */
 
+    $pattern = OBS_PATTERN_NOPRINT;
+    // Not printable chars
+    $array[] = array($pattern, "ABC \n",                  TRUE);
+    $array[] = array($pattern, "ABC \r",                  TRUE);
+    $array[] = array($pattern, "ABC \t",                  TRUE);
+    // All printable
+    $array[] = array($pattern, "ABC ËЙЦ 10 œ∑√∫Ω≈∆µ \"',.:`~!@#$%^&*()_+-=<>?/[]{}|\\", FALSE);
+
     return $array;
   }
-
 }
 
 // EOF

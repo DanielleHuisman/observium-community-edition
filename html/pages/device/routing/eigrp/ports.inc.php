@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -38,8 +37,7 @@ foreach (dbFetchRows("SELECT * FROM `eigrp_ports` WHERE `device_id` = ? AND `eig
           <td>' . $eigrp_port['eigrp_authmode'] . '</td>
         </tr>';
 
-  if ($vars['graphs'] == 'yes')
-  {
+  if (get_var_true($vars['graphs'])) {
     echo '
         <tr>
           <td class="state-marker"></td>

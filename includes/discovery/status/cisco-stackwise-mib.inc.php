@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -33,16 +32,16 @@ $device_tmp = $device;
 $device_tmp['snmp_retries'] = 1;
 $device_tmp['snmp_nobulk'] = TRUE;
 $stackredundant = snmp_get_oid($device_tmp, 'cswRingRedundant.0', 'CISCO-STACKWISE-MIB');
-if ($GLOBALS['snmp_status'])
+if (snmp_status())
 {
-  $stackstatus   = snmpwalk_cache_multi_oid($device_tmp, 'cswSwitchInfoEntry', array(), 'CISCO-STACKWISE-MIB');
+  $stackstatus   = snmpwalk_cache_oid($device_tmp, 'cswSwitchInfoEntry', array(), 'CISCO-STACKWISE-MIB');
   $stackportoper = snmpwalk_cache_oid($device_tmp, 'cswStackPortOperStatus', array(), 'CISCO-STACKWISE-MIB');
 
   $ports_down = 0;
   foreach ($stackportoper as $entry)
   {
     // Count down ports for check if stack exist
-    if ($entry['cswStackPortOperStatus'] == 'down') { $ports_down++; }
+    if ($entry['cswStackPortOperStatus'] === 'down') { $ports_down++; }
   }
 
   $stack_count = count($stackstatus); // Count stack members
@@ -53,8 +52,8 @@ if ($GLOBALS['snmp_status'])
     $stateoid  = '.1.3.6.1.4.1.9.9.500.1.2.1.1.6.'.$index;
     $statedescr = 'Switch '.$entry['cswSwitchNumCurrent'].' stacking state';
 
-    if ($stack_count === 1 && $entry['cswSwitchNumCurrent'] == 1 && $stackredundant == 'false' &&
-        $ports_down === 2 && $entry['cswSwitchRole'] == 'master' && $entry['cswSwitchState'] == 'ready')
+    if ($stack_count === 1 && $entry['cswSwitchNumCurrent'] == 1 && $stackredundant === 'false' &&
+        $ports_down === 2 && $entry['cswSwitchRole'] === 'master' && $entry['cswSwitchState'] === 'ready')
     {
       // Heh, on IOS 15.x stacking is always enabled and does not have any way to detect if stack module exists and stacking is configured
       $stack_count = 0;
@@ -72,7 +71,7 @@ if ($GLOBALS['snmp_status'])
   if ($stack_count)
   {
     $oid   = '.1.3.6.1.4.1.9.9.500.1.1.3.0';
-    $descr = 'Stack is redundant';
+    $descr = 'Stackports in redundant ring';
     discover_status_ng($device, $mib, 'cswRingRedundant', $oid, '0', 'cisco-stackwise-redundant-state', $descr, $stackredundant, array('entPhysicalClass' => 'stack'));
     //discover_status($device, $oid, "cswRingRedundant.0", 'cisco-stackwise-redundant-state', $descr, $stackredundant, array('entPhysicalClass' => 'stack'));
 

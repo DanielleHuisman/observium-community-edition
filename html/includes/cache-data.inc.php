@@ -10,31 +10,6 @@
  *
  */
 
-// FIXME remove later if phpFastCache is OK
-/*
-// Time our cache filling.
-$cache_start = utime();
-
-$wui_cache_time = get_obs_attrib('wui_cache_time');
-$cache_stale = TRUE;
-
-if($config['wui']['cache_age'] && is_numeric($wui_cache_time) && ($wui_cache_time + $config['wui']['cache_age'] > time()))
-{
-
-  $wui_cache = get_obs_attrib('wui_cache');
-
-  $wui_cache = unserialize($wui_cache);
-
-
-  if(count($wui_cache))
-  {
-    $cache = array_merge($cache, $wui_cache);
-    $cache_stale = FALSE;
-  }
-
-}
-*/
-
 $cache_item = get_cache_item('data');
 //print_vars($cache_item->isHit());
 
@@ -103,17 +78,12 @@ if (!ishit_cache_item($cache_item))
         $cache['devices']['types'][$device['type']]['disabled']++;
       }
 
-      if ($device['ignore'])
+      if ($device['ignore'] || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > time()) )
       {
         $cache['devices']['stat']['ignored']++;
         $cache['devices']['ignored'][] = (int)$device['device_id']; // Collect IDs for ignored
         $cache['devices']['types'][$device['type']]['ignored']++;
-      }
-
-      $cache['devices']['stat']['count']++;
-
-      if (!$device['ignore'])
-      {
+      } else {
         if ($device['status']) {
           $cache['devices']['stat']['up']++;
           $cache['devices']['types'][$device['type']]['up']++;
@@ -122,6 +92,8 @@ if (!ishit_cache_item($cache_item))
           $cache['devices']['types'][$device['type']]['down']++;
         }
       }
+
+      $cache['devices']['stat']['count']++;
 
       $cache['devices']['timers']['polling'] += $device['last_polled_timetaken'];
       $cache['devices']['timers']['discovery'] += $device['last_discovered_timetaken'];
@@ -266,6 +238,7 @@ if (!ishit_cache_item($cache_item))
                                     'alert'    => 0,
                                     'warning'  => 0,
                                     'ignored'  => 0,
+                                    'device_ignored' => 0,
                                     'disabled' => 0,
                                     'deleted'  => 0);
   $cache['sensors']['devices'] = array(); // Stats per device ids
@@ -299,7 +272,8 @@ if (!ishit_cache_item($cache_item))
       continue;
     }
 
-    if ($sensor['sensor_event'] == 'ignore' || $sensor['sensor_ignore'])
+    if ($sensor['sensor_event'] === 'ignore' || $sensor['sensor_ignore'] ||
+        in_array($sensor['device_id'], $cache['devices']['ignored']))
     {
       $cache['sensors']['stat']['ignored']++;
       $cache['sensors']['devices'][$sensor['device_id']]['ignored']++;
@@ -369,7 +343,8 @@ if (!ishit_cache_item($cache_item))
       continue;
     }
 
-    if ($status['status_event'] == 'ignore' || $status['status_ignore'])
+    if ($status['status_event'] === 'ignore' || $status['status_ignore']  ||
+        in_array($status['device_id'], $cache['devices']['ignored']))
     {
       $cache['statuses']['stat']['ignored']++;
       $cache['statuses']['devices'][$status['device_id']]['ignored']++;
@@ -435,7 +410,8 @@ if (!ishit_cache_item($cache_item))
       continue;
     }
 
-    if ($counter['counter_event'] == 'ignore' || $counter['counter_ignore'])
+    if ($counter['counter_event'] === 'ignore' || $counter['counter_ignore']  ||
+        in_array($counter['device_id'], $cache['devices']['ignored']))
     {
       $cache['counters']['stat']['ignored']++;
       $cache['counters']['devices'][$counter['device_id']]['ignored']++;
@@ -474,17 +450,15 @@ if (!ishit_cache_item($cache_item))
   $query .= ' WHERE 1' . generate_query_permitted(array('alert'));
 
   $alert_entries = dbFetchRows($query);
-  $cache['alert_entries'] = array('count'    => count($alert_entries),
+  $cache['alert_entries'] = array('count'    => safe_count($alert_entries),
                                   'up'       => 0,
                                   'down'     => 0,
                                   'unknown'  => 0,
                                   'delay'    => 0,
                                   'suppress' => 0);
 
-  foreach ($alert_entries as $alert_table_id => $alert_entry)
-  {
-    switch ($alert_entry['alert_status'])
-    {
+  foreach ($alert_entries as $alert_table_id => $alert_entry) {
+    switch ($alert_entry['alert_status']) {
       case '0':
         ++$cache['alert_entries']['down'];
         break;
@@ -506,8 +480,7 @@ if (!ishit_cache_item($cache_item))
   // Routing
 
   // BGP
-  if (isset($config['enable_bgp']) && $config['enable_bgp'])
-  {
+  if (isset($config['enable_bgp']) && $config['enable_bgp']) {
     // Init variables to 0
     $cache['routing']['bgp']['internal'] = 0;
     $cache['routing']['bgp']['external'] = 0;
@@ -516,22 +489,17 @@ if (!ishit_cache_item($cache_item))
     $cache['routing']['bgp']['down'] = 0;
 
     $cache['routing']['bgp']['last_seen'] = $config['time']['now'];
-    foreach (dbFetchRows('SELECT `device_id`,`bgpPeer_id`,`local_as`,`bgpPeerState`,`bgpPeerAdminStatus`,`bgpPeerRemoteAs` FROM `bgpPeers`;') as $bgp)
-    {
-      if (!$config['web_show_disabled'])
-      {
+    foreach (dbFetchRows('SELECT `device_id`,`bgpPeer_id`,`local_as`,`bgpPeerState`,`bgpPeerAdminStatus`,`bgpPeerRemoteAs` FROM `bgpPeers`;') as $bgp) {
+      if (!$config['web_show_disabled']) {
         if ($cache['devices']['id'][$bgp['device_id']]['disabled']) { continue; }
       }
-      if (device_permitted($bgp))
-      {
+      if (device_permitted($bgp)) {
         $cache['routing']['bgp']['count']++;
         $cache['bgp']['permitted'][] = (int)$bgp['bgpPeer_id']; // Collect permitted peers
-        if ($bgp['bgpPeerAdminStatus'] == 'start' || $bgp['bgpPeerAdminStatus'] == 'running')
-        {
+        if ($bgp['bgpPeerAdminStatus'] === 'start' || $bgp['bgpPeerAdminStatus'] === 'running') {
           $cache['routing']['bgp']['up']++;
           $cache['bgp']['start'][] = (int)$bgp['bgpPeer_id']; // Collect START peers (bgpPeerAdminStatus = (start || running))
-          if ($bgp['bgpPeerState'] != 'established')
-          {
+          if ($bgp['bgpPeerState'] !== 'established') {
             $cache['routing']['bgp']['alerts']++;
           } else {
             $cache['bgp']['up'][] = (int)$bgp['bgpPeer_id']; // Collect UP peers (bgpPeerAdminStatus = (start || running), bgpPeerState = established)
@@ -539,8 +507,7 @@ if (!ishit_cache_item($cache_item))
         } else {
           $cache['routing']['bgp']['down']++;
         }
-        if ($bgp['local_as'] == $bgp['bgpPeerRemoteAs'])
-        {
+        if ($bgp['local_as'] == $bgp['bgpPeerRemoteAs']) {
           $cache['routing']['bgp']['internal']++;
           $cache['bgp']['internal'][] = (int)$bgp['bgpPeer_id']; // Collect iBGP peers
         } else {
@@ -605,9 +572,11 @@ if (!ishit_cache_item($cache_item))
   $cache['where']['ports_permitted']         = generate_query_permitted(array('port', 'device'));
 
   // CEF
-  $cache['routing']['cef']['count'] = count(dbFetchColumn("SELECT `cef_switching_id` FROM `cef_switching` WHERE 1 ".$cache['where']['devices_permitted']." GROUP BY `device_id`, `afi`;"));
+  $cache['routing']['cef']['count'] = safe_count(dbFetchColumn("SELECT `cef_switching_id` FROM `cef_switching` WHERE 1 ".$cache['where']['devices_permitted']." GROUP BY `device_id`, `afi`;"));
   // VRF
-  $cache['routing']['vrf']['count'] = count(dbFetchColumn("SELECT DISTINCT `mplsVpnVrfRouteDistinguisher` FROM `vrfs` WHERE 1 ".$cache['where']['devices_permitted']));
+  if ($config['enable_vrfs']) {
+    $cache['routing']['vrf']['count'] = safe_count(dbFetchColumn("SELECT DISTINCT `vrf_rd` FROM `vrfs` WHERE 1 " . $cache['where']['devices_permitted']));
+  }
 
   // Status
   $cache['status']['count'] = $cache['statuses']['stat']['count']; //dbFetchCell("SELECT COUNT(`status_id`) FROM `status` WHERE 1 ".$cache['where']['devices_permitted']);
@@ -618,17 +587,17 @@ if (!ishit_cache_item($cache_item))
   if ($config['enable_pseudowires'])
   {
     $cache['ports']['pseudowires'] = dbFetchColumn('SELECT DISTINCT `port_id` FROM `pseudowires` WHERE 1 '.$cache['where']['ports_permitted']);
-    $cache['pseudowires']['count'] = count($cache['ports']['pseudowires']);
+    $cache['pseudowires']['count'] = safe_count($cache['ports']['pseudowires']);
   }
   if ($config['poller_modules']['cisco-cbqos'] || $config['discovery_modules']['cisco-cbqos'])
   {
     $cache['ports']['cbqos'] = dbFetchColumn('SELECT DISTINCT `port_id` FROM `ports_cbqos` WHERE 1 '.$cache['where']['ports_permitted']);
-    $cache['cbqos']['count'] = count($cache['ports']['cbqos']);
+    $cache['cbqos']['count'] = safe_count($cache['ports']['cbqos']);
   }
   if ($config['poller_modules']['mac-accounting'] || $config['discovery_modules']['mac-accounting'])
   {
     $cache['ports']['mac_accounting'] = dbFetchColumn('SELECT DISTINCT `port_id` FROM `mac_accounting` WHERE 1 '.$cache['where']['ports_permitted']);
-    $cache['mac_accounting']['count'] = count($cache['ports']['mac_accounting']);
+    $cache['mac_accounting']['count'] = safe_count($cache['ports']['mac_accounting']);
   }
 
 //  if ($config['poller_modules']['unix-agent'])

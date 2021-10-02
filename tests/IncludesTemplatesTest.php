@@ -1,14 +1,15 @@
 <?php
 
-$base_dir = realpath(dirname(__FILE__) . '/..');
+$base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
 
 // Base observium includes
-include(dirname(__FILE__) . '/../includes/defaults.inc.php');
+include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
-include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '/../includes/definitions.inc.php');
+include(__DIR__ . '/../includes/common.inc.php');
+include(__DIR__ . '/../includes/definitions.inc.php');
 //include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
+include(__DIR__ . '/../includes/functions.inc.php');
 
 class IncludesTemplatesTest extends \PHPUnit\Framework\TestCase
 {

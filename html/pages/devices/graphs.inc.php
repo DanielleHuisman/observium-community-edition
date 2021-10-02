@@ -6,19 +6,22 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-
 echo '<div class="row">';
 
+if(!isset($vars['graph'])) { $vars['graph'] = 'bits'; }
+
+$row = 0;
 foreach ($devices as $device)
 {
-  if (is_integer($row/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
 
   if (device_permitted($device['device_id']))
   {
+    $row_colour = is_intnum($row / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
+
     if (!$location_filter || $device['location'] == $location_filter)
     {
       $graph_type = "device_".$vars['graph'];
@@ -58,8 +61,8 @@ foreach ($devices as $device)
 
       $graph_array['height'] = 100;
       $graph_array['width']  = 212;
-      if (is_numeric($vars['to']))   { $graph_array['to']   = $vars['to'];   } else { $graph_array['to']     = $config['time']['now']; }
-      if (is_numeric($vars['from'])) { $graph_array['from'] = $vars['from']; } else { $graph_array['from']   = $config['time']['day']; }
+      if (preg_match('/^(\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['to']))   { $graph_array['to']   = $vars['to'];   } else { $graph_array['to']     = $config['time']['now']; }
+      if (preg_match('/^(\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['from'])) { $graph_array['from'] = $vars['from']; } else { $graph_array['from']   = $config['time']['day']; }
 
       $graph_array['device']     = $device['device_id'];
       $graph_array['type']   = $graph_type;

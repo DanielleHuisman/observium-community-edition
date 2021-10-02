@@ -44,9 +44,9 @@ if (count($service_policies))
   $service_policies = snmpwalk_cache_oid($device, "cbQosPolicyDirection", $service_policies, "CISCO-CLASS-BASED-QOS-MIB");
   $service_policies = snmpwalk_cache_oid($device, "cbQosIfIndex", $service_policies, "CISCO-CLASS-BASED-QOS-MIB");
 
-  # $policy_maps = snmpwalk_cache_oid($device, "cbQosPolicyMapCfgEntry", array(), "CISCO-CLASS-BASED-QOS-MIB");
-  # $class_maps  = snmpwalk_cache_oid($device, "cbQosCMCfgEntry", array(), "CISCO-CLASS-BASED-QOS-MIB");
-  # $object_indexes = snmpwalk_cache_twopart_oid($device, "cbQosConfigIndex", array(), "CISCO-CLASS-BASED-QOS-MIB");
+  $policy_maps = snmpwalk_cache_oid($device, "cbQosPolicyMapCfgEntry", array(), "CISCO-CLASS-BASED-QOS-MIB");
+  $class_maps  = snmpwalk_cache_oid($device, "cbQosCMCfgEntry", array(), "CISCO-CLASS-BASED-QOS-MIB");
+  $object_indexes = snmpwalk_cache_twopart_oid($device, "cbQosConfigIndex", array(), "CISCO-CLASS-BASED-QOS-MIB");
 
   #print_r($policy_maps);
   #print_r($class_maps);
@@ -81,7 +81,7 @@ if (count($service_policies))
       $object_entry['cm_desc'] = $class_maps[$object_entry['cm_cfg_index']]['cbQosCMDesc'];
       $object_entry['cm_info'] = $class_maps[$object_entry['cm_cfg_index']]['cbQosCMInfo'];
 
-      #print_r($object_entry);
+      //print_r($object_entry);
 
       // Populate $metrics array using field names used in RRD and MySQL
       $metrics = array(
@@ -120,11 +120,13 @@ if (count($service_policies))
             $metrics_rrd[$oid] = 'U';
           }
           $metrics_computed[$oid.'_rate'] = $rate;
-
         }
 
         $metrics_computed['cbqos_lastpolled'] = $polled;
         $db_update = array_merge($metrics_computed, $metrics);
+
+        $db_update['policy_name'] = $object_entry['policy_name'];
+        $db_update['object_name'] = $object_entry['cm_name'];
 
         dbUpdate($db_update, 'ports_cbqos', '`cbqos_id` = ?', array($db_object['cbqos_id']));
 
@@ -133,6 +135,9 @@ if (count($service_policies))
       {
         $db_insert = array('device_id' => $device['device_id'], 'port_id' => $port['port_id'], 'policy_index' => $policy_index, 'object_index' => $object_index, 'direction' => $object_entry['direction']);
         $db_insert = array_merge($db_insert, $metrics);
+
+        $db_insert['policy_name'] = $object_entry['policy_name'];
+        $db_insert['object_name'] = $object_entry['cm_name'];
 
         dbInsert($db_insert, 'ports_cbqos');
         echo("+");

@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -28,9 +27,8 @@ if (!is_entity_write_permitted($device['device_id'], 'device'))
     }
   }
 
-  if ($vars['saveas'] == 'yes' && $vars['filename'])
-  {
-    download_as_file(gzencode(_json_encode($export_device)), $vars['filename']);
+  if (get_var_true($vars['saveas']) && $vars['filename']) {
+    download_as_file(gzencode(safe_json_encode($export_device)), $vars['filename']);
   } else {
     if ($config['snmp']['hide_auth'])
     {

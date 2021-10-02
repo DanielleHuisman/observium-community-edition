@@ -68,9 +68,26 @@ foreach ($vsvrs as $vsvr)
   echo('<td>'.escape_html($vsvr['vsvr_type']).'</td>');
   echo('<td>'.escape_html($vsvr['vsvr_label']).'</td>');
   echo('<td>'.escape_html($vsvr['vsvr_state']).'</td>');
-  echo('<td>
-          <input type=checkbox data-toggle="switch-revert" id="vsvrs['.$vsvr['vsvr_id'].'][vsvr_ignore]" name="vsvrs['.$vsvr['vsvr_id'].'][vsvr_ignore]"'.($vsvr['vsvr_ignore'] ? "checked" : "").'>
-        </td>');
+  $item = array(
+    'id'            => 'vsvrs['.$vsvr['vsvr_id'].'][vsvr_ignore]',
+    //'type'          => 'switch',
+    'type'          => 'switch-ng',
+    'off-text'      => 'Yes',
+    'off-color'     => 'success',
+    'on-color'      => 'danger',
+    //'on-icon'       => 'icon-trash',
+    'on-text'       => 'No',
+    //'off-icon'      => 'icon-sitemap',
+    //'grid'          => 1,
+    'size'          => 'mini',
+    //'height'        => '15px',
+    //'title'         => 'Show/Hide Removed',
+    //'placeholder'   => 'Removed',
+    'readonly'      => $readonly,
+    //'disabled'      => TRUE,
+    //'submit_by_key' => TRUE,
+    'value'         => $vsvr['vsvr_ignore']);
+  echo('<td>'.generate_form_element($item).'</td>');
   echo('</tr>');
 }
 ?>

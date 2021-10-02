@@ -11,7 +11,7 @@
  *
  */
 
-$oids  = snmpwalk_cache_multi_oid($device, 'nbsDevPSTable',  array(), 'DEV-CFG-MIB');
+$oids  = snmpwalk_cache_oid($device, 'nbsDevPSTable', array(), 'DEV-CFG-MIB');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -30,7 +30,7 @@ foreach ($oids as $index => $entry)
   discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'powerSupply'));
 }
 
-$oids  = snmpwalk_cache_multi_oid($device, 'nbsDevFANTable',  array(), 'DEV-CFG-MIB');
+$oids  = snmpwalk_cache_oid($device, 'nbsDevFANTable', array(), 'DEV-CFG-MIB');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -30,10 +29,22 @@ $ip_version = 'ipv4';
 // Bintec Elmeg (seems as last number is counter number 1,2,3,etc)
 //IP-MIB::ipAdEntIfIndex.192.168.1.254.0 = 1000
 //IP-MIB::ipAdEntNetMask.192.168.1.254.0 = 255.255.255.0
-$oid_data = array();
-foreach (array('ipAdEntIfIndex', 'ipAdEntNetMask') as $oid)
-{
-  $oid_data = snmpwalk_cache_oid($device, $oid, $oid_data, 'IP-MIB');
+
+$oid_data = snmpwalk_cache_oid($device, 'ipAdEntIfIndex', [], 'IP-MIB');
+if (snmp_status()) {
+  $oid_data = snmpwalk_cache_oid($device, 'ipAdEntNetMask', $oid_data, 'IP-MIB');
+  if (is_numeric(array_key_first($oid_data))) {
+    // Some devices report just numbers instead ip address:
+    // IP-MIB::ipAdEntAddr.0 = IpAddress: 0.0.0.0
+    // IP-MIB::ipAdEntAddr.2130706433 = IpAddress: 127.0.0.1
+    // IP-MIB::ipAdEntIfIndex.0 = INTEGER: 6620672
+    // IP-MIB::ipAdEntIfIndex.2130706433 = INTEGER: 6625280
+    // IP-MIB::ipAdEntNetMask.0 = IpAddress: 255.255.255.0
+    // IP-MIB::ipAdEntNetMask.2130706433 = IpAddress: 255.255.255.255
+    // IP-MIB::ipAdEntBcastAddr.0 = INTEGER: 1
+    // IP-MIB::ipAdEntBcastAddr.2130706433 = INTEGER: 0
+    $oid_data = snmpwalk_cache_oid($device, 'ipAdEntAddr', $oid_data, 'IP-MIB');
+  }
 }
 
 // Rewrite IP-MIB array
@@ -41,13 +52,11 @@ foreach ($oid_data as $ip_address => $entry)
 {
   $ifIndex = $entry['ipAdEntIfIndex'];
   $ip_address_fix = explode('.', $ip_address);
-  switch (count($ip_address_fix))
-  {
+  switch (count($ip_address_fix)) {
     case 4:
       break; // Just normal IPv4 address
     case 5:
-      if ($device['os_group'] == 'bintec')
-      {
+      if ($device['os_group'] === 'bintec') {
         // Bintec Elmeg, see: http://jira.observium.org/browse/OBSERVIUM-1958
         unset($ip_address_fix[4]);
       } else {
@@ -57,8 +66,12 @@ foreach ($oid_data as $ip_address => $entry)
       $ip_address = implode('.', $ip_address_fix);
       break;
     default:
-      print_debug("Detected unknown IPv4 address: $ip_address");
-      continue 2;
+      if (isset($entry['ipAdEntAddr']) && get_ip_version($entry['ipAdEntAddr'])) {
+        $ip_address = $entry['ipAdEntAddr'];
+      } else {
+        print_debug("Detected unknown IPv4 address: $ip_address");
+        continue 2;
+      }
   }
   $ip_mask_fix = explode('.', $entry['ipAdEntNetMask']);
   if ($ip_mask_fix[0] < 255 && $ip_mask_fix[1] <= '255' && $ip_mask_fix[2] <= '255' && $ip_mask_fix[3] == '255')
@@ -66,7 +79,7 @@ foreach ($oid_data as $ip_address => $entry)
     // On some D-Link used wrong masks: 252.255.255.255, 0.255.255.255
     $entry['ipAdEntNetMask'] = $ip_mask_fix[3] . '.' . $ip_mask_fix[2] . '.' . $ip_mask_fix[1] . '.' . $ip_mask_fix[0];
   }
-  if (empty($entry['ipAdEntNetMask']) || count($ip_mask_fix) != 4)
+  if (empty($entry['ipAdEntNetMask']) || safe_count($ip_mask_fix) != 4)
   {
     $entry['ipAdEntNetMask'] = '255.255.255.255';
   }
@@ -90,15 +103,13 @@ $oid_data = array();
 foreach (array('ipAddressIfIndex', 'ipAddressType', 'ipAddressPrefix', 'ipAddressOrigin') as $oid)
 {
   $oid_data = snmpwalk_cache_twopart_oid($device, $oid, $oid_data, 'IP-MIB', NULL, $flags);
-  if ($oid == 'ipAddressIfIndex' && snmp_status() === FALSE)
-  {
+  if ($oid === 'ipAddressIfIndex' && !snmp_status()) {
     break; // Stop walk, not exist table
   }
 }
 //print_vars($oid_data);
 
-if (!count($ip_data[$ip_version]))
-{
+if (!safe_count($ip_data[$ip_version])) {
   //IP-MIB::ipAddressIfIndex.ipv4."198.237.180.2" = 8
   //IP-MIB::ipAddressPrefix.ipv4."198.237.180.2" = ipAddressPrefixOrigin.8.ipv4."198.237.180.2".32
   //IP-MIB::ipAddressOrigin.ipv4."198.237.180.2" = manual
@@ -158,7 +169,7 @@ foreach ($oid_data[$ip_version] as $ip_snmp => $entry)
 {
   $ip_address = hex2ip($ip_snmp);
   $ifIndex = $entry['ipAddressIfIndex'];
-  if ($entry['ipAddressPrefix'] == 'zeroDotZero')
+  if ($entry['ipAddressPrefix'] === 'zeroDotZero')
   {
     // Additionally walk IPV6-MIB, especially in JunOS because they spit at world standards
     // See: http://jira.observium.org/browse/OBSERVIUM-1271

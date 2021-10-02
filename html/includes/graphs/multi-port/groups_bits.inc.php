@@ -35,7 +35,7 @@ foreach($vars['data'] as $entry)
     }
   }
 
-  if (count($rrds))
+  if (safe_count($rrds))
   {
     $this_data = array('rrds'  => $rrds,
                        'colour_in'  => $entry['colour'],

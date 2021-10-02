@@ -6,263 +6,507 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 echo("Caching OIDs: ");
-$ups_array = array();
-echo("upsInput ");
-$ups_array = snmpwalk_cache_multi_oid($device, "upsInput", $ups_array, "UPS-MIB");
-echo("upsOutput ");
-$ups_array = snmpwalk_cache_multi_oid($device, "upsOutput", $ups_array, "UPS-MIB");
-echo("upsBypass ");
-$ups_array = snmpwalk_cache_multi_oid($device, "upsBypass", $ups_array, "UPS-MIB");
 
 $scale         = 0.1;
-$scale_current = $scale;
-if ($device['os'] == 'poweralert')
-{
+$scale_current = 0.1;
+$scale_battery = 0.1;
+// hardware specific hacks
+if ($device['os'] === 'poweralert') {
   // For poweralert use "incorrect" scale, see: http://jira.observium.org/browse/OBSERVIUM-1432
   // Fixed in firmware version 12.06.0068
-  if (!empty($device['version']))
-  {
+  if (!empty($device['version'])) {
     $tl_version = $device['version'];
   } else {
-    $tl_version = snmp_get($device, '.1.3.6.1.4.1.850.10.1.2.3.0', '-Ovq', 'TRIPPLITE-12X');
+    $tl_version = snmp_get_oid($device, '.1.3.6.1.4.1.850.10.1.2.3.0', 'TRIPPLITE-12X');
   }
-  if (!version_compare($tl_version, '12.06.0068', '>='))
-  {
+  if (!version_compare($tl_version, '12.06.0068', '>=')) {
     // incorrect
     $scale_current = 1;
   }
+} elseif ($device['os'] === 'snr-erd') {
+  $scale_battery = 1;
 }
 
+/* SNR ERD-4
+UPS-MIB::upsIdentManufacturer.0 = STRING: APC
+UPS-MIB::upsIdentModel.0 = STRING: Smart-UPS
+UPS-MIB::upsIdentUPSSoftwareVersion.0 = STRING: 665.6.I
+UPS-MIB::upsBatteryStatus.0 = INTEGER: batteryNormal(2)
+UPS-MIB::upsSecondsOnBattery.0 = INTEGER: 0 seconds
+UPS-MIB::upsEstimatedMinutesRemaining.0 = INTEGER: 15300 minutes
+UPS-MIB::upsEstimatedChargeRemaining.0 = INTEGER: 100 percent
+UPS-MIB::upsBatteryVoltage.0 = INTEGER: 55 0.1 Volt DC
+UPS-MIB::upsBatteryTemperature.0 = INTEGER: 24 degrees Centigrade
+UPS-MIB::upsInputLineIndex.1 = INTEGER: 1
+UPS-MIB::upsInputFrequency.1 = INTEGER: 50 0.1 Hertz
+UPS-MIB::upsInputVoltage.1 = INTEGER: 237 RMS Volts
+UPS-MIB::upsOutputSource.0 = INTEGER: normal(3)
+UPS-MIB::upsOutputLineIndex.1 = INTEGER: 1
+UPS-MIB::upsOutputVoltage.1 = INTEGER: 237 RMS Volts
+UPS-MIB::upsOutputCurrent.1 = INTEGER: 0 0.1 RMS Amp
+UPS-MIB::upsOutputPower.1 = INTEGER: 0 Watts
+UPS-MIB::upsOutputPercentLoad.1 = INTEGER: 8 percent
+UPS-MIB::upsTestId.0 = OID: UPS-MIB::upsTestNoTestsInitiated
+UPS-MIB::upsTestElapsedTime.0 = INTEGER: 0
+ */
+/* Microtik RouterOS
+UPS-MIB::upsIdentModel.0 = STRING: Back-UPS ES 550G FW:870.O3 .I USB FW:O3
+UPS-MIB::upsIdentUPSSoftwareVersion.0 = STRING:
+UPS-MIB::upsBatteryStatus.0 = INTEGER: batteryNormal(2)
+UPS-MIB::upsEstimatedMinutesRemaining.0 = INTEGER: 60 minutes
+UPS-MIB::upsEstimatedChargeRemaining.0 = INTEGER: 100 percent
+UPS-MIB::upsBatteryVoltage.0 = INTEGER: 135 0.1 Volt DC
+UPS-MIB::upsBatteryTemperature.0 = INTEGER: 0 degrees Centigrade
+UPS-MIB::upsInputNumLines.0 = INTEGER: 1
+UPS-MIB::upsInputFrequency.1 = INTEGER: 0 0.1 Hertz
+UPS-MIB::upsInputVoltage.1 = INTEGER: 220 RMS Volts
+UPS-MIB::upsOutputNumLines.0 = INTEGER: 1
+UPS-MIB::upsOutputVoltage.1 = INTEGER: 0 RMS Volts
+UPS-MIB::upsOutputPercentLoad.1 = INTEGER: 4 percent
+UPS-MIB::upsAlarmsPresent.0 = Gauge32: 0
+ */
+/* Multiphase UPS
+UPS-MIB::upsIdentManufacturer.0 = STRING: RPS SpA
+UPS-MIB::upsIdentModel.0 = STRING: TT5K100
+UPS-MIB::upsIdentUPSSoftwareVersion.0 = STRING: SWM022-02-21
+UPS-MIB::upsIdentAgentSoftwareVersion.0 = STRING: AppVer. 02.17.001
+UPS-MIB::upsIdentName.0 = STRING: Netman204
+UPS-MIB::upsIdentAttachedDevices.0 = STRING:
+UPS-MIB::upsBatteryStatus.0 = INTEGER: batteryNormal(2)
+UPS-MIB::upsSecondsOnBattery.0 = INTEGER: 0 seconds
+UPS-MIB::upsEstimatedMinutesRemaining.0 = INTEGER: 54 minutes
+UPS-MIB::upsEstimatedChargeRemaining.0 = INTEGER: 100 percent
+UPS-MIB::upsBatteryVoltage.0 = INTEGER: 2726 0.1 Volt DC
+UPS-MIB::upsBatteryCurrent.0 = INTEGER: 30 0.1 Amp DC
+UPS-MIB::upsBatteryTemperature.0 = INTEGER: 37 degrees Centigrade
+UPS-MIB::upsInputLineBads.0 = Counter32: 0
+UPS-MIB::upsInputNumLines.0 = INTEGER: 3
+UPS-MIB::upsInputFrequency.1 = INTEGER: 499 0.1 Hertz
+UPS-MIB::upsInputFrequency.2 = INTEGER: 499 0.1 Hertz
+UPS-MIB::upsInputFrequency.3 = INTEGER: 499 0.1 Hertz
+UPS-MIB::upsInputVoltage.1 = INTEGER: 229 RMS Volts
+UPS-MIB::upsInputVoltage.2 = INTEGER: 228 RMS Volts
+UPS-MIB::upsInputVoltage.3 = INTEGER: 229 RMS Volts
+UPS-MIB::upsInputCurrent.1 = INTEGER: 245 0.1 RMS Amp
+UPS-MIB::upsInputCurrent.2 = INTEGER: 257 0.1 RMS Amp
+UPS-MIB::upsInputCurrent.3 = INTEGER: 254 0.1 RMS Amp
+UPS-MIB::upsInputTruePower.1 = INTEGER: 0 Watts
+UPS-MIB::upsInputTruePower.2 = INTEGER: 0 Watts
+UPS-MIB::upsInputTruePower.3 = INTEGER: 0 Watts
+UPS-MIB::upsOutputSource.0 = INTEGER: normal(3)
+UPS-MIB::upsOutputFrequency.0 = INTEGER: 500 0.1 Hertz
+UPS-MIB::upsOutputNumLines.0 = INTEGER: 3
+UPS-MIB::upsOutputVoltage.1 = INTEGER: 231 RMS Volts
+UPS-MIB::upsOutputVoltage.2 = INTEGER: 230 RMS Volts
+UPS-MIB::upsOutputVoltage.3 = INTEGER: 230 RMS Volts
+UPS-MIB::upsOutputCurrent.1 = INTEGER: 368 0.1 RMS Amp
+UPS-MIB::upsOutputCurrent.2 = INTEGER: 200 0.1 RMS Amp
+UPS-MIB::upsOutputCurrent.3 = INTEGER: 193 0.1 RMS Amp
+UPS-MIB::upsOutputPower.1 = INTEGER: 6688 Watts
+UPS-MIB::upsOutputPower.2 = INTEGER: 3944 Watts
+UPS-MIB::upsOutputPower.3 = INTEGER: 4138 Watts
+UPS-MIB::upsOutputPercentLoad.1 = INTEGER: 25 percent
+UPS-MIB::upsOutputPercentLoad.2 = INTEGER: 13 percent
+UPS-MIB::upsOutputPercentLoad.3 = INTEGER: 13 percent
+UPS-MIB::upsBypassFrequency.0 = INTEGER: 499 0.1 Hertz
+UPS-MIB::upsBypassNumLines.0 = INTEGER: 3
+UPS-MIB::upsBypassVoltage.1 = INTEGER: 230 RMS Volts
+UPS-MIB::upsBypassVoltage.2 = INTEGER: 228 RMS Volts
+UPS-MIB::upsBypassVoltage.3 = INTEGER: 230 RMS Volts
+UPS-MIB::upsBypassCurrent.1 = INTEGER: 0 0.1 RMS Amp
+UPS-MIB::upsBypassCurrent.2 = INTEGER: 0 0.1 RMS Amp
+UPS-MIB::upsBypassCurrent.3 = INTEGER: 0 0.1 RMS Amp
+UPS-MIB::upsBypassPower.1 = INTEGER: 0 Watts
+UPS-MIB::upsBypassPower.2 = INTEGER: 0 Watts
+UPS-MIB::upsBypassPower.3 = INTEGER: 0 Watts
+UPS-MIB::upsAlarmsPresent.0 = Gauge32: 0
+UPS-MIB::upsTestId.0 = Wrong Type (should be OBJECT IDENTIFIER): Gauge32: 0
+UPS-MIB::upsTestSpinLock.0 = INTEGER: 0
+UPS-MIB::upsTestResultsSummary.0 = INTEGER: 0
+UPS-MIB::upsTestResultsDetail.0 = STRING:
+UPS-MIB::upsTestStartTime.0 = Timeticks: (0) 0:00:00.00
+UPS-MIB::upsTestElapsedTime.0 = INTEGER: 0
+UPS-MIB::upsShutdownType.0 = INTEGER: output(1)
+UPS-MIB::upsShutdownAfterDelay.0 = INTEGER: -1 seconds
+UPS-MIB::upsStartupAfterDelay.0 = INTEGER: -1 seconds
+UPS-MIB::upsRebootWithDuration.0 = INTEGER: -1 seconds
+UPS-MIB::upsAutoRestart.0 = INTEGER: 0
+UPS-MIB::upsConfigInputVoltage.0 = INTEGER: 0 RMS Volts
+UPS-MIB::upsConfigInputFreq.0 = INTEGER: 0 0.1 Hertz
+UPS-MIB::upsConfigOutputVoltage.0 = INTEGER: 0 RMS Volts
+UPS-MIB::upsConfigOutputFreq.0 = INTEGER: 0 0.1 Hertz
+UPS-MIB::upsConfigOutputVA.0 = INTEGER: 0 Volt-Amps
+UPS-MIB::upsConfigOutputPower.0 = INTEGER: 0 Watts
+UPS-MIB::upsConfigLowBattTime.0 = INTEGER: 0 minutes
+UPS-MIB::upsConfigAudibleStatus.0 = INTEGER: 0
+UPS-MIB::upsConfigLowVoltageTransferPoint.0 = INTEGER: 0 RMS Volts
+UPS-MIB::upsConfigHighVoltageTransferPoint.0 = INTEGER: 0 RMS Volts
+ */
 $descr_extra = '';
-if ($device['type'] == 'network')
-{
-  // UPS-MIB::upsIdentModel.0 = STRING: Back-UPS ES 550G FW:870.O3 .I USB FW:O3
-  $descr_extra = snmp_get_oid($device, 'upsIdentModel.0', 'UPS-MIB');
-  if (snmp_status()) { $descr_extra = " ($descr_extra)"; }
+if ($device['type'] !== 'power' &&
+    $descr_extra = snmp_get_oid($device, 'upsIdentModel.0', 'UPS-MIB')) {
+  //print_debug_vars($descr_extra);
+  $descr_extra = preg_replace('/ FW:.+$/', '', $descr_extra);
+  if ($manufacturer = snmp_get_oid($device, 'upsIdentManufacturer.0', 'UPS-MIB')) {
+    $descr_extra = "$manufacturer $descr_extra";
+  }
+  //print_debug_vars($descr_extra);
+  $descr_extra = " ($descr_extra)";
 }
-
-print_debug_vars($ups_array);
-$indexes = array_slice(array_keys($ups_array), 1);
 
 // Check if total Input Current and Power more than 0
-$ups_total = array('upsInputCurrent'   => 0,
-                   'upsInputTruePower' => 0,
-                   'upsBypassCurrent'  => 0,
-                   'upsBypassPower'    => 0,
-                  );
-foreach ($indexes as $index)
-{
-  foreach ($ups_total as $oid => $v)
-  {
-    if (isset($ups_array[$index][$oid]))
-    {
-      $ups_total[$oid] += $ups_array[$index][$oid];
+$ups_total = [
+  'upsInputCurrent'   => 0,
+  'upsInputTruePower' => 0,
+  'upsOutputCurrent'  => 0,
+  'upsOutputPower'    => 0,
+  'upsBypassCurrent'  => 0,
+  'upsBypassPower'    => 0,
+];
+
+/* Input */
+echo("upsInput ");
+$ups_array = snmpwalk_cache_oid($device, "upsInputTable", [], "UPS-MIB");
+print_debug_vars($ups_array);
+
+if (safe_count($ups_array)) {
+  $ups_lines = snmp_get_oid($device, 'upsInputNumLines.0', 'UPS-MIB');
+
+  // Check if total Input Current and Power more than 0
+  foreach ($ups_array as $entry) {
+    if (isset($entry['upsInputCurrent'])) {
+      $ups_total['upsInputCurrent'] += (int)$entry['upsInputCurrent'];
     }
+    if (isset($entry['upsInputTruePower'])) {
+      $ups_total['upsInputTruePower'] += (int)$entry['upsInputTruePower'];
+    }
+  }
+
+  foreach ($ups_array as $index => $entry) {
+
+    $phase = $entry['upsInputLineIndex'];
+    // Workaround if no upsInputLineIndex
+    /*
+     * UPS-MIB::upsInputLineBads.0 = 1
+     * UPS-MIB::upsInputNumLines.0 = 1
+     * UPS-MIB::upsInputLineIndex.1.0 = 1
+     * UPS-MIB::upsInputFrequency.1.0 = 500
+     * UPS-MIB::upsInputVoltage.1.0 = 215
+     */
+    if (safe_empty($phase)) {
+      // some devices have incorrect indexes (with additional .0), see:
+      // http://jira.observium.org/browse/OBSERVIUM-2157
+      list($phase) = explode('.', $index);
+    }
+
+    $descr = "Input";
+    if ($ups_lines > 1) {
+      $descr .= " Phase $phase";
+    }
+    $descr .= $descr_extra;
+
+    ## Input voltage
+    // FIXME maybe use upsConfigLowVoltageTransferPoint and upsConfigHighVoltageTransferPoint as limits? (upsConfig table)
+    // Again poweralert report incorrect values in UPS-MIB
+    $oid_name = 'upsInputVoltage';
+    if (isset($entry[$oid_name]) &&
+        !discovery_check_if_type_exist([ 'voltage->TRIPPLITE-PRODUCTS-tlpUpsInputPhaseVoltage',
+                                         'voltage->HUAWEI-UPS-MIB-hwUpsInputVoltageA' ], 'sensor')) {
+      $oid   = ".1.3.6.1.2.1.33.1.3.3.1.3.$index";
+      //discover_sensor('voltage', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, 1, $entry[$oid_name]);
+      $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
+      discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+    }
+
+    ## Input frequency
+    $oid_name = 'upsInputFrequency';
+    if (isset($entry[$oid_name]) && $entry[$oid_name] > 0) {
+      $scale_frequency = strlen($entry[$oid_name]) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
+      $oid   = ".1.3.6.1.2.1.33.1.3.3.1.2.$index";
+      //discover_sensor('frequency', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, $scale, $entry[$oid_name]);
+      $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
+      discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_frequency, $entry[$oid_name], $options);
+    }
+
+    ## Input current
+    $oid_name = 'upsInputCurrent';
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+      $oid   = ".1.3.6.1.2.1.33.1.3.3.1.4.$index";
+      //discover_sensor('current', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, $scale_current, $entry[$oid_name]);
+      $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
+      discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+    }
+
+    ## Input power
+    $oid_name = 'upsInputTruePower';
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+      $oid   = ".1.3.6.1.2.1.33.1.3.3.1.5.$index";
+      //discover_sensor('power', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, $scale, $entry[$oid_name]);
+      $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
+      discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, $scale, $entry[$oid_name], $options);
+    }
+
   }
 }
 
-foreach ($indexes as $index)
-{
-  # Input
-  $phase = $ups_array[$index]['upsInputLineIndex'];
+/* Output */
+echo("upsOutput ");
+$ups_array = snmpwalk_cache_oid($device, "upsOutputTable", [], "UPS-MIB");
+print_debug_vars($ups_array);
 
-  // Workaround if no upsInputLineIndex
-  if ($phase == '')
-  {
-    // some devices have incorrect indexes (with additional .0), see:
-    // http://jira.observium.org/browse/OBSERVIUM-2157
-    list($phase) = explode('.', $index);
+if (safe_count($ups_array)) {
+  $ups_lines = snmp_get_oid($device, 'upsOutputNumLines.0', 'UPS-MIB');
+
+  // Check if total Input Current and Power more than 0
+  foreach ($ups_array as $entry) {
+    if (isset($entry['upsOutputCurrent'])) {
+      $ups_total['upsOutputCurrent'] += (int)$entry['upsOutputCurrent'];
+    }
+    if (isset($entry['upsOutputPower'])) {
+      $ups_total['upsOutputPower'] += (int)$entry['upsOutputPower'];
+    }
   }
 
-  $descr = "Input"; if ($ups_array[0]['upsInputNumLines'] > 1) { $descr .= " Phase $phase"; }
+  foreach ($ups_array as $index => $entry) {
+    $phase = $entry['upsOutputLineIndex'];
+    // Workaround if no upsInputLineIndex
+    /*
+     * UPS-MIB::upsOutputSource.0 = normal
+     * UPS-MIB::upsOutputNumLines.0 = 1
+     * UPS-MIB::upsOutputLineIndex.1.0 = 1
+     * UPS-MIB::upsOutputVoltage.1.0 = 230
+     * UPS-MIB::upsOutputVoltage.2.0 = 0
+     * UPS-MIB::upsOutputVoltage.3.0 = 0
+     * UPS-MIB::upsOutputPower.1.0 = 2700
+     * UPS-MIB::upsOutputPercentLoad.1.0 = 45
+     */
+    if (safe_empty($phase)) {
+      // some devices have incorrect indexes (with additional .0), see:
+      // http://jira.observium.org/browse/OBSERVIUM-2157
+      list($phase) = explode('.', $index);
+    }
 
-  ## Input voltage
-  # FIXME maybe use upsConfigLowVoltageTransferPoint and upsConfigHighVoltageTransferPoint as limits? (upsConfig table)
-  // Again poweralert report incorrect values in UPS-MIB
-  if (isset($ups_array[$index]['upsInputVoltage']) &&
-      !discovery_check_if_type_exist('voltage->TRIPPLITE-PRODUCTS-tlpUpsInputPhaseVoltage', 'sensor'))
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.3.3.1.3.$index"; # UPS-MIB:upsInputVoltage.$index
-    discover_sensor('voltage', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsInputVoltage']);
+    $descr = "Output";
+    if ($ups_lines > 1) {
+      $descr .= " Phase $phase";
+    }
+    $descr .= $descr_extra;
+
+    ## Output voltage
+    $oid_name = 'upsOutputVoltage';
+    if (isset($entry[$oid_name]) && $entry[$oid_name] > 0 &&
+        !discovery_check_if_type_exist([ 'voltage->TRIPPLITE-PRODUCTS-tlpUpsOutputLineVoltage',
+                                         'voltage->HUAWEI-UPS-MIB-hwUpsOutputVoltageA' ], 'sensor')) {
+      $oid   = ".1.3.6.1.2.1.33.1.4.4.1.2.$index";
+      //discover_sensor('voltage', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsOutputVoltage']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
+      discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+    }
+
+    ## Output current
+    $oid_name = 'upsOutputCurrent';
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+      $oid   = ".1.3.6.1.2.1.33.1.4.4.1.3.$index";
+      //discover_sensor('current', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, $scale_current, $entry['upsOutputCurrent']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
+      discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+    }
+
+    ## Output power
+    $oid_name = 'upsOutputPower';
+    if (isset($entry[$oid_name])  && $ups_total[$oid_name] > 0 &&
+        !discovery_check_if_type_exist('power->HUAWEI-UPS-MIB-hwUpsOutputActivePowerA', 'sensor')) {
+      $oid   = ".1.3.6.1.2.1.33.1.4.4.1.4.$index";
+      //discover_sensor('power', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsOutputPower']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
+      discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+    }
+
+    $oid_name = 'upsOutputPercentLoad';
+    if (isset($entry[$oid_name]) &&
+        !discovery_check_if_type_exist('load->HUAWEI-UPS-MIB-hwUpsOutputLoadA', 'sensor')) {
+      $oid   = ".1.3.6.1.2.1.33.1.4.4.1.5.$index";
+      //rename_rrd($device, "sensor-capacity-ups-mib-upsOutputPercentLoad.${phase}", "sensor-load-ups-mib-upsOutputPercentLoad.${phase}");
+      //discover_sensor('load', $device, $oid, "upsOutputPercentLoad.$phase", 'ups-mib', $descr, 1, $entry['upsOutputPercentLoad']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsOutputPercentLoad.'.$phase ];
+      discover_sensor_ng($device, 'load', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+    }
+
+  }
+}
+
+/* Bypass */
+echo("upsBypass ");
+$ups_array = snmpwalk_cache_oid($device, "upsBypassTable", [], "UPS-MIB");
+print_debug_vars($ups_array);
+
+if (safe_count($ups_array)) {
+  $ups_lines = snmp_get_oid($device, 'upsBypassNumLines.0', 'UPS-MIB');
+
+  // Check if total Input Current and Power more than 0
+  foreach ($ups_array as $entry) {
+    if (isset($entry['upsBypassCurrent'])) {
+      $ups_total['upsBypassCurrent'] += (int)$entry['upsBypassCurrent'];
+    }
+    if (isset($entry['upsBypassPower'])) {
+      $ups_total['upsBypassPower'] += (int)$entry['upsBypassPower'];
+    }
   }
 
-  ## Input frequency
-  if (isset($ups_array[$index]['upsInputFrequency']) && $ups_array[$index]['upsInputFrequency'] > 0)
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.3.3.1.2.$index"; # UPS-MIB:upsInputFrequency.$index
-    discover_sensor('frequency', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr.$descr_extra, $scale, $ups_array[$index]['upsInputFrequency']);
-  }
+  foreach ($ups_array as $index => $entry) {
 
-  ## Input current
-  if (isset($ups_array[$index]['upsInputCurrent']) && $ups_total['upsInputCurrent'] > 0)
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.3.3.1.4.$index"; # UPS-MIB:upsInputCurrent.$index
-    discover_sensor('current', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr.$descr_extra, $scale_current, $ups_array[$index]['upsInputCurrent']);
-  }
+    $phase = $entry['upsBypassLineIndex'];
+    // Workaround if no upsBypassLineIndex
+    if (safe_empty($phase)) {
+      // some devices have incorrect indexes (with additional .0), see:
+      // http://jira.observium.org/browse/OBSERVIUM-2157
+      list($phase) = explode('.', $index);
+    }
 
-  ## Input power
-  if (isset($ups_array[$index]['upsInputTruePower']) && $ups_total['upsInputTruePower'] > 0)
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.3.3.1.5.$index"; # UPS-MIB:upsInputTruePower.$index
-    discover_sensor('power', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr.$descr_extra, $scale, $ups_array[$index]['upsInputTruePower']);
-  }
-
-  # Output
-  $phase = $ups_array[$index]['upsOutputLineIndex'];
-
-  // Workaround if no upsOutputLineIndex
-  if ($phase == '')
-  {
-    // some devices have incorrect indexes (with additional .0), see:
-    // http://jira.observium.org/browse/OBSERVIUM-2157
-    list($phase) = explode('.', $index);
-  }
-
-  $descr = "Output"; if ($ups_array[0]['upsOutputNumLines'] > 1) { $descr .= " Phase $phase"; }
-
-  ## Output voltage
-  if (isset($ups_array[$index]['upsOutputVoltage']) && $ups_array[$index]['upsOutputVoltage'] > 0 &&
-      !discovery_check_if_type_exist('voltage->TRIPPLITE-PRODUCTS-tlpUpsOutputLineVoltage', 'sensor'))
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.4.4.1.2.$index"; # UPS-MIB:upsOutputVoltage.$index
-    discover_sensor('voltage', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsOutputVoltage']);
-  }
-
-  ## Output current
-  if (isset($ups_array[$index]['upsOutputCurrent']))
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.4.4.1.3.$index"; # UPS-MIB:upsOutputCurrent.$index
-    discover_sensor('current', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr.$descr_extra, $scale_current, $ups_array[$index]['upsOutputCurrent']);
-  }
-
-  ## Output power
-  if (isset($ups_array[$index]['upsOutputPower']))
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.4.4.1.4.$index"; # UPS-MIB:upsOutputPower.$index
-    //discover_sensor('apower', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsOutputPower']);
-    discover_sensor('power', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsOutputPower']);
-  }
-
-  if (isset($ups_array[$index]['upsOutputPercentLoad']))
-  {
-    $oid   = ".1.3.6.1.2.1.33.1.4.4.1.5.$index"; # UPS-MIB:upsOutputPercentLoad.$index
-    rename_rrd($device, "sensor-capacity-ups-mib-upsOutputPercentLoad.${phase}", "sensor-load-ups-mib-upsOutputPercentLoad.${phase}");
-    discover_sensor('load', $device, $oid, "upsOutputPercentLoad.$phase", 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsOutputPercentLoad']);
-  }
-
-  # Bypass
-
-  if ($ups_array[0]['upsBypassNumLines'] > 0)
-  {
-    // some devices have incorrect indexes (with additional .0), see:
-    // http://jira.observium.org/browse/OBSERVIUM-2157
-    list($phase) = explode('.', $index);
-    $descr = "Bypass"; if ($ups_array[0]['upsBypassNumLines'] > 1) { $descr .= " Phase $phase"; }
+    $descr = "Bypass";
+    if ($ups_lines > 1) {
+      $descr .= " Phase $phase";
+    }
+    $descr .= $descr_extra;
 
     ## Bypass voltage
-    if (isset($ups_array[$index]['upsBypassVoltage']) &&
-        !discovery_check_if_type_exist('voltage->TRIPPLITE-PRODUCTS-tlpUpsBypassLineVoltage', 'sensor'))
-    {
-      $oid   = ".1.3.6.1.2.1.33.1.5.3.1.2.$index"; # UPS-MIB:upsBypassVoltage.$index
-      discover_sensor('voltage', $device, $oid, "upsBypassEntry.".$phase, 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsBypassVoltage']);
+    $oid_name = 'upsBypassVoltage';
+    if (isset($entry[$oid_name]) && $entry[$oid_name] > 0 &&
+        !discovery_check_if_type_exist([ 'voltage->TRIPPLITE-PRODUCTS-tlpUpsBypassLineVoltage',
+                                         'voltage->HUAWEI-UPS-MIB-hwUpsBypassInputVoltageA' ], 'sensor')) {
+      $oid   = ".1.3.6.1.2.1.33.1.5.3.1.2.$index";
+      //discover_sensor('voltage', $device, $oid, "upsBypassEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsBypassVoltage']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsBypassEntry.'.$phase ];
+      discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
     }
 
     ## Bypass current
-    if (isset($ups_array[$index]['upsBypassCurrent']) && $ups_total['upsBypassCurrent'] > 0)
-    {
-      $oid   = ".1.3.6.1.2.1.33.1.5.3.1.3.$index"; # UPS-MIB:upsBypassCurrent.$index
-      discover_sensor('current', $device, $oid, "upsBypassEntry.".$phase, 'ups-mib', $descr.$descr_extra, $scale_current, $ups_array[$index]['upsBypassCurrent']);
+    $oid_name = 'upsBypassCurrent';
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+      $oid   = ".1.3.6.1.2.1.33.1.5.3.1.3.$index";
+      //discover_sensor('current', $device, $oid, "upsBypassEntry.".$phase, 'ups-mib', $descr, $scale_current, $entry['upsBypassCurrent']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsBypassEntry.'.$phase ];
+      discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
     }
 
     ## Bypass power
-    if (isset($ups_array[$index]['upsBypassPower']) && $ups_total['upsBypassPower'] > 0)
-    {
-      $oid   = ".1.3.6.1.2.1.33.1.5.3.1.4.$index"; # UPS-MIB:upsBypassPower.$index
-      discover_sensor('power', $device, $oid, "upsBypassEntry.".$phase, 'ups-mib', $descr.$descr_extra, 1, $ups_array[$index]['upsBypassPower']);
+    $oid_name = 'upsBypassPower';
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+      $oid   = ".1.3.6.1.2.1.33.1.5.3.1.4.$index";
+      //discover_sensor('power', $device, $oid, "upsBypassEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsBypassPower']);
+      $options = [ 'rename_rrd' => 'ups-mib-upsBypassEntry.'.$phase ];
+      discover_sensor_ng($device, 'power', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
     }
+
   }
 }
 
-if (isset($ups_array[0]['upsOutputSource']))
-{
-  $descr = "Source of Output Power";
+/* Battery */
+echo("upsBattery ");
+$ups_array = snmpwalk_cache_oid($device, "upsBattery", array(), "UPS-MIB");
+if (isset($ups_array[0])) {
+  $index = 0;
+  $entry = $ups_array[0];
+  $descr = "Battery" . $descr_extra;
+
+  $oid_name = 'upsBatteryTemperature';
+  if (isset($entry[$oid_name]) &&
+      $entry[$oid_name] != 0 && $entry[$oid_name] < 1000) { // Battery won't be freezing, 0 means no sensor.
+    $oid = ".1.3.6.1.2.1.33.1.2.7.0";
+
+    //discover_sensor('temperature', $device, $oid, "upsBatteryTemperature", 'ups-mib', "Battery".$descr_extra, 1, $ups_array[0]['upsBatteryTemperature']);
+    $options = [ 'rename_rrd' => 'ups-mib-upsBatteryTemperature' ];
+    discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+  }
+
+  $oid_name = 'upsBatteryCurrent';
+  if (isset($entry[$oid_name]) &&
+      $entry[$oid_name] >= 0 && $entry[$oid_name] < 10000) {
+    $oid = ".1.3.6.1.2.1.33.1.2.6.0";
+
+    //discover_sensor('current', $device, $oid, "upsBatteryCurrent", 'ups-mib', "Battery" . $descr_extra, $scale_current, $ups_array[0]['upsBatteryCurrent']);
+    $options = [ 'rename_rrd' => 'ups-mib-upsBatteryCurrent', 'limit_auto' => FALSE ];
+    discover_sensor_ng($device, 'current', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_current, $entry[$oid_name], $options);
+  }
+
+  $oid_name = 'upsBatteryVoltage';
+  if (isset($entry[$oid_name])) {
+    $oid = ".1.3.6.1.2.1.33.1.2.5.0"; # UPS-MIB:upsBatteryVoltage.0
+
+    //discover_sensor('voltage', $device, $oid, "upsBatteryVoltage", 'ups-mib', "Battery" . $descr_extra, $scale, $ups_array[0]['upsBatteryVoltage']);
+    $options = [ 'rename_rrd' => 'ups-mib-upsBatteryVoltage' ];
+    discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_battery, $entry[$oid_name], $options);
+  }
+
+  $oid_name = 'upsEstimatedMinutesRemaining';
+  if (isset($entry[$oid_name])) {
+    $descr  = "Battery Runtime Remaining" . $descr_extra;
+    $oid    = ".1.3.6.1.2.1.33.1.2.3.0";
+    $options = [ 'limit_low' => snmp_get_oid($device, "upsConfigLowBattTime.0", "UPS-MIB") ];
+
+    //discover_sensor('runtime', $device, $oid, "upsEstimatedMinutesRemaining.0", 'mge', $descr . $descr_extra, 1, $value, $limits);
+    $options['rename_rrd'] = 'mge-upsEstimatedMinutesRemaining.0';
+    discover_sensor_ng($device, 'runtime', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+  }
+
+  $oid_name = 'upsEstimatedChargeRemaining';
+  if (isset($entry[$oid_name])) {
+    $descr = "Battery Charge Remaining" . $descr_extra;
+    $oid   = ".1.3.6.1.2.1.33.1.2.4.0";
+
+    //discover_sensor('capacity', $device, $oid, "upsEstimatedChargeRemaining.0", 'ups-mib', $descr . $descr_extra, 1, $value);
+    $options = [ 'rename_rrd' => 'ups-mib-upsEstimatedChargeRemaining.0' ];
+    discover_sensor_ng($device, 'capacity', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
+  }
+
+  $oid_name = 'upsBatteryStatus';
+  if (isset($entry[$oid_name])) {
+    $descr = "Battery Status" . $descr_extra;
+    $oid   = ".1.3.6.1.2.1.33.1.2.1.0";
+
+    //discover_status($device, $oid, "upsBatteryStatus.0", 'ups-mib-battery-state', $descr . $descr_extra, $value, array( 'entPhysicalClass' => 'other' ));
+    discover_status_ng($device, $mib, $oid_name, $oid, $index, 'ups-mib-battery-state', $descr, $entry[$oid_name], [ 'entPhysicalClass' => 'battery' ]);
+  }
+}
+
+## Output Status
+echo("upsOutputSource ");
+$value = snmp_get_oid($device, 'upsOutputSource.0', $mib);
+if (snmp_status()) {
+  $descr = "Source of Output Power" . $descr_extra;
   $oid   = ".1.3.6.1.2.1.33.1.4.1.0";
-  $value  = $ups_array[0]['upsOutputSource'];
 
-  discover_status($device, $oid, "upsOutputSource.0", 'ups-mib-output-state', $descr.$descr_extra, $value, array('entPhysicalClass' => 'other'));
-}
-
-$ups_array = snmpwalk_cache_multi_oid($device, "upsBattery", array(), "UPS-MIB");
-
-if (isset($ups_array[0]['upsBatteryTemperature']) && $ups_array[0]['upsBatteryTemperature'] != 0) // Battery won't be freezing, 0 means no sensor.
-{
-  $oid = ".1.3.6.1.2.1.33.1.2.7.0"; # UPS-MIB:upsBatteryTemperature.0
-
-  discover_sensor('temperature', $device, $oid, "upsBatteryTemperature", 'ups-mib', "Battery".$descr_extra, 1, $ups_array[0]['upsBatteryTemperature']);
-}
-
-if (isset($ups_array[0]['upsBatteryCurrent']) && $ups_array[0]['upsBatteryCurrent'] > 0)
-{
-  $oid = ".1.3.6.1.2.1.33.1.2.6.0"; # UPS-MIB:upsBatteryCurrent.0
-
-  discover_sensor('current', $device, $oid, "upsBatteryCurrent", 'ups-mib', "Battery".$descr_extra, $scale_current, $ups_array[0]['upsBatteryCurrent']);
-}
-
-if (isset($ups_array[0]['upsBatteryVoltage']))
-{
-  $oid = ".1.3.6.1.2.1.33.1.2.5.0"; # UPS-MIB:upsBatteryVoltage.0
-
-  discover_sensor('voltage', $device, $oid, "upsBatteryVoltage", 'ups-mib', "Battery".$descr_extra, $scale, $ups_array[0]['upsBatteryVoltage']);
-}
-
-if (isset($ups_array[0]['upsBatteryStatus']))
-{
-  $descr = "Battery Status";
-  $oid   = ".1.3.6.1.2.1.33.1.2.1.0";
-  $value  = $ups_array[0]['upsBatteryStatus'];
-
-  discover_status($device, $oid, "upsBatteryStatus.0", 'ups-mib-battery-state', $descr.$descr_extra, $value, array('entPhysicalClass' => 'other'));
-}
-
-if (isset($ups_array[0]['upsEstimatedMinutesRemaining']))
-{
-  $descr  = "Battery Runtime Remaining";
-  $oid    = ".1.3.6.1.2.1.33.1.2.3.0";
-  $limits = array('limit_low' => snmp_get_oid($device, "upsConfigLowBattTime.0", "UPS-MIB"));
-  $value  = $ups_array[0]['upsEstimatedMinutesRemaining'];
-
-  // FIXME, why mge? seems as copy-paste
-  discover_sensor('runtime', $device, $oid, "upsEstimatedMinutesRemaining.0", 'mge', $descr.$descr_extra, 1, $value, $limits);
-}
-
-if (isset($ups_array[0]['upsEstimatedChargeRemaining']))
-{
-  $descr = "Battery Charge Remaining";
-  $oid   = ".1.3.6.1.2.1.33.1.2.4.0";
-  $value  = $ups_array[0]['upsEstimatedChargeRemaining'];
-
-  discover_sensor('capacity', $device, $oid, "upsEstimatedChargeRemaining.0", 'ups-mib', $descr.$descr_extra, 1, $value);
+  //discover_status($device, $oid, "upsOutputSource.0", 'ups-mib-output-state', $descr.$descr_extra, $value, array('entPhysicalClass' => 'output'));
+  discover_status_ng($device, $mib, 'upsOutputSource', $oid, 0, 'ups-mib-output-state', $descr, $value, [ 'entPhysicalClass' => 'output' ]);
 }
 
 ## Output Frequency
-$oid   = ".1.3.6.1.2.1.33.1.4.2.0"; # UPS-MIB:upsOutputFrequency.0
-$value = snmp_get($device, $oid, "-OUqv");
-if (is_numeric($value))
-{
-  discover_sensor('frequency', $device, $oid, "upsOutputFrequency", 'ups-mib', "Output".$descr_extra, $scale, $value);
+echo("upsOutputFrequency ");
+$value = snmp_get_oid($device, 'upsOutputFrequency.0', $mib);
+if (is_numeric($value)) {
+  $scale_frequency = strlen($value) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
+  $descr = "Output" . $descr_extra;
+  $oid   = ".1.3.6.1.2.1.33.1.4.2.0";
+  //discover_sensor('frequency', $device, $oid, "upsOutputFrequency", 'ups-mib', "Output".$descr_extra, $scale, $value);
+  $options = [ 'rename_rrd' => 'ups-mib-upsOutputFrequency' ];
+  discover_sensor_ng($device, 'frequency', $mib, "upsOutputFrequency", $oid, 0, NULL, $descr, $scale_frequency, $value, $options);
 }
 
 ## Bypass Frequency
-$oid   = ".1.3.6.1.2.1.33.1.5.1.0"; # UPS-MIB:upsBypassFrequency.0
-$value = snmp_get($device, $oid, "-OUqv");
-if (is_numeric($value))
-{
-  discover_sensor('frequency', $device, $oid, "upsBypassFrequency", 'ups-mib', "Bypass".$descr_extra, $scale, $value);
+echo("upsBypassFrequency ");
+$value = snmp_get_oid($device, 'upsBypassFrequency.0', $mib);
+if (is_numeric($value)) {
+  $scale_frequency = strlen($value) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
+  $descr = "Bypass" . $descr_extra;
+  $oid   = ".1.3.6.1.2.1.33.1.5.1.0";
+  //discover_sensor('frequency', $device, $oid, "upsBypassFrequency", 'ups-mib', "Bypass".$descr_extra, $scale, $value);
+  $options = [ 'rename_rrd' => 'ups-mib-upsBypassFrequency' ];
+  discover_sensor_ng($device, 'frequency', $mib, "upsBypassFrequency", $oid, 0, NULL, $descr, $scale_frequency, $value, $options);
 }
 
 //UPS-MIB::upsTestId.0 = OID: UPS-MIB::upsTestNoTestsInitiated
@@ -271,26 +515,25 @@ if (is_numeric($value))
 //UPS-MIB::upsTestResultsDetail.0 = STRING: No test initiated.
 //UPS-MIB::upsTestStartTime.0 = Timeticks: (0) 0:00:00.00
 //UPS-MIB::upsTestElapsedTime.0 = INTEGER: 0
-$ups_array = snmpwalk_cache_multi_oid($device, "upsTest", array(), "UPS-MIB");
-if (isset($ups_array[0]['upsTestResultsSummary']) && $ups_array[0]['upsTestResultsSummary'] != 'noTestsInitiated')
-{
+echo("upsTest ");
+$ups_array = snmpwalk_cache_oid($device, "upsTest", array(), "UPS-MIB");
+if (isset($ups_array[0]['upsTestResultsSummary']) && $ups_array[0]['upsTestResultsSummary'] !== 'noTestsInitiated') {
   $descr = "Diagnostics Results";
   $oid   = ".1.3.6.1.2.1.33.1.7.3.0";
   $value  = $ups_array[0]['upsTestResultsSummary'];
   $test_starttime = timeticks_to_sec($ups_array[0]['upsTestStartTime']);
-  if ($test_starttime)
-  {
+  if ($test_starttime) {
     $test_sysUpime = timeticks_to_sec(snmp_get_oid($device, "sysUpTime.0", "SNMPv2-MIB"));
-    if ($test_sysUpime)
-    {
+    if ($test_sysUpime) {
       $test_starttime = time() + $test_starttime - $test_sysUpime; // Unixtime of start test
       $descr .= ' (last ' . format_unixtime($test_starttime) . ')';
     }
   }
 
-  discover_status($device, $oid, "upsTestResultsSummary.0", 'ups-mib-test-state', $descr.$descr_extra, $value, array('entPhysicalClass' => 'other'));
+  //discover_status($device, $oid, "upsTestResultsSummary.0", 'ups-mib-test-state', $descr . $descr_extra, $value, array('entPhysicalClass' => 'other'));
+  discover_status_ng($device, $mib, 'upsTestResultsSummary', $oid, 0, 'ups-mib-test-state', $descr . $descr_extra, $value, [ 'entPhysicalClass' => 'other' ]);
 }
 
-unset($ups_array, $ups_total, $indexes, $index, $oid);
+unset($ups_array, $ups_total, $value, $index, $oid, $options, $descr);
 
 // EOF

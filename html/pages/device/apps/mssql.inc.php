@@ -1,19 +1,19 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage applications
  * @author     Solomon Seal <slm4996+observium@gmail.com> 2014-04
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $sql = "SELECT * FROM `applications-state` WHERE `application_id` = ?";
 $app_state = dbFetchRow($sql, array($app['app_id']));
-$app_data = unserialize($app_state['app_state']);
+$app_data = safe_unserialize($app_state['app_state']);
 
 $app_sections['system'] = "System";
 if (!empty($app_data['stats']))

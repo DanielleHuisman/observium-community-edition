@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -64,7 +63,7 @@ $percentage_bar['bars'][1] = array('percent' => $buff_perc, 'colour' => '#cc0000
 $percentage_bar['bars'][2] = array('percent' => $cach_perc, 'colour' => '#f0e0a0', 'text' => '');
 
 $swap_used = $device_state['ucd_mem']['swap_total'] - $device_state['ucd_mem']['swap_avail'];
-$swap_perc = round(($swap_used / $device_state['ucd_mem']['swap_total']) * 100);
+$swap_perc = $device_state['ucd_mem']['swap_total'] != 0 ? round(($swap_used / $device_state['ucd_mem']['swap_total']) * 100) : 0;
 $swap_free_perc = 100 - $swap_perc;
 
 ?>

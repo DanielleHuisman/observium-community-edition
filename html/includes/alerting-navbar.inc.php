@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -60,7 +59,7 @@ if (!$readonly)
         }
         $exist_contacts = dbFetchColumn('SELECT `contact_id` FROM `alert_contacts_assoc` WHERE `aca_type` = ? AND `alert_checker_id` = ?', array('alert', $vars['alert_test_id']));
         //print_vars($exist_contacts);
-        $sql = 'SELECT `contact_id` FROM `alert_contacts` WHERE `contact_disabled` = 0' .
+        $sql = "SELECT `contact_id` FROM `alert_contacts` WHERE `contact_disabled` = 0 AND `contact_method` != 'syscontact'" .
                generate_query_values($exist_contacts, 'contact_id', '!='); // exclude exist contacts
         //print_vars($sql);
         foreach (dbFetchColumn($sql) as $contact_id)
@@ -139,6 +138,22 @@ if (!$readonly)
 
 
 if (!is_array($alert_rules)) { $alert_rules = cache_alert_rules(); }
+
+/* Hardcode Device sysContact
+if ($_SESSION['userlevel'] >= 7 &&
+    !dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
+  $syscontact = [
+    'contact_descr'            => 'Device sysContact',
+    'contact_method'           => 'syscontact',
+    'contact_endpoint'         => '{"syscontact":"device"}',
+    //'contact_disabled'         => '0',
+    //'contact_disabled_until'   => NULL,
+    //'contact_message_custom'   => 0,
+    //'contact_message_template' => NULL
+  ];
+  dbInsert($syscontact, 'alert_contacts');
+}
+*/
 
 $navbar['class'] = 'navbar-narrow';
 $navbar['brand'] = 'Alerting';

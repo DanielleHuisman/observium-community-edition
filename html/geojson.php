@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage billing
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -20,7 +18,9 @@ include($config['html_dir'] . "/includes/functions.inc.php");
 include($config['html_dir'] . "/includes/authenticate.inc.php");
 include($config['html_dir'] . "/includes/cache-data.inc.php");
 
-if ($_SERVER['REMOTE_ADDR'] != $_SERVER['SERVER_ADDR']) { if (!$_SESSION['authenticated']) { echo("unauthenticated"); exit; } }
+if ($_SERVER['REMOTE_ADDR'] != $_SERVER['SERVER_ADDR']) {
+  if (!$_SESSION['authenticated']) { echo("unauthenticated"); exit; }
+}
 
 $vars = get_vars('GET');
 
@@ -47,11 +47,11 @@ foreach ($GLOBALS['cache']['devices']['id'] as $device)
       foreach ($lat as $lo => $lon)
       {
         $tooltip = "";
-        $num_up = count($lon["up_hosts"]);
-        $num_down = count($lon["down_hosts"]);
+        $num_up = safe_count($lon["up_hosts"]);
+        $num_down = safe_count($lon["down_hosts"]);
         $total_hosts = $num_up + $num_down;
         $tooltip = '<p><span class="label label-success">Up '.$num_up.'</span> <span class="label label-error">Down '.$num_down.'</span></p>';
-        $state = unknown;
+        $state = 'unknown';
         $location_name = "";
         if ($num_down > 0)
         {
@@ -93,6 +93,8 @@ header('Content-type: application/javascript');
 
 //print_r($features);
 
-echo json_encode($geo);
+echo safe_json_encode($geo);
 
 //r($geo);
+
+// EOF

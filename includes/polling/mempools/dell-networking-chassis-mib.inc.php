@@ -15,8 +15,8 @@ $mib = 'DELL-NETWORKING-CHASSIS-MIB';
 
 if (!is_array($cache_storage[$mib]))
 {
-  $cache_storage[$mib] = snmpwalk_cache_multi_oid($device, 'dellNetCpuUtilMemUsage',               array(), $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-  $cache_storage[$mib] = snmpwalk_cache_multi_oid($device, 'dellNetProcessorMemSize', $cache_storage[$mib], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $cache_storage[$mib] = snmpwalk_cache_oid($device, 'dellNetCpuUtilMemUsage', array(), $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $cache_storage[$mib] = snmpwalk_cache_oid($device, 'dellNetProcessorMemSize', $cache_storage[$mib], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 } else {
   print_debug("Cached!");
 }

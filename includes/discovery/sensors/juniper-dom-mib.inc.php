@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -54,32 +53,30 @@ foreach ($jnxDomCurrentTable_oids as $oid)
 //$oids = snmpwalk_cache_oid($device, 'jnxDomCurrentEntry',                    array(), 'JUNIPER-DOM-MIB');
 
 $lane_oids = array();
-foreach ($jnxDomCurrentLaneTable_oids as $oid)
-{
+foreach ($jnxDomCurrentLaneTable_oids as $oid) {
   $lane_oids = snmpwalk_cache_oid($device, $oid, $lane_oids, 'JUNIPER-DOM-MIB');
 }
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
 
   $options = array('entPhysicalIndex' => $index);
 
   $port    = get_port_by_index_cache($device['device_id'], $index);
-  if (is_array($port))
-  {
-    $entry['ifDescr'] = $port['ifDescr'];
+  if (is_array($port)) {
+    $entry['ifDescr'] = $port['port_label'];
     $options['measured_class']  = 'port';
     $options['measured_entity'] = $port['port_id'];
   } else {
-    $entry['ifDescr'] = snmp_get($device, "ifDescr.$index", '-Oqv', 'IF-MIB');
+    $entry['ifDescr'] = snmp_get_oid($device, "ifDescr.$index", 'IF-MIB');
   }
 
 
   if (isset($entry['jnxDomCurrentModuleLaneCount']) && $entry['jnxDomCurrentModuleLaneCount'] > 1) {
     for ($i = 0; $i < $entry['jnxDomCurrentModuleLaneCount']; $i++) {
+      $lane = $i + 1;
       $lane_index = "{$index}.{$i}";
 
-      $descr    = $entry['ifDescr'] . ":{$i} DOM";
+      $descr    = $entry['ifDescr'] . " Lane $lane Temperature";
       $oid_name = 'jnxDomCurrentLaneLaserTemperature';
       $oid_num  = ".1.3.6.1.4.1.2636.3.60.1.2.1.1.9.{$lane_index}";
       $scale    = 1;
@@ -97,7 +94,7 @@ foreach ($oids as $index => $entry)
       }
 
       // jnxDomCurrentTxLaserBiasCurrent
-      $descr    = $entry['ifDescr'] . " {$i} TX Bias";
+      $descr    = $entry['ifDescr'] . " Lane $lane TX Bias";
       $oid_name = 'jnxDomCurrentLaneTxLaserBiasCurrent';
       $oid_num  = ".1.3.6.1.4.1.2636.3.60.1.2.1.1.7.{$lane_index}";
       $scale    = si_to_scale('micro'); // Yah, I forgot number :)
@@ -112,7 +109,7 @@ foreach ($oids as $index => $entry)
       discover_sensor_ng($device,'current', $mib, $oid_name, $oid_num, $lane_index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 
       # jnxDomCurrentRxLaserPower[508] -507 0.01 dbm
-      $descr    = $entry['ifDescr'] . " {$i} RX Power";
+      $descr    = $entry['ifDescr'] . " Lane $lane RX Power";
       $oid_name = 'jnxDomCurrentLaneRxLaserPower';
       $oid_num  = ".1.3.6.1.4.1.2636.3.60.1.2.1.1.6.{$lane_index}";
       $scale    = 0.01;
@@ -127,7 +124,7 @@ foreach ($oids as $index => $entry)
       discover_sensor_ng($device,'dbm', $mib, $oid_name, $oid_num, $lane_index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 
       # jnxDomCurrentTxLaserOutputPower[508] -507 0.01 dbm
-      $descr    = $entry['ifDescr'] . " {$i} TX Power";
+      $descr    = $entry['ifDescr'] . " Lane $lane TX Power";
       $oid_name = 'jnxDomCurrentLaneTxLaserOutputPower';
       $oid_num  = ".1.3.6.1.4.1.2636.3.60.1.2.1.1.8.{$lane_index}";
       $scale    = 0.01;
@@ -148,7 +145,7 @@ foreach ($oids as $index => $entry)
     # jnxDomCurrentModuleTemperatureLowAlarmThreshold[508] -25
     # jnxDomCurrentModuleTemperatureHighWarningThreshold[508] 95
     # jnxDomCurrentModuleTemperatureLowWarningThreshold[508] -20
-    $descr    = $entry['ifDescr'] . ' DOM';
+    $descr    = $entry['ifDescr'] . ' Temperature';
     $oid_name = 'jnxDomCurrentModuleTemperature';
     $oid_num  = ".1.3.6.1.4.1.2636.3.60.1.1.1.1.8.{$index}";
     $scale    = 1;

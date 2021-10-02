@@ -2,14 +2,10 @@
 
 //define('OBS_DEBUG', 1);
 
-include(dirname(__FILE__) . '/../includes/sql-config.inc.php');
-//include(dirname(__FILE__) . '/../includes/defaults.inc.php');
-//include(dirname(__FILE__) . '/../config.php');
-//include(dirname(__FILE__) . '/../includes/definitions.inc.php');
-//include(dirname(__FILE__) . '/../includes/functions.inc.php');
-include(dirname(__FILE__) . '../html/includes/functions.inc.php');
+include(__DIR__ . '/../includes/sql-config.inc.php');
+include(__DIR__ . '../html/includes/functions.inc.php');
 
-class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
+class IncludesSyslogTest extends \PHPUnit\Framework\TestCase
 {
 
   /**
@@ -321,6 +317,12 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
                                            'msg'       => '[420813.870000] wmi_unified_event_rx : no registered event handler : event id 0x901b',
                                            'msg_orig'  => 'kernel: [420813.870000] wmi_unified_event_rx : no registered event handler : event id 0x901b',
                                            ));
+    $result[] = array('unifi||1||6||6||U7LR,44d9e7f618f2,v4.3.21.11325:||2020-10-05 16:28:50|| : stahtd[2839]: [STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}||U7LR,44d9e7f618f2,v4.3.21.11325',
+                      array('facility'  => 'user', 'priority' => '6', 'level' => '6',
+                            'tag'       => 'stahtd[2839]', 'program' => 'STAHTD',
+                            'msg'       => '[STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}',
+                            'msg_orig'  => ': stahtd[2839]: [STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}',
+                      ));
 
     // JunOS/JunOSe
     $result[] = array('junos||9||6||6||/usr/sbin/cron[50991]:||2016-10-07 00:15:00|| (root) CMD (   /usr/libexec/atrun)||',
@@ -529,6 +531,50 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
                                            'msg_orig'  => '05:04-12:44:37 utm openvpn[5068]: MANAGEMENT: CMD \'status -1\'',
                                            ));
 
+    // Brocade
+    $result[] = [
+      'nos||21||6||6||raslogd:||2021-03-23 16:41:27|| [log@1588 value="RASLOG"][timestamp@1588 value="2021-03-23T16:41:27.188825"][msgid@1588 value="L2SS-1032"][seqnum@1588 value="94245"][attr@1588 value=" SW/0 | Active | DCE | WWN 10:00:50:eb:1a:ce:e7:44"][severity@1588 value="INFO"][swname@1588 value="VDX_1R01S08"] BOMENS Checksum Mismatch reached maximum threshold(3) for Rbridge:21. Requesting MAC refresh from Rbridge:21.||raslogd',
+      [ 'facility'  => 'local5', 'priority' => '6', 'level' => '6',
+        'tag'       => 'L2SS-1032', 'program' => 'RASLOG',
+        'msg'       => 'ENS Checksum Mismatch reached maximum threshold(3) for Rbridge:21. Requesting MAC refresh from Rbridge:21.',
+        'msg_orig'  => '[log@1588 value="RASLOG"][timestamp@1588 value="2021-03-23T16:41:27.188825"][msgid@1588 value="L2SS-1032"][seqnum@1588 value="94245"][attr@1588 value=" SW/0 | Active | DCE | WWN 10:00:50:eb:1a:ce:e7:44"][severity@1588 value="INFO"][swname@1588 value="VDX_1R01S08"] BOMENS Checksum Mismatch reached maximum threshold(3) for Rbridge:21. Requesting MAC refresh from Rbridge:21.',
+      ]
+    ];
+    $result[] = [
+      'nos||21||6||6||raslogd:||2021-03-23 16:41:31|| [log@1588 value="RASLOG"][timestamp@1588 value="2021-03-23T16:41:31.621350"][msgid@1588 value="SEC-1203"][seqnum@1588 value="184473"][attr@1588 value=" SW/0 | Active | WWN 10:00:c4:f5:7c:65:44:f4"][severity@1588 value="INFO"][swname@1588 value="VDX_TESPOP1"][arg0@1588 value="10.101.10.8" desc="IP address"] BOMLogin information: Login successful via TELNET/SSH/RSH. IP Addr: 10.101.10.8.||raslogd',
+      [ 'facility'  => 'local5', 'priority' => '6', 'level' => '6',
+        'tag'       => 'SEC-1203', 'program' => 'RASLOG',
+        'msg'       => 'Login information: Login successful via TELNET/SSH/RSH. IP Addr: 10.101.10.8.',
+        'msg_orig'  => '[log@1588 value="RASLOG"][timestamp@1588 value="2021-03-23T16:41:31.621350"][msgid@1588 value="SEC-1203"][seqnum@1588 value="184473"][attr@1588 value=" SW/0 | Active | WWN 10:00:c4:f5:7c:65:44:f4"][severity@1588 value="INFO"][swname@1588 value="VDX_TESPOP1"][arg0@1588 value="10.101.10.8" desc="IP address"] BOMLogin information: Login successful via TELNET/SSH/RSH. IP Addr: 10.101.10.8.',
+      ]
+    ];
+    $result[] = [
+      'nos||21||6||6||raslogd:||2021-03-23 16:41:31|| [log@1588 value="AUDIT"][timestamp@1588 value="2021-03-23T16:41:31.623184"][tz@1588 value="CET"][msgid@1588 value="SEC-3020"][severity@1588 value="INFO"][class@1588 value="SECURITY"][user@1588 value="qwerty"][role@1588 value="admin"][ip@1588 value="10.101.10.8"][interface@1588 value="ssh"][application@1588 value="CLI"][swname@1588 value="VDX_TESPOP1"][arg0@1588 value="login" desc="Event Name"][arg1@1588 value="REMOTE, IP Addr: 10.101.10.8" desc="connection method and IP Address"] BOMEvent: login, Status: success, Info: Successful login attempt via REMOTE, IP Addr: 10.101.10.8.||raslogd',
+      [ 'facility'  => 'local5', 'priority' => '6', 'level' => '6',
+        'tag'       => 'SEC-3020,ssh,CLI', 'program' => 'AUDIT',
+        'msg'       => 'Event: login, Status: success, Info: Successful login attempt via REMOTE, IP Addr: 10.101.10.8.',
+        'msg_orig'  => '[log@1588 value="AUDIT"][timestamp@1588 value="2021-03-23T16:41:31.623184"][tz@1588 value="CET"][msgid@1588 value="SEC-3020"][severity@1588 value="INFO"][class@1588 value="SECURITY"][user@1588 value="qwerty"][role@1588 value="admin"][ip@1588 value="10.101.10.8"][interface@1588 value="ssh"][application@1588 value="CLI"][swname@1588 value="VDX_TESPOP1"][arg0@1588 value="login" desc="Event Name"][arg1@1588 value="REMOTE, IP Addr: 10.101.10.8" desc="connection method and IP Address"] BOMEvent: login, Status: success, Info: Successful login attempt via REMOTE, IP Addr: 10.101.10.8.',
+      ]
+    ];
+
+    // Dell
+    $result[] = [
+      'dnos6||23||6||6||CLI_WEB[emWeb]:||2021-05-13 14:20:35|| cmd_logger_api.c(260) 577 %% [WEB:admin:172.90.1.128] User has logged out||CLI_WEB',
+      [ 'facility'  => 'local7', 'priority' => '6', 'level' => '6',
+        'tag'       => 'emWeb,cmd_logger_api.c', 'program' => 'CLI_WEB',
+        'msg'       => '[WEB:admin:172.90.1.128] User has logged out',
+        'msg_orig'  => 'cmd_logger_api.c(260) 577 %% [WEB:admin:172.90.1.128] User has logged out',
+      ]
+    ];
+    $result[] = [
+      'dnos6||23||5||5||TRAPMGR[trapTask]:||2021-05-13 14:21:33|| traputil.c(721) 580 %% \'startup-config\' has changed.||TRAPMGR',
+      [ 'facility'  => 'local7', 'priority' => '5', 'level' => '5',
+        'tag'       => 'trapTask,traputil.c', 'program' => 'TRAPMGR',
+        'msg'       => '\'startup-config\' has changed.',
+        'msg_orig'  => 'traputil.c(721) 580 %% \'startup-config\' has changed.',
+      ]
+    ];
+
     // Tests from issues
     // OBS-335
     $result[] = array('cisco-uc||9||6||6||349:||2013-05-30 16:40:29|| : crond[9538]: (root) CMD (  /etc/rc.d/init.d/fiostats show)||349',
@@ -563,6 +609,21 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
                                            'msg_orig'  => 'Wed Mar 26 12:54:17 2014 : Auth: Login incorrect (mschap: External script says Logon failure (0xc000006d)): [username] (from client 10.100.1.3 port 0 cli a4c3612a4077 via TLS tunnel)',
                                            ));
 
+    // OBS-3614
+    $result[] = [ 'netscaler||16||5||5||||2021-01-26 13:47:07|| 01/26/2021:12:47:07 GMT DCRX-ANS-N004 0-PPE-0 : default EVENT DEVICEDOWN 62431870 0 :  Device "server_serviceGroup_NSSVC_TCP_172.16.200.150:636(SVG_TST_LDAPS_ADMB?DC-BRU-150?636)" - State DOWN||',
+                  [ 'facility'  => 'local0', 'priority' => '5', 'level' => '5',
+                    'tag'       => 'DEVICEDOWN', 'program' => 'EVENT',
+                    'msg'       => 'Device "server_serviceGroup_NSSVC_TCP_172.16.200.150:636(SVG_TST_LDAPS_ADMB?DC-BRU-150?636)" - State DOWN',
+                    'msg_orig'  => '01/26/2021:12:47:07 GMT DCRX-ANS-N004 0-PPE-0 : default EVENT DEVICEDOWN 62431870 0 :  Device "server_serviceGroup_NSSVC_TCP_172.16.200.150:636(SVG_TST_LDAPS_ADMB?DC-BRU-150?636)" - State DOWN',
+                  ]
+    ];
+    $result[] = [ 'netscaler||16||5||5||||2021-01-26 13:47:07|| 10/03/2013:16:49:07 GMT dk-lb001a PPE-4 : UI CMD_EXECUTED 10367926 : User so_readonly - Remote_ip 10.70.66.56 - Command "stat lb vserver" - Status "Success"||',
+                  [ 'facility'  => 'local0', 'priority' => '5', 'level' => '5',
+                    'tag'       => 'CMD_EXECUTED', 'program' => 'UI',
+                    'msg'       => 'User so_readonly - Remote_ip 10.70.66.56 - Command "stat lb vserver" - Status "Success"',
+                    'msg_orig'  => '10/03/2013:16:49:07 GMT dk-lb001a PPE-4 : UI CMD_EXECUTED 10367926 : User so_readonly - Remote_ip 10.70.66.56 - Command "stat lb vserver" - Status "Success"',
+                  ]
+    ];
 
     return $result;
   }

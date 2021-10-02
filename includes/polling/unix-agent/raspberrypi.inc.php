@@ -3,14 +3,14 @@
 /**
  * Observium
  *
- *   This files is part of Observium.
+ *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage poller
  * @subpackage raspberrypi
  * @author     Dennis de Houx <info@all-in-one.be>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
- * @version    1.0.1
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @version    1.1.0
  *
  */
 
@@ -46,6 +46,9 @@ if ($agent_data['raspberrypi'] != ':')
           $sensortype = 'temperature';
           $info = 'Raspberry Pi';
           break;
+       case 'model':
+         $hardware = $data[1];
+         break;
         default:
           unset($sensortype);
           break;

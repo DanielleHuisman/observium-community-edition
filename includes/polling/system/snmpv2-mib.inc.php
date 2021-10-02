@@ -6,12 +6,12 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-$snmpdata = snmp_get_multi_oid($device, 'sysUpTime.0 sysLocation.0 sysContact.0 sysName.0', array(), 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_UTF8);
-$polled   = round($GLOBALS['exec_status']['endtime']);
+$snmpdata = snmp_get_multi_oid($device, [ 'sysUpTime.0', 'sysLocation.0', 'sysContact.0', 'sysName.0' ], [], 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_UTF8);
+$polled   = round(snmp_endtime());
 if (is_array($snmpdata[0]))
 {
   $poll_device = array_merge($poll_device, $snmpdata[0]);
@@ -25,8 +25,8 @@ if (is_array($snmpdata[0]))
   $poll_device['sysName_SNMPv2'] = $poll_device['sysName']; // Store original sysName for devices who store hardware in this Oid
 }
 
-$sysDescr = snmp_get_oid($device, 'sysDescr.0', 'SNMPv2-MIB');
-if ($GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === 1) // Allow empty response for sysDescr (not timeouts)
+$sysDescr = snmp_get_oid($device, 'sysDescr.0', 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_UTF8);
+if (snmp_status() || snmp_error_code() === OBS_SNMP_ERROR_EMPTY_RESPONSE) // Allow empty response for sysDescr (not timeouts)
 {
   $poll_device['sysDescr']   = $sysDescr;
 }

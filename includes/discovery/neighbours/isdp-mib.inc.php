@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -14,18 +14,21 @@
 $isdp_array = snmpwalk_cache_twopart_oid($device, 'agentIsdpCacheTable', [], $mib, NULL, OBS_SNMP_ALL_MULTILINE);
 print_debug_vars($isdp_array);
 
-if ($isdp_array)
-{
-  foreach ($isdp_array as $ifIndex => $port_neighbours)
-  {
+if ($isdp_array) {
+  foreach ($isdp_array as $ifIndex => $port_neighbours) {
     //$port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?", array($device['device_id'], $ifIndex));
     $port = get_port_by_index_cache($device, $ifIndex);
 
-    foreach ($port_neighbours as $entry_id => $isdp)
-    {
+    foreach ($port_neighbours as $entry_id => $isdp) {
+      if (safe_empty($isdp['agentIsdpCacheDevicePort']) && safe_empty($isdp['agentIsdpCachePlatform']) &&
+          safe_empty($isdp['agentIsdpCacheAddress']) && safe_empty($isdp['agentIsdpCacheVersion'])) {
+        // All neighbour fields is empty, ignore
+        print_debug("Neighbour ignored: proto[isdp], ".$isdp['agentIsdpCacheDeviceId']);
+        continue;
+      }
+
       // Normally not possible, but I keep this ability for search local port
-      if (!$port && strlen($isdp['agentIsdpCacheLocalIntf']))
-      {
+      if (!$port && strlen($isdp['agentIsdpCacheLocalIntf'])) {
         $if = $isdp['agentIsdpCacheLocalIntf'];
         $query = 'SELECT * FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
         $port = dbFetchRow($query, array($if, $if, $if, $device['device_id'], 0));
@@ -33,7 +36,7 @@ if ($isdp_array)
 
       // Remote Hostname
       list($isdp['agentIsdpCacheDeviceId']) = explode('(', $isdp['agentIsdpCacheDeviceId']); // Fix for Nexus ISDP neighbors: <hostname>(serial number)
-      $remote_hostname  = $isdp['agentIsdpCacheDeviceId'];
+      $remote_hostname  = trim($isdp['agentIsdpCacheDeviceId']);
 
       // Remote address
       $remote_address = hex2ip($isdp['agentIsdpCacheAddress']);

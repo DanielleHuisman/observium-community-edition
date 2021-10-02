@@ -126,9 +126,9 @@ if ($db_rev > 272) // observium_processes added in db version 272
   add_process_info(-1); // Store process info
 }
 
-// Note, undocumented ability for force update from db schema (not more than 10)
+// Note, undocumented ability for force update from db schema (not more than 50)
 $update_force = isset($options['U']) && is_numeric($options['U']) &&
-                $db_rev >= $options['U'] && ($db_rev - $options['U']) <= 10;
+                $db_rev >= $options['U'] && ($db_rev - $options['U']) <= 50;
 if ($update_force)
 {
   print_debug("Forced update from DB schema ".$options['U']);
@@ -186,12 +186,16 @@ foreach ($filelist as $file)
         }
         $update_time = format_uptime(time() - $start);
         echo(" Done ($update_time)." . PHP_EOL);
-        log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+        if ($filename >= 184) {
+          log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+        }
       } else {
         // Critical errors, stop update
         logfile('update-errors.log', "====== Schema update " . sprintf("%03d", $db_rev) . " -> " . sprintf("%03d", $filename) . " ==============");
         logfile('update-errors.log', "Error: Could not load file $filepath!");
-        log_event("Observium schema not updated: " . $log_msg . ".", NULL, NULL, NULL, 3);
+        if ($filename >= 184) {
+          log_event("Observium schema not updated: " . $log_msg . ".", NULL, NULL, NULL, 3);
+        }
         exit(1);
       }
     }
@@ -219,11 +223,11 @@ foreach ($filelist as $file)
             // Skip comments
             if (str_starts($line, [ '#', '-', '/' ]))
             {
-              if (str_exists($line, [ 'ERROR_IGNORE', 'IGNORE_ERROR' ]))
+              if (str_contains_array($line, [ 'ERROR_IGNORE', 'IGNORE_ERROR' ]))
               {
                 $error_ignore = TRUE;
               }
-              elseif (str_exists($line, 'NOTE'))
+              elseif (str_contains_array($line, 'NOTE'))
               {
                 list(, $note) = explode('NOTE', $line, 2);
                 echo('('.trim($note).')');
@@ -270,17 +274,23 @@ foreach ($filelist as $file)
         $update_time = format_uptime(time() - $start);
         if ($db_rev < 1)
         {
-          log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+          if ($filename >= 184) {
+            log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+          }
           echo(" Done ($update_time)." . PHP_EOL);
         }
         elseif ($err)
         {
           if ($error_ignore)
           {
-            log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+            if ($filename >= 184) {
+              log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+            }
             echo(" Done ($update_time)." . PHP_EOL);
           } else {
-            log_event("Observium schema updated: " . $log_msg . "($update_time, $err errors).", NULL, NULL, NULL, 4);
+            if ($filename >= 184) {
+              log_event("Observium schema updated: " . $log_msg . "($update_time, $err errors).", NULL, NULL, NULL, 4);
+            }
             echo(" Done ($update_time, $err errors)." . PHP_EOL);
           }
           logfile('update-errors.log', "====== Schema update " . sprintf("%03d", $db_rev) . " -> " . sprintf("%03d", $filename) . " ==============");
@@ -291,7 +301,9 @@ foreach ($filelist as $file)
           }
           unset($errors);
         } else {
-          log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+          if ($filename >= 184) {
+            log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
+          }
           echo(" Done ($update_time)." . PHP_EOL);
         }
 
@@ -302,8 +314,16 @@ foreach ($filelist as $file)
           // dbSchema inserted, now only update
           $schema_insert = FALSE;
         }
+
+        /// Only for developers, export latest schema
+        if ($schema_status && $filename >= 300 && OBS_DEBUG > 1 &&
+            !is_file($config['install_dir'] . '/update/db_schema_'.$filename . '.json')) {
+          file_put_contents($config['install_dir'] . '/update/db_schema_'.$filename . '.json', export_db_schema('json'));
+        }
       } else {
-        log_event("Observium schema not updated: " . $log_msg . ".", NULL, NULL, NULL, 3);
+        if ($filename >= 184) {
+          log_event("Observium schema not updated: " . $log_msg . ".", NULL, NULL, NULL, 3);
+        }
         echo(' Could not open file!' . PHP_EOL);
         // Critical errors, stop update
         logfile('update-errors.log', "====== Schema update " . sprintf("%03d", $db_rev) . " -> " . sprintf("%03d", $filename) . " ==============");

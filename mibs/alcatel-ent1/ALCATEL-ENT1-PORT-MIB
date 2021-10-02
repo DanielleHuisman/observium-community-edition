@@ -11,9 +11,11 @@ IMPORTS
         SnmpAdminString                   FROM SNMP-FRAMEWORK-MIB
         ifIndex, ifInErrors, ifOutErrors, ifEntry,
         InterfaceIndex                    FROM IF-MIB
-        softentENT1Port                   FROM ALCATEL-ENT1-BASE;
+        softentIND1Port                   FROM ALCATEL-ENT1-BASE
+        alclnkaggAggIndex                 FROM ALCATEL-ENT1-LAG-MIB;
 
-alcatelENT1PortMIB MODULE-IDENTITY
+
+alcatelIND1PortMIB MODULE-IDENTITY
 
    LAST-UPDATED  "201311220000Z"
    ORGANIZATION  "Alcatel-Lucent"
@@ -70,7 +72,7 @@ alcatelENT1PortMIB MODULE-IDENTITY
     DESCRIPTION
         "The latest version of this MIB Module."
 
-    ::= { softentENT1Port 1}
+    ::= { softentIND1Port 1}
 
 CableState ::= TEXTUAL-CONVENTION
                 STATUS          current
@@ -86,9 +88,9 @@ CableState ::= TEXTUAL-CONVENTION
                                  unknown(6)
                                 }
 
-alcatelIND1PortNotifications                OBJECT IDENTIFIER ::= { alcatelENT1PortMIB 0 }
-alcatelIND1PortMIBObjects                   OBJECT IDENTIFIER ::= { alcatelENT1PortMIB 1 }
-alcatelIND1PortMIBConformance               OBJECT IDENTIFIER ::= { alcatelENT1PortMIB 2 }
+alcatelIND1PortNotifications                OBJECT IDENTIFIER ::= { alcatelIND1PortMIB 0 }
+alcatelIND1PortMIBObjects                   OBJECT IDENTIFIER ::= { alcatelIND1PortMIB 1 }
+alcatelIND1PortMIBConformance               OBJECT IDENTIFIER ::= { alcatelIND1PortMIB 2 }
 
 --
 -- alcatelIND1PortMIBObjects
@@ -101,6 +103,7 @@ portViolations                              OBJECT IDENTIFIER ::= { alcatelIND1P
 csmConfTrap                                 OBJECT IDENTIFIER ::= { alcatelIND1PortMIBObjects 6 }
 interfaceCounters                           OBJECT IDENTIFIER ::= { alcatelIND1PortMIBObjects 7 }
 esmStormTrap                     	    OBJECT IDENTIFIER ::= { alcatelIND1PortMIBObjects 8 }
+linkAggPort                                OBJECT IDENTIFIER ::= { alcatelIND1PortMIBObjects 9 }
 
 
 -- Ethernet Driver object related to Trap *********************
@@ -1477,6 +1480,63 @@ alaDyingGaspTime OBJECT-TYPE
                    stat is only in case of Half duplex and excessive defer bit reset)."
               ::= { alcetherStatsEntry 45 }
 
+    -- Link Aggregation Statistics *****************************
+
+          -- The Link Aggregation Statistics Group
+          --
+          -- The link aggregation statistics group contains statistics
+          -- measured by the probe for each monitored Link Aggregation (lag)
+          -- on this device.  These statistics take the form of free
+          -- running counters that start from zero when a valid entry
+          -- is created.
+          --
+          -- This group currently has statistics defined only for
+          -- lag interfaces.  Each alcLagStatsEntry contains
+          -- statistics for one link aggregation interface.  The probe must
+          -- create one alcLagStats entry for each monitored link aggregation
+          -- interface on the device.
+
+          alcLagStatsTable OBJECT-TYPE
+              SYNTAX SEQUENCE OF AlcLagStatsEntry
+              MAX-ACCESS not-accessible
+              STATUS current
+              DESCRIPTION
+                  "A list of Link Aggregation statistics entries."
+              ::= { linkAggPort 1 }
+
+          alcLagStatsEntry OBJECT-TYPE
+              SYNTAX AlcLagStatsEntry
+              MAX-ACCESS not-accessible
+              STATUS current
+              DESCRIPTION
+                  "A collection of statistics kept for a particular
+                  Link Aggregation interface. alclnkaggAggIndex is defined
+                  in alclnkaggAggTable; it is of SYNTAX InterfaceIndex
+                  (aka ifIndex) starting at value 40000001 for link agg 1.
+                  Index values received outside of the range for link aggregation
+                  interfaces will return an error."
+              INDEX { alclnkaggAggIndex }
+              ::= { alcLagStatsTable 1 }
+
+          AlcLagStatsEntry ::= SEQUENCE {
+              alcLagClearStats                    INTEGER
+            }
+
+          alcLagClearStats OBJECT-TYPE
+              SYNTAX INTEGER
+		{
+			none(0),
+                        reset(1)
+                }
+              MAX-ACCESS read-write
+              STATUS current
+              DESCRIPTION
+                  "Used to Clear all Link Aggregation Statistics counters. New stats collection starts immediately.
+                   No meaningful read on this object."
+	      DEFVAL      { none }
+              ::= { alcLagStatsEntry 1 }
+
+
 
 -- Ethernet Driver Tables *****************************
 
@@ -2669,7 +2729,8 @@ ddmRxPowerThresholdViolated NOTIFICATION-TYPE
                 lbd(10),
                 spb(11),
                 storm(12),
-                stormuucast(13)
+                stormuucast(13),
+                lldp(14)
            }
 
            MAX-ACCESS  not-accessible
@@ -2689,7 +2750,8 @@ ddmRxPowerThresholdViolated NOTIFICATION-TYPE
              10. initiated by LBD
              11. initiated by SPB
              12. initiated by ESM
-             13. initiated by ESM
+             13. initiated by ESM 
+             14. initiated by LLDP
              When there is no value the value of this will be 0"
      ::= { portViolationEntry 2 }
 
@@ -3721,8 +3783,7 @@ ifOutPktsPerSec OBJECT-TYPE
         esmBeaconLedMode OBJECT-TYPE
             SYNTAX INTEGER {
                 ledModeSolid(1),        -- Led mode solid 
-                ledModeBlinking(2),       -- Led mode blinking 
-                ledModeActivity(3)        -- Led mode representing the normal mode operation 
+                ledModeActivity(2)        -- Led mode representing the normal mode operation 
             }
             MAX-ACCESS read-create
             STATUS current
@@ -3789,6 +3850,18 @@ alcEtherStatsCompliance MODULE-COMPLIANCE
 			}
 
     ::= { alcatelIND1PortMIBCompliances 2 }
+
+alcLagStatsCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for the Statistics of the Link Aggregation
+            ports."
+    MODULE  -- this module
+        MANDATORY-GROUPS {  
+                alcLagStatsMIBGroup
+            }
+
+    ::= { alcatelIND1PortMIBCompliances 3 }
 
 -- units of conformance
 
@@ -3857,7 +3930,7 @@ alcEtherStatsMIBGroup OBJECT-GROUP
                 alcetherStatsTxLatePkts,
                 alcetherStatsTxTotalBytesOnWire,
                 alcetherStatsTxLenChkErrPkts,
-                alcetherStatsTxExcDeferPkts
+		alcetherStatsTxExcDeferPkts
 
             }
     STATUS  current
@@ -4222,5 +4295,14 @@ alaPortViolationTrapGroup OBJECT-GROUP
     DESCRIPTION
          "A collection of global pvr objects"
     ::= { alcatelIND1PortMIBGroups 27 }
+
+alcLagStatsMIBGroup OBJECT-GROUP
+    OBJECTS { 
+                alcLagClearStats
+            }
+    STATUS  current
+    DESCRIPTION
+         "A collection of link aggregation objects"
+    ::= { alcatelIND1PortMIBGroups 28 }
 
 END

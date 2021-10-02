@@ -1,0 +1,728 @@
+-- vim: ft=mib et ts=4 sts=4 sw=4:
+OXO-HARDWARE-MIB DEFINITIONS ::= BEGIN
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32
+            FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, DisplayString, MacAddress
+            FROM SNMPv2-TC
+        oxoMIB, PhysicalAddress, ActivationStatus
+            FROM OXO-MIB ;
+
+    oxoHardwareMIB MODULE-IDENTITY
+        LAST-UPDATED    "201503201424Z"
+        ORGANIZATION    "ALE Communication"
+        CONTACT-INFO    "ALE Communication
+            67400 ILLKIRCH
+            FRANCE"
+        DESCRIPTION
+            "This is ALE Communication implementation of
+            enterprise specific MIB for hardware of the
+            OmniPCX Office product."
+        REVISION        "201503201424Z"
+        DESCRIPTION
+            "OXO R10.2"
+        ::= { oxoMIB 1 }
+        
+    -- ===================
+    -- Textual Conventions
+    -- ===================
+
+    TypeDaughterBoard2Type ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Different type of the second daughter board."
+        SYNTAX          INTEGER
+        {
+            none (0),
+            xMEM (1),               -- XMEM 64/128 or IDE only
+            vOIP4 (2),
+            vOIP8 (3),
+            vOIP16 (4),
+            mCV30-P (5),
+            mCV30-S (6),
+            xMEM-1 (7),              -- XMEM-1 64/128 or IDE only
+            vOIP4-1 (18),
+            vOIP8-1 (19),
+            vOIP16-1 (20),
+            vOIP4-2 (34),
+            vOIP8-2 (35),
+            vOIP16-2 (36)
+        }
+
+    cabinetTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF CabinetEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "The OmniOfficePCX product is composed of at least one cabinet -the master- and at most
+		three cabinets -the master and two distinct slaves-.
+		This table contains the description of all the cabinets which have been detected 
+		at least one time since the system has been started."
+        ::= { oxoHardwareMIB 1 }
+
+    cabinetEntry OBJECT-TYPE
+        SYNTAX          CabinetEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Each entry contains the description of one cabinet."
+        INDEX           { cabinetIndex }
+        ::= { cabinetTable 1 }
+
+    CabinetEntry ::= SEQUENCE {
+            cabinetIndex        Integer32,
+            cabinetRole         INTEGER,
+            cabinetType         INTEGER,
+            cabinetStatus       INTEGER,
+            powerSupplyType     INTEGER,
+            powerSupplyStatus   INTEGER,
+            fan1Status          ActivationStatus,
+            fan2Status          ActivationStatus
+        }
+
+    cabinetIndex OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Index into the cabinet table (there is no physical signification for this index)."
+        ::= { cabinetEntry 1 }
+
+    cabinetRole OBJECT-TYPE
+        SYNTAX INTEGER {
+            master (0),
+            slave1 (1),
+            slave2 (2)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "The master cabinet contains the main CPU board and manages the slave cabinets.
+		There are two distinct slave cabinets roles."
+        ::= { cabinetEntry 2 }
+
+    cabinetType OBJECT-TYPE
+        SYNTAX INTEGER {
+            unknown (0),
+            rack-1 (4),
+            rack-2 (5),
+            rack-3 (6),
+            rack-1-2G (7),
+            rack-2-2G (8),
+            rack-3-2G (9),
+            rack-XS (10),
+            rack-XS-N (11),
+            rack-OTOC-M-2-1G (12),
+            rack-OTOC-M-2-2G (13),
+            rack-OTOC-S-2-2G (14)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Cabinet type.
+		Each cabinet can provide for a different number of slots for plugging boards 
+		depending on its type.
+		The 'Rack-1' contains 3 slots, the 'Rack-2' 6 slots and the 'Rack-3' 9 slots.
+		The second generation racks are quoted '2G'."
+        ::= { cabinetEntry 3 }
+
+    cabinetStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            notPlugged (0),
+            notOperational (2),
+            operational (3)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Cabinet status. 
+		The status 'notPlugged' indicates the cabinet was once plugged and then unplugged.
+		The status 'notOperational' indicates the cabinet is stopping or starting, this is a transition state.
+		The status 'operational' indicates the cabinet is plugged, started and in service."
+        ::= { cabinetEntry 4 }
+
+    powerSupplyType OBJECT-TYPE
+        SYNTAX INTEGER {
+            ps-Rack-1 (4),
+            ps-Rack-2 (5),
+            ps-Rack-3 (6),
+            ps-Rack-1-2G (7),
+            ps-Rack-2-2G (8),
+            ps-Rack-3-2G (9)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Power supply type.
+		The power supply must be adapted to the cabinet type; for example 
+		the Rack-1-2G must have a PS-Rack-1-2G power supply."
+        ::= { cabinetEntry 5 }
+
+
+    powerSupplyStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            main-power-supply (0),
+            battery (1),
+            unknown (2)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Power supply status.
+		If it is activated, it means that 
+		the system is running on battery because of power failure."
+        ::= { cabinetEntry 6 }
+
+    fan1Status OBJECT-TYPE
+        SYNTAX          ActivationStatus
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "First fan status (active means it is currently running)."
+        ::= { cabinetEntry 7 }
+
+    fan2Status OBJECT-TYPE
+        SYNTAX          ActivationStatus
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Second fan status (active means it is currently running)."
+        ::= { cabinetEntry 8 }
+
+    boardTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF BoardEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Board table.
+		Various boards can be plugged in the cabinet's slots (see 'cabinet type' description),
+		this table lists the characteristics of the boards that plugged -or not- in all the 
+		slots of all the cabinets."
+        ::= { oxoHardwareMIB 2 }
+
+    boardEntry OBJECT-TYPE
+        SYNTAX          BoardEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Each entry contains the description of one board."
+        INDEX           { boardControllerIndex }
+        ::= { boardTable 1 }
+
+    BoardEntry ::= SEQUENCE {
+            boardControllerIndex    INTEGER,
+            boardCpuIndex           INTEGER,
+            boardLanIndex           INTEGER,
+            boardDescr              DisplayString,
+            boardAccesses           INTEGER,
+            boardPresence           INTEGER,
+            boardStatus             INTEGER,
+            boardType               INTEGER,
+            boardSubType            INTEGER,
+            daughterBoard1          INTEGER,
+            daughterBoard2          INTEGER,
+            boardExternalfeeding    INTEGER
+        }
+
+    boardControllerIndex OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Index for the corresponding board controller entity.
+		Indicates which controller manages the board (ie: in which cabinet the board is plugged).
+		For more information on the controller, see cabinetTable at this index."
+        ::= { boardEntry 1 }
+
+    boardCpuIndex OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Index for the corresponding board cpu entity.
+		If it is relevant, it means that this board is a CPU board.
+		See cpuTable at this index to get cpu characteristics."
+        ::= { boardEntry 2 }
+
+    boardLanIndex OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Index for the corresponding lan switch entity.
+		If it is relevant, it means that this board is a LANX board.
+		See lanSwitchBoardTable at this index to get more information."
+
+        ::= { boardEntry 3 }
+
+    boardDescr OBJECT-TYPE
+        SYNTAX          DisplayString
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Textual description of this board."
+        ::= { boardEntry 4 }
+
+    boardAccesses OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Number of interfaces available on the board. 
+         For example an UAI16-1 board has 16 UA accesses."
+        ::= { boardEntry 5 }
+
+    boardPresence OBJECT-TYPE
+        SYNTAX INTEGER {
+            absent (0),
+            present (1),
+            refused (3)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Presence of the board.
+        - 'absent' means no board is plugged, or it was not detected.
+        - 'refused' means the board was detected but rejected (eg: license or power budget problem)
+        - 'present' means the board was detected and accepted."
+        ::= { boardEntry 6 }
+
+    boardStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            noBoard (0),
+            accepted (1),
+            refused (2),
+            initializing (3)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Status of the board.
+        It is linked to boardPresence information.
+        - 'initializing' is a transition state."
+        ::= { boardEntry 7 }
+
+    boardType OBJECT-TYPE
+        SYNTAX INTEGER {
+            noBoard (0),
+            bRA-DLT0 (149),         -- ISDN DLT0 Board
+            aTA (150),              -- ATA (TBR21 compliant)
+            aTL (151),              -- TIE LINE Board 50Hz, 2 wired
+            aTL2 (152),             -- TIE LINE Board EM, 2 wired
+            aTL4 (153),             -- TIE LINE Board EM, 4 wired
+            aC15 (154),             -- AC 15 Board
+            dDI (155),              -- Analog DDI board
+            sLI (158),              -- Z extensions board Lg Ht
+            sLI-1 (159),            -- Z Extensions board Lg Hault
+            uAI (160),              -- UA extensions board 8/16
+            pRA (161),              -- E1 trunk board
+            pRA-DLT2 (162),         -- DLE1 trunk board
+            pRA-T1 (163),           -- T1 trunk board
+            pRA-DASS2 (164),        -- DASS2 trunk board
+            pCM (165),              -- ISDN PCM trunk board
+            aUX (166),              -- AUX trunk board
+            xRA (167),              -- Virtual remote Access Board
+            virtualVoIP (168),      -- Virtual VOIP board on Main CPU
+            cPU (176),              -- Main or applicative CPU Board
+            mIX (177),              -- Board with mixed T0 UA and Z
+            bRA (178),              -- Basic Rate Access board
+            lANX (179),             -- LANX 8/16 board
+            aPA (180),              -- Analog Public Access board
+            t1-CAS (181),           -- T1 CAS trunk board
+            lANX16-1 (182),         -- LANX16-1 with converter
+            uAI16-1 (183),          -- EBUA-1 with ext feeding
+            bOOST-board (184),      -- BOOST board
+            sLI-1-LH ( 185),        -- SLI-1-LH Z extension board
+            sLI-1-ST (186),         -- SLI-1-ST Z extension board
+            virtual-M-T (187),      -- Virtual Media Terminal
+            lANX-2 (188),           -- LANX-2 board
+            mIX-1-L (189),          -- MIX-1-L board with mixed T0, UA and Z
+            mIX-1-ST(190),          -- MIX-1-ST board with mixed T0, UA and Z
+            aMIX-1-L(191),          -- IX-1-L board with mixed AT, UA and Z
+            aMIX-1-ST(192),         -- AMIX-1-ST board with mixed AT, UA and Z
+            sLI-2 (193),            -- SLI-2 Z extensions board
+            mIX-2 (194),            -- MIX-2 board with mixed T0 UA and Z
+            bRA-2 (195),            -- BRA-2 board
+            unknown (253)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Functional type of this board."
+        ::= { boardEntry 8 }
+
+    boardSubType OBJECT-TYPE
+        SYNTAX INTEGER {
+            mIX048 (0),             -- 0 T0 4 UA 8 Z
+            mIX044 (1),             -- 0 T0 4 UA 4 Z
+            mIX084 (2),             -- 0 T0 8 UA 4 Z
+            mIX248 (3),             -- 2 T0 4 UA 8 Z
+            mIX244 (4),             -- 2 T0 4 UA 4 Z
+            mIX284 (5),             -- 2 T0 8 UA 4 Z
+            mIX448 (6),             -- 4 T0 4 UA 8 Z
+            mIX444 (7),             -- 4 T0 4 UA 4 Z
+            mIX484 (8),             -- 4 T0 8 UA 4 Z
+            mINIMIX (9),           -- 2 T0  or  2 Z
+            mIXERROR (10),         -- Mix Error
+            unknown (254)           -- undefined board sub type
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Functional type of this mixed board.
+		The mixed boards provide for T0, UA and Z accesses at the same time.
+		For example 'MIX048' means 0 T0 access, 4 UA accesses and 8 Z accesses.
+		If the board isn't a mixed board, 'unknown' will be displayed."
+        ::= { boardEntry 9 }
+
+    daughterBoard1 OBJECT-TYPE
+        SYNTAX INTEGER {
+            mET12K (4),             -- MET12K presence
+            mET16K (14),            -- MET16K presence
+            mETCLI (24),            -- METCLI presence
+            cLINL (34),             -- CLINL presence
+            cLIUK (44),             -- CLIUK presence
+            noDaughterBoard (240),
+            gSCLI (241)             -- GSCLI presence
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Presence of daughterboard1 on halfboard.
+		Indicates the type of the daughterboard if present."
+        ::= { boardEntry 10 }
+
+    daughterBoard2 OBJECT-TYPE
+        SYNTAX INTEGER {
+            noDaughterBoard (240),
+            cLI (242)               -- CLI DSP presence
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Presence of daughterboard2 on first halfboard in slot.
+		Indicates the type of the second daughterboard if present."
+        ::= { boardEntry 11 }
+
+    boardExternalfeeding OBJECT-TYPE
+        SYNTAX INTEGER {
+            notPlugged (0),
+            powerOK (1),
+            powerKO (2),
+            powerOFF (3),           -- Transition state (was OK and went KO)
+            unknown (254)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "External power supply state for Digital Interface board.
+		Some boards can have their own external power supply -for example UAI16-1-.
+		Indicates the state of the external power supply.
+		'powerOFF' is a transition state between powerOK and powerKO."
+        ::= { boardEntry 12 }
+
+    cpuTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF CpuEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "CPU table.
+		The services hosted by OmniOfficePCX run on one or several CPU boards.
+		The basic services run on the main board. 
+		The main board can also manage up to 6 applicative CPU boards
+		(running VoIP or RAS for example) distributed between the different cabinets."
+        ::= { oxoHardwareMIB 3 }
+
+    cpuEntry OBJECT-TYPE
+        SYNTAX          CpuEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Each entry contains the description of one CPU board.
+		A CPU board can be equipped with:
+		- RAM
+		- NAND flash
+		- up to 4 daugther boards (XMEM, VoIP vocoders, HSL, WAN...)
+		- Hard Drive (plugged on the 2nd daugther board)."
+        INDEX           { cpuIndex }
+        ::= { cpuTable 1 }
+
+    CpuEntry ::= SEQUENCE {
+            cpuIndex                        INTEGER,
+            cpuType                         INTEGER,
+            cpuRole                         INTEGER,
+            cpuSerialNumber                 DisplayString,
+            cpuSoftVersion                  DisplayString,
+            cpuRamSize                      Integer32,
+            cpuFlashSize                    Integer32,
+            daughterBoard1Type              INTEGER,
+            daughterBoard2Type              TypeDaughterBoard2Type,
+            daughterBoard2Type2             TypeDaughterBoard2Type,
+            daughterBoard3Type              INTEGER,
+            daughterBoard4Type              INTEGER,
+            daughterBoard2HDManufacturer    DisplayString,
+            daughterBoard2HDSize            Integer32,
+            daughterBoard2FlashSize         Integer32,
+            motherVoipPresence              INTEGER,
+            macAddress                      MacAddress
+        }
+
+    cpuIndex OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Index into the CPU table (there is no physical signification for this index)."
+        ::= { cpuEntry 1 }
+
+    cpuType OBJECT-TYPE
+        SYNTAX INTEGER {
+            cpu-Aspen-100 (0),             -- Aspen 100
+            cpu-Aspen-133 (1),             -- Aspen 133
+            cpu-PIII (2),                  -- PIII
+            standart-CPU-1 (3),            -- Standart-CPU-1
+            standart-CPU-2 (4),             -- Standart-CPU-2
+            cpu-PIII2 (5),                 -- PIII 2
+            standart-CPU-3 (6),            -- Standart-CPU-3
+            standart-CPU-3M (7),            -- Standart-CPU-3
+            cpu-PIII3 (8),                 -- PIII 3
+            pOWER-CPU (9),                 -- POWERPC_CPU
+            standart-CPU-4 (10),           -- Standart-CPU-4
+	        pOWER-CPU-EE (11)              -- POWERPC_CPU_EE
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "CPU type.
+		The 'CPU' board has an Aspen processor and is used as the Main board in basic configurations.
+		The 'CPUe' board has an Aspen processor and is used as an applicative board.
+		The 'CPUe-1' board has a Pentium III processor and is used as the main board in enhanced
+		configurations."
+        ::= { cpuEntry 2 }
+
+    cpuRole OBJECT-TYPE
+        SYNTAX INTEGER {
+            call-Handling (0),
+            voIP (1),
+            internetAccess (2),
+            iSDN-RAS (3),
+            none (4)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "CPU role.
+		The 'Call-Handling' role corresponds to the main board; other roles to applicative boards."
+        ::= { cpuEntry 3 }
+
+    cpuSerialNumber OBJECT-TYPE
+        SYNTAX          DisplayString
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Hardware serial number.
+		The software license is checked against this serial number."
+        ::= { cpuEntry 4 }
+
+    cpuSoftVersion OBJECT-TYPE
+        SYNTAX          DisplayString
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Software version.
+		Indicates the version of the software running on the system."
+        ::= { cpuEntry 5 }
+
+    cpuRamSize OBJECT-TYPE
+        SYNTAX          Integer32
+        UNITS           "Mega Bytes"
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "SDRAM memory size of this CPU (in Mega Bytes)."
+        ::= { cpuEntry 6 }
+
+    cpuFlashSize OBJECT-TYPE
+        SYNTAX          Integer32
+        UNITS           "Mega Bytes"
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "NAND memory size of this CPU (in Mega Bytes)."
+        ::= { cpuEntry 7 }
+
+    daughterBoard1Type  OBJECT-TYPE
+        SYNTAX INTEGER {
+            none (0),
+            fOR-DPS(1),
+            wAN (2),
+            wAN2 (3),
+            mCV30-S (4),
+            dATA-T1 (5),
+            armada-VoiP-DSP(6)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Type of the first daughter board."
+        ::= { cpuEntry 8 }
+
+    daughterBoard2Type OBJECT-TYPE
+        SYNTAX 			TypeDaughterBoard2Type
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Type of the second daughter board."
+        ::= { cpuEntry 9 }
+        
+    daughterBoard2Type2 OBJECT-TYPE
+    	SYNTAX 			TypeDaughterBoard2Type
+	    MAX-ACCESS      read-only
+	    STATUS          current
+	    DESCRIPTION
+	        "Type of the second daughter board 2."
+	    ::= { cpuEntry 10 }
+
+    daughterBoard3Type OBJECT-TYPE
+        SYNTAX INTEGER {
+            none (0),
+            aFU (1)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Type of the third daughter board."
+        ::= { cpuEntry 11 }
+
+    daughterBoard4Type OBJECT-TYPE
+        SYNTAX INTEGER {
+            none (0),
+            hSL1 (1),
+            hSL2 (2),
+            sLANX4 (3),
+            miniMIX (4)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Type of the fourth daughter board."
+        ::= { cpuEntry 12 }
+
+    daughterBoard2HDManufacturer OBJECT-TYPE
+        SYNTAX          DisplayString
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Hard disk manufacturer."
+        ::= { cpuEntry 13 }
+
+    daughterBoard2HDSize OBJECT-TYPE
+        SYNTAX          Integer32
+        UNITS           "Mega Bytes"
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Size of the hard disk (in Mega Bytes)."
+        ::= { cpuEntry 14 }
+
+    daughterBoard2FlashSize OBJECT-TYPE
+        SYNTAX          Integer32
+        UNITS           "Mega Bytes"
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "NAND memory size of the second daughter board (in Mega Bytes)."
+        ::= { cpuEntry 15 }
+
+    motherVoipPresence OBJECT-TYPE
+        SYNTAX  		INTEGER 
+        {
+        	no-DSP (0),
+        	one-DSP (1),
+        	one-DSP (256),
+        	two-DSP (257)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Presence of Voip DSP on the motherboard"
+        ::= { cpuEntry 16 }
+        
+
+    macAddress OBJECT-TYPE
+        SYNTAX          MacAddress
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Ethernet address of this CPU."
+        ::= { cpuEntry 17 }
+
+    lanSwitchPortTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF LanSwitchPortEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Table of the LAN switch board ports.
+		This table gives information about the LAN switch boards."
+        ::= { oxoHardwareMIB 4 }
+
+    lanSwitchPortEntry OBJECT-TYPE
+        SYNTAX          LanSwitchPortEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "Each entry contains the description of all the ports of a LAN switch board."
+        INDEX           { lanSwitchPortIndex }
+        ::= { lanSwitchPortTable 1 }
+
+    LanSwitchPortEntry ::= SEQUENCE {
+            lanSwitchPortIndex      PhysicalAddress,
+            lanSwitchPortStatus     INTEGER,
+            lanSwitchPortMode       INTEGER,
+            lanSwitchPortBase       INTEGER
+        }
+
+    lanSwitchPortIndex OBJECT-TYPE
+        SYNTAX          PhysicalAddress
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Indicates the physical address of the board -ie: the slot and the halfboard-.
+		See boardTable at this address."
+        ::= { lanSwitchPortEntry 1 }
+
+    lanSwitchPortStatus OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Port status.
+		It is a bitfield representing all the ports:
+		0 means the port is down
+		1 means the port is up."
+        ::= { lanSwitchPortEntry 2 }
+
+    lanSwitchPortMode OBJECT-TYPE
+        SYNTAX          INTEGER
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Port transmition type.
+		It is a bitfield representing all the ports:
+		0 means half duplex
+		1 means full duplex."
+        ::= { lanSwitchPortEntry 3 }
+
+    lanSwitchPortBase OBJECT-TYPE
+        SYNTAX          INTEGER 
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "Port transmition speed.
+		It is a bitfield representing all the ports:
+		0 means 10 Mbps
+		1 means 100 Mbps."
+        ::= { lanSwitchPortEntry 4 }
+
+END
+

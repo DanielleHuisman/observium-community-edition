@@ -1,0 +1,917 @@
+-- SUPERMICRO OPENFLOW Client proprietary MIB Definition
+-- This MIB contains tables used to configure a switch running
+-- Supermicro openflow Client.
+
+
+SUPERMICRO-OFC-CFG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+   MODULE-IDENTITY, OBJECT-TYPE, 
+   enterprises, Integer32, Unsigned32,
+   Counter64, Counter32    
+                 FROM SNMPv2-SMI 
+   DisplayString, RowStatus,
+   TEXTUAL-CONVENTION
+                 FROM SNMPv2-TC
+   InterfaceIndex                   
+                 FROM IF-MIB
+   InetAddressType, InetAddress
+                 FROM INET-ADDRESS-MIB;
+
+
+   fsofc MODULE-IDENTITY 
+      LAST-UPDATED "201301110000Z" 
+      ORGANIZATION "Super Micro Computer Inc." 
+      CONTACT-INFO 
+
+      "Super Micro Computer Inc.
+       E-mail:support@Supermicro.com"
+
+      DESCRIPTION 
+      "The enterprise ID 10876 is originally assigned to Super Micro Computer Inc."
+
+      REVISION "201301110000Z"
+
+      DESCRIPTION 
+      "The proprietary MIB for Supermicro Openflow Client Configurations." 
+
+      ::= { enterprises supermicro-computer-inc(10876) super-switch(101) extended(2) 81}
+
+PortList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Each octet within this value specifies a set of eight
+        ports, with the first octet specifying ports 1 through
+        8, the second octet specifying ports 9 through 16, etc.
+        Within each octet, the most significant bit represents
+        the lowest numbered port, and the least significant bit
+        represents the highest numbered port.  Thus, each port
+        of the bridge is represented by a single bit within the
+        value of this object.  If that bit has a value of '1',
+        then that port is included in the set of ports; the port
+        is not included if its bit has a value of '0'."
+    SYNTAX      OCTET STRING
+
+
+INTEGER64 ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d64"
+    STATUS       current
+    DESCRIPTION
+       "64 bit Integer value"
+    SYNTAX       Counter64
+
+ActionString ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "255as"
+    STATUS       current
+    DESCRIPTION
+      "This data type is used to model an administratively assigned string to 
+       display the list of actions. The actions to be performed on the matching packet of 
+       current flow entry. The actions for a flow will be a comma separated list
+       Possible actions below for example
+            port=2                      - Send the packet to port 2
+            port=5,controller           - Send the packet out on port 5 and copy to controller.
+            vlan=7,port=3               - Send the packet out on port 3 and set vlan to 7 in outgoing packet."
+    SYNTAX       OCTET STRING (SIZE (0..255))
+
+ContextId ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d32"
+    STATUS      current
+    DESCRIPTION
+      "Identifies the Openflow Client [OFC] Context."
+    SYNTAX      Unsigned32 (0..65535)
+
+TableIndex ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d32"
+    STATUS      current
+    DESCRIPTION
+      "Identifies the Openflow Client Flow Tables in given Context."
+    SYNTAX      Unsigned32 (0..255)
+
+FlowIndex ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d32"
+    STATUS      current
+    DESCRIPTION
+      "A unique ID of value, greater than zero, for each flow entry in Flow Table." 
+    SYNTAX      Unsigned32 (0..2147483647)
+
+
+-- ----------------------------------------------------------------- --
+-- groups in the MIB
+-- ----------------------------------------------------------------- --
+ 
+      fsofcCfgGroup                OBJECT IDENTIFIER ::= { fsofc 1 }
+      fsofcControllerCfgGroup      OBJECT IDENTIFIER ::= { fsofc 2 }
+      fsofcInterfaceGroup          OBJECT IDENTIFIER ::= { fsofc 3 }
+      fsofcFlowGroup               OBJECT IDENTIFIER ::= { fsofc 4 }
+      fsofcGrpGroup		   OBJECT IDENTIFIER ::= { fsofc 5 }
+      fsofcMeterGroup 		   OBJECT IDENTIFIER ::= { fsofc 6 }
+-- ---------------------------------------------------------------- --
+
+-- ------------------------------------------------------------------
+-- OFC Cfg Group 
+-- ------------------------------------------------------------------
+fsofcCfgTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsofcCfgEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "A table containing Controller connection-specific information."
+
+       ::= { fsofcCfgGroup 1 }
+
+fsofcCfgEntry OBJECT-TYPE
+       SYNTAX      FsofcCfgEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "Information about a particular current controller connection."
+
+       INDEX   { fsofcContextId }
+
+       ::= { fsofcCfgTable 1 }
+
+FsofcCfgEntry ::=
+       SEQUENCE {
+           fsofcContextId
+                ContextId,
+           fsofcModuleStatus
+                INTEGER,
+           fsofcSupportedVersion
+                INTEGER,
+           fsofcDefaultFlowMissBehaviour
+                INTEGER,
+           fsofcControlPktBuffering
+                INTEGER,
+           fsofcIpReassembleStatus 
+                INTEGER,
+           fsofcPortStpStatus
+                INTEGER,
+           fsofcTraceEnable
+                Unsigned32,
+           fsofcSwitchModeOnConnFailure
+                INTEGER,
+           fsofcSwitchEntryStatus  
+                RowStatus
+       }
+
+fsofcContextId OBJECT-TYPE
+   SYNTAX      ContextId 
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+      "Identifies the Openflow Client [OFC] Context."
+   ::= { fsofcCfgEntry 1 }
+
+fsofcModuleStatus OBJECT-TYPE
+       SYNTAX       INTEGER {
+                            enabled  (1),
+                            disabled (2)
+                         }
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+       "The desired state of the Openflow Client system. The Openflow client is
+        functionally active only when the module status is enabled. And if module 
+        status set to 'disabled' the openflow client task will be made shutdown 
+        along with turning off timers and cleaning relevant mem-pools."
+       DEFVAL      { enabled }
+       ::= { fsofcCfgEntry  2 }
+
+fsofcSupportedVersion OBJECT-TYPE
+       SYNTAX       INTEGER {
+                            v100  (1),
+                            v131  (2)
+                         }
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+       "The Supported version of the Openflow Client system In this given context."
+       DEFVAL      { v131 }
+       ::= { fsofcCfgEntry  3 }
+
+
+fsofcDefaultFlowMissBehaviour OBJECT-TYPE
+        SYNTAX      INTEGER  { drop(1), sendToController(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "The default action for the flow-miss entries, for all the flow tables, which 
+         does not have any default flow-miss entry.
+         The value 'drop' (1) indicates that the packet to be dropped and
+         'sendToController' (2) indicates that send all the packets to controller."
+        DEFVAL { sendToController }
+        ::= { fsofcCfgEntry 4 }
+
+fsofcControlPktBuffering OBJECT-TYPE
+        SYNTAX      INTEGER  { enabled(1), disabled(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "The administrative decision to buffer the control packets,
+         The value 'enabled' (1) indicates that the packet will be buffered and
+         'disabled' (2) indicates that there will be no buffering and the entire packet 
+         will be sent to controller."
+        DEFVAL { disabled }
+        ::= { fsofcCfgEntry 5 }
+
+fsofcIpReassembleStatus OBJECT-TYPE
+        SYNTAX      INTEGER  { enabled(1), disabled(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "The administrative decision object to enabled/disabled IP packets re-assembling,
+         The value 'enabled' (1) indicates that the packet will be reassembled and
+         'disabled' (2) indicates that there will be no re-assembling. This object is an
+         input to data-plane to perform ip-reassembling or not."
+        DEFVAL { disabled }
+        ::= { fsofcCfgEntry 6 }
+
+fsofcPortStpStatus OBJECT-TYPE
+        SYNTAX      INTEGER  { enabled(1), disabled(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "The administrative decision object to enabled/disabled STP protocol on openflow ports,
+         The value 'enabled' (1) indicates that STP will be enabled on openflow ports and
+         'disabled' (2) indicates that there will be no STP on openflow ports. This object
+         is an input to data-plane to enable/disable STP on openflow ports"
+        DEFVAL { disabled }
+        ::= { fsofcCfgEntry 7 }
+
+fsofcTraceEnable   OBJECT-TYPE
+        SYNTAX          Unsigned32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+        "This object can be used to enable trace dynamically in OFC
+         module. A four byte integer value is specified for enabling
+         the level of tracing.Each Bit in the four byte integer variable
+         represents a level of Trace.
+         Trace Levels
+                     BIT
+                      0  - Init and Shutdown traces
+                      1  - Management traces
+                      2  - Data Path traces
+                      3  - Control Plane traces
+                      4  - Packet Dump traces
+                      5  - Traces related to all resources except buffers
+                      6  - All Failure traces
+                      7  - Buffer allocation/release traces
+
+         The remaining bits are unused. The combination of levels are also allowed. 
+         For example if the bits 1 and  2 are set, then the Trace statements related to 
+         management and Data Path will be printed.
+         The user have to enter the corresponding integer value for the bits set.
+         For example if bits 1 and 2 are set then value of 6 should be entered."
+        ::= { fsofcCfgEntry 8 }
+
+fsofcSwitchModeOnConnFailure OBJECT-TYPE
+        SYNTAX      INTEGER  { failSecure(1), failStandAlone(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "The administrative decision object to decide the switch behavior on connection 
+         failure with controller. The value 'failSecure' (1) indicates that switch will 
+         be moved to secured state on failure and 'failStandAlone' (2) indicates that 
+         switch will moved to stand-alone on failure."
+        DEFVAL { failStandAlone }
+        ::= { fsofcCfgEntry 9 }
+
+fsofcSwitchEntryStatus     OBJECT-TYPE
+        SYNTAX                       RowStatus
+        MAX-ACCESS                   read-write
+        STATUS                       current
+        DESCRIPTION
+        "The status of the entry can be used as specified in the SNMP V2
+         standard. "
+        ::=  { fsofcCfgEntry 10}
+
+-- OFC Cfg Group End
+
+-- Controller Cfg Group 
+
+fsofcControllerConnTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsofcControllerConnEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "A table containing Controller connection-specific information."
+
+       ::= { fsofcControllerCfgGroup 1 }
+
+fsofcControllerConnEntry OBJECT-TYPE
+       SYNTAX      FsofcControllerConnEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "Information about a particular current controller connection."
+
+       INDEX   { fsofcContextId, fsofcControllerIpAddrType, fsofcControllerIpAddress, fsofcControllerConnAuxId }
+
+       ::= { fsofcControllerConnTable 1 }
+
+FsofcControllerConnEntry ::=
+       SEQUENCE {
+           fsofcControllerIpAddrType
+                InetAddressType,
+           fsofcControllerIpAddress
+                InetAddress,
+           fsofcControllerConnAuxId
+                Integer32,
+           fsofcControllerConnPort 
+                Integer32,
+           fsofcControllerConnProtocol
+                INTEGER,
+           fsofcControllerRole
+                INTEGER,
+           fsofcControllerConnState
+                INTEGER,
+           fsofcControllerConnEchoReqCount
+                INTEGER,
+           fsofcControllerConnEchoReplyCount
+                INTEGER,
+           fsofcControllerConnEntryStatus  
+                RowStatus
+       }
+
+fsofcControllerIpAddrType OBJECT-TYPE
+      SYNTAX InetAddressType
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "Address Family Identifier of the controller IP address. Currently support is 
+       available only for IPv4 Address type"
+
+      ::= { fsofcControllerConnEntry 1}
+
+fsofcControllerIpAddress OBJECT-TYPE
+      SYNTAX InetAddress
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "The IP address of the controller for which the connection request has to
+       be issued."
+
+      ::= { fsofcControllerConnEntry 2}
+
+fsofcControllerConnAuxId OBJECT-TYPE
+      SYNTAX Integer32 (0..4)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "The Auxiliary connection ID of the Openflow controller referred to, in this entry."
+
+      ::= { fsofcControllerConnEntry 3}
+
+fsofcControllerConnPort OBJECT-TYPE
+      SYNTAX      Integer32 (0..65535)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+      "The TCP port number of the controller, where the open flow connection to be established."
+
+      DEFVAL { 6633 }
+      ::= { fsofcControllerConnEntry 4}
+
+fsofcControllerConnProtocol OBJECT-TYPE
+      SYNTAX    INTEGER {
+                          tcp(1),
+                          ssl(2)
+                        }
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+      "The protocol to be used when establishing connection with Controller."
+
+      DEFVAL  { 1 }
+      ::= { fsofcControllerConnEntry 5}
+
+fsofcControllerRole OBJECT-TYPE
+      SYNTAX    INTEGER {
+                          equal(1),
+                          master(2),
+                          slave(3)
+                         }
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The selected role of the controller connected with the switch."
+
+      DEFVAL  { 1 }
+      ::= { fsofcControllerConnEntry 6}
+
+fsofcControllerConnState OBJECT-TYPE
+      SYNTAX    INTEGER {
+                          connected(1),
+                          notConnected(2),
+                          connInProgress(3)
+                         }
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The connection state of the controller and the switch."
+
+      ::= { fsofcControllerConnEntry 7}
+
+fsofcControllerConnEchoReqCount OBJECT-TYPE
+      SYNTAX    Integer32 (0..20) 
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+      "The Count of the Echo Requests to be sent to controller from the switch.
+       On each set for this object, fsofcControllerConnEchoReplyCount will be
+       reset to '0'"
+
+      DEFVAL  { 0 }
+      ::= { fsofcControllerConnEntry 8}
+
+fsofcControllerConnEchoReplyCount OBJECT-TYPE
+      SYNTAX     Integer32 (0..20)
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "Statistics of the Echo replies from controller connection. This will be 
+       reset to '0', when fsofcControllerConnEchoReqCount is set to some value"
+      ::= { fsofcControllerConnEntry 9}
+
+fsofcControllerConnEntryStatus     OBJECT-TYPE
+      SYNTAX                       RowStatus
+      MAX-ACCESS                   read-write
+      STATUS                       current
+      DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+      ::=  { fsofcControllerConnEntry 10}
+
+-- Controller Cfg Group End 
+
+-- Interface Group
+
+-- ofcifTable
+-- This table is used for the management of all the openflow interfaces in the
+-- system.
+
+fsofcIfTable          OBJECT-TYPE
+      SYNTAX            SEQUENCE OF FsofcIfEntry
+      MAX-ACCESS        not-accessible
+      STATUS            current
+      DESCRIPTION
+      "A list of all the openflow interface entries in the system.
+       This table contains objects which are applicable to openflow sub
+       type of interfaces in the system."
+      ::= { fsofcInterfaceGroup 1 }
+
+fsofcIfEntry          OBJECT-TYPE
+      SYNTAX            FsofcIfEntry
+      MAX-ACCESS        not-accessible
+      STATUS            current
+      DESCRIPTION
+      "An entry containing management information applicable
+       to a particular interface."
+      INDEX { fsofcContextId, fsofcIfIndex }
+      ::= { fsofcIfTable 1 }
+
+FsofcIfEntry ::=
+      SEQUENCE {
+           fsofcIfIndex
+                InterfaceIndex,
+           fsofcIfType
+                INTEGER,
+           fsofcIfAlias
+                DisplayString,
+           fsofcIfOperStatus
+                INTEGER,
+           fsofcVlanEgressPorts
+                PortList,
+           fsofcVlanUntaggedPorts
+                PortList,
+           fsofcVlanInFrames
+                Counter32,
+           fsofcVlanOutFrames
+                Counter32
+       }
+
+fsofcIfIndex          OBJECT-TYPE
+      SYNTAX            InterfaceIndex
+      MAX-ACCESS        not-accessible
+      STATUS            current
+      DESCRIPTION
+            "A unique value, greater than zero, for each
+             interface. This object is identical to the ifIndex
+             of the standard MIB-2 ifTable."
+      ::= { fsofcIfEntry 1 }
+
+fsofcIfType OBJECT-TYPE
+      SYNTAX      INTEGER { physical (1), logical (2), reserved (3) } 
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+            "The type of openflow interface. This value will be copied from 
+             corresponding IF-Entry for physical interfaces."
+    ::= { fsofcIfEntry 2 }
+
+fsofcIfAlias   OBJECT-TYPE
+      SYNTAX      DisplayString (SIZE(0..64))
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+            "This object is an 'alias' name for the interface as
+            specified by a network manager, and provides a non-volatile
+            'handle' for the interface."
+
+      ::= { fsofcIfEntry 3 }
+
+fsofcIfOperStatus     OBJECT-TYPE
+      SYNTAX            INTEGER  {
+                              up(1),        -- ready to pass packets
+                              down(2),
+                              others(3)     -- status other than up/down 
+                              }
+      MAX-ACCESS        read-only
+      STATUS            current
+      DESCRIPTION
+            "The current operational state of the interface.
+            This object has the semantics of the ifOperStatus of the
+            standard ifTable."
+      ::= { fsofcIfEntry 4 }
+
+fsofcVlanEgressPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The complete set of ports, in this VLAN."
+
+    ::= { fsofcIfEntry 5 }
+
+fsofcVlanUntaggedPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The set of ports that should transmit egress packets
+        for this VLAN as untagged."
+
+    ::= { fsofcIfEntry 6 }
+
+fsofcVlanInFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of valid frames received by this port from
+        its segment that were classified as belonging to this
+        VLAN." 
+
+    ::= { fsofcIfEntry 7 }
+
+
+fsofcVlanOutFrames OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of valid frames transmitted by this port to
+        its segment from the local forwarding process for this
+        VLAN."
+
+    ::= { fsofcIfEntry 8 }
+
+
+-- Interface Group End
+
+-- Flow Group
+
+fsofcFlowTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsofcFlowEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A table containing OpenFlow's flow entries information."
+
+      ::= { fsofcFlowGroup 1 }
+
+fsofcFlowEntry OBJECT-TYPE
+      SYNTAX      FsofcFlowEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A list openflow information for each entry openflow the Flow Table."
+
+      INDEX  {fsofcContextId, fsofcTableIndex, fsofcFlowIndex}
+      ::= { fsofcFlowTable 1 }
+
+FsofcFlowEntry ::=
+      SEQUENCE {
+                fsofcTableIndex
+                      TableIndex,
+                fsofcFlowIndex
+                      FlowIndex,
+                fsofcFlowMatchField
+                      DisplayString,
+                fsofcFlowOutputAction
+                      DisplayString,
+		fsofcFlowIdleTimeout
+		      Unsigned32,
+		fsofcFlowHardTimeout
+		      Unsigned32,
+		fsofcFlowPacketCount
+		      INTEGER64,
+		fsofcFlowByteCount
+		      INTEGER64,
+		fsofcFlowDurationSec
+		      Unsigned32
+               }
+
+fsofcTableIndex OBJECT-TYPE
+      SYNTAX      TableIndex
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A unique value, greater than zero, for each flow table."
+
+      ::= { fsofcFlowEntry 1 }
+
+fsofcFlowIndex OBJECT-TYPE
+      SYNTAX      FlowIndex 
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A unique value, greater than zero, for each flow entry.  It
+       is recommended that values are assigned contiguously
+       starting from 0." 
+
+      ::= { fsofcFlowEntry 2 }
+
+fsofcFlowMatchField OBJECT-TYPE
+      SYNTAX     DisplayString (SIZE (0..1024))
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The fields from Incoming packet, to be matched for current flow entry.
+       The match fields for a flow entry will be a comma separated list
+       Possible match fields below for example
+             Inport=2                    - Input port 2
+             SrcMac=00:01:02:03:04:05    - Src Mac 00:01:02:03:04:05"
+
+      ::= { fsofcFlowEntry 3}
+
+fsofcFlowOutputAction OBJECT-TYPE
+      SYNTAX     DisplayString (SIZE (0..1024))
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The actions to be performed on the matching of current flow.
+       The actions for a flow will be a comma separated list
+       Possible actions below for example
+             port=2                      - Send the packet to port 2
+             port=5,controller           - Send the packet out on port 5 and copy to controller.
+             valn=7,port=3               - Send the packet out on port 3 and set vlan to 7 in outgoing Packet."
+
+      ::= { fsofcFlowEntry 4}
+
+fsofcFlowIdleTimeout OBJECT-TYPE
+      SYNTAX     Unsigned32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the value of Idle Time out in seconds ."
+
+      ::= { fsofcFlowEntry 5 }
+
+fsofcFlowHardTimeout OBJECT-TYPE
+      SYNTAX     Unsigned32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the value of Hard time out in Seconds."
+
+      ::= { fsofcFlowEntry 6 }
+
+fsofcFlowPacketCount OBJECT-TYPE
+      SYNTAX     INTEGER64
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the number of packets processed and matched for a flow entry."
+
+      ::= { fsofcFlowEntry 7 }
+
+fsofcFlowByteCount OBJECT-TYPE
+      SYNTAX     INTEGER64
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the Number of bytes processed for the particular Flow Entry "
+
+      ::= { fsofcFlowEntry 8 }
+
+fsofcFlowDurationSec OBJECT-TYPE
+      SYNTAX     Unsigned32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the time ,the particular flow entry has been  alive in seconds ."
+
+      ::= { fsofcFlowEntry 9 }
+
+-- Flow Group End
+
+-- Grp Group
+fsofcGroupTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsofcGroupEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A table containing OpenFlow Group Table  entries with Group 
+       information."
+
+      ::= { fsofcGrpGroup 1 }
+
+fsofcGroupEntry OBJECT-TYPE
+      SYNTAX      FsofcGroupEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A list of information for each entry of the Group Table."
+
+      INDEX  { fsofcContextId , fsofcGroupIndex }
+
+      ::= { fsofcGroupTable 1 }
+
+FsofcGroupEntry ::=
+      SEQUENCE {           
+                fsofcGroupIndex
+                      Unsigned32,
+		fsofcGroupType
+		      INTEGER,
+		fsofcGroupActionBuckets
+		      ActionString,
+		fsofcGroupPacketCount
+		      INTEGER64,
+		fsofcGroupByteCount
+		      INTEGER64,
+		fsofcGroupDurationSec
+		      Unsigned32
+		}
+
+fsofcGroupIndex OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..65535)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A unique ID of value, greater than zero, for each group in the switch." 
+
+      ::= { fsofcGroupEntry 1 }
+
+fsofcGroupType OBJECT-TYPE
+      SYNTAX      INTEGER {
+                             all(0),
+                             select(1),
+                             indirect(2),
+                             fastfailover(3)
+                          }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "Group Type specifies the Different types of group supported in the Switch.They are
+	All,Select,indirect,FastFailover"
+
+      ::= { fsofcGroupEntry 2 }
+
+fsofcGroupActionBuckets OBJECT-TYPE
+      SYNTAX     ActionString
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the 'list of actions' required to
+       execute for a matching Packet."
+
+      ::= { fsofcGroupEntry 3 }
+
+fsofcGroupPacketCount OBJECT-TYPE
+      SYNTAX     INTEGER64
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the value of number of packets processed through theis group." 
+
+      ::= { fsofcGroupEntry 5 }
+
+fsofcGroupByteCount OBJECT-TYPE
+      SYNTAX     INTEGER64
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the Number of bytes processed by the particular group "
+
+      ::= { fsofcGroupEntry 6 }
+
+fsofcGroupDurationSec OBJECT-TYPE
+      SYNTAX     Unsigned32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the time ,the particular group entry has been  alive in seconds ."
+
+      ::= { fsofcGroupEntry 7 }
+
+-- Grp Group End
+
+-- Meter Group
+fsofcMeterTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsofcMeterEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A table containing OpenFlow Meter Table  entries with meter 
+       information."
+
+      ::= { fsofcMeterGroup 1 }
+
+fsofcMeterEntry OBJECT-TYPE
+      SYNTAX      FsofcMeterEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A list of information for each entry of the Meter Table."
+
+      INDEX  { fsofcContextId, fsofcMeterIndex }
+
+      ::= { fsofcMeterTable 1 }
+
+FsofcMeterEntry ::=
+      SEQUENCE {           
+                fsofcMeterIndex
+                      Unsigned32,
+		fsofcMeterBandInfo
+		      DisplayString,
+		fsofcMeterFlowCount
+		      Counter32,	
+		fsofcMeterPacketInCount
+		      INTEGER64,
+		fsofcMeterByteInCount
+		      INTEGER64,
+		fsofcMeterDurationSec
+		      Unsigned32
+                }
+
+fsofcMeterIndex OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..65535)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A unique ID of value, greater than zero, for each Meter in the switch." 
+
+      ::= { fsofcMeterEntry 1 }
+
+fsofcMeterBandInfo OBJECT-TYPE
+      SYNTAX     DisplayString (SIZE(0..256))
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the Meter band information like value of Rate for dropping packets,
+       Burst size etc.., in comma separated list."
+
+      ::= { fsofcMeterEntry 2 }
+
+fsofcMeterFlowCount OBJECT-TYPE
+      SYNTAX     Counter32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the number of flows or groups that directly forward to the 
+       particular Meter ID."
+
+      ::= { fsofcMeterEntry 3 }
+
+fsofcMeterPacketInCount OBJECT-TYPE
+      SYNTAX     INTEGER64
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the Number of packets in input to the Meter Table ."
+
+      ::= { fsofcMeterEntry 4 }
+
+fsofcMeterByteInCount OBJECT-TYPE
+      SYNTAX     INTEGER64
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the Number of bytes processed by the particular Meter Table "
+
+      ::= { fsofcMeterEntry 5 }
+
+fsofcMeterDurationSec OBJECT-TYPE
+      SYNTAX     Unsigned32
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+      "The entity which holds the time ,the particular Meter Entry has been  alive in seconds ."
+
+      ::= { fsofcMeterEntry 6 }
+
+-- Meter Group End
+
+END

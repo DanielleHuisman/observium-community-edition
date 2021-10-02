@@ -7,7 +7,7 @@ ALCATEL-ENT1-SERVICE-MGR-MIB DEFINITIONS ::= BEGIN
                         FROM SNMPv2-SMI
                 OBJECT-GROUP, MODULE-COMPLIANCE, NOTIFICATION-GROUP
                         FROM SNMPv2-CONF
-                softentENT1serviceMgr
+                softentIND1serviceMgr
                         FROM ALCATEL-ENT1-BASE
                 RowStatus, TEXTUAL-CONVENTION, DisplayString, TruthValue, MacAddress, TimeStamp, DateAndTime
                         FROM SNMPv2-TC
@@ -33,7 +33,7 @@ ALCATEL-ENT1-SERVICE-MGR-MIB DEFINITIONS ::= BEGIN
                 ;
                 
 
-        alcatelENT1ServiceMgrMIB MODULE-IDENTITY
+        alcatelIND1ServiceMgrMIB MODULE-IDENTITY
         LAST-UPDATED "201208090000Z"
         ORGANIZATION "Alcatel-Lucent"
         CONTACT-INFO
@@ -71,7 +71,7 @@ ALCATEL-ENT1-SERVICE-MGR-MIB DEFINITIONS ::= BEGIN
 
                                Copyright (C) 1995-2006 Alcatel-Lucent
                                      ALL RIGHTS RESERVED WORLDWIDE"
-        ::= { softentENT1serviceMgr 1}
+        ::= { softentIND1serviceMgr 1}
 
 -- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 --  Textual Conventions
@@ -175,14 +175,14 @@ alcatelIND1ServiceMgrMIBObjects OBJECT-IDENTITY
         STATUS current
         DESCRIPTION
             "Branch For Service Manager Managed Objects."
-        ::= { alcatelENT1ServiceMgrMIB 1 }
+        ::= { alcatelIND1ServiceMgrMIB 1 }
 
 
 alcatelIND1ServiceMgrMIBConformance OBJECT-IDENTITY
         STATUS current
         DESCRIPTION
             "Branch For Service Manager Conformance Information."
-        ::= { alcatelENT1ServiceMgrMIB 2 }
+        ::= { alcatelIND1ServiceMgrMIB 2 }
 
 alcatelIND1ServiceMgrMIBGroups OBJECT-IDENTITY
         STATUS current
@@ -635,8 +635,12 @@ AlaSvcBaseInfoEntry ::=
         alaSvcEgressByteCount       Counter64,
         alaSvcClearCounters         INTEGER,
         alaSvcSapVlanXlation        ServiceAdminStatus,
-        alaSvcVnid                  Integer32,          -- VXLAN
-        alaSvcRemoveIngressTag      ServiceAdminStatus
+        alaSvcVnid                  Integer32,           -- VXLAN
+        alaSvcRemoveIngressTag      ServiceAdminStatus,
+        alaSvcL3VpnIfIndex          InterfaceIndexOrZero,   -- L3-VPN
+        alaSvcL3VpnIfName           SnmpAdminString,        -- L3-VPN
+        alaSvcL3VpnVrfName          SnmpAdminString,        -- L3-VPN
+        alaSvcL3VpnMtu              Integer32               -- L3-VPN
     }
 
 alaSvcId OBJECT-TYPE
@@ -729,7 +733,7 @@ alaSvcNumSdps OBJECT-TYPE
                      SDPs bound to this service."
     ::= { alaSvcBaseInfoEntry 9 }
 
- alaSvcLastMgmtChange OBJECT-TYPE
+alaSvcLastMgmtChange OBJECT-TYPE
       SYNTAX          AluDateAndTime
       MAX-ACCESS      read-only
       STATUS          current
@@ -905,6 +909,40 @@ alaSvcRemoveIngressTag OBJECT-TYPE
                      configured in this service"
     DEFVAL          { down }
     ::= { alaSvcBaseInfoEntry 28 }
+
+alaSvcL3VpnIfIndex  OBJECT-TYPE
+    SYNTAX          InterfaceIndexOrZero
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The interface index of the L3-VPN IP interface associated with this service.
+                     Value 0 indicates no L3-VPN interface is associated with this service."
+    DEFVAL          { 0 }
+    ::= { alaSvcBaseInfoEntry 29 }
+
+alaSvcL3VpnIfName   OBJECT-TYPE
+    SYNTAX          SnmpAdminString (SIZE(1..32))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The interface name of the L3-VPN IP interface associated with this service"
+    ::= { alaSvcBaseInfoEntry 30 }
+
+alaSvcL3VpnVrfName OBJECT-TYPE
+    SYNTAX          SnmpAdminString (SIZE(1..32))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The current VRF instance name for the L3-VPN interface associated with this service.
+                     The default VRF is assumed if not specifed."
+    ::= { alaSvcBaseInfoEntry 31 }
+
+alaSvcL3VpnMtu      OBJECT-TYPE
+    SYNTAX          Integer32 (0 | 1280..9198)
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     "The maximum packet size of a IP control packet that can be handled by the CPU
+                     for this service.
+                     Value 0 indicates the default mtu."
+    DEFVAL          { 1500 }
+    ::= { alaSvcBaseInfoEntry 32 }
 
 -- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 -- ALA Service Access Point (SAP) Base Info Table
@@ -1603,8 +1641,9 @@ AlaSdpBindEntry ::=
 -- VxLAN
         alaSdpBindCreationOrigin        AluSdpOriginType,
         alaSdpBindFarEndIpAddress       IpAddress,
-        alaSdpBindVnid                  Integer32,
-        alaSdpBindDescription           ServObjDesc
+        alaSdpBindVnid                  Integer32, 
+        alaSdpBindDescription           ServObjDesc,
+        alaSdpBindStatsAdminStatus      ServiceAdminStatus
     }
 
 alaSdpBindId OBJECT-TYPE
@@ -1934,6 +1973,13 @@ alaSdpBindDescription OBJECT-TYPE
     DESCRIPTION     "Generic information about this SDP Bind."
     DEFVAL          { "" }
     ::= { alaSdpBindEntry 30 }
+
+alaSdpBindStatsAdminStatus OBJECT-TYPE
+    SYNTAX          ServiceAdminStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "To enable/disable the ingress/egress stats counters on this Bind SDP."
+    ::= { alaSdpBindEntry 31 }
 
 -- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 -- Service Manager System Config Table
@@ -6272,7 +6318,11 @@ alaSvcBaseInfoEntryGroup OBJECT-GROUP
             alaSvcClearCounters,
             alaSvcSapVlanXlation,
             alaSvcVnid,
-            alaSvcRemoveIngressTag
+            alaSvcRemoveIngressTag,
+            alaSvcL3VpnIfIndex,
+            alaSvcL3VpnIfName,
+            alaSvcL3VpnVrfName,
+            alaSvcL3VpnMtu
         }
         STATUS current
         DESCRIPTION
@@ -6379,7 +6429,8 @@ alaSdpBindTableGroup OBJECT-GROUP
             alaSdpBindCreationOrigin,
             alaSdpBindFarEndIpAddress,
             alaSdpBindVnid,
-            alaSdpBindDescription
+            alaSdpBindDescription,
+            alaSdpBindStatsAdminStatus
         }
         STATUS current
         DESCRIPTION

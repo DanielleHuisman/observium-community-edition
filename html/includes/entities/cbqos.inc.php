@@ -4,12 +4,11 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
-
 
 function build_cbqos_query($vars)
 {
@@ -36,9 +35,14 @@ function build_cbqos_query($vars)
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'cbqos_id');
         break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'ports_cbqos.device_id');
+        break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'device_id');
+        $sql .= generate_query_values($value, 'ports_cbqos.device_id');
         break;
     }
   }
@@ -77,7 +81,7 @@ function build_cbqos_query($vars)
 function print_cbqos_table_header($vars)
 {
 
-  echo('<table class="' . ($vars['graphs'] == 'yes' ? OBS_CLASS_TABLE_STRIPED_TWO : OBS_CLASS_TABLE_STRIPED) . '">');
+  echo('<table class="' . (get_var_true($vars['graphs']) ? OBS_CLASS_TABLE_STRIPED_TWO : OBS_CLASS_TABLE_STRIPED) . '">');
 
   $cols[] = array('', 'class="state-marker"');
   if(!isset($vars['device_id'])) { $cols['hostname']    = array('Device', 'style="width: 200px;"'); }

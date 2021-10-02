@@ -5,10 +5,12 @@ ELTEX-MES-STORMCTRL-MIB DEFINITIONS ::= BEGIN
 -- Date:                 29-Oct-2015
 
 IMPORTS
-    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE  FROM SNMPv2-SMI
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    Unsigned32                                       FROM SNMPv2-SMI
     TruthValue                                       FROM SNMPv2-TC
     InterfaceIndex                                   FROM IF-MIB
-    eltMes                                           FROM ELTEX-MES;
+    eltMes                                           FROM ELTEX-MES
+    rlStormCtrlRateLimCfgEntry                       FROM RADLAN-STORMCTRL-MIB;
 
 eltMesStormCtrl MODULE-IDENTITY
                 LAST-UPDATED "201510290000Z"
@@ -16,219 +18,95 @@ eltMesStormCtrl MODULE-IDENTITY
                 CONTACT-INFO
                       "www.eltex.nsk.ru"
                 DESCRIPTION
-					"This private MIB module defines Eltex's private storm-control MIBs."
+                    "This private MIB module defines Eltex's private storm-control MIBs."
 
-				REVISION "201510290000Z"
-				DESCRIPTION
-                	"Added eltStormCtrlAction field to eltStormCtrlConfigTable.
+                REVISION "201510290000Z"
+                DESCRIPTION
+                    "Added eltStormCtrlAction field to eltStormCtrlConfigTable.
                     Added value 'shutdown' to EltStormControlStatusType."
 
                 REVISION "201412300000Z"
                 DESCRIPTION
-					"Initial revision."
+                    "Initial revision."
         ::= { eltMes 77 }
 
 --
 -- MIB Groups
 --
 
-eltMesStormCtrlMIBNotifs      OBJECT IDENTIFIER ::=
-                                { eltMesStormCtrl 0 }
 eltMesStormCtrlMIBObjects     OBJECT IDENTIFIER ::=
                                 { eltMesStormCtrl 1 }
 
 eltMesStormCtrlConfig         OBJECT IDENTIFIER ::=
                                 { eltMesStormCtrlMIBObjects 1 }
 
-eltMesStormCtrlStatus         OBJECT IDENTIFIER ::=
-                                { eltMesStormCtrlMIBObjects 2 }
-
 --
 -- Textual Conventions
 --
 
-EltStormCtrlNotification ::= TEXTUAL-CONVENTION
-        STATUS      current
-        DESCRIPTION "If the object is set to none(1), no notifications will
-                     be generated.
+EltStormCtrlActionType ::= INTEGER {
+        none(1),
+        trap(2),
+        shutdown(3),
+        trapAndShutdown(4)
+    }
 
-                     A notification will be generated when a storm event is
-                     detected or cleared when the object is set to
-                     stormDetected(2) or stormCleared(3) respectively.
+--------------------------------------------------------------------------------
+-- eltStormCtrlRateLimCfgTable
+--------------------------------------------------------------------------------
 
-                     If the object is set to both(4), a notification will be
-                     generated both when a storm event is detected and
-                     cleared."
-        SYNTAX INTEGER  {
-                            none(1),
-                            stormDetected(2),
-                            stormCleared(3),
-                            both(4)
-                        }
+eltStormCtrlRateLimCfgTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltStormCtrlRateLimCfgEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The table contains additional settings to
+         storm-control and rate-limit for each port."
+    ::= { eltMesStormCtrlConfig 3 }
 
-EltStormCtrlTrafficType ::= TEXTUAL-CONVENTION
-        STATUS      current
-        DESCRIPTION "The type of traffic."
-        SYNTAX INTEGER  {
-                            broadcast(1),
-                            multicast(2),
-                            unicast(3),
-                            all(4)
-                        }
+eltStormCtrlRateLimCfgEntry OBJECT-TYPE
+    SYNTAX  EltStormCtrlRateLimCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "The entry contains additional settings to
+         storm-control and rate-limit for each port."
+    AUGMENTS { rlStormCtrlRateLimCfgEntry }
+    ::= { eltStormCtrlRateLimCfgTable 1 }
 
-EltStormControlStatusType ::= TEXTUAL-CONVENTION
-        STATUS      current
-        DESCRIPTION "The current status of storm control on a given
-                     interface for a given traffic type.
-
-                     inactive        - Storm control is not enabled.
-
-                     forwarding      - Storm control is enabled. No storm event has
-                                       been detected.
-
-                     trafficFiltered - Storm control is enabled. Storm event
-                                       has occurred and traffic received
-                                       on the interface is being filtered.
-
-					 shutdown        - Storm control is enabled. Storm event
-									   has occurred and interface is shutdown."
-
-        SYNTAX INTEGER  {
-                            inactive(1),
-                            forwarding(2),
-                            trafficFiltered(3),
-                            shutdown(4)
-                        }
-
-EltStormControlActionType ::= TEXTUAL-CONVENTION
-        STATUS      current
-        DESCRIPTION "Type of action in case of storm.
-
-                     filtering       - Filter broadcast traffic.
-
-					 shutdown        - Shutdown this interface."
-
-        SYNTAX INTEGER  {
-                            filtering(1),
-                            shutdown(2)
-                        }
-
---
--- Storm-control configuration
---
-
-eltStormCtrlConfigStatusChangeNotif OBJECT-TYPE
-        SYNTAX      EltStormCtrlNotification
-        MAX-ACCESS  read-write
-        STATUS      current
-        DESCRIPTION "This variable indicates whether the system
-                     produces the eltStormCtrlStatusChangeNotif."
-    ::= { eltMesStormCtrlConfig 1 }
-
-eltStormCtrlConfigTable OBJECT-TYPE
-        SYNTAX      SEQUENCE OF EltStormCtrlConfigEntry
-        MAX-ACCESS  not-accessible
-        STATUS      current
-        DESCRIPTION "A table of storm control configuration entries."
-    ::= { eltMesStormCtrlConfig 2 }
-
-eltStormCtrlConfigEntry OBJECT-TYPE
-        SYNTAX      EltStormCtrlConfigEntry
-        MAX-ACCESS  not-accessible
-        STATUS      current
-        DESCRIPTION "Storm control configuration entries, one per
-                     interface and traffic type."
-        INDEX           {
-                            eltStormCtrlIfIndex,
-                            eltStormCtrlTrafficType
-                        }
-    ::= { eltStormCtrlConfigTable 1 }
-
-EltStormCtrlConfigEntry ::= SEQUENCE {
-        eltStormCtrlTrafficLogging          TruthValue,
-        eltStormCtrlAction                  EltStormControlActionType
+EltStormCtrlRateLimCfgEntry ::= SEQUENCE {
+    eltStormCtrlRateLimCfgPpsAction         EltStormCtrlActionType,
+    eltStormCtrlRateLimCfgRatePps           Unsigned32,
+    eltStormCtrlRateLimCfgBurstSizePackets  Unsigned32
 }
 
-eltStormCtrlTrafficLogging OBJECT-TYPE
-        SYNTAX      TruthValue
-        MAX-ACCESS  read-write
-        STATUS      current
-        DEFVAL      {false}
-        DESCRIPTION "This variable indicates whether the system
-                     logging storm events on the interface to
-                     particular traffic type."
-    ::= { eltStormCtrlConfigEntry 1 }
+eltStormCtrlRateLimCfgPpsAction OBJECT-TYPE
+    SYNTAX  EltStormCtrlActionType
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Send a trap when a storm occurs on a port or/and shut down a port when a storm occurs on the port."
+    ::= { eltStormCtrlRateLimCfgEntry 1 }
 
-eltStormCtrlAction OBJECT-TYPE
-		SYNTAX      EltStormControlActionType
-		MAX-ACCESS  read-write
-		STATUS      current
-		DEFVAL      {filtering}
-		DESCRIPTION "This variable indicates which
-					action will be used in case of storm."
-	::= { eltStormCtrlConfigEntry 2 }
+eltStormCtrlRateLimCfgRatePps OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Block the flooding of packets when the value in pps specified is reached.
+         Rate equal to 0 means that the rate limit does not apply
+         to traffic."
+    DEFVAL { 0 }
+    ::= { eltStormCtrlRateLimCfgEntry 2 }
 
---
--- Storm-control status information
---
-
-eltStormCtrlStatusTable OBJECT-TYPE
-        SYNTAX      SEQUENCE OF EltStormCtrlStatusEntry
-        MAX-ACCESS  not-accessible
-        STATUS      current
-        DESCRIPTION "A table of storm control status entries."
-    ::= { eltMesStormCtrlStatus 1 }
-
-eltStormCtrlStatusEntry OBJECT-TYPE
-        SYNTAX      EltStormCtrlStatusEntry
-        MAX-ACCESS  not-accessible
-        STATUS      current
-        DESCRIPTION "Storm control status entries, one per interface and traffic type."
-        INDEX           {
-                            eltStormCtrlIfIndex,
-                            eltStormCtrlTrafficType
-                        }
-    ::= { eltStormCtrlStatusTable 1 }
-
-EltStormCtrlStatusEntry ::= SEQUENCE {
-        eltStormCtrlIfIndex                 InterfaceIndex,
-        eltStormCtrlTrafficType             EltStormCtrlTrafficType,
-        eltStormCtrlTrafficStatus           EltStormControlStatusType
-}
-
-eltStormCtrlIfIndex OBJECT-TYPE
-        SYNTAX      InterfaceIndex
-        MAX-ACCESS  read-only
-        STATUS      current
-        DESCRIPTION "Interface index."
-    ::= { eltStormCtrlStatusEntry 1 }
-
-eltStormCtrlTrafficType OBJECT-TYPE
-        SYNTAX      EltStormCtrlTrafficType
-        MAX-ACCESS  read-only
-        STATUS      current
-        DESCRIPTION "Traffic type."
-    ::= { eltStormCtrlStatusEntry 2 }
-
-eltStormCtrlTrafficStatus OBJECT-TYPE
-        SYNTAX      EltStormControlStatusType
-        MAX-ACCESS  read-only
-        STATUS      current
-        DESCRIPTION "This object identifies the status of storm control."
-    ::= { eltStormCtrlStatusEntry 3 }
-
---
--- Notifications
---
-
-eltStormCtrlStatusChangeNotif NOTIFICATION-TYPE
-        OBJECTS         {
-                            eltStormCtrlTrafficStatus
-                        }
-        STATUS  current
-        DESCRIPTION
-                "Trap indicating that storm event is detected or cleared."
-        ::= { eltMesStormCtrlMIBNotifs 1 }
+eltStormCtrlRateLimCfgBurstSizePackets OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Committed burst in packets."
+    DEFVAL { 0 }
+    ::= { eltStormCtrlRateLimCfgEntry 3 }
 
 END
 

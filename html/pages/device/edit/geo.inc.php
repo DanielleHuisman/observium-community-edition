@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,14 +23,11 @@ if ($vars['editing'])
   } else {
     $updated = 0;
 
-    if ($vars['submit'] == 'save')
+    if ($vars['submit'] === 'save')
     {
-      if ($vars['reset_geolocation'] === 'on' || $vars['reset_geolocation'] === '1')
-      {
+      if (get_var_true($vars['reset_geolocation'])) {
         $updated = dbDelete('devices_locations', '`device_id` = ?', array($device['device_id']));
-      }
-      else if ((bool)$vars['location_manual'])
-      {
+      } elseif ((bool)$vars['location_manual']) {
         // Set manual coordinates if present
         $pattern = '/(?:^|[\[(])\s*(?<lat>[+-]?\d+(?:\.\d+)*)\s*[,; ]\s*(?<lon>[+-]?\d+(?:\.\d+)*)\s*(?:[\])]|$)/';
         if (preg_match($pattern, $vars['coordinates'], $matches))
@@ -51,6 +46,7 @@ if ($vars['editing'])
         if (!$updated) { unset($vars); } // If manual set, but coordinates wrong - reset edit
         //r($vars);
       }
+
       if ((bool)$device['location_manual'] && !(bool)$vars['location_manual'])
       {
         // Reset manual flag, rediscover geo info
@@ -67,8 +63,7 @@ if ($vars['editing'])
         $geo_db = dbFetchRow("SELECT * FROM `devices_locations` WHERE `device_id` = ?", array($device['device_id']));
         if (count($geo_db))
         {
-          if ($vars['reset_geolocation'] === 'on' || $vars['reset_geolocation'] === '1')
-          {
+          if (get_var_true($vars['reset_geolocation'])) {
             print_warning("Device Geo location dropped. Country/city will be updated on next poll.");
           } else {
             print_success("Device Geolocation updated. Country/city will be updated on next poll.");
@@ -178,7 +173,7 @@ if ($updated && $update_message)
                                       'width'       => '16.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => $location['location_lat']);
+                                      'value'       => ($location['location_lat'] ? $location['location_lat'] . ',' . $location['location_lon'] : ''));
       if ($location['location_link'])
       {
         $form['row'][3]['location_link'] = array(
@@ -241,7 +236,7 @@ if ($updated && $update_message)
                                       'on-color'    => 'danger',
                                       'off-color'   => 'primary',
                                       'on-text'     => 'Reset',
-                                      'off-text'    => 'Leave',
+                                      'off-text'    => 'Keep',
                                       'value'       => 0);
 
       $form['row'][9]['submit']    = array(

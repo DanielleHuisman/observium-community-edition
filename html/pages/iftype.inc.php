@@ -19,35 +19,35 @@ $where .= generate_query_permitted(array('port'));
 
 $ports = dbFetchRows('SELECT * FROM `ports` AS I, `devices` AS D '.$where.' AND I.`device_id` = D.`device_id` ORDER BY I.`ifAlias`');
 
-$if_list = array();
-foreach ($ports as $port)
-{
-  $if_list[] = $port['port_id'];
-}
-$if_list = implode(',', $if_list);
+$port_list = array();
+foreach ($ports as $port) { $port_list[] = $port['port_id']; }
+$port_list = implode(',', $port_list);
 
-for ($i = 0; $i < count($vars['type']);$i++) { $vars['type'][$i] = nicecase($vars['type'][$i]); }
-$types = implode(' + ', $vars['type']);
+foreach($vars['type'] AS $type) { $type_list[] = nicecase($type); }
+
+$types = implode(' & ', $type_list);
 
 register_html_title("$types Ports");
 
-echo generate_box_open(array('title' => 'Total Graph for ports of type : '.$types));
+echo generate_box_open(array('title' => 'Total '.$types.' Traffic'));
 
-if ($if_list)
+//echo '<h3>Total '.$types.' Traffic</h3>';
+
+if ($port_list)
 {
   $graph_array['type']   = 'multi-port_bits_separate';
-  $port['port_id']       = $if_list;
   $graph_array['to']     = $config['time']['now'];
-  $graph_array['id']     = $port['port_id'];
+  $graph_array['id']     = $port_list;
 
   print_graph_row($graph_array);
 
   echo generate_box_close();
+
   echo generate_box_open();
 
 ?>
 
-<table class="table table-hover table-striped-two table-condensed" style="margin-top: 10px;">
+<table class="table table-hover table-striped-two table-condensed">
   <thead>
       <tr>
         <th style="width: 250px;"><span style="font-weight: bold;" class="interface">Description</span></th>
@@ -68,8 +68,7 @@ if ($if_list)
     $port['ifAlias'] = str_ireplace($type . ': ', '', $port['ifAlias']);
     $port['ifAlias'] = str_ireplace('[PNI]', 'Private', $port['ifAlias']);
     $ifclass = port_html_class($port['ifOperStatus'], $port['ifAdminStatus'], $port['encrypted']);
-    if ($bg == '#ffffff') { $bg = '#e5e5e5'; } else { $bg = '#ffffff'; }
-    echo('<tr class="iftype">
+    echo('<tr>
              <td><span class="entity-title">' . generate_port_link($port,$port['port_descr_descr']) . '</span>');
 #            <span class=small style='float: left;'>'.generate_device_link($port).' '.generate_port_link($port).' </span>');
 

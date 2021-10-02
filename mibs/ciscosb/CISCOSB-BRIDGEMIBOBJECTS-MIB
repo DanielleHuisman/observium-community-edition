@@ -11,7 +11,7 @@ IMPORTS
     TruthValue, DisplayString, RowStatus                             FROM SNMPv2-TC
     Counter                                                          FROM RFC1155-SMI
     BridgeId, Timeout, dot1dBasePort, dot1dStpPort, MacAddress       FROM BRIDGE-MIB
-    InterfaceIndex, ifIndex                                          FROM IF-MIB
+    InterfaceIndex, ifIndex, InterfaceIndexOrZero                    FROM IF-MIB
     PortList                                                         FROM Q-BRIDGE-MIB
     SnmpAdminString                                                  FROM SNMP-FRAMEWORK-MIB;
 
@@ -632,7 +632,8 @@ Rldot1dStpPortEntry ::= SEQUENCE {
     rldot1dStpPortRestrictedRole        TruthValue,
     rldot1dStpPortAutoEdgePort          TruthValue,
     rldot1dStpPortLoopback              TruthValue,
-    rldot1dStpPortBpduOperStatus        INTEGER
+    rldot1dStpPortBpduOperStatus        INTEGER,
+    rldot1dStpPortTcnGuardEnable        TruthValue
 }
 
 rldot1dStpPortPort OBJECT-TYPE
@@ -786,6 +787,14 @@ rldot1dStpPortBpduOperStatus OBJECT-TYPE
     REFERENCE
         ""
     ::= { rldot1dStpPortEntry 12 }
+
+rldot1dStpPortTcnGuardEnable OBJECT-TYPE
+    SYNTAX  TruthValue
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "Enable / Disable TCN guard on port. TCN guard prevents receiving topology change notifications."
+    ::= { rldot1dStpPortEntry 13 }
 
 rldot1dStpPortsEnable OBJECT-TYPE
     SYNTAX  TruthValue
@@ -1047,7 +1056,16 @@ rldot1dDeviceCapabilities OBJECT-TYPE
     ::= { rldot1dExtBase 2 }
 
 
-
+rldot1dStpClearPortCounters  OBJECT-TYPE
+    SYNTAX  InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Clear the number of bpdu sent and recieved on specific port,
+         if Value of 0 is specified then clear counters action is applied to all ports,
+         this object behaviors is write-only, when reading this object 
+         it will always return 0."
+    ::= { rldot1dStp 27 }
 
 rldot1wRStp  OBJECT IDENTIFIER ::= { rlpBridgeMIBObjects 4 }
 
@@ -1282,11 +1300,12 @@ Rldot1sMstpInstanceEntry ::= SEQUENCE {
     rldot1sMstpInstanceHoldTime                  INTEGER,
     rldot1sMstpInstanceForwardDelay              Timeout,
     rldot1sMstpInstancePriority                  INTEGER,
-    rldot1sMstpInstanceRemainingHopes            INTEGER
+    rldot1sMstpInstanceRemainingHopes            INTEGER,
+    rldot1sMstpInstanceSwId                      INTEGER
 }
 
 rldot1sMstpInstanceId OBJECT-TYPE
-    SYNTAX  INTEGER (1..64)
+    SYNTAX  INTEGER (1..4094)
     MAX-ACCESS  read-only
     STATUS  current
     DESCRIPTION
@@ -1456,6 +1475,14 @@ rldot1sMstpInstanceRemainingHopes OBJECT-TYPE
         "IEEE 802.1D-1990: Section 4.5.3.14"
     ::= { rldot1sMstpInstanceEntry 13 }
 
+rldot1sMstpInstanceSwId OBJECT-TYPE
+    SYNTAX  INTEGER
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The logical Instance Id which is binded for this entry from rldot1sMstpSwInstanceTable."
+    ::= { rldot1sMstpInstanceEntry 14 }
+
 --
 -- rldot1sMstpInstancePortTable
 --
@@ -1496,7 +1523,7 @@ Rldot1sMstpInstancePortEntry ::= SEQUENCE {
 }
 
 rldot1sMstpInstancePortMstiId OBJECT-TYPE
-    SYNTAX  INTEGER (1..256)
+    SYNTAX  INTEGER (1..4094)
     MAX-ACCESS  read-only
     STATUS  current
     DESCRIPTION
@@ -1731,7 +1758,6 @@ Rldot1sMstpVlanEntry ::= SEQUENCE {
       rldot1sMstpVlan              INTEGER,
       rldot1sMstpGroup             INTEGER,
       rldot1sMstpPendingGroup      INTEGER
-
 }
 
 rldot1sMstpVlan OBJECT-TYPE
@@ -1747,7 +1773,7 @@ rldot1sMstpVlan OBJECT-TYPE
     ::= { rldot1sMstpVlanEntry 1 }
 
 rldot1sMstpGroup OBJECT-TYPE
-    SYNTAX  INTEGER (0..64)
+    SYNTAX  INTEGER (0..4094)
     MAX-ACCESS  read-only
     STATUS  current
     DESCRIPTION
@@ -1758,7 +1784,7 @@ rldot1sMstpGroup OBJECT-TYPE
     ::= { rldot1sMstpVlanEntry 2 }
 
 rldot1sMstpPendingGroup OBJECT-TYPE
-    SYNTAX  INTEGER (0..64)
+    SYNTAX  INTEGER (0..4094)
     MAX-ACCESS  read-write
     STATUS  current
     DESCRIPTION
@@ -1963,11 +1989,12 @@ rldot1sMstpInstanceVlanEntry OBJECT-TYPE
     STATUS current
     DESCRIPTION
         " The entry contains vlan lists per specific MSTP instance."
-    INDEX { rldot1sMstpInstanceVlanId }
+    INDEX { rldot1sMstpInstanceVlanId, rldot1sMstpInstanceVlanDbType }
     ::= { rldot1sMstpInstanceVlanTable 1 }
 
 Rldot1sMstpInstanceVlanEntry::= SEQUENCE {
         rldot1sMstpInstanceVlanId             INTEGER,
+        rldot1sMstpInstanceVlanDbType         INTEGER,
         rldot1sMstpInstanceVlanId1To1024      VlanList1,
         rldot1sMstpInstanceVlanId1025To2048   VlanList2,
         rldot1sMstpInstanceVlanId2049To3072   VlanList3,
@@ -1975,12 +2002,23 @@ Rldot1sMstpInstanceVlanEntry::= SEQUENCE {
     }
 
 rldot1sMstpInstanceVlanId OBJECT-TYPE
-    SYNTAX  INTEGER (0..64)
+    SYNTAX  INTEGER (0..4094)
     MAX-ACCESS  read-only
     STATUS  current
     DESCRIPTION
         "Specifiy the instance number."
     ::= { rldot1sMstpInstanceVlanEntry 1 }
+
+rldot1sMstpInstanceVlanDbType OBJECT-TYPE
+    SYNTAX  INTEGER {
+        active(1),
+        pending(2)
+    }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "Specifiy which data-base to access: active or pending."
+    ::= { rldot1sMstpInstanceVlanEntry 2 }
 
 rldot1sMstpInstanceVlanId1To1024 OBJECT-TYPE
     SYNTAX  VlanList1
@@ -1988,7 +2026,7 @@ rldot1sMstpInstanceVlanId1To1024 OBJECT-TYPE
     STATUS  current
     DESCRIPTION
         "first VlanId List of specific MSTP instance."
-    ::= { rldot1sMstpInstanceVlanEntry 2 }
+    ::= { rldot1sMstpInstanceVlanEntry 3 }
 
 rldot1sMstpInstanceVlanId1025To2048 OBJECT-TYPE
     SYNTAX  VlanList2
@@ -1996,7 +2034,7 @@ rldot1sMstpInstanceVlanId1025To2048 OBJECT-TYPE
     STATUS  current
     DESCRIPTION
         "second VlanId List of specific MSTP instance."
-    ::= { rldot1sMstpInstanceVlanEntry 3 }
+    ::= { rldot1sMstpInstanceVlanEntry 4 }
 
 rldot1sMstpInstanceVlanId2049To3072 OBJECT-TYPE
     SYNTAX  VlanList3
@@ -2004,7 +2042,7 @@ rldot1sMstpInstanceVlanId2049To3072 OBJECT-TYPE
     STATUS  current
     DESCRIPTION
         "third VlanId List of specific MSTP instance."
-    ::= { rldot1sMstpInstanceVlanEntry 4 }
+    ::= { rldot1sMstpInstanceVlanEntry 5 }
 
 rldot1sMstpInstanceVlanId3073To4094 OBJECT-TYPE
     SYNTAX  VlanList4
@@ -2012,7 +2050,144 @@ rldot1sMstpInstanceVlanId3073To4094 OBJECT-TYPE
     STATUS  current
     DESCRIPTION
         "fourth VlanId List of specific MSTP instance."
-    ::= { rldot1sMstpInstanceVlanEntry 5 }
+    ::= { rldot1sMstpInstanceVlanEntry 6 }
+
+
+--
+-- rldot1sMstpSwInstanceTable
+--
+
+
+rldot1sMstpSwInstanceTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF Rldot1sMstpSwInstanceEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains logical instance to rldot1sMstpInstanceId mapping."
+    ::= { rldot1sMstp 18 }
+
+rldot1sMstpSwInstanceEntry OBJECT-TYPE
+    SYNTAX Rldot1sMstpSwInstanceEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The entry contains logical instance information."
+    INDEX { rldot1sMstpSwInstanceSwId}
+    ::= { rldot1sMstpSwInstanceTable 1 }
+
+Rldot1sMstpSwInstanceEntry::= SEQUENCE {
+        rldot1sMstpSwInstanceSwId           INTEGER,
+        rldot1sMstpSwInstanceId             INTEGER,
+        rldot1sMstpSwInstanceStatus         RowStatus
+    }
+
+rldot1sMstpSwInstanceSwId OBJECT-TYPE
+    SYNTAX  INTEGER (1..4094)
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The STP Instance logical index."
+    ::= { rldot1sMstpSwInstanceEntry 1 }
+
+rldot1sMstpSwInstanceId OBJECT-TYPE
+    SYNTAX  INTEGER (1..64)
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+        "The STP Instance index rldot1sMstpInstanceId which exist at rldot1sMstpInstanceTable."
+    ::= { rldot1sMstpSwInstanceEntry 2 }
+
+
+rldot1sMstpSwInstanceStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        "The status of the entry, used to add, delete or update an entry"
+   ::= { rldot1sMstpSwInstanceEntry 3 }
+
+
+
+--
+-- rldot1sMstpPendingInstanceVlanTable
+--
+
+--rldot1sMstpPendingInstanceVlanTable OBJECT-TYPE
+--     SYNTAX SEQUENCE OF Rldot1sMstpPendingInstanceVlanEntry
+--    MAX-ACCESS not-accessible
+--    STATUS current
+--     DESCRIPTION
+--        "This table contains vlan lists per MSTP instances."
+--    ::= { rldot1sMstp 16 }
+--
+--rldot1sMstpPendingInstanceVlanEntry OBJECT-TYPE
+--    SYNTAX Rldot1sMstpPendingInstanceVlanEntry
+--    MAX-ACCESS not-accessible
+--    STATUS current
+--    DESCRIPTION
+--        "The entry contains vlan lists per specific MSTP instance."
+--    INDEX { rldot1sMstpPendingInstanceVlanId }
+--    ::= { rldot1sMstpPendingInstanceVlanTable 1 }
+--
+--Rldot1sMstpPendingInstanceVlanEntry::= SEQUENCE {
+--        rldot1sMstpPendingInstanceVlanId             INTEGER,
+--        rldot1sMstpPendingInstanceVlanId1To1024      VlanList1,
+--        rldot1sMstpPendingInstanceVlanId1025To2048   VlanList2,
+--        rldot1sMstpPendingInstanceVlanId2049To3072   VlanList3,
+--        rldot1sMstpPendingInstanceVlanId3073To4094   VlanList4,
+--            rldot1sMstpPendingInstanceVlanStatus         RowStatus
+--    }
+--
+--rldot1sMstpPendingInstanceVlanId OBJECT-TYPE
+--    SYNTAX  INTEGER (0..4094)
+--    MAX-ACCESS  read-only
+--    STATUS  current
+--    DESCRIPTION
+--        "Specifiy the instance number."
+--    ::= { rldot1sMstpPendingInstanceVlanEntry 1 }
+--
+--rldot1sMstpPendingInstanceVlanId1To1024 OBJECT-TYPE
+--    SYNTAX  VlanList1
+--    MAX-ACCESS  read-write
+--    STATUS  current
+--    DESCRIPTION
+--        "first VlanId List of specific MSTP instance."
+--    ::= { rldot1sMstpPendingInstanceVlanEntry 2 }
+--
+--rldot1sMstpPendingInstanceVlanId1025To2048 OBJECT-TYPE
+--    SYNTAX  VlanList2
+--    MAX-ACCESS  read-write
+--    STATUS  current
+--    DESCRIPTION
+--        "second VlanId List of specific MSTP instance."
+--    ::= { rldot1sMstpPendingInstanceVlanEntry 3 }
+--
+--rldot1sMstpPendingInstanceVlanId2049To3072 OBJECT-TYPE
+--    SYNTAX  VlanList3
+--    MAX-ACCESS  read-write
+--    STATUS  current
+--    DESCRIPTION
+--        "third VlanId List of specific MSTP instance."
+--    ::= { rldot1sMstpPendingInstanceVlanEntry 4 }
+--
+--rldot1sMstpPendingInstanceVlanId3073To4094 OBJECT-TYPE
+--    SYNTAX  VlanList4
+--    MAX-ACCESS  read-write
+--    STATUS  current
+--    DESCRIPTION
+--        "fourth VlanId List of specific MSTP instance."
+--    ::= { rldot1sMstpPendingInstanceVlanEntry 5 }
+--
+--
+--rldot1sMstpPendingInstanceVlanStatus OBJECT-TYPE
+--    SYNTAX  RowStatus
+--    MAX-ACCESS  read-create
+--    STATUS  current
+--    DESCRIPTION
+--        "The status of the table entry, used to add, delete or update an entry, when logical mstp IDs are supported,
+--                 Otherwise field value must be Active"
+--        DEFVAL {active }
+--   ::= { rldot1sMstpPendingInstanceVlanEntry 6 }
 
 rldot1dTpAgingTime  OBJECT IDENTIFIER ::= { rlpBridgeMIBObjects 7 }
 
@@ -2038,6 +2213,21 @@ rldot1dTpAgingTimeMax OBJECT-TYPE
         "P802.1d/D9, July 14, 1989: Section 6.7.1.1.3"
     ::= { rldot1dTpAgingTime 2 }
 
+rldot1sMstpConfigurationDigest OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(16))
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The active configuration digest."
+    ::= { rldot1sMstp 16 }
+
+rldot1sMstpPendingConfigurationDigest OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(16))
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The pending configuration digest."
+    ::= { rldot1sMstp 17 }
 
 --
 -- PerVlan SpaningTree MIBs
@@ -2444,6 +2634,7 @@ RlBrgPvstOperPortEntry ::= SEQUENCE {
         rlBrgPvstOperPortDesignatedBridge   BridgeId,
         rlBrgPvstOperPortDesignatedPort     OCTET STRING,
         rlBrgPvstOperPortForwardTransitions Counter32,
+        rlBrgPvstOperPortEdgePort           TruthValue,
         rlBrgPvstOperPortBpduSent           Counter32,
         rlBrgPvstOperPortBpduReceived       Counter32
     }
@@ -2596,13 +2787,26 @@ rlBrgPvstOperPortForwardTransitions OBJECT-TYPE
          from the Learning state to the Forwarding state."
     ::= { rlBrgPvstOperPortEntry 13 }
 
+rlBrgPvstOperPortEdgePort OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational value of the Edge Port parameter.  The
+         object is initialized to the value of
+         dot1dStpPortAdminEdgePort and is set FALSE on reception of
+         a BPDU."
+    REFERENCE
+        "IEEE 802.1t clause 14.8.2, 18.3.4"
+    ::= { rlBrgPvstOperPortEntry 14 }
+
 rlBrgPvstOperPortBpduSent OBJECT-TYPE
     SYNTAX  Counter32
     MAX-ACCESS  read-only
     STATUS  current
     DESCRIPTION
         "Specified the number of bpdu sent from this port."
-    ::= { rlBrgPvstOperPortEntry 14 }
+    ::= { rlBrgPvstOperPortEntry 15 }
 
 rlBrgPvstOperPortBpduReceived OBJECT-TYPE
     SYNTAX  Counter32
@@ -2610,7 +2814,7 @@ rlBrgPvstOperPortBpduReceived OBJECT-TYPE
     STATUS  current
     DESCRIPTION
         "Specified the number of bpdu received in this port."
-    ::= { rlBrgPvstOperPortEntry 15 }
+    ::= { rlBrgPvstOperPortEntry 16 }
 
 -- rlBrgPvstInconsistencyPortTable
 

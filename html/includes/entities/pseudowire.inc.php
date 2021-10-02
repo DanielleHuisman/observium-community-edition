@@ -14,8 +14,6 @@
 function generate_pseudowire_query($vars)
 {
   $sql = 'SELECT * FROM `pseudowires` ';
-  //$sql .= ' LEFT JOIN `pseudowires-state` USING (`pseudowire_id`)';
-  //$sql .= " WHERE `pwRowStatus` = 'active'";
   $sql .= ' WHERE 1';
 
   // Build query
@@ -27,6 +25,11 @@ function generate_pseudowire_query($vars)
       case "group_id":
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'pseudowire_id');
+        break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'device_id');
         break;
       case "device":
       case "device_id":
@@ -40,6 +43,7 @@ function generate_pseudowire_query($vars)
         $sql .= generate_query_values($value, 'pseudowire_id');
         break;
       case "pwid":
+      case "pwID":
         $sql .= generate_query_values($value, 'pwID');
         break;
       case "pwtype":

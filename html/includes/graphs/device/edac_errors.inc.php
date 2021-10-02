@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -22,7 +21,7 @@ $i         = 0;
 
 $colourset = "mixed";
 
-$rownames  = unserialize(get_dev_attrib($device, 'edac_rownames'));
+$rownames  = safe_unserialize(get_dev_attrib($device, 'edac_rownames'));
 
 foreach ($rownames as $mc => $data)
 {

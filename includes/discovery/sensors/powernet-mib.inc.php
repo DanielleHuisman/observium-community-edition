@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -29,7 +28,7 @@ if ($inputs || $outputs)
   foreach (array('upsPhaseInputTable', 'upsPhaseOutputTable', 'upsPhaseInputPhaseTable', 'upsPhaseOutputPhaseTable') as $table)
   {
     echo("$table ");
-    $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], 'PowerNet-MIB');
+    $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], 'PowerNet-MIB');
   }
 
   // Process each input, per phase
@@ -40,7 +39,7 @@ if ($inputs || $outputs)
     $tindex = $cache['apc'][$i]['upsPhaseInputTableIndex'];
     $itype  = $cache['apc'][$i]['upsPhaseInputType'];
 
-    if ($itype == 'bypass') { $name = 'Bypass'; } // Override "Input 2" in case of bypass.
+    if ($itype === 'bypass') { $name = 'Bypass'; } // Override "Input 2" in case of bypass.
 
     for ($p = 1;$p <= $phases;$p++)
     {
@@ -154,7 +153,7 @@ if ($inputs || $outputs)
   foreach (array("upsHighPrecInput", "upsHighPrecOutput", "upsAdvInput", "upsAdvOutput") as $table)
   {
     echo("$table ");
-    $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+    $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
   }
 
   foreach ($cache['apc'] as $index => $entry)
@@ -320,8 +319,8 @@ $cache['apc'] = array();
 foreach (array("upsHighPrecBattery", "upsAdvBattery", "upsBasicBattery") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
-  if ($table == 'upsAdvBattery' && $GLOBALS['snmp_status'] == FALSE) { break; } // Do not query BasicBattery if Adv empty
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  if ($table === 'upsAdvBattery' && !snmp_status()) { break; } // Do not query BasicBattery if Adv empty
 }
 
 foreach ($cache['apc'] as $index => $entry)
@@ -466,7 +465,7 @@ foreach ($cache['apc'] as $index => $entry)
 
 $cache['apc'] = snmp_get_multi_oid($device, 'upsAdvTestDiagnosticSchedule.0 upsAdvTestDiagnosticsResults.0 upsAdvTestLastDiagnosticsDate.0', array(), 'PowerNet-MIB');
 
-if (isset($cache['apc'][0]) && $cache['apc'][0]['upsAdvTestDiagnosticSchedule'] != 'never')
+if (isset($cache['apc'][0]) && $cache['apc'][0]['upsAdvTestDiagnosticSchedule'] !== 'never')
 {
   $oid = ".1.3.6.1.4.1.318.1.1.1.7.2.3.0";
   $descr = "Diagnostics Results";
@@ -497,9 +496,9 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0",  "PowerNet-MIB"))
   echo(' ');
   $cache['apc'] = [];
   echo("atsInputTable ");
-  $cache['apc']['input'] = snmpwalk_cache_multi_oid($device, 'atsInputTable',      [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $cache['apc']['input'] = snmpwalk_cache_oid($device, 'atsInputTable', [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   echo("atsInputPhaseTable");
-  $cache['apc']['phase'] = snmpwalk_cache_multi_oid($device, 'atsInputPhaseTable', [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $cache['apc']['phase'] = snmpwalk_cache_oid($device, 'atsInputPhaseTable', [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   print_debug_vars($cache['apc']);
 
   foreach ($cache['apc']['input'] as $index => $entry)
@@ -533,7 +532,9 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0",  "PowerNet-MIB"))
   foreach ($cache['apc']['phase'] as $index => $entry)
   {
     list($input, $phase) = explode('.', $index);
-    $entry = array_merge($entry, $cache['apc']['input'][$input]);
+    if (isset($cache['apc']['input'][$input])) {
+      $entry = array_merge($entry, $cache['apc']['input'][$input]);
+    }
 
     $descr = 'Input ' . $entry['atsInputName'];
     if ($entry['atsNumInputPhases'] > 1)
@@ -557,18 +558,18 @@ if ($inputs = snmp_get_oid($device, "atsNumInputs.0",  "PowerNet-MIB"))
       if ($limit_nominal = snmp_cache_oid($device, "atsConfigLineVRMS.0", "PowerNet-MIB"))
       {
         $limit_range = snmp_cache_oid($device, "atsConfigTransferVoltageRange.0", "PowerNet-MIB");
-        if ($limit_range == 'wide')
+        if ($limit_range === 'wide')
         {
           $limit_alert   = snmp_cache_oid($device, "atsConfigLineVRMSWideLimit.0", "PowerNet-MIB");
           $limit_warning = snmp_cache_oid($device, "atsConfigLineVRMSMediumLimit.0", "PowerNet-MIB");
         }
-        elseif ($limit_range == 'medium')
+        elseif ($limit_range === 'medium')
         {
           $limit_alert   = snmp_cache_oid($device, "atsConfigLineVRMSMediumLimit.0", "PowerNet-MIB");
           $limit_warning = snmp_cache_oid($device, "atsConfigLineVRMSNarrowLimit.0", "PowerNet-MIB");
         } else {
           $limit_alert   = snmp_cache_oid($device, "atsConfigLineVRMSNarrowLimit.0", "PowerNet-MIB");
-          $limit_warning = intval($limit_alert * 0.7);
+          $limit_warning = (int)($limit_alert * 0.7);
         }
         $options['limit_high']      = $limit_nominal + $limit_alert;
         $options['limit_low']       = $limit_nominal - $limit_alert;
@@ -618,9 +619,9 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB"))
   echo(' ');
   $cache['apc'] = [];
   echo("atsOutputTable ");
-  $cache['apc']['output'] = snmpwalk_cache_multi_oid($device, 'atsOutputTable',     [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $cache['apc']['output'] = snmpwalk_cache_oid($device, 'atsOutputTable', [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   echo("atsOutputPhaseTable");
-  $cache['apc']['phase'] = snmpwalk_cache_multi_oid($device, 'atsOutputPhaseTable', [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+  $cache['apc']['phase'] = snmpwalk_cache_oid($device, 'atsOutputPhaseTable', [], 'PowerNet-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   print_debug_vars($cache['apc']);
 
   foreach ($cache['apc']['output'] as $index => $entry)
@@ -658,7 +659,9 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB"))
   foreach ($cache['apc']['phase'] as $index => $entry)
   {
     list($output, $phase) = explode('.', $index);
-    $entry = array_merge($entry, $cache['apc']['output'][$output]);
+    if (isset($cache['apc']['output'][$output])) {
+      $entry = array_merge($entry, $cache['apc']['output'][$output]);
+    }
 
     $descr = 'Output';
     if ($outputs > 1)
@@ -686,18 +689,18 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB"))
       if ($limit_nominal = snmp_cache_oid($device, "atsConfigLineVRMS.0", "PowerNet-MIB"))
       {
         $limit_range = snmp_cache_oid($device, "atsConfigTransferVoltageRange.0", "PowerNet-MIB");
-        if ($limit_range == 'wide')
+        if ($limit_range === 'wide')
         {
           $limit_alert   = snmp_cache_oid($device, "atsConfigLineVRMSWideLimit.0", "PowerNet-MIB");
           $limit_warning = snmp_cache_oid($device, "atsConfigLineVRMSMediumLimit.0", "PowerNet-MIB");
         }
-        elseif ($limit_range == 'medium')
+        elseif ($limit_range === 'medium')
         {
           $limit_alert   = snmp_cache_oid($device, "atsConfigLineVRMSMediumLimit.0", "PowerNet-MIB");
           $limit_warning = snmp_cache_oid($device, "atsConfigLineVRMSNarrowLimit.0", "PowerNet-MIB");
         } else {
           $limit_alert   = snmp_cache_oid($device, "atsConfigLineVRMSNarrowLimit.0", "PowerNet-MIB");
-          $limit_warning = intval($limit_alert * 0.7);
+          $limit_warning = (int)($limit_alert * 0.7);
         }
         $options['limit_high']      = $limit_nominal + $limit_alert;
         $options['limit_low']       = $limit_nominal - $limit_alert;
@@ -768,7 +771,7 @@ if ($outputs = snmp_get_oid($device, "atsNumOutputs.0", "PowerNet-MIB"))
 
 $outlets = snmp_get_oid($device, "rPDUIdentDeviceNumOutlets.0", "PowerNet-MIB");
 $banks   = snmp_get_oid($device, "rPDULoadDevNumBanks.0", "PowerNet-MIB");
-$loadDev = snmpwalk_cache_multi_oid($device, "rPDULoadDevice", array(), "PowerNet-MIB");
+$loadDev = snmpwalk_cache_oid($device, "rPDULoadDevice", array(), "PowerNet-MIB");
 
 // Check if we have values for these, if not, try other code paths below.
 if ($outlets)
@@ -784,12 +787,12 @@ if ($outlets)
   elseif (stristr($device['version'], 'v5') == TRUE) { $baseversion = 5; }
   elseif (stristr($device['version'], 'v6') == TRUE) { $baseversion = 6; }
 
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, "rPDU2DeviceStatusTable", array(), "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, "rPDU2DeviceStatusTable", array(), "PowerNet-MIB");
 
-  $units = count($cache['apc']); // Set this for use later
+  $units = safe_count($cache['apc']); // Set this for use later
 
   // Try rPDU2 tree, as this supports slaving (rPDU2 devices also do rPDU table)
-  if (count($cache['apc']))
+  if (safe_count($cache['apc']))
   {
     foreach ($cache['apc'] as $index => $entry)
     {
@@ -884,10 +887,10 @@ if ($outlets)
       {
         echo("$table ");
         // FIXME, not sure, that here required numeric index, seems as the remains of old snmp code with caching (added in r4685)
-        $phasetable = snmpwalk_cache_multi_oid($device, $table, $phasetable, "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+        $phasetable = snmpwalk_cache_oid($device, $table, $phasetable, "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
       }
 
-      if (count($phasetable))
+      if (safe_count($phasetable))
       {
 
         foreach ($phasetable as $index => $entry)
@@ -975,8 +978,8 @@ if ($outlets)
         //rPDU2BankConfigNearOverloadCurrentThreshold.2 = INTEGER: 13
         //rPDU2BankConfigOverloadCurrentThreshold.1 = INTEGER: 16
         //rPDU2BankConfigOverloadCurrentThreshold.2 = INTEGER: 16
-        $bank_oids = snmpwalk_cache_multi_oid($device, 'rPDU2BankStatusTable', array(), "PowerNet-MIB");
-        $bank_oids = snmpwalk_cache_multi_oid($device, 'rPDU2BankConfigTable', $bank_oids, "PowerNet-MIB");
+        $bank_oids = snmpwalk_cache_oid($device, 'rPDU2BankStatusTable', array(), "PowerNet-MIB");
+        $bank_oids = snmpwalk_cache_oid($device, 'rPDU2BankConfigTable', $bank_oids, "PowerNet-MIB");
 
         foreach ($bank_oids as $index => $entry)
         {
@@ -1042,7 +1045,7 @@ if ($outlets)
     {
       echo("$table ");
       // FIXME, not sure, that here required numeric index, seems as the remains of old snmp code with caching (added in r4685)
-      $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+      $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
     }
 
     foreach ($cache['apc'] as $index => $entry)
@@ -1087,7 +1090,7 @@ if ($outlets)
       //rPDUStatusBankNumber.2 = INTEGER: 2
       //rPDUStatusBankState.1 = INTEGER: bankLoadNormal(1)
       //rPDUStatusBankState.2 = INTEGER: bankLoadNormal(1)
-      $bank_oids = snmpwalk_cache_multi_oid($device, 'rPDUStatusBankState', array(), "PowerNet-MIB");
+      $bank_oids = snmpwalk_cache_oid($device, 'rPDUStatusBankState', array(), "PowerNet-MIB");
 
       foreach ($bank_oids as $index => $entry)
       {
@@ -1162,7 +1165,7 @@ if ($outlets)
   {
     echo("$table ");
     // FIXME, not sure, that here required numeric index, seems as the remains of old snmp code with caching (added in r4685)
-    $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+    $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   }
 
   foreach ($cache['apc'] as $index => $entry)
@@ -1205,7 +1208,7 @@ if ($oids)
   {
     list($oid,$value) = explode(' ',$data);
     $split_oid = explode('.',$oid);
-    $phase = $split_oid[count($split_oid)-1];
+    $phase = $split_oid[safe_count($split_oid)-1];
     $index = "LtoN:".$phase;
     $descr = "Phase $phase Line to Neutral";
 
@@ -1224,8 +1227,8 @@ if ($oids)
     {
       list($oid,$value) = explode(' ', $data);
       $split_oid = explode('.',$oid);
-      $phase = $split_oid[count($split_oid)-1];
-      $breaker = $split_oid[count($split_oid)-2];
+      $phase = $split_oid[safe_count($split_oid)-1];
+      $breaker = $split_oid[safe_count($split_oid)-2];
       $index = str_pad($breaker, 2, "0", STR_PAD_LEFT) . "-" . $phase;
       $descr = "Breaker $breaker Phase $phase";
       discover_sensor('current', $device, $oid, $index, 'apc', $descr, $scale, $value);
@@ -1240,7 +1243,7 @@ if ($oids)
     {
       list($oid,$value) = explode(' ', $data);
       $split_oid = explode('.',$oid);
-      $phase = $split_oid[count($split_oid)-1];
+      $phase = $split_oid[safe_count($split_oid)-1];
       $index = ".$phase";
       $descr = "Phase $phase overall";
       discover_sensor('current', $device, $oid, $index, 'apc', $descr, $scale, $value);
@@ -1257,7 +1260,7 @@ $cache['apc'] = array();
 foreach (array("emsProbeStatusTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
 }
 $temp_units = snmp_get_oid($device, "emsStatusSysTempUnits.0", "PowerNet-MIB");
 
@@ -1313,7 +1316,7 @@ $cache['apc'] = array();
 foreach (array("iemConfigProbesTable", "iemStatusProbesTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
 }
 
 foreach ($cache['apc'] as $index => $entry)
@@ -1398,7 +1401,7 @@ $cache['apc'] = array();
 foreach (array("uioSensorStatusTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
 }
 
 foreach ($cache['apc'] as $index => $entry)
@@ -1498,7 +1501,7 @@ $cache['apc'] = array();
 foreach (array("memSensorsStatusTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
 }
 $temp_units = snmp_get_oid($device, "memSensorsStatusSysTempUnits.0", "PowerNet-MIB");
 
@@ -1512,10 +1515,10 @@ foreach ($cache['apc'] as $index => $entry)
   list(,$ems_index) = explode('.', $index);
 
   // Exclude already added sensor from emsProbeStatusTable
-  if ($value != '' && $value != -1 && !isset($valid['sensor']['temperature']['apc']["emsProbeStatusProbeTemperature.$ems_index"]))
+  if ($value != -1 && !isset($valid['sensor']['temperature']['PowerNet-MIB-emsProbeStatusProbeTemperature'][$ems_index]))
   {
     $scale_temp = 1;
-    if ($temp_units == 'fahrenheit')
+    if ($temp_units === 'fahrenheit')
     {
       $options['sensor_unit'] = 'F';
     } else {
@@ -1529,7 +1532,7 @@ foreach ($cache['apc'] as $index => $entry)
   $value = $entry['memSensorsHumidity'];
 
   // Exclude already added sensor from emsProbeStatusTable
-  if ($value != '' && $value > 0 && !isset($valid['sensor']['humidity']['apc']["emsProbeStatusProbeHumidity.$ems_index"]))
+  if ($value > 0 && !isset($valid['sensor']['humidity']['PowerNet-MIB-emsProbeStatusProbeHumidity'][$ems_index]))
   {
     discover_sensor('humidity', $device, $oid, "memSensorsHumidity.$index", 'apc', $descr, 1, $value);
   }
@@ -1589,9 +1592,9 @@ if (array_key_exists($type, $inrow)) // Check if the device is a supported APC I
 {
   // APC InRow, Group Statistics
   echo($inrow[$type]['group']['status']['index'] . ' ');
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $inrow[$type]['group']['status']['index'], array(), "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $inrow[$type]['group']['status']['index'], array(), "PowerNet-MIB");
   echo($inrow[$type]['group']['setpoints']['index'] . ' ');
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $inrow[$type]['group']['setpoints']['index'], $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $inrow[$type]['group']['setpoints']['index'], $cache['apc'], "PowerNet-MIB");
 
   foreach ($cache['apc'] as $index => $entry)
   {
@@ -1710,14 +1713,14 @@ if (array_key_exists($type, $inrow)) // Check if the device is a supported APC I
 
   // APC InRow, Unit Statistics
   echo($inrow[$type]['unit']['status']['index'] . ' ');
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $inrow[$type]['unit']['status']['index'], array(), "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $inrow[$type]['unit']['status']['index'], array(), "PowerNet-MIB");
   echo($inrow[$type]['unit']['thresholds']['index'] . ' ');
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $inrow[$type]['unit']['thresholds']['index'], $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $inrow[$type]['unit']['thresholds']['index'], $cache['apc'], "PowerNet-MIB");
 
   foreach ($cache['apc'] as $index => $entry)
   {
     // If there are multiple units found, use the unit number as description prefix
-    $unit = count($cache['apc']) != 1 ? "Unit " . ($index + 1) : "Unit";
+    $unit = safe_count($cache['apc']) != 1 ? "Unit " . ($index + 1) : "Unit";
 
     // airIRxxUnitStatusCoolOutput.x [.1.3.6.1.4.1.318.1.1.13.x.x.x.2.x]
     $descr = $unit . " Cooling Output";
@@ -1871,17 +1874,17 @@ $cache['apc'] = array();
 // This does make it harder to link limits/setpoints to values though. :[
 
 $apc_unit_map = array(
-  'C' => 'temperature',
-  'F' => '', // Ignored, we use C instead
+  'C'   => 'temperature', // also dewpoint by descr
+  'F'   => '', // Ignored, we use C instead
   'CFM' => 'airflow',
   'GPM' => 'waterflow', // Gallons per minute
-  'kW' => 'power',
-  'W' => 'power',
-  '%' => 'capacity',
-  'Pa' => 'pressure',
-  'kWh' => '', // Currently not supported
-  'hr' => '', // Hours? Currently not supported
-  'weeks' => '', // Currently not supported
+  'kW'  => 'power',
+  'W'   => 'power',
+  '%'   => 'capacity',
+  'Pa'  => 'pressure',
+  'kWh' => 'energy', // counter
+  'hr'  => 'lifetime', // Hours
+  //'weeks' => 'lifetime', // Currently not supported
 );
 
 // PowerNet-MIB::coolingUnitStatusAnalogDescription.1.1 = STRING: "Supply Air Temperature"
@@ -1892,33 +1895,57 @@ $apc_unit_map = array(
 foreach (array("coolingUnitStatusAnalogTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, [], "PowerNet-MIB");
+  print_debug_vars($cache['apc']);
 }
 
 foreach ($cache['apc'] as $index => $entry)
 {
-  if ($apc_unit_map[$entry['coolingUnitStatusAnalogUnits']])
-  {
+  if ($apc_unit_map[$entry['coolingUnitStatusAnalogUnits']] && isset($entry['coolingUnitStatusAnalogValue'])) {
     // Proceed if we can map this to a local sensor type
 
-    $descr = $entry['coolingUnitStatusAnalogDescription'];
-    $oid   = ".1.3.6.1.4.1.318.1.1.27.1.4.1.2.1.3.$index";
-    $scale = 1 / $entry['coolingUnitStatusAnalogScale'];
-    $value = $entry['coolingUnitStatusAnalogValue'];
+    if (!is_numeric($entry['coolingUnitStatusAnalogScale']) || $entry['coolingUnitStatusAnalogScale'] == 0) {
+      $entry['coolingUnitStatusAnalogScale'] = 1;
+    }
+
+    $descr    = $entry['coolingUnitStatusAnalogDescription'];
+    $oid      = ".1.3.6.1.4.1.318.1.1.27.1.4.1.2.1.3.$index";
+    $oid_name = 'coolingUnitStatusAnalogValue';
+    $value    = $entry[$oid_name];
     $options = [];
 
-    // Workaround for kW vs W
-    if ($entry['coolingUnitStatusAnalogUnits'] == 'kW')
-    {
-      $scale = 1000 / $entry['coolingUnitStatusAnalogScale']; // 1kW = 1000W
+    // sensor class
+    $class = $apc_unit_map[$entry['coolingUnitStatusAnalogUnits']];
+    if ($class === 'temperature' && str_icontains_array($descr, 'Dew')) {
+      $class = 'dewpoint';
+    } elseif ($class === 'capacity' && str_icontains_array($descr, 'Speed')) {
+      $class = 'load';
     }
+
+    // scale
+    if ($entry['coolingUnitStatusAnalogUnits'] === 'kW' ||
+        $entry['coolingUnitStatusAnalogUnits'] === 'kWh') {
+      $scale = 1000 / $entry['coolingUnitStatusAnalogScale'];
+    } elseif ($entry['coolingUnitStatusAnalogUnits'] === 'hr') {
+      $scale = 3600 / $entry['coolingUnitStatusAnalogScale'];
+    } elseif ($entry['coolingUnitStatusAnalogUnits'] === 'weeks') {
+      $scale = 604800 / $entry['coolingUnitStatusAnalogScale'];
+    } else {
+      $scale = 1 / $entry['coolingUnitStatusAnalogScale'];
+    }
+
     // Append unit conversion for airflow and waterflow
-    if (in_array($entry['coolingUnitStatusAnalogUnits'], ['GPM']))
-    {
+    if ($entry['coolingUnitStatusAnalogUnits'] === 'GPM') {
       $options['sensor_unit'] = $entry['coolingUnitStatusAnalogUnits'];
     }
 
-    discover_sensor($apc_unit_map[$entry['coolingUnitStatusAnalogUnits']], $device, $oid, "coolingUnitStatusAnalogValue.$index", 'apc', $descr, $scale, $value, $options);
+    if (in_array($class, [ 'energy', 'lifetime' ])) {
+      if ($value == 0) { continue; }
+      discover_counter($device, $class, $mib, $oid_name, $oid, $index, $descr, $scale, $value, $options);
+    } else {
+      if (str_starts($descr, [ 'Minimum', 'Maximum' ])) { continue; }
+      discover_sensor($class, $device, $oid, "coolingUnitStatusAnalogValue.$index", 'apc', $descr, $scale, $value, $options);
+    }
   }
 }
 
@@ -1932,35 +1959,50 @@ echo(' ');
 foreach (array("coolingUnitExtendedAnalogTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, [], "PowerNet-MIB");
+  print_debug_vars($cache['apc']);
 }
 
 foreach ($cache['apc'] as $index => $entry)
 {
-  if ($apc_unit_map[$entry['coolingUnitExtendedAnalogUnits']])
+  if ($apc_unit_map[$entry['coolingUnitExtendedAnalogUnits']] && isset($entry['coolingUnitExtendedAnalogValue']))
   {
     // Proceed if we can map this to a local sensor type
 
-    $descr = $entry['coolingUnitExtendedAnalogDescription'];
-    $oid   = ".1.3.6.1.4.1.318.1.1.27.1.6.1.2.1.3.$index";
-    $scale = 1 / $entry['coolingUnitExtendedAnalogScale'];
-    $value = $entry['coolingUnitExtendedAnalogValue'];
-
-    // Workaround for kW vs W
-    if ($entry['coolingUnitExtendedAnalogUnits'] == 'kW')
-    {
-      $scale = 1000 / $entry['coolingUnitStatusAnalogScale']; // 1kW = 1000W
+    if (!is_numeric($entry['coolingUnitExtendedAnalogScale']) || $entry['coolingUnitExtendedAnalogScale'] == 0) {
+      $entry['coolingUnitExtendedAnalogScale'] = 1;
     }
 
-    discover_sensor($apc_unit_map[$entry['coolingUnitExtendedAnalogUnits']], $device, $oid, "coolingUnitExtendedAnalogValue.$index", 'apc', $descr, $scale, $value);
+    $descr    = $entry['coolingUnitExtendedAnalogDescription'];
+    $oid      = ".1.3.6.1.4.1.318.1.1.27.1.6.1.2.1.3.$index";
+    $oid_name = 'coolingUnitExtendedAnalogValue';
+    $value    = $entry[$oid_name];
+    $options  = [];
+
+    // sensor class
+    $class = $apc_unit_map[$entry['coolingUnitStatusAnalogUnits']];
+
+    // scale
+    if ($entry['coolingUnitExtendedAnalogUnits'] === 'kW') {
+      $scale = 1000 / $entry['coolingUnitExtendedAnalogScale'];
+    } else {
+      $scale = 1 / $entry['coolingUnitExtendedAnalogScale'];
+    }
+
+    // Append unit conversion for airflow and waterflow
+    if ($entry['coolingUnitExtendedAnalogUnits'] === 'GPM') {
+      $options['sensor_unit'] = $entry['coolingUnitExtendedAnalogUnits'];
+    }
+
+    if (!in_array($class, [ 'energy', 'lifetime' ])) {
+      discover_sensor($apc_unit_map[$entry['coolingUnitExtendedAnalogUnits']], $device, $oid, "coolingUnitExtendedAnalogValue.$index", 'apc', $descr, $scale, $value, $options);
+    }
   }
 }
 
 unset($apc_unit_map);
 
 echo(' ');
-
-$cache['apc'] = array();
 
 // PowerNet-MIB::coolingUnitStatusDiscreteDescription.1.1 = STRING: "Operating Mode"
 // PowerNet-MIB::coolingUnitStatusDiscreteDescription.1.2 = STRING: "Active Flow Control Status"
@@ -1972,36 +2014,37 @@ $cache['apc'] = array();
 // PowerNet-MIB::coolingUnitStatusDiscreteIntegerReferenceKey.1.2 = STRING: "Under(0),Okay(1),Over(2),NA(3)"
 
 $apc_discrete_map = array(
-  "Open(0),Closed(1)" => 'powernet-cooling-input-state',
-  "Abnormal(0),Normal(1)" => 'powernet-cooling-output-state',
-  "Primary (0),Secondary(1)" => 'powernet-cooling-powersource-state',
-  "Undefined(0),Standard(1),HighTemp(2)" => 'powernet-cooling-unittype-state',
+  "Open(0),Closed(1)"                       => 'powernet-cooling-input-state',
+  "Abnormal(0),Normal(1)"                   => 'powernet-cooling-output-state',
+  "Primary (0),Secondary(1)"                => 'powernet-cooling-powersource-state',
+  "Undefined(0),Standard(1),HighTemp(2)"    => 'powernet-cooling-unittype-state',
   "Standby(0),On(1),Idle(2),Maintenance(3)" => 'powernet-cooling-opmode-state',
-  "Under(0),Okay(1),Over(2),NA(3)" => 'powernet-cooling-flowcontrol-state',
+  "Under(0),Okay(1),Over(2),NA(3)"          => 'powernet-cooling-flowcontrol-state',
 );
 
 foreach (array("coolingUnitStatusDiscreteTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, [], "PowerNet-MIB");
+  print_debug_vars($cache['apc']);
 }
 
-foreach ($cache['apc'] as $index => $entry)
-{
-  $descr = $entry['coolingUnitStatusDiscreteDescription'];
-  $oid   = ".1.3.6.1.4.1.318.1.1.27.1.4.2.2.1.4.$index";
-  $value = $entry['coolingUnitStatusDiscreteValue'];
+foreach ($cache['apc'] as $index => $entry) {
 
   // If we have a state mapped, add status, if not, well... help.
-  if ($apc_discrete_map[$entry['coolingUnitStatusDiscreteIntegerReferenceKey']])
-  {
-    discover_status($device, $oid, "coolingUnitStatusDiscreteValueAsInteger.$index", $apc_discrete_map[$entry['coolingUnitStatusDiscreteIntegerReferenceKey']], $descr, 1, $value);
+  if ($apc_discrete_map[$entry['coolingUnitStatusDiscreteIntegerReferenceKey']]) {
+    $descr    = $entry['coolingUnitStatusDiscreteDescription'];
+    $oid      = ".1.3.6.1.4.1.318.1.1.27.1.4.2.2.1.4.$index";
+    $type     = $apc_discrete_map[$entry['coolingUnitStatusDiscreteIntegerReferenceKey']];
+    $oid_name = 'coolingUnitStatusDiscreteValueAsInteger';
+    $value    = $entry[$oid_name];
+
+    //discover_status($device, $oid, "coolingUnitStatusDiscreteValueAsInteger.$index", $apc_discrete_map[$entry['coolingUnitStatusDiscreteIntegerReferenceKey']], $descr, 1, $value);
+    discover_status_ng($device, $mib, $oid_name, $oid, $index, $type, $descr, $value);
   }
 }
 
 echo(' ');
-
-$cache['apc'] = array();
 
 // PowerNet-MIB::coolingUnitExtendedDiscreteDescription.1.1 = STRING: "Standby Input State"
 // PowerNet-MIB::coolingUnitExtendedDiscreteDescription.1.2 = STRING: "Output 1 State"
@@ -2017,19 +2060,23 @@ $cache['apc'] = array();
 foreach (array("coolingUnitExtendedDiscreteTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, [], "PowerNet-MIB");
+  print_debug_vars($cache['apc']);
 }
 
 foreach ($cache['apc'] as $index => $entry)
 {
-  $descr = $entry['coolingUnitExtendedDiscreteDescription'];
-  $oid   = ".1.3.6.1.4.1.318.1.1.27.1.6.2.2.1.4.$index";
-  $value = $entry['coolingUnitExtendedDiscreteValue'];
-
   // If we have a state mapped, add status, if not, well... help.
-  if ($apc_discrete_map[$entry['coolingUnitExtendedDiscreteIntegerReferenceKey']])
-  {
-    discover_status($device, $oid, "coolingUnitExtendedDiscreteValueAsInteger.$index", $apc_discrete_map[$entry['coolingUnitExtendedDiscreteIntegerReferenceKey']], $descr, 1, $value);
+  if ($apc_discrete_map[$entry['coolingUnitExtendedDiscreteIntegerReferenceKey']]) {
+
+    $descr = $entry['coolingUnitExtendedDiscreteDescription'];
+    $oid   = ".1.3.6.1.4.1.318.1.1.27.1.6.2.2.1.4.$index";
+    $type     = $apc_discrete_map[$entry['coolingUnitExtendedDiscreteIntegerReferenceKey']];
+    $oid_name = 'coolingUnitExtendedDiscreteValueAsInteger';
+    $value    = $entry[$oid_name];
+
+    //discover_status($device, $oid, "coolingUnitExtendedDiscreteValueAsInteger.$index", $apc_discrete_map[$entry['coolingUnitExtendedDiscreteIntegerReferenceKey']], $descr, 1, $value);
+    discover_status_ng($device, $mib, $oid_name, $oid, $index, $type, $descr, $value);
   }
 }
 
@@ -2048,7 +2095,7 @@ $cache['apc'] = snmp_get_multi_oid($device, "mUpsEnvironAmbientTemperature.0 mUp
 foreach ($cache['apc'] as $index => $entry)
 {
   if (is_numeric($entry['mUpsEnvironAmbientTemperature']) &&
-      !isset($valid['sensor']['temperature']['apc']['emsProbeStatusProbeTemperature.1']))
+      !isset($valid['sensor']['temperature']['PowerNet-MIB-emsProbeStatusProbeTemperature'][1]))
   {
     $descr = "Probe 1 Temperature";
     $oid   = ".1.3.6.1.4.1.318.1.1.2.1.1.$index";
@@ -2058,7 +2105,7 @@ foreach ($cache['apc'] as $index => $entry)
   }
 
   if (is_numeric($entry['mUpsEnvironRelativeHumidity']) &&
-      !isset($valid['sensor']['humidity']['apc']['emsProbeStatusProbeHumidity.1']))
+      !isset($valid['sensor']['humidity']['PowerNet-MIB-emsProbeStatusProbeHumidity'][1]))
   {
     $descr = "Probe 1 Humidity";
     $oid   = ".1.3.6.1.4.1.318.1.1.2.1.2.$index";
@@ -2070,7 +2117,7 @@ foreach ($cache['apc'] as $index => $entry)
   if ($entry['mUpsEnvironAmbientTemperature2'] != 0 && $entry['mUpsEnvironRelativeHumidity2'] != 255)
   {
     if (is_numeric($entry['mUpsEnvironAmbientTemperature2']) &&
-        !isset($valid['sensor']['temperature']['apc']['emsProbeStatusProbeTemperature.2']))
+        !isset($valid['sensor']['temperature']['PowerNet-MIB-emsProbeStatusProbeTemperature'][2]))
     {
       $descr = "Probe 2 Temperature";
       $oid   = ".1.3.6.1.4.1.318.1.1.2.1.3.$index";
@@ -2080,7 +2127,7 @@ foreach ($cache['apc'] as $index => $entry)
     }
 
     if (is_numeric($entry['mUpsEnvironRelativeHumidity2']) &&
-        !isset($valid['sensor']['humidity']['apc']['emsProbeStatusProbeHumidity.2']))
+        !isset($valid['sensor']['humidity']['PowerNet-MIB-emsProbeStatusProbeHumidity'][2]))
     {
       $descr = "Probe 2 Humidity";
       $oid   = ".1.3.6.1.4.1.318.1.1.2.1.4.$index";
@@ -2096,7 +2143,7 @@ $cache['apc'] = array();
 foreach (array("mUpsContactTable") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
 }
 
 foreach ($cache['apc'] as $index => $entry)
@@ -2132,7 +2179,7 @@ $cache['apc'] = array();
 foreach (array("accessPX") as $table)
 {
   echo("$table ");
-  $cache['apc'] = snmpwalk_cache_multi_oid($device, $table, $cache['apc'], "PowerNet-MIB");
+  $cache['apc'] = snmpwalk_cache_oid($device, $table, $cache['apc'], "PowerNet-MIB");
 }
 
 foreach ($cache['apc'] as $index => $entry)

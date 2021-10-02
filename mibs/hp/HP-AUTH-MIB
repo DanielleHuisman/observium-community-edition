@@ -1,7 +1,7 @@
  --**MOD+***********************************************************************
  -- Module:   hpicfAuth.mib
  --
- -- Copyright (C) 2000-2019 Hewlett Packard Enterprise Development LP
+ -- Copyright (C) 2000-2020 Hewlett Packard Enterprise Development LP
  -- All Rights Reserved.
  --
  -- The contents of this software are proprietary and confidential
@@ -25,7 +25,7 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
         OBJECT-GROUP, MODULE-COMPLIANCE, NOTIFICATION-GROUP
             FROM SNMPv2-CONF
         hpSwitch
-          FROM HP-ICF-OID 
+          FROM HP-ICF-OID
         ospfIfEntry, ospfVirtIfEntry
             FROM OSPF-MIB
         InetAddress, InetAddressType
@@ -35,8 +35,7 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
 
     hpSwitchAuthenticationMIB MODULE-IDENTITY
 
-
-        LAST-UPDATED "201906100000Z"  -- June 10, 2019
+        LAST-UPDATED "202009070000Z"  -- Sep 07, 2020
         ORGANIZATION "HPE Networking"
         CONTACT-INFO "Hewlett Packard Company
                       8000 Foothills Blvd.
@@ -45,7 +44,15 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION  "This MIB module describes objects for managing
                      the Authentication features of devices in the HP
                      Integrated Communication Facility product line."
- 
+
+        REVISION     "202009070000Z"  -- Sep 07, 2020
+        DESCRIPTION  "Added new MIB object 'hpSwitchRadiusTunnelPrivateGroupId'
+                      to hpSwitchRadiusConfig"
+
+        REVISION     "202006150000Z"  -- Jun 15, 2020
+        DESCRIPTION  "Added new MIB objects hpSwitchTacacsServerFqdn
+                      and hpSwitchTacacsServerFqdnRetry."
+
         REVISION     "201906100000Z"  -- June 10, 2019
         DESCRIPTION  "Modified RADIUS TLS Timeout range and default values -
                       hpSwitchRadiusTLSTimeout."
@@ -995,12 +1002,23 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
         SYNTAX      TruthValue
         MAX-ACCESS  read-write
         STATUS      current
-        DESCRIPTION "When this object is set to true, reordering of TACACS+ servers 
+        DESCRIPTION "When this object is set to true, reordering of TACACS+ servers
                      takes place upon deletion of an existing server, such that further
-                     addition of a new TACACS+ server will take place at a lower 
+                     addition of a new TACACS+ server will take place at a lower
                      priority than the pre-existing servers."
         DEFVAL { false }
-        ::= { hpSwitchTacacsConfig 5 }  
+        ::= { hpSwitchTacacsConfig 5 }
+
+    hpSwitchTacacsServerFqdnRetry OBJECT-TYPE
+        SYNTAX      Integer32 (0..5)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The interval at which the resolution of the FQDN is retried for the tacacs server
+                     which failed to resolve the FQDN at the time of configuring it. Retry interval is
+                     0-5 minutes. When 0 is set, the FQDN resolution will not be retried.
+                     The default value is 3 minutes."
+        DEFVAL { 3 }
+        ::= { hpSwitchTacacsConfig 6 }
 
     hpSwitchTacacsServersTable OBJECT-TYPE
         SYNTAX      SEQUENCE OF HpSwitchTacacsServersEntry
@@ -1026,7 +1044,8 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
             hpSwitchTacacsServerIsOobm        TruthValue,
             hpSwitchTacacsServerKeyEncrypted  OCTET STRING,
             hpSwitchTacacsServerAddressType   InetAddressType,
-            hpSwitchTacacsServerAddress       InetAddress
+            hpSwitchTacacsServerAddress       InetAddress,
+            hpSwitchTacacsServerFqdn          DisplayString
         }
 
     hpSwitchTacacsServerIndex OBJECT-TYPE
@@ -1101,6 +1120,15 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
         STATUS      current
         DESCRIPTION "The IPv4 or IPv6 Address of the TACACS+ server."
         ::= { hpSwitchTacacsServersEntry 8 }
+
+    hpSwitchTacacsServerFqdn OBJECT-TYPE
+        SYNTAX      DisplayString(SIZE(1..255))
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "The FQDN address of TACACS Server.When the TACACS server
+                     has been configured with static IPv6 address or IPv4 address,
+                the value of this object will be set to Null"
+        ::= { hpSwitchTacacsServersEntry 9 }
 
 -- ------------------------------------------------------------
     -- Status support for TACACS+ Protocol
@@ -1532,6 +1560,43 @@ HP-AUTH-MIB DEFINITIONS ::= BEGIN
                     RADIUS tracking. The default value is set to FALSE."
         DEFVAL { false }
         ::= { hpSwitchRadiusConfig 27 }
+
+     hpSwitchRadiusTunnelPrivateGroupId OBJECT-TYPE
+        SYNTAX      INTEGER {
+                        disable(0),
+                        static(1),
+                        dynamic(2)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "If value is set to static, statically configured untagged
+                     VLAN Identifier for the port will be sent as the value of
+                     'Tunnel-Private-Group-ID' attribute in RADIUS
+                     Access-Request packet for all authentication methods.
+
+                     If the value is set to dynamic, the untagged VLAN Identifier
+                     which is assigned dynamically by RADIUS server or assigned
+                     via User Role will be sent as the value of
+                     'Tunnel-Private-Group-ID' attribute in RADIUS
+                     Access-Request packet for all authentication methods.
+
+                     Along with 'Tunnel-Private-Group-ID', attributes
+                     'Tunnel-Type' with value VLAN(13) and 'Tunnel-Medium-Type'
+                     with value IEEE-802(6) will also be sent in RADIUS
+                     Access-Request packet.
+
+                     If the value is set as disable, none of the attributes,
+                     'Tunnel-Private-Group-ID', 'Tunnel-Type' and
+                     'Tunnel-Medium-Type' will be sent in RADIUS Access-Request
+                     packet for 802.1x with CHAP authentication method
+                     and mac-based with PAP and CHAP authentication methods.
+                     'Tunnel-Private-Group-ID', 'Tunnel-Type' and
+                     'Tunnel-Medium-Type' will be included in Radius
+                     Access-Request packet for mac-based with PEAP-MSCHAPv2
+                     authentication method and 802.1x with EAP authentication
+                     method."
+        DEFVAL { disable }
+        ::= { hpSwitchRadiusConfig 28 }
 
     hpSwitchRadiusServerTable OBJECT-TYPE
         SYNTAX      SEQUENCE OF HpSwitchRadiusServerEntry
@@ -4068,7 +4133,7 @@ hpSwitchAuthenticationMIBCompliance23 MODULE-COMPLIANCE
             ::= { hpSwitchAuthenticationMIBCompliances 42 }
 
      hpSwitchAuthenticationMIBCompliance27 MODULE-COMPLIANCE
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "The compliance statement for devices implementing the
                      HP Authentication Mib."
         MODULE
@@ -4107,7 +4172,70 @@ hpSwitchAuthenticationMIBCompliance23 MODULE-COMPLIANCE
             GROUP   hpSwitchAAAServerGroup2
             DESCRIPTION "A collection of objects for configuring RADIUS server groups."
        ::= { hpSwitchAuthenticationMIBCompliances 44 }
-	   
+
+    hpSwitchAuthenticationMIBCompliance28 MODULE-COMPLIANCE
+        STATUS      deprecated
+        DESCRIPTION "The compliance statement for devices implementing the
+                     HP Authentication Mib."
+        MODULE
+            MANDATORY-GROUPS { hpSwitchTacacsConfigGroup4,
+                               hpSwitchTacacsStatsGroup1,
+                               hpSwitchRadiusConfigGroup12,
+                               hpSwitchAuthenticationConfigGroup10}
+            GROUP   hpSwitchKmsGroup1
+            DESCRIPTION "A collection of objects for configuring
+                         KMS functionality."
+            GROUP   hpSwitchOspfAuthGroup1
+            DESCRIPTION "A collection of objects for configuring
+                     OSPF authentication."
+            GROUP   hpSwitchSslGroup
+            DESCRIPTION "A collection of objects for configuring
+                         SSL Server."
+            GROUP   hpSwitchCertGroup
+            DESCRIPTION "A collection of objects for configuring
+                         Certificate."
+            GROUP   hpSwitchCertStatusGroup
+            DESCRIPTION "A collection of objects for configuring
+                         Certificate Status."
+            GROUP   hpSwitchCertStatusGroup3
+            DESCRIPTION "Collection of objects for configuring
+                         Key Certificate"
+            GROUP   hpSwitchRipAuthGroup1
+            DESCRIPTION "A collection of objects for configuring
+                     RIP authentication."
+            ::= { hpSwitchAuthenticationMIBCompliances 45 }
+
+     hpSwitchAuthenticationMIBCompliance29 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION "The compliance statement for devices implementing the
+                     HP Authentication Mib."
+        MODULE
+            MANDATORY-GROUPS { hpSwitchTacacsConfigGroup4,
+                               hpSwitchTacacsStatsGroup1,
+                               hpSwitchRadiusConfigGroup13,
+                               hpSwitchAuthenticationConfigGroup10}
+            GROUP   hpSwitchKmsGroup1
+            DESCRIPTION "A collection of objects for configuring
+                         KMS functionality."
+            GROUP   hpSwitchOspfAuthGroup1
+            DESCRIPTION "A collection of objects for configuring
+                     OSPF authentication."
+            GROUP   hpSwitchSslGroup
+            DESCRIPTION "A collection of objects for configuring
+                         SSL Server."
+            GROUP   hpSwitchCertGroup
+            DESCRIPTION "A collection of objects for configuring
+                         Certificate."
+            GROUP   hpSwitchCertStatusGroup
+            DESCRIPTION "A collection of objects for configuring
+                         Certificate Status."
+            GROUP   hpSwitchCertStatusGroup3
+            DESCRIPTION "Collection of objects for configuring
+                         Key Certificate"
+            GROUP   hpSwitchRipAuthGroup1
+            DESCRIPTION "A collection of objects for configuring
+                     RIP authentication."
+            ::= { hpSwitchAuthenticationMIBCompliances 46 }
 --
 -- GROUPS
 --
@@ -5192,10 +5320,10 @@ hpSwitchAuthenticationMIBCompliance23 MODULE-COMPLIANCE
                       hpSwitchTacacsDeadTime,
                       hpSwitchTacacsOrderingSequence
                     }
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "A collection of objects for configuring the
                     state of the TACACS+ protocol."
-        ::= { hpSwitchAuthenticationMIBGroups 59 }    
+        ::= { hpSwitchAuthenticationMIBGroups 59 }
 
    hpSwitchRadiusConfigGroup12 OBJECT-GROUP
         OBJECTS     { hpSwitchRadiusDeadTime,
@@ -5237,7 +5365,7 @@ hpSwitchAuthenticationMIBCompliance23 MODULE-COMPLIANCE
                       hpSwitchRadiusTLSPort,
                       hpSwitchRadiusTLSRetryTimer
                     }
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "A collection of objects for configuring the
                     state of the RADIUS protocol."
         ::= { hpSwitchAuthenticationMIBGroups 60 }
@@ -5254,4 +5382,69 @@ hpSwitchAuthenticationMIBCompliance23 MODULE-COMPLIANCE
         DESCRIPTION "A collection of objects for configuring RADIUS server groups."
        ::= { hpSwitchAuthenticationMIBGroups 61 }
 
+    hpSwitchTacacsConfigGroup4 OBJECT-GROUP
+        OBJECTS     { hpSwitchTacacsTimeout,
+                      hpSwitchTacacsAuthKey,
+                      hpSwitchTacacsAuthKeyEncrypted,
+                      hpSwitchTacacsServerIpAddr,
+                      hpSwitchTacacsServerAddressType,
+                      hpSwitchTacacsServerAddress,
+                      hpSwitchTacacsServerKey,
+                      hpSwitchTacacsServerKeyEncrypted,
+                      hpSwitchTacacsServerStatus,
+                      hpSwitchTacacsDeadTime,
+                      hpSwitchTacacsOrderingSequence,
+                      hpSwitchTacacsServerFqdn,
+                      hpSwitchTacacsServerFqdnRetry
+                    }
+        STATUS      current
+        DESCRIPTION "A collection of objects for configuring the
+                    state of the TACACS+ protocol."
+        ::= { hpSwitchAuthenticationMIBGroups 62 } 
+
+   hpSwitchRadiusConfigGroup13 OBJECT-GROUP
+        OBJECTS     { hpSwitchRadiusDeadTime,
+                      hpSwitchRadiusTimeout,
+                      hpSwitchRadiusRetransmitAttempts,
+                      hpSwitchRadiusAuthKey,
+                      hpSwitchRadiusAuthKeyEncrypted,
+                      hpSwitchRadiusDynAutzPortNumber,
+                      hpSwitchRadiusServerAddrType,
+                      hpSwitchRadiusServerAddress,
+                      hpSwitchRadiusServerKey,
+                      hpSwitchRadiusServerKeyEncrypted,
+                      hpSwitchRadiusServerAuthPortNumber,
+                      hpSwitchRadiusServerAcctPortNumber,
+                      hpSwitchRadiusServerDynAutzEnabled,
+                      hpSwitchRadiusServerDynAutzTimeWindow,
+                      hpSwitchRadiusServerIsOobm,
+                      hpSwitchRadiusServerStatus,
+                      hpSwitchRadiusServerDynAutzTimeWindowType,
+                      hpSwitchRadiusCppmIdentity,
+                      hpSwitchRadiusCppmKey,
+                      hpSwitchRadiusCppmEncryptedKey,
+                      hpSwitchRadiusDeadTimeInfinite,
+                      hpSwitchRadiusTrackingInterval,
+                      hpSwitchRadiusTrackingPassword,
+                      hpSwitchRadiusTrackDeadOnly,
+                      hpSwitchRadiusTrackReqPktCount,
+                      hpSwitchRadiusTrackPassEncrypt,
+                      hpSwitchRadiusFramedIpv4Address,
+                      hpSwitchRadiusServerFqdn,
+                      hpSwitchRadiusServerIsClearPass,
+                      hpSwitchRadiusFqdnRetry,
+                      hpSwitchRadiusExcludeVsa,
+                      hpSwitchRadiusTLSTimeout,
+                      hpSwitchRadiusTLSConnectionTimeout,
+                      hpSwitchRadiusTLSDeadTime,
+                      hpSwitchRadiusTLSDeadTimeInfinite,
+                      hpSwitchRadiusTLSEnable,
+                      hpSwitchRadiusTLSPort,
+                      hpSwitchRadiusTLSRetryTimer,
+                      hpSwitchRadiusTunnelPrivateGroupId
+                    }
+        STATUS      current
+        DESCRIPTION "A collection of objects for configuring the
+                    state of the RADIUS protocol."
+        ::= { hpSwitchAuthenticationMIBGroups 63 }
 END

@@ -1,6 +1,5 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
@@ -8,20 +7,17 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
 // Get options before definitions!
-$options = getopt("h:i:m:n:U:dquaMV");
+$options = getopt("h:i:m:n:p:U:dquaMV");
 
 include("includes/sql-config.inc.php");
 include("includes/discovery/functions.inc.php");
-
-$scriptname = basename($argv[0]);
 
 $cli = TRUE;
 
@@ -30,33 +26,31 @@ $cli = TRUE;
 $start = utime();
 $runtime_stats = array();
 
-if (isset($options['V']))
-{
+if (isset($options['V'])) {
   print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION);
   if (is_array($options['V'])) { print_versions(); }
   exit;
 }
-elseif (isset($options['M']))
-{
+if (isset($options['M'])) {
   print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION);
 
   print_message('Enabled discovery modules:');
   $m_disabled = array();
-  foreach ($config['discovery_modules'] as $module => $ok)
-  {
-    if ($ok) { print_message('  ' . $module); }
-    else { $m_disabled[] = $module; }
+  foreach ($config['discovery_modules'] as $module => $ok) {
+    if ($ok) {
+      print_message('  ' . $module);
+    } else {
+      $m_disabled[] = $module;
+    }
   }
-  if (count($m_disabled))
-  {
+  if (count($m_disabled)) {
     print_message('Disabled discovery modules:');
     print_message('  ' . implode("\n  ", $m_disabled));
   }
   exit;
 }
 
-if (!isset($options['q']))
-{
+if (!isset($options['q'])) {
   print_cli_banner();
 
   if (OBS_DEBUG) { print_versions(); }
@@ -65,11 +59,24 @@ if (!isset($options['q']))
   if (print_obsolete_config()) { echo PHP_EOL; }
 }
 
-if (isset($options['h']))
-{
+if (isset($options['u']) || isset($options['U']) ||
+    (isset($options['h']) && in_array($options['h'], [ 'all', 'odd', 'even', 'none' ]))) {
+  $options['u'] = TRUE;
+
+  include($config['install_dir'] . '/includes/update/update.php');
+} elseif (!isset($options['q'])) {
+  // Warn about need DB schema update
+  $db_version = get_db_version();
+  $db_version = sprintf("%03d", $db_version + 1);
+  if (is_file($config['install_dir'] . "/update/$db_version.sql") || is_file($config['install_dir'] . "/update/$db_version.php")) {
+    print_warning("Your database schema is old and needs updating. Run from console:\n  " . $config['install_dir'] . "/discovery.php -u");
+  }
+  unset($db_version);
+}
+
+if (isset($options['h'])) {
   $params = array();
-  switch ($options['h'])
-  {
+  switch ($options['h']) {
     case 'odd':
       $options['n'] = 1;
       $options['i'] = 2;
@@ -87,14 +94,20 @@ if (isset($options['h']))
       $params[] = '0000-00-00 00:00:00';
       $params[] = 1;
       $doing = 'new';
+
+      // add new devices on remote poller from actions queue
+      if (function_exists('run_action_queue')) {
+        run_action_queue('device_add');
+        //run_action_queue('device_rename');
+        //run_action_queue('device_delete');
+      }
       break;
     case 'none':
-      $options['u'] = TRUE;
+      //$options['u'] = TRUE;
       break;
     default:
       $doing      = $options['h'];
-      if (is_numeric($options['h']))
-      {
+      if (is_numeric($options['h'])) {
         $where    = 'AND `device_id` = ?';
         $params[] = $options['h'];
       } else {
@@ -108,25 +121,6 @@ if (isset($options['i']) && $options['i'] && isset($options['n'])) {
   $where = 'AND MOD(device_id,' . $options['i'] . ') = ?';
   $params[] = $options['n'];
   $doing = $options['n'] . '/' . $options['i'];
-}
-
-if (isset($options['u']) || isset($options['U']) ||
-    ($where && in_array($options['h'], array('all', 'odd', 'even'))))
-{
-  $options['u'] = TRUE;
-
-  include($config['install_dir'] . '/includes/update/update.php');
-}
-elseif (!isset($options['q']))
-{
-  // Warn about need DB schema update
-  $db_version = get_db_version();
-  $db_version = sprintf("%03d", $db_version + 1);
-  if (is_file($config['install_dir'] . "/update/$db_version.sql") || is_file($config['install_dir'] . "/update/$db_version.php"))
-  {
-    print_warning("Your database schema is old and needs updating. Run from console:\n  " . $config['install_dir'] . "/discovery.php -u");
-  }
-  unset($db_version);
 }
 
 if (!$where && !$options['u'] && !isset($options['a']))
@@ -163,16 +157,13 @@ DEBUGGING OPTIONS:
 %rInvalid arguments!%n", 'color', FALSE);
 }
 
-if ($config['version_check'] && ($options['h'] != 'new' || $options['u']))
-{
+if ($config['version_check'] && ($options['h'] !== 'new' || $options['u'])) {
   include($config['install_dir'] . '/includes/versioncheck.inc.php');
 }
 
-if (!$where)
-{
+if (!$where) {
   // Only update Group/Alert tables
-  if (isset($options['a']))
-  {
+  if (isset($options['a'])) {
     $silent = isset($options['q']);
     // Not exist in CE
     if (function_exists('update_group_tables')) { update_group_tables($silent); }
@@ -183,8 +174,7 @@ if (!$where)
 }
 
 // For not new devices discovery, skip down devices
-if ($options['h'] != 'new')
-{
+if ($options['h'] !== 'new') {
   $where .= ' AND `status` = ?';
   $params[] = 1;
 }
@@ -196,12 +186,10 @@ print_cli_heading("%WStarting discovery run at " . date("Y-m-d H:i:s"), 0);
 $where .= ' AND `poller_id` = ?';
 $params[] = $config['poller_id'];
 
-foreach (dbFetchRows("SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER BY `last_discovered_timetaken` ASC", $params) as $device)
-{
+foreach (dbFetchRows("SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER BY `last_discovered_timetaken` ASC", $params) as $device) {
   // Additional check if device SNMPable, because during
   // discovery many devices (long time), the some device can be switched off
-  if ($options['h'] == 'new' || isSNMPable($device))
-  {
+  if ($options['h'] === 'new' || isSNMPable($device)) {
     discover_device($device, $options);
   } else {
     $string = "Device '" . $device['hostname'] . "' skipped, because switched off during runtime discovery process.";
@@ -217,22 +205,38 @@ $run = $end - $start;
 $discovery_time = substr($run, 0, 5);
 
 // Update Group/Alert tables
-if (($discovered_devices && !isset($options['m'])) || isset($options['a']))
-{
+if (($discovered_devices && !isset($options['m'])) || isset($options['a'])) {
   $silent = isset($options['q']);
   // Not exist in CE
   if (function_exists('update_group_tables')) { update_group_tables($silent); }
   if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
 }
 
-if ($discovered_devices)
-{
+if ($discovered_devices) {
   // Single device ID convert to hostname for log
-  if (is_numeric($doing)) { $doing = $device['hostname']; }
-}
-elseif (!isset($options['q']) && !$options['u'])
-{
-  print_warning("WARNING: 0 devices discovered." . ($options['h'] != 'new' ? " Did you specify a device that does not exist?" : ''));
+  if (is_numeric($doing)) {
+    $doing = $device['hostname'];
+
+    // This discovery passed from wrapper and with process id
+    if ($config['poller_id'] > 0 &&
+        $poller = dbFetchColumn('SELECT * FROM `pollers` WHERE `poller_id` = ?', [ $config['poller_id'] ])) {
+      $host_id = get_local_id();
+      $update = [];
+      if ($poller['host_id'] != $host_id) {
+        $update['host_id'] = $host_id;
+        log_event("Poller ".$config['poller_id']." host ID changed: '".$poller['host_id']."' -> '".$host_id."'");
+      }
+      if ($poller['host_uname'] != php_uname()) {
+        $update['host_uname'] = php_uname();
+        log_event("Poller ".$config['poller_id']." host uname changed: '".$poller['host_uname']."' -> '".$update['host_uname']."'");
+      }
+      if (count($update)) {
+        dbUpdate($update, 'pollers', '`poller_id` = ?', [ $config['poller_id'] ]);
+      }
+    }
+  }
+} elseif (!isset($options['q']) && !$options['u']) {
+  print_warning("WARNING: 0 devices discovered." . ($options['h'] !== 'new' ? " Did you specify a device that does not exist?" : ''));
 }
 
 $string = $argv[0] . ": $doing - $discovered_devices devices discovered in $discovery_time secs";
@@ -240,13 +244,12 @@ print_debug($string);
 logfile($string);
 
 // Clean stale observium processes
-foreach (dbFetchRows("SELECT * FROM `observium_processes` WHERE `process_start` < ?", array($config['time']['fourhour'])) as $process)
-{
+$process_sql = "SELECT * FROM `observium_processes` WHERE `poller_id` = ? AND `process_start` < ?";
+foreach (dbFetchRows($process_sql, [ $config['poller_id'], $config['time']['fourhour'] ]) as $process) {
   // We found processes in DB, check if it exist on system
   print_debug_vars($process);
   $pid_info = get_pid_info($process['process_pid']);
-  if (is_array($pid_info) && strpos($pid_info['COMMAND'], $process['process_name']) !== FALSE)
-  {
+  if (is_array($pid_info) && str_contains($pid_info['COMMAND'], $process['process_name'])) {
     // Process still running
   } else {
     // Remove stalled DB entries
@@ -255,10 +258,8 @@ foreach (dbFetchRows("SELECT * FROM `observium_processes` WHERE `process_start` 
   }
 }
 
-if (!isset($options['q']))
-{
-  if ($config['snmp']['hide_auth'])
-  {
+if (!isset($options['q'])) {
+  if ($config['snmp']['hide_auth']) {
     print_debug("NOTE, \$config['snmp']['hide_auth'] is set to TRUE, snmp community and snmp v3 auth hidden from debug output.");
   }
 
@@ -274,8 +275,8 @@ if (!isset($options['q']))
                     ' Insert[' . ($db_stats['insert'] + 0) . '/' . round($db_stats['insert_sec'] + 0, 3) . 's]' .
                     ' Delete[' . ($db_stats['delete'] + 0) . '/' . round($db_stats['delete_sec'] + 0, 3) . 's]', 0);
 
-  foreach ($GLOBALS['rrdtool'] as $cmd => $data)
-  {
+  $rrd_times = [];
+  foreach ($GLOBALS['rrdtool'] as $cmd => $data) {
     $rrd_times[] = $cmd . "[" . $data['count'] . "/" . round($data['time'], 3) . "s]";
   }
 

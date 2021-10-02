@@ -9,14 +9,10 @@
  *
  */
 /**
- * https://core.telegram.org/bots/api#sendmessage
- * Used keys:
- * ALERT_STATUS, ALERT_TIMESTAMP, ALERT_STATE, ALERT_URL, ALERT_MESSAGE,
- * SYSLOG_MESSAGE, CONDITIONS, METRICS, DURATION,
- * ENTITY_NAME, ENTITY_DESCRIPTION,
- * DEVICE_HOSTNAME, DEVICE_UPTIME
+ * HTML formatting style: https://core.telegram.org/bots/api#html-style
+ * Supports only numeric html entities (&nbsp; == &#160;)
  */
-// Keep more actual information in first 2 lines, for 
+// Keep more actual information in first 2 lines
 {{#ALERT_EMOJI}}{{{ALERT_EMOJI}}}&#160;{{/ALERT_EMOJI}}<strong><a href="{{{ALERT_URL}}}">{{ALERT_MESSAGE}}</a></strong>
 //<b>{{ALERT_STATE}} :</b> {{ALERT_MESSAGE}} (<a href="{{{ALERT_URL}}}">Modify</a>)
 {{#ENTITY_LINK}}

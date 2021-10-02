@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -32,8 +32,7 @@ $graph_return = [
 
 preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>[a-z0-9A-Z-_]+)/', $vars['type'], $graphtype);
 
-if (isset($vars['format']) && in_array($vars['format'], array_keys($config['graph_formats'])))
-{
+if (isset($vars['format']) && array_key_exists($vars['format'], $config['graph_formats'])) {
   $extension = $config['graph_formats'][$vars['format']]['extension'];
   $mimetype  = $config['graph_formats'][$vars['format']]['mimetype'];
   $img_format = strtoupper($vars['format']);
@@ -46,8 +45,7 @@ $graphfile = $config['temp_dir'] . "/"  . strgen() . "." . $extension;
 
 if (OBS_DEBUG) { print_vars($graphtype); }
 
-if(isset($graphtype['type']) && isset($graphtype['subtype']))
-{
+if (isset($graphtype['type']) && isset($graphtype['subtype'])) {
   $type = $graphtype['type'];
   $subtype = $graphtype['subtype'];
 } else {
@@ -56,28 +54,21 @@ if(isset($graphtype['type']) && isset($graphtype['subtype']))
 }
 
 // Get device array
-if (is_numeric($vars['device']))
-{
+if (is_intnum($vars['device'])) {
   $device = device_by_id_cache($vars['device']);
-}
-else if (!empty($vars['device']))
-{
+} elseif (!safe_empty($vars['device'])) {
   $device = device_by_name($vars['device']);
-}
-else if ($type == 'device' && is_numeric($vars['id']))
-{
+} elseif ($type === 'device' && is_intnum($vars['id'])) {
   $device = device_by_id_cache($vars['id']);
 }
 
 // $from, $to - unixtime (or rrdgraph time interval, i.e. '-1d', '-6w')
 // $timestamp_from, $timestamp_to - timestamps formatted as 'Y-m-d H:i:s'
 $timestamp_pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
-if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from']))
-{
+if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from'])) {
   $vars['from'] = strtotime($vars['timestamp_from']);
 }
-if (isset($vars['timestamp_to']) && preg_match($timestamp_pattern, $vars['timestamp_to']))
-{
+if (isset($vars['timestamp_to']) && preg_match($timestamp_pattern, $vars['timestamp_to'])) {
   $vars['to'] = strtotime($vars['timestamp_to']);
 }
 
@@ -134,33 +125,25 @@ if ($graph_include)
   graph_error('no '. $type.'_'.$subtype.''); // Graph Template Missing
 }
 
-if ($error_msg)
-{
+if ($error_msg) {
   // We have an error :(
   graph_error($graph_error);
-}
-else if (!$auth)
-{
+} elseif (!$auth) {
   // We are unauthenticated :(
-  if ($width < 200)
-  {
+  if ($width < 200) {
     graph_error("No Auth");
   } else {
     graph_error("No Authorization");
   }
 } else {
   #$rrd_options .= " HRULE:0#999999";
-  if ($no_file)
-  {
-    if ($width < 200)
-    {
+  if ($no_file) {
+    if ($width < 200) {
       graph_error("No RRD");
     } else {
       graph_error("Missing RRD Datafile");
     }
-  }
-  else if (isset($vars['command_only']) && $vars['command_only'] == TRUE)
-  {
+  } elseif (isset($vars['command_only']) && $vars['command_only'] == TRUE) {
     $return = rrdtool_graph($graphfile, $rrd_options);
     //print_vars($GLOBALS['exec_status']);
 
@@ -171,18 +154,13 @@ else if (!$auth)
       $graph_return['descr'] = $config['graph_types'][$type][$subtype]['long'];
     }
   } else {
-    if ($rrd_options)
-    {
+    if ($rrd_options) {
       rrdtool_graph($graphfile, $rrd_options);
       //print_debug($rrd_cmd);
-      if (is_file($graphfile))
-      {
-        if ($vars['image_data_uri'] == TRUE)
-        {
+      if (is_file($graphfile)) {
+        if ($vars['image_data_uri'] == TRUE) {
           $image_data_uri = data_uri($graphfile, $mimetype);
-        }
-        else if (!OBS_DEBUG)
-        {
+        } elseif (!OBS_DEBUG) {
           $fd = fopen($graphfile, 'rb');
           header('Content-type: '.$mimetype);
           header('Content-Disposition: inline; filename="'.basename($graphfile).'"');
@@ -195,16 +173,14 @@ else if (!$auth)
         }
         unlink($graphfile);
       } else {
-        if ($width < 200)
-        {
+        if ($width < 200) {
           graph_error("Draw Error");
         } else {
           graph_error("Error Drawing Graph");
         }
       }
     } else {
-      if ($width < 200)
-      {
+      if ($width < 200) {
         graph_error("Def Error");
       } else {
         graph_error("Graph Definition Error");
@@ -215,8 +191,7 @@ else if (!$auth)
 
 // Total runtime and clean graph file
 $graph_return['total'] = utime() - $total_start;
-if (strlen($graph_return['filename']) && is_file($graph_return['filename']))
-{
+if (strlen($graph_return['filename']) && is_file($graph_return['filename'])) {
   unlink($graph_return['filename']);
 }
 

@@ -39,7 +39,7 @@ if (count($sensors))
     {
       // Skip not same columns and limits and empty params
       if (in_array($key, ['sensor_id', 'sensor_type']) ||
-          str_exists($key, 'limit') || $value === '')
+          str_contains_array($key, 'limit') || $value === '')
       {
         continue;
       }

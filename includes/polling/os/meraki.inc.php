@@ -15,12 +15,12 @@ if (preg_match('/^Meraki ([A-Z\-_0-9]+) (.*)/', $poll_device['sysDescr'], $match
   $hardware = $matches[1];
   $platform = $matches[2];
 
-  if (str_exists($platform, 'AP') || str_starts($hardware, 'MR'))
+  if (str_contains_array($platform, 'AP') || str_starts($hardware, 'MR'))
   {
     // Meraki MR34 Cloud Managed AP
     $type = 'wireless';
   }
-  else if (str_exists($platform, 'Security') || str_starts($hardware, 'MX'))
+  else if (str_contains_array($platform, 'Security') || str_starts($hardware, 'MX'))
   {
     // Meraki MX100 Cloud Managed Security Appliance
     $type = 'firewall';

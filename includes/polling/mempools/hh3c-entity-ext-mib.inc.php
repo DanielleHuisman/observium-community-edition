@@ -15,8 +15,8 @@ $mib = 'HH3C-ENTITY-EXT-MIB';
 
 if (!is_array($cache_storage[$mib]))
 {
-  $cache_storage[$mib] = snmpwalk_cache_multi_oid($device, 'hh3cEntityExtMemUsage', array(), $mib);
-  $cache_storage[$mib] = snmpwalk_cache_multi_oid($device, 'hh3cEntityExtMemSize', $cache_storage[$mib], $mib);
+  $cache_storage[$mib] = snmpwalk_cache_oid($device, 'hh3cEntityExtMemUsage', array(), $mib);
+  $cache_storage[$mib] = snmpwalk_cache_oid($device, 'hh3cEntityExtMemSize', $cache_storage[$mib], $mib);
 } else {
   print_debug("Cached!");
 }

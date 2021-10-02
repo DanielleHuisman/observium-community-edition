@@ -6,19 +6,19 @@
  *
  * @package    observium
  * @subpackage syslog
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-// FIXME use db functions properly
-
 // DOCME needs phpdoc block
 // TESTME needs unit testing
+// FIXME. Use internal caching instead
 function get_cache($host, $value)
 {
   global $dev_cache;
 
   if (empty($host)) { return NULL; }
+  $host = strtolower($host);
 
   // Check cache expiration
   $now = time();
@@ -29,14 +29,11 @@ function get_cache($host, $value)
   }
   if ($expired) { $dev_cache[$host]['lastchecked'] = $now; }
 
-  if (!isset($dev_cache[$host][$value]) || $expired)
-  {
-    switch($value)
-    {
+  if (!isset($dev_cache[$host][$value]) || $expired) {
+    switch($value) {
       case 'device_id':
         // Try by map in config
-        if (isset($GLOBALS['config']['syslog']['host_map'][$host]))
-        {
+        if (isset($GLOBALS['config']['syslog']['host_map'][$host])) {
           $new_host = $GLOBALS['config']['syslog']['host_map'][$host];
           if (is_numeric($new_host))
           {
@@ -53,14 +50,10 @@ function get_cache($host, $value)
         }
 
         // Localhost IPs, try detect as local system
-        if (in_array($host, array('127.0.0.1', '::1')))
-        {
-          if ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ?', array(get_localhost())))
-          {
+        if (in_array($host, array('127.0.0.1', '::1'))) {
+          if ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ?', array(get_localhost()))) {
             $dev_cache[$host]['device_id'] = $localhost_id;
-          }
-          elseif ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `sysName` = ?', array(get_localhost())))
-          {
+          } elseif ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `sysName` = ?', array(get_localhost()))) {
             $dev_cache[$host]['device_id'] = $localhost_id;
           }
           // NOTE in other cases localhost IPs associated with random device
@@ -70,8 +63,7 @@ function get_cache($host, $value)
         }
 
         // If failed, try by IP
-        if (!is_numeric($dev_cache[$host]['device_id']))
-        {
+        if (!is_numeric($dev_cache[$host]['device_id'])) {
           $ip = $host;
 
           $ip_version = get_ip_version($ip);
@@ -84,16 +76,13 @@ function get_cache($host, $value)
               $ip = $matches[1];
               $ip_version = 4;
             }
-            elseif ($ip_version === 6)
-            {
-              $ip = Net_IPv6::uncompress($ip, TRUE);
-            }
+            $ip = ip_uncompress($ip);
 
             // Detect associated device by IP address, exclude deleted ports
             // IS NULL allow to search addresses without associated port
             $query = 'SELECT * FROM `ipv'.$ip_version.'_addresses` LEFT JOIN `ports` USING (`device_id`, `port_id`) WHERE `ipv'.$ip_version.'_address` = ? AND (`ports`.`deleted` = ? OR `ports`.`deleted` IS NULL);';
             $addresses = dbFetchRows($query, [ $ip, 0 ]);
-            $address_count = count($addresses);
+            $address_count = safe_count($addresses);
 
             if ($address_count)
             {
@@ -162,7 +151,7 @@ function cache_syslog_rules_assoc()
 
     //print_r($laa);
 
-    if ($laa['entity_type'] == 'group')
+    if ($laa['entity_type'] === 'group')
     {
       $devices = get_group_entities($laa['entity_id']);
       foreach($devices as $dev_id)
@@ -170,7 +159,7 @@ function cache_syslog_rules_assoc()
         $device_rules[$dev_id][$laa['la_id']] = TRUE;
       }
     }
-    elseif ($laa['entity_type'] == 'device')
+    elseif ($laa['entity_type'] === 'device')
     {
       $device_rules[$laa['entity_id']][$laa['la_id']] = TRUE;
     }
@@ -190,19 +179,16 @@ function process_syslog($line, $update)
 
   $entry = process_syslog_line($line);
 
-  if ($entry === FALSE)
-  {
+  if ($entry === FALSE) {
     // Incorrect/filtered syslog entry
     return FALSE;
   }
-  elseif ($entry['device_id'])
-  {
+  if ($entry['device_id']) {
     // Main syslog entry with detected device
-    if ($update)
-    {
+    if ($update) {
       // Accurate timestamps
 
-      $log_id = dbInsert(
+      $syslog_id = dbInsert(
         array(
           'device_id' => $entry['device_id'],
           'host'      => $entry['host'],
@@ -252,7 +238,7 @@ function process_syslog($line, $update)
 
           $log_id = dbInsert(array('device_id' => $entry['device_id'],
                                    'la_id'     => $la_id,
-                                   'syslog_id' => $log_id,
+                                   'syslog_id' => $syslog_id,
                                    'timestamp' => $entry['timestamp'],
                                    'program'   => $entry['program'],
                                    'message'   => $entry['msg'], // Use cleared msg instead original (see process_syslog_line() tests)
@@ -274,14 +260,14 @@ function process_syslog($line, $update)
                 'log_id'                => $log_id,
                 'aca_type'              => $notification_type,
                 'severity'              => $entry['priority'],
-                'endpoints'             => json_encode($contact),
+                'endpoints'             => safe_json_encode($contact),
                 //'message_graphs'        => $message_tags['ENTITY_GRAPHS_ARRAY'],
                 'notification_added'    => time(),
                 'notification_lifetime' => 300,                   // Lifetime in seconds
-                'notification_entry'    => json_encode($entry),   // Store full alert entry for use later if required (not sure that this needed)
+                'notification_entry'    => safe_json_encode($entry),   // Store full alert entry for use later if required (not sure that this needed)
               ];
               //unset($message_tags['ENTITY_GRAPHS_ARRAY']);
-              $notification['message_tags'] = json_encode($message_tags);
+              $notification['message_tags'] = safe_json_encode($message_tags);
               $notification_id = dbInsert($notification, 'notifications_queue');
             } // End foreach($contacts)
           } // End if($notified)
@@ -338,7 +324,7 @@ function syslog_generate_tags($entry, $rule)
     'ALERT_EMOJI_NAME'    => $alert_emoji,
     'ALERT_STATUS'        => 0,                              // Tag for templates (0 - ALERT, 1 - RECOVERY, 2 - DELAYED, 3 - SUPPRESSED)
     'ALERT_SEVERITY'      => ucfirst($severity_def['name']), // Critical, Warning, Informational, Other
-    'ALERT_COLOR'         => $alert_color,
+    'ALERT_COLOR'         => ltrim($alert_color, '#'),
     'ALERT_URL'           => generate_url([ 'page'        => 'device',
                                             'device'      => $device['device_id'],
                                             'tab'         => 'alert',
@@ -388,11 +374,10 @@ function syslog_generate_tags($entry, $rule)
  * Observium template:
  * host||facility||priority||level||tag||timestamp||msg||program
  *
- * @param string $line Raw syslog line by observium template
+ * @param string|array $line Raw syslog line by observium template
  * @return array|false Array with processed syslog entry, or FALSE if incorrect/filtered msg.
  */
-function process_syslog_line($line)
-{
+function process_syslog_line($line) {
   global $config;
 
   // Compatibility with old param as array
@@ -408,8 +393,7 @@ function process_syslog_line($line)
   $entry['level']     = array_shift($entry_array);
   $entry['tag']       = array_shift($entry_array);
   $entry['timestamp'] = array_shift($entry_array);
-  if (count($entry_array) > 2)
-  {
+  if (safe_count($entry_array) > 2) {
     // Some time message have || inside:
     // 127.0.0.1||9||6||6||CRON[3196]:||2018-03-13 06:25:01|| (root) CMD (test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily ))||CRON
     $entry['program'] = array_pop($entry_array);
@@ -423,15 +407,20 @@ function process_syslog_line($line)
   $entry['msg'] = str_replace([ '\"', "\'" ], [ '"', "'" ], $entry['msg']);
 
   // Filter by msg string
-  if (str_exists($entry['msg'], $config['syslog']['filter']))
-  {
+  if (str_contains_array($entry['msg'], $config['syslog']['filter'])) {
     return FALSE;
+  } elseif (isset($config['syslog']['filter_regex'])) {
+    // FIXME. currently undocumented
+    foreach ((array)$config['syslog']['filter_regex'] as $filter) {
+      if (preg_match($filter, $entry['msg'])) {
+        return FALSE;
+      }
+    }
   }
 
   // Accurate timestamp
   $entry['unixtime'] = strtotime($entry['timestamp']);
-  if (abs($start_time - $entry['unixtime']) >= 60)
-  {
+  if (abs($start_time - $entry['unixtime']) >= 60) {
     // Seems as wrong time synchronization on device/server or something else.
     // Use self time in this case
     $entry['timestamp'] = date('Y-m-d H:i:s', $start_time);
@@ -444,8 +433,7 @@ function process_syslog_line($line)
   $entry['host']      = strtolower(trim($entry['host']));
 
   if (isset($config['syslog']['debug']) && $config['syslog']['debug'] &&
-      !defined('__PHPUNIT_PHAR__')) // Skip on Unit tests
-  {
+      !defined('__PHPUNIT_PHAR__')) { // Skip on Unit tests
     // Store RAW syslog line into debug.log
     logfile('debug.'.$entry['host'].'.syslog', $line);
   }
@@ -453,8 +441,7 @@ function process_syslog_line($line)
   // Rewrite priority/level/facility from strings to numbers
   $entry['priority']  = priority_string_to_numeric($entry['priority']);
   $entry['level']     = priority_string_to_numeric($entry['level']);
-  if (isset($config['syslog']['facilities'][$entry['facility']]))
-  {
+  if (isset($config['syslog']['facilities'][$entry['facility']])) {
     // Convert numeric facility to string
     $entry['facility'] = $config['syslog']['facilities'][$entry['facility']]['name'];
   }
@@ -463,35 +450,63 @@ function process_syslog_line($line)
   $entry['device_id'] = get_cache($entry['host'], 'device_id');
   //print_vars($entry);
   //print_vars($GLOBALS['dev_cache']);
-  if ($entry['device_id'])
-  {
+  if ($entry['device_id']) {
     // Process msg/program for known os/os_group
     $os       = get_cache($entry['host'], 'os');
     $os_group = get_cache($entry['host'], 'os_group');
 
     // Detect message repeated
-    if (strpos($entry['msg'], 'repeated ') !== FALSE && preg_match('/repeated \d+ times(?:\:\ +\[\s*(?<msg>.+)\])?\s*$/', $entry['msg'], $matches))
-    {
+    if (str_contains($entry['msg'], 'repeated ') &&
+        preg_match('/repeated \d+ times(?:\:\ +\[\s*(?<msg>.+)\])?\s*$/', $entry['msg'], $matches)) {
       //var_dump($matches);
-      if (isset($matches['msg']))
-      {
+      if (isset($matches['msg'])) {
         $entry['msg'] = $matches['msg'];
       } else {
-        // Always skip unusefull entries 'message repeated X times' (without any message)
+        // Always skip unuseful entries 'message repeated X times' (without any message)
         return FALSE;
       }
     }
 
+    if (!safe_empty($entry['tag'])) {
+      $entry['tag']  = rtrim($entry['tag'], ':'); // remove last :
+
+      // OS definition based syslog tag format
+      if (isset($config['os'][$os]['syslog_tag'])) {
+        foreach ($config['os'][$os]['syslog_tag'] as $pattern) {
+          if (preg_match($pattern, $entry['tag'], $matches)) {
+            if (OBS_DEBUG) {
+              print_cli_table(array( array( 'syslog tag', $entry['tag'] ), array( 'matched pattern', $pattern ) ));
+              //print_vars($matches);
+            }
+            // Override founded tag/program references
+            if (isset($matches['program'])) {
+              $entry['program'] = $matches['program'];
+            }
+            if (isset($matches['tag'])) {
+              $entry['tag'] = $matches['tag'];
+            }
+            /*
+            // Tags, also allowed multiple tagsX (0-9), started from 0
+            $i = 0;
+            while (isset($matches['tag'.$i]) && $matches['tag'.$i])
+            {
+              $entry['tag']  = rtrim($entry['tag'], ':'); // remove last :
+              $entry['tag'] .= ','.$matches['tag'.$i];
+              $i++;
+            }
+            */
+            break; // Stop other loop if pattern found
+          }
+        }
+      }
+    }
+
     // OS definition based syslog msg format
-    if (isset($config['os'][$os]['syslog_msg']))
-    {
-      foreach ($config['os'][$os]['syslog_msg'] as $pattern)
-      {
-        if (preg_match($pattern, $entry['msg'], $matches))
-        {
-          if (OBS_DEBUG)
-          {
-            print_cli_table(array(array('syslog msg', $entry['msg']), array('matched pattern', $pattern)), NULL);
+    if (isset($config['os'][$os]['syslog_msg'])) {
+      foreach ($config['os'][$os]['syslog_msg'] as $pattern) {
+        if (preg_match($pattern, $entry['msg'], $matches)) {
+          if (OBS_DEBUG) {
+            print_cli_table(array(array('syslog msg', $entry['msg']), array('matched pattern', $pattern)));
           }
           // Override founded msg/tag/program references
           if (isset($matches['msg']))     { $entry['msg']     = $matches['msg']; }
@@ -499,8 +514,7 @@ function process_syslog_line($line)
           if (isset($matches['tag']))     { $entry['tag']     = $matches['tag']; }
           // Tags, also allowed multiple tagsX (0-9), started from 0
           $i = 0;
-          while (isset($matches['tag'.$i]) && $matches['tag'.$i])
-          {
+          while (isset($matches['tag'.$i]) && $matches['tag'.$i]) {
             $entry['tag']  = rtrim($entry['tag'], ':'); // remove last :
             $entry['tag'] .= ','.$matches['tag'.$i];
             $i++;
@@ -509,16 +523,13 @@ function process_syslog_line($line)
         }
       }
     }
+
     // OS definition based syslog program format
-    if (isset($config['os'][$os]['syslog_program']) && strlen($entry['program']))
-    {
-      foreach ($config['os'][$os]['syslog_program'] as $pattern)
-      {
-        if (preg_match($pattern, $entry['program'], $matches))
-        {
-          if (OBS_DEBUG)
-          {
-            print_cli_table(array(array('syslog program', $entry['program']), array('matched pattern', $pattern)), NULL);
+    if (isset($config['os'][$os]['syslog_program']) && !safe_empty($entry['program'])) {
+      foreach ($config['os'][$os]['syslog_program'] as $pattern) {
+        if (preg_match($pattern, $entry['program'], $matches)) {
+          if (OBS_DEBUG) {
+            print_cli_table(array(array('syslog program', $entry['program']), array('matched pattern', $pattern)));
           }
           // Override founded tag/program references
           if (isset($matches['program'])) { $entry['program'] = $matches['program']; }
@@ -539,35 +550,28 @@ function process_syslog_line($line)
     }
 
     // Additional syslog cases, when regex from definition not possible
-    if ($os_group == 'cisco')
-    {
+    if ($os_group === 'cisco') {
       // Cisco by default store in tag/program syslog fields just seq no,
       // this not useful for this fields
-      if ($entry['priority'] > 6 && (is_numeric($entry['program']) || empty($entry['program'])))
-      {
+      if ($entry['priority'] > 6 && (is_numeric($entry['program']) || empty($entry['program']))) {
         $entry['program'] = 'debug';
         $entry['tag']     = 'debug';
         // Remove prior seqno and timestamp from msg
         $entry['msg'] = preg_replace('/^\s*(?<seq>\d+:)*\s*(?<timestamp>.*?\d+\:\d+\:\d+(?:\.\d+)?(?:\ [\w\-\+]+)?): /', '', $entry['msg']);
       }
-    }
-    elseif (in_array($os, array('junos', 'junose')))
-    {
+    } elseif (in_array($os, [ 'junos', 'junose' ])) {
       //1.1.1.1||9||6||6||/usr/sbin/cron[1305]:||2015-04-08 14:30:01|| (root) CMD (   /usr/libexec/atrun)||
-      if (str_exists($entry['tag'], '/'))
-      {
-        $entry['tag']     = end(explode('/', $entry['tag'])); // /usr/sbin/cron[1305]: -> cron[1305]:
+      if (str_contains_array($entry['tag'], '/')) {
+        $tmp          = explode('/', $entry['tag']);
+        $entry['tag'] = end($tmp); // /usr/sbin/cron[1305]: -> cron[1305]:
       }
-      if (empty($entry['program']))
-      {
+      if (empty($entry['program'])) {
         list($entry['program']) = explode('[', rtrim($entry['tag'], ':')); // cron[1305]: -> cron
       }
       //1.1.1.1||3||4||4||mib2d[1230]:||2015-04-08 14:30:11|| SNMP_TRAP_LINK_DOWN: ifIndex 602, ifAdminStatus up(1), ifOperStatus down(2), ifName ge-0/1/0||mib2d
       //1.1.1.1||3||6||6||chassism[1210]:||2015-04-08 14:30:16|| ethswitch_eth_devstop: called for port ge-0/1/1||chassism
       //1.1.1.1||3||3||3||chassism[1210]:||2015-04-08 14:30:22|| ETH:if_ethgetinfo() returns error||chassism
-    }
-    elseif ($os == 'linux' && get_cache($entry['host'], 'version') == 'Point')
-    {
+    } elseif ($os === 'linux' && get_cache($entry['host'], 'version') === 'Point') {
       // Cisco WAP200 and similar
       $matches = array();
       if (preg_match('#Log: \[(?P<program>.*)\] - (?P<msg>.*)#', $entry['msg'], $matches))
@@ -577,33 +581,28 @@ function process_syslog_line($line)
       }
       unset($matches);
 
-    }
-    elseif ($os_group == 'unix')
-    {
+    } elseif ($os_group === 'unix') {
       //1.1.1.1||9||6||6||/usr/sbin/cron[1305]:||2015-04-08 14:30:01|| (root) CMD (   /usr/libexec/atrun)||
-      if (str_exists($entry['tag'], '/'))
-      {
-        $entry['tag']     = end(explode('/', $entry['tag'])); // /usr/sbin/cron[1305]: -> cron[1305]:
+      if (str_contains($entry['tag'], '/')) {
+        $tmp          = explode('/', $entry['tag']);
+        $entry['tag'] = end($tmp); // /usr/sbin/cron[1305]: -> cron[1305]:
         // And same for program if it based on tag (from os definitions)
-        if (str_exists($entry['program'], '/'))
-        {
-          $entry['program'] = end(explode('/', $entry['program']));
+        if (str_contains($entry['program'], '/')) {
+          $tmp              = explode('/', $entry['program']);
+          $entry['program'] = end($tmp);
         }
       }
-      if (empty($entry['program']))
-      {
+      if (empty($entry['program'])) {
         list($entry['program']) = explode('[', rtrim($entry['tag'], ':')); // cron[1305]: -> cron
       }
 
       // User_CommonName/123.213.132.231:39872 VERIFY OK: depth=1, /C=PL/ST=Malopolska/O=VLO/CN=v-lo.krakow.pl/emailAddress=root@v-lo.krakow.pl
-      if ($entry['facility'] == 'daemon' && preg_match('#/([0-9]{1,3}\.) {3}[0-9]{1,3}:[0-9]{4,} ([A-Z]([A-Za-z])+( ?)) {2,}:#', $entry['msg']))
-      {
+      if ($entry['facility'] === 'daemon' && preg_match('#/([0-9]{1,3}\.) {3}[0-9]{1,3}:[0-9]{4,} ([A-Z]([A-Za-z])+( ?)) {2,}:#', $entry['msg'])) {
         $entry['program'] = 'OpenVPN';
       }
       // pop3-login: Login: user=<username>, method=PLAIN, rip=123.213.132.231, lip=123.213.132.231, TLS
       // POP3(username): Disconnected: Logged out top=0/0, retr=0/0, del=0/1, size=2802
-      elseif ($entry['facility'] == 'mail' && preg_match('/^(((pop3|imap)\-login)|((POP3|IMAP)\(.*\))):/', $entry['msg']))
-      {
+      elseif ($entry['facility'] === 'mail' && preg_match('/^(((pop3|imap)\-login)|((POP3|IMAP)\(.*\))):/', $entry['msg'])) {
         $entry['program'] = 'Dovecot';
       }
       // SYSLOG CONNECTION BROKEN; FD='6', SERVER='AF_INET(123.213.132.231:514)', time_reopen='60'
@@ -611,21 +610,75 @@ function process_syslog_line($line)
       $entry['program'] = preg_replace('/\-\d+$/', '', $entry['program']);
       $entry['program'] = str_replace('rsyslogd0', 'rsyslogd', $entry['program']);
       unset($matches);
-      if (str_exists($entry['program'], '/'))
-      {
+      if (str_contains($entry['program'], '/')) {
         // postfix/smtp
         list($entry['program'], $tag) = explode('/', $entry['program'], 2);
         $entry['tag'] .= ','.$tag;
       }
-    }
-    elseif ($os == 'netscaler')
-    {
+    } elseif ($os === 'netscaler') {
       //10/03/2013:16:49:07 GMT dk-lb001a PPE-4 : UI CMD_EXECUTED 10367926 : User so_readonly - Remote_ip 10.70.66.56 - Command "stat lb vserver" - Status "Success"
-      list(,,,$entry['msg']) = explode(' ', $entry['msg'], 4);
-      list($entry['program'], $entry['msg']) = explode(' : ', $entry['msg'], 3);
-    }
-    elseif (str_starts($entry['tag'], '('))
-    {
+      //01/26/2021:12:47:07 GMT DCRX-ANS-N004 0-PPE-0 : default EVENT DEVICEDOWN 62431870 0 :  Device "server_serviceGroup_NSSVC_TCP_172.16.200.150:636(SVG_TST_LDAPS_ADMB?DC-BRU-150?636)" - State DOWN
+      // main message
+      list($tmp, $tags, $entry['msg']) = explode(' : ', $entry['msg'], 3);
+
+      // try detect correct device association
+      // see: https://jira.observium.org/browse/OBS-523
+      $tmp = explode(' ', trim($tmp));
+      array_pop($tmp);
+      $netscaler_host = array_pop($tmp);
+      if (strtolower($netscaler_host) !== strtolower($entry['host'])) {
+        $netscaler_id = get_cache($netscaler_host, 'device_id');
+        if ($netscaler_id && $netscaler_id != $entry['device_id'] &&
+            get_cache($netscaler_host, 'os') === 'netscaler') {
+          $entry['device_id'] = $netscaler_id;
+        }
+      }
+
+      // program and tags
+      $tags = preg_replace('/ \d+( \d+)?$/', '', trim($tags));
+      $tags = explode(' ', $tags);
+      $entry['tag'] .= ','.array_pop($tags);
+      $entry['program'] = array_pop($tags);
+      unset($tags, $tmp, $netscaler_host, $netscaler_id);
+    } elseif ($os === 'nos' || $entry['program'] === 'raslogd' || str_starts($entry['tag'], 'raslogd')) {
+      // Brocade NOS raslogd format (see unittests)
+      $values_pattern = '/\[(?<var>\w+)(?:@\d+)?\s+(?<values>[^\]]+)\]/';
+      $value_pattern = '/value="(?<value>[^"]+?)"(\s+desc="(?<descr>[^"]+?)")?/';
+      $tags = [];
+      if (preg_match_all($values_pattern, $entry['msg'], $matches_all, PREG_SET_ORDER)) {
+        $replace = [];
+        foreach ($matches_all as $matches) {
+          $replace[] = $matches[0];
+          preg_match($value_pattern, $matches['values'], $value);
+          switch ($matches['var']) {
+            case 'log':
+              // [log@1588 value="RASLOG"] [log@1588 value="AUDIT"]
+              $entry['program'] = $value['value'];
+              break;
+            case 'severity':
+              // not sure, seems as already correct in priority
+              // [severity@1588 value="INFO"]
+              $entry['priority'] = priority_string_to_numeric($value['value']);
+              break;
+            case 'msgid':
+            case 'interface':
+            case 'application':
+            //case 'swname':
+              // [msgid@1588 value="SEC-3020"] [msgid@1588 value="L2SS-1032"]
+              // [interface@1588 value="ssh"]
+              // [application@1588 value="CLI"]
+              // [swname@1588 value="VDX_TESTPOP1"]
+              $tags[] = $value['value'];
+              break;
+          }
+          //print_vars($matches);
+        }
+        $entry['tag'] = implode(',', $tags);
+        $entry['msg'] = str_replace($replace, '', $entry['msg']);
+        $entry['msg'] = preg_replace('/^\s*BOM/', '', $entry['msg']);
+      }
+    } elseif (str_starts($entry['tag'], [ '(', 'BZ2LR,', 'U7LR,' ]) ||
+              preg_match('/\w+,\w+,v\d+\.\d+\.\d+\.\d{3,}/', $entry['tag'])) {
       // Ubiquiti Unifi devices
       // Wtf is BZ2LR and BZ@..
       /**
@@ -633,27 +686,25 @@ function process_syslog_line($line)
        *New:  10.10.34.10||3||6||6||(BZ2LR,00272250c1cd,v3.2.5.2791)||2014-12-12 09:36:39|| hostapd: ath2: STA dc:a9:71:1b:d6:c7 IEEE 802.11: associated||(BZ2LR,00272250c1cd,v3.2.5.2791)
        *New2: 10.10.34.11||1||6||6||("BZ2LR,00272250c119,v3.7.8.5016")||2016-10-06 18:20:25|| syslog: wevent.ubnt_custom_event(): EVENT_STA_LEAVE ath0: dc:a9:71:1b:d6:c7 / 3||("BZ2LR,00272250c119,v3.7.8.5016")
        *      10.10.34.7||1||6||6||("U7LR,44d9e7f618f2,v3.7.17.5220")||2016-10-06 18:21:22|| libubnt[16915]: wevent.ubnt_custom_event(): EVENT_STA_JOIN ath0: fc:64:ba:c1:7d:28 / 1||("U7LR,44d9e7f618f2,v3.7.17.5220")
+       *New3: 10.10.34.7||3||6||6||U7LR,44d9e7f618f2,v4.3.21.11325:||2020-10-05 16:29:43|| hostapd: ath4: STA 0c:70:4a:7d:5c:73 IEEE 802.11: disassociated||U7LR,44d9e7f618f2,v4.3.21.11325
+       *      10.10.34.7||1||6||6||U7LR,44d9e7f618f2,v4.3.21.11325:||2020-10-05 15:11:28|| : mcad[2832]: wireless_agg_stats.log_sta_anomalies(): bssid=44:d9:e7:f8:18:f2 radio=wifi1 vap=ath4 sta=0c:70:4a:7d:5c:73 satisfaction_now=78 anomalies=weak_signal||U7LR,44d9e7f618f2,v4.3.21.11325
        */
-      if (preg_match('/^\s*(?<tag>(?<program>\S+?)(\[\d+\])?): +(?<msg>.*)/', $entry['msg'], $matches))
+      if (preg_match('/^(\s*:)?\s*(?<tag>(?<program>\S+?)(\[\d+\])?): +(?<msg>.*)/', $entry['msg'], $matches))
       {
         $entry['msg']     = $matches['msg'];
         $entry['program'] = $matches['program'];
         $entry['tag']     = $matches['tag'];
       }
 
-    }
-    elseif (str_exists($entry['program'], ','))
-    {
+    } elseif (str_contains_array($entry['program'], ',')) {
       // Mikrotik (and some other)
       // mikrotik||user||5||notice||0d||2018-03-23 07:48:39||dhcp105 assigned 192.168.58.84 to 80:BE:05:7A:73:6E||dhcp,info
       list($entry['program'], $entry['tag']) = explode(',', $entry['program'], 2);
 
       // Mikrotik report all syslog with single priority 5 (but with tags). ie: system,info
-      foreach (explode(',', $entry['tag']) as $tag)
-      {
+      foreach (explode(',', $entry['tag']) as $tag) {
         $tag_priority = priority_string_to_numeric($tag);
-        if ($tag_priority < 8)
-        {
+        if ($tag_priority < 8) {
           // Detected new priority from tags
           $entry['priority'] = $tag_priority;
           break;
@@ -661,7 +712,7 @@ function process_syslog_line($line)
       }
     }
 
-    // Always clear timestamp from beginig of message (if still leaved), test strings:
+    // Always clear timestamp from beginning of message (if still left), test strings:
     //2018-10-16T18:13:03+02:00 hostname
     $pettern_timestamp_rfc3339 = '/^\s*\*?(?<year>[0-9]{4})\-(?<month>[0-9]{2})\-(?<day>[0-9]{2})(?:[Tt](?<hour>[0-9]{2}):(?<minute>[0-9]{2}):(?<second>(?:[0-9]{2})(?:\.[0-9]+)?)?)(?<tz>(?:[Zz]|[+\-](?:[0-9]{2}):(?:[0-9]{2})))?/';
     //Wed Mar 26 12:54:17 2014 :
@@ -681,23 +732,19 @@ function process_syslog_line($line)
     // without TZ, example:
     //Mar 21 13:07:05 netflow syslogd:
     $pattern_timestamp_wo_tz = '/^\s*\*?(?<wmd>(?<week>[a-z]{3,} +)?(?<month>[a-z]{3,} +)(?<date>\d{1,2} +)(?<year0>[12]\d{3} +)?)?(?<hms>\d{1,2}\:\d{1,2}\:\d{1,2}(?:\.\d+)?)(?<year>\s+[12]\d{3})?/i';
-    $entry['msg']      = preg_replace(array($pattern_timestamp, $pattern_timestamp_wo_tz, $pettern_timestamp_rfc3339), '', $entry['msg']);
+    $entry['msg'] = preg_replace([ $pattern_timestamp, $pattern_timestamp_wo_tz, $pettern_timestamp_rfc3339 ], '', $entry['msg']);
 
-    if (!strlen($entry['msg']))
-    {
+    if (!strlen($entry['msg'])) {
       // Something wrong, msg empty
       return FALSE;
     }
 
     // Wed Mar 26 12:54:17 2014 : Auth: Login incorrect (mschap: External script says Logon failure (0xc000006d)): [username] (from client 10.100.1.3 port 0 cli a4c3612a4077 via TLS tunnel)
-    if (strlen($entry['program']))
-    {
+    if (strlen($entry['program'])) {
       // Always clear program from begining of message, ie Auth:, blabla[27346]:
       $pattern_program = '/^\s*'.preg_quote($entry['program'], '/').'(\[\d+\])?\s*:/i';
       $entry['msg']    = preg_replace($pattern_program, '', $entry['msg']);
-    }
-    elseif (strlen($entry['facility']))
-    {
+    } elseif (strlen($entry['facility'])) {
       // fallback, better than nothing...
       $entry['program'] = $entry['facility'];
     } else {

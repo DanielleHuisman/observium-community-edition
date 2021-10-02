@@ -1,19 +1,17 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Print permission error and exit if the user doesn't have write permissions
-if (!is_entity_write_permitted($device['device_id'], 'device'))
-{
+if (!is_entity_write_permitted($device['device_id'], 'device')) {
   print_error_permission();
   return;
 }
@@ -62,22 +60,45 @@ if (!is_entity_write_permitted($device['device_id'], 'device'))
 
   echo generate_box_open($box_args);
 
-  if (count($config['rancid_configs']))
-  {
+  if (safe_count($config['rancid_configs'])) {
     $device_config_file = get_rancid_filename($device['hostname'], 1);
 
     echo('<p />');
 
-    if ($device_config_file)
-    {
+    if ($device_config_file) {
       print_success("Configuration file for device was found; will be displayed to users with level 7 or higher.");
-    } else {
+    } elseif (!isset($config['os'][$device['os']]['rancid'])) {
       print_warning("Configuration file for device was not found.");
+    } else {
+      print_warning("Os not supported by RANCID.");
     }
   } else {
     print_warning("No RANCID directories configured.");
   }
 
+  echo generate_box_close();
+
+  $box_args = [
+    'title'           => 'UNIX Agent',
+    'header-border'   => TRUE,
+    'padding'         => TRUE,
+  ];
+  // show for allowed module
+  if (is_module_enabled($device, 'unix-agent', 'poller')) {
+    $box_args['header-controls'] = [
+      'controls' => [
+        'perf' => [ 'text' => 'Show Applications', 'anchor' => TRUE,
+                    'url'  => generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'apps' ]) ]
+      ]
+    ];
+    echo generate_box_open($box_args);
+    echo '<pre>';
+    echo escape_html(get_dev_attrib($device, 'unixagent_raw'));
+    echo '</pre>';
+  } else {
+    echo generate_box_open($box_args);
+    print_warning("Unix-agent disabled for os.");
+  }
   echo generate_box_close();
 
   $box_args = array('title' => 'Smokeping',

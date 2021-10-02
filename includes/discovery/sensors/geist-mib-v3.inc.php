@@ -39,7 +39,7 @@ if (snmp_get_oid($device, 'temperaturePrecision.0', $mib) === 'deciDegree')
 // This code supports 2 alarms per monitored item, by using the lower one (in case of "trip below") as low warning limit,
 // and the higher one (in case of "trip above") as high warning limit.
 
-$oids = snmpwalk_cache_multi_oid($device, 'alarmCfgTable', array(), 'GEIST-MIB-V3');
+$oids = snmpwalk_cache_oid($device, 'alarmCfgTable', array(), 'GEIST-MIB-V3');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -96,7 +96,7 @@ foreach ($oids as $index => $entry)
 //GEIST-MIB-V3::tempSensorTempF.2 = INTEGER: 69 Degrees Fahrenheit
 //GEIST-MIB-V3::tempSensorTempF.3 = INTEGER: 70 Degrees Fahrenheit
 
-$oids = snmpwalk_cache_multi_oid($device, 'tempSensorTable', array(), 'GEIST-MIB-V3');
+$oids = snmpwalk_cache_oid($device, 'tempSensorTable', array(), 'GEIST-MIB-V3');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -126,7 +126,7 @@ foreach ($oids as $index => $entry)
 //GEIST-MIB-V3::dewPointSensorDewPointC.1 = INTEGER: 0 Degrees Celsius
 //GEIST-MIB-V3::dewPointSensorDewPointF.1 = INTEGER: 31 Degrees Fahrenheit
 
-$oids = snmpwalk_cache_multi_oid($device, 'dewPointSensorTable', array(), 'GEIST-MIB-V3');
+$oids = snmpwalk_cache_oid($device, 'dewPointSensorTable', array(), 'GEIST-MIB-V3');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -178,7 +178,7 @@ foreach ($oids as $index => $entry)
 //GEIST-MIB-V3::sc10TempF.1 = INTEGER: 74 Degrees Fahrenheit
 //GEIST-MIB-V3::sc10Capacity.1 = INTEGER: 36 %
 
-$oids = snmpwalk_cache_multi_oid($device, 'sc10Table', array(), 'GEIST-MIB-V3');
+$oids = snmpwalk_cache_oid($device, 'sc10Table', array(), 'GEIST-MIB-V3');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -246,7 +246,7 @@ foreach ($oids as $index => $entry)
 
 // A note to the designer of this MIB: .1, .2, .3 instead of A/B/C would have been a much nicer parse.
 
-$oids = snmpwalk_cache_multi_oid($device, 'ctrl3ChIECTable', array(), 'GEIST-MIB-V3');
+$oids = snmpwalk_cache_oid($device, 'ctrl3ChIECTable', array(), 'GEIST-MIB-V3');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -444,7 +444,7 @@ foreach ($oids as $index => $entry)
 // GEIST-MIB-V3::airFlowSensorHumidity.1 = INTEGER: 37 %
 // GEIST-MIB-V3::airFlowSensorDewPointC.1 = INTEGER: 6 Degrees Celsius
 
-$oids = snmpwalk_cache_multi_oid($device, 'airFlowSensorTable', array(), 'GEIST-MIB-V3');
+$oids = snmpwalk_cache_oid($device, 'airFlowSensorTable', array(), 'GEIST-MIB-V3');
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)

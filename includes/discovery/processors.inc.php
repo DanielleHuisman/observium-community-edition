@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -21,7 +21,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
 {
   if (is_array($config['mibs'][$mib]['processor']))
   {
-    print_cli_data_field("$mib ");
+    print_cli_data_field("$mib");
     foreach ($config['mibs'][$mib]['processor'] as $entry_name => $entry)
     {
       $entry['found'] = FALSE;
@@ -138,6 +138,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
       unset($processors_array, $processor, $dot_index, $descr, $i); // Clean up
       if (isset($entry['stop_if_found']) && $entry['stop_if_found'] && $entry['found']) { break; } // Stop loop if processor found
     }
+    print_cli(PHP_EOL); // Close MIB entry line.
   }
 }
 
@@ -158,7 +159,7 @@ foreach (dbFetchRows('SELECT * FROM `processors` WHERE `device_id` = ?', array($
   unset($processor_oid); unset($processor_type);
 }
 
-$GLOBALS['module_stats'][$module]['status'] = count($valid['processor']);
+$GLOBALS['module_stats'][$module]['status'] = safe_count($valid['processor']);
 if (OBS_DEBUG && $GLOBALS['module_stats'][$module]['status'])
 {
   print_vars($valid['processor']);

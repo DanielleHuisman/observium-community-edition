@@ -8,7 +8,7 @@ ELTEX-MES-AAA DEFINITIONS ::= BEGIN
 -- 15-Nov-2017 - Added eltMesAAALine objects
 
 IMPORTS
-    eltMes, eltMesRadius                            FROM ELTEX-MES
+    eltMes, eltMesRadius, eltMesTacacs              FROM ELTEX-MES
     MODULE-IDENTITY, OBJECT-TYPE                    FROM SNMPv2-SMI
     TEXTUAL-CONVENTION, TruthValue                  FROM SNMPv2-TC
     DisplayString                                   FROM SNMPv2-TC
@@ -28,7 +28,15 @@ eltMesAAA MODULE-IDENTITY
                 "The private MIB module definition for Authentication, Authorization and Accounting
                  in Eltex MES devices."
         ::= { eltMes 79 }
- 
+
+EltAAAServiceType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "Line service type."
+   SYNTAX INTEGER {
+      console(0),
+      telnet(1),
+      ssh(2)
+}
 
 eltMesAAANotifications OBJECT IDENTIFIER ::= { eltMesAAA 0 }
         
@@ -99,6 +107,93 @@ eltRadiusAttrNasIdFormatString OBJECT-TYPE
         "The format string for NAS-Identifier RADIUS attribute."
     DEFVAL      { "%h" }
     ::= { eltMesRadiusAttr 2 }
+
+--
+-- TACACS attributes
+--
+
+eltMesTacacsAttr OBJECT IDENTIFIER ::= { eltMesTacacs 1 }
+
+eltTacacsAttrPortConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltTacacsAttrPortConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of TACACS attributes configuring mechanism."
+    ::= { eltMesTacacsAttr 1 }
+
+eltTacacsAttrPortConfigEntry OBJECT-TYPE
+   SYNTAX      EltTacacsAttrPortConfigEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "An entry containing TACACS attributes configuring
+        mechanism."
+   INDEX { eltTacacsAttrPortLineType }
+   ::= { eltTacacsAttrPortConfigTable 1 }
+
+EltTacacsAttrPortConfigEntry ::=
+    SEQUENCE {
+        eltTacacsAttrPortLineType
+            EltAAAServiceType,
+        eltTacacsAttrPortFormat
+            OCTET STRING
+    }
+
+eltTacacsAttrPortLineType OBJECT-TYPE
+    SYNTAX      EltAAAServiceType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Line type."
+    ::= { eltTacacsAttrPortConfigEntry 1 }
+
+eltTacacsAttrPortFormat OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "User defined string to use as port attribute
+         in TACACS packets. Specify port
+         string template:
+              <%n: line session index>,
+              <%%: single %>."
+    ::= { eltTacacsAttrPortConfigEntry 2 }
+
+--
+-- Dynamic Authorization MIB Objects
+--
+eltMesDynamicAuthorization OBJECT IDENTIFIER ::= { eltMesAAA 4 }
+eltMesDynamicAuthorizationGlobals OBJECT IDENTIFIER ::= { eltMesDynamicAuthorization 1 }
+
+eltDynamicAuthorizationRadiusEnable OBJECT-TYPE
+   SYNTAX       TruthValue
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+       "Specifies whether Dynamic Radius Server enabled on the switch. "
+   DEFVAL  { false }
+   ::= { eltMesDynamicAuthorizationGlobals 1 }
+
+eltDynamicAuthorizationRadiusPort OBJECT-TYPE
+    SYNTAX INTEGER (1..65535)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "To define the accounting UDP port used for dynamic authentication requests."
+    DEFVAL  { 3799 }
+    ::= { eltMesDynamicAuthorizationGlobals 2 }
+
+--
+-- Command Authorization MIB Objects
+--
+eltAAAAuthorizationCommandsMethodListName OBJECT-TYPE
+    SYNTAX   OCTET STRING (SIZE(3..20))
+    MAX-ACCESS   read-write
+    STATUS   current
+    DESCRIPTION "Specify the name of authorization list used for authorization of user commands."
+    DEFVAL { "cmd_default" }
+  ::= { eltMesAAA 5 }
 
 ---
 --- Notifications

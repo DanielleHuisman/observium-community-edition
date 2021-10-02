@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,20 +6,21 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
+$sla_db         = [];
 $sla_db_count   = 0;
 $sla_snmp_count = 0;
-$table_rows     = array();
+$table_rows     = [];
 
 // WARNING. Discovered all SLAs, but polled only 'active'
 $sql = "SELECT * FROM `slas` WHERE `device_id` = ? AND `deleted` = 0;"; // AND `sla_status` = 'active';";
 foreach (dbFetchRows($sql, array($device['device_id'])) as $entry)
 {
   $sla_db_count++; // Fetch all entries for correct counting, but skip inactive/deleted
-  if ($entry['sla_status'] != 'active') { continue; }
+  if ($entry['sla_status'] !== 'active') { continue; }
 
   $index = $entry['sla_index'];
   $mib_lower = strtolower($entry['sla_mib']);
@@ -82,9 +82,10 @@ foreach (array_keys($sla_db) as $mib_lower)
       $rrd_value  = $sla_state['rtt_value'];
 
       // Check limits
-      $rtt_loss_percent = 100 * $sla_state['rtt_loss'] / ($sla_state['rtt_success'] + $sla_state['rtt_loss']);
+      $rtt_count = (int)($sla_state['rtt_success'] + $sla_state['rtt_loss']);
+      $rtt_loss_percent = $rtt_count ? 100 * $sla_state['rtt_loss'] / $rtt_count : 0;
       $limit_msg = ''; // FIXME, Later use 'rtt_reason' state entry
-      if ($sla_state['rtt_event'] == 'ok' || $sla_state['rtt_event'] == 'warning')
+      if ($sla_state['rtt_event'] === 'ok' || $sla_state['rtt_event'] === 'warning')
       {
         if (is_numeric($sla_state['rtt_value']) && is_numeric($sla['sla_limit_high']))
         {
@@ -99,7 +100,7 @@ foreach (array_keys($sla_db) as $mib_lower)
             $sla_state['rtt_event'] = 'warning';
           }
         }
-        if ($sla_state['rtt_event'] == 'ok' && $rtt_loss_percent >= 50)
+        if ($sla_state['rtt_event'] === 'ok' && $rtt_loss_percent >= 50)
         {
           $limit_msg = ', Probes loss >= 50%';
           $sla_state['rtt_event'] = 'warning'; // Set to warning, because alert only on full SLA down

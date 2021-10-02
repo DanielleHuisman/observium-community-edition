@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,17 +25,15 @@ $menu_start = utime();
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a class="brand brand-observium" href="/" <?php if (isset($config['web']['logo']))
-            {
-               echo 'style="background: url(../images/' . $config['web']['logo'] . ') no-repeat;"';
+            <a class="brand brand-observium" href="/" <?php if (isset($config['web']['logo'])) {
+               echo 'style="background: url(../images/' . escape_html($config['web']['logo']) . ') no-repeat;"';
             } ?> >&nbsp;</a>
             <div class="nav-collapse" id="main-nav">
                 <ul class="nav">
                    <?php
 
-                   //////////// Build main "globe" menu
+                   /// Build main "globe" menu
                    $navbar['observium'] = array('url' => generate_url(array('page' => 'dashboard')), 'icon' => $config['icon']['globe']);
-
 
                    // Dashboards
 
@@ -46,7 +44,7 @@ $menu_start = utime();
 
                       $entries = array();
 
-                      if (count($dashboards))
+                      if (safe_count($dashboards))
                       {
                          //$navbar['observium']['dash']['text'] = "Dashboards";
                          foreach ($dashboards as $dash)
@@ -62,12 +60,28 @@ $menu_start = utime();
 
                    }
 
-
                    $navbar['observium']['entries'][] = array('title' => 'Dashboard', 'url' => generate_url(array('page' => 'dashboard')), 'icon' => $config['icon']['overview'], 'entries' => $entries);
                    $navbar['observium']['entries'][] = array('divider' => TRUE);
 
                    unset($entries);
 
+                   // End Dashboards
+
+                   // Weathermaps
+
+                   if ($config['weathermap']['enable'] === TRUE && $_SESSION['userlevel'] > 7) {
+                     $entries = array();
+
+                     foreach(dbFetchRows("SELECT * FROM `weathermaps`") as $weathermap) {
+                       $entries[] = array('text' => $weathermap['wmap_name'], 'url' => generate_url(array('page' => "wmap", 'mapname' => $weathermap['wmap_name'])), 'icon' => 'sprite-map');
+                     }
+
+                     $navbar['observium']['entries'][] = array('title' => 'Weathermaps', 'url' => generate_url(array('page' => 'wmap')), 'icon' => 'sprite-map-2', 'entries' => $entries);
+                     $navbar['observium']['entries'][] = array('divider' => TRUE);
+
+                   }
+
+                   // End Weathermaps
 
                    // Show Groups
                    if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5)
@@ -78,11 +92,25 @@ $menu_start = utime();
                      $group_menu[] = array('url' => generate_url(array('page' => 'group_add')), 'title' => 'Create New Group', 'icon' => $config['icon']['plus']);
 
                      $group_count = 0;
+                     $groups_count = [];
                      $group_menu_simple = [];
                      $group_menu_nested = [ [ 'divider' => TRUE ] ];
 
                      $groups_by_type = get_groups_by_type();
-                     $groups_by_type_count = count($groups_by_type);
+                     $groups_by_type_count = safe_count($groups_by_type);
+
+                     // Reduce individual group queries
+                     $ids = [];
+                     foreach ($groups_by_type as $type => $groups) {
+                       foreach ($groups as $group) {
+                         $ids[] = $group['group_id'];
+                       }
+                     }
+                     foreach (dbFetchRows("SELECT COUNT(*) AS `count`, `group_id` FROM `group_table` WHERE 1" . generate_query_values($ids, 'group_id') . " GROUP BY `group_id`") as $entry) {
+                       $groups_count[$entry['group_id']] = $entry['count'];
+                     }
+                     unset($ids);
+                     //r($groups_count);
 
                      foreach ($groups_by_type as $type => $groups)
                      {
@@ -90,13 +118,14 @@ $menu_start = utime();
                            'url' => generate_url(array('page' => 'groups', 'entity_type' => $type)),
                            'title' => $config['entities'][$type]['names'],
                            'icon' => $config['entities'][$type]['icon'],
-                           'count' => count($groups)
+                           'count' => safe_count($groups)
                          ];
-                         $group_count += count($groups);
+                         $group_count += safe_count($groups);
 
                          foreach ($groups as $group)
                          {
-                           $group['member_count'] = dbFetchCell("SELECT COUNT(*) FROM `group_table` WHERE `group_id` = ?", array($group['group_id']));
+                           //$group['member_count'] = dbFetchCell("SELECT COUNT(*) FROM `group_table` WHERE `group_id` = ?", array($group['group_id']));
+                           $group['member_count'] = $groups_count[$group['group_id']];
                            $entity_type           = $config['entities'][$group['entity_type']];
 
                            $group_menu_entries['entries'][] = array('url' => generate_url(array('page' => 'group', 'group_id' => $group['group_id'])), 'title' => escape_html($group['group_name']), 'icon' => $config['entities'][$group['entity_type']]['icon'], 'count' => $group['member_count']);
@@ -108,7 +137,7 @@ $menu_start = utime();
                          $group_menu_nested[] = $group_menu_entries;
                          // Simple
                          $group_menu_simple[] = [ 'divider' => TRUE ];
-                         if ($groups_by_type_count > 3 && count($groups) > 7)
+                         if ($groups_by_type_count > 3 && safe_count($groups) > 7)
                          {
                            // Force nested for single group type
                            $group_menu_simple[] = $group_menu_entries;
@@ -194,7 +223,7 @@ $menu_start = utime();
 
                       $oids = dbFetchRows("SELECT `oids`.*, COUNT(*) AS `count` FROM `oids` JOIN `oids_entries` ON `oids`.`oid_id` = `oids_entries`.`oid_id` WHERE 1 GROUP BY `oids`.`oid_id`");
 
-                      $oid_count = count($oids);
+                      $oid_count = safe_count($oids);
 
                       foreach ($oids AS $oid)
                       {
@@ -241,10 +270,10 @@ $menu_start = utime();
                                                            'url'         => generate_url(array('page' => 'devices')),
                                                            'icon'        => $config['icon']['devices']);
 
-                   if (count($entity_group_menu['device']))
+                   if (safe_count($entity_group_menu['device']))
                    {
                       $navbar['devices']['entries'][] = array('divider' => TRUE);
-                      $navbar['devices']['entries'][] = array('title' => 'Groups', 'url' => generate_url(array('page' => 'groups', 'entity_type' => 'device')), 'icon' => $config['icon']['group'], 'count' => count($entity_group_menu['device']), 'entries' => $entity_group_menu['device']);
+                      $navbar['devices']['entries'][] = array('title' => 'Groups', 'url' => generate_url(array('page' => 'groups', 'entity_type' => 'device')), 'icon' => $config['icon']['group'], 'count' => safe_count($entity_group_menu['device']), 'entries' => $entity_group_menu['device']);
                    }
 
                    $navbar['devices']['entries'][] = array('divider' => TRUE);
@@ -275,7 +304,7 @@ $menu_start = utime();
 
                                $ref = &$locations; // Start from top menu array
 
-                               for ($i = 0; $i < count($location_split); $i++)
+                               for ($i = 0; $i < safe_count($location_split); $i++)
                                {
                                   $location_part = trim($location_split[$i]);
 
@@ -292,8 +321,7 @@ $menu_start = utime();
                                      }
                                      // Generate URL based on slice
                                      $location_url = generate_url(array('page'          => 'devices',
-                                                                        'location_text' => str_replace(',', '%1F', trim(implode($config['location']['menu']['nested_split_char'], $location_slice)))));
-                                     // , replaced by %1F (Observium Special), otherwise the value turns into an array (see get_vars() for parsing)
+                                                                        'location_text' => '"'. trim(implode($config['location']['menu']['nested_split_char'], $location_slice)).'"' ));
 
                                      $ref = array('icon' => $config['icon']['location'], 'title' => $location_part, 'url' => $location_url);
                                   }
@@ -323,8 +351,7 @@ $menu_start = utime();
                    // Build list per device type
                    foreach ($config['device_types'] as $devtype)
                    {
-                      if (in_array($devtype['type'], array_keys($cache['device_types'])))
-                      {
+                      if (array_key_exists($devtype['type'], (array)$cache['device_types'])) {
                          $navbar['devices']['entries'][] = array('title' => $devtype['text'],
                                                                  'icon' => $devtype['icon'],
                                                                  'count_array' =>  $cache['devices']['types'][$devtype['type']],
@@ -369,11 +396,15 @@ $menu_start = utime();
                    $navbar['ports']['entries'][] = array('title' => 'All Ports', 'count' => $cache['ports']['stat']['count'], 'url' => generate_url(array('page' => 'ports')), 'icon' => $config['entities']['port']['icon']);
                    $navbar['ports']['entries'][] = array('divider' => TRUE);
 
-                   if (count($entity_group_menu['port']))
+                   if (safe_count($entity_group_menu['port']))
                    {
-                      $navbar['ports']['entries'][] = array('title' => 'Groups', 'url' => generate_url(array('page' => 'groups', 'entity_type' => 'port')), 'icon' => $config['icon']['group'], 'count' => count($entity_group_menu['port']), 'entries' => $entity_group_menu['port']);
+                      $navbar['ports']['entries'][] = array('title' => 'Groups', 'url' => generate_url(array('page' => 'groups', 'entity_type' => 'port')), 'icon' => $config['icon']['group'], 'count' => safe_count($entity_group_menu['port']), 'entries' => $entity_group_menu['port']);
                       $navbar['ports']['entries'][] = array('divider' => TRUE);
                    }
+
+                   $navbar['ports']['entries'][] = array('title' => 'VLANs', 'url' => generate_url(array('page' => 'vlan')), 'icon' => $config['icon']['vlan']);
+                   $navbar['ports']['entries'][] = array('divider' => TRUE);
+
 
                    if ($cache['p2pradios']['count'])
                    {
@@ -536,7 +567,7 @@ $menu_start = utime();
 
                    $menu_items[0] = array('fanspeed', 'humidity', 'temperature', 'airflow');
                    $menu_items[1] = array('current', 'voltage', 'power', 'apower', 'rpower', 'frequency');
-                   $menu_items[2] = array_diff(array_keys($cache['sensors']['types']), $menu_items[0], $menu_items[1]);
+                   $menu_items[2] = array_diff(array_keys((array)$cache['sensors']['types']), $menu_items[0], $menu_items[1]);
 
                    foreach ($menu_items as $items)
                    {
@@ -544,23 +575,21 @@ $menu_start = utime();
 
                       foreach ($items as $item)
                       {
-                         if ($cache['sensors']['types'][$item])
-                         {
-                             if (is_array($cache['sensors']['types'][$item]))
-                             {
-                               if ($sep)
-                               {
-                                 $navbar['health']['entries'][] = array('divider' => TRUE);
-                                 $sep = 0;
-                               }
-                               //$alert_icon = ($cache['sensor_types'][$item]['alert'] ? '<i class="' . $config['icon']['flag'] . ' mini-icon"></i>' : '');
-                               $navbar['health']['entries'][] = array('url' => generate_url(array('page' => 'health', 'metric' => $item)),
-                                                                      'count_array' => $cache['sensors']['types'][$item],
-                                                                      'count' => $cache['sensors']['types'][$item]['count'],
-                                                                      'alert_count' => $cache['sensors']['types'][$item]['alert'],
-                                                                      'icon' => $config['sensor_types'][$item]['icon'],
-                                                                      'title' => nicecase($item));
-                             }
+                         if (isset($cache['sensors']['types'][$item]) && is_array($cache['sensors']['types'][$item])) {
+                           if ($sep) {
+                             $navbar['health']['entries'][] = array('divider' => TRUE);
+                             $sep = 0;
+                           }
+
+                           //$alert_icon = ($cache['sensor_types'][$item]['alert'] ? '<i class="' . $config['icon']['flag'] . ' mini-icon"></i>' : '');
+                           $navbar['health']['entries'][] = [
+                             'url' => generate_url(array('page' => 'health', 'metric' => $item)),
+                             'count_array' => $cache['sensors']['types'][$item],
+                             'count' => $cache['sensors']['types'][$item]['count'],
+                             'alert_count' => $cache['sensors']['types'][$item]['alert'],
+                             'icon' => $config['sensor_types'][$item]['icon'],
+                             'title' => nicecase($item)
+                           ];
                          }
                       }
                       $sep++;
@@ -575,7 +604,7 @@ $menu_start = utime();
                       foreach ($app_list as $app)
                       {
                          $image = $config['html_dir'] . "/images/icons/" . $app['app_type'] . ".png";
-                         $icon  = (is_file($image) ? $app['app_type'] : "apps");
+                         //$icon  = (is_file($image) ? $app['app_type'] : "apps");
 
                          // Detect and add application icon
                          $icon  = $app['app_type'];
@@ -584,18 +613,14 @@ $menu_start = utime();
                          {
                             // Icon found
                             //$icon = $app['app_type'];
-                         }
-                         else
-                         {
+                         } else {
                             list($icon) = explode('-', str_replace('_', '-', $app['app_type']));
                             $image = $config['html_dir'] . '/images/apps/' . $icon . '.png';
                             if ($icon != $app['app_type'] && is_file($image))
                             {
                                // 'postfix_qshape' -> 'postfix'
                                // 'exim-mailqueue' -> 'exim'
-                            }
-                            else
-                            {
+                            } else {
                                $icon = 'apps'; // Generic
                             }
                          }
@@ -620,18 +645,18 @@ $menu_start = utime();
 
                       $separator = 0;
 
-                      if (count($entity_group_menu['bgp_peer']) || count($entity_group_menu['bgp_peer_af']))
+                      if (safe_count($entity_group_menu['bgp_peer']) || safe_count($entity_group_menu['bgp_peer_af']))
                       {
-                          if (count($entity_group_menu['bgp_peer']))
+                          if (safe_count($entity_group_menu['bgp_peer']))
                           {
                             $navbar['routing']['entries'][] = [ 'title'   => 'BGP Peer Groups', 'url' => generate_url([ 'page' => 'groups', 'entity_type' => 'bgp_peer' ]),
-                                                                'icon'    => $config['icon']['group'], 'count' => count($entity_group_menu['bgp_peer']),
+                                                                'icon'    => $config['icon']['group'], 'count' => safe_count($entity_group_menu['bgp_peer']),
                                                                 'entries' => array_merge($entity_group_menu['bgp_peer']) ];
                           }
-                          if (count($entity_group_menu['bgp_peer_af']))
+                          if (safe_count($entity_group_menu['bgp_peer_af']))
                           {
                             $navbar['routing']['entries'][] = [ 'title'   => 'BGP Peer (AFI/SAFI) Groups', 'url' => generate_url([ 'page' => 'groups', 'entity_type' => 'bgp_peer_af' ]),
-                                                                'icon'    => $config['icon']['group'], 'count' => count($entity_group_menu['bgp_peer_af']),
+                                                                'icon'    => $config['icon']['group'], 'count' => safe_count($entity_group_menu['bgp_peer_af']),
                                                                 'entries' => array_merge($entity_group_menu['bgp_peer_af']) ];
                           }
                         $separator = 1;
@@ -718,26 +743,21 @@ $menu_start = utime();
                    {
 //  echo('            <li class="divider-vertical" style="margin: 0;"></li>' . PHP_EOL);
 
-                      if (strpos($dropdown['icon'], 'sprite') !== FALSE)
-                      {
+                      if (str_contains($dropdown['icon'], 'sprite')) {
                          $element = 'span';
-                      }
-                      else
-                      {
+                      } else {
                          $element = 'i';
                       }
 
                       echo('            <li class="dropdown">' . PHP_EOL);
                       echo('              <a href="' . $dropdown['url'] . '" class="visible-lg visible-xl dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
                       echo('                <' . $element . ' class="' . $dropdown['icon'] . '"></' . $element . '> ' . $dropdown['title'] . ' <b class="caret"></b></a>' . PHP_EOL);
-                      echo('              <a href="' . $dropdown['url'] . '" class="visible-xs visible-md dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
+                      echo('              <a href="' . $dropdown['url'] . '" class="visible-xs visible-sm visible-md dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
                       echo('                <' . $element . ' class="' . $dropdown['icon'] . '" style="margin-right: 5px;"></i></a>' . PHP_EOL);
                       echo('              <ul role="menu" class="dropdown-menu">' . PHP_EOL);
 
-                      foreach ($dropdown['entries'] as $entry)
-                      {
-                         if (isset($entry['entries']) && count($entry['entries']))
-                         {
+                      foreach ($dropdown['entries'] as $entry) {
+                         if (isset($entry['entries']) && safe_count($entry['entries'])) {
                             navbar_submenu($entry);
                          } else {
                             navbar_entry($entry);
@@ -751,18 +771,18 @@ $menu_start = utime();
                    unset($navbar);
 
                    // The menus on the right are not handled by the navbar array code yet.
-
+                   // max-width: 80vw - See: https://jira.observium.org/browse/OBS-3667
                    ?>
                 </ul>
                 <ul class="nav pull-right">
-                    <li class="dropdown hidden-xs">
+                    <li class="dropdown hidden-xs navbar-narrow">
                         <form id="searchform" class="navbar-search" action="#"
-                              style="margin-left: 5px; margin-right: 10px;  margin-top: 5px; margin-bottom: -5px;">
+                              style="margin: 5px 10px -5px 5px;">
                             <input style="width: 100px;" onkeyup="lookup(this.value);"
                                    onblur="$('#suggestions').fadeOut()" type="text" value="" class="dropdown-toggle"
                                    placeholder="Search"/>
                         </form>
-                        <div id="suggestions" class="typeahead dropdown-menu"></div>
+                        <div id="suggestions" class="typeahead dropdown-menu" style="max-width: 80vw; max-height: 95vh;"></div>
                     </li>
                    <?php
 
@@ -785,31 +805,21 @@ $(function() {
 ');
 
                    $ua = array('browser' => detect_browser_type());
-                   if ($_SESSION['touch'] == "yes")
-                   {
+                   if (get_var_true($_SESSION['touch'])) {
                       //$ua['url'] = generate_url($vars, array('touch' => 'no'));
                       $ua['attribs']['onclick'] = "ajax_action('touch_off');";
-                   }
-                   else
-                   {
+                   } else {
                       //$ua['url'] = generate_url($vars, array('touch' => 'yes'));
                       $ua['attribs']['onclick'] = "ajax_action('touch_on');";
                    }
 
-                   if ($vars['touch'] == 'yes')
-                   {
+                   if (get_var_true($vars['touch'])) {
                       $ua['icon'] = 'glyphicon glyphicon-hand-up';
-                   }
-                   elseif ($ua['browser'] == 'mobile')
-                   {
+                   } elseif ($ua['browser'] === 'mobile') {
                       $ua['icon'] = 'glyphicon glyphicon-phone';
-                   }
-                   elseif ($ua['browser'] == 'tablet')
-                   {
+                   } elseif ($ua['browser'] === 'tablet') {
                       $ua['icon'] = 'icon-tablet';
-                   }
-                   else
-                   {
+                   } else {
                       $ua['icon'] = 'icon-laptop';
                    }
 
@@ -842,11 +852,11 @@ $(function() {
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-hover="dropdown" data-toggle="dropdown"><i
                                     class="<?php echo $config['icon']['tools']; ?>"></i> <b class="caret"></b></a>
-                        <ul class="dropdown-menu">
+                        <ul role="menu" class="dropdown-menu">
                            <?php
                            // Refresh menu
                            echo('<li class="dropdown-submenu">');
-                           echo('  <a tabindex="-1" href="' . generate_url($vars) . '"><i class="' . $config['icon']['refresh'] . '"></i> Refresh <span id="countrefresh"></span></a>');
+                           echo('  <a role="menuitem" tabindex="-1" href="' . generate_url($vars) . '"><span><i class="' . $config['icon']['refresh'] . '"></i> Refresh</span>&nbsp;<span id="countrefresh"></span></a>');
                            echo('  <ul class="dropdown-menu">');
                            foreach ($page_refresh['list'] as $refresh_time)
                            {
@@ -869,7 +879,7 @@ $(function() {
                            echo('<li class="divider"></li>');
 
                            echo('<li class="dropdown-submenu">');
-                           echo('  <a href="#"><i class="' . $config['icon']['users'] . '"></i> Personalisation</a>');
+                           echo('  <a role="menuitem" href="#"><span><i class="' . $config['icon']['users'] . '"></i> Personalisation</span></a>');
                            echo('  <ul class="dropdown-menu">');
 
                            // This definition not exist in community edition
@@ -881,6 +891,11 @@ $(function() {
                                  {
                                     echo('<li><a href="#" onclick="ajax_action(\'theme\', \''.$theme_name.'\');" title="Switch to '.$theme_data['name'].'"><i class="'.$theme_data['icon'].'" style="font-size: 16px; color: #555;"></i> '.$theme_data['name'].'</a></li>');
                                  }
+                              }
+                              if (isset($_SESSION['theme_default']))
+                              {
+                                // Reset default
+                                echo('<li><a href="#" onclick="ajax_action(\'theme\', \'reset\');" title="Reset to default"><i class="sprite-refresh" style="font-size: 16px; color: #555;"></i> Reset</a></li>');
                               }
 
                               echo('    <li class="divider"></li>');
@@ -908,7 +923,7 @@ $(function() {
                            {
                               echo('<li class="divider"></li>');
                               echo('<li class="dropdown-submenu">');
-                              echo('  <a tabindex="-1" href="' . generate_url(array('page' => 'user_add')) . '"><i class="' . $config['icon']['users'] . '"></i> Users & Groups</a>');
+                              echo('  <a role="menuitem" tabindex="-1" href="' . generate_url(array('page' => 'user_add')) . '"><span><i class="' . $config['icon']['users'] . '"></i> Users & Groups</span></a>');
                               echo('  <ul class="dropdown-menu">');
                               if (auth_usermanagement())
                               {
@@ -931,7 +946,7 @@ $(function() {
                               echo('</li>');
 
                               echo('<li class="dropdown-submenu">');
-                              echo('  <a tabindex="-1" href="' . generate_url(array('page' => 'settings')) . '"><i class="' . $config['icon']['settings'] . '"></i> Global Settings</a>');
+                              echo('  <a role="menuitem" tabindex="-1" href="' . generate_url(array('page' => 'settings')) . '"><span><i class="' . $config['icon']['settings'] . '"></i> Global Settings</span></a>');
                               echo('  <ul class="dropdown-menu">');
                               echo('    <li><a href="' . generate_url(array('page' => 'settings')) . '"><i class="' . $config['icon']['settings-change'] . '"></i> Edit</a></li>');
                               echo('    <li><a href="' . generate_url(array('page' => 'settings', 'format' => 'config')) . '"><i class="' . $config['icon']['config'] . '"></i> Full Dump</a></li>');
@@ -977,7 +992,6 @@ $(function() {
             return new Date().getTime();
         }
     }
-
 
     key_count_global = 0;
     key_press_time = Date.now()
@@ -1030,7 +1044,7 @@ $(function() {
             }
         }
 
-        countrefresh.innerHTML = '<span class="label">' + minutes + seconds + '</span>';
+        countrefresh.innerHTML = '<div class="label">' + minutes + seconds + '</div>';
 
         seconds_left = seconds_left - 1;
 

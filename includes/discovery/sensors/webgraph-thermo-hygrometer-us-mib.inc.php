@@ -30,10 +30,10 @@ $mib = 'WebGraph-Thermo-Hygrometer-US-MIB';
 //WebGraph-Thermo-Hygrometer-US-MIB::wtWebGraphThermoHygroAlarmAHMin.1 = STRING: "1"
 //WebGraph-Thermo-Hygrometer-US-MIB::wtWebGraphThermoHygroAlarmAHMax.1 = STRING: "25"
 
-$oids = snmpwalk_cache_multi_oid($device, "wtWebGraphThermoHygroBinaryTempValueTable", array(), $mib);
+$oids = snmpwalk_cache_oid($device, "wtWebGraphThermoHygroBinaryTempValueTable", array(), $mib);
 if ($GLOBALS['snmp_status'])
 {
-  $oids = snmpwalk_cache_multi_oid($device, "wtWebGraphThermoHygroPortTable",         $oids, $mib);
+  $oids = snmpwalk_cache_oid($device, "wtWebGraphThermoHygroPortTable", $oids, $mib);
 
   // Temperature
   if (is_numeric($oids[1]['wtWebGraphThermoHygroBinaryTempValue']))

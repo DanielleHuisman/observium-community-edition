@@ -1,0 +1,899 @@
+DNOS-G8032-PRIVATE-MIB DEFINITIONS ::= BEGIN
+
+ -- Copyright 2018 Broadcom.
+
+ -- This SNMP Management Information Specification
+ -- embodies Broadcom's confidential and proprietary
+ -- intellectual property.  Broadcom retains all title
+ -- and ownership in the Specification including any revisions.
+
+ -- This Specification is supplied "AS IS", Broadcom 
+ -- makes no warranty, either expressed or implied,
+ -- as to the use, operation, condition, or performance of the
+ -- Specification.
+
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32, Unsigned32, Counter32           FROM SNMPv2-SMI
+    RowStatus, TEXTUAL-CONVENTION, MacAddress  FROM SNMPv2-TC
+    VlanIdOrNone                               FROM Q-BRIDGE-MIB
+    InterfaceIndexOrZero                       FROM IF-MIB  
+    SnmpAdminString                            FROM SNMP-FRAMEWORK-MIB
+    dnOS                                   FROM DELL-REF-MIB
+    VlanList                                   FROM DNOS-SWITCHING-MIB;
+
+ fastPathG8032 MODULE-IDENTITY
+    LAST-UPDATED "201807100000Z" -- 10 July 2018 12:00:00 GMT
+    ORGANIZATION "Dell EMC"
+    CONTACT-INFO ""
+
+    DESCRIPTION
+        "The Dell Networking Private MIB for G8032."
+         
+   -- Revision history.
+   REVISION
+        "201807100000Z" -- 10 July 2018 12:00:00 GMT
+   DESCRIPTION
+        "Initial revision."
+   ::= { dnOS 72 }
+
+--
+-- Textual Conventions
+--
+RPLRole ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Ring Protocol Link role"
+    SYNTAX       INTEGER {
+                   normal (0),
+                   owner (1),
+                   neighbor (2)
+                 }
+
+PortState ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Ring port state."
+    SYNTAX       INTEGER {
+                   blocking (1),
+                   forwarding (2)
+                 }
+
+RingScope ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Ring Scope."
+    SYNTAX       INTEGER {
+                   perPort (0),
+                   perVlan (1)
+                 }
+
+RingType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Ring Type."
+    SYNTAX       INTEGER {
+                   closed (1),
+                   open (2)
+                 }
+   
+--**************************************************************************************
+--    agentG8032ProfileConfigGroup 
+--**************************************************************************************
+
+    agentG8032ProfileConfigGroup       OBJECT IDENTIFIER ::= { fastPathG8032 1 }
+
+    agentG8032ProfileTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentG8032ProfileEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table entries specifying the ERP profile Details."
+         ::= { agentG8032ProfileConfigGroup 1 }
+
+    agentG8032ProfileEntry OBJECT-TYPE
+         SYNTAX      AgentG8032ProfileEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents an ERP Profile Row."
+         INDEX       {
+                       agentG8032ProfileName
+                     }
+         ::= { agentG8032ProfileTable  1 }
+
+    AgentG8032ProfileEntry ::= SEQUENCE {
+          agentG8032ProfileName                SnmpAdminString,
+          agentG8032ProfileGuardTimer          Unsigned32,
+          agentG8032ProfileWTRTimer            Unsigned32,
+          agentG8032ProfileHoldOffTimer        Unsigned32,
+          agentG8032ProfileReversionMode       INTEGER,
+          agentG8032ProfileRowStatus           RowStatus
+         }
+    
+
+    agentG8032ProfileName OBJECT-TYPE
+          SYNTAX      SnmpAdminString (SIZE (1..32))
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "Ethernet ring protection(ERP) profile-name. ERP instance configuration
+                       parameters are defined under profile name." 
+          ::= { agentG8032ProfileEntry 1 }
+
+    agentG8032ProfileGuardTimer OBJECT-TYPE
+          SYNTAX      Unsigned32(10..2000)
+          UNITS       "milliseconds"
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "The guard timer is used by all nodes when a clearing condition occurs.
+                       This is the amount of time that an ERP instance discards R-APS messages
+                       before being allowed to process them. Specify guard timer value in steps of 10ms."  
+          DEFVAL      { 500 }
+          ::= { agentG8032ProfileEntry 2 }
+
+    agentG8032ProfileWTRTimer OBJECT-TYPE
+          SYNTAX      Unsigned32(1..12)
+          UNITS       "minutes"
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This timer is used to avoid toggling protection states in case of
+                       intermittent defects. When the fault condition is cleared, the
+                       traffic channel reverts after the expiry of a WTR timer(if fault
+                       condition is not present)."
+          DEFVAL      { 5 }
+          ::= { agentG8032ProfileEntry 3 }
+
+    agentG8032ProfileHoldOffTimer OBJECT-TYPE
+          SYNTAX      Unsigned32(0..10000)
+          UNITS       "milliseconds"
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "When a new defect or more severe defect occurs, this event will
+                       not be reported immediately to protection switching if the provisioned
+                       hold-off timer value is non-zero. Instead, the hold-off timer will be started.
+                       When the hold-off timer expires, it will be checked whether a defect still
+                       exists on the trail that started the timer. If it does, that defect will be
+                       reported to protection switching. Specify holdoff timer value in steps of 100ms."
+          DEFVAL      { 0 }
+          ::= { agentG8032ProfileEntry 4 }
+
+    agentG8032ProfileReversionMode OBJECT-TYPE
+          SYNTAX      INTEGER {
+                       enable(1),
+                       disable(0)
+                      }
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION 
+                      "This defines Ethernet Ring Protection mode. 2 operation modes are supported:
+                       revertive and non-revertive. In revertive mode, when failures in the link
+                       are removed, the traffic channel is restored to the working transport entity
+                       and RPL(Ring Protection Link) is blocked. In non-revertive mode, RPL is
+                       continued to be used by traffic channel, even after a switch condition
+                       has been resolved."   
+          DEFVAL      { enable }
+          ::= { agentG8032ProfileEntry 5 }
+
+    agentG8032ProfileRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current 
+         DESCRIPTION
+                     "G8032 profile row status. 
+                      Supported values: 
+                      active(1)      - valid entry
+                      createAndGo(4) - used to create a new entry
+                      destroy(6)     - removes the entry"
+         ::= { agentG8032ProfileEntry 6 }
+ 
+--**************************************************************************************
+--    agentG8032RingConfigGroup 
+--**************************************************************************************
+ 
+    agentG8032RingConfigGroup       OBJECT IDENTIFIER ::= { fastPathG8032 2 }
+
+    agentG8032RingTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentG8032RingEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table entries specifying the ERP ring Details."
+         ::= { agentG8032RingConfigGroup 1 }
+
+    agentG8032RingEntry OBJECT-TYPE
+         SYNTAX      AgentG8032RingEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents an ERP port and instance."
+         INDEX       {
+                       agentG8032RingName
+                     }
+         ::= { agentG8032RingTable  1 }
+
+    AgentG8032RingEntry ::= SEQUENCE {
+          agentG8032RingName                SnmpAdminString,
+          agentG8032RingPort0               InterfaceIndexOrZero,
+          agentG8032RingPort1               InterfaceIndexOrZero,
+          agentG8032RingScope               RingScope,
+          agentG8032RingType                RingType,
+          agentG8032RingRowStatus           RowStatus 
+         }
+
+    agentG8032RingName OBJECT-TYPE
+          SYNTAX      SnmpAdminString (SIZE (1..32))
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines G8032 ring name."
+          ::= { agentG8032RingEntry  1 }
+
+    agentG8032RingPort0 OBJECT-TYPE
+          SYNTAX      InterfaceIndexOrZero 
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines port0 as ring port and to participate
+                       in Ethernet Ring Protection."
+          ::= { agentG8032RingEntry  2 }
+
+    agentG8032RingPort1 OBJECT-TYPE
+          SYNTAX      InterfaceIndexOrZero 
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION 
+                      "This defines port1 as ring port and to participate
+                       in Ethernet Ring Protection."
+          ::= { agentG8032RingEntry  3 }
+
+    agentG8032RingScope OBJECT-TYPE
+          SYNTAX      RingScope
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "Ring is per-port or per-vlan."
+          DEFVAL      { perVlan }
+          ::= { agentG8032RingEntry  4 }
+    
+    agentG8032RingType OBJECT-TYPE
+          SYNTAX      RingType
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "Ring is closed(major) or open(sub-ring)."
+          DEFVAL      { closed }
+          ::= { agentG8032RingEntry  5 }
+      
+    agentG8032RingRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "G8032 ring row status.
+                      Supported values:
+                      active(1)      - valid entry
+                      createAndGo(4) - used to create a new entry
+                      destroy(6)     - removes the entry"
+         ::= { agentG8032RingEntry 6 }
+
+--**************************************************************************************
+--    agentG8032RingInstanceTable
+--**************************************************************************************
+
+    agentG8032RingInstanceTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentG8032RingInstanceEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table entries specifying the ERP Instance Details.
+                      This table has an expansion dependent relationship on the
+                      agentG8032RingTable, each ERP instance is mapped to a ring name." 
+         ::= { agentG8032RingConfigGroup 2 }
+
+    agentG8032RingInstanceEntry OBJECT-TYPE
+         SYNTAX      AgentG8032RingInstanceEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Represents an ERP Instance Row."
+         INDEX       {
+                       agentG8032RingName,
+                       agentG8032RingInstance
+                     }
+         ::= { agentG8032RingInstanceTable  1 }
+
+    AgentG8032RingInstanceEntry ::= SEQUENCE {
+          agentG8032RingInstance                 Unsigned32,
+          agentG8032RingInstanceProfile          SnmpAdminString,
+          agentG8032RingInstanceRPLPort0Role     RPLRole,
+          agentG8032RingInstanceRPLPort1Role     RPLRole,
+          agentG8032RingInstanceProtectVlans     VlanList,
+          agentG8032RingInstanceRAPSLevel        Unsigned32,
+          agentG8032RingInstanceRAPSVLAN         VlanIdOrNone,
+          agentG8032RingInstanceAction           INTEGER,  
+          agentG8032RingInstanceStatisticsClear  INTEGER,
+          agentG8032RingInstanceTCN              INTEGER, 
+          agentG8032RingInstanceRowStatus        RowStatus 
+          }
+    
+    agentG8032RingInstance OBJECT-TYPE
+          SYNTAX      Unsigned32(1..255)
+          MAX-ACCESS  read-create 
+          STATUS      current
+          DESCRIPTION 
+                      "This defines ERP instance."
+          ::= { agentG8032RingInstanceEntry  1 }
+
+    agentG8032RingInstanceProfile OBJECT-TYPE
+          SYNTAX      SnmpAdminString (SIZE (1..32))
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This maps ring mode and timer configurations. The default profile
+                       properties gets applied if no profile is associated with an ERP
+                       instance or if the give profile doesn't exists." 
+          ::= { agentG8032RingInstanceEntry  2 }
+
+    agentG8032RingInstanceRPLPort0Role OBJECT-TYPE
+          SYNTAX      RPLRole
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines the port0 role of the RPL ring node. User has to
+                       make sure that only one ring port is chosen for RPL role."
+          ::= { agentG8032RingInstanceEntry  3 }
+
+    agentG8032RingInstanceRPLPort1Role OBJECT-TYPE
+          SYNTAX      RPLRole
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines the port1 role of the RPL ring node. User has to
+                       make sure that only one ring port is chosen for RPL role."
+          ::= { agentG8032RingInstanceEntry  4 }
+
+   agentG8032RingInstanceProtectVlans OBJECT-TYPE
+          SYNTAX      VlanList 
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines the list of VLANs that are protected by the ERP instance." 
+          ::= { agentG8032RingInstanceEntry  5 }
+
+    agentG8032RingInstanceRAPSLevel OBJECT-TYPE
+          SYNTAX      Unsigned32(0..7)
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines CFM Level inside the R-APS messages that the ERP instance
+                       will use for sending and expects to receive. If the node receives an 
+                       R-APS message with the improper level then the message will not be
+                       processed. All nodes in the Ethernet ring must be configured
+                       with the same level." 
+          DEFVAL      { 7 }
+          ::= { agentG8032RingInstanceEntry  6 }
+
+    agentG8032RingInstanceRAPSVLAN OBJECT-TYPE
+          SYNTAX      VlanIdOrNone 
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "This defines VLAN for transmitted/received RAPS PDUs
+                       for an ERP instance." 
+          ::= { agentG8032RingInstanceEntry  7 }
+
+    agentG8032RingInstanceAction OBJECT-TYPE
+          SYNTAX      INTEGER {
+                       none (0),
+                       clear (1),
+                       forcedPort0 (2),
+                       forcedPort1 (3),
+                       manualPort0 (4),
+                       manualPort1 (5)
+                      } 
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+                      "Action performed on this ERP instance."
+          ::= { agentG8032RingInstanceEntry  8 }
+
+     agentG8032RingInstanceStatisticsClear OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "When set to enable(1), statistics of the ERP instance will be reset."
+         DEFVAL      { disable }
+          ::= { agentG8032RingInstanceEntry  9 }
+
+     agentG8032RingInstanceTCN OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "This defines topology change notification propagation for a given ERP instance."
+         DEFVAL      { disable }
+          ::= { agentG8032RingInstanceEntry  10 }
+ 
+     agentG8032RingInstanceRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                     "G8032 ring instance row status.
+                     Supported values:
+                     active(1)      - valid entry
+                     createAndGo(4) - used to create a new entry
+                     destroy(6)     - removes the entry"
+         ::= { agentG8032RingInstanceEntry 11 }
+
+--**************************************************************************************
+--    agentG8032StatisticsClearGroup
+--**************************************************************************************
+
+    agentG8032StatisticsClearGroup              OBJECT IDENTIFIER ::= { fastPathG8032 3 }
+
+    agentG8032StatisticsAllClear OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "When set to enable(1), all statistics of the ERP will be reset."
+          ::= { agentG8032StatisticsClearGroup  1 }
+
+--**************************************************************************************
+--    agentG8032RingStatusGroup
+--**************************************************************************************
+
+    agentG8032RingStatusGroup       OBJECT IDENTIFIER ::= { fastPathG8032 4 }
+
+    agentG8032RingStatusTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentG8032RingStatusEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table entries specifying the ERP status Details."
+         ::= { agentG8032RingStatusGroup 1 }
+
+    agentG8032RingStatusEntry OBJECT-TYPE
+         SYNTAX      AgentG8032RingStatusEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The table includes the status of ERP rings."
+         INDEX       {
+                       agentG8032RingName,
+                       agentG8032RingInstance
+                     }
+         ::= { agentG8032RingStatusTable  1 }
+
+    AgentG8032RingStatusEntry ::= SEQUENCE {
+          agentG8032ERPState                INTEGER,
+          agentG8032Port0State              PortState,
+          agentG8032Port1State              PortState,
+          agentG8032Port0Role               RPLRole,
+          agentG8032Port1Role               RPLRole,
+          agentG8032Port0RemoteNodeId       MacAddress,
+          agentG8032Port0RemoteBPR          Unsigned32,
+          agentG8032Port1RemoteNodeId       MacAddress, 
+          agentG8032Port1RemoteBPR          Unsigned32,
+          agentG8032Profile                 SnmpAdminString,
+          agentG8032WTRTimer                Unsigned32,
+          agentG8032GuardTimer              Unsigned32,
+          agentG8032HoldOffTimer            Unsigned32,
+          agentG8032ReversionMode           INTEGER
+        }
+
+    agentG8032ERPState OBJECT-TYPE
+          SYNTAX      INTEGER {
+                       init(0),
+                       idle(1),
+                       protection(2),
+                       manualSwitch(3),
+                       forcedSwitch(4),
+                       pending(5)
+                      } 
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The state machine's state of the ERP Instance."
+          ::= { agentG8032RingStatusEntry  1 }
+
+    agentG8032Port0State OBJECT-TYPE
+          SYNTAX      PortState
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Port0 state."
+          ::= { agentG8032RingStatusEntry  2 }
+
+     agentG8032Port1State OBJECT-TYPE
+          SYNTAX      PortState
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Port1 state."
+          ::= { agentG8032RingStatusEntry  3 }
+
+     agentG8032Port0Role OBJECT-TYPE
+          SYNTAX      RPLRole 
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "RPL role of the ring port port0."
+          ::= { agentG8032RingStatusEntry  4 }
+ 
+     agentG8032Port1Role OBJECT-TYPE
+          SYNTAX      RPLRole
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "RPL role of the ring port port1."
+          ::= { agentG8032RingStatusEntry  5 } 
+
+     agentG8032Port0RemoteNodeId OBJECT-TYPE
+          SYNTAX      MacAddress 
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Node ID of the last R-APS message received
+                       over the ring port0."
+          ::= { agentG8032RingStatusEntry  6 }
+
+     agentG8032Port0RemoteBPR OBJECT-TYPE
+          SYNTAX      Unsigned32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Blocked port reference (BPR) of the last R-APS
+                       message received over the ring port0."
+          ::= { agentG8032RingStatusEntry  7 }
+
+     agentG8032Port1RemoteNodeId OBJECT-TYPE
+          SYNTAX      MacAddress
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Node ID of the last R-APS message received
+                       over the ring port1."
+          ::= { agentG8032RingStatusEntry  8 }
+
+     agentG8032Port1RemoteBPR OBJECT-TYPE
+          SYNTAX      Unsigned32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Blocked port reference (BPR) of the last R-APS
+                       message received over the ring port1."
+          ::= { agentG8032RingStatusEntry  9 }
+
+     agentG8032Profile OBJECT-TYPE
+          SYNTAX      SnmpAdminString (SIZE (1..32))
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION 
+                      "Ethernet ring protection(ERP) instance profile-name."
+          ::= { agentG8032RingStatusEntry 10 }
+
+     agentG8032WTRTimer OBJECT-TYPE
+          SYNTAX      Unsigned32(1..12)
+          UNITS       "minutes"
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Wait-To-Restore timer value."
+          DEFVAL      { 5 }
+          ::= { agentG8032RingStatusEntry 11 }
+
+     agentG8032GuardTimer OBJECT-TYPE
+          SYNTAX      Unsigned32(10..2000)
+          UNITS       "milliseconds"
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Guard timer value."
+          DEFVAL      { 500 }
+          ::= { agentG8032RingStatusEntry 12 }
+
+    agentG8032HoldOffTimer OBJECT-TYPE
+          SYNTAX      Unsigned32(0..10000)
+          UNITS       "milliseconds"
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Hold off timer value."
+          DEFVAL      { 0 }
+          ::= { agentG8032RingStatusEntry 13 }
+
+    agentG8032ReversionMode OBJECT-TYPE
+          SYNTAX      INTEGER {
+                       enable(1),
+                       disable(0)
+                      }
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "Revertive or non-revertive mode."
+          DEFVAL      { enable }
+          ::= { agentG8032RingStatusEntry 14 }
+
+
+--**************************************************************************************
+--    agentG8032RingStatisticsGroup
+--**************************************************************************************
+
+    agentG8032RingStatisticsGroup       OBJECT IDENTIFIER ::= { fastPathG8032 5 }
+
+    agentG8032RingStatisticsTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentG8032RingStatisticsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "A table entries specifying the ERP statistics Details."
+         ::= { agentG8032RingStatisticsGroup 1 }
+
+    agentG8032RingStatisticsEntry OBJECT-TYPE
+         SYNTAX      AgentG8032RingStatisticsEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "The table includes the statistics of ERP rings."
+         INDEX       {
+                       agentG8032RingName,
+                       agentG8032RingInstance
+                     }
+         ::= { agentG8032RingStatisticsTable  1 }
+
+    AgentG8032RingStatisticsEntry ::= SEQUENCE {
+          agentG8032Port0StatsNRTxCount     Counter32,
+          agentG8032Port0StatsNRRxCount     Counter32,
+          agentG8032Port1StatsNRTxCount     Counter32,
+          agentG8032Port1StatsNRRxCount     Counter32,
+          agentG8032Port0StatsNRRBTxCount   Counter32,
+          agentG8032Port0StatsNRRBRxCount   Counter32,
+          agentG8032Port1StatsNRRBTxCount   Counter32,
+          agentG8032Port1StatsNRRBRxCount   Counter32,
+          agentG8032Port0StatsSFTxCount     Counter32,
+          agentG8032Port0StatsSFRxCount     Counter32,
+          agentG8032Port1StatsSFTxCount     Counter32,
+          agentG8032Port1StatsSFRxCount     Counter32,
+          agentG8032Port0StatsMSTxCount     Counter32,
+          agentG8032Port0StatsMSRxCount     Counter32,
+          agentG8032Port1StatsMSTxCount     Counter32,
+          agentG8032Port1StatsMSRxCount     Counter32,
+          agentG8032Port0StatsFSTxCount     Counter32,
+          agentG8032Port0StatsFSRxCount     Counter32,
+          agentG8032Port1StatsFSTxCount     Counter32,
+          agentG8032Port1StatsFSRxCount     Counter32,
+          agentG8032FOPPMCount              Counter32,
+          agentG8032FOPTOCount              Counter32     
+         }
+
+    agentG8032Port0StatsNRTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS NR packets on port0."
+          ::= { agentG8032RingStatisticsEntry  1 }
+    
+    agentG8032Port0StatsNRRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS NR packets on port0."
+          ::= { agentG8032RingStatisticsEntry  2 }
+    
+    agentG8032Port1StatsNRTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS NR packets on port1."
+          ::= { agentG8032RingStatisticsEntry  3 }
+
+    agentG8032Port1StatsNRRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS NR packets on port1."
+          ::= { agentG8032RingStatisticsEntry  4 } 
+
+   agentG8032Port0StatsNRRBTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS NR,RB packets on port0."
+          ::= { agentG8032RingStatisticsEntry  5 }
+
+    agentG8032Port0StatsNRRBRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS NR,RB packets on port0."
+          ::= { agentG8032RingStatisticsEntry 6 }
+
+    agentG8032Port1StatsNRRBTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS NR,RB packets on port1."
+          ::= { agentG8032RingStatisticsEntry  7 }
+
+    agentG8032Port1StatsNRRBRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS NR,RB packets on port1."
+          ::= { agentG8032RingStatisticsEntry  8 }
+
+    agentG8032Port0StatsSFTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS SF packets on port0."
+          ::= { agentG8032RingStatisticsEntry  9 }
+
+    agentG8032Port0StatsSFRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS SF packets on port0."
+          ::= { agentG8032RingStatisticsEntry  10 }
+
+    agentG8032Port1StatsSFTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS SF packets on port1."
+          ::= { agentG8032RingStatisticsEntry  11 }
+
+    agentG8032Port1StatsSFRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS FS packets on port1."
+          ::= { agentG8032RingStatisticsEntry  12 }
+
+    agentG8032Port0StatsMSTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS MS packets on port0."
+          ::= { agentG8032RingStatisticsEntry  13 }
+
+    agentG8032Port0StatsMSRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS MS packets on port0."
+          ::= { agentG8032RingStatisticsEntry  14 }
+
+    agentG8032Port1StatsMSTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS MS packets on port1."
+          ::= { agentG8032RingStatisticsEntry  15 }
+
+    agentG8032Port1StatsMSRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS MS packets on port1."
+          ::= { agentG8032RingStatisticsEntry  16 } 
+
+    agentG8032Port0StatsFSTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS FS packets on port0."
+          ::= { agentG8032RingStatisticsEntry  17 }
+
+    agentG8032Port0StatsFSRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS FS packets on port0."
+          ::= { agentG8032RingStatisticsEntry  18 }
+
+    agentG8032Port1StatsFSTxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of transmitted RAPS FS packets on port1."
+          ::= { agentG8032RingStatisticsEntry  19 }
+
+    agentG8032Port1StatsFSRxCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of received RAPS FS packets on port1."
+          ::= { agentG8032RingStatisticsEntry  20 }
+
+   agentG8032FOPPMCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of Failure of Protocol, Provisioning Mismatch (FOP-PM)
+                       event occured."
+          ::= { agentG8032RingStatisticsEntry  21 }
+
+   agentG8032FOPTOCount OBJECT-TYPE
+          SYNTAX      Counter32
+          MAX-ACCESS  read-only
+          STATUS      current
+          DESCRIPTION
+                      "The number of Failure of Protocol, Time Out (FOP-TO)
+                       event occured."
+          ::= { agentG8032RingStatisticsEntry  22 }
+
+--**************************************************************************************
+--    agentG8032GlobalTCNGroup
+--**************************************************************************************
+    
+    agentG8032GlobalTCNGroup              OBJECT IDENTIFIER ::= { fastPathG8032 6 }
+    
+    agentG8032GlobalTCN OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }  
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "This defines topology change notification propagation for all ERP instances."
+          ::= { agentG8032GlobalTCNGroup 1 }
+
+--**************************************************************************************
+-- G8032 Traps 
+-- 
+--**************************************************************************************
+    agentG8032Traps OBJECT IDENTIFIER ::= { fastPathG8032 0 }
+
+    agentG8032SmChangeTrap NOTIFICATION-TYPE
+        OBJECTS {
+                    agentG8032RingName,
+                    agentG8032RingInstance,
+                    agentG8032ERPState
+                }
+        STATUS      current 
+        DESCRIPTION
+                    "Trap is sent when Ethernet Ring Protection instance state changes."
+        ::= { agentG8032Traps 1 }
+
+END

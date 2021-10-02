@@ -70,8 +70,8 @@
 // VIPTELA-HARDWARE::hardwareTemperatureThresholdsRedAlarmBadFan.cPU-Junction.0 = Gauge32: 90
 // VIPTELA-HARDWARE::hardwareTemperatureThresholdsRedAlarmBadFan.dRAM.0 = Gauge32: 75
 
-$oids = snmpwalk_cache_multi_oid($device, "hardwareEnvironmentTable", [], "VIPTELA-HARDWARE");
-$oids_limits = snmpwalk_cache_multi_oid($device, "hardwareTemperatureThresholdsTable", [], "VIPTELA-HARDWARE");
+$oids = snmpwalk_cache_oid($device, "hardwareEnvironmentTable", [], "VIPTELA-HARDWARE");
+$oids_limits = snmpwalk_cache_oid($device, "hardwareTemperatureThresholdsTable", [], "VIPTELA-HARDWARE");
 print_debug_vars($oids);
 print_debug_vars($oids_limits);
 

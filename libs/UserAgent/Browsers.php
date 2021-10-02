@@ -8,6 +8,7 @@ interface Browsers {
 
 	const ADSBOT_GOOGLE       = 'AdsBot-Google';
 	const ANDROID_BROWSER     = 'Android Browser';
+	const APPLEBOT            = 'Applebot';
 	const BAIDUSPIDER         = 'Baiduspider';
 	const BINGBOT             = 'bingbot';
 	const BLACKBERRY_BROWSER  = 'BlackBerry Browser';
@@ -25,9 +26,11 @@ interface Browsers {
 	const GOOGLEBOT_VIDEO     = 'Googlebot-Video';
 	const HEADLESSCHROME      = 'HeadlessChrome';
 	const IEMOBILE            = 'IEMobile';
+	const IMESSAGEBOT         = 'iMessageBot';
 	const KINDLE              = 'Kindle';
 	const LYNX                = 'Lynx';
 	const MIDORI              = 'Midori';
+	const MIUIBROWSER         = 'MiuiBrowser';
 	const MSIE                = 'MSIE';
 	const MSNBOT_MEDIA        = 'msnbot-media';
 	const NETFRONT            = 'NetFront';
@@ -36,9 +39,12 @@ interface Browsers {
 	const OPERA               = 'Opera';
 	const PUFFIN              = 'Puffin';
 	const SAFARI              = 'Safari';
+	const SAILFISHBROWSER     = 'SailfishBrowser';
 	const SAMSUNGBROWSER      = 'SamsungBrowser';
 	const SILK                = 'Silk';
+	const TELEGRAMBOT         = 'TelegramBot';
 	const TIZENBROWSER        = 'TizenBrowser';
+	const TWITTERBOT          = 'Twitterbot';
 	const UC_BROWSER          = 'UC Browser';
 	const VALVE_STEAM_TENFOOT = 'Valve Steam Tenfoot';
 	const VIVALDI             = 'Vivaldi';

@@ -1,30 +1,37 @@
 <?php
-
-/**
+/*
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-if (is_device_mib($device, 'CISCO-VTP-MIB'))
-{
+if (is_device_mib($device, 'CISCO-VTP-MIB')) {
   // Q-BRIDGE-MIB is default mib, need excludes Cisco
   return;
 }
 
 $domain_index = '1';
 
+if (safe_count($discovery_vlans[$domain_index]) &&
+    (is_device_mib($device, 'CISCOSB-vlan-MIB') ||
+     is_device_mib($device, 'RADLAN-vlan-MIB') ||
+     is_device_mib($device, 'Dell-vlan-MIB') ||
+     is_device_mib($device, 'DLINK-3100-vlan-MIB') ||
+     is_device_mib($device, 'EDGECORE-vlan-MIB') ||
+     is_device_mib($device, 'NETGEAR-RADLAN-vlan-MIB'))) {
+  // Already discovered RADLAN based vlans
+  return;
+}
+
 // Simplify dot1qVlanStaticTable walk
 $dot1q_ports = snmpwalk_cache_oid($device, 'dot1qVlanStaticName', array(), 'Q-BRIDGE-MIB');
 //$dot1q_ports = snmpwalk_cache_oid($device, 'dot1qVlanStaticTable', array(), 'Q-BRIDGE-MIB', NULL, OBS_SNMP_ALL_MULTILINE | OBS_SNMP_HEX);
-if (!snmp_status())
-{
+if (!snmp_status()) {
   return;
 }
 
@@ -59,12 +66,10 @@ if ($use_baseports)
 /* End base port ifIndex association */
 
 $binary_debug = array(); // DEBUG
-foreach ($dot1q_ports as $vlan_num => $vlan)
-{
+foreach ($dot1q_ports as $vlan_num => $vlan) {
   $vlan['ifIndex'] = $vlan_num;
   // FTOS vlan fix
-  if ($device['os'] == 'ftos')
-  {
+  if ($device['os'] == 'ftos') {
     // Q-BRIDGE-MIB::dot1qVlanStaticEgressPorts.1107787777, where 1107787777 is ifIndex for Vlan interface
     //IF-MIB::ifDescr.1107787777 = STRING: Vlan 1
     //IF-MIB::ifDescr.1107787998 = STRING: Vlan 222
@@ -73,8 +78,7 @@ foreach ($dot1q_ports as $vlan_num => $vlan)
   }
 
   // JunOS Vlan fix
-  if (isset($vlan['jnxExVlanTag']))
-  {
+  if (isset($vlan['jnxExVlanTag'])) {
     $vlan_num = $vlan['jnxExVlanTag'];
   }
 

@@ -25,6 +25,11 @@ function generate_p2pradio_query($vars)
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'radio_id');
         break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'p2p_radios.device_id');
+        break;
       case "device":
       case "device_id":
         $sql .= generate_query_values($value, 'device_id');

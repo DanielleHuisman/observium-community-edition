@@ -28,7 +28,7 @@ $mib = 'Printer-MIB';
 //Printer-MIB::prtMarkerEastMargin.1.1 = INTEGER: 1968
 //Printer-MIB::prtMarkerStatus.1.1 = INTEGER: 2
 
-$oids  = snmpwalk_cache_multi_oid($device, "prtMarkerEntry", array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "prtMarkerEntry", array(), $mib);
 $prt_supplies = snmpwalk_cache_oid($device, 'prtMarkerSuppliesDescription', array(), $mib, NULL, OBS_SNMP_ALL_ASCII);
 //print_vars($oids);
 $count = count($oids);

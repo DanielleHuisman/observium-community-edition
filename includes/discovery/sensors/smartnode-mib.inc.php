@@ -13,7 +13,7 @@
  */
 
 // temperature
-$sensor_array = snmpwalk_cache_multi_oid($device, 'temperature', array(), 'SMARTNODE-MIB');
+$sensor_array = snmpwalk_cache_oid($device, 'temperature', array(), 'SMARTNODE-MIB');
 
 foreach ($sensor_array as $index => $entry)
 {
@@ -33,7 +33,7 @@ foreach ($sensor_array as $index => $entry)
 //  http://jira.observium.org/browse/OBSERVIUM-1066
 /**
 // calls
-$sensor_array = snmpwalk_cache_multi_oid($device, 'gateway', array(), 'SMARTNODE-MIB');
+$sensor_array = snmpwalk_cache_oid($device, 'gateway', array(), 'SMARTNODE-MIB');
 
 foreach ($sensor_array as $index => $entry)
 {

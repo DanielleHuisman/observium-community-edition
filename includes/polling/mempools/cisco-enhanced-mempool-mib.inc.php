@@ -26,12 +26,12 @@ if (!is_array($cache_storage[$mib]))
 {
   foreach ($oids as $param => $oid)
   {
-    $cache_mempool = snmpwalk_cache_multi_oid($device, $oid, $cache_mempool, $mib);
+    $cache_mempool = snmpwalk_cache_oid($device, $oid, $cache_mempool, $mib);
     if ($device['os'] == 'iosxr' && !$GLOBALS['snmp_status'])
     {
       // Hack for some old IOS-XR, sometime return "Timeout: No Response".
       // See http://jira.observium.org/browse/OBSERVIUM-1170
-      $cache_mempool = snmpwalk_cache_multi_oid($device, $oid, $cache_mempool, $mib);
+      $cache_mempool = snmpwalk_cache_oid($device, $oid, $cache_mempool, $mib);
     }
   }
   $cache_storage[$mib] = $cache_mempool;

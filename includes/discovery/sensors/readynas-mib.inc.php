@@ -33,7 +33,7 @@ enterprises.netgear.nasManager.diskTable.diskEntry.diskTemperature.3 = INTEGER: 
 enterprises.netgear.nasManager.diskTable.diskEntry.diskTemperature.4 = INTEGER: 105
 **/
 
-$cache['readynas-mib']['diskTable'] = snmpwalk_cache_multi_oid($device, 'diskTable', array(), 'READYNAS-MIB');
+$cache['readynas-mib']['diskTable'] = snmpwalk_cache_oid($device, 'diskTable', array(), 'READYNAS-MIB');
 
 foreach ($cache['readynas-mib']['diskTable'] as $index => $entry)
 {
@@ -61,7 +61,7 @@ foreach ($cache['readynas-mib']['diskTable'] as $index => $entry)
  enterprises.netgear.nasManager.fanTable.fanEntry.fanType.1 = STRING: "none"
 */
 
-$cache['readynas-mib']['fanTable'] = snmpwalk_cache_multi_oid($device, 'fanTable', array(), 'READYNAS-MIB');
+$cache['readynas-mib']['fanTable'] = snmpwalk_cache_oid($device, 'fanTable', array(), 'READYNAS-MIB');
 
 foreach ($cache['readynas-mib']['fanTable'] as $index => $entry)
 {
@@ -90,7 +90,7 @@ foreach ($cache['readynas-mib']['fanTable'] as $index => $entry)
  enterprises.netgear.nasManager.temperatureTable.temperatureEntry.temperatureStatus.1 = STRING: "ok"
 */
 
-$cache['readynas-mib']['temperatureTable'] = snmpwalk_cache_multi_oid($device, 'temperatureTable', array(), 'READYNAS-MIB');
+$cache['readynas-mib']['temperatureTable'] = snmpwalk_cache_oid($device, 'temperatureTable', array(), 'READYNAS-MIB');
 
 foreach ($cache['readynas-mib']['temperatureTable'] as $index => $entry)
 {

@@ -431,8 +431,8 @@ class CollectdColor {
 	}
 
 	function randomize() {
-		$this->r = rand(0, 255) / 255.0;
-		$this->g = rand(0, 255) / 255.0;
+		$this->r = mt_rand(0, 255) / 255.0;
+		$this->g = mt_rand(0, 255) / 255.0;
 		$this->b = 0.0;
 		$min = 0.0;
 		$max = 1.0;
@@ -442,7 +442,7 @@ class CollectdColor {
 		} else {
 			$max = 2.0 - ($this->r + $this->g);
 		}
-		$this->b = $min + ((rand(0, 255)/255.0) * ($max - $min));
+		$this->b = $min + ((mt_rand(0, 255) / 255.0) * ($max - $min));
 	}
 
 	function fade($bkgnd = null, $alpha = 0.25) {
@@ -504,7 +504,6 @@ function collectd_draw_rrd($host, $plugin, $pinst = null, $type, $tinst = null, 
 	else foreach ($config['timespan'] as &$ts)
 		if ($ts['name'] == $opts['timespan'])
 			$timespan_def = $ts;
-
 	if (!isset($opts['rrd_opts']))
 		$opts['rrd_opts'] = array();
 	if (isset($opts['logarithmic']) && $opts['logarithmic'])
@@ -644,6 +643,7 @@ function collectd_draw_generic($timespan, $host, $plugin, $pinst = null, $type, 
 
 	//$rrd_cmd  = array_merge($rrd_cmd, $config['rrd_opts_array']);
   $rrd_cmd = collectd_rrdcmd($rrd_cmd);
+
 	$rrd_args = $GraphDefs[$type];
 
 	foreach ($config['datadirs'] as $datadir) {
@@ -702,10 +702,10 @@ function collectd_draw_meta_stack(&$opts, &$sources) {
           $cmd = array_merge($cmd, $small_opts);
         }
 
-
 	//$cmd = array_merge($cmd, $config['rrd_opts_array'], $opts['rrd_opts']);
   $cmd = collectd_rrdcmd($cmd, $opts['rrd_opts']);
-	$max_inst_name = 0;
+
+  $max_inst_name = 0;
 
 	foreach($sources as &$inst_data) {
 		$inst_name = $inst_data['name'];
@@ -853,7 +853,8 @@ function collectd_draw_meta_line(&$opts, &$sources) {
 // DERP compatibility
 function collectd_rrdcmd($rrd_cmd, $rrd_opts = [], $graph = [])
 {
-	if ($_SESSION['dark_mode'])
+
+	if ($GLOBALS['config']['themes'][$_SESSION['theme']]['type'] == 'dark')
 	{
 		$rrd_opts_array = str_replace("  ", " ", $GLOBALS['config']['rrdgraph']['dark']);
 	} else {
@@ -861,7 +862,7 @@ function collectd_rrdcmd($rrd_cmd, $rrd_opts = [], $graph = [])
 	}
 	$rrd_opts_array = explode(" ", trim($rrd_opts_array));
 
-	return array_merge($rrd_cmd, $rrd_opts_array, $rrd_opts, $graph);
+  return array_merge($rrd_cmd, $rrd_opts_array, $rrd_opts, $graph);
 }
 
 // EOF

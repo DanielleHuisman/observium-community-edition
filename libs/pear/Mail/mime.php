@@ -1167,7 +1167,7 @@ class Mail_mime
         // add required boundary parameter if not defined
         if (stripos($type, 'multipart/') === 0) {
             if (empty($this->build_params['boundary'])) {
-                $this->build_params['boundary'] = '=_' . md5(rand() . microtime());
+                $this->build_params['boundary'] = '=_' . md5(mt_rand() . microtime());
             }
 
             $header .= ";$eol boundary=\"".$this->build_params['boundary']."\"";
@@ -1437,7 +1437,7 @@ class Mail_mime
             ) {
                 $boundary = $m[1];
             } else {
-                $boundary = '=_' . md5(rand() . microtime());
+                $boundary = '=_' . md5(mt_rand() . microtime());
             }
 
             $this->build_params['boundary'] = $boundary;

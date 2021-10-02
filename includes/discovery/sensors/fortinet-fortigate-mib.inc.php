@@ -11,8 +11,9 @@
  */
 
 // Currently not possible convert to definitions because type detection is hard, based on descriptions
+// SAME code in ATEN-IPMI-MIB
 
-$oids = snmp_walk_multipart_oid($device, "fgHwSensorTable", array(), "FORTINET-FORTIGATE-MIB");
+$oids = snmpwalk_multipart_oid($device, "fgHwSensorTable", array(), "FORTINET-FORTIGATE-MIB");
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
@@ -25,19 +26,18 @@ foreach ($oids as $index => $entry)
   $value    = $entry[$oid_name];
 
   // Detect class based on descr anv value (this is derp, table not have other data for detect class
-  if (str_iexists($descr, 'Fan') && ($value > 100 || $value == 0))
-  {
+  if (str_iends($descr, ' Temp')) {
+    if ($value == 0) { continue; }
+    $descr = str_replace(' Temp', '', $descr);
+    $class = 'temperature';
+  } elseif (str_icontains_array($descr, 'Fan') && ($value > 100 || $value == 0)) {
     if ($value == 0) { continue; }
     $class = 'fanspeed';
-  }
-  elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) ||
-          str_iexists($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht' ]))
-  {
+  } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) ||
+            str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN' ])) {
     if ($value == 0) { continue; }
     $class = 'voltage';
-  }
-  elseif (str_iexists($descr, 'Status'))
-  {
+  } elseif (str_icontains_array($descr, 'Status')) {
     // FORTINET-FORTIGATE-MIB::fgHwSensorEntName.45 = STRING: PS1 Status
     // FORTINET-FORTIGATE-MIB::fgHwSensorEntName.50 = STRING: PS2 Status
     // FORTINET-FORTIGATE-MIB::fgHwSensorEntValue.45 = STRING: 0
@@ -53,6 +53,7 @@ foreach ($oids as $index => $entry)
     discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'powersupply'));
     continue;
   } else {
+    if ($value == 0) { continue; }
     // FIXME, not always?
     $class = 'temperature';
   }

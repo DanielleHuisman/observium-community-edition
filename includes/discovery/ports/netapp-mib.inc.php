@@ -1,20 +1,18 @@
 <?php
-
-/**
+/*
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // NETAPP-MIB
 
-if (count($port_stats) == 0)
-{
+if (safe_empty($port_stats)) {
   // If not has standard IF-MIB table, use NETAPP specific tables
   $mib = 'NETAPP-MIB';
 
@@ -24,45 +22,46 @@ if (count($port_stats) == 0)
   //NETAPP-MIB::netifDescr.16 = STRING: "vega-01:a0m-40"
   print_cli($mib.'::netifDescr ');
   $netif_stat = snmpwalk_cache_oid($device, 'netifDescr', array(), $mib);
-  if (OBS_DEBUG > 1 && count($netif_stat)) { print_vars($netif_stat); }
+  print_debug_vars($netif_stat);
 
   $flags = OBS_SNMP_ALL ^ OBS_QUOTES_STRIP;
   $netport_stat = snmpwalk_cache_twopart_oid($device, 'netportLinkState',  array(), $mib, NULL, $flags);
   print_cli($mib.'::netportLinkState ');
   $netport_stat = snmpwalk_cache_twopart_oid($device, 'netportType', $netport_stat, $mib, NULL, $flags);
   print_cli($mib.'::netportType ');
-  if (OBS_DEBUG > 1 && count($netport_stat)) { print_vars($netport_stat); }
+  print_debug_vars($netport_stat);
 
-  $mib_config = &$config['mibs'][$mib]['ports']['oids']; // Attach MIB options/translations
-  //print_vars($mib_config);
+  $mib_def = &$config['mibs'][$mib]['ports']['oids']; // Attach MIB options/translations
+  //print_vars($mib_def);
 
   // Now rewrite to standard IF-MIB array
-  foreach ($netif_stat as $ifIndex => $port)
-  {
-    list($port['netportNode'], $port['netportPort']) = explode(':', $port['netifDescr'], 2);
+  foreach ($netif_stat as $ifIndex => $port) {
+    if (str_contains($port['netifDescr'], ':')) {
+      list($port['netportNode'], $port['netportPort']) = explode(':', $port['netifDescr'], 2);
+    } else {
+      $port['netportNode'] = '';
+      $port['netportPort'] = $port['netifDescr'];
+    }
     $port['netportPort'] = str_ireplace('MGMT_PORT_ONLY ', '', $port['netportPort']);
 
-    if (isset($netport_stat[$port['netportNode']][$port['netportPort']]))
-    {
+    if (isset($netport_stat[$port['netportNode']][$port['netportPort']])) {
       // ifDescr
       $oid = 'ifDescr';
-      $port[$oid] = $port[$mib_config[$oid]['oid']];
+      $port[$oid] = $port[$mib_def[$oid]['oid']];
       $port_stats[$ifIndex][$oid] = $port[$oid];
 
       // ifName, ifAlias
-      $port_stats[$ifIndex]['ifName']  = $port['netportNode'].':'.$port['netportPort'];
+      $port_stats[$ifIndex]['ifName']  = strlen($port['netportNode']) ? $port['netportNode'].':'.$port['netportPort'] : $port['netportPort'];
       $port_stats[$ifIndex]['ifAlias'] = ''; // FIXME, I not found
 
       $netport = &$netport_stat[$port['netportNode']][$port['netportPort']];
 
       // ifType, ifOperStatus
-      foreach (array('ifType', 'ifOperStatus') as $oid)
-      {
-        $port[$oid] = $netport[$mib_config[$oid]['oid']];
-        if (isset($mib_config[$oid]['rewrite'][$port[$oid]]))
-        {
+      foreach (array('ifType', 'ifOperStatus') as $oid) {
+        $port[$oid] = $netport[$mib_def[$oid]['oid']];
+        if (isset($mib_def[$oid]['transform'])) {
           // Translate to standard IF-MIB values
-          $port[$oid] = $mib_config[$oid]['rewrite'][$port[$oid]];
+          $port[$oid] = string_transform($port[$oid], $mib_def[$oid]['transform']);
         }
         $port_stats[$ifIndex][$oid] = $port[$oid];
       }

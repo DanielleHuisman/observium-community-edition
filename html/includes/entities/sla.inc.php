@@ -25,6 +25,11 @@ function generate_sla_query($vars)
         $values = get_group_entities($value);
         $sql .= generate_query_values($values, 'slas.sla_id');
         break;
+      case 'device_group_id':
+      case 'device_group':
+        $values = get_group_entities($value, 'device');
+        $sql .= generate_query_values($values, 'storage.device_id');
+        break;
       case "device":
       case "device_id":
         $sql .= generate_query_values($value, 'slas.device_id');

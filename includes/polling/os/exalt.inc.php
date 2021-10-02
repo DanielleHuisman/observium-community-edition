@@ -17,7 +17,7 @@
 // EX-5i
 //$hardware = $poll_device['sysDescr'];
 
-$data = snmpwalk_cache_multi_oid($device, 'radioInfo', array(), 'ExaltComProducts');
+$data = snmpwalk_cache_oid($device, 'radioInfo', array(), 'ExaltComProducts');
 
 $hardware      = $data[0]['modelName'];
 list($version) = explode(' ', $data[0]['firmwareVersion']);

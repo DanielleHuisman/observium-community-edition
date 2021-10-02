@@ -71,11 +71,11 @@ foreach ($oids as $meter => $entry1)
         $sensor_type = 'current';
         break;
       case '':
-        if (str_iexists($entry['mtvalName'], 'Power factor'))
+        if (str_icontains_array($entry['mtvalName'], 'Power factor'))
         {
           $sensor_type = 'powerfactor';
         }
-        elseif (str_iexists($entry['mtvalName'], 'counter'))
+        elseif (str_icontains_array($entry['mtvalName'], 'counter'))
         {
           $sensor_type = 'counter';
         }

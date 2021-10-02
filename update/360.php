@@ -44,7 +44,7 @@ foreach (dbFetchColumn("SELECT `device_id` FROM `devices`") as $device_id)
     //print_vars($device_state);
     if ($device_state)
     {
-      $device_state = unserialize($device_state);
+      $device_state = safe_unserialize($device_state);
     } else {
       $device_state = array();
     }

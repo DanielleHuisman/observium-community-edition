@@ -860,6 +860,8 @@ class ref {
       }
     }
 
+    if (is_null($trace)) { return false; }
+
     while ($callee = array_pop($trace)) {
 
       // extract only the information we need
@@ -991,6 +993,7 @@ class ref {
       }
     }
 
+    return array();
   }
 
 
@@ -1603,8 +1606,18 @@ class ref {
 
             }
 
+            // ip (just do not detect is as date)..
+            $isIp = filter_var($subject, FILTER_VALIDATE_IP) !== FALSE;
+            // if ($isIp) {
+            //   $ver = strpos($subject, '.') ? 'ipv4' : 'ipv6';
+            //   //$this->fmt->startContain('IPv' . $ver, true);
+            //   $this->fmt->text($ver, $subject, $ver);
+            //   //$this->fmt->endContain();
+            // }
+
             // date
-            if (($length < 128) && static::$env['supportsDate'] && !preg_match('/[^A-Za-z0-9.:+\s\-\/]/', $subject)) {
+            if (($length < 128) && static::$env['supportsDate'] && !$isIp &&
+                !preg_match('/[^A-Za-z0-9.:+\s\-\/]/', $subject)) {
               try {
                 $date   = new \DateTime($subject);
                 $errors = \DateTime::getLastErrors();
@@ -1690,7 +1703,7 @@ class ref {
             }
 
             // attempt to match a regex
-            if (!$isSerialized && !$isJson && $length < 768) {
+            if (!$isSerialized && !$isJson && !$isIp && $length < 768) {
               try {
                 $components = $this->splitRegex($subject);
                 if ($components) {
@@ -2974,6 +2987,8 @@ class RTextFormatter extends RFormatter {
       'true'     => 'bool(%2$s)',
       'false'    => 'bool(%2$s)',
       'key'      => '[%2$s]',
+      //'ipv4'     => ' IPv4', //'IPv4 "%2$s"',
+      //'ipv6'     => ' IPv6', //'IPv6 "%2$s"',
     );
 
     if (!is_string($meta)) {

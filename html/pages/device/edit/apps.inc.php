@@ -1,25 +1,21 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 print_warning("This page allows you to disable applications for this device that were previously enabled. Observium agent applications are automatically detected by the poller system.");
 
 # Load our list of available applications
-if ($handle = opendir($config['install_dir'] . "/includes/polling/applications/"))
-{
-  while (false !== ($file = readdir($handle)))
-  {
-    if ($file != "." && $file != ".." && strstr($file, ".inc.php"))
-    {
+if ($handle = opendir($config['install_dir'] . "/includes/polling/applications/")) {
+  while (false !== ($file = readdir($handle))) {
+    if ($file != "." && $file != ".." && strstr($file, ".inc.php")) {
       $applications[] = str_replace(".inc.php", "", $file);
     }
   }
@@ -27,14 +23,13 @@ if ($handle = opendir($config['install_dir'] . "/includes/polling/applications/"
 }
 
 # Check if the form was POSTed
-if ($vars['device'])
-{
-  if ($readonly)
-  {
+if ($vars['device']) {
+  if ($readonly) {
     print_error_permission('You have insufficient permissions to edit settings.');
   } else {
     $updated = 0;
     $param[] = $device['device_id'];
+    $enabled = [];
     foreach (array_keys($vars) as $key)
     {
       if (substr($key,0,4) == 'app_')
@@ -45,28 +40,23 @@ if ($vars['device'])
       }
     }
 
-    if (count($enabled))
-    {
+    if (count($enabled)) {
       $updated += dbDelete('applications', "`device_id` = ? AND `app_type` NOT IN (".implode(",",$replace).")", $param);
     } else {
       $updated += dbDelete('applications', "`device_id` = ?", array($param));
     }
 
-    foreach (dbFetchRows( "SELECT `app_type` FROM `applications` WHERE `device_id` = ?", array($device['device_id'])) as $row)
-    {
+    foreach (dbFetchRows( "SELECT `app_type` FROM `applications` WHERE `device_id` = ?", array($device['device_id'])) as $row) {
       $app_in_db[] = $row['app_type'];
     }
 
-    foreach ($enabled as $app)
-    {
-      if (!in_array($app,$app_in_db))
-      {
+    foreach ($enabled as $app) {
+      if (!in_array($app,$app_in_db)) {
         $updated += dbInsert(array('device_id' => $device['device_id'], 'app_type' => $app), 'applications');
       }
     }
 
-    if ($updated)
-    {
+    if ($updated) {
       print_message("Applications updated!");
     } else {
       print_message("No changes.");
@@ -77,8 +67,7 @@ if ($vars['device'])
 # Show list of apps with checkboxes
 
 $apps_enabled = dbFetchRows("SELECT * from `applications` WHERE `device_id` = ? ORDER BY app_type", array($device['device_id']));
-if (count($apps_enabled))
-{
+if (safe_count($apps_enabled)) {
   foreach ($apps_enabled as $application)
   {
     $app_enabled[] = $application['app_type'];
@@ -107,7 +96,23 @@ foreach ($applications as $app)
   {
     echo("    <tr>");
     echo("      <td>");
-    echo("        <input type=checkbox data-toggle='switch-mini' data-on-color='primary' data-off-color='danger' checked='checked' name='app_". $app ."'>");
+    $item = array(
+      'id'            => 'app_' . $app,
+      'type'          => 'switch-ng',
+      'off-text'      => 'Yes',
+      'off-color'     => 'success',
+      'on-color'      => 'danger',
+      'on-text'       => 'No',
+      'size'          => 'mini',
+      //'height'        => '15px',
+      //'title'         => 'Show/Hide Removed',
+      //'placeholder'   => 'Removed',
+      'readonly'      => $readonly,
+      //'disabled'      => TRUE,
+      //'submit_by_key' => TRUE,
+      'value'         => 1
+    );
+    echo('<td class="text-center">'.generate_form_element($item).'</td>');
     echo("      </td>");
     echo("      <td>". nicecase($app) . "</td>");
     echo("    </tr>");

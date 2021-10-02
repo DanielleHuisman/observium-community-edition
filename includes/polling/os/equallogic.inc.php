@@ -15,7 +15,7 @@ if (!is_numeric($attribs['eqlgrpmemid']))
 {
   // eqlMemberName.1.443914937 = hostname-1
   // eqlMemberName.1.1664046123 = hostname-2
-  $eqlgrpmembers = snmpwalk_cache_multi_oid($device, 'eqlMemberName', [], 'EQLMEMBER-MIB');
+  $eqlgrpmembers = snmpwalk_cache_oid($device, 'eqlMemberName', [], 'EQLMEMBER-MIB');
 
   foreach ($eqlgrpmembers as $index => $entry)
   {

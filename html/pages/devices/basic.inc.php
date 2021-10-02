@@ -11,8 +11,18 @@
  *
  */
 
-echo('
-  <table class="table table-hover table-striped  table-condensed ">');
+echo'
+  <table class="table table-hover table-striped  table-condensed">
+  <thead>
+    <tr>
+      <th class="state-marker"></th>
+      <th></th>
+      <th>Device / Location</th>
+      <th>Hardware / Features</th>
+      <th>Operating System</th>
+      <th>Uptime / sysName</th>
+    </tr>
+  </thead>';
 
 foreach ($devices as $device)
 {
@@ -20,7 +30,8 @@ foreach ($devices as $device)
   {
     if (!$location_filter || $device['location'] == $location_filter)
     {
-      print_device_row($device, 'basic');
+      $vars['view'] = 'basic';
+      print_device_row($device, $vars);
     }
   }
 }

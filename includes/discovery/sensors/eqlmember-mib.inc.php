@@ -17,7 +17,7 @@
 
 // eqlMemberName.1.443914937 = hostname-1
 // eqlMemberName.1.1664046123 = hostname-2
-$eqlgrpmembers = snmpwalk_cache_multi_oid($device, 'eqlMemberName', [], 'EQLMEMBER-MIB');
+$eqlgrpmembers = snmpwalk_cache_oid($device, 'eqlMemberName', [], 'EQLMEMBER-MIB');
 if (snmp_status())
 {
   $sysName = strtolower(snmp_cache_oid($device, 'sysName.0', 'SNMPv2-MIB'));

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -100,7 +100,9 @@ $config['wui']['refresh_disabled'][]  = array('page' => 'customoids');
 $config['wui']['refresh_disabled'][]  = array('page' => 'log');
 
 // Search modules used by the ajax search, in order.
-$config['wui']['search_modules'] = array('devices', 'ports', 'slas', 'sensors', 'status', 'accesspoints', 'ip-addresses', 'inventory', 'loadbalancers');
+$config['wui']['search_modules'] = [ 'groups', 'devices', 'ports', 'slas', 'sensors', 'status', 'neighbours',
+                                     'accesspoints', 'ip-addresses', 'inventory', 'loadbalancers',
+                                    ];
 
 // Default groups list (on status page and default panel)
 //$config['wui']['groups_list'] = array('device', 'port', 'processor', 'mempool', 'sensor', 'bgp_peer');
@@ -114,7 +116,7 @@ $config['themes']['darkblue'] = array('name' => "Dark Blue Mode", 'type' => 'dar
 
 // Define Icons used by the user interface, emoji icons see in emoji.inc.php
 
-$config['icon']['globe']             = "sprite-globe-light";
+$config['icon']['globe']             = "sprite-globe";
 $config['icon']['overview']          = "sprite-overview";
 
 $config['icon']['settings-change']   = "sprite-sliders-2";
@@ -125,12 +127,12 @@ $config['icon']['plus']              = "sprite-plus";
 $config['icon']['minus']             = "sprite-minus";
 $config['icon']['success']           = "sprite-success";
 $config['icon']['error']             = "sprite-error";
+$config['icon']['important']         = "sprite-important";
 
 $config['icon']['stop']              = "sprite-cancel";
 $config['icon']['cancel']            = "sprite-cancel";
 $config['icon']['help']              = "sprite-support";
 $config['icon']['info']              = "sprite-info";
-$config['icon']['ignore']            = "sprite-shutdown";
 $config['icon']['exclamation']       = "sprite-exclamation-mark";
 
 $config['icon']['critical']          = $config['icon']['exclamation']; // red exclamation mark in a circle
@@ -147,9 +149,11 @@ $config['icon']['checked']           = "sprite-checked";
 $config['icon']['ok']                = "sprite-ok";
 $config['icon']['return']            = "sprite-return";
 $config['icon']['sort']              = "sprite-sort";
-$config['icon']['network']           = "sprite-network";
+$config['icon']['network']           = "sprite-routing";
 $config['icon']['up']                = $config['icon']['checked'];
 $config['icon']['down']              = $config['icon']['minus'];
+// what is this joke? ignore/shutdown :)
+$config['icon']['ignore']            = "sprite-shutdown";
 $config['icon']['shutdown']          = "sprite-ignore";
 
 $config['icon']['or-gate']           = "sprite-logic-or";
@@ -164,6 +168,7 @@ $config['icon']['merge']             = "sprite-merge";
 $config['icon']['split']             = "sprite-split";
 
 $config['icon']['group']             = "sprite-groups";
+$config['icon']['groups']            = $config['icon']['group'];
 
 $config['icon']['alert']             = "sprite-alert";
 $config['icon']['alert-log']         = "sprite-alert-log";
@@ -207,9 +212,9 @@ $config['icon']['locations']         = $config['icon']['location'];
 $config['icon']['port']              = "sprite-ethernet";
 $config['icon']['port-core']         = "sprite-hub";
 $config['icon']['port-customer']     = "sprite-user-self";
-$config['icon']['port-transit']      = "sprite-globe-light";
-$config['icon']['port-peering']      = "sprite-peers";
-$config['icon']['port-peering-transit'] = "sprite-netmap";
+$config['icon']['port-transit']      = "sprite-transit";
+$config['icon']['port-peering']      = "sprite-peering";
+$config['icon']['port-peering-transit'] = "sprite-peering-transit";
 
 $config['icon']['health']            = "sprite-health";
 $config['icon']['processor']         = "sprite-processor";
@@ -250,10 +255,13 @@ $config['icon']['resistance']        = "sprite-ohms";
 $config['icon']['velocity']          = "sprite-performance";
 $config['icon']['waterflow']         = "sprite-flowrate";
 $config['icon']['volume']            = "sprite-volume";
+$config['icon']['distance']          = "sprite-distance";
 $config['icon']['lflux']             = "sprite-light-bulb";
 $config['icon']['clock']             = "sprite-clock";
+$config['icon']['fiber']             = "sprite-laser"; // FIXME need other icon
 $config['icon']['wavelength']        = "sprite-laser"; // FIXME need other icon
 $config['icon']['gauge']             = "sprite-data"; // FIXME need other icon
+$config['icon']['distance']          = "sprite-distance";
 
 // Status classes
 $config['icon']['battery']           = "sprite-capacity";
@@ -279,13 +287,14 @@ $config['icon']['collectd']          = "sprite-collectd";
 $config['icon']['munin']             = "sprite-munin";
 $config['icon']['smokeping']         = "sprite-paper-plane";
 $config['icon']['wifi']              = "sprite-wifi";
+$config['icon']['hypervisor']        = "sprite-virtual-machine";
 $config['icon']['logs']              = "sprite-logs";
 $config['icon']['loadbalancer']      = "sprite-loadbalancer-2";
 $config['icon']['routing']           = "sprite-routing";
 $config['icon']['vrf']               = "sprite-vrf";
 $config['icon']['cef']               = "sprite-cef";
 $config['icon']['ospf']              = "sprite-ospf";
-$config['icon']['eigrp']             = "sprite-ospf";
+$config['icon']['eigrp']             = "sprite-eigrp";
 $config['icon']['ipsec_tunnel']      = "sprite-tunnel";
 $config['icon']['vlan']              = "sprite-vlan";
 $config['icon']['switching']         = "sprite-switching";
@@ -333,6 +342,8 @@ $config['icon']['database']          = "sprite-database";
 
 $config['icon']['mibs']              = "sprite-map-2";
 
+$config['icon']['notes']             = "sprite-note";
+
 // Font icons
 $config['icon']['edit']              = "icon-cog";
 $config['icon']['delete']            = "icon-trash";
@@ -343,5 +354,9 @@ $config['icon']['arrow-up']          = "icon-circle-arrow-up";
 $config['icon']['arrow-down']        = "icon-circle-arrow-down";
 $config['icon']['arrow-right']       = "icon-circle-arrow-right";
 $config['icon']['arrow-left']        = "icon-circle-arrow-left";
+
+$config['icons'] = ['sprite-device', 'sprite-network', 'sprite-virtual-machine'];
+
+
 
 // EOF

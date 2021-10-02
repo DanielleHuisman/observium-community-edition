@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -107,9 +106,8 @@ function build_alert_table_query($vars)
  * @return none
  *
  */
-function print_alert_table($vars)
-{
-  global $alert_rules; global $config;
+function print_alert_table($vars) {
+  global $alert_rules, $config;
 
   // This should be set outside, but do it here if it isn't
   if (!is_array($alert_rules)) { $alert_rules = cache_alert_rules(); }
@@ -131,19 +129,20 @@ function print_alert_table($vars)
   // Set which columns we're going to show.
   // We hide the columns that have been given as search options via $vars
   $list = array('device_id' => FALSE, 'entity_id' => FALSE, 'entity_type' => FALSE, 'alert_test_id' => FALSE);
-  foreach ($list as $argument => $nope)
-  {
-    if (!isset($vars[$argument]) || empty($vars[$argument]) || $vars[$argument] == "all") { $list[$argument] = TRUE; }
+  foreach ($list as $argument => $nope) {
+    if (!isset($vars[$argument]) || empty($vars[$argument]) || $vars[$argument] === "all") { $list[$argument] = TRUE; }
   }
 
-  if($vars['format'] != "condensed")
-  {
+  if ($vars['format'] !== "condensed") {
     $list['checked'] = TRUE;
     $list['changed'] = TRUE;
     $list['alerted'] = TRUE;
   }
 
-  if($vars['short'] == TRUE) { $list['checked'] = FALSE; $list['alerted'] = FALSE; }
+  if ($vars['short']) {
+    $list['checked'] = FALSE;
+    $list['alerted'] = FALSE;
+  }
 
   // Hide device if we know entity_id
   if (isset($vars['entity_id'])) { $list['device_id'] = FALSE; }
@@ -160,44 +159,36 @@ function print_alert_table($vars)
 
   echo '<table class="table table-condensed  table-striped  table-hover">' ;
 
-  if ($vars['no_header'] == FALSE)
-  {
+  if (!get_var_true($vars['no_header'])) {
     echo '
   <thead>
     <tr>
       <th class="state-marker"></th>
       <th style="width: 1px;"></th>';
 
-    if ($list['device_id'])
-    {
+    if ($list['device_id']) {
       echo('      <th style="width: 15%">Device</th>');
     }
-    if ($list['entity_type'])
-    {
+    if ($list['entity_type']) {
       echo('      <th style="width: 10%">Type</th>');
     }
-    if ($list['entity_id'])
-    {
+    if ($list['entity_id']) {
       echo('      <th style="">Entity</th>');
     }
-    if ($list['alert_test_id'])
-    {
+    if ($list['alert_test_id']) {
       echo('      <th style="min-width: 15%;">Alert</th>');
     }
 
     echo '
       <th style="width: 100px;">Status</th>';
 
-    if ($list['checked'])
-    {
+    if ($list['checked']) {
       echo '      <th style="width: 95px;">Checked</th>';
     }
-    if ($list['changed'])
-    {
+    if ($list['changed']) {
       echo '      <th style="width: 95px;">Changed</th>';
     }
-    if ($list['alerted'])
-    {
+    if ($list['alerted']) {
       echo '      <th style="width: 95px;">Alerted</th>';
     }
 
@@ -207,8 +198,7 @@ function print_alert_table($vars)
   }
   echo '<tbody>'.PHP_EOL;
 
-  foreach ($alerts as $alert)
-  {
+  foreach ($alerts as $alert) {
     // Set the alert_rule from the prebuilt cache array
     $alert_rule = $alert_rules[$alert['alert_test_id']];
     //r($alert_rule);
@@ -259,7 +249,7 @@ function print_alert_table($vars)
       {
         echo '  <i class="' . $config['entities'][$entity_type['parent_type']]['icon'] . '"></i> '.generate_entity_link($entity_type['parent_type'], $entity[$entity_type['parent_id_field']]).'</span> - ';
       }
-      echo '  <i class="' . $config['entities'][$alert['entity_type']]['icon'] . '"></i> '.generate_entity_link($alert['entity_type'], $alert['entity_id'],NULL, NULL, TRUE, $short).'</span>';
+      echo '  <i class="' . $config['entities'][$alert['entity_type']]['icon'] . '"></i> '.generate_entity_link($alert['entity_type'], $alert['entity_id'], NULL, NULL, TRUE, $short).'</span>';
       echo '</td>';
     }
 
@@ -270,7 +260,7 @@ function print_alert_table($vars)
     }
 
     echo('<td>');
-    echo('<span class="label label-'.($alert['html_row_class'] != 'up' ? $alert['html_row_class'] : 'success').'">' . generate_tooltip_link('', $alert['status'], '<div class="small" style="max-width: 500px;"><strong>'.$alert['last_message'].'</strong></div>', $alert['alert_class']) . '</span>');
+    echo('<span class="label label-'.($alert['html_row_class'] !== 'up' ? $alert['html_row_class'] : 'success').'">' . generate_tooltip_link('', $alert['status'], '<div class="small" style="max-width: 500px;"><strong>'.$alert['last_message'].'</strong></div>', $alert['alert_class']) . '</span>');
     echo('</td>');
 
 
@@ -283,12 +273,11 @@ function print_alert_table($vars)
 
     // This stuff should go in an external entity popup in the future.
 
-    $state = json_decode($alert['state'], true);
+    $state = safe_json_decode($alert['state']);
 
     $alert['state_popup'] = '';
 
-    if (count($state['failed']))
-    {
+    if (safe_count($state['failed'])) {
       $alert['state_popup'] .= generate_box_open(array('title' => 'Failed Tests')); //'<h4>Failed Tests</h4>';
 
       $alert['state_popup'] .= '<table style="min-width: 400px;" class="table   table-striped table-condensed">';
@@ -312,36 +301,40 @@ function print_alert_table($vars)
 
     echo '&nbsp;&nbsp;';
 
-        $form = array('type'       => 'simple',
-                      //'userlevel'  => 10,          // Minimum user level for display form
-                      'id'         => 'alert_entry_ignore_until_ok_'.$alert['alert_table_id'],
-                      'style'      => 'display:inline;',
-                     );
+    $form = [
+      'type'       => 'simple',
+      //'userlevel'  => 10,          // Minimum user level for display form
+      'id'         => 'alert_entry_ignore_until_ok_'.$alert['alert_table_id'],
+      'style'      => 'display:inline;',
+    ];
 
-        $form['row'][0]['form_alert_table_id'] = array(
-                                        'type'        => 'hidden',
-                                        'value'       => $alert['alert_table_id']);
+    $form['row'][0]['form_alert_table_id'] = [
+      'type'        => 'hidden',
+      'value'       => $alert['alert_table_id']
+    ];
 
-        $form['row'][99]['action'] = array(
-                                        'type'        => 'submit',
-                                        'icon_only'   => TRUE, // hide button styles
-                                        'name'        => '',
-                                        'readonly'    => $alert['alert_status'] == '1',
-                                        'icon'        => $alert['alert_status'] == '1' ? 'icon-ok-circle text-muted' : 'icon-ok-sign text-muted',
-                                        // confirmation dialog
-                                        'attribs'     => array('data-toggle'            => 'confirm', // Enable confirmation dialog
-                                                               'data-confirm-placement' => 'left',
-                                                               'data-confirm-content'   => 'Ignore until ok?',
-                                                               //'data-confirm-content' => '<div class="alert alert-warning"><h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>
-                                                               //                           This association will be deleted!</div>'),
-                                                              ),
-                                        'value'       => 'alert_entry_ignore_until_ok');
+    $form['row'][99]['action'] = [
+      'type'        => 'submit',
+      'icon_only'   => TRUE, // hide button styles
+      'name'        => '',
+      'readonly'    => get_var_true($alert['alert_status'], '3'), // alert_status == 3 mean suppressed
+      'icon'        => get_var_true($alert['alert_status'], '3') ? 'icon-ok-circle text-muted' : 'icon-ok-sign text-muted',
+      // confirmation dialog
+      'attribs'     => [
+        'data-toggle'            => 'confirm', // Enable confirmation dialog
+        'data-confirm-placement' => 'left',
+        'data-confirm-content'   => 'Ignore until ok?',
+        //'data-confirm-content' => '<div class="alert alert-warning"><h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>
+        //                           This association will be deleted!</div>'),
+      ],
+      'value'       => 'alert_entry_ignore_until_ok'
+    ];
 
-        print_form($form);
-        unset($form);
-
-
-
+    // Only show ignore-until button if userlevel is above 8
+    if ($_SESSION['userlevel'] >= 8) {
+      print_form($form);
+      unset($form);
+    }
 
     echo('</td>');
     echo('</tr>');

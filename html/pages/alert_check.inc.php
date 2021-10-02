@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,6 +23,20 @@ include($config['html_dir']."/includes/alerting-navbar.inc.php");
 $readonly = $_SESSION['userlevel'] < 10; // Currently edit allowed only for Admins
 
 $check = dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", array($vars['alert_test_id']));
+
+// Hardcode Device sysContact
+if (!dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
+  $syscontact = [
+    'contact_descr'            => 'Device sysContact',
+    'contact_method'           => 'syscontact',
+    'contact_endpoint'         => '{"syscontact":"device"}',
+    //'contact_disabled'         => '0',
+    //'contact_disabled_until'   => NULL,
+    //'contact_message_custom'   => 0,
+    //'contact_message_template' => NULL
+  ];
+  dbInsert($syscontact, 'alert_contacts');
+}
 
 // FIXME: move all actions to separate include(s) with common options!
 //if (!$readonly && isset($vars['action']))
@@ -128,7 +142,7 @@ if (!$readonly && $vars['action'])
   {
     $update_message = $rows_updated . " Record(s) updated.";
     $update_type = 'success';
-    set_obs_attrib('alerts_require_rebuild', '1');
+    //set_obs_attrib('alerts_require_rebuild', '1'); not required anymore
   }
   elseif ($rows_updated = '-1')
   {
@@ -159,7 +173,17 @@ humanize_alert_check($check);
 
   echo generate_box_open($box_args);
 
-  $contacts = dbFetchRows("SELECT * FROM `alert_contacts_assoc` LEFT JOIN `alert_contacts` ON `alert_contacts`.`contact_id` = `alert_contacts_assoc`.`contact_id` WHERE `aca_type` = 'alert' AND `alert_checker_id` = ?", array($vars['alert_test_id']));
+  $where = '`aca_type` = ? AND `alert_checker_id` = ?';
+  $params = [ 'alert', $vars['alert_test_id'] ];
+  if ($config['email']['default_syscontact']) {
+    $where = "($where) OR `contact_method` = ?";
+    $params[] = 'syscontact';
+  }
+
+  $sql = "SELECT * FROM `alert_contacts_assoc`
+          LEFT JOIN `alert_contacts` ON `alert_contacts`.`contact_id` = `alert_contacts_assoc`.`contact_id`
+          WHERE $where";
+  $contacts = dbFetchRows($sql, $params);
 
   echo('
         <table class="' . OBS_CLASS_TABLE_STRIPED . '">
@@ -194,7 +218,11 @@ humanize_alert_check($check);
   echo '</td>';
 
   //r($check);
-  $conditions = json_decode($check['conditions'], TRUE);
+  $conditions = safe_json_decode($check['conditions']);
+  $allowed_metrics = array_keys($config['entities'][$check['entity_type']]['metrics']);
+  // FIXME. Currently hardcoded in check_entity(), need rewrite to timeranges.
+  $allowed_metrics[] = 'time';
+  $allowed_metrics[] = 'weekday';
 
   $condition_text_block = array();
   $suggest_entity_types = [ $check['entity_type'] => [ 'name' => $config['entities'][$check['entity_type']]['name'],
@@ -202,8 +230,7 @@ humanize_alert_check($check);
   foreach ($conditions as $condition)
   {
     // Detect incorrect metric used
-    if (!isset($config['entities'][$check['entity_type']]['metrics'][$condition['metric']]))
-    {
+    if (!in_array($condition['metric'], $allowed_metrics, TRUE)) {
       print_error("Unknown condition metric '".$condition['metric']."' for Entity type '".$check['entity_type']."'");
 
       foreach (array_keys($config['entities']) as $suggest_entity)
@@ -277,7 +304,8 @@ humanize_alert_check($check);
   if (!$readonly)
   {
     $navbar['options_right']['edit_test']  = array('text' => 'Edit Conditions', 'icon' => $config['icon']['config'], 'url' => '#modal-edit_conditions', 'link_opts' => 'data-toggle="modal"');
-    $navbar['options_right']['edit_alert'] = array('text' => 'Edit Alert',      'icon' => $config['icon']['tools'],  'url' => '#modal-edit_alert',      'link_opts' => 'data-toggle="modal"');
+    $navbar['options_right']['edit_alert'] = array('text' => 'Edit Check',      'icon' => $config['icon']['tools'],  'url' => '#modal-edit_alert',      'link_opts' => 'data-toggle="modal"');
+    $navbar['options_right']['dupe_alert'] = array('text' => 'Duplicate Check',      'icon' => $config['icon']['plus'],  'url' => generate_url([ 'page' => 'add_alert_check', 'entity_type' => $check['entity_type'], 'duplicate_id' => $check['alert_test_id'] ]));
     $navbar['options_right']['delete']     = array('text' => 'Delete',          'icon' => $config['icon']['cancel'], 'url' => '#modal-delete_alert',    'link_opts' => 'data-toggle="modal"');
   }
 
@@ -334,11 +362,43 @@ humanize_alert_check($check);
     $form_params['alert_and'][1] = array('name' => 'Require all conditions', 'icon' => $config['icon']['and-gate']);
 
     $metrics_list = [];
-    foreach ($config['entities'][$check['entity_type']]['metrics'] as $metric => $entry)
-    {
-      $metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
+    foreach ($config['entities'][$check['entity_type']]['metrics'] as $metric => $entry) {
+      $metric_list = [
+        'metric'      => $metric,
+        'description' => $entry['label'],
+      ];
+      $metric_list['values'] = '';
+      if (is_array($entry['values'])) {
+        $metric_list['values'] = '<span class="label">'.implode('</span>  <span class="label">', $entry['values']).'</span>';
+      } elseif ($entry['type'] === 'integer') {
+        $metric_list['values'] = escape_html('<numeric>');
+        if (str_contains($metric, 'value')) {
+          $metric_list['values'] .= '<br />';
+          // some table fields
+          foreach ([ 'limit_high', 'limit_high_warn', 'limit_low', 'limit_low_warn' ] as $field) {
+            if (isset($config['entities'][$check['entity_type']]['table_fields'][$field])) {
+              $metric_list['values'] .= '<span class="label">@' . $config['entities'][$check['entity_type']]['table_fields'][$field].'</span>  ';
+            }
+          }
+        }
+      } else {
+        $metric_list['values'] = escape_html('<'.$entry['type'].'>');
+      }
+      $metrics_list[] = $metric_list;
+      //$metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
     }
-    $form_params['metrics'] = implode(',<br/>', $metrics_list);
+    //$form_params['metrics'] = implode(',<br/>', $metrics_list);
+    $metrics_opts = [
+      'columns' => [
+        [ 'Metrics', 'style="width: 5%;"' ],
+        'Description',
+        'Values'
+      ],
+      'metric' => [ 'class' => 'label' ],
+      'description' => [ 'class' => 'text-nowrap' ],
+      'values' => [ 'escape' => FALSE ]
+    ];
+    $form_params['metrics'] = build_table($metrics_list, $metrics_opts);
 
     $form['row'][5]['alert_and'] = array(
                                       'type'        => 'select',
@@ -430,7 +490,7 @@ humanize_alert_check($check);
     $form['row'][4]['alert_test_id'] = array(
                                       'type'        => 'hidden',
                                       'fieldset'    => 'body',
-                                      'value'       => escape_html($check['alert_test_id']));
+                                      'value'       => $check['alert_test_id']);
     $form['row'][5]['alert_name'] = array(
                                       'type'        => 'text',
                                       'fieldset'    => 'body',
@@ -438,7 +498,7 @@ humanize_alert_check($check);
                                       //'class'       => 'input-xlarge',
                                       'width'       => '320px',
                                       'placeholder' => TRUE,
-                                      'value'       => escape_html($check['alert_name']));
+                                      'value'       => $check['alert_name']);
     $form['row'][6]['alert_message'] = array(
                                       'type'        => 'textarea',
                                       'fieldset'    => 'body',
@@ -447,7 +507,7 @@ humanize_alert_check($check);
                                       'width'       => '320px',
                                       'rows'        => 3,
                                       'placeholder' => 'Alert message',
-                                      'value'       => escape_html($check['alert_message']));
+                                      'value'       => $check['alert_message']);
     $form['row'][7]['alert_delay'] = array(
                                       'type'        => 'text',
                                       'fieldset'    => 'body',
@@ -455,7 +515,7 @@ humanize_alert_check($check);
                                       //'class'       => 'input-xlarge',
                                       'width'       => '320px',
                                       'placeholder' => "&#8470; of checks to delay alert",
-                                      'value'       => escape_html($check['delay']));
+                                      'value'       => $check['delay']);
     $form['row'][8]['alert_send_recovery'] = array(
                                       'type'        => 'toggle',
                                       'fieldset'    => 'body',
@@ -568,8 +628,7 @@ humanize_alert_check($check);
     /* End delete alert */
   }
 
-if ($vars['view'] == "assoc")
-{
+if ($vars['view'] === "assoc") {
   register_html_title('Alert Associations');
 
   $assocs = dbFetchRows("SELECT * FROM `alert_assoc` WHERE `alert_test_id` = ?", array($vars['alert_test_id']));
@@ -580,8 +639,7 @@ if ($vars['view'] == "assoc")
 
 <?php
 
-  if(!is_null($check['alert_assoc']))
-  {
+  if (!is_null($check['alert_assoc'])) {
 
     register_html_resource('css', 'query-builder.default.css');
     register_html_resource('js', 'jQuery.extendext.min.js');
@@ -597,7 +655,7 @@ if ($vars['view'] == "assoc")
 
             $form_id = 'rules-' . generate_random_string(8);
 
-            echo '<div id="' . $form_id . '"></div>';
+            //echo '<div id="' . $form_id . '"></div>';
             //echo '<div id="output"></div>';
 
             generate_querybuilder_form($check['entity_type'], 'attribs', $form_id, $check['alert_assoc']);
@@ -613,7 +671,8 @@ $script = "<script>
       var formData = JSON.stringify({
                                 action: 'alert_assoc_edit',
                                 alert_assoc: JSON.stringify(result),
-                                alert_test_id: '" . $check['alert_test_id'] . "'
+                                alert_test_id: '" . $check['alert_test_id'] . "',
+                                requesttoken: document.getElementById('requesttoken').value
       });
       
       var request = $.ajax({
@@ -1199,8 +1258,7 @@ echo generate_box_close(array('footer_content' => $footer_content));
 
   $all_contacts = dbFetchRows('SELECT * FROM `alert_contacts` WHERE `contact_disabled` = 0 ORDER BY `contact_method`, `contact_descr`');
 
-  if (count($all_contacts))
-  {
+  if (safe_count($all_contacts)) {
     $form_items = array();
     foreach ($all_contacts as $contact)
     {
@@ -1251,15 +1309,12 @@ echo generate_box_close(array('footer_content' => $footer_content));
 
 </div>';
 
-}
-elseif ($vars['view'] == 'entries')
-{
+} elseif ($vars['view'] === 'entries') {
   echo '
 <div class="row" style="margin-top: 10px;">
   <div class="col-md-12">';
 
-  if ($vars['view'] == 'alert_log')
-  {
+  if ($vars['view'] === 'alert_log') {
     register_html_title('Alert Logs');
     print_alert_log($vars);
   } else {

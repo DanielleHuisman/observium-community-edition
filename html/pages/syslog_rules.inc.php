@@ -1,18 +1,16 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-if ($_SESSION['userlevel'] < 7)
-{
+if ($_SESSION['userlevel'] < 7) {
   print_error_permission();
   return;
 }
@@ -21,6 +19,20 @@ include($config['html_dir'].'/includes/alerting-navbar.inc.php');
 
 // Begin Actions
 $readonly = $_SESSION['userlevel'] < 10; // Currently edit allowed only for Admins
+
+// Hardcode Device sysContact
+if (!dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
+  $syscontact = [
+    'contact_descr'            => 'Device sysContact',
+    'contact_method'           => 'syscontact',
+    'contact_endpoint'         => '{"syscontact":"device"}',
+    //'contact_disabled'         => '0',
+    //'contact_disabled_until'   => NULL,
+    //'contact_message_custom'   => 0,
+    //'contact_message_template' => NULL
+  ];
+  dbInsert($syscontact, 'alert_contacts');
+}
 
 if (!$readonly && isset($vars['action']) &&
     request_token_valid($vars['requesttoken']))
@@ -43,8 +55,7 @@ if (!$readonly && isset($vars['action']) &&
       break;
 
     case 'delete_syslog_rule':
-      if (in_array($vars['confirm'], array('1', 'on', 'yes', 'confirm')))
-      {
+      if (get_var_true($vars['confirm'], 'confirm')) {
         $rows_deleted  = dbDelete('syslog_rules_assoc',   '`la_id` = ?', array($vars['la_id']));
         $rows_deleted += dbDelete('syslog_rules',         '`la_id` = ?', array($vars['la_id']));
         $rows_deleted += dbDelete('syslog_alerts',        '`la_id` = ?', array($vars['la_id']));
@@ -235,7 +246,7 @@ function print_syslog_rules_table($vars)
                                       'class'       => 'input-xxlarge',
                                       'value'       => escape_html($la['la_rule']));
       $form['row'][6]['la_disable'] = array(
-                                      'type'        => 'switch',
+                                      'type'        => 'switch-ng',
                                       'fieldset'    => 'body',
                                       'name'        => 'Status',
                                       'on-text'     => 'Disabled',

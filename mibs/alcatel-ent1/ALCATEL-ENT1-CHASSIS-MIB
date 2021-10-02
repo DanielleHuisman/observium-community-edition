@@ -9,8 +9,8 @@ IMPORTS
          Counter32              FROM SNMPv2-SMI
          PhysicalIndex,
          entPhysicalIndex       FROM ENTITY-MIB
-         hardentENT1Physical,
-         hardentENT1Chassis     FROM ALCATEL-ENT1-BASE
+         hardentIND1Physical,
+         hardentIND1Chassis     FROM ALCATEL-ENT1-BASE
          SnmpAdminString        FROM SNMP-FRAMEWORK-MIB
          MacAddress,
          TruthValue,
@@ -21,7 +21,7 @@ IMPORTS
          NOTIFICATION-GROUP     FROM SNMPv2-CONF;
 
 
-alcatelENT1ChassisMIB MODULE-IDENTITY
+alcatelIND1ChassisMIB MODULE-IDENTITY
     LAST-UPDATED "201103230000Z"
     ORGANIZATION "Alcatel-Lucent, Enterprise Solutions Division"
     CONTACT-INFO
@@ -95,28 +95,28 @@ alcatelENT1ChassisMIB MODULE-IDENTITY
 
         DESCRIPTION
             "Addressing discrepancies with Alcatel Standard."
-     ::= { hardentENT1Chassis 1 }
+     ::= { hardentIND1Chassis 1 }
 
 
     alcatelIND1ChassisMIBNotifications OBJECT-IDENTITY
         STATUS current
         DESCRIPTION
             "Branch For Chassis MIB Subsystem Notifications."
-        ::= { alcatelENT1ChassisMIB 0 }
+        ::= { alcatelIND1ChassisMIB 0 }
 
     alcatelIND1ChassisMIBObjects OBJECT-IDENTITY
         STATUS current
         DESCRIPTION
             "Branch For Chassis Supervision Chassis MIB
             Subsystem Managed Objects."
-        ::= { alcatelENT1ChassisMIB 1 }
+        ::= { alcatelIND1ChassisMIB 1 }
 
     alcatelIND1ChassisMIBConformance OBJECT-IDENTITY
         STATUS current
         DESCRIPTION
             "Branch For Chassis Supervision Chassis MIB
             Subsystem Conformance Information."
-        ::= { alcatelENT1ChassisMIB 2 }
+        ::= { alcatelIND1ChassisMIB 2 }
 
     alcatelIND1ChassisMIBGroups OBJECT-IDENTITY
         STATUS current
@@ -139,7 +139,7 @@ alcatelENT1ChassisMIB MODULE-IDENTITY
         DESCRIPTION
             "Branch For Chassis Supervision Chassis Physical MIB
             Subsystem Managed Objects."
-        ::= { hardentENT1Physical 1 }
+        ::= { hardentIND1Physical 1 }
 
 
     alcatelIND1ChassisPhysMIBConformance OBJECT-IDENTITY
@@ -147,7 +147,7 @@ alcatelENT1ChassisMIB MODULE-IDENTITY
         DESCRIPTION
             "Branch For Chassis Supervision Chassis Physical MIB
             Subsystem Conformance Information."
-        ::= { hardentENT1Physical 2 }
+        ::= { hardentIND1Physical 2 }
 
 
     alcatelIND1ChassisPhysMIBGroups OBJECT-IDENTITY
@@ -615,7 +615,8 @@ ChasChassisEntry ::= SEQUENCE
         chasNI6HardwareBoardTemp    Integer32,
         chasNI7HardwareBoardTemp    Integer32,
         chasNI8HardwareBoardTemp    Integer32,
-        chasPowerSupplyRedundancy   INTEGER
+        chasPowerSupplyRedundancy   INTEGER,
+        chasPowerSupplyRedundancyReserve  INTEGER
     }
 
 
@@ -894,9 +895,44 @@ chasPowerSupplyRedundancy       OBJECT-TYPE
          efficient use of the power supplies, with 1 extra power supply
          in case of a power supply failure. Unneeded power supplies are
          powered off. It can be set to off(2) to disable redundancy mode.
-         In this mode all power supplies are powered on."
+         In this mode all power supplies are powered on.
+         This object is applicable only to OS10K devices."
     DEFVAL   { on }
 ::= { chasChassisEntry 24 }
+
+chasPowerSupplyRedundancyReserve       OBJECT-TYPE
+    SYNTAX INTEGER
+    {
+       on(1),
+       off(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "When chasPowerSupplyRedundancyReserve is enabled, N+1 power supply 
+         redundancy reserve holds the wattage of one power supply in reserve 
+         such that the user cannot insert NIs or configure power over Ethernet (POE)
+         that will use the reserved power from that supply. There are two main advantages 
+         to enabling chasPowerSupplyRedundancyReserve. The first advantage is that 
+         it provides resiliency to avoid POE drawing power from the four main power supplies
+         in the OS9900 chassis to the extent that POE sinks much more wattage than 
+         the CMM, CFM, and NI board logic combined. (Note: The power management functions 
+         on the OS9900 are complicated by the presence of the controllers on the GNI-P48 boards. 
+         Unlike other chassis supporting POE, like OS6860, there is no separate power supply 
+         for the POE front-panel ports.) This is not to be confused with chasPowerSupplyRedundancy 
+         which switches off unneeded power supplies - on the OS9900, all inserted power supplies
+         are always switched on and enabled. The second advantage of enabling 
+         chasPowerSupplyRedundancyReserve is to avoid 'brown-outs'. 
+         (A brown-out may happen when a system running at full POE capacity without the N+1 redundancy reserve
+         enabled suffers a power supply failure causing the POE hardware to immediately
+         disable power over Ethernet on the basis of port priority as soon as it detects the failure.
+         Then, if there is still insufficient power available to run the logic and fan trays,
+         the power supplies will 'crowbar' and the system will be power cycled. The software can 
+         do little in this scenario since there is insufficient power to keep the CPU chips running.
+         When the system reboots the chassis supervisor will only power-up NI slots based 
+         upon the power available from the remaining power supplies.)"
+    DEFVAL   { on }
+::= { chasChassisEntry 25 }
 
 -- Extension of the Entity physical table
 
@@ -2039,7 +2075,9 @@ chasGlobalControlUpdateFirmware OBJECT-TYPE
                 fpgaNi(7),
                 fpgaNiDaughterBoard1(8),
                 fpgaNiDaughterBoard2(9),
-		fpgaCmmAll(10)
+                fpgaCmmAll(10),
+                fpgaCmmPower(11),
+                fpgaNiPower(12)
         }
         MAX-ACCESS read-write
         STATUS current
@@ -3129,7 +3167,8 @@ physicalIndex             OBJECT-TYPE
             chasNI6HardwareBoardTemp,
             chasNI7HardwareBoardTemp,
             chasNI8HardwareBoardTemp,
-            chasPowerSupplyRedundancy
+            chasPowerSupplyRedundancy,
+            chasPowerSupplyRedundancyReserve
         }
         STATUS  current
         DESCRIPTION

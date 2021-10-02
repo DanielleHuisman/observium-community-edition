@@ -20,7 +20,7 @@ $oids = array('hh3cEntityExtMemUsage', 'hh3cEntityExtMemSize');
 $mempool_array = array();
 foreach ($oids as $oid)
 {
-  $mempool_array = snmpwalk_cache_multi_oid($device, $oid, $mempool_array, $mib);
+  $mempool_array = snmpwalk_cache_oid($device, $oid, $mempool_array, $mib);
   if (!$GLOBALS['snmp_status']) { break; }
 }
 

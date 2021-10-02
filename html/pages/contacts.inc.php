@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -28,10 +28,25 @@ include($config['html_dir'].'/includes/contacts-navbar.inc.php');
 
 <?php
 
+// Hardcode Device sysContact
+if (!dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
+  $syscontact = [
+    'contact_descr'            => 'Device sysContact',
+    'contact_method'           => 'syscontact',
+    'contact_endpoint'         => '{"syscontact":"device"}',
+    //'contact_disabled'         => '0',
+    //'contact_disabled_until'   => NULL,
+    //'contact_message_custom'   => 0,
+    //'contact_message_template' => NULL
+  ];
+  dbInsert($syscontact, 'alert_contacts');
+}
+
 // FIXME. Show for anyone > 5 (also for non-ADMIN) and any contacts?
 $contacts = dbFetchRows('SELECT * FROM `alert_contacts` WHERE 1');
-if (count($contacts))
-{
+
+if (count($contacts)) {
+  //r($contacts);
   // We have contacts, print the table.
   echo generate_box_open();
 ?>
@@ -55,43 +70,44 @@ if (count($contacts))
 
   $modals = '';
 
-  foreach ($contacts as $contact)
-  {
-    $num_assocs = dbFetchCell("SELECT COUNT(*) FROM `alert_contacts_assoc` WHERE `contact_id` = ?", array($contact['contact_id'])) + 0;
+  foreach ($contacts as $contact) {
+    if ($contact['contact_method'] === 'syscontact' && $config['email']['default_syscontact']) {
+      $num_assocs = dbFetchCell('SELECT COUNT(*) FROM `alert_tests`') + 0;
+      $num_assocs += dbFetchCell('SELECT COUNT(*) FROM `syslog_rules`') + 0;
+    } else {
+      $num_assocs = dbFetchCell("SELECT COUNT(*) FROM `alert_contacts_assoc` WHERE `contact_id` = ?", array( $contact['contact_id'] )) + 0;
+    }
 
     if ($contact['contact_disabled'] == 1) { $disabled = ""; }
 
     // If we have "identifiers" set for this type of transport, use those to print a user friendly destination.
     // If we don't, just dump the JSON array as we don't have a better idea what to do right now.
     $transport = $contact['contact_method'];
-    if (isset($config['transports'][$transport]['identifiers']))
-    {
+    if (isset($config['transports'][$transport]['identifiers'])) {
       // Decode JSON for use below
       $contact['endpoint_variables'] = json_decode($contact['contact_endpoint'], TRUE);
 
       // Add all identifier strings to an array and implode them into the description variable
       // We can't just foreach the identifiers array as we don't know what section the variable is in
-      foreach ($config['transports'][$contact['contact_method']]['identifiers'] as $key)
-      {
-        foreach ($config['transports'][$contact['contact_method']]['parameters'] as $section => $parameters)
-        {
-          if (isset($parameters[$key]) && isset($contact['endpoint_variables'][$key]))
-          {
+      foreach ($config['transports'][$contact['contact_method']]['identifiers'] as $key) {
+        foreach ($config['transports'][$contact['contact_method']]['parameters'] as $section => $parameters) {
+          if (isset($parameters[$key]) && isset($contact['endpoint_variables'][$key])) {
             $contact['endpoint_identifiers'][] = escape_html($parameters[$key]['description'] . ': ' . $contact['endpoint_variables'][$key]);
           }
         }
       }
 
       $contact['endpoint_descr'] = implode('<br />', $contact['endpoint_identifiers']);
-    }
-    else
-    {
+    } else {
       $contact['endpoint_descr'] = escape_html($contact['contact_endpoint']);
     }
 
-    if (!isset($config['transports'][$transport]))
-    {
-        // Transport undefined (removed or limited to Pro)
+    if ($transport === 'syscontact') {
+      $transport_name = 'sysContact';
+      $transport_status = $contact['contact_disabled'] ? '<span class="label label-error">disabled</span>' : '<span class="label label-success">enabled</span>';
+      $contact['endpoint_descr'] = 'Device specified contact in sysContact field (email only)';
+    } elseif (!isset($config['transports'][$transport])) {
+      // Transport undefined (removed or limited to Pro)
       $transport_name = nicecase($transport) . ' (Missing)';
       $transport_status = '<span class="label">missing</span>';
     } else {
@@ -107,8 +123,7 @@ if (count($contacts))
     echo '      <td><span class="label label-primary">'.$num_assocs.'</span></td>';
     echo '      <td>' . $transport_status . '</td>';
     echo '      <td style="text-align: right;">';
-    if ($_SESSION['userlevel'] >= 10)
-    {
+    if ($_SESSION['userlevel'] >= 10 && $transport !== 'syscontact') {
       echo '
       <div class="btn-group btn-group-xs" role="group" aria-label="Contact actions">
         <a class="btn btn-danger" role="group" title="Delete" href="#modal-contact_delete_' . $contact['contact_id'] . '" data-toggle="modal"><i class="icon-trash"></i></a>

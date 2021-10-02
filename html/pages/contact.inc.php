@@ -6,55 +6,57 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Contact display and editing page.
 
-if ($_SESSION['userlevel'] < 7)
-{
+if ($_SESSION['userlevel'] < 7) {
   // Allowed only secure global read permission
   print_error_permission();
   return;
 }
 
 include($config['html_dir'].'/includes/alerting-navbar.inc.php');
-
 include($config['html_dir'].'/includes/contacts-navbar.inc.php');
 
-if ($contact = get_contact_by_id($vars['contact_id']))
-{
+if ($contact = get_contact_by_id($vars['contact_id'])) {
 
 ?>
 
 <div class="row">
-  <div class="col-sm-6">
+  <div class="col-sm-7">
 <?php
 
-  foreach (json_decode($contact['contact_endpoint']) as $field => $value)
-  {
+  foreach (safe_json_decode($contact['contact_endpoint']) as $field => $value) {
     $contact['endpoint_parameters'][$field] = $value;
   }
 
   $transport = $contact['contact_method'];
-  if (isset($config['transports'][$transport]))
-  {
+  if ($transport === 'syscontact') {
+    //$readonly = TRUE;
+    $data = [
+      'name' => 'sysContact',
+      'docs' => $transport
+    ];
+  } elseif (isset($config['transports'][$transport])) {
     $data = $config['transports'][$transport];
   } else {
-    $data = [ 'name' => nicecase($transport) . ' (Missing)',
-              'docs' => $transport];
+    $data = [
+      'name' => nicecase($transport) . ' (Missing)',
+      'docs' => $transport
+    ];
   }
 
-    if (isset($data['docs']))
-    {
+    if (isset($data['docs'])) {
       // Known key in docs page (use if transport name is different with docs page)
       $docs_link = OBSERVIUM_DOCS_URL . '/alerting_transports/#' . $data['docs'];
     } else {
       $docs_link = OBSERVIUM_DOCS_URL . '/alerting_transports/#' . str_replace(' ', '-', strtolower($data['name']));
     }
 
-    if (!count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
+    if (!safe_count($data['parameters']['global'])) { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
     // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
     // This needs supporting code in the transport to check for set variable and if not, use the global default
 
@@ -81,7 +83,7 @@ if ($contact = get_contact_by_id($vars['contact_id']))
                                     'html'        => '<a id="contact_doc" href="' . $docs_link . '" target="_blank">See documentation for this Transport (new page)</a>');
 
     $form['row'][++$row]['contact_enabled'] = array(
-                                    'type'        => 'switch',
+                                    'type'        => 'switch-ng',
                                     //'fieldset'    => 'edit',
                                     'name'        => 'Contact Status',
                                     'size'        => 'small',
@@ -97,11 +99,10 @@ if ($contact = get_contact_by_id($vars['contact_id']))
                                     //'fieldset'    => 'edit',
                                     'name'        => 'Description',
                                     'width'       => '80%',
-                                    'readonly'    => $readonly,
+                                    'readonly'    => $readonly || $transport === 'syscontact',
                                     'value'       => $contact['contact_descr']);
 
-  if (count($data['parameters']['required']) || count($data['parameters']['global']))
-  {
+  if (safe_count($data['parameters']['required']) || safe_count($data['parameters']['global'])) {
     // Pseudo item, just for additional title
     $form['row'][++$row]['contact_required'] = array(
                                     'type'        => 'html',
@@ -132,15 +133,40 @@ if ($contact = get_contact_by_id($vars['contact_id']))
           }
         // do not break here
         case 'enum':
+          if (isset($contact['endpoint_parameters'][$parameter])) {
+            $value = $contact['endpoint_parameters'][$parameter];
+            if (isset($param_data['default']) &&
+                !(isset($param_data['params'][$value]) || in_array($value, (array)$param_data['params']))) {
+              $value = $param_data['default'];
+            }
+          } else {
+            $value = $param_data['default'];
+          }
           $form_param = [
             'type'     => 'select',
             //'fieldset'    => 'edit',
             'name'     => $param_data['description'],
             'width'    => '80%',
             'readonly' => $readonly,
-            'value'    => $contact['endpoint_parameters'][$parameter],
+            'value'    => $value,
             'values'   => $param_data['params']
           ];
+          break;
+        case 'textarea':
+          $form_param = [
+            'type'     => 'textarea',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '80%',
+            'rows'     => 5,
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter]
+          ];
+          // Prettify JSON
+          if (isset($param_data['format']) && $param_data['format'] === 'json' &&
+              $json = safe_json_decode($form_param['value'])) {
+            $form_param['value'] = safe_json_encode($json, JSON_PRETTY_PRINT);
+          }
           break;
         default:
           $form_param = [
@@ -160,13 +186,13 @@ if ($contact = get_contact_by_id($vars['contact_id']))
                                     'type'        => 'raw',
                                     //'fieldset'    => 'edit',
                                     'readonly'    => $readonly,
-                                    'html'        => generate_tooltip_link(NULL, '<i class="'.$config['icon']['question'].'"></i>', $param_data['tooltip']));
+                                    'html'        => generate_tooltip_link(NULL, '<i class="'.$config['icon']['question'].'"></i>', escape_html($param_data['tooltip'])));
       }
 
     }
   }
 
-  if (count($data['parameters']['optional']))
+  if (safe_count($data['parameters']['optional']))
   {
     // Pseudo item, just for additional title
     $form['row'][++$row]['contact_optional'] = array(
@@ -194,19 +220,44 @@ if ($contact = get_contact_by_id($vars['contact_id']))
           // Boolean type is just select with true/false string
           if (!isset($param_data['params']))
           {
-            $param_data['params'] = ['' => 'Unset', 'true' => 'True', 'false' => 'False' ];
+            $param_data['params'] = [ '' => 'Unset', 'true' => 'True', 'false' => 'False' ];
           }
         // do not break here
         case 'enum':
+          if (isset($contact['endpoint_parameters'][$parameter])) {
+            $value = $contact['endpoint_parameters'][$parameter];
+            if (isset($param_data['default']) &&
+                !(isset($param_data['params'][$value]) || in_array($value, (array)$param_data['params']))) {
+              $value = $param_data['default'];
+            }
+          } else {
+            $value = $param_data['default'];
+          }
           $form_param = [
             'type'     => 'select',
             //'fieldset'    => 'edit',
             'name'     => $param_data['description'],
             'width'    => '80%',
             'readonly' => $readonly,
-            'value'    => $contact['endpoint_parameters'][$parameter],
+            'value'    => $value,
             'values'   => $param_data['params']
           ];
+          break;
+        case 'textarea':
+          $form_param = [
+            'type'     => 'textarea',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '80%',
+            'rows'     => 5,
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter]
+          ];
+          // Prettify JSON
+          if (isset($param_data['format']) && $param_data['format'] === 'json' &&
+              $json = safe_json_decode($form_param['value'])) {
+            $form_param['value'] = safe_json_encode($json, JSON_PRETTY_PRINT);
+          }
           break;
         default:
           $form_param = [
@@ -232,14 +283,74 @@ if ($contact = get_contact_by_id($vars['contact_id']))
     }
   }
 
-  $form['row'][++$row]['action'] = array(
-                                  'type'        => 'submit',
-                                  'name'        => 'Save Changes',
-                                  'icon'        => 'icon-ok icon-white',
-                                  'right'       => TRUE,
-                                  'class'       => 'btn-primary',
-                                  'readonly'    => $readonly,
-                                  'value'       => 'update_contact');
+  // User defined templates
+  $message_template = '';
+  $message_custom = isset($contact['contact_message_custom']) && $contact['contact_message_custom'];
+  if ($message_custom) {
+    // user defined
+    $message_template = $contact['contact_message_template'];
+  } elseif (isset($data['notification']['message_template'])) {
+    // file-based template
+    // template can have tags (ie telegram)
+    if (str_contains($data['notification']['message_template'], '%')) {
+      //print_vars($data['notification']['message_template']);
+      $template = array_tag_replace(generate_transport_tags($transport, $contact['endpoint_parameters']), $data['notification']['message_template']);
+      $template = strtolower($template);
+      //print_vars($template);
+    } else {
+      $template = $data['notification']['message_template'];
+    }
+    $message_template = get_template('notification', $template);
+
+    // remove own comments
+    $message_template = preg_replace('!^\s*/\*[\*\s]+Observium\s.*?\*/(\s*\n)?!is', '', $message_template);
+  } elseif (isset($data['notification']['message_text'])) {
+    // definition-based template
+    $message_template = $data['notification']['message_text'];
+  }
+  if (strlen($message_template)) {
+    // Pseudo item, just for additional title
+    $form['row'][++$row]['message_title'] = [
+      'type'        => 'html',
+      //'fieldset'    => 'edit',
+      'html'        => '<h3 id="message_title">Notification parameters</h3>'
+    ];
+
+    $form['row'][++$row]['contact_message_custom'] = [
+      'type'        => 'toggle',
+      'name'        => 'Custom template',
+      'view'        => 'toggle',
+      'size'        => 'large',
+      'placeholder' => 'Set custom message, using Mustache formatting.',// : [Notification templates]('.OBSERVIUM_DOCS_URL.'/xxx/){target=_blank}',
+      //'width'       => '250px',
+      'readonly'    => $readonly,
+      'onchange'    => "toggleAttrib('disabled', 'contact_message_template');",
+      'value'       => $message_custom
+    ];
+    $form['row'][++$row]['contact_message_template'] = [
+      'type'        => 'textarea',
+      //'fieldset'    => 'edit',
+      'name'        => 'Template',
+      'rows'        => 6,
+      'class'       => 'text-monospace small',
+      //'style'       => 'font-size: 12px;',
+      'width'       => '500px',
+      //'placeholder' => '1-30. Default 10.',
+      'readonly'    => $readonly,
+      'disabled'    => !$message_custom,
+      'value'       => $message_template
+    ];
+  }
+
+  $form['row'][++$row]['action'] = [
+          'type'        => 'submit',
+          'name'        => 'Save Changes',
+          'icon'        => 'icon-ok icon-white',
+          'right'       => TRUE,
+          'class'       => 'btn-primary',
+          'readonly'    => $readonly,
+          'value'       => 'update_contact'
+  ];
 
     //print_vars($form);
     print_form($form);
@@ -248,29 +359,33 @@ if ($contact = get_contact_by_id($vars['contact_id']))
 
   </div>
 
- <div class="col-sm-6">
+ <div class="col-sm-5">
 
 <?php
 
     // Alert associations
     $assoc_exists = array();
-    $assocs = dbFetchRows('SELECT * FROM `alert_contacts_assoc` AS A
+    if ($transport === 'syscontact' && $config['email']['default_syscontact']) {
+      $assocs = dbFetchRows('SELECT * FROM `alert_tests`
+                           ORDER BY `entity_type`, `alert_name` DESC');
+    } else {
+      $assocs = dbFetchRows('SELECT * FROM `alert_contacts_assoc` AS A
                            LEFT JOIN `alert_tests` AS T ON T.`alert_test_id` = A.`alert_checker_id`
                            WHERE `aca_type` = ? AND `contact_id` = ?
-                           ORDER BY `entity_type`, `alert_name` DESC', array('alert', $contact['contact_id']));
+                           ORDER BY `entity_type`, `alert_name` DESC', [ 'alert', $contact['contact_id'] ]);
+    }
     //r($assocs);
     echo generate_box_open(array('title' => 'Associated Alert Checkers', 'header-border' => TRUE));
-    if (count($assocs))
-    {
+    if (safe_count($assocs)) {
 
       echo('<table class="'. OBS_CLASS_TABLE_STRIPED .'">');
 
       foreach ($assocs as $assoc)
       {
 
-        $alert_test = get_alert_test_by_id($assoc['alert_checker_id']);
+        $alert_test = get_alert_test_by_id($assoc['alert_test_id']);
 
-        $assoc_exists[$assoc['alert_checker_id']] = TRUE;
+        $assoc_exists[$assoc['alert_test_id']] = TRUE;
 
         echo('<tr>
                   <td width="150px"><i class="'.$config['entities'][$alert_test['entity_type']]['icon'].'"></i> '.nicecase($alert_test['entity_type']).'</td>
@@ -279,12 +394,12 @@ if ($contact = get_contact_by_id($vars['contact_id']))
 
         $form = array('type'       => 'simple',
                       //'userlevel'  => 10,          // Minimum user level for display form
-                      'id'         => 'delete_alert_checker_'.$assoc['alert_checker_id'],
+                      'id'         => 'delete_alert_checker_'.$assoc['alert_test_id'],
                       'style'      => 'display:inline;',
                      );
         $form['row'][0]['alert_test_id'] = array(
                                         'type'        => 'hidden',
-                                        'value'       => $assoc['alert_checker_id']);
+                                        'value'       => $assoc['alert_test_id']);
         $form['row'][0]['contact_id'] = array(
                                         'type'        => 'hidden',
                                         'value'       => $contact['contact_id']);
@@ -294,7 +409,7 @@ if ($contact = get_contact_by_id($vars['contact_id']))
                                         'icon_only'   => TRUE, // hide button styles
                                         'name'        => '',
                                         'icon'        => $config['icon']['cancel'],
-                                        //'right'       => TRUE,
+                                        'readonly'    => $transport === 'syscontact',
                                         //'class'       => 'btn-small',
                                         // confirmation dialog
                                         'attribs'     => array('data-toggle'            => 'confirm', // Enable confirmation dialog
@@ -322,7 +437,7 @@ if ($contact = get_contact_by_id($vars['contact_id']))
 
   $alert_tests = dbFetchRows('SELECT * FROM `alert_tests` ORDER BY `entity_type`, `alert_name`');
 
-  if (count($alert_tests))
+  if (safe_count($alert_tests))
   {
     foreach ($alert_tests as $alert_test)
     {
@@ -372,13 +487,18 @@ if ($contact = get_contact_by_id($vars['contact_id']))
 
   // Syslog associations
   $assoc_exists = array();
-  $assocs = dbFetchRows('SELECT * FROM `alert_contacts_assoc` AS A
+  if ($transport === 'syscontact' && $config['email']['default_syscontact']) {
+    $assocs = dbFetchRows('SELECT * FROM `syslog_rules`
+                           ORDER BY `la_severity`, `la_name` DESC');
+  } else {
+    $assocs = dbFetchRows('SELECT * FROM `alert_contacts_assoc` AS A
                          LEFT JOIN `syslog_rules` AS T ON T.`la_id` = A.`alert_checker_id`
                          WHERE `aca_type` = ? AND `contact_id` = ?
-                         ORDER BY `la_severity`, `la_name` DESC', array('syslog', $contact['contact_id']));
+                         ORDER BY `la_severity`, `la_name` DESC', [ 'syslog', $contact['contact_id'] ]);
+  }
   //r($assocs);
   echo generate_box_open(array('title' => 'Associated Syslog Rules', 'header-border' => TRUE));
-  if (count($assocs))
+  if (safe_count($assocs))
   {
 
     echo('<table class="'. OBS_CLASS_TABLE_STRIPED .'">');
@@ -413,7 +533,7 @@ if ($contact = get_contact_by_id($vars['contact_id']))
                                       'icon_only'   => TRUE, // hide button styles
                                       'name'        => '',
                                       'icon'        => $config['icon']['cancel'],
-                                      //'right'       => TRUE,
+                                      'readonly'    => $transport === 'syscontact',
                                       //'class'       => 'btn-small',
                                       // confirmation dialog
                                       'attribs'     => array('data-toggle'            => 'confirm', // Enable confirmation dialog
@@ -440,7 +560,7 @@ if ($contact = get_contact_by_id($vars['contact_id']))
 
   $alert_tests = dbFetchRows('SELECT * FROM `syslog_rules` ORDER BY `la_severity`, `la_name`');
 
-  if (count($alert_tests))
+  if (safe_count($alert_tests))
   {
     foreach ($alert_tests as $alert_test)
     {

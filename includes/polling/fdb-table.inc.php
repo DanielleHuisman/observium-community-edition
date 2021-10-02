@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -44,8 +43,8 @@ include("includes/include-dir-mib.inc.php");
  * Cisco Q-BRIDGE-MIB *
  **********************/
 
-if (!count($fdbs) && $device['os_group'] == 'cisco' && empty($device['snmp_context']) &&
-    is_device_mib($device, 'Q-BRIDGE-MIB')) // Can block by mib permissions!
+if ($device['os_group'] === 'cisco' && empty($device['snmp_context']) &&
+    !safe_count($fdbs) && is_device_mib($device, 'Q-BRIDGE-MIB')) // Can block by mib permissions!
 {
 
   // I think this is global, not per-VLAN. (in normal world..)
@@ -73,23 +72,10 @@ if (!count($fdbs) && $device['os_group'] == 'cisco' && empty($device['snmp_conte
   {
     $vlan = $cisco_vlan['vlan_vlan'];
 
-    /* Not actual, since we check if context exist in vlans discovery
-    list($ios_version) = explode('(', $device['version']);
-    // vlan context not worked on Cisco IOS <= 12.1 (SNMPv3)
-    if ($device['snmp_version'] == 'v3' && $device['os'] == 'ios' && ($ios_version * 10) <= 121)
-    {
-      print_error('ERROR: For correct operation please use SNMP v2c for this device.');
-      break;
-    }
-
-    // Skip hardcoded VLANs used for non-Ethernet purposes.
-    if (!is_numeric($vlan) || ($vlan >= 1002 && $vlan <= 1005)) { continue; }
-    */
-
     // Set per-VLAN context
     $device_context = $device;
     // Add vlan context for snmp auth
-    if ($device['snmp_version'] == 'v3')
+    if ($device['snmp_version'] === 'v3')
     {
       $device_context['snmp_context'] = 'vlan-' . $vlan;
     } else {
@@ -100,13 +86,13 @@ if (!count($fdbs) && $device['os_group'] == 'cisco' && empty($device['snmp_conte
     //dot1dTpFdbAddress[0:7:e:6d:55:41] 0:7:e:6d:55:41
     //dot1dTpFdbPort[0:7:e:6d:55:41] 28
     //dot1dTpFdbStatus[0:7:e:6d:55:41] learned
-    $dot1dTpFdbEntry_table = snmp_walk_multipart_oid($device_context, 'dot1dTpFdbEntry', array(), 'BRIDGE-MIB', NULL, OBS_SNMP_ALL_TABLE);
+    $dot1dTpFdbEntry_table = snmpwalk_multipart_oid($device_context, 'dot1dTpFdbEntry', array(), 'BRIDGE-MIB', NULL, OBS_SNMP_ALL_TABLE);
 
     // Detection shit snmpv3 authorization errors for contexts
     if ($GLOBALS['exec_status']['exitcode'] != 0)
     {
       unset($device_context);
-      if ($device['snmp_version'] == 'v3')
+      if ($device['snmp_version'] === 'v3')
       {
         print_error("ERROR: For proper usage of 'vlan-' context on cisco device with SNMPv3, it is necessary to add 'match prefix' in snmp-server config.");
       } else {
@@ -114,7 +100,7 @@ if (!count($fdbs) && $device['os_group'] == 'cisco' && empty($device['snmp_conte
       }
       break;
     }
-    else if (!snmp_status())
+    elseif (!snmp_status())
     {
       // Continue if no entries for vlan
       unset($device_context);
@@ -160,18 +146,19 @@ unset($dot1dBasePortIfIndex, $dot1dTpFdbEntry_table);
  * non-Cisco Q-BRIDGE-MIB *
  **************************/
 
-if (!count($fdbs) && $device['os_group'] != 'cisco' && is_device_mib($device, 'Q-BRIDGE-MIB')) // Q-BRIDGE-MIB already blacklisted for vrp
+if ($device['os_group'] !== 'cisco' && !safe_count($fdbs) && is_device_mib($device, 'Q-BRIDGE-MIB')) // Q-BRIDGE-MIB already blacklisted for vrp
 {
   //dot1qTpFdbPort[1][0:0:5e:0:1:1] 50
   //dot1qTpFdbStatus[1][0:0:5e:0:1:1] learned
 
-  if ($device['os'] == 'junos')
+  if ($device['os'] === 'junos')
   {
     // JUNOS doesn't use the actual vlan ids for much in Q-BRIDGE-MIB
     // but we can get the vlan names and use that to lookup the actual
     // vlan ids that were found with JUNIPER-VLAN-MIB during discovery
 
     // Fetch list of active VLANs
+    $vlanidsbyname = [];
     foreach (dbFetchRows('SELECT `vlan_vlan`,`vlan_name` FROM `vlans` WHERE (`vlan_status` = ? OR `vlan_status` = ?) AND `device_id` = ?', array('active', 'operational', $device['device_id'])) as $entry)
     {
       $vlanidsbyname[$entry['vlan_name']] = $entry['vlan_vlan'];
@@ -242,7 +229,7 @@ if (!count($fdbs) && $device['os_group'] != 'cisco' && is_device_mib($device, 'Q
  *******************/
 
 // Note, BRIDGE-MIB not have Vlan information
-if (!count($fdbs) && is_device_mib($device, 'BRIDGE-MIB'))
+if (!safe_count($fdbs) && is_device_mib($device, 'BRIDGE-MIB'))
 {
 
   $dot1dTpFdbEntry_table = snmpwalk_cache_oid($device, 'dot1dTpFdbPort', array(), 'BRIDGE-MIB', NULL, OBS_SNMP_ALL_TABLE);
@@ -288,7 +275,7 @@ foreach ($fdbs as $vlan => $mac_list)
   {
 
     // Skip incorrect mac entries
-    if (strlen($mac) !== 12 || $mac == '000000000000')
+    if (strlen($mac) !== 12 || $mac === '000000000000')
     {
       //unset($fdbs[$vlan][$mac]);
       continue;
@@ -349,7 +336,6 @@ foreach ($fdbs as $vlan => $mac_list)
           dbUpdate($q_update, 'vlans_fdb', '`device_id` = ? AND `vlan_id` = ? AND `mac_address` = ?', array($device['device_id'], $vlan, $mac));
         }
         //echo('U');
-      } else {
       }
       // remove it from the existing list
       unset ($fdbs_db[$vlan][$mac]);
@@ -393,14 +379,14 @@ foreach ($fdbs_db as $vlan => $fdb_macs)
 }
 
 // MultiDelete old entries
-if (count($fdb_delete))
+if (safe_count($fdb_delete))
 {
   print_debug_vars($fdb_delete);
   dbDelete('vlans_fdb', generate_query_values($fdb_delete, 'fdb_id', NULL, FALSE));
 }
 
 // MultiInsert new fdb entries
-if (count($fdb_insert))
+if (safe_count($fdb_insert))
 {
   print_debug_vars($fdb_insert);
   dbInsertMulti($fdb_insert, 'vlans_fdb');

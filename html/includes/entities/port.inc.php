@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -20,16 +20,12 @@
  * @param array $vars
  * @return array
  */
-function build_ports_where_array($vars)
-{
+function build_ports_where_array($vars) {
   $where = array();
 
-  foreach($vars as $var => $value)
-  {
-    if ($value != '')
-    {
-      switch ($var)
-      {
+  foreach($vars as $var => $value) {
+    if (!safe_empty($value)) {
+      switch ($var) {
         case 'location':
           $where[] = generate_query_values($value, $var);
           break;
@@ -37,8 +33,14 @@ function build_ports_where_array($vars)
           $where[] = generate_query_values($value, 'ports.device_id');
           break;
         case 'group':
+        case 'group_id':
           $values  = get_group_entities($value);
           $where[] = generate_query_values($values, 'ports.port_id');
+          break;
+        case 'device_group_id':
+        case 'device_group':
+          $values = get_group_entities($value, 'device');
+          $where[] = generate_query_values($values, 'ports.device_id');
           break;
         case 'disable':
           $var = 'disabled';
@@ -68,14 +70,12 @@ function build_ports_where_array($vars)
           $where[] = generate_query_values($value, $var, 'LIKE');
           break;
         case 'errors':
-          if ($value == 1 || $value == "yes")
-          {
+          if (get_var_true($value)) {
             $where[] = " AND (`ifInErrors_delta` > '0' OR `ifOutErrors_delta` > '0')";
           }
           break;
         case 'alerted':
-          if ($value == "yes")
-          {
+          if (get_var_true($value)) {
             // this is just state=down
             //$where[] = ' AND `ifAdminStatus` = "up" AND (`ifOperStatus` = "lowerLayerDown" OR `ifOperStatus` = "down")';
             $var   = 'state';
@@ -85,26 +85,19 @@ function build_ports_where_array($vars)
         case 'state':
           // Allowed multiple states as array
           $state_where = [];
-          foreach ((array)$value as $state)
-          {
-            if ($state == "down")
-            {
+          foreach ((array)$value as $state) {
+            if ($state === "down") {
               $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("lowerLayerDown", "down")';
               //$state_where[] = generate_query_values('up', 'ifAdminStatus', NULL, FALSE) . generate_query_values(['down', 'lowerLayerDown'], 'ifOperStatus');
-            }
-            else if ($state == "up")
-            {
+            } elseif ($state === "up") {
               $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("up", "testing", "monitoring")';
               //$state_where[] = generate_query_values('up', 'ifAdminStatus', NULL, FALSE) . generate_query_values(['up', 'testing', 'monitoring'], 'ifOperStatus');
-            }
-            else if ($state == "admindown" || $state == "shutdown")
-            {
+            } elseif ($state === "admindown" || $state === "shutdown") {
               $state_where[] = '`ifAdminStatus` = "down"';
               //$state_where[] = generate_query_values('down', 'ifAdminStatus', NULL, FALSE);
             }
           }
-          switch (count($state_where))
-          {
+          switch (count($state_where)) {
             case 0:
               // incorrect state passed, ignore
               break;
@@ -116,14 +109,12 @@ function build_ports_where_array($vars)
           }
           break;
         case 'cbqos':
-          if ($value && $value != 'no')
-          {
+          if ($value && $value !== 'no') {
             $where[] = generate_query_values($GLOBALS['cache']['ports']['cbqos'], 'ports.port_id');
           }
           break;
         case 'mac_accounting':
-          if ($value && $value != 'no')
-          {
+          if ($value && $value !== 'no') {
             $where[] = generate_query_values($GLOBALS['cache']['ports']['mac_accounting'], 'ports.port_id');
           }
           break;
@@ -332,27 +323,29 @@ function generate_port_row($port, $vars = array())
   if (!isset($vars['view'])) { $vars['view'] = "basic"; }
 
   // Populate $port_adsl if the port has ADSL-MIB data
-  if (!isset($cache['ports_option']['ports_adsl']) || in_array($port['port_id'], $cache['ports_option']['ports_adsl']))
-  {
+  if (!isset($cache['ports_option']['ports_adsl']) || in_array($port['port_id'], $cache['ports_option']['ports_adsl'])) {
     $port_adsl = dbFetchRow("SELECT * FROM `ports_adsl` WHERE `port_id` = ?", array($port['port_id']));
   }
 
   // Populate $port['tags'] with various tags to identify port statuses and features
   // Port Errors
-  if ($port['ifInErrors_delta'] > 0 || $port['ifOutErrors_delta'] > 0)
-  {
+  if ($port['ifInErrors_delta'] > 0 || $port['ifOutErrors_delta'] > 0) {
     $port['tags'] .= generate_port_link($port, '<span class="label label-important">Errors</span>', 'port_errors');
   }
 
   // Port Deleted
-  if ($port['deleted'] == '1')
-  {
+  if ($port['deleted']) {
     $port['tags'] .= '<a href="'.generate_url(array('page' => 'deleted-ports')).'"><span class="label label-important">Deleted</span></a>';
+  }
+  if ($port['ignore']) {
+    $port['tags'] .= '<span class="label label-suppressed">Ignored</span>';
+  }
+  if ($port['disabled']) {
+    $port['tags'] .= '<span class="label label-disabled">Poll disabled</span>';
   }
 
   // Port IPv6
-  if(isset($port['attribs']['ipv6-octets']))
-  {
+  if (isset($port['attribs']['ipv6-octets'])) {
     $port['tags'] .= '<span class="label label-primary">IPv6</span>';
   }
 
@@ -457,8 +450,7 @@ function generate_port_row($port, $vars = array())
     unset($break);
 
     $ignore_type = $GLOBALS['config']['ip-address']['ignore_type'];
-    if (!isset($cache['ports_option']['ipv4_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv4_addresses']))
-    {
+    if (!isset($cache['ports_option']['ipv4_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv4_addresses'])) {
       $sql = "SELECT * FROM `ipv4_addresses` WHERE `port_id` = ?";
       // Do not exclude IPv4 link-local
       $sql .= generate_query_values(array_diff($ignore_type, [ 'link-local' ]), 'ipv4_type', '!='); // Do not show ignored ip types
@@ -510,8 +502,7 @@ function generate_port_row($port, $vars = array())
 
     $string .= '<td style="width: 100px; white-space: nowrap;">';
 
-    if ($port['ifOperStatus'] === "up" || $port['ifOperStatus'] === "monitoring")
-    {
+    if ($port['ifOperStatus'] === "up" || $port['ifOperStatus'] === "monitoring") {
       // Colours generated by humanize_port
       $string .= '<i class="icon-circle-arrow-down" style="'.$port['bps_in_style']. '"></i> <span class="small" style="'.$port['bps_in_style']. '">' . formatRates($port['in_rate']) . '</span><br />
       <i class="icon-circle-arrow-up"   style="'.$port['bps_out_style'].'"></i> <span class="small" style="'.$port['bps_out_style'].'">' . formatRates($port['out_rate']). '</span><br />
@@ -534,19 +525,16 @@ function generate_port_row($port, $vars = array())
     if (strlen($port['ifTrunk']) &&
         !in_array($port['ifTrunk'], array('access', 'routed'))) // Skip on routed (or access)
     {
-      if ($port['ifVlan'])
-      {
+      if ($port['ifVlan']) {
         // Native VLAN
-        if (!isset($cache['ports_vlan']))
-        {
+        if (!isset($cache['ports_vlan'])) {
           $native_state = dbFetchCell('SELECT `state` FROM `ports_vlans` WHERE `device_id` = ? AND `port_id` = ?',    array($device['device_id'], $port['port_id']));
           $native_name  = dbFetchCell('SELECT `vlan_name` FROM vlans     WHERE `device_id` = ? AND `vlan_vlan` = ?;', array($device['device_id'], $port['ifVlan']));
         } else {
           $native_state = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['state'];
           $native_name  = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['vlan_name'];
         }
-        switch ($native_state)
-        {
+        switch ($native_state) {
           case 'blocking':   $class = 'text-danger';   break;
           case 'forwarding': $class = 'text-success'; break;
           default:           $class = 'muted';
@@ -555,62 +543,51 @@ function generate_port_row($port, $vars = array())
         $native_tooltip = 'NATIVE: <strong class='.$class.'>'.$port['ifVlan'].' ['.$native_name.']</strong><br />';
       }
 
-      if (!isset($cache['ports_vlan']))
-      {
+      if (!isset($cache['ports_vlan'])) {
         $vlans = dbFetchRows('SELECT * FROM `ports_vlans` AS PV
                          LEFT JOIN vlans AS V ON PV.`vlan` = V.`vlan_vlan` AND PV.`device_id` = V.`device_id`
                          WHERE PV.`port_id` = ? AND PV.`device_id` = ? ORDER BY PV.`vlan`;', array($port['port_id'], $device['device_id']));
       } else {
         $vlans = $cache['ports_vlan'][$port['port_id']];
       }
-      $vlans_count = count($vlans);
+      $vlans_count = safe_count($vlans);
       $rel = ($vlans_count || $native_tooltip) ? 'tooltip' : ''; // Hide tooltip for empty
       $string .= '<p class="small"><a class="label label-info" data-rel="'.$rel.'" data-tooltip="<div class=\'small\' style=\'max-width: 320px; text-align: justify;\'>'.$native_tooltip;
-      if ($vlans_count)
-      {
+      if ($vlans_count) {
         $string .= 'ALLOWED: ';
         $vlans_aggr = array();
-        foreach ($vlans as $vlan)
-        {
-          if ($vlans_count > 20)
-          {
+        foreach ($vlans as $vlan) {
+          if ($vlans_count > 20) {
             // Aggregate VLANs
             $vlans_aggr[] = $vlan['vlan'];
           } else {
             // List VLANs
-            switch ($vlan['state'])
-            {
+            switch ($vlan['state']) {
               case 'blocking':   $class = 'text-danger'; break;
               case 'forwarding': $class = 'text-success';  break;
               default:           $class = 'muted';
             }
-            if (empty($vlan['vlan_name']))
-            {
+            if (empty($vlan['vlan_name'])) {
               $vlan['vlan_name'] = 'VLAN'.str_pad($vlan['vlan'], 4, '0', STR_PAD_LEFT);
             }
             $string .= '<strong class='.$class.'>'.$vlan['vlan'] .' ['.$vlan['vlan_name'].']</strong><br />';
           }
         }
-        if ($vlans_count > 20)
-        {
+        if ($vlans_count > 20) {
           // End aggregate VLANs
           $string .= '<strong>'.range_to_list($vlans_aggr, ', ').'</strong>';
         }
       }
       $string .= '</div>">'.$port['ifTrunk'].'</a></p>';
-    }
-    else if ($port['ifVlan'])
-    {
-      if (!isset($cache['ports_vlan']))
-      {
+    } elseif ($port['ifVlan']) {
+      if (!isset($cache['ports_vlan'])) {
         $native_state = dbFetchCell('SELECT `state` FROM `ports_vlans` WHERE `device_id` = ? AND `port_id` = ?',    array($device['device_id'], $port['port_id']));
         $native_name  = dbFetchCell('SELECT `vlan_name` FROM vlans     WHERE `device_id` = ? AND `vlan_vlan` = ?;', array($device['device_id'], $port['ifVlan']));
       } else {
         $native_state = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['state'];
         $native_name  = $cache['ports_vlan'][$port['port_id']][$port['ifVlan']]['vlan_name'];
       }
-      switch ($native_state)
-      {
+      switch ($native_state) {
         case 'blocking':   $class = 'label-error';   break;
         case 'forwarding': $class = 'label-success'; break;
         default:           $class = '';
@@ -619,9 +596,7 @@ function generate_port_row($port, $vars = array())
       $vlan_name = ($port['ifTrunk'] !== 'access') ? nicecase($port['ifTrunk']) . ' ' : '';
       $vlan_name .= 'VLAN ' . $port['ifVlan'];
       $string .= '<br /><span data-rel="'.$rel.'" class="label '.$class.'"  data-tooltip="<strong class=\'small\'>'.$port['ifVlan'].' ['.$native_name.']</strong>">' . $vlan_name . '</span>';
-    }
-    else if ($port['ifVrf']) // Print the VRF name if the port is assigned to a VRF
-    {
+    } elseif ($port['ifVrf']) { // Print the VRF name if the port is assigned to a VRF
       $vrf_name = dbFetchCell("SELECT `vrf_name` FROM `vrfs` WHERE `vrf_id` = ?", array($port['ifVrf']));
       $string .= '<br /><span class="label label-success" data-rel="tooltip" data-tooltip="VRF">'.$vrf_name.'</span>';
     }
@@ -629,8 +604,7 @@ function generate_port_row($port, $vars = array())
     $string .= '</td>';
 
     // If the port is ADSL, print ADSL port data.
-    if ($port_adsl['adslLineCoding'])
-    {
+    if ($port_adsl['adslLineCoding']) {
       $string .= '<td style="width: 200px;"><span class="small">';
       $string .= '<span class="label">'.$port_adsl['adslLineCoding'].'</span> <span class="label">' . rewrite_adslLineType($port_adsl['adslLineType']).'</span>';
       $string .= '<br />';
@@ -653,23 +627,19 @@ function generate_port_row($port, $vars = array())
     $string .= '<td style="min-width: 200px" class="small">';
 
 
-    if (strpos($port['port_label'], "oopback") === FALSE && !$graph_type)
-    {
-      unset($br);
+    if ($port['ifType'] !== 'softwareLoopback' && !str_contains($port['port_label'], 'oopback') &&
+        safe_empty($graph_type)) {
+      $br = '';
 
       // Populate links array for ports with direct links
-      if (!isset($cache['ports_option']['neighbours']) || in_array($port['port_id'], $cache['ports_option']['neighbours']))
-      {
-        foreach (dbFetchRows('SELECT * FROM `neighbours` WHERE `port_id` = ? AND `active` = ?', [ $port['port_id'], 1 ]) as $neighbour)
-        {
+      if (!isset($cache['ports_option']['neighbours']) || in_array($port['port_id'], $cache['ports_option']['neighbours'])) {
+        foreach (dbFetchRows('SELECT * FROM `neighbours` WHERE `port_id` = ? AND `active` = ?', [ $port['port_id'], 1 ]) as $neighbour) {
           // print_r($neighbour);
-          if ($neighbour['remote_port_id'])
-          {
+          if ($neighbour['remote_port_id']) {
             // Do not show some "non-physical" interfaces links,
             // see: https://jira.observium.org/browse/OBS-2979
             $remote_port = get_port_by_id_cache($neighbour['remote_port_id']);
-            if (!in_array($remote_port['ifType'], ['propVirtual', 'ieee8023adLag']))
-            {
+            if (!in_array($remote_port['ifType'], [ 'propVirtual', 'ieee8023adLag' ])) {
               $int_links[$neighbour['remote_port_id']] = $neighbour['remote_port_id'];
               $int_links_phys[$neighbour['remote_port_id']] = $neighbour['protocol'];
             }
@@ -759,15 +729,13 @@ function generate_port_row($port, $vars = array())
 
       // Output content of unknown links array (where ports don't exist in our database, or they weren't matched)
 
-      foreach ($int_links_unknown as $int_link)
-      {
+      foreach ($int_links_unknown as $int_link) {
         //r($int_link);
         $string .= generate_tooltip_link(NULL, NULL, 'Directly connected', $config['icon']['connected']) . ' ';
         $string .= '<b><i>'.short_ifname($int_link['remote_port']).'</i></b> on ';
 
         $text = '<div class="small" style="max-width: 500px;">';
-        if (strlen($int_link['remote_platform']))
-        {
+        if (!safe_empty($int_link['remote_platform'])) {
           $text .= '<strong>' . $int_link['remote_platform'].'</strong><br />';
         }
         $text .= $int_link['remote_version'].'</div>';
@@ -776,10 +744,8 @@ function generate_port_row($port, $vars = array())
       }
     }
 
-    if (!isset($cache['ports_option']['pseudowires']) || in_array($port['port_id'], $cache['ports_option']['pseudowires']))
-    {
-      foreach (dbFetchRows("SELECT * FROM `pseudowires` WHERE `port_id` = ?", array($port['port_id'])) as $pseudowire)
-      {
+    if (!isset($cache['ports_option']['pseudowires']) || in_array($port['port_id'], $cache['ports_option']['pseudowires'])) {
+      foreach (dbFetchRows("SELECT * FROM `pseudowires` WHERE `port_id` = ?", array($port['port_id'])) as $pseudowire) {
         //`port_id`,`peer_device_id`,`peer_ldp_id`,`pwID`,`pwIndex`
         #    $pw_peer_dev = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", array($pseudowire['peer_device_id']));
         $pw_peer_int = dbFetchRow("SELECT * FROM `ports` AS I, `pseudowires` AS P WHERE I.`device_id` = ? AND P.`pwID` = ? AND P.`port_id` = I.`port_id`", array($pseudowire['peer_device_id'], $pseudowire['pwID']));
@@ -825,33 +791,38 @@ function generate_port_row($port, $vars = array())
 
 **/
 
-    if (!isset($cache['ports_option']['ports_stack_low']) || in_array($port['ifIndex'], $cache['ports_option']['ports_stack_low']))
-    {
-      foreach (dbFetchRows("SELECT * FROM `ports_stack` WHERE `port_id_low` = ? and `device_id` = ?", array($port['ifIndex'], $device['device_id'])) as $higher_if)
-      {
-        if ($higher_if['port_id_high'])
-        {
-          if ($pagp[$device['device_id']][$higher_if['port_id_high']][$port['ifIndex']]) { continue; } // Skip if same PAgP port
-          $this_port = get_port_by_index_cache($device['device_id'], $higher_if['port_id_high']);
-          if (is_array($this_port))
-          {
-            $string .= $br.'<i class="'.$config['icon']['split'].'"></i> <strong>' . generate_port_link($this_port) . '</strong>';
+    if (!isset($cache['ports_option']['ports_stack_low']) ||
+        in_array($port['ifIndex'], $cache['ports_option']['ports_stack_low'])) {
+      foreach (dbFetchRows("SELECT * FROM `ports_stack` WHERE `port_id_low` = ? AND `device_id` = ? AND `ifStackStatus` = ?", [ $port['ifIndex'], $device['device_id'], 'active' ]) as $higher_if) {
+        if ($higher_if['port_id_high']) {
+          if (isset($pagp[$device['device_id']][$higher_if['port_id_high']][$port['ifIndex']])) { continue; } // Skip if same PAgP port
+          if ($this_port = get_port_by_index_cache($device['device_id'], $higher_if['port_id_high'])) {
+            $label = '';
+            if ($this_port['ifType'] === 'l2vlan') {
+              $label = '<span class="label label-primary">L2 VLAN</span> ';
+            } elseif ($this_port['ifType'] === 'l3ipvlan' || $this_port['ifType'] === 'l3ipxvlan') {
+              $label = '<span class="label label-info">L3 VLAN</span> ';
+            } elseif ($this_port['ifType'] === 'ieee8023adLag') {
+              $label = '<span class="label label-success">LAG</span> ';
+            } elseif (str_starts($this_port['port_label'], 'Stack')) {
+              $label = '<span class="label label-warning">STACK</span> ';
+            } else {
+              $label = '<span class="label label-default">'.$this_port['human_type'].'</span> ';
+              //r($this_port);
+            }
+            $string .= $br.'<i class="'.$config['icon']['split'].'"></i> <strong>' . generate_port_link($this_port) . '</strong> '.$label;
             $br = "<br />";
           }
         }
       }
     }
 
-    if (!isset($cache['ports_option']['ports_stack_high']) || in_array($port['ifIndex'], $cache['ports_option']['ports_stack_high']))
-    {
-      foreach (dbFetchRows("SELECT * FROM `ports_stack` WHERE `port_id_high` = ? and `device_id` = ?", array($port['ifIndex'], $device['device_id'])) as $lower_if)
-      {
-        if ($lower_if['port_id_low'])
-        {
-          if ($pagp[$device['device_id']][$port['ifIndex']][$lower_if['port_id_low']]) { continue; } // Skip if same PAgP ports
-          $this_port = get_port_by_index_cache($device['device_id'], $lower_if['port_id_low']);
-          if (is_array($this_port))
-          {
+    if (!isset($cache['ports_option']['ports_stack_high']) ||
+        in_array($port['ifIndex'], $cache['ports_option']['ports_stack_high'])) {
+      foreach (dbFetchRows("SELECT * FROM `ports_stack` WHERE `port_id_high` = ? AND `device_id` = ? AND `ifStackStatus` = ?", [ $port['ifIndex'], $device['device_id'], 'active' ]) as $lower_if) {
+        if ($lower_if['port_id_low']) {
+          if (isset($pagp[$device['device_id']][$port['ifIndex']][$lower_if['port_id_low']])) { continue; } // Skip if same PAgP ports
+          if ($this_port = get_port_by_index_cache($device['device_id'], $lower_if['port_id_low'])) {
             $string .= $br.'<i class="'.$config['icon']['merge'].'"></i> <strong>' . generate_port_link($this_port) . '</strong>';
             $br = "<br />";
           }
@@ -866,7 +837,7 @@ function generate_port_row($port, $vars = array())
 
   // If we're showing graphs, generate the graph and print the img tags
 
-  if ($vars['graph'] == "etherlike")
+  if ($vars['graph'] === "etherlike")
   {
     $graph_file = get_port_rrdfilename($port, "dot3", TRUE);
   } else {
@@ -889,6 +860,41 @@ function generate_port_row($port, $vars = array())
   }
   
   return $string;
+}
+
+function print_port_minigraph($port, $graph_type = 'port_bits', $period = 'day') {
+  $port['graph_type'] = $graph_type;
+
+  $graph_array           = [];
+  $graph_array['to']     = get_time();
+  $graph_array['from']   = get_time($period);
+  $graph_array['id']     = $port['port_id'];
+  $graph_array['type']   = $port['graph_type'];
+  $graph_array['width']  = 400; //100;
+  $graph_array['height'] = 150; //20;
+  $graph_array['bg']     = 'ffffff00';
+  $graph_array['legend'] = "no";
+  $graph_array['graph_only'] = "yes";
+
+  //r(generate_port_link($port, generate_graph_tag($graph_array)));
+  echo("<div style='display: block; padding: 3px; margin: 3px; min-width: 200px; max-width:200px; min-height:115px; max-height:115px; text-align: center; float: left; background-color: #e9e9e9;'>
+    <div style='font-weight: bold;'>".escape_html($port['port_label_short'])."</div>");
+
+  $graph_array_zoom = $graph_array;
+  $graph_array_zoom['height'] = "175";
+  $graph_array_zoom['width']  = "600";
+  unset($graph_array_zoom['legend'], $graph_array_zoom['graph_only']);
+
+  $link_array = $graph_array;
+  $link_array['page'] = "graphs";
+  unset($link_array['height'], $link_array['width']);
+  $link = generate_url($link_array);
+
+  echo(overlib_link($link, generate_graph_tag($graph_array), generate_graph_tag($graph_array_zoom), NULL));
+  //echo(generate_port_link($port, generate_graph_tag($graph_array)));
+
+  echo("<div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
+    </div>");
 }
 
 // EOF

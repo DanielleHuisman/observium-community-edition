@@ -16,17 +16,17 @@ echo(' HPICF-IPSLA-MIB ');
 $sla_states = &$GLOBALS['config']['mibs']['HPICF-IPSLA-MIB']['sla_states']; // Events from MIB definitions
 
 // Derp table, not have latest RTT time, mostly Oids is empty
-$sla_poll = snmpwalk_cache_multi_oid($device, "hpicfIpSlaHistMinRTT",       array(), 'HPICF-IPSLA-MIB');
-$sla_poll = snmpwalk_cache_multi_oid($device, "hpicfIpSlaHistMaxRTT",     $sla_poll, 'HPICF-IPSLA-MIB');
+$sla_poll = snmpwalk_cache_oid($device, "hpicfIpSlaHistMinRTT", array(), 'HPICF-IPSLA-MIB');
+$sla_poll = snmpwalk_cache_oid($device, "hpicfIpSlaHistMaxRTT", $sla_poll, 'HPICF-IPSLA-MIB');
 
-$sla_poll = snmpwalk_cache_multi_oid($device, "hpicfIpSlaHistPacketLoss", $sla_poll, 'HPICF-IPSLA-MIB');
-$sla_poll = snmpwalk_cache_multi_oid($device, "hpicfIpSlaHistSentPktNum", $sla_poll, 'HPICF-IPSLA-MIB');
-$sla_poll = snmpwalk_cache_multi_oid($device, "hpicfIpSlaAttrNumPkts",    $sla_poll, 'HPICF-IPSLA-MIB');
+$sla_poll = snmpwalk_cache_oid($device, "hpicfIpSlaHistPacketLoss", $sla_poll, 'HPICF-IPSLA-MIB');
+$sla_poll = snmpwalk_cache_oid($device, "hpicfIpSlaHistSentPktNum", $sla_poll, 'HPICF-IPSLA-MIB');
+$sla_poll = snmpwalk_cache_oid($device, "hpicfIpSlaAttrNumPkts", $sla_poll, 'HPICF-IPSLA-MIB');
 
 // History table
-$sla_hist = snmp_walk_multipart_oid($device, "hpicfIpSlaHistSummStartTime", array(), 'HPICF-IPSLA-MIB');
-$sla_hist = snmp_walk_multipart_oid($device, "hpicfIpSlaHistSummRTT",     $sla_hist, 'HPICF-IPSLA-MIB');
-$sla_hist = snmp_walk_multipart_oid($device, "hpicfIpSlaHistSummStatus",  $sla_hist, 'HPICF-IPSLA-MIB');
+$sla_hist = snmpwalk_multipart_oid($device, "hpicfIpSlaHistSummStartTime", array(), 'HPICF-IPSLA-MIB');
+$sla_hist = snmpwalk_multipart_oid($device, "hpicfIpSlaHistSummRTT", $sla_hist, 'HPICF-IPSLA-MIB');
+$sla_hist = snmpwalk_multipart_oid($device, "hpicfIpSlaHistSummStatus", $sla_hist, 'HPICF-IPSLA-MIB');
 
 //print_debug_vars($sla_poll);
 //print_debug_vars($sla_hist);

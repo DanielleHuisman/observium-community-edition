@@ -11,7 +11,7 @@
  *
  */
 
-$array = snmpwalk_cache_multi_oid($device, 'ceqfpUtilizationEntry', array(), $mib);
+$array = snmpwalk_cache_oid($device, 'ceqfpUtilizationEntry', array(), $mib);
 
 if (is_array($array))
 {

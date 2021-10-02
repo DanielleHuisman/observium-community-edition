@@ -1,4 +1,7 @@
 <?php
+
+$blank = '{}';
+
 dbInsert(array('dash_id' => '1', 'dash_name' => 'Default Dashboard'), 'dashboards');
 $y = 0;
 
@@ -108,7 +111,7 @@ else
                 break;
 
             case "status_summary":
-                $height = ceil((120 + $grid_v_margin) / ($grid_cell_height + $grid_v_margin));
+                $height = ceil((140 + $grid_v_margin) / ($grid_cell_height + $grid_v_margin));
                 dbInsert(array('dash_id'       => '1',
                     'widget_type'   => 'status_summary',
                     'widget_config' => $blank,

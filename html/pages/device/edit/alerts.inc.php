@@ -1,34 +1,40 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-if ($vars['editing'])
-{
-  if ($readonly)
-  {
+if ($vars['editing']) {
+  if ($readonly) {
     print_error_permission('You have insufficient permissions to edit settings.');
   } else {
     $override_sysContact_bool = $vars['override_sysContact'];
     if (isset($vars['sysContact'])) { $override_sysContact_string  = $vars['sysContact']; }
     $disable_notify  = $vars['disable_notify'];
 
-    if ($override_sysContact_bool) { set_dev_attrib($device, 'override_sysContact_bool', '1'); } else { del_dev_attrib($device, 'override_sysContact_bool'); }
-    if (isset($override_sysContact_string)) { set_dev_attrib($device, 'override_sysContact_string', $override_sysContact_string); }
-    if ($disable_notify) { set_dev_attrib($device, 'disable_notify', '1'); } else { del_dev_attrib($device, 'disable_notify'); }
+    if ($override_sysContact_bool) {
+      set_dev_attrib($device, 'override_sysContact_bool', '1');
+    } else {
+      del_dev_attrib($device, 'override_sysContact_bool');
+    }
+    if (isset($override_sysContact_string)) {
+      set_dev_attrib($device, 'override_sysContact_string', $override_sysContact_string);
+    }
+    if ($disable_notify) {
+      set_dev_attrib($device, 'disable_notify', '1');
+    } else {
+      del_dev_attrib($device, 'disable_notify');
+    }
 
     // 2019-12-05 23:30:00
 
-    if (isset($vars['ignore_until']) && $vars['ignore_until_enable'])
-    {
+    if (isset($vars['ignore_until']) && $vars['ignore_until_enable']) {
       $update['ignore_until'] = $vars['ignore_until'];
       $device['ignore_until'] = $vars['ignore_until'];
     } else {
@@ -42,12 +48,9 @@ if ($vars['editing'])
     $updated = 1;
   }
 
-  if ($updated && $update_message)
-  {
+  if ($updated && $update_message) {
     print_message($update_message);
-  }
-  else if ($update_message)
-  {
+  } elseif ($update_message) {
     print_error($update_message);
   }
 }
@@ -76,7 +79,7 @@ $disable_notify = get_dev_attrib($device,'disable_notify');
                                       'readonly'    => $readonly,
                                       'disabled'    => empty($device['ignore_until']),
                                       'min'         => 'current',
-                                      'value'       => ($device['ignore_until'] ? $device['ignore_until'] : ''));
+                                      'value'       => $device['ignore_until'] ?: '');
       $form['row'][1]['ignore_until_enable'] = array(
                                       'type'        => 'toggle',
                                       'size'        => 'large',
@@ -107,9 +110,9 @@ $disable_notify = get_dev_attrib($device,'disable_notify');
                                       'type'        => 'toggle',
                                       'view'        => 'toggle',
                                       'palette'     => 'red',
-                                      'name'        => 'Disable alerts',
+                                      'name'        => 'Disable notifications',
                                       //'fieldset'    => 'edit',
-                                      'placeholder' => 'Don\'t send alert mails (<em>but write to eventlog</em>)',
+                                      'placeholder' => 'Don\'t send alert notifications (but write to eventlog)',
                                       'readonly'    => $readonly,
                                       'value'       => $disable_notify);
       $form['row'][7]['submit']    = array(

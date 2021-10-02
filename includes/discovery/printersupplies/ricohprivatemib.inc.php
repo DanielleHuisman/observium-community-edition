@@ -11,11 +11,11 @@
  *
  */
 
-//$prt_supplies = snmpwalk_cache_oid_num2($device, '.1.3.6.1.4.1.367.3.2.1.2.24.1.1', array(), 'RicohPrivateMIB');
-$prt_supplies = snmpwalk_cache_oid_num2($device, 'ricohEngTonerName',        array(), 'RicohPrivateMIB');
-//$prt_supplies = snmpwalk_cache_oid_num2($device, 'ricohEngTonerDescr', $prt_supplies, 'RicohPrivateMIB');
-$prt_supplies = snmpwalk_cache_oid_num2($device, 'ricohEngTonerType',  $prt_supplies, 'RicohPrivateMIB');
-$prt_supplies = snmpwalk_cache_oid_num2($device, 'ricohEngTonerLevel', $prt_supplies, 'RicohPrivateMIB');
+//$prt_supplies = snmpwalk_oid_num($device, '.1.3.6.1.4.1.367.3.2.1.2.24.1.1', array(), 'RicohPrivateMIB');
+$prt_supplies = snmpwalk_oid_num($device, 'ricohEngTonerName', array(), 'RicohPrivateMIB');
+//$prt_supplies = snmpwalk_oid_num($device, 'ricohEngTonerDescr', $prt_supplies, 'RicohPrivateMIB');
+$prt_supplies = snmpwalk_oid_num($device, 'ricohEngTonerType', $prt_supplies, 'RicohPrivateMIB');
+$prt_supplies = snmpwalk_oid_num($device, 'ricohEngTonerLevel', $prt_supplies, 'RicohPrivateMIB');
 print_debug_vars($prt_supplies);
 
 foreach ($prt_supplies as $index => $entry)
@@ -46,7 +46,7 @@ foreach ($prt_supplies as $index => $entry)
     continue;
   }
 
-  if (str_iexists($entry['ricohEngTonerName'], 'Ink'))
+  if (str_icontains_array($entry['ricohEngTonerName'], 'Ink'))
   {
     $update_array['type'] = 'ink';
   }

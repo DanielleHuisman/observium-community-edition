@@ -96,24 +96,24 @@ $oid_units = array(
 );
 
 // Inlets
-$names = snmpwalk_cache_oid($device, "inletName.$pduId",                          array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorUnits.$pduId",                   array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorDecimalDigits.$pduId",             $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorEnabledThresholds.$pduId",         $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorLowerCriticalThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorLowerWarningThreshold.$pduId",     $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorUpperWarningThreshold.$pduId",     $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "inletSensorUpperCriticalThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsInletSensorIsAvailable.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsInletSensorState.$pduId",         $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsInletSensorValue.$pduId",         $oids, $mib);
+$names = snmpwalk_cache_oid($device, "inletName",                          array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorUnits",                   array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorDecimalDigits",             $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorEnabledThresholds",         $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorLowerCriticalThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorLowerWarningThreshold",     $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorUpperWarningThreshold",     $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "inletSensorUpperCriticalThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsInletSensorIsAvailable",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsInletSensorState",         $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsInletSensorValue",         $oids, $mib);
 print_debug_vars($names);
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
 {
-  //list($pduId, $id, $sensorType) = explode('.', $index);
-  list(, $id, $sensorType) = explode('.', $index);
+  list($pduId, $id, $sensorType) = explode('.', $index);
+  //list(, $id, $sensorType) = explode('.', $index);
   $index_id     = $pduId . '.' . $id;
   $index        = $index_id . '.' . $oid_types[$sensorType]['index']; // Convert to numeric index
 
@@ -200,24 +200,24 @@ foreach ($oids as $index => $entry)
 }
 
 // Outlets
-$names = snmpwalk_cache_oid($device, "outletName.$pduId",                         array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorUnits.$pduId",                  array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorDecimalDigits.$pduId",            $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorEnabledThresholds.$pduId",        $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorLowerCriticalThreshold.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorLowerWarningThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorUpperWarningThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "outletSensorUpperCriticalThreshold.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsOutletSensorIsAvailable.$pduId",  $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsOutletSensorState.$pduId",        $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsOutletSensorValue.$pduId",        $oids, $mib);
+$names = snmpwalk_cache_oid($device, "outletName",                         array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorUnits",                  array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorDecimalDigits",            $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorEnabledThresholds",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorLowerCriticalThreshold",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorLowerWarningThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorUpperWarningThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "outletSensorUpperCriticalThreshold",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsOutletSensorIsAvailable",  $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsOutletSensorState",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsOutletSensorValue",        $oids, $mib);
 print_debug_vars($names);
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
 {
-  //list($pduId, $id, $sensorType) = explode('.', $index);
-  list(, $id, $sensorType) = explode('.', $index);
+  list($pduId, $id, $sensorType) = explode('.', $index);
+  //list(, $id, $sensorType) = explode('.', $index);
   $index_id = $pduId . '.' . $id;
   $index        = $index_id . '.' . $oid_types[$sensorType]['index']; // Convert to numeric index
 
@@ -297,24 +297,24 @@ foreach ($oids as $index => $entry)
 }
 
 // Over Current Protectors
-$names = snmpwalk_cache_oid($device, "overCurrentProtectorName.$pduId",                         array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorUnits.$pduId",                  array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorDecimalDigits.$pduId",            $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorEnabledThresholds.$pduId",        $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorLowerCriticalThreshold.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorLowerWarningThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorUpperWarningThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorUpperCriticalThreshold.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsOverCurrentProtectorSensorIsAvailable.$pduId",  $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsOverCurrentProtectorSensorState.$pduId",        $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsOverCurrentProtectorSensorValue.$pduId",        $oids, $mib);
+$names = snmpwalk_cache_oid($device, "overCurrentProtectorName",                         array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorUnits",                  array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorDecimalDigits",            $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorEnabledThresholds",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorLowerCriticalThreshold",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorLowerWarningThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorUpperWarningThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "overCurrentProtectorSensorUpperCriticalThreshold",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsOverCurrentProtectorSensorIsAvailable",  $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsOverCurrentProtectorSensorState",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsOverCurrentProtectorSensorValue",        $oids, $mib);
 print_debug_vars($names);
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
 {
-  //list($pduId, $id, $sensorType) = explode('.', $index);
-  list(, $id, $sensorType) = explode('.', $index);
+  list($pduId, $id, $sensorType) = explode('.', $index);
+  //list(, $id, $sensorType) = explode('.', $index);
   $index_id = $pduId . '.' . $id;
   $index        = $index_id . '.' . $oid_types[$sensorType]['index']; // Convert to numeric index
 
@@ -394,19 +394,19 @@ foreach ($oids as $index => $entry)
 }
 
 // External Sensors
-$oids  = snmpwalk_cache_oid($device, "externalSensorName.$pduId",                   array(), $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorDescription.$pduId",              $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorType.$pduId",                     $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorUnits.$pduId",                    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorDecimalDigits.$pduId",            $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorEnabledThresholds.$pduId",        $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorLowerCriticalThreshold.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorLowerWarningThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorUpperWarningThreshold.$pduId",    $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "externalSensorUpperCriticalThreshold.$pduId",   $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsExternalSensorIsAvailable.$pduId",  $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsExternalSensorState.$pduId",        $oids, $mib);
-$oids  = snmpwalk_cache_oid($device, "measurementsExternalSensorValue.$pduId",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorName",                   array(), $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorDescription",              $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorType",                     $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorUnits",                    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorDecimalDigits",            $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorEnabledThresholds",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorLowerCriticalThreshold",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorLowerWarningThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorUpperWarningThreshold",    $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "externalSensorUpperCriticalThreshold",   $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsExternalSensorIsAvailable",  $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsExternalSensorState",        $oids, $mib);
+$oids  = snmpwalk_cache_oid($device, "measurementsExternalSensorValue",        $oids, $mib);
 print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)

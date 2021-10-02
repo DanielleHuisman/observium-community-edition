@@ -15,7 +15,7 @@ if (!is_array($ns_sensor_array) && strpos($device['hardware'], 'NetScaler Virtua
 {
   $ns_sensor_array = array();
   echo(" sysHealthCounterValue ");
-  $ns_sensor_array = snmpwalk_cache_multi_oid($device, "sysHealthCounterValue", $ns_sensor_array, "NS-ROOT-MIB");
+  $ns_sensor_array = snmpwalk_cache_oid($device, "sysHealthCounterValue", $ns_sensor_array, "NS-ROOT-MIB");
 }
 
 foreach ($ns_sensor_array as $descr => $data)

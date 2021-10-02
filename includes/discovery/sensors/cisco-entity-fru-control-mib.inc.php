@@ -18,10 +18,10 @@ $entity_array = array();
 $oids = array('cefcFRUPowerStatusEntry', 'cefcFanTrayStatusEntry', 'cefcFanEntry', 'cefcModuleEntry');
 foreach ($oids as $oid)
 {
-  $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, 'CISCO-ENTITY-FRU-CONTROL-MIB');
+  $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, 'CISCO-ENTITY-FRU-CONTROL-MIB');
 }
 // split PowerSupplyGroup from common walk array
-$cefcFRUPowerSupplyGroupEntry = snmpwalk_cache_multi_oid($device, 'cefcFRUPowerSupplyGroupEntry', array(), 'CISCO-ENTITY-FRU-CONTROL-MIB');
+$cefcFRUPowerSupplyGroupEntry = snmpwalk_cache_oid($device, 'cefcFRUPowerSupplyGroupEntry', array(), 'CISCO-ENTITY-FRU-CONTROL-MIB');
 
 if (count($entity_array))
 {
@@ -35,7 +35,7 @@ if (count($entity_array))
     $oids       = array('entPhysicalDescr', 'entPhysicalName', 'entPhysicalClass', 'entPhysicalContainedIn', 'entPhysicalParentRelPos');
     foreach ($oids as $oid)
     {
-      $entity_mib = snmpwalk_cache_multi_oid($device, $oid, $entity_mib, 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB');
+      $entity_mib = snmpwalk_cache_oid($device, $oid, $entity_mib, 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB');
       if (!$GLOBALS['snmp_status']) { break; }
     }
     //$entity_mib = snmpwalk_cache_twopart_oid($device, 'entAliasMappingIdentifier', $entity_mib, 'ENTITY-MIB:IF-MIB');

@@ -6,14 +6,13 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $cache_discovery['netapp-mib'] = snmpwalk_cache_oid($device, "dfEntry", array(), 'NETAPP-MIB');
 
-if (count($cache_discovery['netapp-mib']))
-{
+if (safe_count($cache_discovery['netapp-mib'])) {
   /*
   Available data:
 

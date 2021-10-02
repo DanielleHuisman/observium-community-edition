@@ -33,7 +33,7 @@ $vmw_vmlist = array();
  *  VMWARE-VMINFO-MIB::vmwVmCpus.416 = INTEGER: 2
  */
 
-$oids = snmpwalk_cache_multi_oid($device, 'vmwVmTable', array(), 'VMWARE-VMINFO-MIB');
+$oids = snmpwalk_cache_oid($device, 'vmwVmTable', array(), 'VMWARE-VMINFO-MIB');
 
 foreach ($oids as $index => $entry)
 {

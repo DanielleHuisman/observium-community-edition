@@ -25,7 +25,6 @@ if ($device['os_group'] == "unix")
 
   // ... Unless user configured a port for this specific device, and it's valid (numeric and within 16-bit port range)
   $override_port = get_dev_attrib($device, 'agent_port');
-
   if (is_numeric($override_port) && $override_port < 65536)
   {
     $agent_port = $override_port;
@@ -50,6 +49,9 @@ if ($device['os_group'] == "unix")
     echo("execution time: ".$agent_time."ms");
     rrdtool_update_ng($device, 'agent', array('time' => $agent_time));
     $graphs['agent'] = TRUE;
+
+    // Store raw output in device attribute for debugging purposes (showtech page)
+    set_dev_attrib($device, 'unixagent_raw', $agent_raw);
 
     foreach (explode("<<<", $agent_raw) as $section)
     {

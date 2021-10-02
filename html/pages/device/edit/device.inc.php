@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -17,45 +16,44 @@ $override_type_bool   = !empty($override_type_string);
 
 $default_type = $override_type_bool ? $config['os'][$device['os']]['type'] : $device['type'];
 $device_types = array();
-foreach ($config['device_types'] as $type)
-{
+foreach ($config['device_types'] as $type) {
   $device_types[$type['type']] = array('name' => nicecase($type['type']), 'icon' => $type['icon']);
-  if ($type['type'] == $default_type)
-  {
+  if ($type['type'] == $default_type) {
     $device_types[$type['type']]['subtext'] = 'Default';
     //$device_types[$type['type']]['class']   = 'error';
   }
 }
-if (!in_array($device['type'], array_keys($device_types)))
-{
+if (!array_key_exists($device['type'], $device_types)) {
   $device_types[$device['type']] = array('name' => 'Other', 'icon' => $config['icon']['question']);
 }
 
-if ($vars['editing'])
-{
-  if ($readonly)
-  {
+if ($vars['editing']) {
+  if ($readonly) {
     print_error_permission('You have insufficient permissions to edit settings.');
   } else {
-    if (OBS_DEBUG) { print_vars($vars); }
+    print_debug_vars($vars);
     $updated = 0;
 
     // Changed sysLocation
     $override_sysLocation_bool = $vars['override_sysLocation'];
-    if (isset($vars['sysLocation'])) { $override_sysLocation_string = $vars['sysLocation']; }
+    if (isset($vars['sysLocation'])) {
+      $override_sysLocation_string = $vars['sysLocation'];
+    }
 
     if (get_entity_attrib('device', $device, 'override_sysLocation_bool')   != $override_sysLocation_bool ||
-        get_entity_attrib('device', $device, 'override_sysLocation_string') != $override_sysLocation_string)
-    {
+        get_entity_attrib('device', $device, 'override_sysLocation_string') != $override_sysLocation_string) {
       $updated = 2;
     }
 
-    if ($override_sysLocation_bool) { set_entity_attrib( 'device', $device, 'override_sysLocation_bool', '1', $device['device_id']); }
-    else                            { del_entity_attrib('device', $device, 'override_sysLocation_bool'); }
+    if ($override_sysLocation_bool) {
+      set_entity_attrib('device', $device, 'override_sysLocation_bool', '1', $device['device_id']);
+    } else {
+      del_entity_attrib('device', $device, 'override_sysLocation_bool');
+    }
     if (isset($override_sysLocation_string)) { set_entity_attrib('device', $device, 'override_sysLocation_string', $override_sysLocation_string); }
 
     // Changed Skip ping
-    $ping_skip_set = isset($vars['ping_skip']) && ($vars['ping_skip'] == 'on' || $vars['ping_skip'] == '1');
+    $ping_skip_set = isset($vars['ping_skip']) && get_var_true($vars['ping_skip']);
     if ($ping_skip != $ping_skip_set)
     {
       if ($ping_skip_set) { set_entity_attrib('device', $device, 'ping_skip', '1'); }
@@ -92,8 +90,8 @@ if ($vars['editing'])
     {
       if (!in_array($param, array('purpose', 'poller_id')))
       {
-        // Boolead params
-        $vars[$param] = in_array($vars[$param], array('on', '1')) ? '1' : '0';
+        // Boolean params
+        $vars[$param] = get_var_true($vars[$param]) ? '1' : '0';
       }
       if ($vars[$param] != $device[$param])
       {
@@ -110,8 +108,7 @@ if ($vars['editing'])
     //r($update_array);
     //r($rows_updated);
     
-    if ($updated)
-    {
+    if ($updated) {
       if ((bool)$vars['ignore'] != (bool)$device['ignore'])
       {
         log_event('Device '.((bool)$vars['ignore'] ? 'ignored' : 'attended').': '.$device['hostname'], $device['device_id'], 'device', $device['device_id'], 5);
@@ -142,12 +139,9 @@ if ($vars['editing'])
 $override_sysLocation_bool   = get_entity_attrib('device', $device, 'override_sysLocation_bool');
 $override_sysLocation_string = get_entity_attrib('device', $device, 'override_sysLocation_string');
 
-if ($updated && $update_message)
-{
+if ($updated && $update_message) {
   print_message($update_message);
-}
-else if ($update_message)
-{
+} elseif ($update_message) {
   print_error($update_message);
 }
 
@@ -210,14 +204,24 @@ else if ($update_message)
                                       'value'       => $override_sysLocation_bool);
 
       $poller_list = array();
-      $poller_list[0] = 'Default Poller';
-      foreach(dbFetchRows("SELECT * FROM `pollers`") AS $poller)
-      {
-        $poller_list[$poller['poller_id']] = $poller['poller_name'];
+      $poller_list[0] = [ 'name' => 'Default Poller' ];
+      if ($config['poller_id'] != 0) {
+        $poller_list[0]['group'] = 'External';
+      }
+      foreach(dbFetchRows("SELECT * FROM `pollers`") as $poller) {
+        $poller_list[$poller['poller_id']] = [
+          'name'    => $poller['poller_name'],
+          'subtext' => $poller['host_id']
+          //'subtext' => $poller['host_uname']
+        ];
+        if ($config['poller_id'] != $poller['poller_id']) {
+          $poller_list[$poller['poller_id']]['group'] = 'External';
+        }
       }
 
       $form['row'][4]['poller_id']      = array(
                                       'type'        => 'select',
+                                      'community'   => FALSE, // not available on community edition
                                       'name'        => 'Poller',
                                       'width'       => '250px',
                                       'readonly'    => $readonly,

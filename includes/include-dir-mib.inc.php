@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage common
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -54,7 +52,7 @@ foreach (get_device_mibs_permitted($device, $include_order) as $mib)
       include_once($inc_dir . '.lib.php');
     }
   }
-  else if (is_dir($inc_dir))
+  elseif (is_dir($inc_dir))
   {
     if (OBS_DEBUG) { echo("[[$mib]]"); }
     foreach (glob($inc_dir.'/*.inc.php') as $dir_file)
@@ -66,6 +64,7 @@ foreach (get_device_mibs_permitted($device, $include_order) as $mib)
         echo(PHP_EOL);
       }
     }
+
     if ($include_lib && is_file($inc_dir . '.lib.php'))
     {
       // separated functions include, for exclude fatal redeclare errors

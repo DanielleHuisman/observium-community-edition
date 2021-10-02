@@ -1,45 +1,41 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $ok = FALSE;
-if ($vars['editing'])
-{
-  if ($readonly)
-  {
+if ($vars['editing']) {
+  if ($readonly) {
     print_error_permission('You have insufficient permissions to edit settings.');
   } else {
     $update = array();
-    switch ($vars['snmp_version'])
-    {
+    switch ($vars['snmp_version']) {
       case 'v3':
-        switch ($vars['snmp_authlevel'])
-        {
+        switch ($vars['snmp_authlevel']) {
           case 'authPriv':
-            if ($vars['snmp_cryptoalgo'] == 'DES' || $vars['snmp_cryptoalgo'] == 'AES')
-            {
+            if (is_valid_param($vars['snmp_cryptoalgo'], 'snmp_cryptoalgo')) {
               $ok = TRUE;
-              $update['snmp_cryptoalgo'] = $vars['snmp_cryptoalgo'];
+              $update['snmp_cryptoalgo'] = strtoupper($vars['snmp_cryptoalgo']);
               $update['snmp_cryptopass'] = $vars['snmp_cryptopass'];
+            } else {
+              $error = 'Incorrect SNMP Crypto Algorithm';
             }
             // no break here
           case 'authNoPriv':
-            if ($vars['snmp_authalgo'] == 'MD5' || $vars['snmp_authalgo'] == 'SHA')
-            {
+            if (is_valid_param($vars['snmp_authalgo'], 'snmp_authalgo')) {
               $ok = TRUE;
-              $update['snmp_authalgo']   = $vars['snmp_authalgo'];
+              $update['snmp_authalgo']   = strtoupper($vars['snmp_authalgo']);
               $update['snmp_authname']   = $vars['snmp_authname'];
               $update['snmp_authpass']   = $vars['snmp_authpass'];
             } else {
+              $error = 'Incorrect SNMP Auth parameters';
               $ok = FALSE;
             }
             break;
@@ -51,65 +47,68 @@ if ($vars['editing'])
         break;
       case 'v2c':
       case 'v1':
-        if (is_string($vars['snmp_community']))
-        {
+        if (is_valid_param($vars['snmp_community'], 'snmp_community')) {
           $ok = TRUE;
           $update['snmp_community'] = $vars['snmp_community'];
+        } else {
+          $error = 'Incorrect SNMP Community';
         }
         break;
     }
-    if ($ok)
-    {
+    if ($ok) {
       $update['snmp_version'] = $vars['snmp_version'];
-      if (in_array($vars['snmp_transport'], $config['snmp']['transports']))
-      {
+      if (in_array($vars['snmp_transport'], $config['snmp']['transports'])) {
         $update['snmp_transport'] = $vars['snmp_transport'];
       } else {
         $update['snmp_transport'] = 'udp';
       }
-      if (is_numeric($vars['snmp_port']) && $vars['snmp_port'] > 0 && $vars['snmp_port'] <= 65535)
-      {
+      if (is_valid_param($vars['snmp_port'], 'port')) {
         $update['snmp_port'] = (int)$vars['snmp_port'];
       } else {
+        if (strlen($vars['snmp_port'])) { print_warning('Passed incorrect SNMP port ('.$vars['snmp_port'].'). Should be between 1 and 65535.'); }
         $update['snmp_port'] = 161;
       }
-      if (is_numeric($vars['snmp_timeout']) && $vars['snmp_timeout'] > 0 && $vars['snmp_timeout'] <= 120)
-      {
+      if (is_valid_param($vars['snmp_timeout'], 'snmp_timeout')) {
         $update['snmp_timeout'] = (int)$vars['snmp_timeout'];
       } else {
+        if (strlen($vars['snmp_timeout'])) { print_warning('Passed incorrect SNMP timeout ('.$vars['snmp_timeout'].'). Should be between 1 and 120 sec.'); }
         $update['snmp_timeout'] = array('NULL');
       }
-      if (is_numeric($vars['snmp_retries']) && $vars['snmp_retries'] > 0 && $vars['snmp_retries'] <= 10)
-      {
+      if (is_valid_param($vars['snmp_retries'], 'snmp_retries')) {
         $update['snmp_retries'] = (int)$vars['snmp_retries'];
       } else {
+        if (strlen($vars['snmp_retries'])) { print_warning('Passed incorrect SNMP retries ('.$vars['snmp_retries'].'). Should be between 1 and 10.'); }
         $update['snmp_retries'] = array('NULL');
       }
 
       // SNMPbulk max repetitions, allow 0 for disable snmpbulk(walk|get)
-      if (is_numeric($vars['snmp_maxrep']) && $vars['snmp_maxrep'] >= 0 && $vars['snmp_maxrep'] <= 500)
-      {
+      if (is_intnum($vars['snmp_maxrep']) && $vars['snmp_maxrep'] >= 0 && $vars['snmp_maxrep'] <= 500) {
         $update['snmp_maxrep'] = (int)$vars['snmp_maxrep'];
       } else {
-        $update['snmp_maxrep'] = array('NULL');
+        if (strlen($vars['snmp_maxrep'])) { print_warning('Passed incorrect SNMPbulk max repetitions ('.$vars['snmp_maxrep'].'). Should be between 0 and 500. When 0 - snmpbulk will disable.'); }
+        $update['snmp_maxrep'] = [ 'NULL' ];
       }
 
-      if (strlen(trim($vars['snmp_context'])))
-      {
+      if (strlen(trim($vars['snmp_context']))) {
         $update['snmp_context'] = trim($vars['snmp_context']);
       } else {
-        $update['snmp_context'] = array('NULL');
+        $update['snmp_context'] = [ 'NULL' ];
       }
 
-      if (dbUpdate($update, 'devices', '`device_id` = ?', array($device['device_id'])))
-      {
+      if (dbUpdate($update, 'devices', '`device_id` = ?', array($device['device_id']))) {
         print_success("Device SNMP configuration updated");
         log_event('Device SNMP configuration changed.', $device['device_id'], 'device', $device['device_id'], 5);
       } else {
+        $ok = FALSE;
         print_warning("Device SNMP configuration update is not required");
       }
     }
-    if (!$ok) { print_error("Device SNMP configuration not updated"); }
+    if (!$ok) {
+      if ($error) {
+        $error = "Device SNMP configuration not updated ($error)";
+      }
+      print_error($error);
+    }
 
     unset($update);
   }
@@ -117,10 +116,35 @@ if ($vars['editing'])
 
 $device = device_by_id_cache($device['device_id'], $ok);
 $transports = array();
-foreach ($config['snmp']['transports'] as $transport)
-{
+foreach ($config['snmp']['transports'] as $transport) {
   $transports[$transport] = strtoupper($transport);
 }
+
+$snmp_version = get_versions('snmp');
+if (version_compare($snmp_version, '5.8', '<')) {
+  $authclass = 'bg-warning';
+  $authtext  = 'Poller required net-snmp >= 5.8';
+} else {
+  $authclass = 'bg-success';
+  $authtext  = '';
+}
+$authalgo = [
+  'MD5'     => [ 'name' => 'MD5' ],
+  'SHA'     => [ 'name' => 'SHA' ],
+  'SHA-224' => [ 'name' => 'SHA-224', 'class' => $authclass, 'subtext' => $authtext ],
+  'SHA-256' => [ 'name' => 'SHA-256', 'class' => $authclass, 'subtext' => $authtext ],
+  'SHA-384' => [ 'name' => 'SHA-384', 'class' => $authclass, 'subtext' => $authtext ],
+  'SHA-512' => [ 'name' => 'SHA-512', 'class' => $authclass, 'subtext' => $authtext ],
+];
+
+$cryptoalgo = [
+  'DES'       => [ 'name' => 'DES' ],
+  'AES'       => [ 'name' => 'AES' ],
+  'AES-192'   => [ 'name' => 'AES-192',       'class' => 'bg-warning', 'subtext' => 'Poller required net-snmp >= 5.8 compiled with --enable-blumenthal-aes' ],
+  'AES-192-C' => [ 'name' => 'AES-192 Cisco', 'class' => 'bg-warning', 'subtext' => 'Poller required net-snmp >= 5.8 compiled with --enable-blumenthal-aes' ],
+  'AES-256'   => [ 'name' => 'AES-256',       'class' => 'bg-warning', 'subtext' => 'Poller required net-snmp >= 5.8 compiled with --enable-blumenthal-aes' ],
+  'AES-256-C' => [ 'name' => 'AES-256 Cisco', 'class' => 'bg-warning', 'subtext' => 'Poller required net-snmp >= 5.8 compiled with --enable-blumenthal-aes' ],
+];
 
 $form = array('type'      => 'horizontal',
               'id'        => 'edit',
@@ -175,6 +199,7 @@ $form['row'][3]['snmp_port'] = array(
                                 'fieldset'    => 'edit',
                                 'name'        => 'Port',
                                 'width'       => '250px',
+                                'placeholder' => '1-65535. Default 161.',
                                 'readonly'    => $readonly,
                                 'value'       => $device['snmp_port']);
 $form['row'][4]['snmp_timeout'] = array(
@@ -182,6 +207,7 @@ $form['row'][4]['snmp_timeout'] = array(
                                 'fieldset'    => 'edit',
                                 'name'        => 'Timeout',
                                 'width'       => '250px',
+                                'placeholder' => '1-120 sec. Default 1 sec.',
                                 'readonly'    => $readonly,
                                 'value'       => $device['snmp_timeout']);
 $form['row'][5]['snmp_retries'] = array(
@@ -189,6 +215,7 @@ $form['row'][5]['snmp_retries'] = array(
                                 'fieldset'    => 'edit',
                                 'name'        => 'Retries',
                                 'width'       => '250px',
+                                'placeholder' => '1-10. Default 5.',
                                 'readonly'    => $readonly,
                                 'value'       => $device['snmp_retries']);
 
@@ -197,6 +224,7 @@ $form['row'][6]['snmp_maxrep'] = array(
                                 'fieldset'    => 'edit',
                                 'name'        => 'Max Repetitions',
                                 'width'       => '250px',
+                                'placeholder' => '0-500. Default 10. 0 for disable snmpbulk.',
                                 'readonly'    => $readonly,
                                 'value'       => $device['snmp_maxrep']);
 // Snmp v1/2c fieldset
@@ -245,7 +273,7 @@ $form['row'][11]['snmp_authalgo'] = array(
                                 'name'        => 'Auth Algorithm',
                                 'width'       => '250px',
                                 'readonly'    => $readonly,
-                                'values'      => array('MD5' => 'MD5', 'SHA' => 'SHA'),
+                                'values'      => $authalgo,
                                 'value'       => $device['snmp_authalgo']);
 
 $form['row'][12]['snmp_cryptopass'] = array(
@@ -262,7 +290,7 @@ $form['row'][13]['snmp_cryptoalgo'] = array(
                                 'name'        => 'Crypto Algorithm',
                                 'width'       => '250px',
                                 'readonly'    => $readonly,
-                                'values'      => array('AES' => 'AES', 'DES' => 'DES'),
+                                'values'      => $cryptoalgo,
                                 'value'       => $device['snmp_cryptoalgo']);
 
 $form['row'][15]['snmp_context'] = array(

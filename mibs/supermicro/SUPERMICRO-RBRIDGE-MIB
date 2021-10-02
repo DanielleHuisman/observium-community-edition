@@ -1,0 +1,1035 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsrbridge.mib,v 1.6 2013/05/17 12:02:58 siva Exp $
+
+SUPERMICRO-RBRIDGE-MIB DEFINITIONS ::= BEGIN
+
+   -- ---------------------------------------------------------- --
+   -- MIB for RBRIDGE devices
+   -- ---------------------------------------------------------- --
+   IMPORTS
+       MODULE-IDENTITY, OBJECT-TYPE,
+       enterprises, Counter32, Counter64, Integer32, Unsigned32
+           FROM SNMPv2-SMI            -- RFC2578
+       TEXTUAL-CONVENTION, TruthValue, MacAddress, RowStatus
+           FROM SNMPv2-TC             -- RFC2579
+       PortList, VlanId
+           FROM Q-BRIDGE-MIB
+       InterfaceIndex
+           FROM IF-MIB
+       ;
+
+   fsrbridgeMIB MODULE-IDENTITY
+   LAST-UPDATED "201209050000Z"
+   ORGANIZATION "Super Micro Computer Inc."
+   CONTACT-INFO "support@Supermicro.com"
+   DESCRIPTION
+           "The RBridge MIB module for managing devices that support
+           the TRILL protocol."
+   REVISION "201209050000Z" 
+   DESCRIPTION
+           "The RBridge MIB module for managing devices that support
+           the TRILL protocol."
+
+   REVISION     "201103010000Z"
+   DESCRIPTION
+            "This is a proprietary mib for R-Bridge"
+         ::=  { enterprises supermicro-computer-inc(10876) super-switch(101) extended(2) 66 }
+
+   -- ---------------------------------------------------------- --
+   -- subtrees in the RBridge MIB
+   -- ---------------------------------------------------------- --
+
+   fsrbridgeObjects        OBJECT IDENTIFIER ::= { fsrbridgeMIB 0 }
+
+   fsrbridge               OBJECT IDENTIFIER ::= { fsrbridgeObjects 1 }
+   fsrbridgeFdb            OBJECT IDENTIFIER ::= { fsrbridgeObjects 2 }
+   fsrbridgeCounter        OBJECT IDENTIFIER ::= { fsrbridgeObjects 3 }
+
+   -- ---------------------------------------------------------- --
+   -- type definitions
+   -- ---------------------------------------------------------- --
+
+   RbridgeAddress ::= TEXTUAL-CONVENTION
+       DISPLAY-HINT "1x:"
+       STATUS current
+       DESCRIPTION
+           "The MAC address used by an RBridge port. This may match the
+           RBridge ISIS SystemID."
+   SYNTAX OCTET STRING (SIZE (6))
+
+
+   RbridgeNickname ::= TEXTUAL-CONVENTION
+       DISPLAY-HINT "d"
+       STATUS current
+       DESCRIPTION
+           "The 16-bit identifier used in TRILL as an
+           abbreviation for the RBridge's 48-bit IS-IS System ID.
+           The value 0 means a nickname is not specified, the values
+           0xffco through 0xfffe are reserved for future allocation,
+           and the value 0xffff is permanently reserved."
+   SYNTAX Integer32 (1..65471)
+   --
+   -- the rbridge subtree
+   --
+   -- Implementation of the rbridge subtree is mandatory for all
+   -- RBridges.
+   --
+
+   fsrbridgeGlobalTrace OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+        "This object is used to enable Trace Statements in R-Bridge Module.
+
+         A FOUR BYTE integer is used for enabling the level of tracing.
+         Each BIT in the four byte integer represents a particular
+         level of Trace.
+
+         The mapping between the bit positions & the level of trace is
+         as follows:
+                  1 - Management Traces
+                  2 - System Resource Traces
+                  3 - Failure Traces
+                  4 - Control Plane Traces.
+
+         The remaining bits are unused. Combinations of levels are
+         also allowed.
+
+         For example if the bits 1 and 2 are set, then the trace
+         statements related to management and System resources will be printed.
+
+         The user has to enter the corresponding INTEGER VALUE for the
+         bits set. For example if bits 1 and 2 are set then user has to
+         set the value 3."
+   ::= { fsrbridge 1 }
+
+   fsrbridgeGlobalTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsrbridgeGlobalEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+       "A table that contains information about R-Bridge properties
+       associated with a particular context."
+      ::= { fsrbridge 2 }
+
+   fsrbridgeGlobalEntry OBJECT-TYPE
+       SYNTAX      FsrbridgeGlobalEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A list of information for each RBridge on this context."
+       INDEX  { fsrbridgeContextId }
+       ::= { fsrbridgeGlobalTable 1 }
+
+   FsrbridgeGlobalEntry ::=
+       SEQUENCE {
+           fsrbridgeContextId
+               Unsigned32, 
+           fsrbridgeTrillVersion
+               Unsigned32,
+           fsrbridgeNumPorts      
+               Unsigned32,
+           fsrbridgeUniMultipathEnable
+               TruthValue,
+          fsrbridgeMultiMultipathEnable
+               TruthValue,
+          fsrbridgeNicknameNumber
+               Unsigned32,
+          fsrbridgeSystemControl
+               INTEGER,
+          fsrbridgeModuleStatus
+               INTEGER,
+         fsrbridgeUnicastMultipathCount
+               Unsigned32,
+         fsrbridgeMulticastMultipathCount
+               Unsigned32,
+          fsrbridgeClearCounters
+               TruthValue
+       }
+
+   fsrbridgeContextId OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+              "The bridge component within the system to which the information 
+               in this fsrbridgeGlobalEntry applies." 
+       ::= { fsrbridgeGlobalEntry 1 }
+   
+   fsrbridgeTrillVersion OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The maximum TRILL version number that this Rbridge
+           supports."
+       REFERENCE
+           "RBridge section 4.6"
+       ::= { fsrbridgeGlobalEntry 2 }
+
+   fsrbridgeNumPorts OBJECT-TYPE
+      SYNTAX      Unsigned32
+      UNITS       "ports"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "The number of ports controlled by this RBridge."
+     REFERENCE
+          "RBridge section 2.6.1"
+      ::= { fsrbridgeGlobalEntry 3 }
+
+   fsrbridgeUniMultipathEnable OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The enabled/disabled status of unicast TRILL
+           multipathing.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+            "RBridge Appendix C"
+      ::= { fsrbridgeGlobalEntry 4 }
+
+   fsrbridgeMultiMultipathEnable OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The enabled/disabled status of multidestination TRILL
+           multipathing.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+            "RBridge Appendix C"
+      ::= { fsrbridgeGlobalEntry 5 }
+
+   fsrbridgeNicknameNumber OBJECT-TYPE
+       SYNTAX      Unsigned32 (1..255)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The number of nicknames this RBridge should have.
+           Default value is 1."
+       DEFVAL {1}
+      ::= { fsrbridgeGlobalEntry 6 }
+
+   fsrbridgeSystemControl  OBJECT-TYPE
+    SYNTAX     INTEGER{
+               start(1),
+            shutdown(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "The administrative system control status of R-Bridge
+          module. The value 'start' (1) indicates that all
+          resources required  for this context by R-Bridge module
+          should be allocated and R-Bridge should be supported on all ports
+          of this context.
+          The value 'shutdown' (2) indicates that R-Bridge should be
+          shutdown on all ports of this context and all allocated
+          memory must be released."              
+    DEFVAL         {start}
+    ::= { fsrbridgeGlobalEntry 7 }
+
+fsrbridgeModuleStatus   OBJECT-TYPE
+    SYNTAX        INTEGER{
+                     enable(1),
+                     disable(2)
+    }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The R-Bridge Module status for the switch.
+	 
+	 If this object is set as 'disabled', configurations on this module
+     are allowed. But it'll not be operational.
+	
+	 If this object is set as 'enabled', all configurations are allowed and 
+     they are operational."
+    DEFVAL { disable }
+    ::= { fsrbridgeGlobalEntry 8 }
+   
+   fsrbridgeUnicastMultipathCount OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "The number of ECMP paths supported by this RBridge
+          for unicast entries."
+     REFERENCE
+          "RBridge section 2.6.1"
+      ::= { fsrbridgeGlobalEntry 9 }
+
+   fsrbridgeMulticastMultipathCount OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "The number of ECMP paths  supported by this RBridge
+          for multicast entries."
+     REFERENCE
+          "RBridge section 2.6.1"
+      ::= { fsrbridgeGlobalEntry 10 }
+
+
+    fsrbridgeClearCounters OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object when set to TRUE, resets all the counters in this context.
+            Setting this object to FALSE has no effect.
+            This object always returns FALSE when read. "
+       DEFVAL { false }
+       ::= { fsrbridgeGlobalEntry 11 }
+
+   -- ---------------------------------------------------------- --
+   -- The RBridge Base Nickname Table
+   -- ---------------------------------------------------------- --
+
+   fsrbridgeNicknameTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF FsrbridgeNicknameEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+       "A table that contains information about nicknames
+       associated with this RBridge."
+      REFERENCE
+           "RBridge section 3.7"
+      ::= { fsrbridge 3 }
+
+   fsrbridgeNicknameEntry OBJECT-TYPE
+       SYNTAX      FsrbridgeNicknameEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A list of information for each nickname of the RBridge."
+       REFERENCE
+           "RBridge section 3.7"
+       INDEX  { fsrbridgeContextId, fsrbridgeNicknameName }
+       ::= { fsrbridgeNicknameTable 1 }
+
+   FsrbridgeNicknameEntry ::=
+       SEQUENCE {
+           fsrbridgeNicknameName
+               RbridgeNickname,
+           fsrbridgeNicknamePriority
+               Unsigned32,
+           fsrbridgeNicknameDtrPriority
+               Unsigned32,
+           fsrbridgeNicknameStatus
+               INTEGER
+       }
+
+   fsrbridgeNicknameName OBJECT-TYPE
+       SYNTAX      RbridgeNickname
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Nicknames are 16-bit quantities that act as
+            abbreviations for RBridge's 48-bit IS-IS System ID to
+            achieve a more compact encoding."
+       REFERENCE
+           "RBridge section 3.7"
+       ::= { fsrbridgeNicknameEntry 1 }
+
+   fsrbridgeNicknamePriority OBJECT-TYPE
+       SYNTAX      Unsigned32 (0..255)
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "This RBridge's priority to hold this nickname. When
+           the nickname is configured, the default value of
+           this object is 192.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+           "RBridge section 3.7"
+       DEFVAL      { 192 }
+       ::= { fsrbridgeNicknameEntry 2 }
+
+   fsrbridgeNicknameDtrPriority OBJECT-TYPE
+       SYNTAX      Unsigned32 (1..65535)
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "The Distribution tree root priority for this nickname.
+           The default value of this object is 32768.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+           "RBridge section 4.5"
+       DEFVAL      { 32768 }
+       ::= { fsrbridgeNicknameEntry 3 }
+
+   fsrbridgeNicknameStatus OBJECT-TYPE
+       SYNTAX      INTEGER {
+                       static(1),
+                       dynamic(2),
+                       invalid(3)
+                   }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "This object indicates the status of the entry. The
+           default value is static(1).
+               static(1) - this entry has been configured and
+                   will remain after the next reset of the RBridge.
+               dynamic(2) - this entry has been acquired by the
+                   RBridge nickname acquisition protocol.
+               invalid(3) - writing this value to the object removes
+                   the corresponding entry."
+       REFERENCE
+           "RBridge section 3.7"
+       DEFVAL { static }
+       ::= { fsrbridgeNicknameEntry 4 }
+
+
+   -- ---------------------------------------------------------- --
+   -- The RBridge Port Table
+   -- ---------------------------------------------------------- --
+
+   fsrbridgePortTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsRBridgeBasePortEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table that contains generic information about every
+           port that is associated with this RBridge."
+       REFERENCE
+           "RBridge section 5.2"
+       ::= { fsrbridge 4 }
+
+   fsrbridgePortEntry OBJECT-TYPE
+       SYNTAX      FsRBridgeBasePortEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A list of information for each port of the bridge."
+       REFERENCE
+           "RBridge section 5.2"
+       INDEX  { fsrbridgePortIfIndex }
+       ::= { fsrbridgePortTable 1 }
+
+   FsRBridgeBasePortEntry ::=
+       SEQUENCE {
+           fsrbridgePortIfIndex
+               InterfaceIndex,
+           fsrbridgePortDisable
+               TruthValue,
+           fsrbridgePortTrunkPort
+               TruthValue,
+           fsrbridgePortAccessPort
+               TruthValue,
+           fsrbridgePortState
+               INTEGER,
+           fsrbridgePortDisableLearning
+               TruthValue,
+           fsrbridgePortDesigVlan
+               VlanId,
+           fsrbridgePortClearCounters
+               TruthValue,
+          fsrbridgePortMac
+               MacAddress
+   }
+
+   fsrbridgePortIfIndex OBJECT-TYPE
+       SYNTAX      InterfaceIndex
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The port number of the port for which this entry
+           contains RBridge management information."
+       ::= { fsrbridgePortEntry 1 }
+
+   fsrbridgePortDisable OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "Disable port bit. When this bit is set (true), all frames
+           received or to be transmitted are discarded, with the
+           possible exception of some layer 2 control frames that may
+           be generated and transmitted or received and processed
+           locally. Default value is false.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+          "RBridge section 4.9.1"
+       DEFVAL      { false }
+       ::= { fsrbridgePortEntry 2 }
+
+   fsrbridgePortTrunkPort OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "End station service disable (trunk port) bit. When this bit
+           is set (true), all native frames received on the port and all
+           native frames that would have been sent on the port are
+           discarded. Default value is false.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+          "RBridge clause 4.9.1"
+       DEFVAL      { false }
+       ::= { fsrbridgePortEntry 3 }
+
+   fsrbridgePortAccessPort OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "TRILL traffic disable (access port) bit. If this bit is set,
+           the goal is to avoid sending any TRILL frames, except
+           TRILL-Hello frames, on the port since it is intended only for
+           native end station traffic.  This ensures that the link is
+           not on the shortest path for any destination. Default value
+           is false.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+          "RBridge clause 4.9.1"
+       DEFVAL      { false }
+       ::= { fsrbridgePortEntry 4 }
+
+   fsrbridgePortState OBJECT-TYPE
+       SYNTAX      INTEGER {
+                          uninhibited(1),
+                          portInhibited(2),
+                          vlanInhibited(3),
+                          disabled(4),
+                          broken(5)
+                      }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The port's current state. For ports that are disabled
+           (see rbridgePortDisable), this object will have a value of disabled(4).
+           If the RBridge has detected a port that is malfunctioning, it will
+           place that port into the broken(5) state."
+      REFERENCE
+          "RBridge section 4.2.4.3"
+      ::= { fsrbridgePortEntry 5 }
+
+
+   fsrbridgePortDisableLearning OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+           "Disable learning of MAC addresses seen on this port.
+           The default is false.
+           The value of this object MUST be retained across
+           reinitializations of the management system."
+       REFERENCE
+            "RBridge section 4.8"
+       DEFVAL      { false }
+       ::= { fsrbridgePortEntry 6 }
+
+   fsrbridgePortDesigVlan OBJECT-TYPE
+       SYNTAX      VlanId
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The VLAN being used on this link for TRILL frames."
+       REFERENCE
+           "RBridge section 4.4.3"
+       ::= { fsrbridgePortEntry 7 }
+
+    fsrbridgePortClearCounters OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "This object when set to TRUE, resets all counters on this port.
+            Setting this object to FALSE has no effect.
+            This object always returns FALSE when read. "
+       DEFVAL { false }
+       ::= { fsrbridgePortEntry 8 }
+    
+    
+    fsrbridgePortMac OBJECT-TYPE
+       SYNTAX      MacAddress
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            " Switch Mac Address of the port. This Mac Address will be used
+            as the source MAC address in packets forwarded through this port."
+       ::= { fsrbridgePortEntry 9 }
+   -- -------------------------------------------------------------
+   -- RBridge Forwarding Database
+   -- -------------------------------------------------------------
+
+   -- -------------------------------------------------------------
+   -- Multiple Forwarding Databases for RBridges
+   -- This allows for an instance per FdbId, defined in Bridge MIB.
+   -- Each VLAN may have an independent Fdb, or multiple VLANs may
+   -- share one.
+   -- -------------------------------------------------------------
+
+   fsrbridgeUniFdbTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsRbridgeUniFdbEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table that contains information about unicast entries
+           for which the device has forwarding and/or filtering
+           information.  This information is used by the
+           transparent bridging function in determining how to
+           propagate a received frame."
+       REFERENCE
+           "RBridge section 4.8"
+       ::= { fsrbridgeFdb 1 }
+
+   fsrbridgeUniFdbEntry OBJECT-TYPE
+       SYNTAX      FsRbridgeUniFdbEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Information about a specific unicast MAC address for
+           which the rbridge has some forwarding and/or filtering
+           information."
+       INDEX   { fsrbridgeContextId, fsrbridgeFdbId, fsrbridgeUniFdbAddr }
+       ::= { fsrbridgeUniFdbTable 1 }
+
+   FsRbridgeUniFdbEntry ::=
+       SEQUENCE {
+           fsrbridgeFdbId
+               Unsigned32,
+           fsrbridgeUniFdbAddr
+               MacAddress,
+           fsrbridgeUniFdbPort
+               Integer32,
+           fsrbridgeUniFdbNick
+               RbridgeNickname,
+           fsrbridgeUniFdbConfidence
+               Unsigned32,
+           fsrbridgeUniFdbStatus
+               INTEGER,
+           fsrbridgeUniFdbRowStatus
+               RowStatus
+       }
+
+   fsrbridgeFdbId OBJECT-TYPE
+       SYNTAX      Unsigned32 (0..4294967295)
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The identity of this Filtering Database."
+       ::= { fsrbridgeUniFdbEntry 1 }
+   
+   fsrbridgeUniFdbAddr OBJECT-TYPE
+       SYNTAX      MacAddress
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A unicast MAC address for which the device has
+           forwarding information."
+       ::= { fsrbridgeUniFdbEntry 2 }
+
+   fsrbridgeUniFdbPort OBJECT-TYPE
+       SYNTAX      Integer32 (0..65535)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Either the value '0', or the port number of the port on
+           which a frame having a source address equal to the value
+           of the corresponding instance of rbridgeUniFdbAddress has
+           been seen.  A value of '0' indicates that the port
+           number has not been learned but that the device does have
+           some information about this MAC address.
+           Implementors are encouraged to assign the port value to
+           this object whenever it is available, even for addresses
+           for which the corresponding value of rbridgeUniFdbStatus is
+           not learned(3)."
+       ::= { fsrbridgeUniFdbEntry 3 }
+
+   fsrbridgeUniFdbNick OBJECT-TYPE
+       SYNTAX      RbridgeNickname
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The RBridge nickname which is placed in the Egress
+           Nickname field of a TRILL frame sent to this
+           rbridgeFdbAddress in this FdbId."
+      REFERENCE
+           "RBridge section 4.8.1"
+       ::= { fsrbridgeUniFdbEntry 4 }
+
+   fsrbridgeUniFdbConfidence OBJECT-TYPE
+       SYNTAX      Unsigned32 (0..254)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The confidence level associated with this entry."
+      REFERENCE
+           "RBridge section 4.8.1"
+       ::= { fsrbridgeUniFdbEntry 5 }
+
+   fsrbridgeUniFdbStatus OBJECT-TYPE
+       SYNTAX      INTEGER {
+                       other(1),
+                       invalid(2),
+                       learned(3),
+                       self(4),
+                       mgmt(5),
+                       esadi(6)
+                   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The status of this entry.  The meanings of the values
+           are:
+               other(1) - none of the following.
+               invalid(2) - this entry is no longer valid (e.g., it
+                   was learned but has since aged out), but has not
+                   yet been flushed from the table.
+               learned(3) - the information in this entry was learned
+                   and is being used.
+               self(4) - the value of the corresponding instance of
+                   rbridgeFdbAddress represents one of the device's
+                   addresses.  The corresponding instance of
+                   rbridgeFdbPort indicates which of the device's
+                   ports has this address.
+               mgmt(5) - the value of the corresponding instance of
+                   rbridgeFdbAddress was configured by management.
+               esadi(6) - the value of the corresponding instance of
+                   rbridgeFdbAddress was learned from ESADI."
+       ::= { fsrbridgeUniFdbEntry 6 }
+
+   fsrbridgeUniFdbRowStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Row status of this entry. Supports CreateAndGo, Active and Destroy"
+       ::= { fsrbridgeUniFdbEntry 7 }
+   -- -------------------------------------------------------------
+   -- RBridge FIB
+   -- -------------------------------------------------------------
+
+   fsrbridgeUniFibTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsRbridgeUniFibEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table that contains information about nicknames
+           known by the RBridge. If ECMP is implemented, there are
+           as many entries for a nickname as ECMP paths available for
+           it."
+       ::= { fsrbridgeFdb 2 }
+
+   fsrbridgeUniFibEntry OBJECT-TYPE
+       SYNTAX      FsRbridgeUniFibEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A list of information about nicknames known by the RBridge.
+           If ECMP is implemented, there are as many entries as ECMP
+           paths available for a given nickname."
+       INDEX   { fsrbridgeContextId, fsrbridgeFibNickname,
+                 fsrbridgeFibPort, fsrbridgeFibNextHopRBridge }
+       ::= { fsrbridgeUniFibTable 1 }
+
+   FsRbridgeUniFibEntry ::=
+       SEQUENCE {
+           fsrbridgeFibNickname
+               RbridgeNickname,
+           fsrbridgeFibPort
+               Integer32,
+           fsrbridgeFibNextHopRBridge
+               RbridgeNickname,
+           fsrbridgeFibMacAddress
+               RbridgeAddress,
+          fsrbridgeFibMtuDesired
+               Unsigned32,
+          fsrbridgeFibHopCount
+               Unsigned32,
+          fsrbridgeFibStatus
+               INTEGER,
+           fsrbridgeFibRowstatus
+               RowStatus
+       }
+
+
+   fsrbridgeFibNickname OBJECT-TYPE
+       SYNTAX      RbridgeNickname
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "An RBridge nickname for which this RBridge has
+           forwarding information."
+       ::= { fsrbridgeUniFibEntry 1 }
+
+   fsrbridgeFibPort OBJECT-TYPE
+       SYNTAX      Integer32 (0..65535)
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The port number of the port attached to the next-hop
+           RBridge for the path towards the RBridge whose nickname
+           is specified in this entry."
+       ::= { fsrbridgeUniFibEntry 2 }
+
+   fsrbridgeFibNextHopRBridge OBJECT-TYPE
+       SYNTAX      RbridgeNickname
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The nickname of the next-hop RBridge for the path towards the
+           RBridge whose nickname is specified in fsrbridgeFibNickname."
+       ::= { fsrbridgeUniFibEntry 3 }
+
+   fsrbridgeFibMacAddress OBJECT-TYPE
+       SYNTAX      RbridgeAddress
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The MAC address of the next-hop RBridge for the path
+           towards the RBridge whose nickname is specified in this
+           entry."
+       ::= { fsrbridgeUniFibEntry 4 }
+   
+   fsrbridgeFibMtuDesired OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The desired MTU for packets on this forwarding path.
+           Default vlaue is 1470 bytes."
+       DEFVAL      { 1470 }
+       ::= { fsrbridgeUniFibEntry 5 }
+
+    fsrbridgeFibHopCount OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+            " HopCount to be set in the TRILL header for 
+            packets on this forwarding path." 
+       DEFVAL      { 10 }
+       ::= { fsrbridgeUniFibEntry 6 }
+   
+   fsrbridgeFibStatus OBJECT-TYPE
+       SYNTAX      INTEGER {
+                        static (1),
+                        dynamic (2)
+                   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The status of this entry.  The meanings of the values
+           are:
+           static (1) - Configured through management interface.
+           dynamic (2) - dynamically learnt"
+       ::= { fsrbridgeUniFibEntry 7 }
+   
+   fsrbridgeFibRowstatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Row status object for thjis entry. This object supports the following 
+           options:
+           1. CreateAndGo
+           2. Active
+           3. Destroy"
+       ::= { fsrbridgeUniFibEntry 8 }
+   
+   fsrbridgeMultiFibTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsrbridgeMultiFibEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table that contains information about egress nicknames
+           used for multi-destination frame forwarding by this
+           RBridge."
+       ::= { fsrbridgeFdb 4 }
+
+   fsrbridgeMultiFibEntry OBJECT-TYPE
+       SYNTAX      FsrbridgeMultiFibEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A list of information about egress nicknames used for
+           multi-destination frame forwarding by this RBridge."
+       INDEX   { fsrbridgeContextId, fsrbridgeMultiFibNickname }
+       ::= { fsrbridgeMultiFibTable 1 }
+
+   FsrbridgeMultiFibEntry ::=
+       SEQUENCE {
+           fsrbridgeMultiFibNickname
+               RbridgeNickname,
+           fsrbridgeMultiFibPorts
+               PortList,
+           fsrbridgeMultiFibStatus
+               INTEGER,
+           fsrbridgeMultiFibRowStatus
+               RowStatus
+       }
+
+   
+   fsrbridgeMultiFibNickname OBJECT-TYPE
+       SYNTAX      RbridgeNickname
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "The nickname of the multicast distribution tree."
+       ::= { fsrbridgeMultiFibEntry 1 }
+
+   fsrbridgeMultiFibPorts OBJECT-TYPE
+       SYNTAX      PortList
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The list of ports to which a frame destined to this
+           multicast distribution tree is flooded. This may be pruned
+           further based on other forwarding information."
+       ::= { fsrbridgeMultiFibEntry 2 }
+
+   fsrbridgeMultiFibStatus OBJECT-TYPE
+       SYNTAX      INTEGER {
+                        static (1),
+                        dynamic (2)
+                   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The status of this entry.  The meanings of the values
+           are:
+           static (1) - Configured through management interface.
+           dynamic (2) - dynamically learnt"
+       ::= { fsrbridgeMultiFibEntry 3 }
+
+   fsrbridgeMultiFibRowStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "Row status of this entry. Supports CreateAndGo, Active and Destroy"
+       ::= { fsrbridgeMultiFibEntry 4 }
+
+
+   -- ---------------------------------------------------------- --
+   -- The RBridge Port Table
+   -- ---------------------------------------------------------- --
+
+   fsrbridgePortCounterTable  OBJECT-TYPE
+       SYNTAX      SEQUENCE OF FsRbridgePortCounterEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "A table contains per-port counters for this RBridge."
+       ::= { fsrbridgeCounter 1 }
+
+   fsrbridgePortCounterEntry OBJECT-TYPE
+       SYNTAX      FsRbridgePortCounterEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+           "Counters for a port on this RBridge."
+       INDEX   { fsrbridgePortIfIndex }
+       ::= { fsrbridgePortCounterTable 1 }
+
+   FsRbridgePortCounterEntry ::=
+       SEQUENCE {
+           fsrbridgePortRpfChecksFailed
+               Counter32,
+           fsrbridgePortHopCountsExceeded
+               Counter32,
+           fsrbridgePortOptions
+               Counter32,
+           fsrbridgePortTrillInFrames
+               Counter64,
+           fsrbridgePortTrillOutFrames
+               Counter64
+       }
+
+   fsrbridgePortRpfChecksFailed OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The number of times a multidestination frame was
+           dropped on this port because the RPF check failed.
+           Discontinuities in the value of this counter can occur
+           at re-initialization of the management system, and at
+           other times as indicated by the value of
+           ifCounterDiscontinuityTime object of the associated
+           interface."
+       REFERENCE
+           "RBridge section 4.5.2"
+       ::= { fsrbridgePortCounterEntry 1 }
+
+   fsrbridgePortHopCountsExceeded OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The number of times a frame was dropped on this port
+           because its hop count was zero.
+           Discontinuities in the value of this counter can occur
+           at re-initialization of the management system, and at
+           other times as indicated by the value of
+           ifCounterDiscontinuityTime object of the associated
+           interface."
+       REFERENCE
+           "RBridge section 3.6"
+       ::= { fsrbridgePortCounterEntry 2 }
+
+   fsrbridgePortOptions OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The number of times a frame was dropped on this port
+           because it contained unsupported options.
+           Discontinuities in the value of this counter can occur
+           at re-initialization of the management system, and at
+           other times as indicated by the value of
+           ifCounterDiscontinuityTime object of the associated
+           interface."
+       REFERENCE
+           "RBridge section 3.5"
+       ::= { fsrbridgePortCounterEntry 3 }
+
+   fsrbridgePortTrillInFrames OBJECT-TYPE
+       SYNTAX      Counter64
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The number of TRILL-encapsulated frames that have been
+           received by this port from its attached link, including
+           management frames.
+           Discontinuities in the value of this counter can occur
+           at re-initialization of the management system, and at
+           other times as indicated by the value of
+           ifCounterDiscontinuityTime object of the associated
+           interface."
+       REFERENCE
+           "RBridge section 2.3"
+       ::= { fsrbridgePortCounterEntry 4 }
+
+   fsrbridgePortTrillOutFrames OBJECT-TYPE
+       SYNTAX      Counter64
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The number of TRILL-encapsulated frames that have been
+           transmitted by this port to its attached link, including
+           management frames.
+           Discontinuities in the value of this counter can occur
+           at re-initialization of the management system, and at
+           other times as indicated by the value of
+           ifCounterDiscontinuityTime object of the associated
+           interface."
+       REFERENCE
+           "RBridge section 2.3"
+       ::= { fsrbridgePortCounterEntry 5 }
+
+ END

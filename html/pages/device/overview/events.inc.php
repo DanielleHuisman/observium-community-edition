@@ -1,22 +1,25 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-    print_events(array('device' => $device['device_id'], 'short' => TRUE, 'pagesize' => '20',
-                        'header' => array('title' => 'Eventlog',
-                                          'icon' => $config['icon']['eventlog'],
-                                          'url' => generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'logs', 'section' => 'eventlog'))
-                                    )
-    ));
-
+print_events([
+  'device' => $device['device_id'],
+  'short' => TRUE,
+  'pagesize' => '20',
+  'severity' => [ 0, 1, 2, 3, 4, 5, 6 ], // do not show debug events on overview page
+  'header' => [
+    'title' => 'Eventlog',
+    'icon'  => $config['icon']['eventlog'],
+    'url'   => generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'logs', 'section' => 'eventlog' ])
+  ]
+]);
 
 // EOF

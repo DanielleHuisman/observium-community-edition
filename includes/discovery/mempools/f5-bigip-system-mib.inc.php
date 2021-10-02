@@ -11,8 +11,8 @@
  *
  */
 
-$tmm_memory = snmpwalk_cache_multi_oid($device, 'sysTmmStatMemoryUsed', array(), $mib);
-$tmm_memory = snmpwalk_cache_multi_oid($device, 'sysTmmStatMemoryTotal', $tmm_memory, $mib);
+$tmm_memory = snmpwalk_cache_oid($device, 'sysTmmStatMemoryUsed', array(), $mib);
+$tmm_memory = snmpwalk_cache_oid($device, 'sysTmmStatMemoryTotal', $tmm_memory, $mib);
 
 foreach ($tmm_memory as $index => $entry)
 {

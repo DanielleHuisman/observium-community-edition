@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -205,20 +205,16 @@ if ($hardware)
 }
 
 // Additional checks for IOS devices
+$ios_type = '';
 if ($device['os'] === 'ios' &&
-    (str_iexists($hardware, 'AIRAP') || str_starts($hardware, 'AIR-')))
-{
+    (str_icontains_array($hardware, 'AIRAP') || str_starts($hardware, 'AIR-'))) {
   $ios_type = 'wireless';
-}
-
-// Set type to a predefined type for the OS if it's not already set
-if (empty($ios_type))
-{
+} else {
+  // Set type to a predefined type for the OS if it's not already set
   $ios_type = rewrite_definition_type($device, $poll_device['sysObjectID']);
 }
 
-if (!empty($ios_type) && $device['type'] != $ios_type)
-{
+if (!empty($ios_type)) {
   $type = $ios_type;
 }
 

@@ -311,10 +311,10 @@ TIMETRA-PORT-MIB::tmnxDDMExternallyCalibrated.1.69435392 = INTEGER: false(2)
 // TIMETRA-PORT-MIB::tmnxPortSFPVendorSerialNum.1.69435392 = STRING: "PG93Q3X         "
 // TIMETRA-PORT-MIB::tmnxPortSFPVendorPartNum.1.69435392 = STRING: "FTRJ8519P2BNL-A5"
 
-$oids = snmp_walk_multipart_oid($device, 'tmnxDigitalDiagMonitorTable', [], 'TIMETRA-PORT-MIB');
+$oids = snmpwalk_multipart_oid($device, 'tmnxDigitalDiagMonitorTable', [], 'TIMETRA-PORT-MIB');
 if (snmp_status())
 {
-  $oids = snmp_walk_multipart_oid($device, 'tmnxPortTransceiverType', $oids, 'TIMETRA-PORT-MIB');
+  $oids = snmpwalk_multipart_oid($device, 'tmnxPortTransceiverType', $oids, 'TIMETRA-PORT-MIB');
 }
 print_debug_vars($oids);
 

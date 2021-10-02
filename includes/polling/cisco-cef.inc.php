@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,6 +14,7 @@ if (is_device_mib($device, 'CISCO-CEF-MIB'))
 {
   echo('Cisco CEF Switching Path: ');
 
+  $cefs_db = [];
   $cefs_query = dbFetchRows('SELECT * FROM `cef_switching` WHERE `device_id` = ?', array($device['device_id']));
   foreach ($cefs_query as $ceftmp)
   {
@@ -44,11 +44,11 @@ if (is_device_mib($device, 'CISCO-CEF-MIB'))
       echo('Caching OIDs: ');
       $entity_array = array();
       echo(' entPhysicalDescr');
-      $entity_array = snmpwalk_cache_multi_oid($device, 'entPhysicalDescr', $entity_array, 'ENTITY-MIB');
+      $entity_array = snmpwalk_cache_oid($device, 'entPhysicalDescr', $entity_array, 'ENTITY-MIB');
       echo(' entPhysicalName');
-      $entity_array = snmpwalk_cache_multi_oid($device, 'entPhysicalName', $entity_array, 'ENTITY-MIB');
+      $entity_array = snmpwalk_cache_oid($device, 'entPhysicalName', $entity_array, 'ENTITY-MIB');
       echo(' entPhysicalModelName');
-      $entity_array = snmpwalk_cache_multi_oid($device, 'entPhysicalModelName', $entity_array, 'ENTITY-MIB');
+      $entity_array = snmpwalk_cache_oid($device, 'entPhysicalModelName', $entity_array, 'ENTITY-MIB');
     }
     $polled = time();
   }

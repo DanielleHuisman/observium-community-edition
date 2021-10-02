@@ -31,7 +31,7 @@ $x            = 0;
 
 if (is_file($rrd_filename))
 {
-  $max_colours = count($config['graph_colours'][$colours]);
+  $max_colours = safe_count($config['graph_colours'][$colours]);
   foreach ($array as $ds => $data)
   {
     $x = (($x<=$max_colours) ? $x : 0);

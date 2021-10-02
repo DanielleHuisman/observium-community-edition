@@ -11,7 +11,7 @@
  *
  */
 
-$bcsiOptMonLaneEntry = snmp_walk_multipart_oid($device, 'bcsiOptMonLaneEntry', array(), 'BROCADE-OPTICAL-MONITORING-MIB');
+$bcsiOptMonLaneEntry = snmpwalk_multipart_oid($device, 'bcsiOptMonLaneEntry', array(), 'BROCADE-OPTICAL-MONITORING-MIB');
 print_debug_vars($bcsiOptMonLaneEntry);
 if (!snmp_status()) { return; }
 

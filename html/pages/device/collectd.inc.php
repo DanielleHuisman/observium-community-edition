@@ -83,7 +83,7 @@ echo '<table class="table table-condensed table-striped table-hover">';
 
      foreach ($typeinstances as &$tinst) {
        $i++;
-       if (!is_integer($i/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
+       $row_colour = !is_intnum($i / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
 
        echo('<tr><td>');
        echo('<h3>'.$graph_title);

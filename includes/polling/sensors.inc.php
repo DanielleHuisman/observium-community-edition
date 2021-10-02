@@ -1,10 +1,12 @@
 <?php
-
-/* Observium Network Management and Monitoring System
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -21,7 +23,7 @@ $sensor_classes = dbFetchColumn($query, array($device['device_id'], '0'));
 if (count($sensor_classes) > 0)
 {
   // Cache device sensors attribs (currently need for get sensor_addition attrib)
-  get_device_entities_attribs($device['device_id'], 'sensor');
+  $GLOBALS['cache']['entity_attribs'] = array_merge((array)$GLOBALS['cache']['entity_attribs'], get_device_entities_attribs($device['device_id'], 'sensor'));
   //print_vars($GLOBALS['cache']['entity_attribs']);
 
   poll_cache_oids($device, 'sensor', $oid_cache);

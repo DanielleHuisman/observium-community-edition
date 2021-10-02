@@ -36,6 +36,10 @@ IMPORTS
     dot1dTpFdbPort,
     dot1dTpFdbStatus
         FROM BRIDGE-MIB
+    InterfaceIndex
+        FROM IF-MIB
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB
     CFWNetworkProtocol,
     CFWApplicationProtocol,
     CFWPolicy,
@@ -47,16 +51,12 @@ IMPORTS
     Hardware,
     HardwareStatus
         FROM CISCO-FIREWALL-MIB
-    InterfaceIndex
-        FROM IF-MIB
-    SnmpAdminString
-        FROM SNMP-FRAMEWORK-MIB
     ciscoMgmt
         FROM CISCO-SMI;
 
 
 ciscoUnifiedFirewallMIB MODULE-IDENTITY
-    LAST-UPDATED    "202001070000Z"
+    LAST-UPDATED    "202010290000Z"
     ORGANIZATION    "Cisco Systems"
     CONTACT-INFO
             "Cisco Systems
@@ -243,6 +243,13 @@ ciscoUnifiedFirewallMIB MODULE-IDENTITY
             An entity that performs deep packet inspection
             of layer 7 application protocol data units is
             termed an 'Application Firewall'."
+    REVISION        "202010290000Z"
+    DESCRIPTION
+        "Update includes defining cufwAaicSnortEvRates and cufwAaicIntrusionEvtRate."
+    REVISION        "202003060000Z"
+    DESCRIPTION
+        "Update includes changing datatype from TimeStamp into String
+        in cuFwClusterGrp & cuFwFailoverGrp."
     REVISION        "202001070000Z"
     DESCRIPTION
         "Update includes defining cuFwClusterGrp."
@@ -300,7 +307,7 @@ cuFwL2FwGrp  OBJECT IDENTIFIER
 cuFwNotifCntlGrp  OBJECT IDENTIFIER
     ::= { ciscoUnifiedFirewallMIBObjects 7 }
 
-cuFwClusterGrp    OBJECT IDENTIFIER
+cuFwClusterGrp  OBJECT IDENTIFIER
     ::= { ciscoUnifiedFirewallMIBObjects 8 }
 
 -- +++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2195,7 +2202,7 @@ CUfwFOHistoryEvEntry ::= SEQUENCE {
         cufwFOHistoryIndex        Integer32,
         cufwFOGrpHAFromState      CUfwFOState,
         cufwFOGrpHAToState        CUfwFOState,
-        cufwFOGrpTransitionAt     DateAndTime,
+        cufwFOGrpTransitionAt     DisplayString,
         cufwFOGrpTransitionReason DisplayString
 }
 
@@ -2234,7 +2241,7 @@ cufwFOGrpHAToState OBJECT-TYPE
     ::= { cufwFOHistoryEvEntry 4 }
 
 cufwFOGrpTransitionAt OBJECT-TYPE
-    SYNTAX          DateAndTime
+    SYNTAX          DisplayString
     MAX-ACCESS      read-only
     STATUS          current
     DESCRIPTION
@@ -2273,7 +2280,7 @@ cufwFOGrpStatusEntry OBJECT-TYPE
 
 CUfwFOGrpStatusEntry ::= SEQUENCE {
         cufwFOGroupIndex        CUfwFOGroupId,
-        cufwFOGrpLastFailoverAt DateAndTime,
+        cufwFOGrpLastFailoverAt DisplayString,
         cufwFOGrpHAstate        HardwareStatus,
         cufwFOGrpUpTime         Gauge32,
         cufwFOGrpContextCount   Gauge32
@@ -2289,7 +2296,7 @@ cufwFOGroupIndex OBJECT-TYPE
     ::= { cufwFOGrpStatusEntry 1 }
 
 cufwFOGrpLastFailoverAt OBJECT-TYPE
-    SYNTAX          DateAndTime
+    SYNTAX          DisplayString
     MAX-ACCESS      read-only
     STATUS          current
     DESCRIPTION
@@ -3024,6 +3031,19 @@ cufwAaicInjDropCount OBJECT-TYPE
     DESCRIPTION
         "The number of packets that Snort added to the traffic stream that were dropped." 
     ::= { cufwAaicLinaSnortStats 12 }
+    
+cufwAaicSnortEvRates  OBJECT IDENTIFIER
+    ::= { cufwAaicEngineStats 2 }
+
+cufwAaicIntrusionEvtRate OBJECT-TYPE
+    SYNTAX          Gauge32
+    UNITS           "Events per second"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The rate at which intrusion events were recorded by Snort on this firewall
+        averaged over the last 300 seconds." 
+    ::= { cufwAaicSnortEvRates 1 }
 -- Transparent or Layer 2 or Stealth Firewall group
 
 cufwL2FwGlobals  OBJECT IDENTIFIER
@@ -3162,389 +3182,347 @@ cufwL2GlobalNumSpoofedArpResps OBJECT-TYPE
         This counter is accumulated since the last reboot of 
         the firewall." 
     ::= { cufwL2FwGlobals 11 }
-
-
 -- Cluster group
 
-cuFwClusterGlobals        OBJECT IDENTIFIER ::= { cuFwClusterGrp 1 }
-cuFwClusterStatus         OBJECT IDENTIFIER ::= { cuFwClusterGrp 2 }
-cuFwClusterHistory        OBJECT IDENTIFIER ::= { cuFwClusterGrp 3 }
+cuFwClusterGlobals  OBJECT IDENTIFIER
+    ::= { cuFwClusterGrp 1 }
+
+cuFwClusterStatus  OBJECT IDENTIFIER
+    ::= { cuFwClusterGrp 2 }
+
+cuFwClusterHistory  OBJECT IDENTIFIER
+    ::= { cuFwClusterGrp 3 }
 
 
 CUfwCluState ::= TEXTUAL-CONVENTION
-        STATUS     current
-        DESCRIPTION
-                "This type denotes possible cluster unit states.            
-                "
-        SYNTAX INTEGER {
-		disabled      (0),
-		election      (1),
-		onCall        (2),
-		slaveCold     (3),
-		slaveAppSync  (4),
-		slaveConfig   (5),
-		slaveFilesys  (6),
-		slaveBulkSync (7),
-		slave         (8),
-		masterFast    (9),
-		masterDrain   (10),
-		masterConfig  (11),
-		masterPostConfig (12),
-		master	      (13),
-		masterDefer   (14)
-        }
-
-
+    STATUS          current
+    DESCRIPTION
+        "This type denotes possible cluster unit states."
+    SYNTAX          INTEGER  {
+                        disabled(0),
+                        election(1),
+                        onCall(2),
+                        slaveCold(3),
+                        slaveAppSync(4),
+                        slaveConfig(5),
+                        slaveFilesys(6),
+                        slaveBulkSync(7),
+                        slave(8),
+                        slavePending(9),
+                        deputyBulkSync(10),
+                        deputy(11),
+                        masterFast(12),
+                        masterDrain(13),
+                        masterConfig(14),
+                        masterPostConfig(15),
+                        master(16),
+                        masterDefer(17)
+                    }
 
 CUfwCluHealth ::= TEXTUAL-CONVENTION
-        STATUS     current
-        DESCRIPTION
-                "This type denotes possible cluster interface/app health states.            
-                "
-        SYNTAX INTEGER {
-		init      (0),
-		up        (1),
-		down      (2),
-		goingDown (3),
-		goingUp   (4),
-		noLicense (5),
-		none	  (6)
-        }
+    STATUS          current
+    DESCRIPTION
+        "This type denotes possible cluster interface/app health states."
+    SYNTAX          INTEGER  {
+                        init(0),
+                        up(1),
+                        down(2),
+                        goingDown(3),
+                        goingUp(4),
+                        noLicense(5),
+                        none(6)
+                    }
 
 cuFwCluUnitHealth OBJECT-TYPE
-        SYNTAX     DisplayString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                " The string would show either healthy
-                or un-healthy.
-                "
-        ::= { cuFwClusterStatus  1 }
-
+    SYNTAX          DisplayString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The string would show either healthy
+        or un-healthy." 
+    ::= { cuFwClusterStatus 1 }
 
 cufwCluOverallHealth OBJECT-TYPE
-        SYNTAX     DisplayString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The string would show either healthy
-                or un-healthy.
-                "
-       ::= { cuFwClusterStatus 2 }
-
+    SYNTAX          DisplayString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The string would show either healthy
+        or un-healthy." 
+    ::= { cuFwClusterStatus 2 }
 
 cufwCluInterfaceTable OBJECT-TYPE
-        SYNTAX     SEQUENCE OF CufwCluInterfaceEntry
-        MAX-ACCESS not-accessible
-        STATUS current
-        DESCRIPTION
-                "This table summarises the health of each interface
-		in a cluster unit.
-                "
-       ::= { cuFwClusterStatus 3 }
+    SYNTAX          SEQUENCE OF CufwCluInterfaceEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table summarises the health of each interface
+        in a cluster unit."
+    ::= { cuFwClusterStatus 3 }
 
 cufwCluInterfaceEntry OBJECT-TYPE
-        SYNTAX     CufwCluInterfaceEntry
-        MAX-ACCESS not-accessible
-        STATUS     current
-        DESCRIPTION
-                "Each entry in the table depicts the health of a clustering interface.
-                "
-        INDEX {
-		cuCluIfcIndex
-        }
-        ::= { cufwCluInterfaceTable 1 }
+    SYNTAX          CufwCluInterfaceEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Each entry in the table depicts the health of a clustering interface."
+    INDEX           { cuCluIfcIndex } 
+    ::= { cufwCluInterfaceTable 1 }
 
 CufwCluInterfaceEntry ::= SEQUENCE {
-    cuCluIfcIndex         InterfaceIndex,        
-	cufwCluHealthStatus	  CUfwCluHealth,
-	cufwCluHealthCheck	  CUfwInterfaceMonitor
+        cuCluIfcIndex       InterfaceIndex,
+        cufwCluHealthCheck  CUfwInterfaceMonitor,
+        cufwCluHealthStatus CUfwCluHealth
 }
 
-
 cuCluIfcIndex OBJECT-TYPE
-        SYNTAX     InterfaceIndex
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The ifIndex from the IF-MIB for an interface in a cluster unit.
-                "
-        ::= { cufwCluInterfaceEntry  1 }
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The ifIndex from the IF-MIB for an interface in a cluster unit." 
+    ::= { cufwCluInterfaceEntry 1 }
 
 cufwCluHealthCheck OBJECT-TYPE
-        SYNTAX     CUfwInterfaceMonitor
-        MAX-ACCESS read-only
-        STATUS     current
-	DESCRIPTION
-                "The monitoring state of the interface being addressed in a cluster unit.
-                "
-        ::= { cufwCluInterfaceEntry  3 }
-
+    SYNTAX          CUfwInterfaceMonitor
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The monitoring state of the interface being addressed in a cluster unit." 
+    ::= { cufwCluInterfaceEntry 3 }
 
 cufwCluHealthStatus OBJECT-TYPE
-        SYNTAX     CUfwCluHealth
-        MAX-ACCESS read-only
-        STATUS     current
-	DESCRIPTION
-            "The health-check outcome of the interface being addressed in a cluster unit.
-        	"
-        ::= { cufwCluInterfaceEntry  2 }
+    SYNTAX          CUfwCluHealth
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The health-check outcome of the interface being addressed in a cluster unit." 
+    ::= { cufwCluInterfaceEntry 2 }
+ 
 
 
 cuFwCluMaxStateEvents OBJECT-TYPE
-        SYNTAX     INTEGER
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The max count of history logs for cluster state transitions
-		that can be saved on the device.
-                "
-        ::= { cuFwClusterHistory  1 }
-
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The max count of history logs for cluster state transitions
+        that can be saved on the device." 
+    ::= { cuFwClusterHistory 1 }
 
 cufwCluHistEvTable OBJECT-TYPE
-        SYNTAX     SEQUENCE OF CufwCluHistEvEntry
-        MAX-ACCESS not-accessible
-        STATUS current
-        DESCRIPTION
-                "This table summarises the cluster state transitions' history
-		in a unit.
-                "
-       ::= { cuFwClusterHistory 2 }
+    SYNTAX          SEQUENCE OF CufwCluHistEvEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table summarises the cluster state transitions' history
+        in a unit."
+    ::= { cuFwClusterHistory 2 }
 
 cufwCluHistEvEntry OBJECT-TYPE
-        SYNTAX     CufwCluHistEvEntry
-        MAX-ACCESS not-accessible
-        STATUS     current
-        DESCRIPTION
-                "Each entry in the table lists details of a cluster state transition.
-                "
-        INDEX {
-		cufwCluHistIndex
-        }
-        ::= { cufwCluHistEvTable 1 }
+    SYNTAX          CufwCluHistEvEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Each entry in the table lists details of a cluster state transition."
+    INDEX           { cufwCluHistIndex } 
+    ::= { cufwCluHistEvTable 1 }
 
 CufwCluHistEvEntry ::= SEQUENCE {
-    cufwCluHistIndex      INTEGER,        
-	cufwCluFromState	  CUfwCluState,
-    cufwCluToState	  	  CUfwCluState,
-	cufwCluTransitionAt	  DateAndTime,
-	cufwCluTransitionReason   DisplayString
+        cufwCluHistIndex        INTEGER,
+        cufwCluFromState        CUfwCluState,
+        cufwCluToState          CUfwCluState,
+        cufwCluTransitionAt     DateAndTime,
+        cufwCluTransitionReason DisplayString
 }
 
-
 cufwCluHistIndex OBJECT-TYPE
-        SYNTAX     INTEGER
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "A distinct index that points to an entry in the cluster history table
-		for this unit.
-                "
-        ::= { cufwCluHistEvEntry  1 }
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "A distinct index that points to an entry in the cluster history table
+        for this unit." 
+    ::= { cufwCluHistEvEntry 1 }
 
 cufwCluFromState OBJECT-TYPE
-        SYNTAX     CUfwCluState
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The log entry points to the cluster state that this event transitioned from.
-                "
-        ::= { cufwCluHistEvEntry  2 }
-
+    SYNTAX          CUfwCluState
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The log entry points to the cluster state that this event transitioned from." 
+    ::= { cufwCluHistEvEntry 2 }
 
 cufwCluToState OBJECT-TYPE
-        SYNTAX     CUfwCluState
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The log entry points to the cluster state that this event transitioned to.
-                "
-        ::= { cufwCluHistEvEntry  3 }
-
+    SYNTAX          CUfwCluState
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The log entry points to the cluster state that this event transitioned to." 
+    ::= { cufwCluHistEvEntry 3 }
 
 cufwCluTransitionAt OBJECT-TYPE
-        SYNTAX     DateAndTime
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The date&time at which this transition happened for the cluster unit.
-                "
-        ::= { cufwCluHistEvEntry  4 }
+    SYNTAX          DateAndTime
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The date&time at which this transition happened for the cluster unit." 
+    ::= { cufwCluHistEvEntry 4 }
 
 cufwCluTransitionReason OBJECT-TYPE
-        SYNTAX     DisplayString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The reason for this transition for the cluster unit.
-                "
-        ::= { cufwCluHistEvEntry  5 }
+    SYNTAX          DisplayString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The reason for this transition for the cluster unit." 
+    ::= { cufwCluHistEvEntry 5 }
+ 
+
 
 -- Cluster Globals
 
 cufwCluEnabled OBJECT-TYPE
-        SYNTAX     TruthValue
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "This value depicts if clustering is enabled or not
-		on the device.
-                "
-        ::= { cuFwClusterGlobals  1 }
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This value depicts if clustering is enabled or not
+        on the device." 
+    ::= { cuFwClusterGlobals 1 }
 
 cufwCluInterfaceMode OBJECT-TYPE
-        SYNTAX     INTEGER (0..3)
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "Mode of interface in clustering.
-			Value	Type
-			  0	none
-			  1	Spanned ether-channel
-			  2 	Individual
-			  3     invalid
-                "
-        ::= { cuFwClusterGlobals  2 }
+    SYNTAX          INTEGER (0..3)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Mode of interface in clustering.
+        Value        Type
+          0        none
+          1        Spanned ether-channel
+          2         Individual
+          3     invalid" 
+    ::= { cuFwClusterGlobals 2 }
 
 cufwCluUnitState OBJECT-TYPE
-        SYNTAX     CUfwCluState
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The current state of the unit in cluster.
-                "
-        ::= { cuFwClusterGlobals  3 }
+    SYNTAX          CUfwCluState
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The current state of the unit in cluster." 
+    ::= { cuFwClusterGlobals 3 }
 
 cufwCCLink OBJECT-TYPE
-        SYNTAX     InterfaceIndex
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The ifIndex of the interface used for cluster communication
-		between the units.
-                "
-        ::= { cuFwClusterGlobals  4 }
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The ifIndex of the interface used for cluster communication
+        between the units." 
+    ::= { cuFwClusterGlobals 4 }
 
 cufwCluGroupName OBJECT-TYPE
-        SYNTAX     SnmpAdminString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The group name uniquely identifying this cluster.
-                "
-        ::= { cuFwClusterGlobals  5 }
+    SYNTAX          SnmpAdminString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The group name uniquely identifying this cluster." 
+    ::= { cuFwClusterGlobals 5 }
 
 cufwCluUnitName OBJECT-TYPE
-        SYNTAX     SnmpAdminString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The name uniquely identifying this cluster member.
-                "
-        ::= { cuFwClusterGlobals  6 }
+    SYNTAX          SnmpAdminString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The name uniquely identifying this cluster member." 
+    ::= { cuFwClusterGlobals 6 }
 
 cufwCluConsoleReplicate OBJECT-TYPE
-        SYNTAX     TruthValue
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The console replication feature is enabled on this slave. Slave units 
-                 send the console messages to the master unit so that you 
-                 only need to monitor one console port for the cluster.
-                "
-        ::= { cuFwClusterGlobals  7 }
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The console replication feature is enabled on this slave. Slave units
+        send the console messages to the master unit so that you 
+        only need to monitor one console port for the cluster." 
+    ::= { cuFwClusterGlobals 7 }
 
 cufwCluSiteID OBJECT-TYPE
-        SYNTAX     INTEGER (0..8)
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The site ID for this unit used in inter-site clustering.
-                "
-        ::= { cuFwClusterGlobals  8 }
+    SYNTAX          INTEGER (0..8)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The site ID for this unit used in inter-site clustering." 
+    ::= { cuFwClusterGlobals 8 }
 
 cufwCluPriority OBJECT-TYPE
-        SYNTAX     INTEGER (1..100)
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The priority of this unit for master unit elections (1 being highest).
-                "
-        ::= { cuFwClusterGlobals  9 }
-
+    SYNTAX          INTEGER (1..100)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The priority of this unit for master unit elections (1 being highest)." 
+    ::= { cuFwClusterGlobals 9 }
 
 cufwCluSerialNum OBJECT-TYPE
-        SYNTAX     SnmpAdminString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The vendor-specific serial number string for the
-		current unit in cluster.
-                "
-        ::= { cuFwClusterGlobals  10 }
+    SYNTAX          SnmpAdminString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The vendor-specific serial number string for the
+        current unit in cluster." 
+    ::= { cuFwClusterGlobals 10 }
 
 cufwCCLipAddr OBJECT-TYPE
-        SYNTAX     InetAddress
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The ip address used on the interface for CCL communication.
-                "
-        ::= { cuFwClusterGlobals  11 }
-
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The ip address used on the interface for CCL communication." 
+    ::= { cuFwClusterGlobals 11 }
 
 cufwCCLmacAddr OBJECT-TYPE
-        SYNTAX     PhysAddress
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                " The MAC address on the CCL link.
-                "
-        ::= { cuFwClusterGlobals  12 }
+    SYNTAX          PhysAddress
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The MAC address on the CCL link." 
+    ::= { cuFwClusterGlobals 12 }
 
 cufwCluSwVersion OBJECT-TYPE
-        SYNTAX     SnmpAdminString
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The vendor-specific software revision string for the
-		current unit in cluster.
-                "
-        ::= { cuFwClusterGlobals  13 }
-
+    SYNTAX          SnmpAdminString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The vendor-specific software revision string for the
+        current unit in cluster." 
+    ::= { cuFwClusterGlobals 13 }
 
 cufwCluUnitHoldtime OBJECT-TYPE
-        SYNTAX     INTEGER (800..45000)
-        UNITS      "millisec"
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "To determine unit health, the ASA cluster units send 
-		keepalive messages on the cluster control link to other units.
-		The hold time that each unit will wait before
-		declaring a peer unit as dead. 
-                "
-        ::= { cuFwClusterGlobals  14 }
+    SYNTAX          INTEGER (800..45000)
+    UNITS           "millisec"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "To determine unit health, the ASA cluster units send
+        keepalive messages on the cluster control link to other units.
+        The hold time that each unit will wait before
+        declaring a peer unit as dead." 
+    ::= { cuFwClusterGlobals 14 }
 
 cufwCluLastJoinAt OBJECT-TYPE
-        SYNTAX     DateAndTime
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The date&time at which this unit last joined the cluster.
-                "
-        ::= { cuFwClusterGlobals  15 }
+    SYNTAX          DisplayString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The date&time at which this unit last joined the cluster." 
+    ::= { cuFwClusterGlobals 15 }
 
 cufwCluLastLeaveAt OBJECT-TYPE
-        SYNTAX     DateAndTime
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-                "The date&time at which this unit last left the cluster.
-                "
-        ::= { cuFwClusterGlobals  16 }
-
+    SYNTAX          DisplayString
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The date&time at which this unit last left the cluster." 
+    ::= { cuFwClusterGlobals 16 }
 
 -- Cisco Firewall MIB Notification Control
 
@@ -3666,10 +3644,9 @@ cufwFailoverStateChanged NOTIFICATION-TYPE
         object 'cufwCntlFOstateChange' has been
         set to 'true'."
    ::= { ciscoUnifiedFirewallMIBNotifs 3 }
-   
-   cufwClusterStateChanged NOTIFICATION-TYPE
-    OBJECTS         { cufwCluUnitState
-                    }
+
+cufwClusterStateChanged NOTIFICATION-TYPE
+    OBJECTS         { cufwCluUnitState }
     STATUS          current
     DESCRIPTION
         "This notification is generated when the firewall
@@ -3679,7 +3656,6 @@ cufwFailoverStateChanged NOTIFICATION-TYPE
         object 'cufwCntlCluStateChange' has been
         set to 'true'."
    ::= { ciscoUnifiedFirewallMIBNotifs 4 }
-   
 -- Conformance Information
 
 ciscoUniFirewallMIBCompliances  OBJECT IDENTIFIER
@@ -4049,4 +4025,5 @@ ciscoFwFailoverGroup OBJECT-GROUP
     ::= { ciscoUniFirewallMIBGroups 13 }
 
 END
+
 

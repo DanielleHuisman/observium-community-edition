@@ -1,0 +1,1398 @@
+ELTEX-ISIS-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32,
+    Counter32,
+    Gauge32,
+    Unsigned32,
+    IpAddress,
+    TimeTicks
+      FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION,
+    DisplayString,
+    TruthValue,
+    RowStatus,
+    TimeStamp,
+    TimeInterval
+      FROM SNMPv2-TC
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP
+      FROM SNMPv2-CONF
+
+    InetAddressType,
+    InetAddress,
+    InetPortNumber,
+    InetAddressPrefixLength
+      FROM INET-ADDRESS-MIB
+
+    InterfaceIndexOrZero,
+    InterfaceIndex
+      FROM IF-MIB
+
+    SnmpAdminString
+      FROM SNMP-FRAMEWORK-MIB
+
+    eltexLtd
+      FROM ELTEX-SMI-ACTUAL;
+      
+
+  eltexIsisMIB MODULE-IDENTITY
+    LAST-UPDATED "201906060000Z" -- Mon Jun 06 00:00:00 GMT 2019
+    ORGANIZATION "Eltex Enterprise Co, Ltd."
+    CONTACT-INFO 
+        "eltex-co.ru"
+    DESCRIPTION  
+        "The MIB module for management of the ISIS protocol."
+
+  ::= { eltexLtd 55 }
+
+-------------------------------------------------------------------------------
+-- Textual Conventions.
+
+    EltexIsisSystemID ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION "A system ID."
+        SYNTAX OCTET STRING (SIZE(6))
+
+    EltexIsisAdminState ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION "Type used in enabling and disabling a row.
+                     Values match those in RFC 2863."
+        SYNTAX INTEGER
+            {
+                on(1),
+                off(2)
+            }
+
+    EltexNETAddress ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Network Entity Title address"
+        SYNTAX OCTET STRING (SIZE(0..20))
+
+    EltexIsisOperStatus ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+           "The current operational state of ISIS entity."
+        SYNTAX INTEGER 
+            {
+                operStatusUp(1),       -- active
+                operStatusDown(2),     -- inactive
+                operStatusGoingUp(3),  -- activating
+                operStatusGoingDown(4),-- deactivating
+                operStatusActFailed(5) -- activation failed
+            }
+
+    EltexIsisISLevel ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION "Identifies a level."
+        SYNTAX INTEGER
+            {
+                area(1),        -- L1
+                domain(2)       -- L2
+            }
+
+    EltexIsisLinkStatePDUID ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION "A Link State PDU Identifier."
+        SYNTAX OCTET STRING (SIZE(8))
+
+    EltexIsisISPriority ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Integer sub-range for IS-IS priority."
+        SYNTAX Integer32 (0..127)
+
+    EltexIsisMetricStyle ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Do we use 1195 style Metrics or wide metrics."
+        SYNTAX INTEGER
+            {
+                narrow(1),
+                wide(2),
+                both(3)
+            }
+
+    EltexIsisWideMetric ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "Wide Metric for IS Neighbors.  ISO 10589 provides a
+             6 bit metric.  Traffic Engineering extensions provide
+             24 bit metrics."
+        SYNTAX Unsigned32 (1..16777215)
+
+    EltexIsisAuthType ::= TEXTUAL-CONVENTION
+       STATUS current
+       DESCRIPTION
+          "The authentication type."
+       SYNTAX       INTEGER {
+                       none (0),
+                       simplePassword (1),
+                       hmac-md5 (2)
+                    }
+
+    EltexIsisHelloPaddingAction ::= TEXTUAL-CONVENTION
+       STATUS current
+       DESCRIPTION
+          "What to do with padding in hello packets?
+
+           - disabled (0) - Disable padding in all hello packets.
+           - enabled  (1) - Add padding in all hello packets.
+           - adaptive (2) - Enable padding in hello packets before
+                            establishing a connection with a neighbor.
+          "
+       SYNTAX       INTEGER {
+                       disabled (0),
+                       enabled  (1),
+                       adaptive (2)
+                    }
+
+-------------------------------------------------------------------------------
+
+  eltexIsisObjects    OBJECT IDENTIFIER ::= { eltexIsisMIB 1 }
+
+  eltexIsisSystem     OBJECT IDENTIFIER ::= { eltexIsisObjects 1 }
+--
+-- ISIS System Table.
+--
+
+  eltexIsisSysTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisSysEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The set of instances of the Integrated IS-IS
+                   protocol existing on the system."
+  ::= { eltexIsisSystem 1 }
+
+  eltexIsisSysEntry OBJECT-TYPE
+      SYNTAX EltexIsisSysEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each row defines information specific to a single
+                   instance of the IS-IS protocol existing on the system."
+      REFERENCE "{ISIS.poi cLNSISISBasic-P (1)}"
+      INDEX { eltexIsisSysInstance }
+  ::= { eltexIsisSysTable 1 }
+  
+  EltexIsisSysEntry ::= SEQUENCE {
+          eltexIsisSysInstance
+              Integer32,
+          eltexIsisSysType
+              INTEGER,
+          eltexIsisSysID
+              EltexIsisSystemID,
+          eltexIsisSysAdminState
+              EltexIsisAdminState,
+          eltexIsisSysOperState
+              EltexIsisOperStatus,
+          eltexIsisSysRowStatus
+              RowStatus,
+          eltexIsisSysMaxAge
+              Unsigned32,
+          eltexIsisSysMaxLSPGenInt
+              Unsigned32,
+          eltexIsisSysCalcMaxDelay
+              Unsigned32,
+          eltexIsisSysCalcThrshUpdStart
+              Unsigned32,
+          eltexIsisSysCalcThrshUpdRestart
+              Unsigned32,
+          eltexIsisSysCalcThrshRestartLimit
+              Unsigned32,
+          eltexIsisSysHostNameDynamic
+              TruthValue
+      }
+
+  eltexIsisSysInstance OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The unique identifier of the Integrated IS-IS
+                   instance to which this row corresponds.
+                   This object follows the index behavior."
+  ::= { eltexIsisSysEntry 1 }
+
+  eltexIsisSysType OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              reserved (0),
+              level1IS (1),
+              level2IS (2),
+              level1L2IS (3)
+          }
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "At which levels is the Intermediate System
+                   running? This object follows the
+                   replaceOnlyWhileDisabled behavior."
+      REFERENCE "{ISIS.aoi iSType (2)}"
+      DEFVAL { level1L2IS }
+  ::= { eltexIsisSysEntry 2 }
+
+  eltexIsisSysID OBJECT-TYPE
+      SYNTAX EltexIsisSystemID
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The ID for this instance of the Integrated IS-IS
+                   protocol."
+      REFERENCE "{ISIS.aoi systemId (119)}"
+  ::= { eltexIsisSysEntry 3 }
+
+  eltexIsisSysAdminState OBJECT-TYPE
+      SYNTAX EltexIsisAdminState
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The administrative state of this instance of the
+                   Integrated IS-IS protocol.  Setting this object to the
+                   value 'on' when its current value is 'off' enables operation
+                   of this instance of the Integrated IS-IS protocol."
+      DEFVAL { off }
+  ::= { eltexIsisSysEntry 4 }
+
+  eltexIsisSysOperState OBJECT-TYPE
+      SYNTAX EltexIsisOperStatus
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The current operational status of this IS-IS instance."
+  ::= { eltexIsisSysEntry 5 }
+
+  eltexIsisSysRowStatus OBJECT-TYPE
+      SYNTAX RowStatus
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The state of the IS-IS router.  Turning this to
+                   state 'destroy' forces the router to forget all
+                   the current configuration.  Setting the state to
+                   'notInService' stops protocol processing, but
+                   retains the configuration."
+  ::= { eltexIsisSysEntry 6 }
+
+  eltexIsisSysMaxAge OBJECT-TYPE
+      SYNTAX Unsigned32 (350..65535)
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION "Value to place in RemainingLifeTime field of
+                   the LSPs we generate.
+                   This should be at least 300 seconds greater than
+                   eltexIsisSysMaxLSPGenInt."
+      DEFVAL { 1200 }
+  ::= { eltexIsisSysEntry 7 }
+
+  eltexIsisSysMaxLSPGenInt OBJECT-TYPE
+      SYNTAX Unsigned32 (1..65235)
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION 
+            "Maximum interval, in seconds, between generated LSPs
+             by this instance of the protocol. This object follows
+             the resettingTimer behavior.  The value must be
+             greater than any value configured for
+             eltexIsisSysLevelMinLSPGenInt, and should be at least 300
+             seconds less than eltexIsisSysMaxAge.
+
+             Note that this value is specified in seconds whereas
+             eltexIsisSysLevelMinLSPGenInt is specified in milliseconds."
+      DEFVAL { 900 }
+  ::= { eltexIsisSysEntry 8 }
+
+  eltexIsisSysCalcMaxDelay OBJECT-TYPE
+      SYNTAX Unsigned32 (0..'FFFFFFFF'H)
+      MAX-ACCESS read-write
+      STATUS  current
+      DESCRIPTION
+          "The maximum delay before the Routing Table is
+           recalculated following a change to the Link State
+           Database.  (Recalculation is delayed to reduce the
+           frequency of recalculations of the Routing Table).
+
+           This parameter has units of milliseconds.  A value of
+           0 indicates that a routing calculation will
+           immediately follow an update to the database."
+       DEFVAL { 5000 }
+  ::= { eltexIsisSysEntry 9 }
+
+  eltexIsisSysCalcThrshUpdStart OBJECT-TYPE
+      SYNTAX Unsigned32 (0..'FFFFFFFF'H)
+      MAX-ACCESS read-write
+      STATUS  current
+      DESCRIPTION
+          "This parameter can be used to override the routing
+           calculation delay indicated by the eltexIsisSysCalcMaxDelay
+           parameter when the number of updates to the Link State
+           Database reaches a threshold value.
+
+           This parameter specifies the threshold number of updates
+           that can be made to the Link State Database such that any
+           subsequent update to the database causes a full routing
+           calculation to start immediately.
+
+           - 0 indicates that a routing calculation will immediately
+             follow an update to the database.
+
+           - 0xFFFFFFFF indicates that this threshold is infinite, and
+             hence the timing of a routing calculation is determined
+             solely by the configured calculation delay."
+       DEFVAL { 4294967295 }
+  ::= { eltexIsisSysEntry 10 }
+
+  eltexIsisSysCalcThrshUpdRestart OBJECT-TYPE
+      SYNTAX Unsigned32 (0..'FFFFFFFF'H)
+      MAX-ACCESS read-write
+      STATUS  current
+      DESCRIPTION
+          "This parameter can be used to interrupt a full routing
+           calculation when the number of pending updates to the Link
+           State Database has reached a threshold value.
+
+           This parameter specifies the threshold number of updates
+           that can be made to the Link State Database such that any
+           subsequent update to the database causes the current
+           routing  calculation to be interrupted, and a new
+           calculation to start using an up to date Link State
+           Database.
+
+           - 0 indicates that an update to the Link State Database
+             will cause any current routing calculation to be
+             interrupted and a new one to start.
+
+           - 0xFFFFFFFF indicates that this threshold is infinite, and
+             hence no number of pending updates to the database will
+             cause a routing calculation to be interrupted."
+       DEFVAL { 4294967295 }
+  ::= { eltexIsisSysEntry 11 }
+
+  eltexIsisSysCalcThrshRestartLimit OBJECT-TYPE
+      SYNTAX Unsigned32 (1..'FFFFFFFF'H)
+      MAX-ACCESS read-write
+      STATUS  current
+      DESCRIPTION
+          "This parameter limits the number of consecutive times a
+           routing calculation can be interrupted by new updates.
+           This guarantees that the routing calculation will actually
+           complete.
+
+           - 1 indicates that once a calculation has been interrupted
+             once, it will not be interrupted again.
+
+           - 0xFFFFFFFF indicates that the calculation can always be
+             interrupted."
+       DEFVAL { 10 }
+  ::= { eltexIsisSysEntry 12 }
+
+    eltexIsisSysHostNameDynamic OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Enable translation from System ID to hostname.
+
+             Advertise hostname to other Intermediate Systems in the
+             Dynamic Hostname TLV."
+        DEFVAL { true }
+    ::= { eltexIsisSysEntry 13 }
+
+--
+-- NET Address Table.
+--
+
+  eltexIsisNetAddrTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisNetAddrEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The set of NET addresses configured on this
+                   Intermediate System."
+      REFERENCE "{ISIS.aoi manualAreaAddresses (10)}"
+  ::= { eltexIsisSystem 2 }
+
+  eltexIsisNetAddrEntry OBJECT-TYPE
+      SYNTAX EltexIsisNetAddrEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry contains one NET address manually configured
+                   on this system"
+      INDEX { eltexIsisSysInstance,
+              eltexIsisNetAddr }
+  ::= { eltexIsisNetAddrTable 1 }
+
+  EltexIsisNetAddrEntry ::=
+      SEQUENCE {
+          eltexIsisNetAddr
+              EltexNETAddress,
+          eltexIsisNetAddrRowStatus
+              RowStatus
+          }
+
+  eltexIsisNetAddr OBJECT-TYPE
+      SYNTAX EltexNETAddress
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "A manually configured NET address for this system.  This
+                   object follows the index behavior. "
+
+  ::= { eltexIsisNetAddrEntry 1 }
+
+  eltexIsisNetAddrRowStatus OBJECT-TYPE
+      SYNTAX RowStatus
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The state of the eltexIsisNetAddrEntry."
+  ::= { eltexIsisNetAddrEntry 2 }
+
+--
+-- The Router Table keeps track of hostnames and system IDs
+-- associated with peers in the area and domain.
+--
+
+  eltexIsisRouterTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisRouterEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "The set of hostnames and system ID."
+  ::= { eltexIsisSystem 5 }
+
+  eltexIsisRouterEntry OBJECT-TYPE
+      SYNTAX EltexIsisRouterEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "Each entry tracks information about one peer at
+           one level."
+      INDEX { eltexIsisSysInstance,
+              eltexIsisRouterSysID,
+              eltexIsisRouterLevel }
+  ::= { eltexIsisRouterTable 1 }
+
+  EltexIsisRouterEntry ::=
+      SEQUENCE {
+          eltexIsisRouterSysID
+              EltexIsisSystemID,
+          eltexIsisRouterLevel
+              EltexIsisISLevel,
+          eltexIsisRouterHostName
+              SnmpAdminString
+      }
+
+  eltexIsisRouterSysID OBJECT-TYPE
+      SYNTAX EltexIsisSystemID
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "The System ID of the Router Peer."
+  ::= { eltexIsisRouterEntry 1 }
+
+  eltexIsisRouterLevel OBJECT-TYPE
+      SYNTAX EltexIsisISLevel
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "The level of this Intermediate System."
+  ::= { eltexIsisRouterEntry 2 }
+
+  eltexIsisRouterHostName OBJECT-TYPE
+      SYNTAX SnmpAdminString
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+          "The hostname listed in LSP, or NULL if none."
+  ::= { eltexIsisRouterEntry 3 }
+
+--
+-- ISIS System Level Table.
+--
+
+  eltexIsisSysLevelTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisSysLevelEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Level specific information about an instance of IS-IS."
+  ::= { eltexIsisSystem 3 }
+
+  eltexIsisSysLevelEntry OBJECT-TYPE
+      SYNTAX EltexIsisSysLevelEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Describe variables defined for Area or Domain."
+      INDEX { eltexIsisSysInstance,
+              eltexIsisSysLevelIndex }
+  ::= { eltexIsisSysLevelTable 1 }
+  
+  EltexIsisSysLevelEntry ::= SEQUENCE {
+          eltexIsisSysLevelIndex
+              INTEGER,
+          eltexIsisSysLevelMinLSPGenInt
+              Unsigned32,
+          eltexIsisSysLevelMetricStyle
+              EltexIsisMetricStyle,
+          eltexIsisSysLevelAuthType
+              EltexIsisAuthType,
+          eltexIsisSysLevelAuthKey
+              OCTET STRING,
+          eltexIsisSysLevelAuthKeyChain
+              OCTET STRING,
+          eltexIsisSysLevelOrigLSPBuffSize
+              Unsigned32
+      }
+
+  eltexIsisSysLevelIndex OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              level1IS (1),
+              level2IS (2)
+          }
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "The level that this entry describes."
+  ::= { eltexIsisSysLevelEntry 1 }
+
+  eltexIsisSysLevelMinLSPGenInt OBJECT-TYPE
+      SYNTAX Unsigned32 (1000..65535000)
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+          "Minimum interval, in milliseconds, between successive
+           generation of LSPs with the same LSPID at this level
+           by this instance of the protocol.  This object
+           follows the resettingTimer behavior."
+      DEFVAL { 30000 }
+  ::= { eltexIsisSysLevelEntry 2 }
+
+  eltexIsisSysLevelMetricStyle OBJECT-TYPE
+      SYNTAX EltexIsisMetricStyle
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+          "Which style of Metric do we generate in our LSPs
+           at this level?"
+      DEFVAL { both }
+  ::= { eltexIsisSysLevelEntry 3 }
+
+  eltexIsisSysLevelAuthType OBJECT-TYPE
+      SYNTAX      EltexIsisAuthType
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "Authentication type for area/domain level authentication."
+  ::= { eltexIsisSysLevelEntry 4 }
+
+  eltexIsisSysLevelAuthKey OBJECT-TYPE
+      SYNTAX      OCTET STRING (SIZE (0..20))
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "Authentication key for area/domain level
+           authentication. If the field eltexIsisSysLevelAuthKeyChain
+           is set and key chain with this name is present in the
+           configuration, then this field is ignored."
+  ::= { eltexIsisSysLevelEntry 5 }
+
+  eltexIsisSysLevelAuthKeyChain OBJECT-TYPE
+      SYNTAX      OCTET STRING (SIZE (0..32))
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "Name of key chain for area/domain level
+           authentication."
+  ::= { eltexIsisSysLevelEntry 6 }
+
+  eltexIsisSysLevelOrigLSPBuffSize OBJECT-TYPE
+      SYNTAX Unsigned32 (512..9000)
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+          "The maximum size of LSPs and SNPs originated by
+           this Intermediate System at this level.
+
+           This field can only be changed if the eltexIsisSysAdminState
+           field is set to off."
+      DEFVAL { 1500 }
+  ::= { eltexIsisSysLevelEntry 7 }
+
+  eltexIsisCirc     OBJECT IDENTIFIER ::= { eltexIsisObjects 2 }
+
+--
+-- Circuit configuration table.
+--
+
+  eltexIsisCircTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisCircEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The table of circuits used by each instance of
+                   Integrated IS-IS on this system."
+      REFERENCE "{ISIS.aoi manualAreaAddresses (10)}"
+  ::= { eltexIsisCirc 1 }
+
+  eltexIsisCircEntry OBJECT-TYPE
+      SYNTAX EltexIsisCircEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry contains configuration of one IS-IS circuit"
+      INDEX { eltexIsisSysInstance,
+              eltexIsisCircIfindex }
+  ::= { eltexIsisCircTable 1 }
+
+  EltexIsisCircEntry ::=
+      SEQUENCE {
+          eltexIsisCircIfindex
+              InterfaceIndex,
+          eltexIsisCircRowStatus
+              RowStatus,
+          eltexIsisCircAdminState
+              EltexIsisAdminState,
+          eltexIsisCircOperState
+              EltexIsisOperStatus,
+          eltexIsisCircLevel
+              INTEGER,
+          eltexIsisCircPassiveCircuit
+              TruthValue,
+          eltexIsisCircPtToPt
+              TruthValue,
+          eltexIsisCircHelloPadding
+              EltexIsisHelloPaddingAction,
+          eltexIsisCircPDUBuffSize
+              Unsigned32
+          }
+
+  eltexIsisCircIfindex OBJECT-TYPE
+      SYNTAX InterfaceIndex
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The value of ifIndex for the interface to which this
+                   circuit corresponds."
+::= { eltexIsisCircEntry 1 }
+
+  eltexIsisCircRowStatus OBJECT-TYPE
+      SYNTAX RowStatus
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The state of the eltexIsisNetAddrEntry."
+  ::= { eltexIsisCircEntry 2 }
+  
+  eltexIsisCircAdminState OBJECT-TYPE
+      SYNTAX EltexIsisAdminState
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The administrative state of the circuit."
+      DEFVAL { off }
+    ::= { eltexIsisCircEntry 3 }
+    
+  eltexIsisCircOperState OBJECT-TYPE
+        SYNTAX EltexIsisOperStatus
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION "The operational state of this circuit."
+    ::= { eltexIsisCircEntry 4 }
+
+  eltexIsisCircLevel OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              reserved (0),
+              level1(1),
+              level2(2),
+              level1L2(3)
+          }
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "Indicates which type of packets will be sent and
+                   accepted on this circuit."
+      DEFVAL { level1L2 }
+  ::= { eltexIsisCircEntry 5 }
+
+  eltexIsisCircPassiveCircuit OBJECT-TYPE
+      SYNTAX TruthValue
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+          "Specify if normal transmission and interpretation of IS-IS
+           PDUs are suppressed on this circuit. If set to 'true', 
+           the interface is included in LSPs but can't set up 
+           adjacency with any neighbor router."
+      DEFVAL { false }
+  ::= { eltexIsisCircEntry 6 }
+
+  eltexIsisCircPtToPt OBJECT-TYPE
+      SYNTAX TruthValue
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+          "Specify interface type like point to point.
+
+           This field can only be changed if the eltexIsisCircAdminState
+           field is set to off."
+      DEFVAL { false }
+  ::= { eltexIsisCircEntry 7 }
+
+  eltexIsisCircHelloPadding OBJECT-TYPE
+      SYNTAX EltexIsisHelloPaddingAction
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+          "What to do with padding in hello packets?"
+       DEFVAL { enabled }
+  ::= { eltexIsisCircEntry 8 }
+
+  eltexIsisCircPDUBuffSize OBJECT-TYPE
+      SYNTAX      Unsigned32 (512..9000)
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "Maximum size of PDU that can be sent or received over this
+           circuit.
+
+           This field can only be changed if the eltexIsisCircAdminState
+           field is set to off."
+      DEFVAL { 1500 }
+  ::= { eltexIsisCircEntry 9 }
+
+--
+-- Circuit Level Table.
+-- This table captures level-specific information about a circuit
+--
+
+  eltexIsisCircLevelTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisCircLevelEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION 
+            "Level specific information about circuits used by IS-IS."
+  ::= { eltexIsisCirc 2 }
+
+  eltexIsisCircLevelEntry OBJECT-TYPE
+      SYNTAX EltexIsisCircLevelEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry contains configuration of one IS-IS circuit"
+      INDEX { eltexIsisSysInstance,
+              eltexIsisCircIfindex,
+              eltexIsisCircLevelIndex }
+  ::= { eltexIsisCircLevelTable 1 }
+
+  EltexIsisCircLevelEntry ::=
+      SEQUENCE {
+          eltexIsisCircLevelIndex
+              INTEGER,
+          eltexIsisCircLevelRowStatus
+              RowStatus,
+          eltexIsisCircLevelMetric
+              EltexIsisWideMetric,
+          eltexIsisCircLevelAuthType
+              EltexIsisAuthType,
+          eltexIsisCircLevelAuthKey
+              OCTET STRING,
+          eltexIsisCircLevelAuthKeyChain
+              OCTET STRING
+          }
+
+  eltexIsisCircLevelIndex OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              level1IS (1),
+              level2IS (2)
+          }
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "The level that this entry describes."
+  ::= { eltexIsisCircLevelEntry 1 }
+
+  eltexIsisCircLevelRowStatus OBJECT-TYPE
+      SYNTAX RowStatus
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION "The state of the eltexIsisCircLevelEntry."
+  ::= { eltexIsisCircLevelEntry 2 }
+
+  eltexIsisCircLevelMetric OBJECT-TYPE
+      SYNTAX EltexIsisWideMetric
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+          "The metric value of this circuit for this level.
+
+           This metric should not be configured with a zero value
+           unless the circuit is a passive circuit.  If a non-passive
+           circuit is configured with a zero metric, it is treated as
+           having metric 1 for LSP generation and SPF calculation
+           purposes."
+      DEFVAL { 10 }
+  ::= { eltexIsisCircLevelEntry 3 }
+
+  eltexIsisCircLevelAuthType OBJECT-TYPE
+      SYNTAX EltexIsisAuthType
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+           "Authentication type for circuit level authentication."
+  ::= { eltexIsisCircLevelEntry 4 }
+
+  eltexIsisCircLevelAuthKey OBJECT-TYPE
+      SYNTAX OCTET STRING (SIZE (0..20))
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+           "Authentication key for circuit level authentication.
+            If the field eltexIsisCircLevelAuthKeyChain is set
+            and key chain with this name is present in the
+            configuration, then this field is ignored."
+  ::= { eltexIsisCircLevelEntry 5 }
+
+  eltexIsisCircLevelAuthKeyChain OBJECT-TYPE
+      SYNTAX OCTET STRING (SIZE (0..32))
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+           "Name of key chain for circuit level authentication."
+  ::= { eltexIsisCircLevelEntry 6 }
+
+--
+-- Circuit Level Status Table.
+-- This table captures the operational values of
+-- level-specific circuit.
+--
+
+  eltexIsisCircLevelStatusTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisCircLevelStatusEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION 
+            "The operational values of level-specific circuit."
+  ::= { eltexIsisCirc 4 }
+
+  eltexIsisCircLevelStatusEntry OBJECT-TYPE
+      SYNTAX EltexIsisCircLevelStatusEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry contains operational values of one
+                   IS-IS circuit."
+      INDEX { eltexIsisSysInstance,
+              eltexIsisCircIfindex,
+              eltexIsisCircLevelIndex }
+  ::= { eltexIsisCircLevelStatusTable 1 }
+
+  EltexIsisCircLevelStatusEntry ::=
+      SEQUENCE {
+          eltexIsisCircLevelStatusMetric
+              Unsigned32
+          }
+
+  eltexIsisCircLevelStatusMetric OBJECT-TYPE
+      SYNTAX Unsigned32
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+          "The metric value of this circuit for this level."
+  ::= { eltexIsisCircLevelStatusEntry 1 }
+
+
+  eltexIsisISAdj     OBJECT IDENTIFIER ::= { eltexIsisObjects 3 }
+
+-- The IS Adjacency Table
+--
+-- Each adjacency to an IS corresponds to one entry in this
+-- table.
+
+  eltexIsisISAdjTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisISAdjEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The table of adjacencies to Intermediate Systems."
+  ::= { eltexIsisISAdj 1 }
+
+  eltexIsisISAdjEntry OBJECT-TYPE
+      SYNTAX EltexIsisISAdjEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry corresponds to one adjacency to an
+                   Intermediate System on this system."
+      INDEX { eltexIsisSysInstance,
+              eltexIsisCircIfindex,
+              eltexIsisISAdjIndex }
+  ::= { eltexIsisISAdjTable 1 }
+
+  EltexIsisISAdjEntry ::=
+      SEQUENCE {
+          eltexIsisISAdjIndex
+              Integer32,
+          eltexIsisISAdjState
+              INTEGER,
+          eltexIsisISAdj3WayState
+              INTEGER,
+          eltexIsisISAdjNeighSNPAAddress
+              EltexNETAddress,
+          eltexIsisISAdjNeighSysType
+              INTEGER,
+          eltexIsisISAdjNeighSysID
+              EltexIsisSystemID,
+          eltexIsisISAdjNbrExtendedCircID
+              Unsigned32,
+          eltexIsisISAdjUsage
+              INTEGER,
+          eltexIsisISAdjHoldTimer
+              Unsigned32,
+          eltexIsisISAdjNeighPriority
+              EltexIsisISPriority,
+          eltexIsisISAdjLastUpTime
+              TimeTicks,
+          eltexIsisISAdjRestartCapable
+              TruthValue,
+          eltexIsisISAdjPeerRestartState
+              INTEGER,
+          eltexIsisISAdjSuppressed
+              TruthValue,
+          eltexIsisISAdjNeighLanID
+              OCTET STRING,
+          eltexIsisISAdjNeighHostname
+              SnmpAdminString,
+          eltexIsisISAdjNeighLanIDHostname
+              SnmpAdminString
+    }
+
+  eltexIsisISAdjIndex OBJECT-TYPE
+      SYNTAX Integer32 (1..2000000000)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "A unique value identifying the IS adjacency from all
+                   other such adjacencies on this circuit. This value is
+                   automatically assigned by the system when the adjacency
+                   is created."
+  ::= { eltexIsisISAdjEntry 1 }
+
+  eltexIsisISAdjState OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+               down (1),
+               initializing (2),
+               up (3),
+               failed(4)
+          }
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The state of the adjacency."
+      REFERENCE "{ISIS.aoi adjacencyState (78)}"
+  ::= { eltexIsisISAdjEntry 2 }
+
+  eltexIsisISAdj3WayState OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+               up (0),
+               initializing (1),
+               down (2),
+               failed (3)
+          }
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The 3Way state of the adjacency.  These are picked
+                   to match the historical on-the-wire representation
+                   of the 3Way state, and are not intended to match
+                   eltexIsisISAdjState."
+      REFERENCE "{ RFC 3373 }"
+  ::= { eltexIsisISAdjEntry 3 }
+
+  eltexIsisISAdjNeighSNPAAddress OBJECT-TYPE
+      SYNTAX EltexNETAddress
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The SNPA address of the neighboring system."
+      REFERENCE "{ISIS.aoi neighbourSNPAAddress (79)}"
+  ::= { eltexIsisISAdjEntry 4 }
+
+  eltexIsisISAdjNeighSysType OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              l1IntermediateSystem(1),
+              l2IntermediateSystem(2),
+              l1L2IntermediateSystem(3),
+              unknown(4)
+          }
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The type of the neighboring system."
+      REFERENCE "{ISIS.aoi neighbourSystemType (80)}"
+  ::= { eltexIsisISAdjEntry 5 }
+
+  eltexIsisISAdjNeighSysID OBJECT-TYPE
+      SYNTAX EltexIsisSystemID
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The system ID of the neighboring Intermediate
+                   System."
+      REFERENCE "{ISIS.aoi neighbourSystemIds (83)}"
+  ::= { eltexIsisISAdjEntry 6 }
+
+  eltexIsisISAdjNbrExtendedCircID OBJECT-TYPE
+      SYNTAX Unsigned32
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The 4 byte Extended Circuit ID learned from the
+                   Neighbor during 3-way handshake, or 0."
+  ::= { eltexIsisISAdjEntry 7 }
+
+
+  eltexIsisISAdjUsage OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              reserved (0),
+              level1(1),
+              level2(2),
+              level1and2(3)
+          }
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "How is the adjacency used?  On a point-to-point link,
+                   this might be level1and2, but on a LAN, the usage will
+                   be level1 on the adjacency between peers at L1,
+                   and level2 for the adjacency between peers at L2."
+      REFERENCE "{ISIS.aoi adjacencyUsage (82)}"
+  ::= { eltexIsisISAdjEntry 8 }
+
+  eltexIsisISAdjHoldTimer OBJECT-TYPE
+      SYNTAX Unsigned32 (1..65535)
+      UNITS "seconds"
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The holding time in seconds for this adjacency.
+                   This value is based on received IIH PDUs and
+                   the elapsed time since receipt."
+      REFERENCE "{ISIS.aoi holdingTimer (85)}"
+  ::= { eltexIsisISAdjEntry 9 }
+
+  eltexIsisISAdjNeighPriority OBJECT-TYPE
+      SYNTAX EltexIsisISPriority
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "Priority of the neighboring Intermediate System for
+                   becoming the Designated Intermediate System."
+      REFERENCE "{ISIS.aoi lANPriority (86)}"
+  ::= { eltexIsisISAdjEntry 10 }
+
+  eltexIsisISAdjLastUpTime OBJECT-TYPE
+      SYNTAX TimeTicks
+      UNITS "seconds"
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "If the eltexIsisISAdjState is in state 'up', the value
+                   of sysUpTime when the adjacency most recently
+                   entered the state 'up',  or 0 if it has never
+                   been in state 'up'."
+  ::= { eltexIsisISAdjEntry 11 }
+
+  eltexIsisISAdjRestartCapable OBJECT-TYPE
+      SYNTAX TruthValue
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "Does the neighbor support restart signalling?
+
+                   This object is set to 'true' if the peer includes the
+                   restart TLV in IIH PDUs."
+  ::= { eltexIsisISAdjEntry 12 }
+
+  eltexIsisISAdjPeerRestartState OBJECT-TYPE
+      SYNTAX INTEGER
+          {
+              notRestarting(1),
+              restartingNoHelp(2),
+              helpingRestart(3)
+          }
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "Is the peer currently restarting?
+
+                   Set to 'notRestarting' if the neighbor is not restarting
+                   (is not including a restart TLV in the IIH, or is not setting the
+                   RR bit).
+
+                   Set to 'restartingNoHelp' if the neighbor is restarting
+                   (is including a restart TLV with the RR bit in IIH PDUs), but
+                   the local node is not helping the restart.
+
+                   Set to 'helpingRestart' if the neighbor is restarting and the
+                   local node is helping the restart."
+  ::= { eltexIsisISAdjEntry 13 }
+
+  eltexIsisISAdjSuppressed OBJECT-TYPE
+      SYNTAX TruthValue
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "Has the peer requested that the adjacency be suppressed?
+                   If set to 'true', the adjacency will not be added to the
+                   local LSP.
+
+                   This object is set to 'true' if the peer sets the SA bit in
+                   the restart TLV in IIH PDUs."
+  ::= { eltexIsisISAdjEntry 14 }
+
+  eltexIsisISAdjNeighLanID OBJECT-TYPE
+      SYNTAX OCTET STRING (SIZE(0..7))
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "On a broaeltexast circuit, the LAN ID reported by the
+                   neighbor for the Designated Intermediate System on this
+                   circuit at this level.  For a non-broadcast circuit, or if,
+                   for any reason, the neighbor is not partaking in the
+                   relevant Designated Intermediate System election process,
+                   then the value returned is the zero length OCTET STRING."
+  ::= { eltexIsisISAdjEntry 15 }
+
+  eltexIsisISAdjNeighHostname OBJECT-TYPE
+      SYNTAX SnmpAdminString
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The hostname corresponding to eltexIsisISAdjNeighSysID.
+                   This is the null string if no hostname is known."
+  ::= { eltexIsisISAdjEntry 16 }
+
+  eltexIsisISAdjNeighLanIDHostname OBJECT-TYPE
+      SYNTAX SnmpAdminString
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The hostname corresponding to the system ID part of the
+                   eltexIsisISAdjNeighLanID object.
+                   This is the null string if no hostname is known."
+  ::= { eltexIsisISAdjEntry 17 }
+
+
+-- The IS Adjacency Area Address Table
+
+-- The IS Adjacency Area Address Table contains the set of
+-- Area Addresses of neighboring
+-- Intermediate Systems as reported in IIH PDUs.
+
+  eltexIsisISAdjAreaAddrTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisISAdjAreaAddrEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "This table contains the set of Area Addresses of
+                   neighboring Intermediate Systems as reported in received
+                   IIH PDUs."
+      REFERENCE "{ISIS.aoi areaAddressesOfNeighbour (84)}"
+  ::= { eltexIsisISAdj 2 }
+
+  eltexIsisISAdjAreaAddrEntry OBJECT-TYPE
+      SYNTAX EltexIsisISAdjAreaAddrEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry contains one Area Address reported by a
+                   neighboring Intermediate System in its IIH PDUs."
+      INDEX { eltexIsisSysInstance,
+              eltexIsisCircIfindex,
+              eltexIsisISAdjIndex,
+              eltexIsisISAdjAreaAddrIndex }
+  ::= { eltexIsisISAdjAreaAddrTable 1 }
+
+  EltexIsisISAdjAreaAddrEntry ::=
+      SEQUENCE {
+          eltexIsisISAdjAreaAddrIndex
+              Integer32,
+          eltexIsisISAdjAreaAddress
+              EltexNETAddress
+          }
+
+  eltexIsisISAdjAreaAddrIndex OBJECT-TYPE
+      SYNTAX Integer32 (1..2000000000)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "An index for the areas associated with one neighbor.
+                   This provides a simple way to walk the table."
+  ::= { eltexIsisISAdjAreaAddrEntry 1 }
+
+  eltexIsisISAdjAreaAddress OBJECT-TYPE
+      SYNTAX EltexNETAddress
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "One Area Address as reported in IIH PDUs received from
+                   the neighbor."
+  ::= { eltexIsisISAdjAreaAddrEntry 2 }
+
+-- The IS Adjacency IP Address Table
+
+-- The IS Adjacency IP Address Table contains the
+-- set of IP Addresses of neighboring Intermediate Systems
+-- as reported in received IIH PDUs.
+
+  eltexIsisISAdjIPAddrTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisISAdjIPAddrEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "This table contains the set of IP Addresses of
+                   neighboring Intermediate Systems as reported in received
+                   IIH PDUs."
+  ::= { eltexIsisISAdj 3 }
+
+  eltexIsisISAdjIPAddrEntry OBJECT-TYPE
+      SYNTAX EltexIsisISAdjIPAddrEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry contains one IP Address reported by a
+                   neighboring Intermediate System in its IIH PDUs."
+      INDEX { eltexIsisSysInstance,
+              eltexIsisCircIfindex,
+              eltexIsisISAdjIndex,
+              eltexIsisISAdjIPAddrIndex
+              }
+  ::= { eltexIsisISAdjIPAddrTable 1 }
+
+  EltexIsisISAdjIPAddrEntry ::=
+      SEQUENCE {
+          eltexIsisISAdjIPAddrIndex
+              Integer32,
+          eltexIsisISAdjIPAddrType
+               InetAddressType,
+          eltexIsisISAdjIPAddrAddress
+              InetAddress
+      }
+
+  eltexIsisISAdjIPAddrIndex OBJECT-TYPE
+      SYNTAX Integer32 (1..2000000000)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "An index to this table which identifies the IP addresss
+                   to which this entry belongs."
+  ::= { eltexIsisISAdjIPAddrEntry 1 }
+
+  eltexIsisISAdjIPAddrType OBJECT-TYPE
+      SYNTAX InetAddressType
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The type of one IP Address as reported in IIH PDUs
+                   received from the neighbor."
+  ::= { eltexIsisISAdjIPAddrEntry 2 }
+
+  eltexIsisISAdjIPAddrAddress OBJECT-TYPE
+      SYNTAX InetAddress (SIZE(4|16))
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "One IP Address as reported in IIH PDUs received from the
+                   neighbor."
+  ::= { eltexIsisISAdjIPAddrEntry 3 }
+
+eltexIsisLSPDataBase     OBJECT IDENTIFIER ::= { eltexIsisObjects 5 }
+
+-- The LSP Database Table
+--
+-- The table provides Summary Information about LSPs
+
+  eltexIsisLSPSummaryTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF EltexIsisLSPSummaryEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The table of LSP Headers."
+  ::= { eltexIsisLSPDataBase 1 }
+
+  eltexIsisLSPSummaryEntry OBJECT-TYPE
+      SYNTAX EltexIsisLSPSummaryEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "Each entry provides a summary describing an
+                   LSP currently stored in the system."
+      INDEX {  eltexIsisSysInstance,
+               eltexIsisLSPLevel,
+               eltexIsisLSPID }
+  ::= { eltexIsisLSPSummaryTable 1 }
+
+  EltexIsisLSPSummaryEntry ::=
+      SEQUENCE {
+          eltexIsisLSPLevel
+              EltexIsisISLevel,
+          eltexIsisLSPID
+              EltexIsisLinkStatePDUID,
+          eltexIsisLSPSeq
+              Unsigned32,
+          eltexIsisLSPZeroLife
+              TruthValue,
+          eltexIsisLSPChecksum
+              Unsigned32,
+          eltexIsisLSPLifetimeRemain
+              Unsigned32,
+          eltexIsisLSPPDULength
+              Unsigned32,
+          eltexIsisLSPAttributes
+              Unsigned32,
+          eltexIsisLSPIDHostname
+              SnmpAdminString
+      }
+
+  eltexIsisLSPLevel OBJECT-TYPE
+      SYNTAX EltexIsisISLevel
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "At which level does this LSP appear?"
+  ::= { eltexIsisLSPSummaryEntry 1 }
+
+  eltexIsisLSPID OBJECT-TYPE
+      SYNTAX EltexIsisLinkStatePDUID
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION "The 8 byte LSP ID, consisting of the SystemID,
+                   Circuit ID, and Fragment Number."
+  ::= { eltexIsisLSPSummaryEntry 2 }
+
+  eltexIsisLSPSeq OBJECT-TYPE
+      SYNTAX Unsigned32
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The sequence number for this LSP."
+  ::= { eltexIsisLSPSummaryEntry 3 }
+
+  eltexIsisLSPZeroLife OBJECT-TYPE
+      SYNTAX TruthValue
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "Is this LSP being purged by this System?"
+  ::= { eltexIsisLSPSummaryEntry 4 }
+
+  eltexIsisLSPChecksum OBJECT-TYPE
+      SYNTAX Unsigned32 (0..65535)
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The 16 bit Fletcher Checksum."
+  ::= { eltexIsisLSPSummaryEntry 5 }
+
+  eltexIsisLSPLifetimeRemain OBJECT-TYPE
+      SYNTAX Unsigned32 (0..65535)
+      UNITS "seconds"
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The remaining lifetime in seconds for this LSP.
+
+                   For a current LSP (eltexIsisLSPZeroLife is 'false'), this
+                   indicates the time remaining before the LSP will expire.
+                   For an LSP being purged from the system (eltexIsisLSPZeroLife
+                   is 'true'), the LSP remains in the database for
+                   ZeroAgeLifetime, and this will indicate the time remaining
+                   before final deletion of the LSP."
+  ::= { eltexIsisLSPSummaryEntry 6 }
+
+  eltexIsisLSPPDULength OBJECT-TYPE
+      SYNTAX Unsigned32 (0..65535)
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The length of this LSP."
+  ::= { eltexIsisLSPSummaryEntry 7 }
+
+  eltexIsisLSPAttributes OBJECT-TYPE
+      SYNTAX Unsigned32 (0..255)
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "Flags carried by the LSP."
+  ::= { eltexIsisLSPSummaryEntry 8 }
+
+  eltexIsisLSPIDHostname OBJECT-TYPE
+      SYNTAX SnmpAdminString
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION "The hostname corresponding to the system ID part of the
+                   eltexIsisLSPID object.
+
+                   This is the null string if no hostname is known."
+  ::= { eltexIsisLSPSummaryEntry 9 }
+
+END

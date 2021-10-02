@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -48,7 +47,7 @@ if ($width > "500")
 $i = 0;
 $colours = "mixed-10b";
 
-$device_state = unserialize($device['device_state']);
+$device_state = safe_unserialize($device['device_state']);
 
 $cpu_oids = array('ssCpuRawUser' => array('colour' => 'c02020'),
                   'ssCpuRawNice' => array('colour' => '008f00'),

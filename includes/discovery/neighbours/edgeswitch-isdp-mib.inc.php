@@ -24,6 +24,6 @@
 // EdgeSwitch-ISDP-MIB::agentIsdpCacheProtocolVersion.25.1 = STRING: "2"
 // EdgeSwitch-ISDP-MIB::agentIsdpCacheHoldtime.25.1 = INTEGER: 120 seconds
 
-include("isdp-mib.inc.php");
+include(__DIR__ . "/isdp-mib.inc.php");
 
 // EOF

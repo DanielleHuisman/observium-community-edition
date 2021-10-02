@@ -6,25 +6,24 @@
  *
  * @package    observium
  * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 //print_r($_SERVER);
 
-// All simple, OBS_API set to TRUE only in API index.php
-if (!defined('OBS_API'))
-{
-  define('OBS_API', FALSE);
-}
+// OBS_API set to TRUE only in html/api/index.php
+if (!defined('OBS_API')) { define('OBS_API', FALSE); }
+// OBS_GRAPH set to TRUE only in html/graph.php
+if (!defined('OBS_GRAPH')) { define('OBS_GRAPH', FALSE); }
 
 // Detect AJAX request
-define('OBS_AJAX', (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') ||
+define('OBS_AJAX', (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') ||
                     str_starts($_SERVER['REQUEST_URI'], '/ajax/'));
 
 $debug_auth = FALSE; // Do not use this debug unless you Observium Developer ;)
 
-if (version_compare(PHP_VERSION, '7.1.0', '<'))
+if (PHP_VERSION_ID < 70100)
 {
   // Use sha1 to generate the session ID (option removed in php 7.1)
   // session.sid_length (Number of session ID characters - 22 to 256.
@@ -49,13 +48,12 @@ $cookie_httponly = FALSE;
 //$cookie_httponly = TRUE;
 
 // Use custom session lifetime
-if (is_numeric($GLOBALS['config']['web_session_lifetime']) && $GLOBALS['config']['web_session_lifetime'] >= 0)
-{
-  $lifetime = intval($GLOBALS['config']['web_session_lifetime']);
+if (is_numeric($GLOBALS['config']['web_session_lifetime']) && $GLOBALS['config']['web_session_lifetime'] >= 0) {
+  $lifetime = (int)$GLOBALS['config']['web_session_lifetime'];
 }
 
 @ini_set('session.gc_maxlifetime',  $lifetime); // Session lifetime (for non "remember me" sessions)
-if (version_compare(PHP_VERSION, '7.3.0', '>='))
+if (PHP_VERSION_ID >= 70300)
 {
   // Allows servers to assert that a cookie ought not to be sent along with cross-site requests.
   // Lax will sent the cookie for cross-domain GET requests, while Strict will not
@@ -75,8 +73,7 @@ if (version_compare(PHP_VERSION, '7.3.0', '>='))
 //session_cache_limiter('private');
 
 //register_shutdown_function('session_commit'); // This already done at end of script run
-if (!session_is_active())
-{
+if (!session_is_active()) {
   session_regenerate();
 }
 
@@ -99,8 +96,7 @@ if ($config['auth']['remote_user'] && $_SERVER['REMOTE_USER'] != '')
 }
 
 $auth_file = $config['html_dir'].'/includes/authentication/' . $config['auth_mechanism'] . '.inc.php';
-if (is_file($auth_file))
-{
+if (is_file($auth_file)) {
   if (isset($_SESSION['auth_mechanism']) && $_SESSION['auth_mechanism'] != $config['auth_mechanism'])
   {
     // Logout if AUTH mechanism changed
@@ -114,7 +110,7 @@ if (is_file($auth_file))
   include($config['html_dir'].'/includes/authentication/mysql.inc.php');
 
   // Load primary module if not mysql
-  if ($config['auth_mechanism'] != 'mysql') { include($auth_file); }
+  if ($config['auth_mechanism'] !== 'mysql') { include($auth_file); }
 
   // Include base auth functions calls
   include($config['html_dir'].'/includes/authenticate-functions.inc.php');
@@ -124,8 +120,7 @@ if (is_file($auth_file))
 }
 
 // Check logout
-if ($_SESSION['authenticated'] && str_starts(ltrim($_SERVER['REQUEST_URI'], '/'), 'logout'))
-{
+if ($_SESSION['authenticated'] && str_starts(ltrim($_SERVER['REQUEST_URI'], '/'), 'logout')) {
   // Do not use $vars and get_vars here!
   //print_vars($_SERVER['REQUEST_URI']);
   if (auth_can_logout())
@@ -156,35 +151,28 @@ if ($remote_addr_header && $remote_addr != $remote_addr_header)
 
 // Check if allowed auth by CIDR
 $auth_allow_cidr = TRUE;
-if (isset($config['web_session_cidr']) && count($config['web_session_cidr']))
-{
+if (isset($config['web_session_cidr']) && count($config['web_session_cidr'])) {
   $auth_allow_cidr = match_network(get_remote_addr($config['web_session_ip_by_header']), $config['web_session_cidr']);
 }
 
-if (!$_SESSION['authenticated'])
-{
+if (!$_SESSION['authenticated']) {
   if (isset($_GET['username']) && isset($_GET['password']) &&
-      is_string($_GET['username']) && is_string($_GET['password']))
-  {
+      is_string($_GET['username']) && is_string($_GET['password'])) {
     session_set_var('username', $_GET['username']);
     $auth_password        = $_GET['password'];
-  }
-  elseif (isset($_POST['username']) && isset($_POST['password']) &&
-          is_string($_POST['username']) && is_string($_POST['password']))
+    //r($_GET);
+    //r($_SESSION);
+  } elseif (isset($_POST['username']) && isset($_POST['password']) &&
+            is_string($_POST['username']) && is_string($_POST['password']))
   {
     session_set_var('username', $_POST['username']);
     $auth_password        = $_POST['password'];
-  }
-  elseif (isset($_SERVER['PHP_AUTH_USER']) && isset($_SERVER['PHP_AUTH_PW']))
-  {
+  } elseif (isset($_SERVER['PHP_AUTH_USER']) && isset($_SERVER['PHP_AUTH_PW'])) {
     session_set_var('username', $_SERVER['PHP_AUTH_USER']);
     $auth_password        = $_SERVER['PHP_AUTH_PW'];
-  }
-  elseif (OBS_ENCRYPT && isset($_COOKIE['ckey']) && is_string($_COOKIE['ckey']))
-  {
+  } elseif (OBS_ENCRYPT && isset($_COOKIE['ckey']) && is_string($_COOKIE['ckey'])) {
     ///DEBUG
-    if ($debug_auth)
-    {
+    if ($debug_auth) {
       $debug_log = $GLOBALS['config']['log_dir'] . '/debug_cookie_' . date("Y-m-d_H:i:s") . '.log';
       file_put_contents($debug_log, var_export($_SERVER, TRUE), FILE_APPEND);
       file_put_contents($debug_log, var_export($_SESSION, TRUE), FILE_APPEND);
@@ -193,10 +181,8 @@ if (!$_SESSION['authenticated'])
 
     $ckey = dbFetchRow("SELECT * FROM `users_ckeys` WHERE `user_uniq` = ? AND `user_ckey` = ? LIMIT 1",
                        [ $user_unique_id, $_COOKIE['ckey'] ]);
-    if (is_array($ckey))
-    {
-      if ($ckey['expire'] > $currenttime && $auth_allow_cidr)
-      {
+    if (is_array($ckey)) {
+      if ($ckey['expire'] > $currenttime && $auth_allow_cidr) {
         session_set_var('username', $ckey['username']);
         $auth_password = decrypt($ckey['user_encpass'], $_COOKIE['dkey']);
 
@@ -223,24 +209,21 @@ if (!$_SESSION['authenticated'])
   }
 }
 
-if ($_COOKIE['password']) { setcookie("password", NULL); }
-if ($_COOKIE['username']) { setcookie("username", NULL); }
-if ($_COOKIE['user_id'] ) { setcookie("user_id",  NULL); }
+if (isset($_COOKIE['password'])) { setcookie("password", NULL); }
+if (isset($_COOKIE['username'])) { setcookie("username", NULL); }
+if (isset($_COOKIE['user_id']))  { setcookie("user_id",  NULL); }
 
 $auth_success = FALSE; // Variable for check if just logged
 
-if (isset($_SESSION['username']))
-{
+if (isset($_SESSION['username'])) {
   // Check for allowed by CIDR range
-  if (!$auth_allow_cidr)
-  {
+  if (!$auth_allow_cidr) {
     session_logout(FALSE, 'Remote IP not allowed in CIDR ranges');
     reauth_with_message('Remote IP not allowed in CIDR ranges');
   }
 
   // Auth from COOKIEs
-  if ($_SESSION['cookie_auth'])
-  {
+  if (isset($_SESSION['cookie_auth']) && $_SESSION['cookie_auth']) {
     @session_start();
     $_SESSION['authenticated'] = TRUE;
     $auth_success              = TRUE;
@@ -291,9 +274,7 @@ if (isset($_SESSION['username']))
       setcookie("dkey", $dkey, $cookie_expire, $cookie_path, $cookie_domain, $cookie_https, FALSE);
       session_unset_var('user_ckey_id');
     }
-  }
-  elseif (!$_SESSION['authenticated'])
-  {
+  } elseif (!$_SESSION['authenticated']) {
     // Not authenticated
     session_set_var('auth_message', 'Authentication Failed');
     session_logout(function_exists('auth_require_login'));
@@ -356,14 +337,10 @@ if (isset($_SESSION['username']))
     // Generate a CSRF Token
     // https://stackoverflow.com/questions/6287903/how-to-properly-add-csrf-token-using-php
     // For validate use: request_token_valid($vars['requesttoken'])
-    if (empty($_SESSION['requesttoken']))
-    {
-      try
-      {
+    if (empty($_SESSION['requesttoken'])) {
+      try {
         $requesttoken = bin2hex(random_bytes(32));
-      }
-      catch(Exception $e)
-      {
+      } catch(Exception $e) {
         $requesttoken = bin2hex(openssl_random_pseudo_bytes(32));
       }
       session_set_var('requesttoken', $requesttoken);
@@ -396,11 +373,9 @@ if (isset($_SESSION['username']))
 
     // Add feeds & api keys after first auth
     if (OBS_ENCRYPT && !OBS_GRAPH && !OBS_API && !OBS_AJAX &&
-        !get_user_pref($_SESSION['user_id'], 'atom_key'))
-    {
+        !get_user_pref($_SESSION['user_id'], 'atom_key')) {
       // Generate unique token
-      do
-      {
+      do {
         $atom_key = md5(strgen());
       }
       //while (dbFetchCell("SELECT COUNT(*) FROM `users_prefs` WHERE `pref` = ? AND `value` = ?;", array('atom_key', $atom_key)) > 0);
@@ -409,12 +384,10 @@ if (isset($_SESSION['username']))
     }
   }
 
-  if ($auth_success && !OBS_API && !OBS_AJAX)
-  {
+  if ($auth_success && !OBS_GRAPH && !OBS_API && !OBS_AJAX) {
     // If just logged in go to request uri, unless we're debugging or in API,
     // in which case we want to see authentication module output first.
-    if (!OBS_DEBUG)
-    {
+    if (!OBS_DEBUG) {
       redirect_to_url($_SERVER['REQUEST_URI']);
     } else {
       print_message("Debugging mode has disabled redirect to front page; please click <a href=\"" . $_SERVER['REQUEST_URI'] . "\">here</a> to continue.");
@@ -437,13 +410,14 @@ function session_is_active()
 {
   if (!is_cli())
   {
-    if (version_compare(PHP_VERSION, '5.4.0', '>='))
+    if (PHP_VERSION_ID >= 50400)
     {
-      return session_status() === PHP_SESSION_ACTIVE ? TRUE : FALSE;
-    } else {
-      return session_id() === '' ? FALSE : TRUE;
+      return session_status() === PHP_SESSION_ACTIVE;
     }
+
+    return session_id() !== '';
   }
+
   return FALSE;
 }
 
@@ -464,7 +438,16 @@ function session_unique_id()
 
   if ($config['web_session_ip'])
   {
-    $remote_addr = get_remote_addr($config['web_session_ip_by_header']); // Remote address by header if configured
+    $remote_ip = get_remote_addr($config['web_session_ip_by_header']); // Remote address by header if configured
+    $config['web_session_ipv6_prefix'] = ltrim($config['web_session_ipv6_prefix'], '/');
+    if (is_numeric($config['web_session_ipv6_prefix']) &&
+        $config['web_session_ipv6_prefix'] >= 1 && $config['web_session_ipv6_prefix'] <= 127 &&
+        get_ip_version($remote_ip) === 6)
+    {
+      $remote_addr = Net_IPv6::getNetmask($remote_ip, (int) $config['web_session_ipv6_prefix']);
+    } else {
+      $remote_addr = $remote_ip;
+    }
     $id .= $remote_addr;   // User IP address
 
     // Force reauth if remote IP changed
@@ -474,7 +457,7 @@ function session_unique_id()
       {
         if ($debug_auth)
         {
-          logfile('debug_auth.log', __LINE__ . " IP changed. IP=[$remote_addr]. ID=[$id]. URL=[" . $_SERVER['REQUEST_URI'] . "]");
+          logfile('debug_auth.log', __LINE__ . " IP changed. IP=[$remote_ip]. ID=[$id]. URL=[" . $_SERVER['REQUEST_URI'] . "]");
           logfile('debug_auth.log', __LINE__ . ' ' . var_export($_SESSION, TRUE));
         }
         // FIXME. Hrm, I forgot why not just session_logout()
@@ -542,12 +525,12 @@ function session_unique_id()
 function session_encrypt_password($auth_password, $key)
 {
   // Store encrypted password
-  if ($GLOBALS['config']['auth_mechanism'] == 'ldap' &&
+  if ($GLOBALS['config']['auth_mechanism'] === 'ldap' &&
       !($GLOBALS['config']['auth_ldap_bindanonymous'] || strlen($GLOBALS['config']['auth_ldap_binddn'].$GLOBALS['config']['auth_ldap_bindpw'])))
   {
     if (OBS_ENCRYPT)
     {
-      if (OBS_ENCRYPT_MODULE == 'mcrypt')
+      if (OBS_ENCRYPT_MODULE === 'mcrypt')
       {
         $key .= get_unique_id();
       }
@@ -732,7 +715,7 @@ function safe_session_regenerate_id()
 {
   global $config, $debug_auth;
 
-  if (version_compare(PHP_VERSION, '7.1.0', '<'))
+  if (PHP_VERSION_ID < 70100)
   {
     // While session_create_id() not exist in php less than 7.1
     // and not possible make userland implementation, use this hack
@@ -778,8 +761,7 @@ function safe_session_regenerate_id()
   $_SESSION = $tmp;
 
   // New session does not need them
-  unset($_SESSION['destroyed']);
-  unset($_SESSION['new_session_id']);
+  unset($_SESSION['destroyed'], $_SESSION['new_session_id']);
 }
 
 /**
@@ -855,12 +837,14 @@ function reauth_with_message($message)
     return;
   }
 
-  if ($config['auth_mechanism'] == 'remote')
+  if ($config['auth_mechanism'] === 'remote')
   {
     print('<h1>' . $message . '</h1>');
   } else {
     session_set_var('auth_message', $message);
-    redirect_to_url($config['base_url']);
+    //redirect_to_url($config['base_url'] . '?lm='.var_encode($message));
+    // Message encrypted for prevent hijacking any custom messages
+    redirect_to_url($config['base_url'] . '?lm='.encrypt($message, OBSERVIUM_PRODUCT.OBSERVIUM_VERSION));
   }
   exit();
 }

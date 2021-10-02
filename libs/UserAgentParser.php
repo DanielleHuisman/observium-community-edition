@@ -54,21 +54,21 @@ namespace donatj\UserAgent {
 		$browser  = null;
 		$version  = null;
 
-		$empty = array( PLATFORM => $platform, BROWSER => $browser, BROWSER_VERSION => $version );
+		$return = [ PLATFORM => &$platform, BROWSER => &$browser, BROWSER_VERSION => &$version ];
 
 		if( !$u_agent ) {
-			return $empty;
+			return $return;
 		}
 
 		if( preg_match('/\((.*?)\)/m', $u_agent, $parent_matches) ) {
 			preg_match_all(<<<'REGEX'
-/(?P<platform>BB\d+;|Android|CrOS|Tizen|iPhone|iPad|iPod|Linux|(Open|Net|Free)BSD|Macintosh|Windows(\ Phone)?|Silk|linux-gnu|BlackBerry|PlayBook|X11|(New\ )?Nintendo\ (WiiU?|3?DS|Switch)|Xbox(\ One)?)
+/(?P<platform>BB\d+;|Android|Adr|Symbian|Sailfish|CrOS|Tizen|iPhone|iPad|iPod|Linux|(Open|Net|Free)BSD|Macintosh|Windows(\ Phone)?|Silk|linux-gnu|BlackBerry|PlayBook|X11|(New\ )?Nintendo\ (WiiU?|3?DS|Switch)|Xbox(\ One)?)
 (?:\ [^;]*)?
 (?:;|$)/imx
 REGEX
 				, $parent_matches[1], $result);
 
-			$priority = array( 'Xbox One', 'Xbox', 'Windows Phone', 'Tizen', 'Android', 'FreeBSD', 'NetBSD', 'OpenBSD', 'CrOS', 'X11' );
+			$priority = [ 'Xbox One', 'Xbox', 'Windows Phone', 'Tizen', 'Android', 'FreeBSD', 'NetBSD', 'OpenBSD', 'CrOS', 'X11', 'Sailfish' ];
 
 			$result[PLATFORM] = array_unique($result[PLATFORM]);
 			if( count($result[PLATFORM]) > 1 ) {
@@ -86,27 +86,30 @@ REGEX
 			$platform = 'Linux';
 		} elseif( $platform == 'CrOS' ) {
 			$platform = 'Chrome OS';
+		} elseif( $platform == 'Adr' ) {
+			$platform = 'Android';
 		}
 
 		preg_match_all(<<<'REGEX'
 %(?P<browser>Camino|Kindle(\ Fire)?|Firefox|Iceweasel|IceCat|Safari|MSIE|Trident|AppleWebKit|
-TizenBrowser|(?:Headless)?Chrome|YaBrowser|Vivaldi|IEMobile|Opera|OPR|Silk|Midori|Edge|Edg|CriOS|UCBrowser|Puffin|OculusBrowser|SamsungBrowser|
-Baiduspider|Googlebot|YandexBot|bingbot|Lynx|Version|Wget|curl|
+TizenBrowser|(?:Headless)?Chrome|YaBrowser|Vivaldi|IEMobile|Opera|OPR|Silk|Midori|Edge|Edg|CriOS|UCBrowser|Puffin|
+OculusBrowser|SamsungBrowser|SailfishBrowser|XiaoMi/MiuiBrowser|
+Baiduspider|Applebot|Facebot|Googlebot|YandexBot|bingbot|Lynx|Version|Wget|curl|
 FxiOS|Vienna|
 Valve\ Steam\ Tenfoot|
 NintendoBrowser|PLAYSTATION\ (\d|Vita)+)
-(?:\)?;?)
-(?:(?:[:/ ])(?P<version>[0-9A-Z.]+)|/(?:[A-Z]*))%ix
+\)?;?
+(?:[:/ ](?P<version>[0-9A-Z.]+)|/[A-Z]*)%ix
 REGEX
 			, $u_agent, $result);
 
 		// If nothing matched, return null (to avoid undefined index errors)
 		if( !isset($result[BROWSER][0]) || !isset($result[BROWSER_VERSION][0]) ) {
 			if( preg_match('%^(?!Mozilla)(?P<browser>[A-Z0-9\-]+)(/(?P<version>[0-9A-Z.]+))?%ix', $u_agent, $result) ) {
-				return array( PLATFORM => $platform ?: null, BROWSER => $result[BROWSER], BROWSER_VERSION => empty($result[BROWSER_VERSION]) ? null : $result[BROWSER_VERSION] );
+				return [ PLATFORM => $platform ?: null, BROWSER => $result[BROWSER], BROWSER_VERSION => empty($result[BROWSER_VERSION]) ? null : $result[BROWSER_VERSION] ];
 			}
 
-			return $empty;
+			return $return;
 		}
 
 		if( preg_match('/rv:(?P<version>[0-9A-Z.]+)/i', $u_agent, $rv_result) ) {
@@ -147,12 +150,12 @@ REGEX
 
 		$key = 0;
 		$val = '';
-		if( $findT(array( 'OPR' => 'Opera', 'UCBrowser' => 'UC Browser', 'YaBrowser' => 'Yandex', 'Iceweasel' => 'Firefox', 'Icecat' => 'Firefox', 'CriOS' => 'Chrome', 'FxiOS' => 'Firefox', 'Edg' => 'Edge' ), $key, $browser) ) {
-			$version = $result[BROWSER_VERSION][$key];
+		if( $findT([ 'OPR' => 'Opera', 'Facebot' => 'iMessageBot', 'UCBrowser' => 'UC Browser', 'YaBrowser' => 'Yandex', 'Iceweasel' => 'Firefox', 'Icecat' => 'Firefox', 'CriOS' => 'Chrome', 'FxiOS' => 'Firefox', 'Edg' => 'Edge', 'XiaoMi/MiuiBrowser' => 'MiuiBrowser' ], $key, $browser) ) {
+			$version = is_numeric(substr($result[BROWSER_VERSION][$key], 0, 1)) ? $result[BROWSER_VERSION][$key] : null;
 		} elseif( $find('Playstation Vita', $key, $platform) ) {
 			$platform = 'PlayStation Vita';
 			$browser  = 'Browser';
-		} elseif( $find(array( 'Kindle Fire', 'Silk' ), $key, $val) ) {
+		} elseif( $find([ 'Kindle Fire', 'Silk' ], $key, $val) ) {
 			$browser  = $val == 'Silk' ? 'Silk' : 'Kindle';
 			$platform = 'Kindle Fire';
 			if( !($version = $result[BROWSER_VERSION][$key]) || !is_numeric($version[0]) ) {
@@ -174,13 +177,13 @@ REGEX
 				if( ctype_upper($part) ) {
 					$version = substr($version, 0, -2);
 
-					$flags = array( 'IP' => 'iPhone', 'IT' => 'iPad', 'AP' => 'Android', 'AT' => 'Android', 'WP' => 'Windows Phone', 'WT' => 'Windows' );
+					$flags = [ 'IP' => 'iPhone', 'IT' => 'iPad', 'AP' => 'Android', 'AT' => 'Android', 'WP' => 'Windows Phone', 'WT' => 'Windows' ];
 					if( isset($flags[$part]) ) {
 						$platform = $flags[$part];
 					}
 				}
 			}
-		} elseif( $find(array( 'IEMobile', 'Edge', 'Midori', 'Vivaldi', 'OculusBrowser', 'SamsungBrowser', 'Valve Steam Tenfoot', 'Chrome', 'HeadlessChrome' ), $key, $browser) ) {
+		} elseif( $find([ 'Applebot', 'IEMobile', 'Edge', 'Midori', 'Vivaldi', 'OculusBrowser', 'SamsungBrowser', 'Valve Steam Tenfoot', 'Chrome', 'HeadlessChrome', 'SailfishBrowser' ], $key, $browser) ) {
 			$version = $result[BROWSER_VERSION][$key];
 		} elseif( $rv_result && $find('Trident') ) {
 			$browser = 'MSIE';
@@ -208,6 +211,6 @@ REGEX
 			$browser  = 'NetFront';
 		}
 
-		return array( PLATFORM => $platform ?: null, BROWSER => $browser ?: null, BROWSER_VERSION => $version ?: null );
+		return $return;
 	}
 }

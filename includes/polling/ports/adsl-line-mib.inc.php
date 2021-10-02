@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,34 +6,30 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // ADSL-LINE-MIB stats
 
 $port_module = 'adsl';
-if ($ports_modules[$port_module] && $port_stats_count)
-{
-  $dsl_count = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `device_id` = ? AND `ifType` IN (?, ?)", array($device['device_id'], 'adsl', 'vdsl'));
-  if ($dsl_count > 0)
-  {
-    echo("ADSL ");
-    $adsl_oids  = array('adslLineEntry', 'adslAtucPhysEntry', 'adslAturPhysEntry', 'adslAtucChanEntry',
-                        'adslAturChanEntry', 'adslAtucPerfDataEntry', 'adslAturPerfDataEntry');
-    $port_stats = snmpwalk_cache_oid($device, array_shift($adsl_oids), $port_stats, "ADSL-LINE-MIB");
+if ($ports_modules[$port_module] && $port_stats_count &&
+  dbExist('ports', '`device_id` = ? AND `ifType` IN (?, ?, ?)', [ $device['device_id'], 'adsl', 'vdsl', 'vdsl2' ])) {
+  echo("ADSL ");
+  $adsl_oids  = [ 'adslAtucPhysEntry', 'adslAturPhysEntry', 'adslAtucChanEntry',
+                      'adslAturChanEntry', 'adslAtucPerfDataEntry', 'adslAturPerfDataEntry' ];
+  $port_stats = snmpwalk_cache_oid($device, 'adslLineEntry', $port_stats, "ADSL-LINE-MIB");
 
-    $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
+  $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
 
-    if ($GLOBALS['snmp_status'])
-    {
-      foreach ($adsl_oids as $oid)
-      {
-        $port_stats = snmpwalk_cache_oid($device, $oid, $port_stats, "ADSL-LINE-MIB");
-      }
+  if (snmp_status()) {
+    foreach ($adsl_oids as $oid) {
+      $port_stats = snmpwalk_cache_oid($device, $oid, $port_stats, "ADSL-LINE-MIB");
     }
-    //print_vars($port_stats);
   }
+  print_debug_vars($port_stats);
+
+  // VDSL2-LINE-MIB
 }
 
 // EOF

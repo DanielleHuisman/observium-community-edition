@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -17,8 +16,7 @@ if (!isset($cache_discovery['host-resources-mib']))
 }
 
 //$debug_stats = array('total' => 0, 'used' => 0);
-if (count($cache_discovery['host-resources-mib']))
-{
+if (safe_count($cache_discovery['host-resources-mib'])) {
   foreach ($cache_discovery['host-resources-mib'] as $index => $entry)
   {
     $descr  = $entry['hrStorageDescr'];
@@ -48,9 +46,8 @@ if (count($cache_discovery['host-resources-mib']))
     }
 
 
-    if ($device['os'] == "routeros" && $descr == "main memory") { $deny = FALSE; }
-    else if ($device['os'] == "mcd")
-    {
+    if ($device['os'] === "routeros" && $descr === "main memory") { $deny = FALSE; }
+    elseif ($device['os'] === "mcd") {
       // Yes, hardcoded logic for mcd, because they do not use standard
       // See: http://jira.observium.org/browse/OBSERVIUM-1269
       if ($index === 1)

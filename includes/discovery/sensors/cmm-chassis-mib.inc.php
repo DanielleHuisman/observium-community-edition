@@ -14,8 +14,8 @@
 // Here DOM sensors for OcNOS os, currently not possible convert to definitions
 // because used multichannel sensors (ie for 40G/100G interfaces)
 
-$cmmTrans    = snmp_walk_multipart_oid($device, "cmmTransEEPROMTable", array(), "CMM-CHASSIS-MIB");
-$cmmTransDDM = snmp_walk_multipart_oid($device, "cmmTransDDMTable",    array(), "CMM-CHASSIS-MIB");
+$cmmTrans    = snmpwalk_multipart_oid($device, "cmmTransEEPROMTable", array(), "CMM-CHASSIS-MIB");
+$cmmTransDDM = snmpwalk_multipart_oid($device, "cmmTransDDMTable", array(), "CMM-CHASSIS-MIB");
 print_debug_vars($cmmTrans);
 print_debug_vars($cmmTransDDM);
 

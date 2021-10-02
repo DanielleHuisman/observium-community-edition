@@ -1,0 +1,1 @@
+ALTER TABLE `lsp` CHANGE `lsp_id` `lsp_id` INT NOT NULL AUTO_INCREMENT;

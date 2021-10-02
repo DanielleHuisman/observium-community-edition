@@ -9,13 +9,13 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
         MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
             FROM SNMPv2-CONF
         SnmpAdminString        FROM SNMP-FRAMEWORK-MIB
-        InetAddressType, InetAddress
+        InetAddressType, InetAddress, InetAddressPrefixLength
             FROM INET-ADDRESS-MIB
-        softentENT1AAA
+        softentIND1AAA
             FROM ALCATEL-ENT1-BASE;
 
 
-    alcatelENT1AAAMIB MODULE-IDENTITY
+    alcatelIND1AAAMIB MODULE-IDENTITY
         LAST-UPDATED  "201311070000Z"
         ORGANIZATION  "Alcatel-Lucent"
         CONTACT-INFO
@@ -67,7 +67,7 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
             "The latest version of this MIB Module."
 
-        ::= { softentENT1AAA 1 }
+        ::= { softentIND1AAA 1 }
 
 
 
@@ -76,7 +76,7 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
             "Branch For Authentication, Authorization, and Accounting (AAA)
             Subsystem Managed Objects."
-        ::= { alcatelENT1AAAMIB 1 }
+        ::= { alcatelIND1AAAMIB 1 }
 
 
     alcatelIND1AAAMIBConformance OBJECT-IDENTITY
@@ -84,7 +84,7 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
             "Branch For Authentication, Authorization, and Accounting (AAA)
             Subsystem Conformance Information."
-        ::= { alcatelENT1AAAMIB 2 }
+        ::= { alcatelIND1AAAMIB 2 }
 
 
     alcatelIND1AAAMIBGroups OBJECT-IDENTITY
@@ -1257,7 +1257,8 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
             aaauReadRight3     Unsigned32,
             aaauReadRight4     Unsigned32,
             aaauWriteRight3    Unsigned32,
-            aaauWriteRight4    Unsigned32
+            aaauWriteRight4    Unsigned32,
+            aaauSnmpPrivPassword OCTET STRING
         }
 
     aaauUserName OBJECT-TYPE
@@ -1333,9 +1334,11 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
                            noauth(2),
                               sha(3),
                               md5(4),
-                          shaDes(5),
-                          md5Des(6),
-                          shaAes(7)
+                           shaDes(5),
+                           md5Des(6),
+                           shaAes(7),
+                           sha224(8),
+                           sha256(9)
                       }
         MAX-ACCESS    read-create
         STATUS        current
@@ -1348,6 +1351,8 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
                 sha-des(5) - SNMPv3 with SHA authentication and DES encryption.
                 md5-des(6) - SNMPv3 with MD5 authentication and DES encryption.
                 sha-aes(7) - SNMPv3 with SHA authentication and AES encryption.
+                 sha224(8) - SNMPv3 with SHA224 authentication and no encryption.
+                 sha256(9) - SNMPv3 with SHA256 authentication and no encryption.
              If the value is not specified, the value configured for the 'default' user
              is taken"
         ::= { aaaUserEntry 7}
@@ -1502,6 +1507,14 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
             not specified, the value configured for the 'default' user is taken"
         ::= { aaaUserEntry 19}
 
+    aaauSnmpPrivPassword OBJECT-TYPE
+        SYNTAX        OCTET STRING ( SIZE( 8 .. 30 ) )
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Authentication key of the user. The key is encoded in a two way method.
+            The encryption key is deducted from this key."
+        ::= { aaaUserEntry 20}
 
 
 --    ASA specific configuration MIB
@@ -1513,7 +1526,7 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
 --
 
     aaaAsaPasswordSizeMin OBJECT-TYPE
-        SYNTAX        Integer32 ( 0 .. 14 )
+        SYNTAX        Integer32 ( 0 .. 31 )
         MAX-ACCESS    read-write
         STATUS        current
         DESCRIPTION
@@ -1631,6 +1644,42 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
              "Enable or disable AdminUser console only restriction"
         DEFVAL { disable }
         ::= { aaaAsaConfig 13}
+
+     aaaAsaAccessMode OBJECT-TYPE   
+        SYNTAX        INTEGER { default (1),enhanced(2) }  
+        MAX-ACCESS    read-write   
+        STATUS        current  
+        DESCRIPTION    
+             "Set access mode to enhanced or default.  0 is default 1 is enhanced"     
+        DEFVAL { default }     
+        ::= { aaaAsaConfig 14}     
+   
+     aaaAsaAccessIpLockoutThreshold   OBJECT-TYPE  
+        SYNTAX INTEGER(0..999)     
+        MAX-ACCESS  read-write     
+        STATUS current     
+        DESCRIPTION    
+             "When aaaAsaAccessMode is enhanced, This object indicates the value of the threshold for failed login     
+              attempts from an IP address after which the IP address will be banned from switch access.    
+              when aaaAsaAccessMode, this  is set to 0, disable"   
+            DEFVAL      { 6 }  
+        ::= {aaaAsaConfig 15}  
+   
+     aaaAsaAccessManagementIpStatus   OBJECT-TYPE  
+        SYNTAX       INTEGER {     
+                                enable(1),     
+                                disable(2)     
+                             }     
+        MAX-ACCESS read-write  
+        STATUS current     
+        DESCRIPTION    
+            " When aaaAsaAccessMode is enhanced, When enabled , session allowed only for   
+               pre-configured/allowed management station  defined in aaaSwitchAccessMgmtStationTable.  
+              If disabled, any station can try to establish session is authenticated successfully,     
+              when disabled aaaSwitchAccessMgmtStationTable will be destroyed.     
+               When aaaAsaAccessMode is default, aaaAsaAccessManagementIpStatus will be disable"   
+            DEFVAL { disable }     
+        ::= {aaaAsaConfig 16}  
 
     alaAaaClientAttr        OBJECT IDENTIFIER ::= { alcatelIND1AAAMIBObjects 5 } 
 
@@ -2343,6 +2392,283 @@ ALCATEL-ENT1-AAA-MIB DEFINITIONS ::= BEGIN
         ::= { alaAaaProfAcctEntry 10 }
 
 
+-- START: AAA SWITCH ACCESS CONFIG-RELATED MIB---------------------
+
+    aaaSwitchAccessConfig   OBJECT IDENTIFIER ::= { alcatelIND1AAAMIBObjects 7 }
+
+-- SwitchAccess config MIB --
+
+    aaaSwitchAccessMgmtStationTable OBJECT-TYPE
+        SYNTAX           SEQUENCE OF AaaSwitchAccessMgmtStationEntry
+        MAX-ACCESS       not-accessible
+        STATUS           current
+        DESCRIPTION
+            "This table is used to configure SwitchAccess management station's Ip address."
+        ::= {aaaSwitchAccessConfig 1 }
+
+    aaaSwitchAccessMgmtStationEntry  OBJECT-TYPE
+        SYNTAX                  AaaSwitchAccessMgmtStationEntry
+        MAX-ACCESS               not-accessible
+        STATUS                   current
+        DESCRIPTION
+            "SwitchAccessManagementStation configuration."
+        INDEX  { aaaSwitchAccessMgmtStationIpType,
+                 aaaSwitchAccessMgmtStationIpAddress,
+                 aaaSwitchAccessMgmtStationIpPrefixLength
+               }
+        ::= { aaaSwitchAccessMgmtStationTable 1 }
+
+    AaaSwitchAccessMgmtStationEntry  ::= SEQUENCE
+        {
+        aaaSwitchAccessMgmtStationIpType      InetAddressType,
+        aaaSwitchAccessMgmtStationIpAddress   InetAddress,
+        aaaSwitchAccessMgmtStationIpPrefixLength    InetAddressPrefixLength,
+        aaaSwitchAccessMgmtStationRowStatus   RowStatus
+        }
+
+    aaaSwitchAccessMgmtStationIpType OBJECT-TYPE
+        SYNTAX                  InetAddressType {  unknown(0), ipv4(1) }
+        MAX-ACCESS              not-accessible
+        STATUS                  current
+        DESCRIPTION
+            "The Ip Address Type for the SwitchAccess management station"
+        ::= { aaaSwitchAccessMgmtStationEntry  1 }
+
+    aaaSwitchAccessMgmtStationIpAddress OBJECT-TYPE
+        SYNTAX                  InetAddress (SIZE (4 | 16))
+        MAX-ACCESS              not-accessible
+        STATUS                  current
+        DESCRIPTION
+            "The Ip Address for the SwitchAccess management station"
+        ::= { aaaSwitchAccessMgmtStationEntry  2 }
+
+    aaaSwitchAccessMgmtStationIpPrefixLength OBJECT-TYPE
+        SYNTAX                  InetAddressPrefixLength
+        MAX-ACCESS              not-accessible
+        STATUS                  current
+        DESCRIPTION
+            "The prefix length that, when combined
+            with aaaSwitchAccessMgmtStationIpAddress , gives the prefix for this
+            entry.  The InetAddressType is given by the
+            aaaSwitchAccessMgmtStationIpType object.
+            Currntly release supports only IPV4."
+        ::= { aaaSwitchAccessMgmtStationEntry 3 }
+
+    aaaSwitchAccessMgmtStationRowStatus  OBJECT-TYPE
+        SYNTAX                         RowStatus
+        MAX-ACCESS                     read-create
+        STATUS                         current
+        DESCRIPTION
+            "The Rowstatus of the AaaSwitchAccessMgmtStationEntry."
+        ::= { aaaSwitchAccessMgmtStationEntry  4 }
+
+--
+-- Banned IP list, this table will be populated by software
+--
+
+    aaaSwitchAccessBannedIpTable OBJECT-TYPE
+        SYNTAX           SEQUENCE OF AaaSwitchAccessBannedIpEntry
+        MAX-ACCESS       not-accessible
+        STATUS           current
+        DESCRIPTION
+            "This table is populated by software for Banned Ip address."
+        ::= {aaaSwitchAccessConfig  2}
+
+    aaaSwitchAccessBannedIpEntry OBJECT-TYPE
+        SYNTAX                  AaaSwitchAccessBannedIpEntry
+        MAX-ACCESS               not-accessible
+        STATUS                   current
+        DESCRIPTION
+            "SwitchAccessManagementStation configuration."
+        INDEX  {
+                 aaaSwitchAccessBannedIpType,
+                 aaaSwitchAccessBannedIpAddress
+               }
+        ::= { aaaSwitchAccessBannedIpTable 1 }
+
+    AaaSwitchAccessBannedIpEntry   ::= SEQUENCE
+        {
+           aaaSwitchAccessBannedIpType      InetAddressType,
+           aaaSwitchAccessBannedIpAddress   InetAddress,
+           aaaSwitchAccessBannedIpRowStatus  RowStatus
+        }
+
+    aaaSwitchAccessBannedIpType   OBJECT-TYPE
+        SYNTAX                     InetAddressType
+        MAX-ACCESS                  not-accessible
+        STATUS                      current
+        DESCRIPTION
+            "IP address type of banned IP"
+        ::= { aaaSwitchAccessBannedIpEntry   1 }
+
+
+    aaaSwitchAccessBannedIpAddress   OBJECT-TYPE
+        SYNTAX                      InetAddress (SIZE (4|16))
+        MAX-ACCESS                  not-accessible
+        STATUS                      current
+        DESCRIPTION
+            "IP address of banned IP"
+        ::= { aaaSwitchAccessBannedIpEntry   2 }
+
+    aaaSwitchAccessBannedIpRowStatus  OBJECT-TYPE
+        SYNTAX       RowStatus
+        MAX-ACCESS   read-create 
+        STATUS        current
+        DESCRIPTION
+            "Rowstatus of the AaaSwitchAccessBannedIpEntry, Since this table
+             is populated by switch, only destroy action is allowed."
+        ::= { aaaSwitchAccessBannedIpEntry   3 }
+
+--
+--  Switch Access Priv mask based on session  type
+--
+
+     aaaSwitchAccessPrivMaskTable OBJECT-TYPE
+         SYNTAX        SEQUENCE OF AaaSwitchAccessPrivMaskEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+             "This table is used to define the user privilege based on access type along with users existing privilege level."
+     ::= { aaaSwitchAccessConfig 3}
+
+    aaaSwitchAccessPrivMaskEntry OBJECT-TYPE
+        SYNTAX        AaaSwitchAccessPrivMaskEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "Priv mask configuration identified by the access type"
+        INDEX { aaaSwitchAccessType }
+        ::= { aaaSwitchAccessPrivMaskTable 1 }
+
+    AaaSwitchAccessPrivMaskEntry ::= SEQUENCE
+        {
+           aaaSwitchAccessType           INTEGER,
+           aaaSwitchAccessReadRight1     Unsigned32,
+           aaaSwitchAccessReadRight2     Unsigned32,
+           aaaSwitchAccessReadRight3     Unsigned32,
+           aaaSwitchAccessReadRight4     Unsigned32,
+           aaaSwitchAccessWriteRight1    Unsigned32,
+           aaaSwitchAccessWriteRight2    Unsigned32,
+           aaaSwitchAccessWriteRight3    Unsigned32,
+           aaaSwitchAccessWriteRight4    Unsigned32
+        }
+
+    aaaSwitchAccessType    OBJECT-TYPE
+        SYNTAX       INTEGER
+                     {
+                           console(1),
+                           telnet(2),
+                              ssh(3),
+                             http(4),
+                             https(5)
+                      }
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "Type of connection for which privilege mask should be applied for.
+             If no specific privilege is configured, by default all the mode shall have
+             all the privilege for the user."
+        ::= { aaaSwitchAccessPrivMaskEntry 1}
+
+    aaaSwitchAccessReadRight1     OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+            "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 2}
+
+    aaaSwitchAccessReadRight2    OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+             "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 3}
+
+    aaaSwitchAccessReadRight3    OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+             "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 4}
+
+    aaaSwitchAccessReadRight4    OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+             "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 5}
+
+     aaaSwitchAccessWriteRight1   OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+            "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 6}
+
+    aaaSwitchAccessWriteRight2    OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+          "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 7}
+
+    aaaSwitchAccessWriteRight3    OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+          "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 8}
+
+    aaaSwitchAccessWriteRight4    OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 0 .. 4294967295 )
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+          "Specifies the families through the access type can execute with read right.
+            Each bit of the 32-bit integer mask represents a command's family
+            number. When the family bit is set, through the access type the user is allowed to run
+            commands of this family.First part of the bitmask.If the value is
+            not specified, the value configured for the 'default'."
+        ::= { aaaSwitchAccessPrivMaskEntry 9}
+
+-- END: AAA SWITCH ACCESS CONFIG-RELATED MIB---------------------
+
+
 --
 -- User profile save
 --
@@ -2361,6 +2687,201 @@ alaAaaUserProfileSave OBJECT-TYPE
         globalProfile (2): when set through CLI GlobalProfile.txt is generated and synced accross VC/Chassiss."
     ::= { alaAaaProfileConfig 4 }
 
+    alaAaaCommonCriteriaConfig   OBJECT IDENTIFIER ::= { alcatelIND1AAAMIBObjects 8 }
+
+    alaAaaCommonCriteriaMode   OBJECT-TYPE
+        SYNTAX      INTEGER {
+                        enable(1),
+                        disable(2)
+                    }
+        MAX-ACCESS read-write
+        STATUS current 
+        DESCRIPTION 
+            " Enable/Disable Common Criteria mode."
+        DEFVAL { disable }
+        ::= { alaAaaCommonCriteriaConfig 1 }
+
+--
+-- START: AAA TLS CONFIG-RELATED MIB---------------------
+--
+    alaAaaTlsConfig   OBJECT IDENTIFIER ::= { alcatelIND1AAAMIBObjects 9 }
+
+    alaAaaTlsBaseConfig   OBJECT IDENTIFIER ::= { alaAaaTlsConfig 1 }
+
+    alaAaaTlsCaFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the CA bundle file (in PEM format) stored in /flash/switch directory."
+        ::= { alaAaaTlsBaseConfig 1 }
+
+    alaAaaTlsCrlFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the CRL file (in PEM format) stored in /flash/switch directory."
+        ::= { alaAaaTlsBaseConfig 2 }
+
+    alaAaaTlsKeyFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the rsa key file stored in /flash/switch directory."
+        ::= { alaAaaTlsBaseConfig 3 }
+
+    alaAaaTlsSelfSignedCert   OBJECT IDENTIFIER ::= { alaAaaTlsConfig 2 }
+
+    alaAaaTlsSelfSignedCertFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the self-signed certificate file stored in /flash/switch directory."
+        ::= { alaAaaTlsSelfSignedCert 1 }
+
+    alaAaaTlsSelfSignedCertKeyFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the key file file stored in /flash/switch directory."
+        ::= { alaAaaTlsSelfSignedCert 2 }
+
+    alaAaaTlsSelfSignedCertValidPeriod   OBJECT-TYPE
+        SYNTAX        Integer32 (0..3650)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The valid period in days of certificate."
+        ::= { alaAaaTlsSelfSignedCert 3 }
+
+    alaAaaTlsSelfSignedCertCommonName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The certificate common name."
+        ::= { alaAaaTlsSelfSignedCert 4 }
+
+    alaAaaTlsSelfSignedCertOrgName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The certificate organization name ."
+        ::= { alaAaaTlsSelfSignedCert 5 }
+
+    alaAaaTlsSelfSignedCertOrgUnit   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The certificate organization unit."
+        ::= { alaAaaTlsSelfSignedCert 6 }
+
+    alaAaaTlsSelfSignedCertLocality   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Locality of the certificate organization."
+        ::= { alaAaaTlsSelfSignedCert 7 }
+
+    alaAaaTlsSelfSignedCertState   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The state of certificate organization."
+        ::= { alaAaaTlsSelfSignedCert 8 }
+
+    alaAaaTlsSelfSignedCertCountry   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (2))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The country of certificate organization."
+        ::= { alaAaaTlsSelfSignedCert 9 }
+
+    alaAaaTlsSelfSignedCertAction   OBJECT-TYPE
+        SYNTAX        INTEGER
+                      {
+                        create (1),
+                        delete (2)
+                      }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Create/delete self-signed certificate stored in /flash/switch directory."
+        ::= { alaAaaTlsSelfSignedCert 10 }
+
+    alaAaaTlsCsr   OBJECT IDENTIFIER ::= { alaAaaTlsConfig 3 }
+
+    alaAaaTlsCsrFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The domain name of csr file stored in /flash/switch directory."
+        ::= { alaAaaTlsCsr 1 }
+
+    alaAaaTlsCsrKeyFileName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of key file stored in /flash/switch directory."
+        ::= { alaAaaTlsCsr 2 }
+
+    alaAaaTlsCsrCommonName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The csr common name."
+        ::= { alaAaaTlsCsr 3 }
+
+    alaAaaTlsCsrOrgName   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The csr organization name ."
+        ::= { alaAaaTlsCsr 4 }
+
+    alaAaaTlsCsrOrgUnit   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The csr organization unit."
+        ::= { alaAaaTlsCsr 5 }
+
+    alaAaaTlsCsrLocality   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Locality of the certificate organization."
+        ::= { alaAaaTlsCsr 6 }
+
+    alaAaaTlsCsrState   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (0..32))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The state of certificate organization."
+        ::= { alaAaaTlsCsr 7 }
+
+    alaAaaTlsCsrCountry   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (2))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The country of certificate organization."
+        ::= { alaAaaTlsCsr 8 }
+
+    alaAaaTlsValidate   OBJECT IDENTIFIER ::= { alaAaaTlsConfig 4 }
+
+    alaAaaTlsValidateCa   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (1..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the CA certificate (in PEM format) used to validate."
+        ::= { alaAaaTlsValidate 1 }
+
+    alaAaaTlsValidateCert   OBJECT-TYPE
+        SYNTAX        SnmpAdminString (SIZE (1..255))
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Name of the certificate (in PEM format) needed to validate."
+        ::= { alaAaaTlsValidate 2 }
+--
+-- END: AAA TLS CONFIG-RELATED MIB---------------------
+--
+
 --
 -- Compliance Statements
 --
@@ -2378,7 +2899,12 @@ alaAaaUserProfileSave OBJECT-TYPE
                 aaaAuthAcctGroup,
                 aaaUserMIBGroup,
                 alaAaaClientAttrGroup,
-                alaAaaProfileObjectsGroup  
+                alaAaaProfileObjectsGroup,
+                aaaSwitchAccessMIBGroup,
+                alaAaaCommonCriteriaGroup,
+                alaAaaTlsBaseConfigGroup,
+                alaAaaTlsSelfSignedCertGroup,
+                alaAaaTlsCsrGroup
             }
 
         ::= { alcatelIND1AAAMIBCompliances 1 }
@@ -2414,7 +2940,10 @@ alaAaaUserProfileSave OBJECT-TYPE
             aaasVrfName,
 	    aaasRadKeyHash,
             aaasLdapPasswdHash,
-            aaasTacacsKeyHash
+            aaasTacacsKeyHash,
+            aaaAsaAccessMode,
+            aaaAsaAccessIpLockoutThreshold,
+            aaaAsaAccessManagementIpStatus   
         }
         STATUS  current
         DESCRIPTION
@@ -2526,7 +3055,8 @@ alaAaaUserProfileSave OBJECT-TYPE
                 aaaAsaLockoutWindow,
                 aaaAsaLockoutDuration,
                 aaaAsaLockoutThreshold,
-                aaaAsaAccessPolicyAdminConsoleOnly
+                aaaAsaAccessPolicyAdminConsoleOnly,
+                aaauSnmpPrivPassword 
         }
         STATUS  current
         DESCRIPTION
@@ -2610,5 +3140,93 @@ alaAaaClientAttrGroup OBJECT-GROUP
     DESCRIPTION
       "Collection of AAA profile objects"
     ::= { alcatelIND1AAAMIBGroups 5 }
+
+    aaaSwitchAccessMIBGroup OBJECT-GROUP
+        OBJECTS
+        {
+           aaaSwitchAccessMgmtStationRowStatus,
+           aaaSwitchAccessBannedIpRowStatus,
+           aaaSwitchAccessReadRight1,
+           aaaSwitchAccessReadRight2,
+           aaaSwitchAccessReadRight3,
+           aaaSwitchAccessReadRight4,
+           aaaSwitchAccessWriteRight1,
+           aaaSwitchAccessWriteRight2,
+           aaaSwitchAccessWriteRight3,
+           aaaSwitchAccessWriteRight4
+        }
+        STATUS  current
+        DESCRIPTION
+            "Collection of objects for management of AAA Switch Access."
+        ::= { alcatelIND1AAAMIBGroups 6 }
+
+    alaAaaCommonCriteriaGroup  OBJECT-GROUP
+        OBJECTS
+        {
+           alaAaaCommonCriteriaMode
+        }
+        STATUS  current
+        DESCRIPTION
+            "Collection of objects for common criteria."
+        ::= { alcatelIND1AAAMIBGroups 7 }
+
+     alaAaaTlsBaseConfigGroup OBJECT-GROUP
+        OBJECTS
+        {
+            alaAaaTlsCaFileName,
+            alaAaaTlsCrlFileName,
+            alaAaaTlsKeyFileName
+        }
+        STATUS  current
+        DESCRIPTION
+            "Collection of objects for management of AAA TLS base configuration."
+        ::= { alcatelIND1AAAMIBGroups 8 }
+
+     alaAaaTlsSelfSignedCertGroup OBJECT-GROUP
+        OBJECTS
+        {
+            alaAaaTlsSelfSignedCertFileName,
+            alaAaaTlsSelfSignedCertKeyFileName,
+            alaAaaTlsSelfSignedCertValidPeriod,
+            alaAaaTlsSelfSignedCertCommonName,
+            alaAaaTlsSelfSignedCertOrgName,
+            alaAaaTlsSelfSignedCertOrgUnit,
+            alaAaaTlsSelfSignedCertLocality,
+            alaAaaTlsSelfSignedCertState,
+            alaAaaTlsSelfSignedCertCountry,
+            alaAaaTlsSelfSignedCertAction
+        }
+        STATUS  current
+        DESCRIPTION
+            "Collection of objects for management of AAA TLS self-signed certificate."
+        ::= { alcatelIND1AAAMIBGroups 9 }
+
+     alaAaaTlsCsrGroup OBJECT-GROUP
+        OBJECTS
+        {
+            alaAaaTlsCsrFileName,
+            alaAaaTlsCsrKeyFileName,
+            alaAaaTlsCsrCommonName,
+            alaAaaTlsCsrOrgName,
+            alaAaaTlsCsrOrgUnit,
+            alaAaaTlsCsrLocality,
+            alaAaaTlsCsrState,
+            alaAaaTlsCsrCountry
+        }
+        STATUS  current
+        DESCRIPTION
+            "Collection of objects for management of AAA TLS CSR."
+        ::= { alcatelIND1AAAMIBGroups 10 }
+
+     alaAaaTlsValidateGroup OBJECT-GROUP
+        OBJECTS
+        {
+            alaAaaTlsValidateCa,
+            alaAaaTlsValidateCert
+        }
+        STATUS  current
+        DESCRIPTION
+            "Collection of objects for certificate validation."
+        ::= { alcatelIND1AAAMIBGroups 11 }
 
 END

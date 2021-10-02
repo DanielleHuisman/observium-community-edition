@@ -20,7 +20,7 @@ $scale = 1; // Start at 1 for 2 digits setting.
 
 // Internal Temperature
 // ROOMALERT4E-MIB::internal-tempc.0 = 2882
-$oids = snmpwalk_cache_multi_oid($device, "internal-tempc", array(), "ROOMALERT4E-MIB");
+$oids = snmpwalk_cache_oid($device, "internal-tempc", array(), "ROOMALERT4E-MIB");
 
 foreach ($oids as $index => $entry)
 {
@@ -52,7 +52,7 @@ foreach ($oids as $index => $entry)
 // ROOMALERT4E-MIB::digital-sen1-2.0 = 7327
 // ROOMALERT4E-MIB::digital-sen1.6.0 = "External Temp"
 
-$oids = snmpwalk_cache_multi_oid($device, "digital", array(), "ROOMALERT4E-MIB");
+$oids = snmpwalk_cache_oid($device, "digital", array(), "ROOMALERT4E-MIB");
 
 $index = 0;
 

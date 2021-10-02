@@ -18,7 +18,7 @@
 if ($device['os'] == "junose" && ($attribs['enable_ports_junoseatmvp'] || ($config['enable_ports_junoseatmvp'] && !isset($attribs['enable_ports_junoseatmvp']))))
 {
   echo("JunOSe ATM vps : ");
-  $vp_array = snmpwalk_cache_multi_oid($device, "juniAtmVpStatsInCells", $vp_array, "Juniper-UNI-ATM-MIB");
+  $vp_array = snmpwalk_cache_oid($device, "juniAtmVpStatsInCells", $vp_array, "Juniper-UNI-ATM-MIB");
   $valid_vp = array();
   if (OBS_DEBUG && count($vp_array)) { print_vars($vp_array); }
 

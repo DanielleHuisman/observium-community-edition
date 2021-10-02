@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -20,54 +20,56 @@
  * @param string $item
  * @return string
 */
-function nicecase($item)
-{
+function nicecase($item) {
+  if (is_numeric($item)) {
+    return (string) $item;
+  }
+  if (!is_string($item)) {
+    return '';
+  }
+
   $mappings = $GLOBALS['config']['nicecase'];
   if (isset($mappings[$item])) { return $mappings[$item]; }
   //$item = preg_replace('/([a-z])([A-Z]{2,})/', '$1 $2', $item); // turn "fixedAC" into "fixed AC"
 
-  return ucfirst($item);
+  return ucfirst((string)$item);
 }
 
 /**
  * Trim string and remove paired and/or escaped quotes from string
  *
  * @param string $string Input string
+ * @param int    $flags
+ *
  * @return string Cleaned string
  */
-function trim_quotes($string, $flags = OBS_QUOTES_TRIM)
-{
+function trim_quotes($string, $flags = OBS_QUOTES_TRIM) {
   $string = trim($string); // basic string clean
-  if (strpos($string, '"') !== FALSE)
-  {
-    if (is_flag_set(OBS_QUOTES_STRIP, $flags))
-    {
-      // Just remove all (double) quotes from string
-      $string = str_replace(array('\"', '"'), '', $string);
+
+  if (is_flag_set(OBS_QUOTES_STRIP, $flags) && str_contains($string, '"')) {
+    // Just remove all (double) quotes from string
+    return str_replace([ '\"', '"' ], '', $string);
+  }
+
+  if (is_flag_set(OBS_QUOTES_TRIM, $flags)) {
+    if (str_contains($string, '\"')) {
+      // replace escaped quotes
+      $string = str_replace('\"', '"', $string);
     }
-    else if (is_flag_set(OBS_QUOTES_TRIM, $flags))
-    {
-      if (strpos($string, '\"') !== FALSE)
-      {
-        $string = str_replace('\"', '"', $string); // replace escaped quotes
-      }
-      $quotes = array('["\']', // remove single quotes
-                      //'\\\"',  // remove escaped quotes
-                      );
-      foreach ($quotes as $quote)
-      {
-        $pattern = '/^(' . $quote . ')(?<value>.*?)(\1)$/s';
-        while (preg_match($pattern, $string, $matches))
-        {
-          $string = $matches['value'];
-        }
+
+    if (str_starts($string, [ '"', "'" ])) {
+      $quotes = '["\']'; // remove double and single quotes
+      $pattern = '/^(' . $quotes . ')(?<value>.*?)(\1)$/s';
+      while (preg_match($pattern, $string, $matches)) {
+        $string = $matches['value'];
       }
     }
   }
+
   return $string;
 }
 
- /**
+/**
   * Humanize User
   *
   *   Process an array containing user info to add/modify elements.
@@ -226,7 +228,7 @@ function humanize_alert_check(&$check)
 function humanize_alert_entry(&$entry)
 {
   // Exit if already humanized
-  if ($entry['humanized']) { return; }
+  if (isset($entry['humanized']) && $entry['humanized']) { return; }
 
   // Set colours and classes based on the status of the alert
   if ($entry['alert_status'] == '1')
@@ -300,10 +302,10 @@ function humanize_device(&$device)
   global $config;
 
   // Exit if already humanized
-  if ($device['humanized']) { return; }
+  if (isset($device['humanized']) && $device['humanized']) { return; }
 
   // Expand the device state array from the php serialized string
-  $device['state'] = unserialize($device['device_state']);
+  $device['state'] = safe_unserialize($device['device_state']);
 
   // Set the HTML class and Tab color for the device based on status
   if ($device['status'] == '0')
@@ -312,11 +314,9 @@ function humanize_device(&$device)
     $device['html_row_class'] = "error";
   } else {
     $device['row_class'] = "";
-    $device['html_row_class'] = "up";  // Fucking dull gay colour, but at least there's a semicolon now - tom
-                                            // Your mum's a semicolon - adama
-                                            // Haha - mike
+    $device['html_row_class'] = "up";
   }
-  if ($device['ignore'] == '1')
+  if ($device['ignore'] == '1' || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > time()) )
   {
     $device['html_row_class'] = "suppressed";
     if ($device['status'] == '1')
@@ -356,7 +356,7 @@ function humanize_device(&$device)
  * row_class, table_tab_colour, state_class, admin_class
  *
  * @param array $peer
- * @return array $peer
+ * @return array|void $peer
  *
  */
 // TESTME needs unit testing
@@ -365,10 +365,10 @@ function humanize_bgp(&$peer)
   global $config;
 
   // Exit if already humanized
-  if ($peer['humanized']) { return; }
+  if (isset($peer['humanized']) && $peer['humanized']) { return; }
 
   // Set colours and classes based on the status of the peer
-  if ($peer['bgpPeerAdminStatus'] == 'stop' || $peer['bgpPeerAdminStatus'] == 'halted')
+  if ($peer['bgpPeerAdminStatus'] === 'stop' || $peer['bgpPeerAdminStatus'] === 'halted')
   {
     // Peer is disabled, set row to warning and text classes to muted.
     $peer['html_row_class'] = "warning";
@@ -377,23 +377,31 @@ function humanize_bgp(&$peer)
     $peer['alert']          = 0;
     $peer['disabled']       = 1;
   }
-  else if ($peer['bgpPeerAdminStatus'] == "start" || $peer['bgpPeerAdminStatus'] == "running" )
+  elseif ($peer['bgpPeerAdminStatus'] === "start" || $peer['bgpPeerAdminStatus'] === "running" )
   {
     // Peer is enabled, set state green and check other things
     $peer['admin_class'] = "success";
-    if ($peer['bgpPeerState'] == "established")
+    if ($peer['bgpPeerState'] === "established")
     {
       // Peer is up, set colour to blue and disable row class
-      $peer['state_class'] = "success"; $peer['html_row_class'] = "up";
+      $peer['state_class'] = "success";
+      $peer['html_row_class'] = "up";
     } else {
       // Peer is down, set colour to red and row class to error.
-      $peer['state_class'] = "danger"; $peer['html_row_class'] = "error";
+      $peer['state_class'] = "danger";
+      $peer['html_row_class'] = "error";
     }
   }
 
   // Set text and colour if peer is same AS, private AS or external.
-  if ($peer['bgpPeerRemoteAs'] == $peer['local_as'])                                    { $peer['peer_type_class'] = "info";    $peer['peer_type'] = "iBGP"; }
-  else                                                                                  { $peer['peer_type_class'] = "primary"; $peer['peer_type'] = "eBGP"; }
+  if ($peer['bgpPeerRemoteAs'] == $peer['local_as'])
+  {
+    $peer['peer_type_class'] = "info";
+    $peer['peer_type'] = "iBGP";
+  } else {
+    $peer['peer_type_class'] = "primary";
+    $peer['peer_type'] = "eBGP";
+  }
 
   // Private AS numbers, see: https://tools.ietf.org/html/rfc6996
   if (is_bgp_as_private($peer['bgpPeerRemoteAs']))
@@ -411,8 +419,8 @@ function humanize_bgp(&$peer)
   }
 
   // Format (compress) the local/remote IPs if they're IPv6
-  $peer['human_localip']  = (strstr($peer['bgpPeerLocalAddr'],  ':')) ? Net_IPv6::compress($peer['bgpPeerLocalAddr'])  : $peer['bgpPeerLocalAddr'];
-  $peer['human_remoteip'] = (strstr($peer['bgpPeerRemoteAddr'], ':')) ? Net_IPv6::compress($peer['bgpPeerRemoteAddr']) : $peer['bgpPeerRemoteAddr'];
+  $peer['human_localip']  = ip_compress($peer['bgpPeerLocalAddr']);
+  $peer['human_remoteip'] = ip_compress($peer['bgpPeerRemoteAddr']);
 
   // Format ASN as asdot if configured
   $peer['human_local_as']  = $config['web_show_bgp_asdot'] ? bgp_asplain_to_asdot($peer['local_as']) : $peer['local_as'];
@@ -429,29 +437,31 @@ function process_port_label(&$this_port, $device)
   //file_put_contents('/tmp/process_port_label_'.$device['hostname'].'_'.$this_port['ifIndex'].'.port', var_export($this_port, TRUE)); ///DEBUG
 
   // OS Specific rewrites (get your shit together, vendors)
-  if ($device['os'] == 'zxr10') { $this_port['ifAlias'] = preg_replace("/^" . str_replace("/", "\\/", $this_port['ifName']) . "\s*/", '', $this_port['ifDescr']); }
-  if ($device['os'] == 'ciscosb' && $this_port['ifType'] == 'propVirtual' && is_numeric($this_port['ifDescr'])) { $this_port['ifName'] = 'Vlan'.$this_port['ifDescr']; }
-
-  // Added for Brocade NOS. Will copy ifDescr -> ifAlias if ifDescr != ifName
-  /* ifAlias passed over SW-MIB
-  if ($config['os'][$device['os']]['ifDescr_ifAlias'] && $this_port['ifAlias'] == '' && $this_port['ifDescr'] != $this_port['ifName'])
-  {
-    $this_port['ifAlias'] = $this_port['ifDescr'];
+  if ($device['os'] === 'zxr10') {
+    $this_port['ifAlias'] = preg_replace("/^" . str_replace("/", "\\/", $this_port['ifName']) . "\s*/", '', $this_port['ifDescr']);
+  } elseif ($device['os'] === 'ciscosb' && $this_port['ifType'] === 'propVirtual' && is_numeric($this_port['ifDescr'])) {
+    $this_port['ifName'] = 'Vlan'.$this_port['ifDescr'];
   }
-  */
+
+  // Will copy ifDescr -> ifAlias if ifDescr != ifName (Actually for Brocade NOS and Allied Telesys devices)
+  if (isset($config['os'][$device['os']]['ifDescr_ifAlias']) && $config['os'][$device['os']]['ifDescr_ifAlias'] &&
+      $this_port['ifType'] === 'ethernetCsmacd' && $this_port['ifDescr'] !== $this_port['ifName'] &&
+      $this_port['ifDescr'] !== '-' && !str_starts($this_port['ifDescr'], 'Allied Teles')) {
+    if (empty($this_port['ifAlias']) ||
+        $this_port['ifName'] === $this_port['ifAlias']) {
+      $this_port['ifAlias'] = $this_port['ifDescr'];
+    }
+  }
 
   // Write port_label, port_label_base and port_label_num
 
   // Here definition override for ifDescr, because Calix switch ifDescr <> ifName since fw 2.2
   // Note, only for 'calix' os now
-  if ($device['os'] == 'calix')
-  {
+  if ($device['os'] === 'calix') {
     unset($config['os'][$device['os']]['ifname']);
     $version_parts = explode('.', $device['version']);
-    if ($version_parts[0] > 2 || ($version_parts[0] == 2 && $version_parts[1] > 1))
-    {
-      if ($this_port['ifName'] == '')
-      {
+    if ($version_parts[0] > 2 || ($version_parts[0] == 2 && $version_parts[1] > 1)) {
+      if ($this_port['ifName'] == '') {
         $this_port['port_label'] = $this_port['ifDescr'];
       } else {
         $this_port['port_label'] = $this_port['ifName'];
@@ -727,7 +737,7 @@ function humanize_port(&$port)
   global $config, $cache;
 
   // Exit if already humanized
-  if ($port['humanized']) { return; }
+  if (isset($peer['humanized']) && $port['humanized']) { return; }
 
   $port['attribs'] = get_entity_attribs('port', $port['port_id']);
 
@@ -756,37 +766,41 @@ function humanize_port(&$port)
   $port['entity_shortname'] = $port['port_label_short'];
   $port['entity_descr']     = $port['ifAlias'];
 
-  $port['table_tab_colour'] = "#aaaaaa"; $port['row_class'] = ""; $port['icon'] = 'port-ignored'; // Default
+  $port['table_tab_colour'] = "#aaaaaa";
+  $port['row_class'] = "";
+  $port['icon'] = 'port-ignored'; // Default
   $port['admin_status'] = $port['ifAdminStatus'];
   if     ($port['ifAdminStatus'] == "down")
   {
     $port['admin_status'] = 'disabled';
     $port['row_class'] = "disabled";
     $port['icon'] = 'port-disabled';
+    $port['admin_class'] = "disabled";
   }
   elseif ($port['ifAdminStatus'] == "up")
   {
     $port['admin_status'] = 'enabled';
+    $port['admin_class']  = 'primary';
     switch ($port['ifOperStatus'])
     {
       case 'up':
-        $port['table_tab_colour'] = "#194B7F"; $port['row_class'] = "up";      $port['icon'] = 'port-up';
+        $port['table_tab_colour'] = "#194B7F"; $port['row_class'] = "ok";      $port['icon'] = 'port-up'; $port['oper_class'] = "primary";
         break;
       case 'monitoring':
         // This is monitoring ([e|r]span) ports
-        $port['table_tab_colour'] = "#008C00"; $port['row_class'] = "success"; $port['icon'] = 'port-up';
+        $port['table_tab_colour'] = "#008C00"; $port['row_class'] = "success"; $port['icon'] = 'port-up'; $port['oper_class'] = "success";
         break;
       case 'down':
-        $port['table_tab_colour'] = "#cc0000"; $port['row_class'] = "error";   $port['icon'] = 'port-down';
+        $port['table_tab_colour'] = "#cc0000"; $port['row_class'] = "error";   $port['icon'] = 'port-down'; $port['oper_class'] = "error";
         break;
       case 'lowerLayerDown':
-        $port['table_tab_colour'] = "#ff6600"; $port['row_class'] = "warning"; $port['icon'] = 'port-down';
+        $port['table_tab_colour'] = "#ff6600"; $port['row_class'] = "warning"; $port['icon'] = 'port-down';  $port['oper_class'] = "warning";
         break;
       case 'testing':
       case 'unknown':
       case 'dormant':
       case 'notPresent':
-        $port['table_tab_colour'] = "#85004b"; $port['row_class'] = "info";    $port['icon'] = 'port-ignored';
+        $port['table_tab_colour'] = "#85004b"; $port['row_class'] = "info";    $port['icon'] = 'port-ignored'; $port['oper_class'] = "info";
         break;
     }
   }
@@ -794,9 +808,16 @@ function humanize_port(&$port)
   // If the device is down, colour the row/tab as 'warning' meaning that the entity is down because of something below it.
   if ($device['status'] == '0')
   {
-    $port['table_tab_colour'] = "#ff6600"; $port['row_class'] = "warning"; $port['icon'] = 'port-ignored';
+    $port['table_tab_colour'] = "#ff6600";
+    $port['row_class'] = "warning";
+    $port['icon'] = 'port-ignored';
   }
-
+  if ($port['ignore'] == '1' && $port['row_class'] !== 'ok') {
+    $port['row_class'] = "suppressed";
+  }
+  if ($port['disabled'] == '1') {
+    $port['row_class'] = "disabled";
+  }
   $port['in_rate'] = $port['ifInOctets_rate'] * 8;
   $port['out_rate'] = $port['ifOutOctets_rate'] * 8;
 
@@ -1325,53 +1346,21 @@ function short_ifname($if, $len = NULL, $escape = TRUE)
  *
  * @return string
  */
-function rewrite_entity_name($string, $entity_type = NULL, $escape = TRUE)
-{
+function rewrite_entity_name($string, $entity_type = NULL, $escape = TRUE) {
   $string = array_str_replace($GLOBALS['config']['rewrites']['entity_name'], $string, TRUE); // case-sensitive
   $string = array_preg_replace($GLOBALS['config']['rewrites']['entity_name_regexp'], $string);
-
-  //CLEANME. Remove if no troubles with definitions
-  // (moved to $config['rewrites']['entity_name'], $config['rewrites']['entity_name_regexp'])
-  //$string = str_replace("Distributed Forwarding Card", "DFC", $string);
-  //$string = str_replace("7600 Series SPA Interface Processor-", "7600 SIP-", $string);
-  //$string = preg_replace("/Rev\.\ [0-9\.]+\ /", "", $string);
-  //$string = str_replace("12000 Series Performance Route Processor", "12000 PRP", $string);
-  //$string = preg_replace("/^12000/", "", $string);
-  //$string = str_replace("Gigabit Ethernet", "GigE", $string);
-  //$string = preg_replace("/^ASR1000\ /", "", $string);
-  //$string = str_replace("Routing Processor", "RP", $string);
-  //$string = str_replace("Route Processor", "RP", $string);
-  //$string = str_replace("Switching Processor", "SP", $string);
-  //$string = str_replace("Sub-Module", "Module ", $string);
-  //$string = str_replace('Module for SMF', 'Module', $string);
-  //$string = str_replace("DFC Card", "DFC", $string);
-  //$string = str_replace("Centralized Forwarding Card", "CFC", $string);
-  //$string = str_replace(', Enterprise-Class', '', $string);
-  //$string = str_replace([ 'fan-tray' ], 'Fan Tray', $string);
-  //$string = str_replace([ 'Temp: ', 'CPU of ', 'CPU ', '(TM)', '(R)', '(r)' ], '', $string);
-  //$string = str_replace('GenuineIntel Intel', 'Intel', $string);
-  //$string = str_replace([ ' Inc.', ' Computer Corporation', ' Corporation' ], '', $string);
-  //$string = str_replace('IBM IBM', 'IBM', $string);
-  //$string = preg_replace("/(HP \w+) Switch/", "$1", $string);
-  //$string = preg_replace("/power[ -]supply( \d+)?(?: (?:module|sensor))?/i", "Power Supply$1", $string);
-  //$string = preg_replace("/([Vv]oltage|[Tt]ransceiver|[Pp]ower|[Cc]urrent|[Tt]emperature|[Ff]an|input|fail)\ [Ss]ensor/", "$1", $string);
-  //$string = preg_replace("/^(temperature|voltage|current|power)s?\ /", "", $string);
-  //$string = preg_replace('/;\s*SN\w{2,}/', '', $string); // Schwarz-Tonermodul, PN Genuine Xerox(R) Toner;SNXXXXX00843070000
 
   $string = preg_replace('/\s{2,}/', ' ', $string); // multiple spaces to single space
   $string = preg_replace('/([a-z])([A-Z]{2,})/', '$1 $2', $string); // turn "fixedAC" into "fixed AC"
 
   // Entity specific rewrites (additionally to common)
-  switch ($entity_type)
-  {
+  switch ($entity_type) {
     case 'port':
       return rewrite_ifname($string, $escape);
       break;
 
     case 'processor':
-      $string = str_replace("Routing Processor",   "RP", $string);
-      $string = str_replace("Route Processor",     "RP", $string);
-      $string = str_replace("Switching Processor", "SP", $string);
+      $string = str_replace([ "Routing Processor", "Route Processor", "Switching Processor" ], [ "RP", "RP", "SP" ], $string);
       break;
 
     case 'storage':
@@ -1379,8 +1368,7 @@ function rewrite_entity_name($string, $entity_type = NULL, $escape = TRUE)
       break;
   }
 
-  if ($escape)
-  {
+  if ($escape) {
     $string = escape_html($string);
   }
 
@@ -1604,28 +1592,29 @@ function array_preg_replace($array, $string)
  * Replace tag(s) inside string with appropriate key from array: %tag% -> $array['tag']
  * Note, not exist tags in array will cleaned from string!
  *
- * @param array  $array     Array with keys appropriate for tags, wich used for replace
- * @param string $string    String with tag(s) for replace (between percent sign, ie: %key%)
- * @param string $tag_scope Scope string for detect tag(s), default: %
- * @return string           Result string with replaced tags
+ * @param array        $array     Array with keys appropriate for tags, wich used for replace
+ * @param string|array $string    String with tag(s) for replace (between percent sign, ie: %key%)
+ * @param string       $tag_scope Scope string for detect tag(s), default: %
+ * @return string|array           Result string with replaced tags
  */
-function array_tag_replace($array, $string, $tag_scope = '%')
-{
+function array_tag_replace($array, $string, $tag_scope = '%') {
   // If passed array, do tag replace recursive (for values only)
-  if (is_array($string))
-  {
-    foreach ($string as $key => $value)
-    {
+  if (is_array($string)) {
+    foreach ($string as $key => $value) {
       $string[$key] = array_tag_replace($array, $value, $tag_scope);
     }
     return $string;
   }
 
-  $new_array = array();
+  // Keep non string values as is
+  if (!is_string($string)) {
+    return $string;
+  }
+
+  $new_array = [];
 
   // Generate new array of tags including delimiter
-  foreach($array as $key => $value)
-  {
+  foreach($array as $key => $value) {
     $new_array[$tag_scope.$key.$tag_scope] = $value;
   }
 
@@ -1634,8 +1623,7 @@ function array_tag_replace($array, $string, $tag_scope = '%')
   //$string = strtr($string, $new_array); // never use this slowest function in the world
 
   // Remove unused tags
-  if ($tag_scope !== '/')
-  {
+  if ($tag_scope !== '/') {
     $pattern_clean = '/'.$tag_scope.'\S+?'.$tag_scope.'/';
   } else {
     $pattern_clean = '%/\S+?/%';

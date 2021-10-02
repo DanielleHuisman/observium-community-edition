@@ -6,35 +6,48 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 if ($vars['view'] === 'graphs' || $vars['view'] === 'minigraphs')
 {
-  if (isset($vars['graph'])) { $graph_type = "port_" . $vars['graph']; } else { $graph_type = "port_bits"; }
+  if (isset($vars['graph']))
+  {
+    $graph_type = "port_" . $vars['graph'];
+  } else {
+    $graph_type = "port_bits";
+  }
 }
 
-if (!$vars['view']) { $vars['view'] = trim($config['ports_page_default'],'/'); }
+if (!$vars['view'])
+{
+  $vars['view'] = trim($config['ports_page_default'], '/');
+}
 
+/* Already set in device page
 $link_array = array('page'    => 'device',
                     'device'  => $device['device_id'],
                     'tab' => 'ports');
 
 $filters_array = (isset($vars['filters'])) ? $vars['filters'] : array('deleted' => TRUE);
 $link_array['filters'] = $filters_array;
+*/
 
 $navbar = array('brand' => "Ports", 'class' => "navbar-narrow");
 
 $navbar['options']['basic']['text']   = 'Basic';
 $navbar['options']['details']['text'] = 'Details';
 
-//if (dbFetchCell("SELECT COUNT(*) FROM `ipv4_addresses` WHERE `device_id` = ?", array($device['device_id'])))
+if (is_array($ports_exist['navbar']))
+{
+  $navbar['options'] = array_merge($navbar['options'], $ports_exist['navbar']);
+}
+/*
 if (dbExist('ipv4_addresses', '`device_id` = ?', array($device['device_id'])))
 {
   $navbar['options']['ipv4']['text'] = 'IPv4 addresses';
 }
-//if (dbFetchCell("SELECT COUNT(*) FROM `ipv6_addresses` WHERE `device_id` = ?", array($device['device_id'])))
 if (dbExist('ipv6_addresses', '`device_id` = ?', array($device['device_id'])))
 {
   $navbar['options']['ipv6']['text'] = 'IPv6 addresses';
@@ -47,38 +60,38 @@ if (dbFetchCell("SELECT COUNT(*) FROM `ip_mac` LEFT JOIN `ports` USING(`port_id`
   $navbar['options']['arp']['text'] = 'ARP/NDP Table';
 }
 
-//if (dbFetchCell("SELECT COUNT(*) FROM `vlans_fdb` WHERE `device_id` = ?", array($device['device_id'])))
 if (dbExist('vlans_fdb', '`device_id` = ?', array($device['device_id'])))
 {
   $navbar['options']['fdb']['text'] = 'FDB Table';
 }
 
-//if (dbFetchCell("SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `measured_class` = ?", array($device['device_id'], 'port')))
-if (dbExist('sensors', '`device_id` = ? AND `measured_class` = ?', array($device['device_id'], 'port')))
+if (dbExist('sensors', '`device_id` = ? AND `measured_class` = ? AND `sensor_deleted` = ?', [ $device['device_id'], 'port', 0 ]))
 {
   $navbar['options']['sensors']['text'] = 'Sensors';
 }
 
-//if (dbFetchCell("SELECT COUNT(*) FROM `neighbours` /*LEFT JOIN `ports` USING(`port_id`, `device_id`) */ WHERE `device_id` = ?;", array($device['device_id'])))
 if (dbExist('neighbours', '`device_id` = ?', array($device['device_id'])))
 {
   $navbar['options']['neighbours']['text'] = 'Neighbours';
   $navbar['options']['map']['text']        = 'Map';
 }
 
-//if (dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `ifType` = 'adsl' AND `device_id` = ?", array($device['device_id'])))
 if (dbExist('ports', '`ifType` = ? AND `device_id` = ?', array('adsl', $device['device_id'])))
 {
   $navbar['options']['adsl']['text'] = 'ADSL';
 }
+*/
 
 $navbar['options']['graphs']     = array('text' => 'Graphs', 'class' => 'pull-right');
 $navbar['options']['minigraphs'] = array('text' => 'Minigraphs', 'class' => 'pull-right');
 
 foreach ($navbar['options'] as $option => $array)
 {
-  if ($vars['view'] == $option) { $navbar['options'][$option]['class'] .= " active"; }
-  $navbar['options'][$option]['url'] = generate_url($link_array,array('view' => $option));
+  if ($vars['view'] == $option)
+  {
+    $navbar['options'][$option]['class'] .= " active";
+  }
+  $navbar['options'][$option]['url'] = generate_url($link_array, array('view' => $option));
 }
 
 //r($config['graph_types']['port']);
@@ -87,8 +100,8 @@ foreach (array('graphs', 'minigraphs') as $type)
 {
   foreach ($config['graph_types']['port'] as $option => $data)
   {
-    // Skip unavialable port graphs
-    //if (!isset($device['graphs']['port_'.$option])) { continue; } // device grapha array is not the place for this
+    // Skip unavailable port graphs
+    //if (!isset($device['graphs']['port_'.$option])) { continue; } // device graphs array is not the place for this
 
     if ($vars['view'] == $type && $vars['graph'] == $option)
     {
@@ -155,37 +168,23 @@ if (isset($vars['view']) && in_array($vars['view'], [ 'basic', 'details', 'graph
 print_navbar($navbar);
 unset($navbar);
 
-if ($vars['view'] === 'minigraphs')
-{
-  $timeperiods = array('-1day','-1week','-1month','-1year');
-  $from = '-1day';
+if ($vars['view'] === 'minigraphs') {
+  $timeperiods = array('-1d','-1w','-1m','-1y');
+  $from = '-1d';
   echo("<div style='display: block; clear: both; margin: auto; min-height: 500px;'>");
   unset ($seperator);
 
   // FIXME - FIX THIS. UGLY.
-  foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? ORDER BY `ifIndex`", array($device['device_id'])) as $port)
-  {
+  foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? ORDER BY `ifIndex`", array($device['device_id'])) as $port) {
     if (is_filtered()) { continue; }
-    echo("<div style='display: block; padding: 3px; margin: 3px; min-width: 183px; max-width:183px; min-height:90px; max-height:90px; text-align: center; float: left; background-color: #e9e9e9;'>
-    <div style='font-weight: bold;'>".escape_html($port['port_label_short'])."</div>
-    <a href=\"" . generate_port_url($port) . "\" onmouseover=\"return overlib('\
-    <div style=\'font-size: 16px; padding:5px; font-weight: bold; color: #e5e5e5;\'>".$device['hostname']." - ".escape_html($port['port_label'])."</div>\
-    ".$port['ifAlias']." \
-    <img src=\'graph.php?type=".$graph_type."&amp;id=".$port['port_id']."&amp;from=".$from."&amp;to=".$config['time']['now']."&amp;width=450&amp;height=150\'>\
-    ', CENTER, LEFT, FGCOLOR, '#e5e5e5', BGCOLOR, '#e5e5e5', WIDTH, 400, HEIGHT, 150);\" onmouseout=\"return nd();\"  >".
-    "<img src='graph.php?type=".$graph_type."&amp;id=".$port['port_id']."&amp;from=".$from."&amp;to=".$config['time']['now']."&amp;width=180&amp;height=45&amp;legend=no'>
-    </a>
-    <div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
-    </div>");
+
+    print_port_minigraph($port, $graph_type);
   }
   echo("</div>");
-}
-elseif (is_alpha($vars['view']) && is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php'))
-{
+} elseif (is_alpha($vars['view']) && is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php')) {
   include($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php');
 } else {
-  if ($vars['view'] === "details")
-  {
+  if ($vars['view'] === "details") {
     $port_details = 1;
   }
 
@@ -214,28 +213,30 @@ elseif (is_alpha($vars['view']) && is_file($config['html_dir'] . '/pages/device/
   // Collect port IDs and ifIndexes who has adsl/cbqos/pagp/ip and other.
   $cache['ports_option'] = array();
   $ext_tables = array('ports_adsl', 'ports_cbqos', 'mac_accounting', 'neighbours');
-  if ($port_details)
-  {
+  if ($port_details) {
     $ext_tables = array_merge($ext_tables, array('ipv4_addresses', 'ipv6_addresses', 'pseudowires'));
     // Here stored ifIndex!
     //$cache['ports_option']['ports_pagp']       = dbFetchColumn("SELECT `pagpGroupIfIndex` FROM `ports`   WHERE `device_id` = ? GROUP BY `pagpGroupIfIndex`", array($device['device_id'])); // PAGP removed
-    $cache['ports_option']['ports_stack_low']  = dbFetchColumn("SELECT `port_id_low`  FROM `ports_stack` WHERE `device_id` = ? AND `port_id_high` != 0 GROUP BY `port_id_low`",  array($device['device_id']));
-    $cache['ports_option']['ports_stack_high'] = dbFetchColumn("SELECT `port_id_high` FROM `ports_stack` WHERE `device_id` = ? AND `port_id_low`  != 0 GROUP BY `port_id_high`", array($device['device_id']));
+    $cache['ports_option']['ports_stack_low']  = dbFetchColumn("SELECT `port_id_low`  FROM `ports_stack` WHERE `device_id` = ? AND `port_id_high` != ? AND `ifStackStatus` = ? GROUP BY `port_id_low`",  [ $device['device_id'], 0, 'active' ]);
+    $cache['ports_option']['ports_stack_high'] = dbFetchColumn("SELECT `port_id_high` FROM `ports_stack` WHERE `device_id` = ? AND `port_id_low`  != ? AND `ifStackStatus` = ? GROUP BY `port_id_high`", [ $device['device_id'], 0, 'active' ]);
   }
 
   //$where = ' IN ('.implode(',', array_keys($port_cache)).')';
   //$where = generate_query_values(array_keys($port_cache), 'port_id');
-  $where = generate_query_permitted(array('ports', 'devices'));
-  foreach ($ext_tables as $table)
-  {
+  //$where = generate_query_permitted(array('ports', 'devices'));
+  foreach ($ext_tables as $table) {
     // Here stored port_id!
     $sql = "SELECT DISTINCT `port_id` FROM `$table` WHERE 1 ";
-    if ($table === 'neighbours')
-    {
+    if ($table === 'neighbours') {
       // Show only active neighbours
       $sql .= 'AND `active` = 1 ';
+    } elseif ($table === 'ports_adsl') {
+      // FIXME. adsl table still not have device_id
+      $cache['ports_option'][$table] = dbFetchColumn($sql . generate_query_permitted([ 'ports' ]));
+      continue;
     }
-    $cache['ports_option'][$table] = dbFetchColumn($sql . $where);
+
+    $cache['ports_option'][$table] = dbFetchColumn($sql . $cache['where']['ports_permitted']);
 
     //r("SELECT DISTINCT `port_id` FROM `$table` WHERE 1 " . generate_query_permitted(array('ports', 'devices')));
 
