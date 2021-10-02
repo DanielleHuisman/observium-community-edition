@@ -14,10 +14,12 @@ LATEST_GIT_VERSION=$(
 echo "Latest version: $LATEST_OBSERVIUM_VERSION"
 echo "Mirror latest version: $LATEST_GIT_VERSION"
 
+echo "LATEST_OBSERVIUM_VERSION=$LATEST_OBSERVIUM_VERSION" >> $GITHUB_ENV
+
 if [ "$LATEST_OBSERVIUM_VERSION" != "$LATEST_GIT_VERSION" ]; then
     echo "Update required"
-    exit 1
+    echo "UPDATE_REQUIRED=1" >> $GITHUB_ENV
 else
     echo "No update required"
-    exit 0
+    echo "UPDATE_REQUIRED=0" >> $GITHUB_ENV
 fi
