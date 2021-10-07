@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 LATEST_OBSERVIUM_VERSION=$(
     wget https://www.observium.org/observium-community-latest.tar.gz -O - -q \

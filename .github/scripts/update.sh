@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 . ./.github/scripts/check_update.sh
 
