@@ -15,7 +15,7 @@ include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $openvpn_rrd = get_rrd_path($device, "app-openvpn-" . $app['app_instance'] . ".rrd");
 
-if (is_file($openvpn_rrd))
+if (rrd_is_file($openvpn_rrd))
 {
   $rrd_filename = $openvpn_rrd;
 }

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2015 Adam Armstrong
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -26,7 +25,7 @@ $sentry4_OutletEntry = snmpwalk_cache_threepart_oid($device, 'st4OutletConfigEnt
 $sentry4_OutletMonitorEntry = snmpwalk_cache_threepart_oid($device, 'st4OutletMonitorEntry', array(), 'Sentry4-MIB');
 $sentry4_OutletEventEntry = snmpwalk_cache_threepart_oid($device, 'st4OutletEventConfigEntry', array(), 'Sentry4-MIB');
 
-if (OBS_DEBUG > 1 && count($sentry4_LineMonitorEntry)) { var_dump($sentry4_LineMonitorEntry); }
+print_debug_vars($sentry4_LineMonitorEntry);
 
 foreach ($sentry4_LineConfigEntry as $tower => $cords)
 {
@@ -105,7 +104,7 @@ $sentry4_TempSensorEventEntry = snmpwalk_cache_oid($device, 'st4TempSensorEventC
 
 $temp_scale = snmp_get($device, '.1.3.6.1.4.1.1718.4.1.9.1.10.0', "-Ovq");
 
-if (OBS_DEBUG > 1 && count($sentry4_TempSensorEntry)) { var_dump($sentry4_TempSensorEntry); }
+print_debug_vars($sentry4_TempSensorEntry);
 
 foreach ($sentry4_TempSensorEntry as $index => $entry)
 {
@@ -115,10 +114,9 @@ foreach ($sentry4_TempSensorEntry as $index => $entry)
   $oid        = '.1.3.6.1.4.1.1718.4.1.9.3.1.1.'.$index;
   $entry_monitor = $sentry4_TempSensorMonitorEntry[$index];
   $entry_config = $sentry4_TempSensorEventEntry[$index];
-  if (OBS_DEBUG > 1) {
-    var_dump($entry_monitor);
-    var_dump($entry_config);
-  }
+
+    print_debug_vars($entry_monitor);
+    print_debug_vars($entry_config);
 
   if (isset($entry_monitor['st4TempSensorValue']) && $entry_monitor['st4TempSensorValue'] >= 0)
   {
@@ -131,10 +129,8 @@ foreach ($sentry4_TempSensorEntry as $index => $entry)
       $limits['sensor_unit'] = 'F';
     }
 
-    if (OBS_DEBUG > 1) {
-        var_dump($value);
-        var_dump($limits);
-    }
+      print_debug_vars($value);
+      print_debug_vars($limits);
 
     discover_sensor('temperature', $device, $oid, "st4TempSensorValue.$index", 'sentry4', $descr, $scale_temp, $value, $limits);
   }
@@ -145,7 +141,7 @@ $sentry4_HumidSensorEntry = snmpwalk_cache_oid($device, 'st4HumidSensorConfigEnt
 $sentry4_HumidSensorMonitorEntry = snmpwalk_cache_oid($device, 'st4HumidSensorMonitorEntry', array(), 'Sentry4-MIB');
 $sentry4_HumidSensorEventEntry = snmpwalk_cache_oid($device, 'st4HumidSensorEventConfigEntry', array(), 'Sentry4-MIB');
 
-if (OBS_DEBUG > 1 && count($sentry4_HumidSensorEntry)) { var_dump($sentry4_HumidSensorEntry); }
+print_debug_vars($sentry4_HumidSensorEntry);
 
 foreach ($sentry4_HumidSensorEntry as $index => $entry)
 {
@@ -154,20 +150,18 @@ foreach ($sentry4_HumidSensorEntry as $index => $entry)
   $oid        = '.1.3.6.1.4.1.1718.4.1.10.3.1.1.'.$index;
   $entry_monitor = $sentry4_HumidSensorMonitorEntry[$index];
   $entry_config = $sentry4_HumidSensorEventEntry[$index];
-  if (OBS_DEBUG > 1) {
-    var_dump($entry_monitor);
-    var_dump($entry_config);
-  }
+
+    print_debug_vars($entry_monitor);
+    print_debug_vars($entry_config);
 
   if (isset($entry_monitor['st4HumidSensorValue']) && $entry_monitor['st4HumidSensorValue'] >= 0)
   {
     $limits     = array('limit_high' => $entry_config['st4HumidSensorHighAlarm'],
                         'limit_low'  => $entry_config['st4HumidSensorLowAlarm']);
     $value      = $entry_monitor['st4HumidSensorValue'];
-    if (OBS_DEBUG > 1) {
-      var_dump($value);
-      var_dump($limits);
-    }
+
+      print_debug_vars($value);
+      print_debug_vars($limits);
 
     discover_sensor('humidity', $device, $oid, "st4HumidSensorValue.$index", 'sentry4', $descr, 1, $value, $limits);
   }

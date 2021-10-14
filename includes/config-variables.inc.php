@@ -31,6 +31,13 @@ $config_variable[$setting]['name']       = 'Require valid hostname';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'If TRUE, devices must have a valid resolvable hostname (in DNS or /etc/hosts). Default is FALSE, allowing addition of devices by IP address.';
 
+$setting = 'use_ip';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Use resolved IP';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'If TRUE, snmp and other services request device by resolved ip instead hostname. This reduce queries to DNS cache.';
+
 $setting = 'timestamp_format';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Datetime';

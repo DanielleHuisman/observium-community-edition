@@ -15,7 +15,7 @@ include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $mysql_rrd = get_rrd_path($device, "app-mysql-".$app['app_id'].".rrd");
 
-if (is_file($mysql_rrd))
+if (rrd_is_file($mysql_rrd))
 {
   $rrd_filename = $mysql_rrd;
 }

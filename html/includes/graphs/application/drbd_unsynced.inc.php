@@ -17,7 +17,7 @@ include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $drbd_rrd = get_rrd_path($device, "app-drbd-".$app['app_instance'].".rrd");
 
-if (is_file($drbd_rrd))
+if (rrd_is_file($drbd_rrd))
 {
   $rrd_filename = $drbd_rrd;
 }

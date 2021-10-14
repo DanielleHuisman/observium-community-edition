@@ -22,7 +22,7 @@ $rrd_filename = get_rrd_path($device, "app-nsd-queries.rrd");
 $i            = 0;
 $array        = array();
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $rrd_list[$i]['filename'] = $rrd_filename;
   $rrd_list[$i]['descr'] = 'Requests for AXFR';

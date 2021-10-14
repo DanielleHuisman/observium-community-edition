@@ -165,15 +165,17 @@ $config['snmp']['errors']         = TRUE;    // Collect and (auto)disable snmp q
 //$config['rrd']['debug']         = TRUE;    // If TRUE store RRD errors in logs/rrd.log
 //$config['debug_port'][0]        = TRUE;    // List of port IDs for debug (each port ID as key), written to /tmp/port_debug_ID.txt
 $config['debug_port']['spikes']   = FALSE;   // Additional only spikes debug, written to /tmp/port_debug_spikes.txt
+$config['unix-agent']['debug']    = TRUE;    // Store raw unix-agent output. See it on device showtech page
 $config['check_process']['alerter'] = TRUE;  // Ability for skip process checking. USE AT OWN RISK.
 $config['web_debug_unprivileged'] = FALSE;   // Allow show debug information for Unprivileged (userlevel < 7) users in Web UI
 $config['php_debug']              = FALSE;   // Store all php errors in logs/php-error.log
 
 $config['require_hostname']       = FALSE;   // If TRUE, devices must have valid resolvable hostname (in DNS or /etc/hosts)
+$config['use_ip']                 = FALSE;   // If TRUE, snmp and other services request device by resolved ip instead hostname
 
 // Web Interface Settings
 
-#$config['base_url']        = "http://localhost/";    // Not recomend change this, only if autodetect wrong. Used in WUI
+#$config['base_url']        = "http://localhost/";    // Not recommend change this, only if autodetect wrong. Used in WUI
 #$config['web_url']         = "http://localhost:80/"; // This same as base_url but used only in cli for example in alerts
 
 $config['mono_font']         = "DroidSansMono,DejaVuSansMono";

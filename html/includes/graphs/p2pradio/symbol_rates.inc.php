@@ -21,7 +21,7 @@ $array = array(
         'sym_rate_tx'          => array('descr' => 'Tx Symbol Rate'),
 );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

@@ -114,6 +114,7 @@ if (!$auth)
       /// This is terrible. --mike
       /// The future solution is to keep a 'registry' of which graphtypes apply to which entities and devices.
       /// I'm not quite sure if this is going to be too slow. --adama 2013-11-11
+      $types = [];
       if ($handle = opendir($config['html_dir'] . "/includes/graphs/".$type."/"))
       {
         while (false !== ($file = readdir($handle)))

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -42,7 +42,7 @@ if (count($entity_array))
   }
 
   // Merge with ENTITY-MIB
-  if (count($entity_mib))
+  if (safe_count($entity_mib))
   {
     // Power & Fan
     foreach ($entity_array as $index => $entry)

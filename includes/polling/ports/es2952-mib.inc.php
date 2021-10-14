@@ -6,12 +6,11 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
- *
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-if (!$has_ifEntry) { return; }
+if (!$has_ifEntry) { return FALSE; }
 
 // Ports Duplex, Secure
 echo("portOperDuplex ");
@@ -45,8 +44,6 @@ if (!$ports_modules[$port_module])
   return;
 }
 
-$start = microtime(TRUE); // Module timing start
-
 /*
 Es2952-MIB::portPvid.12 = INTEGER: 1
 Es2952-MIB::portPvid.13 = INTEGER: 500
@@ -73,8 +70,6 @@ foreach ($entries as $ifIndex => $vlan)
   $port_stats[$ifIndex]['ifTrunk'] = $trunk;
 
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

@@ -187,21 +187,18 @@ function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $r
     return FALSE;
   }
 
-  if ($ip_version == 6)
-  {
-    $flags = $flags ^ OBS_DNS_A; // Exclude IPv4
+  if ($ip_version == 6) {
+    $flags ^= OBS_DNS_A; // Exclude IPv4
   }
 
   print_debug("Host $hostname ($ip) founded inside configured nets, trying to add:");
 
   // By first check if pingable
-  if (isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip'])
-  {
-    $flags = $flags | OBS_PING_SKIP; // Add skip pings flag
+  if (isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip']) {
+    $flags |= OBS_PING_SKIP; // Add skip pings flag
   }
-  $pingable = isPingable($ip, $flags);
-  if (!$pingable)
-  {
+  $pingable = is_pingable($ip, $flags);
+  if (!$pingable) {
     print_debug("Host $hostname not pingable. You can try set in config: \$config['autodiscovery']['ping_skip'] = TRUE;");
     $insert = [
       //'poller_id'        => $config['poller_id'],
@@ -743,42 +740,45 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
     return $cache['autodiscovery_remote_device_id'][$hostname][$ip_key];
   }
 
+  // Always check by mac for private IPs
+  $check_mac = $ip_type === 'private' && !safe_empty($mac);
+
   // Check previous autodiscovery rounds as mostly correct!
-  //$sql = 'SELECT `remote_device_id` FROM `autodiscovery` WHERE `remote_hostname` = ? AND `remote_ip` = ? AND `last_reason` = ?';
-  //$remote_device_id = dbFetchCell($sql, [ $hostname, $ip, 'ok' ]);
-  $autodiscovery_entry = get_autodiscovery_entry($hostname, $ip, $device['device_id']);
-  if (isset($autodiscovery_entry['last_reason']) && $autodiscovery_entry['last_reason'] === 'ok')
-  {
-    $remote_device_id = $autodiscovery_entry['remote_device_id'];
+  if (!$check_mac) {
+    print_debug("Autodiscovery skipped for Private IPs [$ip] and checks by MAC address [$mac].");
+    //$sql = 'SELECT `remote_device_id` FROM `autodiscovery` WHERE `remote_hostname` = ? AND `remote_ip` = ? AND `last_reason` = ?';
+    //$remote_device_id = dbFetchCell($sql, [ $hostname, $ip, 'ok' ]);
+    $autodiscovery_entry = get_autodiscovery_entry($hostname, $ip, $device['device_id']);
+    if (isset($autodiscovery_entry['last_reason']) && $autodiscovery_entry['last_reason'] === 'ok') {
+      $remote_device_id = $autodiscovery_entry['remote_device_id'];
+    }
   }
 
   // Try to find remote host by remote chassis mac address from DB
-  if (!$remote_device_id)
-  {
+  if (!$remote_device_id) {
     $remote_device_id = get_device_id_by_mac($mac, $device['device_id']);
   }
 
   // We can also use IP address to find remote device.
-  if (!$remote_device_id && $ip_type && !in_array($ip_type, [ 'unspecified', 'loopback' ])) // 'link-local' ?
-  {
+  if (!$remote_device_id && $ip_type && !in_array($ip_type, [ 'unspecified', 'loopback' ])) { // 'link-local' ?
+
     //$remote_device_id = dbFetchCell("SELECT `device_id` FROM `ports` LEFT JOIN `ipv4_addresses` on `ports`.`port_id`=`ipv4_addresses`.`port_id` WHERE `deleted` = '0' AND `ipv4_address` = ? LIMIT 1;", array($entry['mtxrNeighborIpAddress']));
     $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
     // Fetch all devices with peer IP and filter by UP
-    if ($ids = get_entity_ids_ip_by_network('device', $ip, $peer_where))
-    {
+    if ($ids = get_entity_ids_ip_by_network('device', $ip, $peer_where)) {
       $remote_device_id = $ids[0];
-      if (count($ids) > 1)
-      {
+      if (count($ids) > 1) {
         // If multiple same IPs found, get first NOT disabled or down
-        foreach ($ids as $id)
-        {
+        foreach ($ids as $id) {
           $tmp_device = device_by_id_cache($id);
-          if (!$tmp_device['disabled'] && $tmp_device['status'])
-          {
+          if (!$tmp_device['disabled'] && $tmp_device['status']) {
             $remote_device_id = $id;
             break;
           }
         }
+      } elseif ($check_mac) {
+        // Do not set remote device by private ip when really should be found by MAC address
+        $remote_device_id = NULL;
       }
     }
   }
@@ -809,8 +809,7 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
   // This is dumb, but I not remember if all functions return null :/
   if ($remote_device_id === FALSE) { $remote_device_id = NULL; }
 
-  if ($remote_device_id)
-  {
+  if ($remote_device_id) {
     // Founded remote device in local DB
     $insert = [
       //'poller_id'        => $config['poller_id'],

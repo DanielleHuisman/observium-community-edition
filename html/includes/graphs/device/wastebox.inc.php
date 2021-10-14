@@ -17,7 +17,7 @@ $rrd_options .= " -l 0 -E ";
 
 $waste_rrd = get_rrd_path($device, "wastebox.rrd");
 
-if (is_file($waste_rrd))
+if (rrd_is_file($waste_rrd))
 {
   $rrd_options .= " COMMENT:'                           Cur   Min  Max\\n'";
 

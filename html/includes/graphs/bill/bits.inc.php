@@ -20,7 +20,7 @@ foreach ($ports as $port)
   // $device and $port are retrieved from the same query
   $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
 
-  if (is_file($rrdfile))
+  if (rrd_is_file($rrdfile))
   {
     $rrd_list[$i]['filename'] = $rrdfile;
     $rrd_list[$i]['descr'] = $port['hostname'];

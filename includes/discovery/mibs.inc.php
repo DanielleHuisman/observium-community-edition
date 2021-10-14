@@ -158,11 +158,13 @@ if (safe_count($GLOBALS['table_rows'])) {
 unset($GLOBALS['table_rows']);
 
 /* Detect correct (new) version of FASTPATH mibs */
-$old_fastpath_mibs = array('BROADCOM-POWER-ETHERNET-MIB',
-                           'FASTPATH-BOXSERVICES-PRIVATE-MIB',
-                           'FASTPATH-SWITCHING-MIB',
-                           'FASTPATH-ISDP-MIB');
-if (count($mibs_found) && !empty(array_intersect(array_keys($mibs_found), $old_fastpath_mibs))) {
+$old_fastpath_mibs = [
+  'BROADCOM-POWER-ETHERNET-MIB',
+  'FASTPATH-BOXSERVICES-PRIVATE-MIB',
+  'FASTPATH-SWITCHING-MIB',
+  'FASTPATH-ISDP-MIB'
+];
+if (safe_count($mibs_found) && !empty(array_intersect(array_keys($mibs_found), $old_fastpath_mibs))) {
   $use_fastpath_new = FALSE;
 
   // OID tree: .1.3.6.1.4.1.4413.1.1

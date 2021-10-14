@@ -30,7 +30,7 @@ if (is_numeric($vars['id']))
       $device = device_by_id_cache($ma['device_id']);
       $rrd_filename = get_rrd_path($device, "mac_acc-" . $ma['ifIndex'] . "-" . $ma['vlan_id'] ."-" . $ma['mac'] . ".rrd");
 
-      if (is_file($rrd_filename))
+      if (rrd_is_file($rrd_filename))
       {
         $port   = get_port_by_id($ma['port_id']);
         $device = device_by_id_cache($port['device_id']);

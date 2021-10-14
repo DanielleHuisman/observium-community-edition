@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,13 +6,12 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-if (count($valid['sensor']['temperature']['DNOS-BOXSERVICES-PRIVATE-MIB']) ||
-    count($valid['sensor']['power']['DNOS-BOXSERVICES-PRIVATE-MIB']))
-{
+if (safe_count($valid['sensor']['temperature']['DNOS-BOXSERVICES-PRIVATE-MIB']) ||
+    safe_count($valid['sensor']['power']['DNOS-BOXSERVICES-PRIVATE-MIB'])) {
   // Exit from discovery, since already added valid sensors by DNOS-BOXSERVICES-PRIVATE-MIB
   // Note, DNOS-BOXSERVICES-PRIVATE-MIB and FASTPATH-BOXSERVICES-PRIVATE-MIB are crossed
   return;

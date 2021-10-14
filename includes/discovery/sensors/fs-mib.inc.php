@@ -15,8 +15,7 @@
 // fs-MIB::switchThermalActionFallingThreshold.1.1.1 = INTEGER: 40
 
 $oids = snmpwalk_multipart_oid($device, 'switchThermalTempValue', array(), 'fs-MIB');
-if (!count($oids))
-{
+if (safe_empty($oids)) {
   return;
 }
 $limit_oids = snmpwalk_multipart_oid($device, 'switchThermalActionRisingThreshold', array(), 'fs-MIB');

@@ -141,6 +141,7 @@ $updating = 0;
 $sql_regexp = "/^\d{3,4}\.sql$/";
 $php_regexp = "/^\d{3,4}\.php$/";
 
+$filelist = [];
 if ($handle = opendir($config['install_dir'] . '/update'))
 {
   while (FALSE !== ($file = readdir($handle)))

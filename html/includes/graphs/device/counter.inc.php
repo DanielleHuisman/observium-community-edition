@@ -26,7 +26,7 @@ foreach (dbFetchRows("SELECT * FROM `counters` WHERE $where ORDER BY `counter_in
 {
   $rrd_filename = get_rrd_path($device, get_counter_rrd($device, $counter));
 
-  if (($config['allow_unauth_graphs'] == TRUE || is_entity_permitted($counter['counter_id'], 'counter')) && is_file($rrd_filename))
+  if (($config['allow_unauth_graphs'] == TRUE || is_entity_permitted($counter['counter_id'], 'counter')) && rrd_is_file($rrd_filename))
   {
     $descr = rewrite_entity_name($counter['counter_descr']);
     $rrd_list[$i]['filename'] = $rrd_filename;

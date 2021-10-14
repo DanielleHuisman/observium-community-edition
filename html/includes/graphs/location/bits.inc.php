@@ -41,7 +41,7 @@ foreach ($devices as $device) {
     }
 
     $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
-    if (is_file($rrdfile)) {
+    if (rrd_is_file($rrdfile)) {
       $rrd_filenames[]           = $rrdfile;
       $rrd_list[$i]['filename']  = $rrdfile;
       $rrd_list[$i]['descr']     = $port['port_label_short']; // Options sets for skip htmlentities

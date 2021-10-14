@@ -233,12 +233,13 @@ function print_navbar($navbar) {
 
 // DOCME needs phpdoc block
 function navbar_location_menu($array) {
-  ksort($array['entries']);
+  if ($count = safe_count($array['entries'])) {
+    ksort($array['entries']);
+  }
 
   echo('<ul role="menu" class="dropdown-menu">');
 
-  if (safe_count($array['entries']) > "5")
-  {
+  if ($count > 5) {
     foreach ($array['entries'] as $entry => $entry_data)
     {
       $image = get_icon('location');

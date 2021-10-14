@@ -37,7 +37,7 @@ foreach (array('numAnswerSecure' => 'Secure answers', 'numAnswerBogus' => 'Bogus
   $array[$key] = array('descr' => $descr, 'colour' => $colours[(safe_count($array) % safe_count($colours))]);
 }
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

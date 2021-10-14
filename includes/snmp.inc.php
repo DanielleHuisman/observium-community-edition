@@ -771,27 +771,24 @@ function snmp_command($command, $device, $oids, $options, $mib = NULL, &$mibdir 
 
   // Set correct MIB directories based on passed dirs and OS definition
   // If $mibdir variable is passed, we use it directly
-  if (empty($mibdir))
-  {
+  if (empty($mibdir)) {
     // Change to correct mibdir, required for store in snmp_errors
     $mibdir = snmp_mib2mibdirs($mib);
   }
   $cmd .= " -M $mibdir";
 
   // Add the device URI to the string
-  $cmd .= ' ' . escapeshellarg($device['snmp_transport']).':'.escapeshellarg($device['hostname']).':'.escapeshellarg($device['snmp_port']);
+  $cmd .= ' ' . escapeshellarg($device['snmp_transport']).':'.escapeshellarg(device_host($device)).':'.escapeshellarg($device['snmp_port']);
 
   // Add the OID(s) to the string
   $oids = trim($oids);
-  if ($oids === '')
-  {
+  if ($oids === '') {
     print_error("Empty oids passed to snmp_command(). THIS SHOULD NOT HAPPEN. PLEASE REPORT TO DEVELOPERS.");
     $GLOBALS['snmp_command'] = $cmd;
     return FALSE;
-  } else {
-    $cmd .= ' ' . addslashes($oids); // Quote slashes for string indexes
-    $GLOBALS['snmp_command'] = $cmd;
   }
+  $cmd .= ' ' . addslashes($oids); // Quote slashes for string indexes
+  $GLOBALS['snmp_command'] = $cmd;
 
   // Set global snmpbulk status
   $GLOBALS['snmp_bulk'] = !$nobulk;

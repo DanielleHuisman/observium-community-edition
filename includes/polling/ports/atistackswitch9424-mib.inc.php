@@ -6,17 +6,16 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 // Untagged/primary port vlans
 $port_module = 'vlan';
 
-if (!$ports_modules[$port_module])
-{
+if (!$ports_modules[$port_module]) {
   // Module disabled
-  return;
+  return FALSE; // False for do not collect stats
 }
 
 $start = microtime(TRUE); // Module timing start
@@ -64,8 +63,6 @@ foreach ($ports_vlans as $ifIndex => $vlan)
   $port_stats[$ifIndex]['ifTrunk'] = $trunk;
 
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

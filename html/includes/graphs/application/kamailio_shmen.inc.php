@@ -36,7 +36,7 @@ $colours = 'mixed';
 
 $rrd_options .= " COMMENT:'".str_pad('Size   %used', $descr_len+20, ' ', STR_PAD_LEFT)."\\\l'";
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $colour=$config['graph_colours'][$colours][$iter];
 

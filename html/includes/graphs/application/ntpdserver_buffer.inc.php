@@ -24,7 +24,7 @@ $array        = array(
                       'buffer_free' => array('descr' => 'Free')
                      );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $i = 0;
 

@@ -1054,25 +1054,42 @@ function print_versions()
   }
 }
 
-// DOCME needs phpdoc block
-// Observium's SQL debugging. Chooses nice output depending upon web or cli
-// TESTME needs unit testing
-function print_sql($query)
-{
-  if ($GLOBALS['cli'])
-  {
-    print_vars($query);
-  } else {
-    if (class_exists('SqlFormatter'))
-    {
-      // Hide it under a "database icon" popup.
-      #echo overlib_link('#', '<i class="oicon-databases"> </i>', SqlFormatter::highlight($query));
-      $query = SqlFormatter::compress($query);
-      echo '<p>',SqlFormatter::highlight($query),'</p>';
-    } else {
-      print_vars($query);
-    }
+/**
+ * Observium's SQL debugging. Chooses nice output depending upon web or cli.
+ * Use format param:
+ *  'compress' (default) print compressed and highlight query;
+ *  'full', 'html' print fully formatted query (multiline);
+ *  'log' for return compressed query.
+ *
+ * @param string $query
+ * @param string $format
+ */
+function print_sql($query, $format = 'compress') {
+  switch ($format) {
+    case 'full':
+    case 'format':
+    case 'html':
+      // Fully formatted
+      $output = (new Doctrine\SqlFormatter\SqlFormatter())->format($query);
+      break;
+
+    case 'log':
+      // Only compress and return for log
+      return (new Doctrine\SqlFormatter\SqlFormatter())->compress($query);
+
+    default:
+      // Only compress and highlight in single line (default)
+      $compressed = (new Doctrine\SqlFormatter\SqlFormatter())->compress($query);
+      $output = (new Doctrine\SqlFormatter\SqlFormatter())->highlight($compressed);
   }
+
+  if (!is_cli()) {
+    $output = '<p>' . $output . '</p>';
+  } else {
+    $output = rtrim($output);
+  }
+
+  echo $output;
 }
 
 // DOCME needs phpdoc block
@@ -2285,13 +2302,11 @@ function str_starts($string, $needle, $encoding = FALSE, $case_insensitivity = F
 
   // PHP 8.0 simplify for case sensitive compare
   if (PHP_VERSION_ID >= 80000) {
-    return str_starts_with($string, $needle);
+    return str_starts_with((string)$string, $needle);
   }
 
   // Case-sensitive
-  return $string[0] === $needle[0]
-         ? strncmp($string, $needle, strlen($needle)) === 0
-         : FALSE;
+  return $string[0] === $needle[0] && strncmp($string, $needle, strlen($needle)) === 0;
 }
 
 function str_istarts($string, $needle, $encoding = FALSE) {
@@ -2338,7 +2353,7 @@ function str_ends($string, $needle, $encoding = FALSE, $case_insensitivity = FAL
 
   // PHP 8.0 simplify for case sensitive compare
   if (!$case_insensitivity && PHP_VERSION_ID >= 80000) {
-    return str_ends_with($string, $needle);
+    return str_ends_with((string)$string, $needle);
   }
 
   $nlen = strlen($needle);
@@ -2444,14 +2459,11 @@ function is_cron()
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function print_prompt($text, $default_yes = FALSE)
-{
-  if (is_cli())
-  {
-    if (cli_is_piped())
-    {
+function print_prompt($text, $default_yes = FALSE) {
+  if (is_cli()) {
+    if (cli_is_piped()) {
       // If now not have interactive TTY skip any prompts, return default
-      $return = TRUE && $default_yes;
+      return TRUE && $default_yes;
     }
 
     $question = ($default_yes ? 'Y/n' : 'y/N');
@@ -3541,174 +3553,157 @@ function is_valid_param($string, $type = '') {
   return $valid;
 }
 
-// BOOLEAN safe function to check if hostname resolves as IPv4 or IPv6 address
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function is_domain_resolves($hostname, $flags = OBS_DNS_ALL)
-{
+/**
+ * BOOLEAN safe function to check if hostname resolves as IPv4 or IPv6 address
+ *
+ * @param string $hostname
+ * @param int $flags
+ *
+ * @return bool
+ */
+function is_domain_resolves($hostname, $flags = OBS_DNS_ALL) {
   return (is_valid_hostname($hostname) && gethostbyname6($hostname, $flags));
 }
 
-// get $host record from /etc/hosts
-// FIXME Maybe replace the below thing with exec'ing getent? this makes hosts from LDAP and other NSS sources work as well.
-//
-//   tom@magic:~$ getent ahostsv4 magic.powersource.cx
-//   195.160.166.161 STREAM magic.powersource.cx
-//   tom@magic:~$ getent hosts magic.powersource.cx
-//   2001:67c:5c:100::c3a0:a6a1 magic.powersource.cx
-//
-// Possibly, as above, not ideal for v4/v6 things though... but I'm not sure what the below code does for a v4 or v6 host (or both)
-//
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function ip_from_hosts($host, $flags = OBS_DNS_ALL)
-{
+/**
+ * Get $host record from /etc/hosts
+ *
+ * @param string $host
+ * @param int $flags
+ *
+ * @return false|mixed|string|null
+ */
+function ip_from_hosts($host, $flags = OBS_DNS_ALL) {
   $host = strtolower($host);
-  /* getent also return dns entries, but we need only hosts
-  if (is_executable('/usr/bin/getent'))
-  {
-    $hosts = external_exec('/usr/bin/getent hosts '.escapeshellarg($host));
-    if ($hosts)
-    {
-      $hosts = explode("\n", $hosts); // only first entry
-      list($ip) = explode(' ', $hosts);
 
-      $try_a =is_flag_set(OBS_DNS_A, $flags);
-
-      if (str_contains_array($ip, ':'))
-      {
-        // IPv6 returned
-        if ($try_a)
-        {
-          // if IPv6, try to fetch IPv4
-          // ::1             localhost ip6-localhost ip6-loopback
-          // 127.0.0.1       STREAM localhost
-          $ahosts = external_exec('/usr/bin/getent ahostsv4 ' . escapeshellarg($host));
-          if ($ahosts)
-          {
-            $ahosts = explode("\n", $ahosts); // only first entry
-            list($ip4) = explode(' ', $ahosts);
-
-            if ($ip4)
-            {
-              // By default prefer IPv4
-              return $ip4;
-            }
-          }
-        }
-
-        if (is_flag_set(OBS_DNS_AAAA, $flags))
-        {
-          // IPv6 returned and requested
-          return $ip;
-        }
-      }
-      elseif ($try_a)
-      {
-        // requested only IPv4
-        return $ip;
-      }
-    }
-
-    return FALSE;
-  }
-  */
-
-  // getent not found, try old hosts reading
   try {
-    foreach (new SplFileObject('/etc/hosts') as $line)
-    {
-      $d = preg_split('/\s/', $line, -1, PREG_SPLIT_NO_EMPTY);
-      if (empty($d) || substr(reset($d), 0, 1) == '#') { continue; } // skip empty and comments
-      //print_vars($d);
-      $ip = array_shift($d);
-      $hosts = array_map('strtolower', $d);
-      if (in_array($host, $hosts))
-      {
+    foreach (new SplFileObject('/etc/hosts') as $line) {
+      // skip empty and comments
+      if (str_contains($line, '#')) {
+        // remove inline comments
+        list($line,) = explode('#', $line, 2);
+      }
+      $line = trim($line);
+      if (safe_empty($line)) { continue; }
+
+      $hosts = preg_split('/\s/', strtolower($line), -1, PREG_SPLIT_NO_EMPTY);
+
+      //print_debug_vars($hosts);
+      $ip = array_shift($hosts);
+      //$hosts = array_map('strtolower', $d);
+      if (in_array($host, $hosts, TRUE)) {
         if ((is_flag_set(OBS_DNS_A, $flags) && str_contains($ip, '.')) ||
-            (is_flag_set(OBS_DNS_AAAA, $flags) && str_contains($ip, ':')))
-        {
+            (is_flag_set(OBS_DNS_AAAA, $flags) && str_contains($ip, ':'))) {
           print_debug("Host '$host' found in hosts");
           return $ip;
         }
       }
     }
-  }
-  catch (Exception $e)
-  {
+  } catch (Exception $e) {
     print_warning("Could not open the file /etc/hosts! This file should be world readable, also check that SELinux is not in enforcing mode.");
   }
 
   return FALSE;
 }
 
-// Same as gethostbyname(), but work with both IPv4 and IPv6
-// Get the IPv4 or IPv6 address corresponding to a given Internet hostname
-// By default return IPv4 address (A record) if exist,
-// else IPv6 address (AAAA record) if exist.
-// For get only IPv6 record use gethostbyname6($hostname, OBS_DNS_AAAA)
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function gethostbyname6($host, $flags = OBS_DNS_ALL)
-{
+/**
+ * Same as gethostbyname(), but work with both IPv4 and IPv6.
+ * Get the IPv4 or IPv6 address corresponding to a given Internet hostname.
+ * By default, return IPv4 address (A record) if exist,
+ * else IPv6 address (AAAA record) if exist.
+ * For get only IPv6 record use gethostbyname6($hostname, OBS_DNS_AAAA).
+ *
+ * @param string $host
+ * @param int $flags
+ *
+ * @return false|mixed
+ */
+function gethostbyname6($host, $flags = OBS_DNS_ALL) {
   // get AAAA record for $host
   // if flag OBS_DNS_A is set, if AAAA fails, it tries for A
   // the first match found is returned
   // otherwise returns FALSE
 
+  $flags |= OBS_DNS_FIRST; // Set return only first found dns record (do not request all A/AAAA/hosts records)
   $dns = gethostbynamel6($host, $flags);
-  if ($dns == FALSE)
-  {
-    return FALSE;
-  } else {
-    return $dns[0];
+
+  if (safe_count($dns)) {
+    return array_shift($dns);
   }
+
+  return FALSE;
 }
 
-// Same as gethostbynamel(), but work with both IPv4 and IPv6
-// By default returns both IPv4/6 addresses (A and AAAA records),
-// for get only IPv6 addresses use gethostbynamel6($hostname, OBS_DNS_AAAA)
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function gethostbynamel6($host, $flags = OBS_DNS_ALL)
-{
+/**
+ * Same as gethostbynamel(), but work with both IPv4 and IPv6.
+ * By default, returns both IPv4/6 addresses (A and AAAA records),
+ * for get only IPv6 addresses use gethostbynamel6($hostname, OBS_DNS_AAAA).
+ *
+ * @param string $host
+ * @param int $flags
+ *
+ * @return array|false
+ */
+function gethostbynamel6($host, $flags = OBS_DNS_ALL) {
   // get AAAA records for $host,
   // if $try_a is true, if AAAA fails, it tries for A
   // results are returned in an array of ips found matching type
   // otherwise returns FALSE
 
-  $ip6 = array();
-  $ip4 = array();
+  $ip6 = [];
+  $ip4 = [];
 
-  // First try /etc/hosts
-  //$etc = ip_from_hosts($host);
-  $etc6 = is_flag_set(OBS_DNS_AAAA, $flags) ? ip_from_hosts($host, OBS_DNS_AAAA) : FALSE;
+  $try_a    = is_flag_set(OBS_DNS_A, $flags);
+  $try_aaaa = is_flag_set(OBS_DNS_AAAA, $flags);
+  $first    = is_flag_set(OBS_DNS_FIRST, $flags); // Return first found record, when flag set
 
-  $try_a = is_flag_set(OBS_DNS_A, $flags);
-  if ($try_a === TRUE)
-  {
+  if ($try_a === TRUE) {
+    // First try /etc/hosts (v4)
     $etc4 = ip_from_hosts($host, OBS_DNS_A);
+    if ($etc4) {
+      $ip4[] = $etc4;
 
-    if ($etc4) { $ip4[] = $etc4; }
-    if ($etc6) { $ip6[] = $etc6; }
+      if ($first) { return $ip4; }
+    }
+
+    // Second try /etc/hosts (v6)
+    $etc6 = $try_aaaa ? ip_from_hosts($host, OBS_DNS_AAAA) : FALSE;
+    if ($etc6) {
+      $ip6[] = $etc6;
+
+      if ($first) { return $ip6; }
+    }
 
     // Separate A and AAAA queries, see: https://www.mail-archive.com/observium@observium.org/msg09239.html
     $dns = dns_get_record($host, DNS_A);
-    if (!is_array($dns)) { $dns = array(); }
-    $dns6 = dns_get_record($host, DNS_AAAA);
-    if (is_array($dns6))
-    {
-      $dns = array_merge($dns, $dns6);
+    print_debug_vars($dns);
+    if (!is_array($dns)) { $dns = []; }
+
+    // Request AAAA record (when requested only first record and A record exist, skip)
+    if ($try_aaaa && !($first && count($dns))) {
+      $dns6 = dns_get_record($host, DNS_AAAA);
+      print_debug_vars($dns6);
+      if (is_array($dns6)) {
+        $dns = array_merge($dns, $dns6);
+      }
     }
-  } else {
-    if ($etc6) { $ip6[] = $etc6; }
+  } elseif ($try_aaaa) {
+    // First try /etc/hosts (v6)
+    $etc6 = ip_from_hosts($host, OBS_DNS_AAAA);
+    if ($etc6) {
+      $ip6[] = $etc6;
+
+      if ($first) { return $ip6; }
+    }
     $dns = dns_get_record($host, DNS_AAAA);
+    print_debug_vars($dns);
+  } else {
+    // Not A or AAAA record requested
+    return FALSE;
   }
 
-  foreach ($dns as $record)
-  {
-    switch ($record['type'])
-    {
+  foreach ($dns as $record) {
+    switch ($record['type']) {
       case 'A':
         $ip4[] = $record['ip'];
         break;
@@ -3718,34 +3713,33 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
     }
   }
 
-  if ($try_a && count($ip4))
-  {
+  if ($try_a && count($ip4)) {
     // Merge ipv4 & ipv6
     $ip6 = array_merge($ip4, $ip6);
   }
 
-  if (count($ip6))
-  {
+  if (count($ip6)) {
     return $ip6;
   }
 
   return FALSE;
 }
 
-// Get hostname by IP (both IPv4/IPv6)
-// Return PTR or FALSE
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function gethostbyaddr6($ip)
-{
+/**
+ * Get hostname by IP (both IPv4/IPv6)
+ * Return PTR or FALSE.
+ *
+ * @param string $ip
+ *
+ * @return string|false
+ */
+function gethostbyaddr6($ip) {
 
   $ptr = FALSE;
   $resolver = new Net_DNS2_Resolver();
-  try
-  {
+  try {
     $response = $resolver->query($ip, 'PTR');
-    if ($response)
-    {
+    if ($response) {
       $ptr = $response->answer[0]->ptrdname;
     }
   } catch (Net_DNS2_Exception $e) {}
@@ -4368,8 +4362,7 @@ function generate_http_url($def, $tags = array(), $params = array())
  *
  * @return int
  */
-function get_time($str = 'now', $future = FALSE)
-{
+function get_time($str = 'now', $future = FALSE) {
   global $config;
 
   // Set some times needed by loads of scripts (it's dynamic, so we do it here!)
@@ -4394,8 +4387,7 @@ function get_time($str = 'now', $future = FALSE)
 
   $str = strtolower(trim($str));
 
-  if ($str == 'now' || empty($str))
-  {
+  if ($str === 'now' || empty($str)) {
     return $config['time']['now'];
   }
   $time = $config['time']['now'];
@@ -4416,21 +4408,19 @@ function get_time($str = 'now', $future = FALSE)
   ];
   $time_pattern = '/^(?<multiplier>' . implode('|', array_keys($multipliers)) . ')?(?<time>'  . implode('|', array_keys($times)) . ')$/';
   //$time_pattern = '/^(?<multiplier>two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)?(?<time>year|month|week|day|hour|minute)$/';
-  if (preg_match($time_pattern, $str, $matches))
-  {
+  if (preg_match($time_pattern, $str, $matches)) {
     $multiplier = isset($multipliers[$matches['multiplier']]) ? $multipliers[$matches['multiplier']] : 1;
 
     $diff = $multiplier * $times[$matches['time']];
 
-    if ($future)
-    {
+    if ($future) {
       $time += $diff;
     } else {
       $time -= $diff;
     }
   }
 
-  return intval($time);
+  return (int)$time;
 }
 
 /**
@@ -4449,17 +4439,13 @@ function get_time($str = 'now', $future = FALSE)
  * @return string
  */
 // TESTME needs unit testing
-function format_timestamp($str)
-{
+function format_timestamp($str) {
   global $config;
 
-  if ($str == 'now')
-  {
+  if ($str === 'now') {
     // Use for get formatted current time
     $timestamp = get_time($str);
-  }
-  elseif (($timestamp = strtotime($str)) === FALSE)
-  {
+  } elseif (($timestamp = strtotime($str)) === FALSE) {
     return $str;
   }
 
@@ -4506,10 +4492,9 @@ function format_unixtime($time, $format = NULL) {
 
   if (strlen($format)) {
     return date_format($date, $format);
-  } else {
-    //return date_format($date, $config['timestamp_format'] . ' T');
-    return date_format($date, $GLOBALS['config']['timestamp_format']);
   }
+  //return date_format($date, $config['timestamp_format'] . ' T');
+  return date_format($date, $GLOBALS['config']['timestamp_format']);
 }
 
 /**
@@ -4525,18 +4510,14 @@ function format_unixtime($time, $format = NULL) {
  * @param string $date Erroneous date format
  * @return string $date
  */
-function reformat_us_date($date)
-{
+function reformat_us_date($date) {
   global $config;
 
   $date = trim($date);
-  if (preg_match('!^\d{1,2}/\d{1,2}/(\d{2}|\d{4})$!', $date))
-  {
+  if (preg_match('!^\d{1,2}/\d{1,2}/(\d{2}|\d{4})$!', $date)) {
     // Only date
     $format = $config['date_format'];
-  }
-  elseif (preg_match('!^\d{1,2}/\d{1,2}/(\d{2}|\d{4})\s+\d{1,2}:\d{1,2}(:\d{1,2})?$!', $date))
-  {
+  } elseif (preg_match('!^\d{1,2}/\d{1,2}/(\d{2}|\d{4})\s+\d{1,2}:\d{1,2}(:\d{1,2})?$!', $date)) {
     // Date + time
     $format = $config['timestamp_format'];
   } else {

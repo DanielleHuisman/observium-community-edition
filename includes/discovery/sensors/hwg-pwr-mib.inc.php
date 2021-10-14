@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -17,11 +16,8 @@ echo("HWG-PWR-MIB ");
 
 $meters = snmpwalk_cache_oid($device,         'mtEntry',    array(), 'HWG-PWR-MIB');
 $oids   = snmpwalk_cache_twopart_oid($device, 'mtvalEntry', array(), 'HWG-PWR-MIB');
-if (OBS_DEBUG > 1 && count($oids))
-{
-  print_vars($meters);
-  print_vars($oids);
-}
+print_debug_vars($meters);
+print_debug_vars($oids);
 
 foreach ($oids as $meter => $entry1)
 {

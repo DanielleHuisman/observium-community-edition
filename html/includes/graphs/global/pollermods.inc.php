@@ -42,7 +42,7 @@ foreach($mods as $mod => $mod_data)
 
     $rrd_filename = get_rrd_path($device, 'perf-pollermodule-'.$mod.'.rrd');
 
-    if (is_file($rrd_filename))
+    if (rrd_is_file($rrd_filename))
     {
       $groups[$mod]['list'][] = array ('filename' => $rrd_filename,
                                        'descr'    => str_pad($device['hostname'],25) ." (".$device['os'].")",

@@ -1,28 +1,25 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 echo generate_box_open();
 
-if(isset($attribs['juniper-firewall-mib']))
-{
+if (isset($attribs['juniper-firewall-mib'])) {
 
   echo '<table class="table table-striped-two table-condensed">';
 
-  $filters = json_decode($attribs['juniper-firewall-mib'], TRUE);
-
-  ksort($filters);
-  foreach ($filters as $filter => $counters)
-  {
+  if ($filters = safe_json_decode($attribs['juniper-firewall-mib'])) {
+    ksort($filters);
+  }
+  foreach ($filters as $filter => $counters) {
 
     ksort($counters);
 

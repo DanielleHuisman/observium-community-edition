@@ -166,7 +166,10 @@ $pagp_oids = array(); // PAgP disabled since r7987, while not moved to new polli
 
 print_cli_data_field("Caching Oids");
 $port_stats = array();
+$include_stats = [];
 if (is_device_mib($device, "IF-MIB")) {
+  $inc_start = microtime(TRUE); // MIB timing start
+
   if (!$ports_modules['separate_walk']) {
     print_debug("Used full table ifEntry/ifXEntry snmpwalk.");
     $ifmib_oids = ['ifEntry', 'ifXEntry'];
@@ -231,15 +234,23 @@ if (is_device_mib($device, "IF-MIB")) {
       }
     }
   }
-} else { // End IF-MIB permitted
-  // This part for devices who not have IF-MIB stats, but have own vendor tree with ports
+  // MIB timing
+  $include_stats['IF-MIB'] = microtime(TRUE) - $inc_start;
+  // End IF-MIB permitted
 }
+//else {
+  // This part for devices who not have IF-MIB stats, but have own vendor tree with ports
+//}
 echo PHP_EOL; // End IF-MIB section
 
 //////////
+$private_stats = [];
 foreach (get_device_mibs_permitted($device) as $mib) {
-  merge_private_mib($device, 'ports', $mib, $port_stats, NULL);
+  $private_stats[] = merge_private_mib($device, 'ports', $mib, $port_stats, NULL);
 }
+$include_stats = array_merge($include_stats, ...$private_stats);
+unset($private_stats);
+print_debug_vars($include_stats);
 ////////
 
 // Prevent mark ports as DELETED when ifEntry snmpwalk return not complete data!
@@ -273,6 +284,13 @@ $port_stats_count = safe_count($port_stats);
 $include_lib = TRUE;
 $include_dir = "includes/polling/ports/";
 include("includes/include-dir-mib.inc.php");
+
+if (safe_count($include_stats)) {
+  // Set per mib polling times
+  $device_state['poller_ports_perf'] = $include_stats;
+}
+print_debug_vars($include_stats);
+unset($include_stats);
 
 if (safe_count($port_stats)) {
   // FIXME This probably needs re-enabled. We need to clear these things when they get unset, too.

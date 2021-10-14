@@ -252,7 +252,7 @@ function add_device($hostname, $snmp_version = array(), $snmp_port = 161, $snmp_
         $flags |= OBS_PING_SKIP;
       }
 
-      if (isPingable($hostname, $flags)) {
+      if (is_pingable($hostname, $flags)) {
         // Test directory exists in /rrd/
         if (!$config['rrd_override'] && file_exists($config['rrd_dir'].'/'.$hostname)) {
           print_error("Directory <observium>/rrd/$hostname already exists.");
@@ -335,7 +335,7 @@ function add_device($hostname, $snmp_version = array(), $snmp_port = 161, $snmp_
                   if ($options['ping_skip']) {
                     set_entity_attrib('device', $device_id, 'ping_skip', 1);
                     // Force pingable check
-                    if (isPingable($hostname, $flags ^ OBS_PING_SKIP)) {
+                    if (is_pingable($hostname, $flags ^ OBS_PING_SKIP)) {
                       //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
                       print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
                     }
@@ -390,7 +390,7 @@ function add_device($hostname, $snmp_version = array(), $snmp_port = 161, $snmp_
                   if ($options['ping_skip']) {
                     set_entity_attrib('device', $device_id, 'ping_skip', 1);
                     // Force pingable check
-                    if (isPingable($hostname, $flags ^ OBS_PING_SKIP)) {
+                    if (is_pingable($hostname, $flags ^ OBS_PING_SKIP)) {
                       //print_warning("You passed the option the skip device ICMP echo pingable checks, but device responds to ICMP echo. Please check device preferences.");
                       print_message("You have checked the option to skip ICMP ping, but the device responds to an ICMP ping. Perhaps you need to check the device settings.");
                     }
@@ -851,7 +851,7 @@ function device_status_array(&$device) {
     $flags |= OBS_PING_SKIP; // Add skip ping flag
   }
 
-  $device['pingable'] = isPingable($device['hostname'], $flags);
+  $device['pingable'] = is_pingable($device['hostname'], $flags);
   if ($device['pingable']) {
     $device['snmpable'] = isSNMPable($device);
     if ($device['snmpable']) {
@@ -880,6 +880,11 @@ function device_status_array(&$device) {
   }
 
   return [ 'status' => $status, 'status_type' => $status_type, 'message' => $status_message ];
+}
+
+function device_host($device) {
+  // Return cached IP (only for poller, other processes not resolve IPs)
+  return (OBS_PROCESS_NAME === 'poller' && $GLOBALS['config']['use_ip'] && !safe_empty($device['ip'])) ? $device['ip'] : $device['hostname'];
 }
 
 /**
@@ -1093,8 +1098,8 @@ function generate_device_hostnames($device, $suffix = '', $dprint = FALSE) {
     $device = device_by_name($device);
 
     // Device by IP
-    if (!$device && get_ip_version($hostname)) {
-      $ids = get_entity_ids_ip_by_network('device', $hostname);
+    if (!$device && get_ip_version($hostname) &&
+        $ids = get_entity_ids_ip_by_network('device', $hostname)) {
       $device = device_by_id_cache($ids[0]);
       if ($dprint) { echo "Device: get by device IP.<br />"; }
     } elseif ($dprint) { echo "Device: get by hostname.<br />"; }

@@ -47,7 +47,7 @@ foreach ($rownames as $mc => $data)
 
         $rrd_filename = get_rrd_path($device, "edac-errors-$mc-$row_id-$channel-$errortype.rrd");
 
-        if (is_file($rrd_filename))
+        if (rrd_is_file($rrd_filename))
         {
           $rrd_list[$i]['filename'] = $rrd_filename;
           $rrd_list[$i]['descr'] = strtoupper($errortype) . " $mc $row_id" . ($channel != 'all' ? " $channel" : "");

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -56,10 +55,7 @@ foreach ($oids as $index => $entry)
   discover_sensor('power', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 }
 
-if (OBS_DEBUG > 1 && count($oids))
-{
-  print_vars($oids);
-}
+print_debug_vars($oids);
 
 ////// Per-port Statistics
 
@@ -95,10 +91,7 @@ if (OBS_DEBUG > 1 && count($oids))
 
 $oids = snmpwalk_cache_oid($device, 'hwPoePortEntry', array(), $mib);
 
-if (OBS_DEBUG > 1 && count($oids))
-{
-  print_vars($oids);
-}
+print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
 {

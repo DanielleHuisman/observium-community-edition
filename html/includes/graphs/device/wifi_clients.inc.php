@@ -18,9 +18,9 @@ $rrd_options .= " -l 0 -E ";
 $radio1 = get_rrd_path($device, "wificlients-radio1.rrd");
 $radio2 = get_rrd_path($device, "wificlients-radio2.rrd");
 
-if (is_file($radio1))
+if (rrd_is_file($radio1))
 {
-  $radio2_exists = is_file($radio2);
+  $radio2_exists = rrd_is_file($radio2);
 
   $rrd_options .= " COMMENT:'                           Cur   Min  Max\\n'";
   $rrd_options .= " DEF:wificlients1=".$radio1.":wificlients:AVERAGE ";

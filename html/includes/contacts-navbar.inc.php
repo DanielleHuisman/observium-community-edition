@@ -92,7 +92,9 @@ unset($navbar);
                                       'offset'      => TRUE,
                                       'html'        => '<a id="contact_' . $transport . '_doc" href="' . $docs_link . '" target="_blank">See documentation for this Transport (new page)</a>');
     }
-    asort($form_params['method']);
+    if (is_array($form_params['method'])) {
+      asort($form_params['method']);
+    }
     $form['row'][$row_tmp]['contact_method']['values'] = $form_params['method'];
 
     $form['row'][++$row]['contact_descr'] = array(

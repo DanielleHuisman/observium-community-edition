@@ -26,7 +26,7 @@ foreach($vars['data'] as $entry)
     $device   = device_by_id_cache($port['device_id']);
     $filename = get_port_rrdfilename($port, NULL, TRUE);
 
-    if (is_file($filename))
+    if (rrd_is_file($filename))
     {
       $rrds[] = array('file'       => $filename,
                       'descr'      => $device['hostname'] . " " . $port['port_label_short'],

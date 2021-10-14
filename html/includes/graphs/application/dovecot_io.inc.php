@@ -29,7 +29,7 @@ $array        = array(
 $i            = 0;
 $x            = 0;
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $max_colours = safe_count($config['graph_colours'][$colours]);
   foreach ($array as $ds => $data)

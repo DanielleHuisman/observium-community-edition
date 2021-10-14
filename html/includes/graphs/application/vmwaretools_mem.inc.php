@@ -15,7 +15,7 @@ $rrd_filename = get_rrd_path($device, "app-vmwaretools-".$app['app_id'].".rrd");
 
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $rrd_options .= " '-b 1024'";
 

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -99,7 +98,7 @@ foreach ($oids as $index => $entry)
 //DELL-NETWORKING-CHASSIS-MIB::dellNetSysIfXfpTxPower.2097412 = INTEGER: .00 dB
 
 $oids = snmpwalk_cache_oid($device, "dellNetSysIfXfpRecvTemp",    array(), "DELL-NETWORKING-CHASSIS-MIB");
-if (count($oids))
+if (safe_count($oids))
 {
   $oids = snmpwalk_cache_oid($device, "dellNetSysIfXfpRecvPower", $oids, "DELL-NETWORKING-CHASSIS-MIB");
   $oids = snmpwalk_cache_oid($device, "dellNetSysIfXfpTxPower",   $oids, "DELL-NETWORKING-CHASSIS-MIB");

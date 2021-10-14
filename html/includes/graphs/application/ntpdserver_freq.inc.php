@@ -22,7 +22,7 @@ $graph_max       = 100;
 $unit_text       = "Frequency";
 $ntpdserver_rrd  = get_rrd_path($device, "app-ntpdserver-".$app['app_id'].".rrd");
 
-if (is_file($ntpdserver_rrd))
+if (rrd_is_file($ntpdserver_rrd))
 {
   $rrd_filename = $ntpdserver_rrd;
 }

@@ -15,10 +15,8 @@ $port_module = 'vlan';
 
 if (!$ports_modules[$port_module]) {
   // Module disabled
-  return;
+  return FALSE; // False for do not collect stats
 }
-
-$start = microtime(TRUE); // Module timing start
 
 /*
 TPLINK-DOT1Q-VLAN-MIB::vlanPortPvid.49154 = INTEGER: 999
@@ -120,8 +118,6 @@ if (snmp_status()) {
   }
 
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

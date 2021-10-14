@@ -20,7 +20,7 @@ if ($ports_modules[$port_module] && $port_stats_count &&
                       'adslAturChanEntry', 'adslAtucPerfDataEntry', 'adslAturPerfDataEntry' ];
   $port_stats = snmpwalk_cache_oid($device, 'adslLineEntry', $port_stats, "ADSL-LINE-MIB");
 
-  $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
+  $process_port_functions[$port_module] = snmp_status();
 
   if (snmp_status()) {
     foreach ($adsl_oids as $oid) {
@@ -30,6 +30,8 @@ if ($ports_modules[$port_module] && $port_stats_count &&
   print_debug_vars($port_stats);
 
   // VDSL2-LINE-MIB
+} else {
+  return FALSE; // False for do not collect stats
 }
 
 // EOF

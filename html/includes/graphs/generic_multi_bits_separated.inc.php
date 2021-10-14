@@ -154,16 +154,23 @@ $rrd_options .= " GPRINT:totin:'%6.2lf%s$total_units'";
 $rrd_options .= " 'COMMENT:".str_pad("", $descr_len-8)."<'";
 $rrd_options .= " GPRINT:inbits:LAST:%6.2lf%s$units";
 $rrd_options .= " GPRINT:inbits:AVERAGE:%6.2lf%s$units";
-$rrd_options .= " GPRINT:inbits:MAX:%6.2lf%s$units\\n";
-#  $rrd_options .= " GPRINT:95thin:%6.2lf%s\\n";
+$rrd_options .= " GPRINT:inbits:MAX:%6.2lf%s$units";
+if (!$nototal && $width > "500") {
+  $rrd_options .= " GPRINT:95thin:%6.2lf%s$units";
+}
+$rrd_options .= " COMMENT:\\n";
 
 $rrd_options .= " GPRINT:totout:'%6.2lf%s$total_units'";
 $rrd_options .= " 'COMMENT:".str_pad("", $descr_len-8).">'";
 $rrd_options .= " GPRINT:outbits:LAST:%6.2lf%s$units";
 $rrd_options .= " GPRINT:outbits:AVERAGE:%6.2lf%s$units";
-$rrd_options .= " GPRINT:outbits:MAX:%6.2lf%s$units\\n";
+$rrd_options .= " GPRINT:outbits:MAX:%6.2lf%s$units";
+if (!$nototal && $width > "500") {
+  $rrd_options .= " GPRINT:95thout:%6.2lf%s$units";
+}
+$rrd_options .= " COMMENT:\\n";
 
-#  $rrd_options .= " GPRINT:95thout:%6.2lf%s\\n";
+
 
 if ($custom_graph) { $rrd_options .= $custom_graph; }
 

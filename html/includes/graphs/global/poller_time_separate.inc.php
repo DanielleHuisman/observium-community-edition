@@ -20,7 +20,7 @@ foreach ($devices AS $device)
 {
   $rrd_filename = get_rrd_path($device, "perf-poller.rrd");
 
-  if (device_permitted($device) && is_file($rrd_filename))
+  if (device_permitted($device) && rrd_is_file($rrd_filename))
   {
 
     $rrd_list[$i]['filename'] = $rrd_filename;

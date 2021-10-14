@@ -37,7 +37,7 @@ $array = array('sl1xxreplies'  => array('descr' => '1XX Replies'),
               );
 
 $i = 0;
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

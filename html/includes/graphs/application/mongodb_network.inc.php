@@ -15,7 +15,7 @@ include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $mongo_rrd = get_rrd_path($device, "app-mongodb-".$app['app_id'].".rrd");
 
-if (is_file($mongo_rrd))
+if (rrd_is_file($mongo_rrd))
 {
   $rrd_filename = $mongo_rrd;
 }

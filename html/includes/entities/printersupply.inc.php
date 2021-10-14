@@ -244,14 +244,13 @@ function print_printersupplies_form($vars, $single_device = FALSE)
     'grid'        => 3,
     'value'       => $vars['status_descr']);
 
-  foreach (['supply_colour' => 'Colour', 'supply_type' => 'Type'] as $param => $param_name)
-  {
+  foreach ([ 'supply_colour' => 'Colour', 'supply_type' => 'Type' ] as $param => $param_name) {
     $sql = 'SELECT DISTINCT `'.$param.'` FROM `printersupplies` WHERE 1' . $GLOBALS['cache']['where']['devices_permitted'];
-    $entries = dbFetchColumn($sql);
-    asort($entries);
-    foreach ($entries as $entry)
-    {
-      if ($entry == '') { $entry = OBS_VAR_UNSET; }
+    if ($entries = dbFetchColumn($sql)) {
+      asort($entries);
+    }
+    foreach ($entries as $entry) {
+      if (safe_empty($entry)) { $entry = OBS_VAR_UNSET; }
       $name = nicecase($entry);
       $form_items[$param][$entry] = $name;
     }
@@ -260,7 +259,7 @@ function print_printersupplies_form($vars, $single_device = FALSE)
       'type'        => 'multiselect',
       'name'        => $param_name,
       'width'       => '100%', //'180px',
-      'grid'        => $param == 'supply_colour' ? 1: 2,
+      'grid'        => $param === 'supply_colour' ? 1: 2,
       'value'       => $vars[$param],
       'values'      => $form_items[$param]);
   }

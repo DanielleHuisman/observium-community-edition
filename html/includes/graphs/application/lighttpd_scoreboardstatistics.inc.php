@@ -32,7 +32,7 @@ $array = array('connectionsp' => array('descr' => 'Connect', 'colour' => '750F7D
 );
 
 $i = 0;
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

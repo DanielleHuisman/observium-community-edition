@@ -83,7 +83,9 @@ foreach (array('ifType', 'ifSpeed', 'port_descr_type') as $entry)
   }
 }
 
-asort($form_items['ifType']);
+if (isset($form_items['ifType'])) {
+  asort($form_items['ifType']);
+}
 
 $form_items['devices'] = generate_form_values('device'); // Always all devices
  

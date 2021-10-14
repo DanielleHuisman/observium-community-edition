@@ -102,10 +102,7 @@ print_debug_vars($oids);
 
 $oids = snmpwalk_cache_oid($device, 'snAgentPoePortEntry', array(), $mib);
 
-if (OBS_DEBUG > 1 && count($oids))
-{
-  print_vars($oids);
-}
+print_debug_vars($oids);
 
 foreach ($oids as $index => $entry)
 {

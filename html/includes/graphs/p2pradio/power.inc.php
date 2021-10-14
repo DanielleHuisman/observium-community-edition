@@ -20,7 +20,7 @@ $array = array(
         'tx_power'          => array('descr' => 'Tx Power'),
 );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

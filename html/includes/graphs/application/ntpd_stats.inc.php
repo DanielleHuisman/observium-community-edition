@@ -25,17 +25,17 @@ $array          = array(
                         'stability' => array('descr' => 'Stability')
                        );
 
-if (is_file($ntpdclient_rrd))
+if (rrd_is_file($ntpdclient_rrd))
 {
   $rrd_filename = $ntpdclient_rrd;
 }
 
-if (is_file($ntpdserver_rrd))
+if (rrd_is_file($ntpdserver_rrd))
 {
   $rrd_filename = $ntpdserver_rrd;
 }
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $i = 0;
 

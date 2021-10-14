@@ -281,8 +281,7 @@ if ($_SESSION['authenticated']) {
       }
       ob_start();
       include($panel_file);
-      $panel_html = ob_get_contents();
-      ob_end_clean();
+      $panel_html = ob_get_clean();
 
       register_html_panel($panel_html);
     }

@@ -59,8 +59,8 @@ define('OBS_SNMP_ALL_TIMETICKS',     OBS_SNMP_ALL | OBS_SNMP_TIMETICKS);     // 
 define('OBS_DNS_A',            65536); // Use only IPv4 dns queries
 define('OBS_DNS_AAAA',        131072); // Use only IPv6 dns queries
 define('OBS_DNS_ALL',          OBS_DNS_A | OBS_DNS_AAAA); // Use both IPv4/IPv6 dns queries
-define('OBS_PING_SKIP',       262144); // Skip device isPingable checks
-#define('OBS_',               524288); // Reserved
+define('OBS_DNS_FIRST',       262144); // Flag for use in gethostbyname6()
+define('OBS_PING_SKIP',       524288); // Skip device icmp ping checks
 
 // Permission levels flags
 define('OBS_PERMIT_ACCESS',        1); // Can access (ie: logon)

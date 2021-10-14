@@ -18,7 +18,7 @@ $nototal      = 1;
 $unit_text    = "Count";
 $rrd_filename = get_rrd_path($device, "wmi-app-exchange-is.rrd");
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $rrd_list[0]['filename'] = $rrd_filename;
   $rrd_list[0]['descr']    = "Active Connection Count";

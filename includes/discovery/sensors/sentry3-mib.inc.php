@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -79,7 +78,7 @@ foreach ($sentry3_InfeedEntry as $tower => $feeds)
 
 // temperature/humidity sensor
 $sentry3_TempHumidSensorEntry = snmpwalk_cache_oid($device, 'TempHumidSensorEntry', array(), 'Sentry3-MIB');
-if (OBS_DEBUG > 1 && count($sentry3_TempHumidSensorEntry)) { var_dump($sentry3_TempHumidSensorEntry); }
+print_debug_vars($sentry3_TempHumidSensorEntry);
 
 foreach ($sentry3_TempHumidSensorEntry as $index => $entry)
 {

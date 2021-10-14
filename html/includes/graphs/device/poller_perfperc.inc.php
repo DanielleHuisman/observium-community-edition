@@ -1,18 +1,29 @@
 <?php
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ *
+ */
 
 $scale_min = 0;
 
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-arsort($device['state']['poller_mod_perf']);
+if (is_array($device['state']['poller_mod_perf'])) {
+  arsort($device['state']['poller_mod_perf']);
+}
 //r($device['state']['poller_mod_perf']);
 
 $total_rrd = get_rrd_path($device, 'perf-poller.rrd');
 
 $rrd_options .= " DEF:tot=".$total_rrd.":val:AVERAGE";
 
-foreach($device['state']['poller_mod_perf'] as $mod => $perf)
-{
+foreach($device['state']['poller_mod_perf'] as $mod => $perf) {
 
   $colours = 'mixed';
 
@@ -33,9 +44,6 @@ foreach($device['state']['poller_mod_perf'] as $mod => $perf)
   $rrd_options .= " GPRINT:".$mod."_perc:AVERAGE:%6.2lf%s";
   $rrd_options .= " GPRINT:".$mod."_perc:MIN:%6.2lf%s";
   $rrd_options .= " GPRINT:".$mod."_perc:MAX:%6.2lf%s\\l";
-
-
 }
 
-
-?>
+// EOF

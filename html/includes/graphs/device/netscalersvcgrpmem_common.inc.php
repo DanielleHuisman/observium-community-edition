@@ -17,7 +17,7 @@ foreach (dbFetchRows("SELECT * FROM `netscaler_servicegroupmembers` AS NS, `devi
 {
   $rrd_filename = get_rrd_path($device, "nscaler-svcgrpmem-".$svc['svc_name'].".rrd");
 
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = $svc['svc_label'];

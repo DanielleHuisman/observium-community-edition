@@ -25,7 +25,7 @@ foreach ($vars['id'] as $ifid)
 
   $int = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
   $rrd_file = get_port_rrdfilename($int, NULL, TRUE);
-  if (is_file($rrd_file))
+  if (rrd_is_file($rrd_file))
   {
     $rrd_filenames[$i] = $rrd_file;
     $i++;

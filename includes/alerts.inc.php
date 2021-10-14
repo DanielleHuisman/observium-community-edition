@@ -422,7 +422,10 @@ function update_alert_table($alert, $silent = TRUE)
 
       $query = parse_qb_ruleset($alert['entity_type'], safe_json_decode($alert['alert_assoc']));
 
+      //r($query);
+
       $data  = dbFetchRows($query);
+      //$data  = dbFetchRows($query, NULL, 'log');
       //$error = dbError();
       $entities = array();
 
@@ -436,6 +439,9 @@ function update_alert_table($alert, $silent = TRUE)
    } else {
       $entities = get_alert_entities_from_assocs($alert);
    }
+
+
+   //r($entities);
 
    //$field = $config['entities'][$alert['entity_type']]['table_fields']['id'];
 
@@ -452,11 +458,11 @@ function update_alert_table($alert, $silent = TRUE)
    {
       if (is_cli())
       {
-        print_cli("Alert Checker " . str_pad("'${alert['alert_name']}'", 30, ' ', STR_PAD_LEFT) . ": " . count($existing_entities) . " existing, " . count($entities) . " new entries (+" . count($add) . "/-" . count($remove) . ").\n");
+        print_cli("Alert Checker " . str_pad("'${alert['alert_name']}'", 30, ' ', STR_PAD_LEFT) . ": " . count($existing_entities) . " existing, " . safe_count($entities) . " new entries (+" . safe_count($add) . "/-" . safe_count($remove) . ").\n");
       } else {
-        print_message(count($existing_entities) . " existing entries.<br />" .
-                      count($entities) . " new entries.<br />" .
-                      "(+" . count($add) . "/-" . count($remove) . ")<br />");
+        print_message(safe_count($existing_entities) . " existing entries.<br />" .
+                      safe_count($entities) . " new entries.<br />" .
+                      "(+" . safe_count($add) . "/-" . safe_count($remove) . ")<br />");
       }
    }
 
@@ -2861,17 +2867,17 @@ function parse_qb_ruleset($entity_type, $rules, $ignore = FALSE) {
 
   $sql  = 'SELECT `'.$entity_type_data['table_fields']['id'] . '`';
 
-  /* hrm, already join with using
+  // Required in update_alert_table()
   if ($entity_type !== 'device') {
     $sql .= ", `devices`.`device_id` as `device_id`";
   }
-  */
 
   $sql .= ' FROM `'.$entity_type_data['table'].'` ';
 
   // Join devices before parents
   if ($entity_type !== 'device') {
-    $sql .= ' LEFT JOIN `devices` USING (`device_id`)';
+    //$sql .= ' LEFT JOIN `devices` USING (`device_id`)';
+    $sql .= ' LEFT JOIN `devices` ON (`'.$entity_type_data['table'].'`.`device_id` = `devices`.`device_id`) ';
   }
 
   // if (isset($entity_type_data['state_table'])) {
@@ -2914,6 +2920,7 @@ function parse_qb_ruleset($entity_type, $rules, $ignore = FALSE) {
 function parse_qb_rules($entity_type, $rules, $ignore = FALSE)
 {
   global $config;
+
 
   $entity_type_data = entity_type_translate_array($entity_type);
   $entity_attribs   = $config['entities'][$entity_type]['attribs'];

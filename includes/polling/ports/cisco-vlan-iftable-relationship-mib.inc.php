@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,9 +14,8 @@
 
 $port_module = 'vlan';
 
-if (!$ports_modules[$port_module])
-{
-  return;
+if (!$ports_modules[$port_module]) {
+  return FALSE; // False for do not collect stats
 }
 
 //CISCO-VLAN-IFTABLE-RELATIONSHIP-MIB::cviRoutedVlanIfIndex.1.8 = INTEGER: 8
@@ -26,8 +24,6 @@ if (!$ports_modules[$port_module])
 //CISCO-VLAN-IFTABLE-RELATIONSHIP-MIB::cviRoutedVlanIfIndex.202.8 = INTEGER: 14
 //CISCO-VLAN-IFTABLE-RELATIONSHIP-MIB::cviRoutedVlanIfIndex.210.8 = INTEGER: 16
 //CISCO-VLAN-IFTABLE-RELATIONSHIP-MIB::cviRoutedVlanIfIndex.222.8 = INTEGER: 24
-
-$start = microtime(TRUE); // Module timing start
 
 $vlan_oids = snmpwalk_cache_oid($device, "cviRoutedVlanIfIndex", array(), "CISCO-VLAN-IFTABLE-RELATIONSHIP-MIB"); // Routed ports only
 
@@ -55,8 +51,6 @@ if (snmp_status())
   }
 
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

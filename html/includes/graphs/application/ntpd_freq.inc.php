@@ -23,12 +23,12 @@ $unit_text       = "Frequency";
 $ntpdserver_rrd  = get_rrd_path($device, "app-ntpd-server-".$app['app_id'].".rrd");
 $ntpdclient_rrd  = get_rrd_path($device, "app-ntpd-client-".$app['app_id'].".rrd");
 
-if (is_file($ntpdclient_rrd))
+if (rrd_is_file($ntpdclient_rrd))
 {
   $rrd_filename = $ntpdclient_rrd;
 }
 
-if (is_file($ntpdserver_rrd))
+if (rrd_is_file($ntpdserver_rrd))
 {
   $rrd_filename = $ntpdserver_rrd;
 }

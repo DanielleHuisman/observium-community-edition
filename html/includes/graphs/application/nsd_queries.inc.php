@@ -37,11 +37,9 @@ $rrd_list[$i]['colour']   = $config['graph_colours'][$colours][$i % safe_count($
 $i++;
 
 $server = 0;
-while (1)
-{
+while (TRUE) {
   $rrd_filename = get_rrd_path($device, "app-nsd-server$server.rrd");
-  if (file_exists($rrd_filename))
-  {
+  if (rrd_is_file($rrd_filename, TRUE)) {
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr']    = "Server$server";
     $rrd_list[$i]['ds']       = "numQueries";
@@ -49,9 +47,7 @@ while (1)
     $i++;
 
     $server++;
-  }
-  else
-  {
+  } else {
     break;
   }
 }
@@ -69,7 +65,7 @@ $array        = array(
                       'numQueryDropped' => array('descr' => 'Drop', 'colour' => 'AA00AAFF'),
                      );
 
-if (is_file($queries_filename))
+if (rrd_is_file($queries_filename))
 {
   foreach ($array as $ds => $data)
   {

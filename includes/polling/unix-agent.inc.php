@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -16,42 +15,44 @@ include_once("includes/discovery/functions.inc.php");
 
 global $valid, $agent_sensors;
 
-if ($device['os_group'] == "unix")
-{
+// use
+// if ($device['os_group'] == "unix")
+// {
   echo("Observium UNIX Agent: ");
 
   // Use port configured in config (or defaults)
   $agent_port = $config['unix-agent']['port'];
 
   // ... Unless user configured a port for this specific device, and it's valid (numeric and within 16-bit port range)
-  $override_port = get_dev_attrib($device, 'agent_port');
-  if (is_numeric($override_port) && $override_port < 65536)
-  {
-    $agent_port = $override_port;
+  if (isset($attribs['agent_port']) && is_valid_param($attribs['agent_port'], 'port')) {
+    $agent_port = $attribs['agent_port'];
   }
 
   $agent_start = utime();
-  $agent_socket = "tcp://".$device['hostname'].":".$agent_port;
+  $agent_socket = "tcp://".device_host($device).":".$agent_port;
   $agent = @stream_socket_client($agent_socket, $errno, $errstr, 10);
 
-  if (!$agent)
-  {
+  if (!$agent) {
     print_warning("Connection to UNIX agent on ".$agent_socket." failed. ERROR: ".$errno." ".$errstr);
     logfile("UNIX-AGENT: Connection on ".$agent_socket." failed. ERROR: ".$errno." ".$errstr);
   } else {
+    //var_dump($agent);
     $agent_raw = stream_get_contents($agent);
+    print_debug_vars($agent_raw);
   }
 
-  $agent_end = utime(); $agent_time = round(($agent_end - $agent_start) * 1000);
+  $agent_end = utime();
+  $agent_time = round(($agent_end - $agent_start) * 1000);
 
-  if (!empty($agent_raw))
-  {
+  if (!empty($agent_raw)) {
     echo("execution time: ".$agent_time."ms");
     rrdtool_update_ng($device, 'agent', array('time' => $agent_time));
     $graphs['agent'] = TRUE;
 
     // Store raw output in device attribute for debugging purposes (showtech page)
-    set_dev_attrib($device, 'unixagent_raw', $agent_raw);
+    if ($config['unix-agent']['debug']) {
+      set_dev_attrib($device, 'unixagent_raw', str_compress($agent_raw));
+    }
 
     foreach (explode("<<<", $agent_raw) as $section)
     {
@@ -116,7 +117,7 @@ if ($device['os_group'] == "unix")
 
     $agent_sensors = array(); # Init to empty to be able to use array_merge() later on
 
-    if (OBS_DEBUG && count($agent_data)) { print_vars($agent_data); }
+    print_debug_vars($agent_data, 1);
 
     include("unix-agent/packages.inc.php");
     include("unix-agent/munin-plugins.inc.php");
@@ -163,7 +164,7 @@ if ($device['os_group'] == "unix")
       echo("\nProcesses: ");
       foreach (explode("\n", $agent_data['ps']) as $process)
       {
-        $process = preg_replace("/\((.*),([0-9]*),([0-9]*),([0-9\.]*)\)\ (.*)/", "\\1|\\2|\\3|\\4|\\5", $process);
+        $process = preg_replace("/\((.*),(\d*),(\d*),([\d\.]*)\)\ (.*)/", "\\1|\\2|\\3|\\4|\\5", $process);
         list($user, $vsz, $rss, $pcpu, $command) = explode("|", $process, 5);
         $processlist[] = array('user' => $user, 'vsz' => $vsz, 'rss' => $rss, 'pcpu' => $pcpu, 'command' => $command);
       }
@@ -182,6 +183,6 @@ if ($device['os_group'] == "unix")
   echo("Virtual machines: ");
   check_valid_virtual_machines($device, $valid['vm'], 'agent');
   echo("\n");
-}
+//}
 
 // EOF

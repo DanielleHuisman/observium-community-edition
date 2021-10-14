@@ -20,7 +20,7 @@ $array = array(
         'rx_level'          => array('descr' => 'Rx Level'),
 );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

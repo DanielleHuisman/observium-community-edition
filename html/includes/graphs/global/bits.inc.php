@@ -56,7 +56,7 @@ foreach ($ports as $port) {
   }
 
   $rrd_filename = get_port_rrdfilename($port, NULL, TRUE);
-  if (is_file($rrd_filename)) {
+  if (rrd_is_file($rrd_filename)) {
     $rrd_filenames[] = $rrd_filename;
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = $port['hostname'] . " " . $port['ifDescr'];

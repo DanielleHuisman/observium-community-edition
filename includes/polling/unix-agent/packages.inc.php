@@ -16,8 +16,7 @@ $pkgs_id    = array();
 $pkgs_db_id = array();
 
 // RPM
-if (!empty($agent_data['rpm']))
-{
+if (!safe_empty($agent_data['rpm'])) {
   echo("\nRPM Packages: ");
   // Build array of existing packages
   $manager = "rpm";
@@ -121,14 +120,13 @@ foreach ($pkgs_id as $pkg)
     }
     unset($pkgs_db_id[$id]);
   } else {
-    if (count($pkgs[$manager][$name][$arch], 1) > "10" || count($pkgs_db[$manager][$name][$arch], 1) == '0')
-    {
+    if (safe_count($pkgs[$manager][$name][$arch], 1) > 10 || safe_count($pkgs_db[$manager][$name][$arch], 1) === 0) {
       dbInsert(array('device_id' => $device['device_id'], 'name' => $name, 'manager' => $manager,
                    'status' => 1, 'version' => $pversion, 'build' => $build, 'arch' => $arch, 'size' => $size), 'packages');
       if ($build != "") { $dbuild = '-' . $build; } else { $dbuild = ''; }
       echo("+".$name."-".$pversion.$dbuild."-".$arch);
       log_event('Package installed: '.$name.' ('.$arch.') version '.$pversion.$dbuild, $device, 'package');
-    } elseif(count($pkgs_db[$manager][$name][$arch], 1)) {
+    } elseif (safe_count($pkgs_db[$manager][$name][$arch], 1)) {
       $pkg_c = dbFetchRow("SELECT * FROM `packages` WHERE `device_id` = ? AND `manager` = ? AND `name` = ? and `arch` = ? ORDER BY version DESC, build DESC", array($device['device_id'], $manager, $name, $arch));
       if ($pkg_c['build'] != "") { $pkg_c_dbuild = '-'.$pkg_c['build']; } else { $pkg_c_dbuild = ''; }
       echo("U(".$pkg_c['name']."-".$pkg_c['version'].$pkg_c_dbuild."|".$name."-".$pversion.$dbuild.")");

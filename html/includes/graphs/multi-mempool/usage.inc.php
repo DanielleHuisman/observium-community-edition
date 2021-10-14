@@ -61,7 +61,7 @@ foreach ($vars['id'] as $mempool_id)
     $rrd_filename = get_rrd_path($device, "mempool-".strtolower($mempool['mempool_mib'])."-".$mempool['mempool_index'].".rrd");
   }
 
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
     $rrd_filename_escape = rrdtool_escape($rrd_filename);
 

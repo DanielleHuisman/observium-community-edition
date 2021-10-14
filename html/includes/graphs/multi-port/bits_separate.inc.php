@@ -19,7 +19,7 @@ foreach ($vars['id'] as $ifid)
 {
   $port = dbFetchRow("SELECT * FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
   $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
-  if (is_file($rrdfile))
+  if (rrd_is_file($rrdfile))
   {
     humanize_port($port);
     $rrd_list[$i]['filename']  = $rrdfile;

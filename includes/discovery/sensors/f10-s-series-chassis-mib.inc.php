@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -91,7 +90,7 @@ foreach ($oids as $index => $entry)
 //F10-S-SERIES-CHASSIS-MIB::chSysPortXfpTxPower.13.1 = INTEGER: .00 dB
 
 $oids = snmpwalk_cache_oid($device, "chSysPortIfIndex",    array(), "F10-S-SERIES-CHASSIS-MIB");
-if (count($oids))
+if (safe_count($oids))
 {
   $oids = snmpwalk_cache_oid($device, "chSysPortXfpRecvPower", $oids, "F10-S-SERIES-CHASSIS-MIB");
   $oids = snmpwalk_cache_oid($device, "chSysPortXfpTxPower",   $oids, "F10-S-SERIES-CHASSIS-MIB");

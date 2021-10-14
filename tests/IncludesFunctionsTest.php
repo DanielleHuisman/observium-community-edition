@@ -1231,8 +1231,8 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       $GLOBALS['config']['fping6'] = '/usr/sbin/fping6';
     }
     $flags = OBS_DNS_ALL;
-    if (!$try_a) { $flags = $flags ^ OBS_DNS_A; }
-    $ping = isPingable($hostname, $flags);
+    if (!$try_a) { $flags ^= OBS_DNS_A; }
+    $ping = is_pingable($hostname, $flags);
     $ping = is_numeric($ping) && $ping > 0; // Function return random float number
     $this->assertSame($result, $ping);
   }

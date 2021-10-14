@@ -12,7 +12,7 @@
  */
 
 $rrd_filename = get_rrd_path($device, 'netapp_stats.rrd');
-$rrd_exists   = is_file($rrd_filename);
+$rrd_exists   = rrd_is_file($rrd_filename);
 
 foreach (array('iscsi', 'nfs', 'cifs', 'http', 'fcp') as $stat)
 {

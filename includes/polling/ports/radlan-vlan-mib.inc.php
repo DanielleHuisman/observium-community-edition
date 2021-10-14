@@ -1,5 +1,5 @@
 <?php
-/*
+/**
  * Observium
  *
  *   This file is part of Observium.
@@ -24,10 +24,8 @@ $port_module = 'vlan';
 
 if (!$ports_modules[$port_module]) {
   // Module disabled
-  return;
+  return FALSE; // False for do not collect stats
 }
-
-$start = microtime(TRUE); // Module timing start
 
 /* start polling vlans */
 $vlan_ports = snmpwalk_cache_oid($device, 'vlanPortModeState', [], $mib);
@@ -134,8 +132,6 @@ foreach ($vlan_ports as $ifIndex => $entry) {
 }
 
 /* end polling vlans */
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

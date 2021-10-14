@@ -22,7 +22,7 @@ $graph_max       = 100;
 $unit_text       = "Latency";
 $powerdns_rrd    = get_rrd_path($device, "app-powerdns-".$app['app_id'].".rrd");
 
-if (is_file($powerdns_rrd))
+if (rrd_is_file($powerdns_rrd))
 {
   $rrd_filename = $powerdns_rrd;
 }

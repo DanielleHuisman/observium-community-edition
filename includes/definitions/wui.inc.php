@@ -155,6 +155,7 @@ $config['icon']['down']              = $config['icon']['minus'];
 // what is this joke? ignore/shutdown :)
 $config['icon']['ignore']            = "sprite-shutdown";
 $config['icon']['shutdown']          = "sprite-ignore";
+$config['icon']['percent']           = "sprite-percent";
 
 $config['icon']['or-gate']           = "sprite-logic-or";
 $config['icon']['and-gate']          = "sprite-logic-and";
@@ -242,6 +243,7 @@ $config['icon']['current']           = "sprite-amps";
 $config['icon']['power']             = "sprite-watts";
 $config['icon']['illuminance']       = "sprite-light-bulb";
 $config['icon']['load']              = "sprite-asterisk";
+$config['icon']['progress']          = "sprite-percent";
 $config['icon']['temperature']       = "sprite-temperature";
 $config['icon']['humidity']          = "sprite-humidity";
 $config['icon']['airflow']           = "sprite-airflow";
@@ -306,6 +308,8 @@ $config['icon']['device-data']       = "sprite-data";
 $config['icon']['device-poller']     = "sprite-performance";
 $config['icon']['techsupport']       = "sprite-support";
 $config['icon']['tools']             = "sprite-tools";
+$config['icon']['device-tools']      = "sprite-cog";
+$config['icon']['device-settings']   = "sprite-settings-3";
 $config['icon']['hardware']          = "sprite-cogs"; // FIXME
 
 $config['icon']['linecard']          = "sprite-nic";

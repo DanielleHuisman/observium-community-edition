@@ -23,7 +23,7 @@ $xre = array('ErrFirstRetransmiss' => 'First',
 
 foreach ($xre as $stat => $descr)
 {
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = $descr;

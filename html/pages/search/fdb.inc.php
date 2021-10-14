@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -35,8 +34,10 @@ foreach (dbFetchRows('SELECT F.`device_id`, `vlan_vlan`, `vlan_name` FROM `vlans
     $form_items['vlan_name'][$data['vlan_name']] = $data['vlan_name'];
   }
 }
-ksort($form_items['vlans']);
-natcasesort($form_items['vlan_name']);
+if (is_array($form_items['vlans'])) {
+  ksort($form_items['vlans']);
+  natcasesort($form_items['vlan_name']);
+}
 
 // Select the devices with FDB tables
 //$form_devices = dbFetchColumn('SELECT DISTINCT `device_id` FROM `vlans_fdb`');

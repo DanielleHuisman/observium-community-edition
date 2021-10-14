@@ -72,7 +72,7 @@ foreach ($mas as $ma)
 {
   $this_rrd = get_rrd_path($device, "mac_acc-" . $port['ifIndex'] . "-" . $ma['vlan_id'] ."-" . $ma['mac'] . ".rrd");
 
-  if (is_file($this_rrd))
+  if (rrd_is_file($this_rrd))
   {
     $mac = format_mac($ma['mac']);
     $name = $mac;

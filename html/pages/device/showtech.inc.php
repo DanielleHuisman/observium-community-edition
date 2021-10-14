@@ -93,7 +93,14 @@ if (!is_entity_write_permitted($device['device_id'], 'device')) {
     ];
     echo generate_box_open($box_args);
     echo '<pre>';
-    echo escape_html(get_dev_attrib($device, 'unixagent_raw'));
+    if ($unixagent = get_dev_attrib($device, 'unixagent_raw')) {
+      if ($tmp = str_decompress($unixagent)) {
+        // New compressed format
+        $unixagent = $tmp;
+        unset($tmp);
+      }
+      echo escape_html($unixagent);
+    }
     echo '</pre>';
   } else {
     echo generate_box_open($box_args);

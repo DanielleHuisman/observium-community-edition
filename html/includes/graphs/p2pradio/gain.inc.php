@@ -20,7 +20,7 @@ $array = array(
         'agc_gain'          => array('descr' => 'Internal Gain'),
 );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

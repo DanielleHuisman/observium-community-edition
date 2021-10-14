@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -19,6 +18,7 @@
 unset($search, $vlans, $vlan_names, $port_names);
 
 // Select ports only present in FDB tables
+$form_items = [];
 foreach (dbFetchRows('SELECT `port_id`, `device_id`, `ifDescr`, `ifName`, `ifAlias`
                         FROM `vlans_fdb` AS F
                         LEFT JOIN `ports` as P USING (`port_id`, `device_id`)
@@ -27,7 +27,9 @@ foreach (dbFetchRows('SELECT `port_id`, `device_id`, `ifDescr`, `ifName`, `ifAli
   humanize_port($data);
   $form_items['ports'][$data['port_id']] = $data['port_label'];
 }
-natcasesort($form_items['ports']);
+if (is_array($form_items['ports'])) {
+  natcasesort($form_items['ports']);
+}
 
 foreach (dbFetchRows('SELECT `vlan_vlan`, `vlan_name`
                      FROM `vlans_fdb` AS F
@@ -38,8 +40,10 @@ foreach (dbFetchRows('SELECT `vlan_vlan`, `vlan_name`
   $form_items['vlans'][$data['vlan_vlan']] = 'Vlan ' . $data['vlan_vlan'];
   $form_items['vlan_name'][$data['vlan_name']] = $data['vlan_name'];
 }
-ksort($form_items['vlans']);
-natcasesort($form_items['vlan_name']);
+if (is_array($form_items['vlans'])) {
+  ksort($form_items['vlans']);
+  natcasesort($form_items['vlan_name']);
+}
 
 $form = array('type'          => 'rows',
               'space'         => '5px',

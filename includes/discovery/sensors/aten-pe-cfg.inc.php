@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -26,10 +25,11 @@
 
 $oids  = snmpwalk_cache_oid($device, "deviceIntegerValueEntry", array(), 'ATEN-PE-CFG');
 $oids  = snmpwalk_cache_oid($device, "deviceConfigEntry", $oids, 'ATEN-PE-CFG');
-$count = count($oids);
+print_debug_vars($oids);
+
+$count = safe_count($oids);
 $scale = 0.001;
 
-if (OBS_DEBUG > 1 && $count) { var_dump($oids); }
 foreach ($oids as $index => $entry)
 {
   $descr = ($count > 1 ? "Device $index" : "Device");
@@ -151,7 +151,7 @@ $oids = snmpwalk_cache_oid($device, "sensorIntegerValueEntry", array(), 'ATEN-PE
 $oids = snmpwalk_cache_oid($device, "deviceSensorTresholdEntry", $oids, 'ATEN-PE-CFG');
 $scale = 0.001;
 
-if (OBS_DEBUG > 1 && count($oids)) { var_dump($oids); }
+print_debug_vars($oids);
 foreach ($oids as $index => $entry)
 {
   // Temperature

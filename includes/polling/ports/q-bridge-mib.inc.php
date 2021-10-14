@@ -18,14 +18,12 @@ if (!$ports_modules[$port_module] || is_device_mib($device, 'CISCO-VTP-MIB'))
 {
   // Module disabled, or Cisco device
   // Q-BRIDGE-MIB is default mib, need excludes
-  return;
+  return FALSE; // False for do not collect stats
 }
 
 // Vendor specific
 $is_juniper = is_device_mib($device, 'JUNIPER-VLAN-MIB');
 //$is_hpe = $device['os'] == 'hh3c';
-
-$start = microtime(TRUE); // Module timing start
 
 //BRIDGE-MIB::dot1dBaseNumPorts.0 = INTEGER: 9 ports
 //BRIDGE-MIB::dot1dBaseType.0 = INTEGER: transparent-only(2)
@@ -252,8 +250,6 @@ elseif ($is_juniper)
     }
   }
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

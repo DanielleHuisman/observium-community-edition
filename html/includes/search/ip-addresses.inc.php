@@ -15,10 +15,10 @@
 list($addr, $mask) = explode('/', $queryString);
 
 if (preg_match('/^(?:(?<both>\d+)|(?<ipv6>[\d\:abcdef]+)|(?<ipv4>[\d\.]+))$/i', $addr, $matches)) {
-  $query_ipv4  = 'SELECT `port_id`, `ipv4_address` AS `ip_address`, `ipv4_prefixlen` AS `ip_prefixlen` FROM `ipv4_addresses`';
+  $query_ipv4  = 'SELECT `device_id`, `port_id`, `ipv4_address` AS `ip_address`, `ipv4_prefixlen` AS `ip_prefixlen` FROM `ipv4_addresses`';
   $query_ipv4 .= ' WHERE `ipv4_address` LIKE ?';
 
-  $query_ipv6  = 'SELECT `port_id`, `ipv6_compressed` AS `ip_address`, `ipv6_prefixlen` AS `ip_prefixlen` FROM `ipv6_addresses`';
+  $query_ipv6  = 'SELECT `device_id`, `port_id`, `ipv6_compressed` AS `ip_address`, `ipv6_prefixlen` AS `ip_prefixlen` FROM `ipv6_addresses`';
   $query_ipv6 .= ' WHERE (`ipv6_address` LIKE ? OR `ipv6_compressed` LIKE ?)';
 
   $query_end   = $query_permitted_port . " ORDER BY `ip_address` LIMIT $query_limit";
@@ -26,9 +26,7 @@ if (preg_match('/^(?:(?<both>\d+)|(?<ipv6>[\d\:abcdef]+)|(?<ipv4>[\d\.]+))$/i', 
   if (isset($matches['ipv4'])) {
     // IPv4 only
     $results = dbFetchRows($query_ipv4 . $query_end, array($query_param));
-  }
-  elseif (isset($matches['ipv6']))
-  {
+  } elseif (isset($matches['ipv6'])) {
     // IPv6 only
     $results = dbFetchRows($query_ipv6 . $query_end, array($query_param, $query_param));
   } else {
@@ -54,7 +52,7 @@ if (safe_count($results)) {
   foreach ($results as $result)
   {
     $port = get_port_by_id_cache($result['port_id']);
-    $device = device_by_id_cache($port['device_id']);
+    $device = device_by_id_cache($result['device_id']);
 
     $descr = strlen($device['location']) ? $device['location'] . ' | ' : '';
     $descr .= $port['port_label'];
@@ -64,11 +62,12 @@ if (safe_count($results)) {
 
     $tab_colour = '#194B7F'; // FIXME: This colour pulled from functions.inc.php humanize_device, maybe set it centrally in definitions?
 
+    $view = str_contains($result['ip_address'], '.') ? 'ipv4' : 'ipv6';
     $ip_search_results[] = array(
-      'url'    => generate_port_url($port),
+      'url'    => $port ? generate_port_url($port) : generate_device_url($device, [ 'tab' => 'ports', 'view' => $view ]),
       'name'   => $name,
       'colour' => $tab_colour,
-      'icon'   => strpos($result['ip_address'], '.') ? $config['icon']['ipv4'] : $config['icon']['ipv6'],
+      'icon'   => $config['icon'][$view],
       'data'   => array(
         '| ' . escape_html($device['hostname']),
         escape_html($descr)),

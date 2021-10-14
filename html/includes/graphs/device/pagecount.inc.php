@@ -17,7 +17,7 @@ foreach (dbFetchRows("SELECT * FROM `sensors` WHERE `sensor_class` = ? AND `sens
 {
   $rrd_filename = get_rrd_path($device, get_sensor_rrd($device, $sensor));
 
-  if (($auth == TRUE || is_entity_permitted($sensor['sensor_id'], 'sensor')) && is_file($rrd_filename))
+  if (($auth == TRUE || is_entity_permitted($sensor['sensor_id'], 'sensor')) && rrd_is_file($rrd_filename))
   {
     //if (!str_contains_array($sensor['sensor_descr'], array('Total', 'Printed'))) { continue; } // FIXME, currently show only Total here
     //if (!str_icontains_array($sensor['sensor_type'], 'print')) { continue; }

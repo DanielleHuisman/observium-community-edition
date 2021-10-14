@@ -17,7 +17,7 @@ foreach (dbFetchRows("SELECT * FROM `sensors` WHERE `sensor_class` = ? AND `devi
 {
   $rrd_filename = get_rrd_path($device, get_sensor_rrd($device, $sensor));
 
-  if (($config['allow_unauth_graphs'] == TRUE || is_entity_permitted($sensor['sensor_id'], 'sensor')) && is_file($rrd_filename))
+  if (($config['allow_unauth_graphs'] == TRUE || is_entity_permitted($sensor['sensor_id'], 'sensor')) && rrd_is_file($rrd_filename))
   {
     $descr = rewrite_entity_name($sensor['sensor_descr'], 'sensor');
     $rrd_list[$i]['filename'] = $rrd_filename;

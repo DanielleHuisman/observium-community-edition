@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -102,6 +101,8 @@ unset($vars_filter['rtt_type'], $vars_filter['owner']); // Do not filter rtt_typ
 
 $sql = generate_sla_query($vars_filter);
 
+$rtt_types = [];
+$sla_owners = [];
 foreach (dbFetchRows($sql) as $sla)
 {
   $owner = ($sla['sla_owner'] == '' ? OBS_VAR_UNSET : $sla['sla_owner']);

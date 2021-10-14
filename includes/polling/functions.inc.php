@@ -70,19 +70,16 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
     // Walk by mib & object
     $oid_to_cache = dbFetchRows($walk_query, $walk_params);
     print_debug_vars($oid_to_cache);
-    foreach ($oid_to_cache as $entry)
-    {
+    foreach ($oid_to_cache as $entry) {
       $mib    = $entry[$mib_field];
       $object = $entry[$object_field];
 
       // MIB not support walk (by definition)
       if (isset($config['mibs'][$mib][$mib_walk_option]) &&
-               !$config['mibs'][$mib][$mib_walk_option])
-      {
+               !$config['mibs'][$mib][$mib_walk_option]) {
         continue;
       }
-      else if (isset($GLOBALS['cache']['snmp_object_polled'][$mib][$object]))
-      {
+      if (isset($GLOBALS['cache']['snmp_object_polled'][$mib][$object])) {
         print_debug("MIB/Object ($mib::$object)already polled.");
         continue;
       }
@@ -92,8 +89,9 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
     }
   } else {
     // Multi get for all others
-    $oid_to_cache = dbFetchColumn($get_query, $get_params);
-    usort($oid_to_cache, 'compare_numeric_oids'); // correctly sort numeric oids
+    if ($oid_to_cache = dbFetchColumn($get_query, $get_params)) {
+      usort($oid_to_cache, 'compare_numeric_oids'); // correctly sort numeric oids
+    }
     print_debug_vars($oid_to_cache);
     $oid_cache = snmp_get_multi_oid($device, $oid_to_cache, $oid_cache, NULL, NULL, $snmp_flags);
   }
@@ -135,14 +133,12 @@ function poll_device($device, $options)
 
   print_cli_data("OS", $device['os'], 1);
 
-  if ($config['os'][$device['os']]['group'])
-  {
+  if ($config['os'][$device['os']]['group']) {
     $device['os_group'] = $config['os'][$device['os']]['group'];
     print_cli_data("OS Group", $device['os_group'], 1);
   }
 
-  if (is_numeric($device['last_polled_timetaken']))
-  {
+  if (is_numeric($device['last_polled_timetaken'])) {
     print_cli_data("Last poll duration", $device['last_polled_timetaken']. " seconds", 1);
   }
 
@@ -153,59 +149,32 @@ function poll_device($device, $options)
   $update_array = array();
 
   $host_rrd_dir = $config['rrd_dir'] . "/" . $device['hostname'];
-  if (!is_dir($host_rrd_dir))
-  {
+  if (!is_dir($host_rrd_dir)) {
     mkdir($host_rrd_dir);
     echo("Created directory : $host_rrd_dir\n");
   }
 
-  /* moved to device_status_array()
-  $flags = OBS_DNS_ALL;
-  if ($device['snmp_transport'] === 'udp6' || $device['snmp_transport'] === 'tcp6') // Exclude IPv4 if used transport 'udp6' or 'tcp6'
-  {
-    $flags ^= OBS_DNS_A;
-  }
-  $attribs['ping_skip'] = isset($attribs['ping_skip']) && $attribs['ping_skip'];
-  if ($attribs['ping_skip'])
-  {
-    $flags |= OBS_PING_SKIP; // Add skip ping flag
-  }
-  $device['pingable'] = isPingable($device['hostname'], $flags);
-  if ($device['pingable'])
-  {
-    $device['snmpable'] = isSNMPable($device);
-    if ($device['snmpable'])
-    {
-      $ping_msg = ($attribs['ping_skip'] ? '' : 'PING (' . $device['pingable'] . 'ms) and ');
-
-      print_cli_data("Device status", "Device is reachable by " . $ping_msg . "SNMP (".$device['snmpable']."ms)", 1);
-      $status = "1";
-      $status_type = 'ok';
-    } else {
-      print_cli_data("Device status", "Device is not responding to SNMP requests", 1);
-      $status = "0";
-      $status_type = 'snmp';
-    }
-  } else {
-    print_cli_data("Device status", "Device is not responding to PINGs", 1);
-    $status = "0";
-    print_vars(get_status_var('ping_dns'));
-    if (isset_status_var('ping_dns') && get_status_var('ping_dns') !== 'ok')
-    {
-      $status_type = 'dns';
-    } else {
-      $status_type = 'ping';
-    }
-  }
-  */
   $device_status = device_status_array($device);
   $status        = $device_status['status'];
   $status_type   = $device_status['status_type'];
   print_cli_data("Device status", $device_status['message'], 1);
 
+  // device cached dns ip
+  if (isset_status_var('dns_ip') &&
+      $dns_ip = get_status_var('dns_ip')) {
+    // Store not empty dns ip
+    if ($device['ip'] != $dns_ip) {
+      $device['ip'] = $dns_ip;
+      $update_array['ip'] = $dns_ip;
+      if ($device['hostname'] != $dns_ip && ($config['use_ip'] || safe_empty($device['ip']))) {
+        // Log ip changes (only first resolve or when config 'use_ip' is TRUE)
+        log_event('Device resolved hostname to ip: ' . $device['hostname'] . ' -> ' . $dns_ip, $device, 'device', $device['device_id']);
+      }
+    }
+  }
+
   // Device status
-  if ($device['status'] != $status)
-  {
+  if ($device['status'] != $status) {
     dbUpdate(array('status' => $status), 'devices', 'device_id = ?', array($device['device_id']));
     // dbInsert(array('importance' => '0', 'device_id' => $device['device_id'], 'message' => "Device is " .($status == '1' ? 'up' : 'down')), 'alerts');
 
@@ -239,11 +208,11 @@ function poll_device($device, $options)
 
   if (!$attribs['ping_skip']) {
     // Ping response RRD database.
-    rrdtool_update_ng($device, 'ping', array('ping' => ($device['pingable'] ? $device['pingable'] : 'U')));
+    rrdtool_update_ng($device, 'ping', array('ping' => ($device['pingable'] ?: 'U')));
   }
 
   // SNMP response RRD database.
-  rrdtool_update_ng($device, 'ping_snmp', array('ping_snmp' => ($device['snmpable'] ? $device['snmpable'] : 'U')));
+  rrdtool_update_ng($device, 'ping_snmp', array('ping_snmp' => ($device['snmpable'] ?: 'U')));
 
   $alert_metrics['device_status'] = $status;
   $alert_metrics['device_status_type'] = $status_type;
@@ -458,16 +427,17 @@ function poll_device($device, $options)
       rrdtool_update_ng($device, 'perf-poller', array('val' => $device_time));
     }
 
-    if (OBS_DEBUG) {
-      echo("Updating " . $device['hostname'] . " - ");
-      print_vars($update_array);
-      echo(" \n");
-    }
+    // Update device table
+    if (safe_count($update_array)) {
+      if (OBS_DEBUG) {
+        echo("Updating " . $device['hostname'] . " - ");
+        print_vars($update_array);
+        echo(" \n");
+      }
 
-    $updated = dbUpdate($update_array, 'devices', '`device_id` = ?', array($device['device_id']));
-
-    if ($updated) {
-      print_cli_data("Updated Data", implode(", ", array_keys($update_array)), 1);
+      if (dbUpdate($update_array, 'devices', '`device_id` = ?', [ $device['device_id'] ])) {
+        print_cli_data("Updated Data", implode(", ", array_keys($update_array)), 1);
+      }
     }
 
     $alert_metrics['device_la']            = $device_state['la']['5min']; // 5 min as common LA
@@ -484,11 +454,22 @@ function poll_device($device, $options)
 
   } elseif (!$options['m']) {
     // State is 0, also collect poller time for down devices, since it not zero!
-
     $device_end  = utime();
     $device_run  = $device_end - $device_start;
     $device_time = round($device_run, 4);
 
+    // partially update device table
+    if (isset($update_array['ip'])) {
+      if (OBS_DEBUG) {
+        echo("Updating " . $device['hostname'] . " - ");
+        print_vars($update_array);
+        echo(" \n");
+      }
+
+      if (dbUpdate([ 'ip' => $update_array['ip'] ], 'devices', '`device_id` = ?', [ $device['device_id'] ])) {
+        print_cli_data("Updated Data", 'ip', 1);
+      }
+    }
     print_cli_data("Poller time", $device_time." seconds", 1);
     // Also store history in graph
     rrdtool_update_ng($device, 'perf-poller', array('val' => $device_time));

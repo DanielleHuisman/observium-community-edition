@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,17 +6,17 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $modulecurrentmax = 160;
 
 $oids  = snmpwalk_cache_oid($device, "sBTAModulesRPCEntry", array(), 'Baytech-MIB-403-1');
-$count = count($oids);
+$count = safe_count($oids);
 $scale = 0.1;
 
-if (OBS_DEBUG > 1 && $count) { var_dump($oids); }
+print_debug_vars($oids);
 foreach ($oids as $index => $entry)
 {
   $descr = ($count > 1 ? "Module $index" : "Module");
@@ -73,10 +72,10 @@ foreach ($oids as $index => $entry)
 }
 
 $oids  = snmpwalk_cache_oid($device, "sBTAModulesRPCBreakersEntry", array(), 'Baytech-MIB-403-1');
-$count = count($oids);
+$count = safe_count($oids);
 $scale = 0.1;
 
-if (OBS_DEBUG > 1 && $count) { var_dump($oids); }
+print_debug_vars($oids);
 foreach ($oids as $index => $entry)
 {
   $module = $entry['sBTAModulesRPCBreakersModulesIndex'];

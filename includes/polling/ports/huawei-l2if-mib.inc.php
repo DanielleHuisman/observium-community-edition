@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -18,10 +17,8 @@ $port_module = 'vlan';
 if (!$ports_modules[$port_module])
 {
   // Module disabled
-  return;
+  return FALSE; // False for do not collect stats
 }
-
-$start = microtime(TRUE); // Module timing start
 
 //HUAWEI-L2IF-MIB::hwL2IfPortIfIndex.39 = INTEGER: 92
 //HUAWEI-L2IF-MIB::hwL2IfPortIfIndex.40 = INTEGER: 93
@@ -85,8 +82,6 @@ if (snmp_status())
   }
 
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

@@ -19,15 +19,23 @@
  */
 
 /// SEARCH DEVICES
+$where = '(`hostname` LIKE ? OR `sysName` LIKE ? OR `ip` LIKE ? OR `location` LIKE ? OR `sysDescr` LIKE ? OR `os` LIKE ? OR `vendor` LIKE ? OR `purpose` LIKE ?)';
+$params = [ $query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param ];
 $results = dbFetchRows("SELECT * FROM `devices`
-                        WHERE (`hostname` LIKE ? OR `sysName` LIKE ? OR `location` LIKE ? OR `sysDescr` LIKE ? OR `os` LIKE ? OR `vendor` LIKE ? OR `purpose` LIKE ?) $query_permitted_device
-                        ORDER BY `hostname` LIMIT $query_limit", [ $query_param, $query_param, $query_param, $query_param, $query_param, $query_param, $query_param ]);
+                        WHERE $where $query_permitted_device
+                        ORDER BY `hostname` LIMIT $query_limit", $params);
 if (safe_count($results)) {
   foreach ($results as $result) {
     humanize_device($result);
 
     $name = $result['hostname'];
-    if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
+    $max_len = 35;
+    if (strlen($name) > 35) {
+      $name = substr($name, 0, 35) . "...";
+    }
+    if ($_SESSION['userlevel'] >= 5 && !safe_empty($result['ip'])) {
+      $name .= ' ('.$result['ip'].')';
+    }
 
     $num_ports = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE device_id = ?", array($result['device_id']));
 

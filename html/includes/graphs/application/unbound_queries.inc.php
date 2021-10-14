@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -22,11 +21,9 @@ $thread = 0;
 
 $i = 0;
 
-while (1)
-{
+while (TRUE) {
   $rrd_filename = get_rrd_path($device, "app-unbound-".$app['app_id']."-thread$thread.rrd");
-  if (is_file($rrd_filename))
-  {
+  if (rrd_is_file($rrd_filename, TRUE)) {
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr']    = "Queries handled by thread$thread";
     $rrd_list[$i]['ds']       = "numQueries";
@@ -34,9 +31,7 @@ while (1)
     $i++;
 
     $thread++;
-  }
-  else
-  {
+  } else {
     break;
   }
 }
@@ -49,7 +44,7 @@ $array        = array(
                       'prefetch' => array('descr' => 'Cache prefetch', 'colour' => 'FF0000FF'),
                      );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {
@@ -72,7 +67,7 @@ $array        = array(
                       'numReplyUnwanted' => array('descr' => 'Unwanted replies', 'colour' => '00FFFFFF'), /// FIXME better colours
                      );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

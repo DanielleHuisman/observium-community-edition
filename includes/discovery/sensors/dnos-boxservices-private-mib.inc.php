@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -35,8 +34,7 @@ $oids = snmpwalk_cache_oid($device, $oid, array(), $mib);
 
 // By first detect if device used old FAST-BOXSERVICES-PRIVATE-MIB, it use single key in boxServicesTempSensorsTable
 $index = explode('.', key($oids));
-if (count($oids) && count($index) === 1)
-{
+if (safe_count($oids) && count($index) === 1) {
   print_debug('Device must use OLD-DNOS-BOXSERVICES-PRIVATE-MIB');
 
   return; // Exit from mib discovery
@@ -117,7 +115,7 @@ foreach ($oids as $index => $entry)
 
 $oid = 'boxServicesFansTable';
 $oids = snmpwalk_cache_oid($device, $oid, array(), $mib);
-$show_numbers = count($oids) > 1;
+$show_numbers = safe_count($oids) > 1;
 
 foreach ($oids as $index => $entry)
 {
@@ -186,7 +184,7 @@ foreach ($oids as $index => $entry)
 
 $oid = 'boxServicesPowSuppliesTable';
 $oids = snmpwalk_cache_oid($device, $oid, array(), $mib);
-$show_numbers = count($oids) > 1;
+$show_numbers = safe_count($oids) > 1;
 
 foreach ($oids as $index => $entry)
 {

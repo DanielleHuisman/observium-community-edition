@@ -24,7 +24,7 @@ foreach ($devices as $device_id => $device) {
 
   $rrd_filename = get_rrd_path($device, 'perf-poller.rrd');
 
-  if (is_file($rrd_filename)) {
+  if (rrd_is_file($rrd_filename)) {
 
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = str_pad($device['hostname'], 25) ." (".$device['os'].")";

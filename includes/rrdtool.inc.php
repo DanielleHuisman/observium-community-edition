@@ -39,11 +39,14 @@ function get_rrd_path($device, $filename)
     $rrd_file .= $device['hostname'] . '/';
   }
 
-  if (strlen($filename) > 0)
-  {
-    $ext = pathinfo($filename, PATHINFO_EXTENSION);
-    if ($ext !== 'rrd') { $filename .= '.rrd'; } // Add rrd extension if not already set
-    $rrd_file .= safename($filename);
+  if (!safe_empty($filename)) {
+    $path_array = explode('.', $filename);
+    if (!(count($path_array) > 1 && end($path_array) === 'rrd')) {
+      $filename .= '.rrd'; // Add rrd extension if not already set
+    }
+    //$ext = pathinfo($filename, PATHINFO_EXTENSION);
+    //if ($ext !== 'rrd') { $filename .= '.rrd'; }
+    $rrd_file .= $filename;
 
     // Add rrd filename to global array $graph_return
     $GLOBALS['graph_return']['rrds'][] = $rrd_file;
@@ -793,6 +796,31 @@ function rrd_exists($device, $filename) {
   }
 
   return is_file($fsfilename);
+}
+
+/* Simple pass is_file() on local system and TRUE on REMOTE rrdcached */
+function rrd_is_file($filename, $remote_validate = FALSE) {
+
+  if (OBS_RRD_NOLOCAL) {
+    // NOTE. RRD last on remote daemon reduce polling times
+    if ($remote_validate) {
+      // FIXME. Caching for valid files?
+      $unixtime = rrdtool_last($filename);
+      if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
+        // Correct unixtime without errors
+        return TRUE;
+      }
+      //ERROR: realpath(hostname/status.rrd): No such file or directory
+      return strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
+      //return $GLOBALS['rrd_status'];
+    }
+
+    // Probably for polling
+    return TRUE;
+  }
+
+  // Local system, just use file valid check
+  return is_file($filename);
 }
 
 function rrdtool_file_valid($file) {

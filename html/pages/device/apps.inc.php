@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -35,14 +34,7 @@ foreach ($device_app_types as $type_key => $type_data)
     $url = generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'apps', 'app' => $app['app_type'], 'instance' => $app['app_id'] ));
 
     // Check if an app name was inserted into mysql->observium.applications.app_name
-    if (!empty($app['app_name']))
-    {
-      $name = $app['app_name'];
-    }
-    else
-    {
-      $name = nicecase($app['app_type']);
-    }
+    $name = !empty($app['app_name']) ? $app['app_name'] : nicecase($app['app_type']);
 
     // Determine if this is a named instance of app_type
     if (!empty($app['app_instance']))
@@ -64,15 +56,10 @@ foreach ($device_app_types as $type_key => $type_data)
       // Detect and add application icon
       $icon = $app['app_type'];
       $image = $config['html_dir'].'/images/apps/'.$icon.'.png';
-      if (is_file($image))
-      {
-        // Icon found
-        //$icon = $app['app_type'];
-      } else {
+      if (!is_file($image)) {
         list($icon) = explode('-', str_replace('_', '-', $app['app_type']));
         $image = $config['html_dir'].'/images/apps/'.$icon.'.png';
-        if ($icon != $app['app_type'] && is_file($image))
-        {
+        if ($icon !== $app['app_type'] && is_file($image)) {
           // 'postfix_qshape' -> 'postfix'
           // 'exim-mailqueue' -> 'exim'
         } else {
@@ -80,8 +67,7 @@ foreach ($device_app_types as $type_key => $type_data)
         }
       }
       $navbar['options'][$app['app_type']]['image'] = 'images/apps/'.$icon.'.png';
-      if (is_file($config['html_dir'].'/images/apps/'.$icon.'_2x.png'))
-      {
+      if (is_file($config['html_dir'].'/images/apps/'.$icon.'_2x.png')) {
         // HiDPI icon
         $navbar['options'][$app['app_type']]['image_2x'] = 'images/apps/'.$icon.'_2x.png';
       }

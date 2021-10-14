@@ -15,7 +15,7 @@ $rrd_list = [];
 foreach (dbFetchRows("SELECT * FROM `ports` AS I, `devices` AS D WHERE `port_descr_type` = 'cust' AND `port_descr_descr` = ? AND D.device_id = I.device_id", array($vars['id'])) as $port)
 {
   $rrd_filename = get_port_rrdfilename($port, NULL, TRUE);
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
     $rrd_list[] = [ 'filename'  => $rrd_filename,
                     'descr'     => $port['hostname'] ."-". $port['ifDescr'],

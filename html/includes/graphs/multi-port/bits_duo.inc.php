@@ -25,7 +25,7 @@ foreach ($vars['id'] as $ifid)
 {
   $int = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
   $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
-  if (is_file($rrdfile))
+  if (rrd_is_file($rrdfile))
   {
     $rrd_options .= " DEF:inoctets" . $i . "=" . $rrdfile . ":INOCTETS:AVERAGE";
     $rrd_options .= " DEF:outoctets" . $i . "=" . $rrdfile . ":OUTOCTETS:AVERAGE";
@@ -42,7 +42,7 @@ foreach ($vars['idb'] as $ifid)
 {
   $int = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices as D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
   $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
-  if (is_file($rrdfile))
+  if (rrd_is_file($rrdfile))
   {
     $rrd_options .= " DEF:inoctetsb" . $i . "=" . $rrdfile . ":INOCTETS:AVERAGE";
     $rrd_options .= " DEF:outoctetsb" . $i . "=" . $rrdfile . ":OUTOCTETS:AVERAGE";

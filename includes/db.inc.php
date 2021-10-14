@@ -193,17 +193,27 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
 {
   global $fullSql;
 
+  //r($_REQUEST);
+  // if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'print_query')) {
+  //   $print_query = TRUE;
+  // }
+
   $fullSql = dbMakeQuery($sql, $parameters);
 
   $debug = defined('OBS_DEBUG') ? OBS_DEBUG : 0;
   if ($debug > 0 || $print_query) {
     // Pre query debug output
-    if (is_cli())
-    {
-      $debug_sql = explode(PHP_EOL, $fullSql);
-      print_message(PHP_EOL.'SQL[%y' . implode('%n'.PHP_EOL.'%y', $debug_sql) . '%n]', 'console', FALSE);
+    if (is_cli()) {
+      //$debug_sql = explode(PHP_EOL, $fullSql);
+      //print_message(PHP_EOL . 'SQL[%y' . implode('%n' . PHP_EOL . '%y', $debug_sql) . '%n]', 'console', FALSE);
+      echo(PHP_EOL . 'SQL[');
+      print_sql($fullSql);
+      echo(']' . PHP_EOL);
+    } elseif ($print_query === 'log') {
+      logfile('db.log', 'Requested Query: ' . print_sql($fullSql, 'log'));
     } else {
       print_sql($fullSql);
+      //print_sql($fullSql, 'html');
     }
   }
 

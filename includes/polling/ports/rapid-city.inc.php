@@ -48,13 +48,10 @@ foreach ($ports_vlans as $vlan_num => $entry)
 // Untagged/primary port vlans
 $port_module = 'vlan';
 
-if (!$ports_modules[$port_module])
-{
+if (!$ports_modules[$port_module]) {
   // Module disabled
   return;
 }
-
-$start = microtime(TRUE); // Module timing start
 
 /*
 RAPID-CITY::rcVlanPortType.513 = INTEGER: access(1)
@@ -66,8 +63,7 @@ RAPID-CITY::rcVlanPortDefaultVlanId.514 = INTEGER: 6
 // Base vlan IDs
 $ports_vlans_oids = snmpwalk_cache_oid($device, 'rcVlanPortDefaultVlanId', array(), 'RAPID-CITY');
 
-if (snmp_status())
-{
+if (snmp_status()) {
   echo("rcVlanPortDefaultVlanId ");
 
   $ports_vlans_oids = snmpwalk_cache_oid($device, 'rcVlanPortType', $ports_vlans_oids, 'RAPID-CITY');
@@ -88,8 +84,6 @@ if (snmp_status())
   }
 
 }
-
-$device_state['poller_ports_perf'][$port_module] += microtime(TRUE) - $start; // Module timing
 
 $headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
 print_cli_table($vlan_rows, $headers);

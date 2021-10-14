@@ -47,8 +47,8 @@ $rrd_multi = array();
 
 $count = safe_count($rrd_list);
 
-if (isset($colours) && $colours != "mixed" && strpos("mixed", $colours) !== FALSE)
-{
+if (isset($colours) && is_string($colours) &&
+    $colours !== "mixed" && str_contains($colours, "mixed")) {
   $config['graph_colours']['colours'] = generate_colour_gradient(reset($config['graph_colours'][$colours]), end($config['graph_colours'][$colours]), $count);
   $colours = 'colours';
 }

@@ -6,13 +6,14 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 include_once($config['install_dir'] . '/includes/polling/functions.inc.php');
 
 // Fetch all MIBs we support for this specific OS
+$mibs = [];
 foreach (get_device_mibs($device) as $mib) { $mibs[$mib]++; }
 
 // Sort alphabetically
@@ -65,8 +66,9 @@ if ($config['snmp']['errors']) {
     }
     $snmp_errors[$entry['mib']][] = $entry;
   }
-  ksort($snmp_errors);
+
   if (count($snmp_errors)) {
+    ksort($snmp_errors);
     $mib_grid = 5;
   }
 }

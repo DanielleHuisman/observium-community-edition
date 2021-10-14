@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,23 +14,19 @@ echo generate_box_open(array('box-class' => 'hidden-xl'));
 
 echo('<table class="table table-condensed table-striped table-hover">');
 
-if ($config['overview_show_sysDescr'])
-{
+if ($config['overview_show_sysDescr']) {
   echo('<tr><td colspan=2 style="padding: 10px;"><strong><i>' . escape_html($device['sysDescr']) . "</i></strong></td></tr>");
 }
 
-if ($device['purpose'])
-{
+if ($device['purpose']) {
   echo('<tr>
         <td class="entity">Description</td>
         <td>' . escape_html($device['purpose']) . '</td>
       </tr>');
 }
 
-if ($device['hardware'])
-{
-  if ($device['vendor'])
-  {
+if ($device['hardware']) {
+  if ($device['vendor']) {
     echo('<tr>
           <td class="entity">Vendor/Hardware</td>
           <td>' . escape_html($device['vendor'].' '.$device['hardware']) . '</td>
@@ -42,9 +37,7 @@ if ($device['hardware'])
           <td>' . escape_html($device['hardware']) . '</td>
         </tr>');
   }
-}
-else if ($device['vendor'])
-{
+} elseif ($device['vendor']) {
   // Only Vendor exist
   echo('<tr>
         <td class="entity">Vendor</td>
@@ -52,16 +45,14 @@ else if ($device['vendor'])
       </tr>');
 }
 
-if ($device['os'] != 'generic')
-{
+if ($device['os'] !== 'generic') {
   echo('<tr>
         <td class="entity">Operating system</td>
         <td>' . escape_html($device['os_text']) . ' ' . escape_html($device['version']) . ($device['features'] ? ' (' . escape_html($device['features']) . ')' : '') . ' </td>
       </tr>');
 }
 
-if ($device['sysName'])
-{
+if ($device['sysName']) {
   echo('<tr>
         <td class="entity">System name</td>');
   echo('
@@ -69,12 +60,18 @@ if ($device['sysName'])
       </tr>');
 }
 
-if ($device['sysContact'])
-{
+if ($_SESSION['userlevel'] >= 5 && $device['ip']) {
+  echo('<tr>
+        <td class="entity">Cached IP</td>');
+  echo('
+        <td>' . escape_html($device['ip']). '</td>
+      </tr>');
+}
+
+if ($device['sysContact']) {
   echo('<tr>
         <td class="entity">Contact</td>');
-  if (get_dev_attrib($device,'override_sysContact_bool'))
-  {
+  if (get_dev_attrib($device,'override_sysContact_bool')) {
     echo('
         <td>' . escape_html(get_dev_attrib($device,'override_sysContact_string')) . '</td>
       </tr>
@@ -86,14 +83,12 @@ if ($device['sysContact'])
       </tr>');
 }
 
-if ($device['location'])
-{
+if ($device['location']) {
   echo('<tr>
         <td class="entity">Location</td>
         <td>' . escape_html($device['location']) . '</td>
       </tr>');
-  if (get_dev_attrib($device,'override_sysLocation_bool') && !empty($device['real_location']))
-  {
+  if (get_dev_attrib($device,'override_sysLocation_bool') && !empty($device['real_location'])) {
     echo('<tr>
         <td class="entity">SNMP Location</td>
         <td>' . escape_html($device['real_location']) . '</td>
@@ -101,30 +96,24 @@ if ($device['location'])
   }
 }
 
-if ($device['asset_tag'])
-{
+if ($device['asset_tag']) {
   echo('<tr>
         <td class="entity">Asset tag</td>
         <td>' . escape_html($device['asset_tag']) . '</td>
       </tr>');
 }
 
-if ($device['serial'])
-{
+if ($device['serial']) {
   echo('<tr>
         <td class="entity">Serial</td>
         <td>' . escape_html($device['serial']) . '</td>
       </tr>');
 }
 
-if ($device['state']['la']['5min'])
-{
-  if ($device['state']['la']['5min'] > 10)
-  {
+if ($device['state']['la']['5min']) {
+  if ($device['state']['la']['5min'] > 10) {
     $la_class = 'text-danger';
-  }
-  else if ($device['state']['la']['5min'] > 4)
-  {
+  } elseif ($device['state']['la']['5min'] > 4) {
     $la_class = 'text-warning';
   } else {
     $la_class = '';
@@ -135,15 +124,14 @@ if ($device['state']['la']['5min'])
       </tr>');
 }
 
-if ($device['uptime'])
-{
+if ($device['uptime']) {
   echo('<tr>
         <td class="entity">Uptime</td>
         <td>' . deviceUptime($device) . '</td>
       </tr>');
 }
-if (FALSE &&
-    $device['status_type'] && $device['status_type'] != 'ok')
+/*
+if ($device['status_type'] && $device['status_type'] != 'ok')
 {
   if ($device['status_type'] == 'ping')
   {
@@ -163,9 +151,9 @@ if (FALSE &&
         <td>' . $reason . '</td>
       </tr>');
 }
+*/
 
-if ($device['last_rebooted'])
-{
+if ($device['last_rebooted']) {
   echo('<tr>
         <td class="entity">Last reboot</td>
         <td>' . format_unixtime($device['last_rebooted']) . '</td>

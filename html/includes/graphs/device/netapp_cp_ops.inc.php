@@ -31,7 +31,7 @@ foreach ($cp_stats as $stat => $descr)
 {
   $rrd_filename = get_rrd_path($device, 'netapp-cp.rrd');
 
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
     #$descr = nicecase($stat);
 

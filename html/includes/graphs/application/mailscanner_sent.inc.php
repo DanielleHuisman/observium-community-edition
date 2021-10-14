@@ -28,7 +28,7 @@ $colour_area_out_max = $config['colours']['graphs']['pkts']['out_max'];
 
 $mailscanner_rrd     = get_rrd_path($device, "app-mailscannerV2-" . $app['app_id'] . ".rrd");
 
-if (is_file($mailscanner_rrd))
+if (rrd_is_file($mailscanner_rrd))
 {
   $rrd_filename = $mailscanner_rrd;
 }

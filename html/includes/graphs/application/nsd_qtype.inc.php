@@ -38,7 +38,7 @@ foreach ($dns_qtype as $qtype)
 
 $i = 0;
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

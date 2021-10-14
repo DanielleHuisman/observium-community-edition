@@ -540,15 +540,14 @@ function print_counter_form($vars, $single_device = FALSE)
   }
 
   $counter_permitted = generate_query_permitted(array('device', 'counter'));
-  foreach (['counter_class' => 'Counter Class', 'counter_event' => 'Counter Event'] as $param => $param_name)
-  {
+  foreach ([ 'counter_class' => 'Counter Class', 'counter_event' => 'Counter Event' ] as $param => $param_name) {
     $sql = 'SELECT DISTINCT `'.$param.'` FROM `counters` WHERE `counter_deleted` = ?' . $counter_permitted;
-    $entries = dbFetchColumn($sql, [0]);
-    asort($entries);
-    foreach ($entries as $entry)
-    {
-      if ($entry == '') { $entry = OBS_VAR_UNSET; }
-      if ($param == 'counter_class')
+    if ($entries = dbFetchColumn($sql, [ 0 ])) {
+      asort($entries);
+    }
+    foreach ($entries as $entry) {
+      if (safe_empty($entry)) { $entry = OBS_VAR_UNSET; }
+      if ($param === 'counter_class')
       {
         $name = nicecase($entry);
         if (isset($config['counter_types'][$entry]['icon']))

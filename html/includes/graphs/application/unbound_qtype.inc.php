@@ -28,12 +28,12 @@ $colours = $config['graph_colours']['mixed']; # needs moar colours!
 
 foreach ($dns_qtype as $qtype)
 {
-  $array["qType$qtype"] = array('descr' => "$qtype", 'colour' => $colours[(safe_count($array) % safe_count($colours))]);
+  $array["qType$qtype"] = array('descr' => $qtype, 'colour' => $colours[(safe_count($array) % safe_count($colours))]);
 }
 
 $i            = 0;
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

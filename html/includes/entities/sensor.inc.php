@@ -462,16 +462,16 @@ function print_sensor_form($vars, $single_device = FALSE)
   }
 
   $sensor_permitted = generate_query_permitted(array('device', 'sensor'));
-  foreach (['sensor_class' => 'Sensor Class', 'sensor_event' => 'Sensor Event'] as $param => $param_name)
+  foreach ([ 'sensor_class' => 'Sensor Class', 'sensor_event' => 'Sensor Event' ] as $param => $param_name)
   {
     $sql = 'SELECT DISTINCT `'.$param.'` FROM `sensors` WHERE `sensor_deleted` = ?' . $sensor_permitted;
-    $entries = dbFetchColumn($sql, [0]);
-    asort($entries);
+    if ($entries = dbFetchColumn($sql, [ 0 ])) {
+      asort($entries);
+    }
     foreach ($entries as $entry)
     {
-      if ($entry == '') { $entry = OBS_VAR_UNSET; }
-      if ($param == 'sensor_class')
-      {
+      if (safe_empty($entry)) { $entry = OBS_VAR_UNSET; }
+      if ($param === 'sensor_class') {
         $name = nicecase($entry);
         if (isset($config['sensor_types'][$entry]['icon']))
         {

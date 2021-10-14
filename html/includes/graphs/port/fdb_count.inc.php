@@ -16,7 +16,7 @@ $scale_min = 0;
 include_once($config['html_dir'].'/includes/graphs/common.inc.php');
 
 $rrd = get_port_rrdfilename($port, 'fdbcount', TRUE);
-if (is_file($rrd))
+if (rrd_is_file($rrd))
 {
   $rrd_filename = $rrd;
 }

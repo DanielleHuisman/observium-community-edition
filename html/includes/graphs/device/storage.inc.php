@@ -35,7 +35,7 @@ foreach (dbFetchRows("SELECT * FROM storage where device_id = ?", array($device[
 
   $descr = rrdtool_escape(rewrite_entity_name($storage['storage_descr'], 'storage'), $descr_len);
   $rrd = get_rrd_path($device, "storage-".strtolower($storage['storage_mib'])."-".$storage['storage_descr'].".rrd");
-  if (is_file($rrd))
+  if (rrd_is_file($rrd))
   {
     $rrd_filename_escape = rrdtool_escape($rrd);
     $rrd_options .= " DEF:".$storage['storage_id']."used=$rrd_filename_escape:used:AVERAGE";

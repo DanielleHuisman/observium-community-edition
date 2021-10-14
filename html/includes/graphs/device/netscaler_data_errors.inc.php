@@ -27,7 +27,7 @@ $array = array(
         'ErrStrayPkt'         => array('descr' => 'ErrStrayPkt')
 );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

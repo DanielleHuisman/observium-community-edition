@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -14,8 +14,7 @@
 
 $oids = snmpwalk_cache_oid($device, 'cpqDaCntlrEntry', array(), 'CPQIDA-MIB');
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
   if (isset($entry['cpqDaCntlrBoardStatus']))
   {
     $hardware   = rewrite_cpqida_hardware($entry['cpqDaCntlrModel']);
@@ -59,7 +58,6 @@ foreach ($oids as $index => $entry)
   {
     $name .= ' ('.trim($entry['cpqDaPhyDrvSerialNum']).')';
   }
-  $name = preg_replace('/\s{2,}/', ' ', $name);
 
   if ($entry['cpqDaPhyDrvTemperatureThreshold'] > 0)
   {
@@ -96,13 +94,14 @@ foreach ($oids as $index => $entry)
 
 $oids = snmpwalk_cache_oid($device, 'cpqDaLogDrv', array(), 'CPQIDA-MIB');
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
 
-  $name   = 'Controller '. $entry['cpqDaLogDrvCntlrIndex'] . ' Logical Drive ' . $entry['cpqDaLogDrvIndex'];
-  if (!empty($entry['cpqDaLogDrvOsName']))
-  {
-    $name .= ' (' . $entry['cpqDaLogDrvOsName'] . ')';
+  $controller = rewrite_cpqida_hardware($entry['cpqDaCntlrModel']) . ' #' . $entry['cpqDaLogDrvCntlrIndex'];
+  $name = 'Logical Drive ' . $entry['cpqDaLogDrvIndex'];
+  if (!safe_empty($entry['cpqDaLogDrvOsName'])) {
+    $name .= ' (' . $entry['cpqDaLogDrvOsName'] . $controller . ')';
+  } else {
+    $name .= ' (' . $controller . ')';
   }
 
   $oid    = '.1.3.6.1.4.1.232.3.2.3.1.1.4.' . $index;
@@ -115,6 +114,23 @@ foreach ($oids as $index => $entry)
 
   discover_status_ng($device, $mib, 'cpqDaLogDrvCondition', $oid, $index, 'cpqDaLogDrvCondition', $name . ' Condition', $state, array('entPhysicalClass' => 'logicalDrive'));
 
+  // Do not ignore wrong 4294967295 value, because controller no other state when rebuild or initialization
+  // CPQIDA-MIB::cpqDaLogDrvPercentRebuild.3.1 = Gauge32: 4294967295
+  //if ($entry['cpqDaLogDrvPercentRebuild'] < 4294967295) {
+    $descr   = $name . ' Rebuild';
+    $oid     = ".1.3.6.1.4.1.232.3.2.3.1.1.12." . $index;
+    $value   = $entry['cpqDaLogDrvPercentRebuild'];
+    $options = [ 'limit_low' => 15, 'limit_low_warn' => 50 ];
+    discover_sensor_ng($device, 'progress', $mib, 'cpqDaLogDrvPercentRebuild', $oid, $index, NULL, $descr, 1, $value, $options);
+  //}
+  // CPQIDA-MIB::cpqDaLogDrvRPIPercentComplete.3.1 = Gauge32: 0
+  //if ($entry['cpqDaLogDrvRPIPercentComplete'] < 4294967295) {
+    $descr   = $name . ' Undergoing Parity Initialization';
+    $oid     = ".1.3.6.1.4.1.232.3.2.3.1.1.23." . $index;
+    $value   = $entry['cpqDaLogDrvRPIPercentComplete'];
+    $options = [ 'limit_low' => 15, 'limit_low_warn' => 50 ];
+    discover_sensor_ng($device, 'progress', $mib, 'cpqDaLogDrvRPIPercentComplete', $oid, $index, NULL, $descr, 1, $value, $options);
+  //}
 }
 
 // EOF

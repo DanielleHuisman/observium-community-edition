@@ -17,7 +17,7 @@ $i=0;
 foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? AND `pagpGroupIfIndex` = ?", array($port['device_id'], $port['ifIndex'])) as $int)
 {
   $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
-  if (is_file($rrdfile))
+  if (rrd_is_file($rrdfile))
   {
     $rrd_list[$i]['filename'] = $rrdfile;
     $rrd_list[$i]['descr'] = $int['ifDescr'];

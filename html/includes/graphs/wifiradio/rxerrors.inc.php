@@ -25,7 +25,7 @@ $array = array(
         'rx_decrypt_crcerr'  => array('descr' => 'Decrypt CRC Errors')
 );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($array as $ds => $data)
   {

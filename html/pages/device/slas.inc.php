@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -31,19 +30,19 @@ $sql = generate_sla_query($vars_type);
 
 $slas = dbFetchRows($sql);
 
-foreach ($slas as $sla)
-{
+$rtt_types = [];
+foreach ($slas as $sla) {
   $rtt_type = $sla['rtt_type'];
 
-  if (!in_array($rtt_type, $rtt_types))
-    if (isset($config['sla_type_labels'][$rtt_type]))
-    {
+  if (!isset($rtt_types[$rtt_type])) {
+    if (isset($config['sla_type_labels'][$rtt_type])) {
       $text = $config['sla_type_labels'][$rtt_type];
     } else {
       $text = nicecase($rtt_type);
     }
 
     $rtt_types[$rtt_type] = $text;
+  }
 }
 asort($rtt_types);
 

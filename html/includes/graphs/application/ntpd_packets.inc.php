@@ -22,7 +22,7 @@ $array        = array(
                       'packets_ignore' => array('descr' => 'Ignored', 'colour' => 'FF8800FF')
                      );
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   $i = 0;
 

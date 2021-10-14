@@ -181,8 +181,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
 
     echo generate_box_close();
 
-    $panel_html = ob_get_contents();
-    ob_end_clean();
+    $panel_html = ob_get_clean();
 
     register_html_panel($panel_html);
 
@@ -198,10 +197,8 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
 
   // Show tabs if the user has access to this device
 
-  if (device_permitted($device['device_id']))
-  {
-    if ($config['show_overview_tab'])
-    {
+  if (device_permitted($device['device_id'])) {
+    if ($config['show_overview_tab']) {
       $navbar['options']['overview'] = array('text' => 'Overview', 'icon' => $config['icon']['overview']);
     }
 
@@ -222,27 +219,8 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
               $health_exist['sensors'] || $health_exist['status'] || $health_exist['counter'] ||
               $health_exist['mempools'] || $health_exist['processors'];
 
-    if ($health)
-    {
+    if ($health) {
       $navbar['options']['health'] = array('text' => 'Health', 'icon' => $config['icon']['health']);
-    }
-
-    // Print applications tab if there are matching entries in `applications` table
-    if (dbExist('applications', '`device_id` = ?', array($device['device_id'])))
-    {
-      $navbar['options']['apps'] = array('text' => 'Apps', 'icon' => $config['icon']['apps']);
-    }
-    
-    // Print the collectd tab if there is a matching directory
-    if (isset($config['collectd_dir']) && is_dir($config['collectd_dir'] . "/" . $device['hostname'] ."/"))
-    {
-      $navbar['options']['collectd'] = array('text' => 'Collectd', 'icon' => $config['icon']['collectd']);
-    }
-
-    // Print the munin tab if there are matchng entries in the munin_plugins table
-    if (dbExist('munin_plugins', '`device_id` = ?', array($device['device_id'])))
-    {
-      $navbar['options']['munin'] = array('text' => 'Munin', 'icon' => $config['icon']['munin']);
     }
 
     // Ports submenu
@@ -258,8 +236,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     ];
 
     // Print the port tab if there are matching entries in the ports table
-    if ($ports_exist['ports'])
-    {
+    if ($ports_exist['ports']) {
       $navbar['options']['ports'] = array('text' => 'Ports', 'icon' => $config['icon']['port']);
 
       $navbar['options']['ports']['suboptions']['basic']['text']   = 'Basic';
@@ -268,8 +245,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
       $navbar['options']['ports']['suboptions']['divider_1']['divider'] = TRUE;
     }
     $option = 'ipv4';
-    if ($ports_exist[$option])
-    {
+    if ($ports_exist[$option]) {
       // Duplicate, because possible IPs without Ports
       $navbar['options']['ports']['text'] = 'Ports';
       $navbar['options']['ports']['icon'] = $config['icon']['port'];
@@ -278,8 +254,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
       //$navbar['options']['ports']['suboptions'][$option]['url']  = generate_url($link_array, [ 'view' => $option ]);
     }
     $option = 'ipv6';
-    if ($ports_exist[$option])
-    {
+    if ($ports_exist[$option]) {
       // Duplicate, because possible IPs without Ports
       $navbar['options']['ports']['text'] = 'Ports';
       $navbar['options']['ports']['icon'] = $config['icon']['port'];
@@ -288,8 +263,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
       //$navbar['options']['ports']['suboptions'][$option]['url']  = generate_url($link_array, [ 'view' => $option ]);
     }
     // Other ports options after Addresses
-    if ($ports_exist['ports'])
-    {
+    if ($ports_exist['ports']) {
       $filters_array = isset($vars['filters']) ? $vars['filters'] : [ 'deleted' => TRUE ];
       $link_array['filters'] = $filters_array;
 
@@ -326,43 +300,42 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     $ports_exist['navbar'] = $navbar['options']['ports']['suboptions'];
 
     // Ports options urls and active
-    foreach ($navbar['options']['ports']['suboptions'] as $option => $entry)
-    {
-      if (!isset($entry['url']))
-      {
+    foreach ($navbar['options']['ports']['suboptions'] as $option => $entry) {
+      if (!isset($entry['url'])) {
         $navbar['options']['ports']['suboptions'][$option]['url']  = generate_url($link_array, [ 'view' => $option ]);
-        if ($vars['tab'] === 'ports' && $vars['view'] === $option)
-        {
+        if ($vars['tab'] === 'ports' && $vars['view'] === $option) {
           $navbar['options']['ports']['suboptions'][$option]['class'] .= ' active';
         }
       }
     }
     //r($ports_exist);
 
-    // Juniper Firewall MIB. Some day generify this stuff.
-    if (isset($attribs['juniper-firewall-mib']))
-    {
-      $navbar['options']['juniper-firewall'] = array('text' => 'Firewall', 'icon' => $config['icon']['firewall']);
+    // Print vlans tab if there are matching entries in the vlans table
+    //if (dbFetchCell('SELECT COUNT(vlan_id) FROM vlans WHERE device_id = ?', array($device['device_id'])) > '0')
+    if (dbExist('vlans', '`device_id` = ?', array($device['device_id']))) {
+      $navbar['options']['vlans'] = array('text' => 'VLANs', 'icon' => $config['icon']['vlan']);
     }
 
     // Print the SLAs tab if there are matching entries in the slas table
     //if (dbFetchCell('SELECT COUNT(*) FROM `slas` WHERE `device_id` = ? AND `deleted` = 0', array($device['device_id'])) > '0')
-    if (dbExist('slas', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('slas', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['slas'] = array('text' => 'SLAs', 'icon' => $config['icon']['sla']);
+    }
+
+    // Juniper Firewall MIB. Some day generify this stuff.
+    if (isset($attribs['juniper-firewall-mib'])) {
+      $navbar['options']['juniper-firewall'] = array('text' => 'Firewall', 'icon' => $config['icon']['firewall']);
     }
 
     // Print the p2p radios tab if there are matching entries in the p2p radios
     //if (dbFetchCell('SELECT COUNT(radio_id) FROM p2p_radios WHERE device_id = ?', array($device['device_id'])) > '0')
-    if (dbExist('p2p_radios', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('p2p_radios', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['p2pradios'] = array('text' => 'Radios', 'icon' => $config['icon']['p2pradio']);
     }
 
     // Print the access points tab if there are matching entries in the accesspoints table (Aruba Legacy)
     //if (dbFetchCell('SELECT COUNT(accesspoint_id) FROM accesspoints WHERE device_id = ?', array($device['device_id'])) > '0')
-    if (dbExist('accesspoints', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('accesspoints', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['accesspoints'] = array('text' => 'APs (Legacy)', 'icon' => $config['icon']['wifi']);
     }
 
@@ -375,42 +348,75 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     $device_radio_exist = dbExist('wifi_radios', '`device_id` = ?', array($device['device_id']));
     $device_wlan_exist  = dbExist('wifi_wlans',  '`device_id` = ?', array($device['device_id']));
 
-    if ($device_ap_exist || $device_radio_exist || $device_wlan_exist)
-    {
+    if ($device_ap_exist || $device_radio_exist || $device_wlan_exist) {
       $navbar['options']['wifi'] = array('text' => 'WiFi', 'icon' => $config['icon']['wifi']);
     }
 
+    // Print applications tab if there are matching entries in `applications` table
+    //if (dbExist('applications', '`device_id` = ?', array($device['device_id']))) {
+    if ($apps = dbFetchColumn('SELECT DISTINCT `app_type` FROM `applications` WHERE `device_id` = ?', [ $device['device_id'] ])) {
+      $navbar['options']['apps'] = [ 'text' => 'Apps', 'icon' => $config['icon']['apps'] ];
+      $app_array = [ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'apps' ];
+      foreach ($apps as $app_type) {
+        $navbar['options']['apps']['suboptions'][$app_type]['text'] = nicecase($app_type);
+        //$url = generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'apps', 'app' => $app['app_type'], 'instance' => $app['app_id'] ));
+        $navbar['options']['apps']['suboptions'][$app_type]['url']  = generate_url($app_array, [ 'app' => $app_type ]);
+        if ($vars['tab'] === 'apps' && $vars['app'] === $app_type) {
+          $navbar['options']['apps']['suboptions'][$app_type]['class'] .= ' active';
+        }
+
+        // Detect and add application icon
+        $icon = $app_type;
+        $image = $config['html_dir'].'/images/apps/'.$icon.'.png';
+        if (!is_file($image)) {
+          list($icon) = explode('-', str_replace('_', '-', $app_type));
+          $image = $config['html_dir'].'/images/apps/'.$icon.'.png';
+          if ($icon !== $app_type && is_file($image)) {
+            // 'postfix_qshape' -> 'postfix'
+            // 'exim-mailqueue' -> 'exim'
+          } else {
+            $icon = 'apps'; // Generic
+          }
+        }
+        $navbar['options']['apps']['suboptions'][$app_type]['image'] = 'images/apps/'.$icon.'.png';
+        if (is_file($config['html_dir'].'/images/apps/'.$icon.'_2x.png')) {
+          // HiDPI icon
+          $navbar['options']['apps']['suboptions'][$app_type]['image_2x'] = 'images/apps/'.$icon.'_2x.png';
+        }
+      }
+    }
+
+    // Print the collectd tab if there is a matching directory
+    if (isset($config['collectd_dir']) && is_dir($config['collectd_dir'] . "/" . $device['hostname'] ."/")) {
+      $navbar['options']['collectd'] = array('text' => 'Collectd', 'icon' => $config['icon']['collectd']);
+    }
+
+    // Print the munin tab if there are matchng entries in the munin_plugins table
+    if (dbExist('munin_plugins', '`device_id` = ?', array($device['device_id']))) {
+      $navbar['options']['munin'] = array('text' => 'Munin', 'icon' => $config['icon']['munin']);
+    }
+
     // Build array of smokeping files for use in tab building and smokeping page.
-    if (isset($config['smokeping']['dir']))
-    {
+    if (isset($config['smokeping']['dir'])) {
       $smokeping_files = get_smokeping_files();
     }
 
     // Print latency tab if there are smokeping files with source or destination matching this hostname
-    if (safe_count($smokeping_files['incoming'][$device['hostname']]) || safe_count($smokeping_files['outgoing'][$device['hostname']]))
-    {
+    if (safe_count($smokeping_files['incoming'][$device['hostname']]) ||
+        safe_count($smokeping_files['outgoing'][$device['hostname']])) {
       $navbar['options']['latency'] = array('text' => 'Ping', 'icon' => $config['icon']['smokeping']);
-    }
-
-    // Print vlans tab if there are matching entries in the vlans table
-    //if (dbFetchCell('SELECT COUNT(vlan_id) FROM vlans WHERE device_id = ?', array($device['device_id'])) > '0')
-    if (dbExist('vlans', '`device_id` = ?', array($device['device_id'])))
-    {
-      $navbar['options']['vlans'] = array('text' => 'VLANs', 'icon' => $config['icon']['vlan']);
     }
 
     // Pring Virtual Machines tab if there are matching entries in the vminfo table
     //if (dbFetchCell('SELECT COUNT(vm_id) FROM vminfo WHERE device_id = ?', array($device['device_id'])) > '0')
-    if (dbExist('vminfo', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('vminfo', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['vm'] = array('text' => 'VMs', 'icon' => $config['icon']['virtual-machine']);
     }
 
     // $loadbalancer_tabs is used in device/loadbalancer/ to build the submenu. we do it here to save queries
 
     // Check for Netscaler vservers and services
-    if ($device['os'] === "netscaler") // Netscaler
-    {
+    if ($device['os'] === "netscaler") { // Netscaler
       $device_loadbalancer_count['netscaler_vsvr'] = dbFetchCell("SELECT COUNT(*) FROM `netscaler_vservers` WHERE `device_id` = ?", array($device['device_id']));
       if ($device_loadbalancer_count['netscaler_vsvr']) { $loadbalancer_tabs[] = 'netscaler_vsvr'; }
 
@@ -421,8 +427,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
       if ($device_loadbalancer_count['netscaler_servicegroupmembers']) { $loadbalancer_tabs[] = 'netscaler_servicegroupmembers'; }
     }
 
-    if ($device['os'] === "f5")  // F5
-    {
+    if ($device['os'] === "f5") { // F5
       $device_loadbalancer_count['lb_virtuals'] = dbFetchCell("SELECT COUNT(*) FROM `lb_virtuals` WHERE `device_id` = ?", array($device['device_id']));
       if ($device_loadbalancer_count['lb_virtuals']) { $loadbalancer_tabs[] = 'lb_virtuals'; }
 
@@ -434,8 +439,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     }
 
     // Check for Cisco ACE vservers
-    if ($device['os'] === "acsw")  // Cisco ACE
-    {
+    if ($device['os'] === "acsw") { // Cisco ACE
 	  /* FIXME. Undone by adama
       $device_loadbalancer_count['slb_vsvrs'] = dbFetchCell("SELECT COUNT(*) FROM `lb_slb_vsvrs` WHERE `device_id` = ?", array($device['device_id']));
       if ($device_loadbalancer_count['slb_vsvrs']) { $loadbalancer_tabs[] = 'slb_vsvrs'; }
@@ -451,8 +455,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     }
 
     // Print the load balancer tab if the loadbalancer_tabs array has entries.
-    if (is_array($loadbalancer_tabs))
-    {
+    if (is_array($loadbalancer_tabs)) {
       $navbar['options']['loadbalancer'] = array('text' => 'Load Balancer', 'icon' => $config['icon']['loadbalancer'], 'community' => FALSE);
     }
 
@@ -515,54 +518,43 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
 
     // Print the pseudowire tab if any of the routing tables contain matching entries
     //if (dbFetchCell("SELECT COUNT(*) FROM `pseudowires` WHERE `device_id` = ?", array($device['device_id'])))
-    if (dbExist('pseudowires', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('pseudowires', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['pseudowires'] = array('text' => 'Pseudowires', 'icon' => $config['icon']['pseudowire']);
     }
 
     // Print the packages tab if there are matching entries in the packages table
     //if (dbFetchCell('SELECT COUNT(*) FROM `packages` WHERE `device_id` = ?', array($device['device_id'])) > 0)
-    if (dbExist('packages', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('packages', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['packages'] = array('text' => 'Pkgs', 'icon' => $config['icon']['packages']);
     }
 
     // Print the Windows Services tab if there are matching entries in the winservices table
     //if (dbFetchCell('SELECT COUNT(*) FROM `winservices` WHERE `device_id` = ?', array($device['device_id'])) > 0)
-    if (dbExist('winservices', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('winservices', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['winservices'] = array('text' => 'Windows Services', 'icon' => $config['icon']['processes']);
     }
 
     // Print the inventory tab if inventory is enabled and either entphysical or hrdevice tables have entries
     //if (dbFetchCell('SELECT COUNT(*) FROM `entPhysical` WHERE `device_id` = ?', array($device['device_id'])) > 0)
-    if (dbExist('entPhysical', '`device_id` = ? AND `deleted` IS NULL', [ $device['device_id'] ]))
-    {
+    if (dbExist('entPhysical', '`device_id` = ? AND `deleted` IS NULL', [ $device['device_id'] ])) {
       $navbar['options']['entphysical'] = array('text' => 'Inventory', 'icon' => $config['icon']['inventory']);
-    }
-    //elseif (dbFetchCell('SELECT COUNT(*) FROM `hrDevice` WHERE `device_id` = ?', array($device['device_id'])) > 0)
-    elseif (dbExist('hrDevice', '`device_id` = ?', array($device['device_id'])))
-    {
+    } elseif (dbExist('hrDevice', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['hrdevice'] = array('text' => 'Inventory', 'icon' => $config['icon']['inventory']);
     }
 
-    if (isset($attribs['ps_list']))
-    {
+    if (isset($attribs['ps_list'])) {
       $navbar['options']['processes'] = array('text' => 'Processes', 'icon' => $config['icon']['processes']);
     }
 
     // Print probes tab if there are entries in the probes table
-    if (
-        dbExist('probes', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('probes', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['probes'] = array('text' => 'Probes', 'icon' => $config['icon']['status']);
     }
 
 
     // Print printing tab if there are entries in the printersupplies table
     //if (dbFetchCell('SELECT COUNT(*) FROM `printersupplies` WHERE device_id = ?', array($device['device_id'])) > 0)
-    if (dbExist('printersupplies', '`device_id` = ?', array($device['device_id'])))
-    {
+    if (dbExist('printersupplies', '`device_id` = ?', array($device['device_id']))) {
       $navbar['options']['printing'] = array('text' => 'Printing', 'icon' => $config['icon']['printersupply']);
 
       // $printing_tabs is used in device/printing/ to build the tabs menu. we build it here to save some queries
@@ -600,25 +592,21 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     */
 
     // If nfsen is enabled, check for an nfsen file
-    if ($config['nfsen_enable'])
-    {
-      $nfsen_rrd_file = get_nfsen_filename($device['hostname']);
-    }
-
-    // Print the netflow tab if we have an nfsen file
-    if ($nfsen_rrd_file)
-    {
+    if ($config['nfsen_enable'] &&
+        $nfsen_rrd_file = get_nfsen_filename($device['hostname'])) {
+      // Print the netflow tab if we have an nfsen file
       $navbar['options']['nfsen'] = array('text' => 'Netflow', 'icon' => $config['icon']['nfsen']);
     }
 
     $navbar['options']['notes']                             = array('text' => '', 'icon' => $config['icon']['notes'], 'right' => TRUE, 'class' => "dropdown-toggle");
 
-    if (is_array($config['os'][$device['os']]['remote_access']))
-    {
+    if (is_array($config['os'][$device['os']]['remote_access'])) {
       $connect_entries = array();
-      foreach ($config['os'][$device['os']]['remote_access'] as $name => $ra_array)
-      {
-        if (!is_array($ra_array)) { $name = $ra_array; $ra_array = array(); }
+      foreach ($config['os'][$device['os']]['remote_access'] as $name => $ra_array) {
+        if (!is_array($ra_array)) {
+          $name = $ra_array;
+          $ra_array = array();
+        }
 
         if (isset($config['remote_access'][$name])) {
           $ra_array = array_merge($ra_array, (array)$config['remote_access'][$name]);
@@ -628,21 +616,21 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
         $ra_array['url'] = get_dev_attrib($device, 'ra_url_' . $name);
 
         // If no attribute set, default to protocol://hostname:port
-        if ($ra_array['url'] == '')
-        {
+        if (safe_empty($ra_array['url'])) {
           $ra_array['url'] = $name.'://'.$device['hostname'].':'.$ra_array['port'];
         }
-        $connect_entries[]       = array('text' => 'Connect via '.$ra_array['name'], 'icon' => $ra_array['icon'], 'url' => $ra_array['url'], 'link_opts' => 'target="_blank"');
+        $connect_entries[] = [ 'text' => 'Connect via '.$ra_array['name'], 'icon' => $ra_array['icon'], 'url' => $ra_array['url'], 'link_opts' => 'target="_blank"' ];
       }
     }
 
     // If the user has global write permissions, show them the edit tab
-    if (is_entity_write_permitted($device['device_id'], 'device'))
-    {
-      $navbar['options']['tools']                             = array('text' => '', 'icon' => $config['icon']['tools'], 'url' => '#', 'right' => TRUE, 'class' => "dropdown-toggle");
+    if (is_entity_write_permitted($device['device_id'], 'device')) {
+      $navbar['options']['tools']                             = array('text' => '', 'icon' => $config['icon']['device-tools'], 'url' => '#', 'right' => TRUE, 'class' => "dropdown-toggle");
       $navbar['options']['tools']['suboptions']['data']       = array('text' => 'Device Data', 'icon' => $config['icon']['device-data']);
       $navbar['options']['tools']['suboptions']['perf']       = array('text' => 'Performance Data', 'icon' => $config['icon']['device-poller']);
-      if($config['web_enable_showtech']) { $navbar['options']['tools']['suboptions']['showtech']       = array('text' => 'Show Tech-Support', 'icon' => $config['icon']['techsupport']); }
+      if ($config['web_enable_showtech']) {
+        $navbar['options']['tools']['suboptions']['showtech'] = array('text' => 'Show Tech-Support', 'icon' => $config['icon']['techsupport']);
+      }
       $navbar['options']['tools']['suboptions']['divider_1']  = array('divider' => TRUE);
 
       // Connect menu
@@ -657,17 +645,15 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
 
       $navbar['options']['tools']['suboptions']['divider_3']  = array('divider' => TRUE);
 
-      $navbar['options']['tools']['suboptions']['edit']       = array('text' => 'Properties', 'icon' => $config['icon']['tools']);
+      // All properties
+      $navbar['options']['tools']['suboptions']['edit']       = array('text' => 'Properties', 'icon' => $config['icon']['device-settings']);
 
-    } else {
-
-        // User-only cog menu
-      if(safe_count($connect_entries)) {
-        $navbar['options']['tools']                                     = array('text' => '', 'icon' => $config['icon']['tools'], 'url' => '#', 'right' => TRUE, 'class' => "dropdown-toggle");
-        $navbar['options']['tools']['suboptions']['connect']            = array('text' => 'Connect', 'icon' => 'sprite-config', 'url' => '#');
-        $navbar['options']['tools']['suboptions']['connect']['entries'] = $connect_entries;
-        $navbar['options']['tools']['suboptions']['divider_2']          = array('divider' => TRUE);
-      }
+    } elseif (safe_count($connect_entries)) {
+      // User-only cog menu
+      $navbar['options']['tools']                                     = array('text' => '', 'icon' => $config['icon']['device-tools'], 'url' => '#', 'right' => TRUE, 'class' => "dropdown-toggle");
+      $navbar['options']['tools']['suboptions']['connect']            = array('text' => 'Connect', 'icon' => 'sprite-config', 'url' => '#');
+      $navbar['options']['tools']['suboptions']['connect']['entries'] = $connect_entries;
+      $navbar['options']['tools']['suboptions']['divider_2']          = array('divider' => TRUE);
     }
 ?>
 
@@ -729,24 +715,23 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     foreach ($navbar['options'] as $option => $array)
     {
       if (!isset($vars['tab'])) { $vars['tab'] = $option; }
-      if ($vars['tab'] == $option) { $navbar['options'][$option]['class'] .= " active"; }
-      if (!isset($navbar['options'][$option]['url']))
-      {
+      if ($vars['tab'] === $option) { $navbar['options'][$option]['class'] .= " active"; }
+      if (!isset($navbar['options'][$option]['url'])) {
         $navbar['options'][$option]['url'] = generate_device_url($device, array('tab' => $option));
       }
 
-      if (isset($navbar['options'][$option]['suboptions']))
-      {
-        foreach ($navbar['options'][$option]['suboptions'] as $sub_option => $sub_array)
-        {
-          if (!isset($navbar['options'][$option]['suboptions'][$sub_option]['url'])) { $navbar['options'][$option]['suboptions'][$sub_option]['url'] = generate_device_url($device, array('tab' => $sub_option)); }
+      if (isset($navbar['options'][$option]['suboptions'])) {
+        foreach ($navbar['options'][$option]['suboptions'] as $sub_option => $sub_array) {
+          if (!isset($navbar['options'][$option]['suboptions'][$sub_option]['url'])) {
+            $navbar['options'][$option]['suboptions'][$sub_option]['url'] = generate_device_url($device, array('tab' => $sub_option));
+          }
         }
       }
     }
 
-    if ($vars['tab'] == 'port')        { $navbar['options']['ports']['class'] .= " active"; }
-    if ($vars['tab'] == 'alert')       { $navbar['options']['alerts']['class'] .= " active"; }
-    if ($vars['tab'] == 'accesspoint') { $navbar['options']['accesspoints']['class'] .= " active"; }
+    if ($vars['tab'] === 'port')        { $navbar['options']['ports']['class'] .= " active"; }
+    if ($vars['tab'] === 'alert')       { $navbar['options']['alerts']['class'] .= " active"; }
+    if ($vars['tab'] === 'accesspoint') { $navbar['options']['accesspoints']['class'] .= " active"; }
 
     print_navbar($navbar);
     unset($navbar);

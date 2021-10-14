@@ -17,7 +17,7 @@ foreach (dbFetchRows("SELECT * FROM `netscaler_vservers` WHERE `device_id` = ?",
 {
   $rrd_filename = get_rrd_path($device, "netscaler-vsvr-".$vsvr['vsvr_name'].".rrd");
 
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
     $rrd_list[$i]['filename']  = $rrd_filename;
     $rrd_list[$i]['descr']     = $vsvr['vsvr_name'];

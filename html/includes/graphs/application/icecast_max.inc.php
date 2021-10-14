@@ -22,7 +22,7 @@ $graph_max       = 0;
 $unit_text       = "Max";
 $icecast_rrd     = get_rrd_path($device, "app-icecast-".$app['app_id'].".rrd");
 
-if (is_file($icecast_rrd))
+if (rrd_is_file($icecast_rrd))
 {
 	$rrd_filename = $icecast_rrd;
 }

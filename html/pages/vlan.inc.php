@@ -39,8 +39,6 @@ if ($_SESSION['userlevel'] < 5) {
 
       if (is_array($vlan['names'])) {
         ksort($vlan['names']);
-      } else {
-        //r($vlan);
       }
 
       // Fixme - improve method of choosing which name to use.

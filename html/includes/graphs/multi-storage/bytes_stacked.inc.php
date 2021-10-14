@@ -56,7 +56,7 @@ foreach ($vars['id'] as $storage_id)
    $descr = rrdtool_escape(rewrite_entity_name($storage['storage_descr'], 'storage'), $descr_len);
    if (isset($storage['storage_type'])) { $storage['storage_mib'] = $storage['storage_type']; }
 
-   if (is_file($rrd_filename))
+   if (rrd_is_file($rrd_filename))
    {
       $rrd_filename_escape = rrdtool_escape($rrd_filename);
 

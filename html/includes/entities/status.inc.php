@@ -387,15 +387,14 @@ function print_status_form($vars, $single_device = FALSE)
   }
 
   $status_permitted = generate_query_permitted(array('device', 'status'));
-  foreach (['entPhysicalClass' => 'Physical Class', 'status_event' => 'Status Event', 'status_name' => 'Status'] as $param => $param_name)
-  {
+  foreach ([ 'entPhysicalClass' => 'Physical Class', 'status_event' => 'Status Event', 'status_name' => 'Status' ] as $param => $param_name) {
     $sql = 'SELECT DISTINCT `'.$param.'` FROM `status` WHERE `status_deleted` = ?' . $status_permitted;
-    $entries = dbFetchColumn($sql, [0]);
-    asort($entries);
-    foreach ($entries as $entry)
-    {
-      if ($entry == '') { $entry = OBS_VAR_UNSET; }
-      if ($param == 'entPhysicalClass')
+    if ($entries = dbFetchColumn($sql, [ 0 ])) {
+      asort($entries);
+    }
+    foreach ($entries as $entry) {
+      if (safe_empty($entry)) { $entry = OBS_VAR_UNSET; }
+      if ($param === 'entPhysicalClass')
       {
         $name = nicecase($entry);
         if (isset($config['icon'][strtolower($entry)]))

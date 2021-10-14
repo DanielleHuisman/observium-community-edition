@@ -21,7 +21,7 @@ $oids = array('dot3StatsAlignmentErrors', 'dot3StatsFCSErrors', 'dot3StatsSingle
 $i = 0;
 $rrd_filename = get_port_rrdfilename($port, "dot3", TRUE);
 
-if (is_file($rrd_filename))
+if (rrd_is_file($rrd_filename))
 {
   foreach ($oids as $oid)
   {

@@ -10,17 +10,8 @@
  *
  */
 
-print_warning("This page allows you to disable applications for this device that were previously enabled. Observium agent applications are automatically detected by the poller system.");
-
-# Load our list of available applications
-if ($handle = opendir($config['install_dir'] . "/includes/polling/applications/")) {
-  while (false !== ($file = readdir($handle))) {
-    if ($file != "." && $file != ".." && strstr($file, ".inc.php")) {
-      $applications[] = str_replace(".inc.php", "", $file);
-    }
-  }
-  closedir($handle);
-}
+print_warning("This page allows you to disable applications for this device that were previously enabled. " .
+              "Observium agent applications are automatically detected by the poller system.");
 
 # Check if the form was POSTed
 if ($vars['device']) {
@@ -30,12 +21,10 @@ if ($vars['device']) {
     $updated = 0;
     $param[] = $device['device_id'];
     $enabled = [];
-    foreach (array_keys($vars) as $key)
-    {
-      if (substr($key,0,4) == 'app_')
-      {
-        $param[] = substr($key,4);
-        $enabled[] = substr($key,4);
+    foreach (array_keys($vars) as $key) {
+      if (str_starts($key, 'app_')) {
+        $param[] = substr($key, 4);
+        $enabled[] = substr($key, 4);
         $replace[] = "?";
       }
     }
@@ -51,7 +40,7 @@ if ($vars['device']) {
     }
 
     foreach ($enabled as $app) {
-      if (!in_array($app,$app_in_db)) {
+      if (!in_array($app, $app_in_db)) {
         $updated += dbInsert(array('device_id' => $device['device_id'], 'app_type' => $app), 'applications');
       }
     }
@@ -90,12 +79,20 @@ if (safe_count($apps_enabled)) {
 
 <?php
 
-foreach ($applications as $app)
-{
-  if (in_array($app,$app_enabled))
-  {
+# Load our list of available applications
+if ($handle = opendir($config['install_dir'] . "/includes/polling/applications/")) {
+  while (false !== ($file = readdir($handle))) {
+    if ($file != "." && $file != ".." && strstr($file, ".inc.php")) {
+      $applications[] = str_replace(".inc.php", "", $file);
+    }
+  }
+  closedir($handle);
+}
+
+foreach ($applications as $app) {
+  if (in_array($app, $app_enabled)) {
     echo("    <tr>");
-    echo("      <td>");
+    //echo("      <td>");
     $item = array(
       'id'            => 'app_' . $app,
       'type'          => 'switch-ng',
@@ -113,7 +110,7 @@ foreach ($applications as $app)
       'value'         => 1
     );
     echo('<td class="text-center">'.generate_form_element($item).'</td>');
-    echo("      </td>");
+    //echo("      </td>");
     echo("      <td>". nicecase($app) . "</td>");
     echo("    </tr>");
 

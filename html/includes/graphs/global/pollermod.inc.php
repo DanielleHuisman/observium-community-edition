@@ -43,7 +43,7 @@ foreach ($devices AS $device_id => $device)
 
   $rrd_filename = get_rrd_path($device, 'perf-pollermodule-'.$vars['module'].'.rrd');
 
-  if (is_file($rrd_filename))
+  if (rrd_is_file($rrd_filename))
   {
 
     $rrd_list[$i]['filename'] = $rrd_filename;

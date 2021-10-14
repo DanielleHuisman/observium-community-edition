@@ -569,9 +569,8 @@ $menu_start = utime();
                    $menu_items[1] = array('current', 'voltage', 'power', 'apower', 'rpower', 'frequency');
                    $menu_items[2] = array_diff(array_keys((array)$cache['sensors']['types']), $menu_items[0], $menu_items[1]);
 
-                   foreach ($menu_items as $items)
-                   {
-                       sort($items);
+                   foreach ($menu_items as $items) {
+                      if (is_array($items)) { sort($items); }
 
                       foreach ($items as $item)
                       {
