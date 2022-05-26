@@ -1,31 +1,29 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage applications
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
-if (!empty($app_data['memory']))
-{
+if (!safe_empty($app_data['memory'])) {
   $memory_used = $app_data['memory']['used'] - $app_data['memory']['cache'];
-  $memory_used_perc = round($memory_used / $app_data['memory']['total'] * 100, 2);
-  $memory_cached_perc = round(($app_data['memory']['cache'] / $app_data['memory']['total']) * 100, 2);
+  $memory_used_perc = round(float_div($memory_used, $app_data['memory']['total']) * 100, 2);
+  $memory_cached_perc = round(float_div($app_data['memory']['cache'], $app_data['memory']['total']) * 100, 2);
   $memory_free = $app_data['memory']['total'] - $app_data['memory']['used'];
-  $memory_free_perc = round($memory_free / $app_data['memory']['total'] * 100, 2);
+  $memory_free_perc = round(float_div($memory_free, $app_data['memory']['total']) * 100, 2);
 
   $graph_array = array();
   $graph_array['height'] = "100";
   $graph_array['width']  = "512";
-  $graph_array['to']     = $config['time']['now'];
+  $graph_array['to']     = get_time();
   $graph_array['id']     = $app['app_id'];
   $graph_array['type']   = 'application_mssql_memory_usage';
-  $graph_array['from']   = $config['time']['day'];
+  $graph_array['from']   = get_time('day');
   $graph_array['legend'] = "no";
   $graph = generate_graph_tag($graph_array);
 
@@ -37,7 +35,7 @@ if (!empty($app_data['memory']))
   $overlib_content = generate_overlib_content($graph_array, $app['app_instance'] . " - Memory Usage");
 
   $percentage_bar            = array();
-  $percentage_bar['border']  = "#EA8F00";
+  //$percentage_bar['border']  = "#EA8F00";
   $percentage_bar['border']  = "#E25A00";
   $percentage_bar['bg']      = "#f0f0f0";
   $percentage_bar['width']   = "100%";

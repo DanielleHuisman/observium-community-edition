@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -30,10 +29,9 @@
   STE2-MIB::sensID.2 = INTEGER: 3594
  */
 
-$oids = snmpwalk_cache_oid($device, 'sensTable', array(), 'STE2-MIB');
+$oids = snmpwalk_cache_oid($device, 'sensTable', [], 'STE2-MIB');
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
   $descr    = $entry['sensName'];
 
   $oid_name = 'sensValue';
@@ -43,7 +41,7 @@ foreach ($oids as $index => $entry)
   $value    = $entry[$oid_name];
 
   $options = array();
-  // sensUnit: none (0), celsius (1), fahrenheit (2), kelvin (3), percent(4)
+  // sensUnit: none (0), celsius (1), fahrenheit (2), kelvin (3), percent(4), 5
   switch ($entry['sensUnit'])
   {
     case 'celsius':
@@ -60,13 +58,15 @@ foreach ($oids as $index => $entry)
     case 'percent':
       $sensor_type = 'humidity';
       break;
-    default:
+    case 'none':
       continue 2; // continue foreach loop
+    default:
+      $sensor_type = 'status';
   }
 
-  if ($entry['sensState'] != 'invalid')
-  {
-    discover_sensor($sensor_type, $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+  if ($entry['sensState'] !== 'invalid' && $sensor_type !== 'status') {
+    //discover_sensor($sensor_type, $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $sensor_type, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
   }
 
   $oid_name = 'sensState';
@@ -74,7 +74,8 @@ foreach ($oids as $index => $entry)
   $type     = 'ste2-SensorState';
   $value    = $entry[$oid_name];
 
-  discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, array('entPhysicalClass' => 'other'));
+  //discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, [ 'entPhysicalClass' => 'other' ]);
+  discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, [ 'entPhysicalClass' => 'other' ]);
 }
 
 /**

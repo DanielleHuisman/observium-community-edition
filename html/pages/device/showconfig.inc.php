@@ -142,10 +142,10 @@ if ($_SESSION['userlevel'] >= 7) {
         $diff = 'No Difference';
       }
     }
+  } elseif (is_file($device_config_file)) {
+    $device_config = file_get_contents($device_config_file);
   } else {
-    $fh = fopen($device_config_file, 'r') or die("Can't open file");
-    $device_config = fread($fh, filesize($device_config_file));
-    fclose($fh);
+    $device_config = '';
   }
 
   if ($config['rancid_ignorecomments']) {

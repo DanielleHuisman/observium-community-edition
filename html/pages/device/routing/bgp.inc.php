@@ -29,10 +29,10 @@ echo generate_box_open();
     foreach (dbFetchRows('SELECT `bgpPeer_id`,`local_as`,`bgpPeerState`,`bgpPeerAdminStatus`,`bgpPeerRemoteAs` FROM `bgpPeers` WHERE `device_id` = ?;', array($device['device_id'])) as $bgp)
     {
       $sessions['count']++;
-      if ($bgp['bgpPeerAdminStatus'] == 'start' || $bgp['bgpPeerAdminStatus'] == 'running')
+      if ($bgp['bgpPeerAdminStatus'] === 'start' || $bgp['bgpPeerAdminStatus'] === 'running')
       {
         $sessions['enabled']++;
-        if ($bgp['bgpPeerState'] != 'established')
+        if ($bgp['bgpPeerState'] !== 'established')
         {
           $sessions['alerts']++;
         } else {
@@ -129,11 +129,11 @@ foreach ($statuses as $option => $text)
 }
 
 $navbar['options_right']['details']['text'] = 'No Graphs';
-if ($vars['view'] == 'details') { $navbar['options_right']['details']['class'] .= ' active'; }
+if ($vars['view'] === 'details') { $navbar['options_right']['details']['class'] .= ' active'; }
 $navbar['options_right']['details']['url'] = generate_url($vars, array('view' => 'details', 'graph' => 'NULL'));
 
 $navbar['options_right']['updates']['text'] = 'Updates';
-if ($vars['graph'] == 'updates') { $navbar['options_right']['updates']['class'] .= ' active'; }
+if ($vars['graph'] === 'updates') { $navbar['options_right']['updates']['class'] .= ' active'; }
 $navbar['options_right']['updates']['url'] = generate_url($vars, array('view' => 'graphs', 'graph' => 'updates'));
 
 /*
@@ -151,18 +151,24 @@ foreach ($device['graphs'] as $entry)
 }
 */
 
-$bgp_graphs = array('unicast'   => array('text' => 'Unicast'),
-                    'multicast' => array('text' => 'Multicast'),
-                    'mac'       => array('text' => 'MAC Accounting'));
-$bgp_graphs['unicast']['types'] = array('prefixes_ipv4unicast' => 'IPv4 Ucast Prefixes',
-                                        'prefixes_ipv6unicast' => 'IPv6 Ucast Prefixes',
-                                        'prefixes_ipv4vpn'     => 'VPNv4 Prefixes');
-$bgp_graphs['multicast']['types'] = array('prefixes_ipv4multicast' => 'IPv4 Mcast Prefixes',
-                                          'prefixes_ipv6multicast' => 'IPv6 Mcast Prefixes');
-
-$bgp_graphs['mac'] = array('text' => 'MAC Accounting');
-$bgp_graphs['mac']['types'] = array('macaccounting_bits' => 'MAC Bits',
-                                    'macaccounting_pkts' => 'MAC Pkts');
+$bgp_graphs = [
+  'unicast'   => array('text' => 'Unicast'),
+  'multicast' => array('text' => 'Multicast'),
+  'mac'       => array('text' => 'MAC Accounting')
+];
+$bgp_graphs['unicast']['types'] = [
+  'prefixes_ipv4unicast' => 'IPv4 Ucast Prefixes',
+  'prefixes_ipv6unicast' => 'IPv6 Ucast Prefixes',
+  'prefixes_ipv4vpn'     => 'VPNv4 Prefixes'
+];
+$bgp_graphs['multicast']['types'] = [
+  'prefixes_ipv4multicast' => 'IPv4 Mcast Prefixes',
+  'prefixes_ipv6multicast' => 'IPv6 Mcast Prefixes'
+];
+$bgp_graphs['mac']['types'] = [
+  'macaccounting_bits' => 'MAC Bits',
+  'macaccounting_pkts' => 'MAC Pkts'
+];
 foreach ($bgp_graphs as $bgp_graph => $bgp_options)
 {
   $navbar['options_right'][$bgp_graph]['text'] = $bgp_options['text'];

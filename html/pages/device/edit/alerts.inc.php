@@ -42,10 +42,30 @@ if ($vars['editing']) {
       $device['ignore_until'] = '';
     }
 
+    foreach (array('ignore') as $param)
+    {
+
+      if (!in_array($param, array('purpose', 'poller_id')))
+      {
+        // Boolean params
+        $vars[$param] = get_var_true($vars[$param]) ? '1' : '0';
+      }
+      if ($vars[$param] != $device[$param])
+      {
+        $update[$param] = $vars[$param];
+      }
+    }
+
     dbUpdate($update, 'devices', '`device_id` = ?', array($device['device_id']));
 
     $update_message = "Device alert settings updated.";
     $updated = 1;
+
+      // Request for clear WUI cache
+      set_cache_clear('wui');
+
+      $device = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", array($device['device_id']));
+
   }
 
   if ($updated && $update_message) {
@@ -70,7 +90,18 @@ $disable_notify = get_dev_attrib($device,'disable_notify');
       $form['row'][0]['editing']   = array(
                                       'type'        => 'hidden',
                                       'value'       => 'yes');
-      $form['row'][1]['ignore_until'] = array(
+
+      $form['row'][1]['ignore'] = array(
+                                      'type'        => 'toggle',
+                                      'view'        => 'toggle',
+                                      'palette'     => 'yellow',
+                                      'name'        => 'Ignore Device',
+                                      //'fieldset'    => 'edit',
+                                      'placeholder' => 'Suppresses alerts and notifications. Hides device from some UI elements.',
+                                      'readonly'    => $readonly,
+                                      'value'       => $device['ignore']);
+
+      $form['row'][2]['ignore_until'] = array(
                                       'type'        => 'datetime',
                                       //'fieldset'    => 'edit',
                                       'name'        => 'Ignore Until',
@@ -80,14 +111,14 @@ $disable_notify = get_dev_attrib($device,'disable_notify');
                                       'disabled'    => empty($device['ignore_until']),
                                       'min'         => 'current',
                                       'value'       => $device['ignore_until'] ?: '');
-      $form['row'][1]['ignore_until_enable'] = array(
+      $form['row'][2]['ignore_until_enable'] = array(
                                       'type'        => 'toggle',
                                       'size'        => 'large',
                                       'readonly'    => $readonly,
                                       'onchange'    => "toggleAttrib('disabled', 'ignore_until')",
                                       'value'       => !empty($device['ignore_until']));
 
-      $form['row'][2]['override_sysContact'] = array(
+      $form['row'][3]['override_sysContact'] = array(
                                       'type'        => 'toggle',
                                       'view'        => 'toggle',
                                       'palette'     => 'yellow',
@@ -97,7 +128,7 @@ $disable_notify = get_dev_attrib($device,'disable_notify');
                                       'readonly'    => $readonly,
                                       'onchange'    => "toggleAttrib('disabled', 'sysContact')",
                                       'value'       => $override_sysContact_bool);
-      $form['row'][3]['sysContact'] = array(
+      $form['row'][4]['sysContact'] = array(
                                       'type'        => 'text',
                                       //'fieldset'    => 'edit',
                                       'name'        => 'Custom contact',

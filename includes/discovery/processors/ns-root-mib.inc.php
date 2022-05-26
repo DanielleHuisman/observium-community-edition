@@ -15,14 +15,11 @@
 #NS-ROOT-MIB::nsCPUname."cpu0" = STRING: "cpu0"
 #NS-ROOT-MIB::nsCPUusage."cpu0" = Gauge32: 0
 
-if (!is_array($nsaarray))
-{
-  $nsarray = array();
-  $nsarray = snmpwalk_cache_oid($device, 'nsCPUTable', $nsarray, $mib);
+if (safe_empty($nsaarray)) {
+  $nsarray = snmpwalk_cache_oid($device, 'nsCPUTable', [], $mib);
 }
 
-foreach ($nsarray as $descr => $data)
-{
+foreach ($nsarray as $descr => $data) {
 
   $current = $data['nsCPUusage'];
 

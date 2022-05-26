@@ -8,12 +8,12 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
             FROM SNMPv2-CONF
         Integer32, Counter32, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
             FROM SNMPv2-SMI
-        TruthValue, MacAddress
+        TruthValue, MacAddress, RowStatus
             FROM SNMPv2-TC;
 
     -- 1.3.6.1.4.1.11.2.14.11.5.1.119
     hpicfArpThrottle MODULE-IDENTITY
-        LAST-UPDATED "201505070000Z"
+        LAST-UPDATED "202106100000Z"
         ORGANIZATION  "HP Networking"
         CONTACT-INFO
             "Hewlett-Packard Company
@@ -22,6 +22,11 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
         DESCRIPTION
             "This MIB module contains HP proprietary
              objects for managing ARP throttling."
+        REVISION "202106100000Z"
+        DESCRIPTION
+            "Added hpicfArpThrottleStatsNumClientsInDenylist and
+             hpicfArpThrottleDenylistAgingTime."
+
         REVISION "201505070000Z"
         DESCRIPTION
             "Initial revision."
@@ -73,7 +78,7 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
         STATUS      current
         DESCRIPTION "The administrative status of the ARP Throttle feature.
                      true(1)  - enabled;
-                     false(2) – disabled."
+                     false(2) - disabled."
         ::= { hpicfArpThrottleConfig 1 }
 
     -- 1.3.6.1.4.1.11.2.14.11.5.1.119.1.2.2
@@ -98,7 +103,7 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
         STATUS      current
         DESCRIPTION
             "The maximum number of ARP packets a client can send in 5 seconds. When a
-             client goes over the threshold, it will be put into a blacklist and
+             client goes over the threshold, it will be put into a denylist and
              subject to the configured remediation action."
         DEFVAL     { 30 }
         ::= { hpicfArpThrottleConfig 3 }
@@ -121,6 +126,16 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
         DESCRIPTION
             "List of excluded MAC addresses that are not subject to throttling."
         ::= { hpicfArpThrottleConfig 5 }
+
+    -- 1.3.6.1.4.1.11.2.14.11.5.1.119.1.2.6
+    hpicfArpThrottleDenylistAgingTime OBJECT-TYPE
+        SYNTAX      Integer32 (1..86400)
+        UNITS       "seconds"
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The time a client stays in the denylist, in seconds."
+        DEFVAL      { 300 }
+        ::= { hpicfArpThrottleConfig 6 }
 
     -- 1.3.6.1.4.1.11.2.14.11.5.1.119.1.2.5.1
     hpicfArpThrottleExcludedMacEntry OBJECT-TYPE
@@ -181,6 +196,13 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
         DESCRIPTION  "Total number of clients being tracked for their ARP packets."
         ::= { hpicfArpThrottleStats 2 }
 
+    -- 1.3.6.1.4.1.11.2.14.11.5.1.119.1.3.3
+    hpicfArpThrottleStatsNumClientsInDenylist OBJECT-TYPE
+        SYNTAX       Counter32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  "Total number of clients in denylist."
+        ::= { hpicfArpThrottleStats 3 }
 
 -- Object Groups
 
@@ -194,13 +216,12 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
             hpicfArpThrottleRemediationMode,
             hpicfArpThrottleThreshold,
             hpicfArpThrottleBlacklistAgingTime,
-            hpicfArpThrottleExcludedMac,
             hpicfArpThrottleExcludedMacStatus,
             hpicfArpThrottleStatsNumClientsInBlacklist,
             hpicfArpThrottleStatsNumClientsBeingTracked,
             hpicfArpThrottleClientOverThreshold
         }
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "A group of objects that provides ARP throttle configuration,
                      Statistics, and traps."
         ::= { hpicfArpThrottleGroups 1 }
@@ -212,6 +233,24 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
         DESCRIPTION "A group of notifications for ARP throttle."
         ::= { hpicfArpThrottleGroups 2 }
 
+    -- 1.3.6.1.4.1.11.2.14.11.5.1.119.2.1.3
+    hpicfArpThrottleBaseGroup1 OBJECT-GROUP
+        OBJECTS  {
+            hpicfArpThrottleEnable,
+            hpicfArpThrottleRemediationMode,
+            hpicfArpThrottleThreshold,
+            hpicfArpThrottleBlacklistAgingTime,
+            hpicfArpThrottleExcludedMacStatus,
+            hpicfArpThrottleStatsNumClientsInBlacklist,
+            hpicfArpThrottleStatsNumClientsBeingTracked,
+            hpicfArpThrottleClientOverThreshold,
+            hpicfArpThrottleDenylistAgingTime,
+            hpicfArpThrottleStatsNumClientsInDenylist
+        }
+        STATUS      current
+        DESCRIPTION "A group of objects that provides ARP throttle configuration,
+                     Statistics, and traps."
+        ::= { hpicfArpThrottleGroups 3 }
 
     -- Compliances
 
@@ -221,7 +260,7 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
 
     -- 1.3.6.1.4.1.11.2.14.11.5.1.119.2.2.1
     hpicfArpThrottleCompliance MODULE-COMPLIANCE
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION
             "The compliance statement for HP switches that support ARP Throttle."
         MODULE      -- this module
@@ -230,6 +269,18 @@ HP-ICF-ARP-THROTTLE DEFINITIONS ::= BEGIN
             hpicfArpThrottleNotificationGroup
         }
         ::= { hpicfArpThrottleCompliances 1 }
+
+    -- 1.3.6.1.4.1.11.2.14.11.5.1.119.2.2.2
+    hpicfArpThrottleCompliance1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "The compliance statement for HP switches that support ARP Throttle."
+        MODULE      -- this module
+        MANDATORY-GROUPS {
+            hpicfArpThrottleBaseGroup1,
+            hpicfArpThrottleNotificationGroup
+        }
+        ::= { hpicfArpThrottleCompliances 2 }
 
 END
 

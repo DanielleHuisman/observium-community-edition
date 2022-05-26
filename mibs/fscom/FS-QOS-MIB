@@ -1,0 +1,1187 @@
+-- *****************************************************************
+-- FS-QOS-MIB.mib:  FS QoS MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-QOS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Counter64,
+        Unsigned32,
+        Counter32
+                FROM SNMPv2-SMI
+        DisplayString
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        IfIndex
+                FROM FS-TC    
+        EnabledStatus 
+                FROM P-BRIDGE-MIB                            
+        fsMgmt
+                FROM FS-SMI;
+
+fsQoSMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs QoS(Policy-Based Quality of Service) mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 18}
+
+-- Priority configure
+
+fsQoSPriorityMIBObjects OBJECT IDENTIFIER ::= { fsQoSMIB 1 }
+
+fsQoSGlobalStatus OBJECT-TYPE
+    SYNTAX  EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+           "QoS function status"
+         ::={ fsQoSPriorityMIBObjects 1 }
+                  
+fsPriorityTrafficClassNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of the traffic class the priority can mapping to.
+            Traffic class is a  number in the range (1..fsPriorityTrafficClassNum)"
+        ::= { fsQoSPriorityMIBObjects 2 }
+
+fsPriorityClassNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of the priority class.
+             The range of Priority class is (0..(fsPriorityClassNum-1))"
+        ::= { fsQoSPriorityMIBObjects 3 }
+
+fsPriorityDscpMaxValue OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "max value of the dscp in system."
+        ::= { fsQoSPriorityMIBObjects 4 }
+    
+fsTrafficClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping evaluated User Priority to Traffic
+            Class, for forwarding by the bridge.  Traffic class is a
+            number in the range (1..fsPriorityTrafficClassNum)."
+    ::= { fsQoSPriorityMIBObjects 5 }
+    
+fsTrafficClassEntry OBJECT-TYPE
+        SYNTAX FSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "User Priority to Traffic Class mapping."
+        INDEX { fsTrafficClassPriority }
+    ::= { fsTrafficClassTable 1 }
+
+    
+FSTrafficClassEntry ::=
+        SEQUENCE {
+        fsTrafficClassPriority
+                INTEGER,
+        fsTrafficClass
+                INTEGER,
+        fsPriorityToDscp
+                Integer32
+        }
+    
+fsTrafficClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The Priority value determined for the received frame.
+            This value is equivalent to the priority indicated in
+            the tagged frame received, or one of the evaluated
+            priorities, determined according to the media-type.
+    
+            For untagged frames received from Ethernet media, this
+            value is equal to the fsPortDefaultUserPriority value
+            for the ingress port.
+    
+            For untagged frames received from non-Ethernet media,
+            this value is equal to the fsRegenUserPriority value
+            for the ingress port and media-specific user priority.
+            
+            This value is in the range(0..(fsPriorityClassNum-1))"
+    ::= { fsTrafficClassEntry 1 }
+    
+fsTrafficClass OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The Traffic Class the received frame is mapped to, Its value
+            ranges between 0 and the value of the object fsPriorityTrafficClass - 1.
+            The priority is higher if this value is bigger."
+    ::= { fsTrafficClassEntry 2 }
+    
+fsPriorityToDscp OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Dscp value of priority mapping to."
+    ::= { fsTrafficClassEntry 3 }
+
+-- mapping of dscp to priority
+fsDscpClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSDscpClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping evaluated dscp to priority."
+    ::= { fsQoSPriorityMIBObjects 6 }
+    
+fsDscpClassEntry OBJECT-TYPE
+        SYNTAX FSDscpClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A entry mapping evaluated dscp to priority."
+        INDEX { fsDscpClass }
+    ::= { fsDscpClassTable 1 }
+    
+FSDscpClassEntry ::=
+        SEQUENCE {
+        fsDscpClass
+                INTEGER,
+        fsDscpTrafficClassPriority
+                INTEGER                
+        }
+
+fsDscpClass OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Dscp value.This value is even number in 0 between62"
+    ::= { fsDscpClassEntry 1 }
+        
+fsDscpTrafficClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The priority which dscp value mapped to.            
+            This value is in the range(0..(fsPriorityClassNum-1))"
+    ::= { fsDscpClassEntry 2 }
+             
+
+fsPriorityTrafficClassOperMode OBJECT-TYPE
+        SYNTAX INTEGER{
+                   qos-sp(1),  -- SP arithmetic
+                   qos-wrr(2),  -- WRR arithmetic
+                   qos-drr(3)
+               }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The global arithmetic type which the priority traffic class use."  
+        ::= { fsQoSPriorityMIBObjects 7 }
+        
+fsPriorityBandWidth OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The global weight setting for every queue  
+             Each octet indicate a traffic class queue in the range(1..255)
+              ,first octet indicate first queue. 
+              The string length equal to fsPriorityTrafficClassNum."  
+        ::= { fsQoSPriorityMIBObjects 8 }
+        
+        
+fsIfPriorityTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSIfPriorityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table that contains information about every interface"
+    ::= { fsQoSPriorityMIBObjects 9 }
+
+fsIfPriorityEntry OBJECT-TYPE
+        SYNTAX FSIfPriorityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of Default User Priorities for each interface."
+        INDEX { fsIfPriorityIfIndex }
+    ::= { fsIfPriorityTable 1 }
+    
+FSIfPriorityEntry ::=
+        SEQUENCE {
+            fsIfPriorityIfIndex
+                IfIndex,
+            fsIfPriority
+                Integer32,
+            fsIfPriTrafficClassOperMode
+                INTEGER,
+            fsIfPriorityBandwidth
+                OCTET STRING,
+            fsIfPriorityQosTrustMode
+                INTEGER
+        }
+fsIfPriorityIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            ""
+     ::= { fsIfPriorityEntry 1 }
+                
+fsIfPriority OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The default ingress User Priority for this interface.
+            This value is in the range (0..(fsPriorityClassNum-1))"
+    ::= { fsIfPriorityEntry 2 }
+      
+--fsIfPriorityDscpMutation OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp Mutation name of this interface match. It indicate that 
+--            this interface doesn't match any dscp mutation which this string is null"
+--        ::= { fsIfPriorityEntry  3 }  
+
+fsIfPriTrafficClassOperMode OBJECT-TYPE
+        SYNTAX INTEGER{
+                   qos-sp(1),  -- SP arithmetic
+                   qos-wrr(2),  -- WRR arithmetic
+                   qos-drr(3)
+               }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The arithmetic type which the priority traffic class use in this interface."  
+        ::= { fsIfPriorityEntry 3 }
+            
+fsIfPriorityBandwidth OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The weight of every queue on a interface. 
+             Each octet indicate a traffic class queue in the range(1..255)
+              ,first octet indicate first queue. 
+              The string length equal to fsPriorityTrafficClassNum."  
+        ::= { fsIfPriorityEntry 4 }
+
+fsIfPriorityQosTrustMode OBJECT-TYPE
+        SYNTAX INTEGER{
+               not-trust(1),       
+               trust-cos(2),
+               trust-dscp(3),
+               trust-ip-precedence(4)  
+           } 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "QoS trust mode  for this interface."
+    ::= { fsIfPriorityEntry 5 }
+
+-- ippre to dscp table
+fsIpPreClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSIpPreClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping ip precedence to dscp value." 
+    ::= { fsQoSPriorityMIBObjects 10 }
+    
+fsIpPreClassEntry OBJECT-TYPE
+        SYNTAX FSIpPreClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Ip precedence to dscp mapping."
+        INDEX { fsIpPreClassPriority }
+    ::= { fsIpPreClassTable 1 }
+
+    
+FSIpPreClassEntry ::=
+        SEQUENCE {
+        fsIpPreClassPriority
+                INTEGER,
+        fsIpPreToDscp
+                Integer32
+        }
+    
+fsIpPreClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The Ip precedence value determined for the received frame."
+    ::= { fsIpPreClassEntry 1 }
+    
+    
+fsIpPreToDscp OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Dscp value of priority mapping to."
+    ::= { fsIpPreClassEntry 2 }
+
+-- Rate limit support
+fsIfRateLimitTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSIfRateLimitEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of rate limit interface objects."
+        ::= { fsQoSPriorityMIBObjects 11 }
+    
+fsIfRateLimitEntry OBJECT-TYPE
+        SYNTAX FSIfRateLimitEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry ACL interface information."
+        INDEX { fsIfRateLimitIndex }
+        ::= { fsIfRateLimitTable 1 }
+
+FSIfRateLimitEntry ::=
+        SEQUENCE {
+            fsIfRateLimitIndex IfIndex,
+            fsIfRateLimitInMaxBandWidth Unsigned32,
+            fsIfRateLimitInBurstFlowLimit Integer32,
+            fsIfRateLimitOutMaxBandWidth Unsigned32,
+            fsIfRateLimitOutBurstFlowLimit Integer32
+        }
+
+fsIfRateLimitIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            " "
+        ::= { fsIfRateLimitEntry 1 }
+
+fsIfRateLimitInMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Input maximum bandwidth of in units of kbps.
+             0 indicate that bandwidth will be not limitted."
+        ::= { fsIfRateLimitEntry 2 }
+        
+fsIfRateLimitInBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Input limit of burst traffic in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { fsIfRateLimitEntry 3 }
+
+fsIfRateLimitOutMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Ouput maximum bandwidth of in units of kbps.
+             0 indicate that bandwidth will be not limitted."
+        ::= { fsIfRateLimitEntry 4 }
+        
+fsIfRateLimitOutBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Ouput limit of burst traffic in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { fsIfRateLimitEntry 5 }
+
+-- queue support
+fsIfQueueSupportTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSIfQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "List queues of interfaces."
+        ::= { fsQoSPriorityMIBObjects 12 }
+    
+fsIfQueueSupportEntry OBJECT-TYPE
+        SYNTAX FSIfQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Queue Entry."
+        INDEX { fsIfIndex, fsIfQueueIndex}
+        ::= { fsIfQueueSupportTable 1 }
+
+FSIfQueueSupportEntry ::=
+        SEQUENCE {
+            fsIfIndex IfIndex,
+            fsIfQueueIndex Integer32,
+            fsIfQueueSupportTransmitPacket Counter64,
+            fsIfQueueSupportTransmitBytes Counter64,
+            fsIfQueueSupportDropPacket Counter64,
+            fsIfQueueSupportDropBytes Counter64
+        }
+
+fsIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Interface index."
+        ::= { fsIfQueueSupportEntry 1 }
+		
+fsIfQueueIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Queue index."
+        ::= { fsIfQueueSupportEntry 2 }
+
+fsIfQueueSupportTransmitPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit packets of queues."
+        ::= { fsIfQueueSupportEntry 3 }
+        
+fsIfQueueSupportTransmitBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit bytes of queues."
+        ::= { fsIfQueueSupportEntry 4 }
+
+fsIfQueueSupportDropPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of queues."
+        ::= { fsIfQueueSupportEntry 5 }
+        
+fsIfQueueSupportDropBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of queues."
+        ::= { fsIfQueueSupportEntry 6 }
+		
+-- multicast queue support
+fsIfMulticastQueueSupportTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSIfMulticastQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "List multicast queues of interfaces."
+        ::= { fsQoSPriorityMIBObjects 13 }
+    
+fsIfMulticastQueueSupportEntry OBJECT-TYPE
+        SYNTAX FSIfMulticastQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Multicast Queue Entry."
+        INDEX { fsIfIndexMulticast, fsIfMulticastQueueIndex}
+        ::= { fsIfMulticastQueueSupportTable 1 }
+
+FSIfMulticastQueueSupportEntry ::=
+        SEQUENCE {
+            fsIfIndexMulticast IfIndex,
+            fsIfMulticastQueueIndex Integer32,
+            fsIfMulticastQueueSupportTransmitPacket Counter64,
+            fsIfMulticastQueueSupportTransmitBytes Counter64,
+            fsIfMulticastQueueSupportDropPacket Counter64,
+            fsIfMulticastQueueSupportDropBytes Counter64
+        }
+
+fsIfIndexMulticast OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Interface index."
+        ::= { fsIfMulticastQueueSupportEntry 1 }
+		
+fsIfMulticastQueueIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Multicast Queue index."
+        ::= { fsIfMulticastQueueSupportEntry 2 }
+
+fsIfMulticastQueueSupportTransmitPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit packets of multicast queues."
+        ::= { fsIfMulticastQueueSupportEntry 3 }
+        
+fsIfMulticastQueueSupportTransmitBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit bytes of multicast queues."
+        ::= { fsIfMulticastQueueSupportEntry 4 }
+
+fsIfMulticastQueueSupportDropPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of multicast queues."
+        ::= { fsIfMulticastQueueSupportEntry 5 }
+        
+fsIfMulticastQueueSupportDropBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of multicast queues."
+        ::= { fsIfMulticastQueueSupportEntry 6 }
+
+fsWredEcnStatsTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF FSWredEcnStatsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+               "A table of WredEcn statistics entries."
+        ::= { fsQoSPriorityMIBObjects 14 }
+
+fsWredEcnStatsEntry OBJECT-TYPE
+        SYNTAX     FSWredEcnStatsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Entry contains WredEcn statistics."  
+        INDEX { fsWredEcnStatsIfIndex }
+        ::= { fsWredEcnStatsTable 1 }
+
+       FSWredEcnStatsEntry ::=
+       SEQUENCE {
+           fsWredEcnStatsIfIndex      Unsigned32,
+           fsWredDropped              Counter64,
+           fsEcnSended                Counter64
+       }
+
+       fsWredEcnStatsIfIndex OBJECT-TYPE
+       SYNTAX        Unsigned32 
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+           "The interface index of WredEcn statistics ."
+       ::= { fsWredEcnStatsEntry 1 }
+
+       fsWredDropped OBJECT-TYPE
+       SYNTAX        Counter64 
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+           "The discard packet number of QoS Wred." 
+       DEFVAL { 0 }
+       ::= { fsWredEcnStatsEntry 2 }
+
+       fsEcnSended OBJECT-TYPE
+       SYNTAX        Counter64 
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+           "The marked packet number by QoS Ecn." 
+       DEFVAL { 0 }
+       ::= { fsWredEcnStatsEntry 3 }
+
+--------------------------------------------------------------
+-- QoS traffic classification
+---------------------------------------------------------------
+fsQoSTrafficClassMIBObjects OBJECT IDENTIFIER ::= { fsQoSMIB 2 }
+
+fsQoSTrafficClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSQoSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos traffic classification entries."
+        ::= { fsQoSTrafficClassMIBObjects 1 }
+    
+fsQoSTrafficClassEntry OBJECT-TYPE
+        SYNTAX FSQoSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS traffic classification entry.Every valid QoS traffic 
+                 classification entry need make use of a FSAclEntry which
+                 fsAclFlowAction is 'permit'."  
+        INDEX { fsQosClassMapName }
+        ::= { fsQoSTrafficClassTable 1 }
+        
+FSQoSTrafficClassEntry ::= 
+        SEQUENCE {
+                fsQosClassMapName DisplayString,
+                fsQosClassAclName DisplayString,
+                fsQosClassMapEntryStatus ConfigStatus
+        }
+fsQosClassMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS class map.This value is unique for every entry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsQoSTrafficClassEntry  1 }
+         
+fsQosClassAclName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (0..32))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Access list name of this class map match.Null indicate that this class 
+            map doesn't match any acl"
+        ::= { fsQoSTrafficClassEntry  2 } 
+        
+fsQosClassMapEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a class map entry,
+             and set its value to invalid will delete this entry."
+        ::= { fsQoSTrafficClassEntry 3 }
+        
+
+fsQoSPoliceMapTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSQoSPoliceMapEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos police map entries."
+        ::= { fsQoSTrafficClassMIBObjects 2 }
+    
+fsQoSPoliceMapEntry OBJECT-TYPE
+        SYNTAX FSQoSPoliceMapEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS police map entry."  
+        INDEX { fsQosPoliceMapName}
+        ::= { fsQoSPoliceMapTable 1 }
+        
+FSQoSPoliceMapEntry ::= 
+        SEQUENCE {
+                fsQosPoliceMapName DisplayString,
+                fsQosPoliceMapEntryStatus ConfigStatus
+        }
+fsQosPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS police map.
+             When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsQoSPoliceMapEntry  1 }
+                
+fsQosPoliceMapEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+        ::= { fsQoSPoliceMapEntry 2 }
+
+fsQoSPoliceMapConfTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSQoSPoliceMapConfEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos police map config entries."
+        ::= { fsQoSTrafficClassMIBObjects 3 }
+    
+fsQoSPoliceMapConfEntry OBJECT-TYPE
+        SYNTAX FSQoSPoliceMapConfEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS police map config entry."  
+        INDEX { fsQoSPoliceCfgPoliceMapName,fsQoSPoliceCfgClassMapName}
+        ::= { fsQoSPoliceMapConfTable 1 }
+        
+FSQoSPoliceMapConfEntry ::= 
+        SEQUENCE {
+                fsQoSPoliceCfgPoliceMapName DisplayString,
+                fsQoSPoliceCfgClassMapName DisplayString,
+                fsQoSPoliceMapConfMaxBandWidth Unsigned32,
+                fsQoSPoliceMapConfBurstFlowLimit Integer32,
+                fsQoSPoliceMapConfExceedAction INTEGER,
+                fsQoSPoliceMapConfExceedDscp Integer32,
+                fsQoSPoliceMapConfNewDscp Integer32,
+                fsQoSPoliceMapCfgEntryStatus ConfigStatus,
+                fsQoSPoliceMapConfMaxHighBandWidth Unsigned32
+        }
+fsQoSPoliceCfgPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS police map.
+             When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsQoSPoliceMapConfEntry  1 }
+         
+fsQoSPoliceCfgClassMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "A QoS class map name of this police map match.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsQoSPoliceMapConfEntry  2 } 
+    
+fsQoSPoliceMapConfMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Maximum bandwidth of this traffic classification in units of bps.
+            If the Maximum bandwidth is greater than the maximum value
+            reportable by this object then this object should report its
+            maximum value (4,294,967,295) and fsQoSPoliceMapConfMaxBandWidth
+             must be used to set or report the Maximum bandwidth. 
+             0 indicate that bandwidth will be not limitted."
+        ::= { fsQoSPoliceMapConfEntry 3 }
+        
+fsQoSPoliceMapConfBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Limit of burst traffic of this traffic classification in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { fsQoSPoliceMapConfEntry 4 }
+                
+        
+fsQoSPoliceMapConfExceedAction OBJECT-TYPE
+        SYNTAX INTEGER{
+               discard(1),     --discard part exceeded bandwidth of traffic
+               modify-dscp(2)  --modify dscp value of packet exceeded bandwidth
+        }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The action deal with the traffic exceeded bandwidth."
+        ::= { fsQoSPoliceMapConfEntry 5 }        
+        
+fsQoSPoliceMapConfExceedDscp OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The new dscp value will replaces the old dscp value of packet when 
+             traffic of packet has exceeded bandwidth. This value has meaning only
+             when value of fsQoSPoliceMapConfExceedAction is 'modify-dscp' ."
+        ::= { fsQoSPoliceMapConfEntry 6 }
+        
+fsQoSPoliceMapConfNewDscp OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The new dscp value will replaces the old dscp value of packet regardless
+             whether the traffic has exceeded bandwidth. Setting this value to -1 indicate
+             that the dscp value of packet will not be modifed"            
+        ::= { fsQoSPoliceMapConfEntry 7 }        
+        
+fsQoSPoliceMapCfgEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+        ::= { fsQoSPoliceMapConfEntry 8 }
+
+    
+fsQoSPoliceMapConfMaxHighBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Maximum bandwidth of this traffic classification in units of kbps.
+            0 indicate that bandwidth will be not limitted.
+            when fsQoSPoliceMapConfMaxBandWidth is equal to ,this object display
+            the real  Maximum bandwidth of this traffic classification"
+        ::= { fsQoSPoliceMapConfEntry 9 }
+        
+--fsQosPoliceIfTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF FSQosPoliceIfEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "list of QoS Police Map interface objects."
+--        ::= { fsQoSTrafficClassMIBObjects 4 } this oid is obsolete
+--    
+--fsQosPoliceIfEntry OBJECT-TYPE
+--        SYNTAX FSQosPoliceIfEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "Entry ACL interface information."
+--        INDEX { fsQosPoliceIfIndex }
+--        ::= { fsQosPoliceIfTable 1 }
+--
+--FSQosPoliceIfEntry ::=
+--        SEQUENCE {
+--            fsQosPoliceIfIndex IfIndex,
+--            fsIfPoliceMapName  DisplayString
+--        }
+--
+--fsQosPoliceIfIndex OBJECT-TYPE
+--        SYNTAX IfIndex
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            " "
+--        ::= { fsQosPoliceIfEntry 1 }
+--
+--fsIfPoliceMapName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Police map name of this interface match. It indicate that 
+--            this interface doesn't match any ACL which this string is null"
+--        ::= { fsQosPoliceIfEntry  2 }        
+
+fsQosPoliceIfExtTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSQosPoliceIfExtEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of QoS Police Map interface objects."
+        ::= { fsQoSTrafficClassMIBObjects 5 }
+    
+fsQosPoliceIfExtEntry OBJECT-TYPE
+        SYNTAX FSQosPoliceIfExtEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry ACL interface information."
+        INDEX { fsQosPoliceIfIndex }
+        ::= { fsQosPoliceIfExtTable 1 }
+
+FSQosPoliceIfExtEntry ::=
+        SEQUENCE {
+            fsQosPoliceIfIndex IfIndex,
+            fsIfInPoliceMapName  DisplayString,
+            fsIfOutPoliceMapName  DisplayString
+        }
+
+fsQosPoliceIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            " "
+        ::= { fsQosPoliceIfExtEntry 1 }
+
+fsIfInPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Police map name of this interface ingress match. It indicate that 
+            this interface doesn't match any ACL which this string is null"
+        ::= { fsQosPoliceIfExtEntry  2 }        
+
+fsIfOutPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Police map name of this interface egress match. It indicate that 
+            this interface doesn't match any ACL which this string is null"
+        ::= { fsQosPoliceIfExtEntry  3 }        
+
+-- conformance information
+
+fsQoSMIBConformance OBJECT IDENTIFIER ::= { fsQoSMIB 3 }
+fsQoSMIBCompliances OBJECT IDENTIFIER ::= { fsQoSMIBConformance 1 }
+fsQoSMIBGroups      OBJECT IDENTIFIER ::= { fsQoSMIBConformance 2 }
+
+
+-- compliance statements
+
+fsQoSMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS QoS MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { 
+                          fsQoSPriorityMIBGroup,
+                          fsQoSTrafficClassMIBGroup 
+                          }
+        ::= { fsQoSMIBCompliances 1 }
+
+-- units of conformance
+
+fsQoSPriorityMIBGroup OBJECT-GROUP
+        OBJECTS {
+                fsQoSGlobalStatus, 
+                fsPriorityTrafficClassNum,
+                fsPriorityClassNum,
+                fsPriorityDscpMaxValue,
+                
+                fsTrafficClassPriority,
+                fsTrafficClass,
+                fsPriorityToDscp,
+                
+                fsDscpClass,
+                fsDscpTrafficClassPriority,
+                                                 
+                fsPriorityTrafficClassOperMode,
+                fsPriorityBandWidth,
+                
+                fsIfPriorityIfIndex,
+                fsIfPriority,
+                fsIfPriTrafficClassOperMode,
+                fsIfPriorityBandwidth,
+                fsIfPriorityQosTrustMode,
+
+                fsIpPreClassPriority,
+                fsIpPreToDscp
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qos priority ability to a
+                FS agent."
+        ::= { fsQoSMIBGroups 1 }        
+        
+fsQoSTrafficClassMIBGroup OBJECT-GROUP
+        OBJECTS {
+                fsQosClassMapName,
+                fsQosClassAclName,
+                fsQosClassMapEntryStatus,
+                
+                fsQosPoliceMapName,
+--                fsQosPoliceClassMapName,
+                fsQosPoliceMapEntryStatus,
+                
+                fsQoSPoliceCfgPoliceMapName,
+                fsQoSPoliceCfgClassMapName,
+                fsQoSPoliceMapConfMaxBandWidth,
+                fsQoSPoliceMapConfExceedAction,
+                fsQoSPoliceMapConfExceedDscp,
+                fsQoSPoliceMapConfNewDscp,
+                fsQoSPoliceMapCfgEntryStatus, 
+                fsQoSPoliceMapConfMaxHighBandWidth,               
+                
+                fsQosPoliceIfIndex,
+                fsIfInPoliceMapName,
+                fsIfOutPoliceMapName
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qos traffic classification ability to a
+                FS agent."
+        ::= { fsQoSMIBGroups 2 }                
+END
+
+
+-- mapping of ip precedence to dscp
+--fsIpPrecToDscpTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF FSIpPrecToDscpEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "A table mapping evaluated ip precedence to dscp."
+--    ::= { fsQoSPriorityMIBObjects 6 }
+--    
+--fsIpPrecToDscpEntry OBJECT-TYPE
+--        SYNTAX FSIpPrecToDscpEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "A entry mapping evaluated ip precedence to dscp."
+--        INDEX { fsDscpIpPrecToDscpIpPrec }
+--    ::= { fsIpPrecToDscpTable 1 }
+--    
+--FSIpPrecToDscpEntry ::=
+--        SEQUENCE {
+--        fsDscpIpPrecToDscpIpPrec
+--                Integer32,
+--        fsIpPrecToDscpDscp
+--                Integer32                
+--        }
+--fsDscpIpPrecToDscpIpPrec OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "The ip precedence which dscp value mapped to."
+--    ::= { fsIpPrecToDscpEntry 1 }
+--
+--fsIpPrecToDscpDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp value."
+--    ::= { fsIpPrecToDscpEntry 2 }
+--           
+--
+--fsDscpMutationTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF FSDscpMutationEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--               "A table of Dscp Mutation request entries."
+--        ::= { fsQoSPriorityMIBObjects 7 }
+--    
+--fsDscpMutationEntry OBJECT-TYPE
+--        SYNTAX FSDscpMutationEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--                "Entry contains Dscp Mutation name"  
+--        INDEX { fsDscpMutationName }
+--        ::= { fsDscpMutationTable 1 }
+--        
+--FSDscpMutationEntry ::= 
+--        SEQUENCE {
+--                fsDscpMutationName DisplayString,
+--                fsDscpMutationStatus ConfigStatus
+--        } 
+--           
+--fsDscpMutationName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp mutation name of this entry.This value is unique for every entry
+--            When this string be used as an index,Value of a sub-identifier equal 
+--            ASCII value of corresponding character(first sub-identifier corresponds
+--            first character of string). The number of sub-identifiers of this string
+--            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+--            will be filled in tail."
+--        ::= { fsDscpMutationEntry  1 }
+--                
+--fsDscpMutationStatus OBJECT-TYPE
+--        SYNTAX ConfigStatus
+--        MAX-ACCESS read-create
+--        STATUS current
+--        DESCRIPTION
+--            "Status of this entry, set this object to valid will creat a entry,
+--             and set its value to invalid will delete this entry."
+--        ::= { fsDscpMutationEntry 2 }    
+--
+--fsDscpMutationMapTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF FSDscpMutationMapEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--               "A table of Dscp Mutation mapping input dscp to output dscp entries .
+--                Default mapping is that output dscp value equals input
+--                dscp value.The table doesn't include default mapping."
+--        ::= { fsQoSPriorityMIBObjects 8 }
+--    
+--fsDscpMutationMapEntry OBJECT-TYPE
+--        SYNTAX FSDscpMutationMapEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--                "Entry of Dscp Mutation mapping."  
+--        INDEX { fsDscpMutationMapName }
+--        ::= { fsDscpMutationMapTable 1 }
+--        
+--FSDscpMutationMapEntry ::= 
+--        SEQUENCE {
+--                fsDscpMutationMapName DisplayString,
+--                fsDscpMutationInputDscp Integer32,
+--                fsDscpMutationOutputDscp Integer32
+--        } 
+--           
+--fsDscpMutationMapName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp mutation name of this entry.This value is unique for every entry
+--            When this string be used as an index,Value of a sub-identifier equal 
+--            ASCII value of corresponding character(first sub-identifier corresponds
+--            first character of string). The number of sub-identifiers of this string
+--            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+--            will be filled in tail."
+--        ::= { fsDscpMutationMapEntry  1 }
+--
+--fsDscpMutationInputDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Input dscp value."
+--        ::= { fsDscpMutationMapEntry 2 }
+--
+--fsDscpMutationOutputDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Output dscp value."
+--       ::= { fsDscpMutationMapEntry 3 } 
+

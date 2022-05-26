@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -74,6 +74,8 @@ if (isset($options['u']) || isset($options['U']) ||
   unset($db_version);
 }
 
+$where = '';
+
 if (isset($options['h'])) {
   $params = array();
   switch ($options['h']) {
@@ -90,16 +92,19 @@ if (isset($options['h'])) {
       $doing = 'all';
       break;
     case 'new':
-      $where = 'AND (`last_discovered` IS NULL OR `last_discovered` = ? OR `force_discovery` = ?)';
+      $where = ' AND (`last_discovered` IS NULL OR `last_discovered` = ? OR `force_discovery` = ?)';
       $params[] = '0000-00-00 00:00:00';
       $params[] = 1;
       $doing = 'new';
 
       // add new devices on remote poller from actions queue
-      if (function_exists('run_action_queue')) {
+      if (OBS_DISTRIBUTED && function_exists('run_action_queue')) {
         run_action_queue('device_add');
         //run_action_queue('device_rename');
         //run_action_queue('device_delete');
+
+        // Update alert and group tables
+        run_action_queue('tables_update');
       }
       break;
     case 'none':
@@ -108,17 +113,17 @@ if (isset($options['h'])) {
     default:
       $doing      = $options['h'];
       if (is_numeric($options['h'])) {
-        $where    = 'AND `device_id` = ?';
+        $where    = ' AND `device_id` = ?';
         $params[] = $options['h'];
       } else {
-        $where = 'AND `hostname` LIKE ?';
+        $where = ' AND `hostname` LIKE ?';
         $params[] = str_replace('*', '%', $options['h']);
       }
   }
 }
 
 if (isset($options['i']) && $options['i'] && isset($options['n'])) {
-  $where = 'AND MOD(device_id,' . $options['i'] . ') = ?';
+  $where .= ' AND MOD(device_id,' . $options['i'] . ') = ?';
   $params[] = $options['n'];
   $doing = $options['n'] . '/' . $options['i'];
 }
@@ -207,9 +212,15 @@ $discovery_time = substr($run, 0, 5);
 // Update Group/Alert tables
 if (($discovered_devices && !isset($options['m'])) || isset($options['a'])) {
   $silent = isset($options['q']);
-  // Not exist in CE
-  if (function_exists('update_group_tables')) { update_group_tables($silent); }
-  if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
+  if (OBS_DISTRIBUTED && !isset($options['a']) && function_exists('add_action_queue') &&
+      $action_id = add_action_queue('tables_update', 'discovery', [ 'silent' => $silent ])) {
+    print_message("Update alert and group tables added to queue [$action_id].");
+    //log_event("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [${vars['poller_id']}].", NULL, 'info', NULL, 7);
+  } elseif (OBSERVIUM_EDITION !== 'community') {
+    // Not exist in CE
+    update_group_tables($silent);
+    update_alert_tables($silent);
+  }
 }
 
 if ($discovered_devices) {
@@ -219,7 +230,8 @@ if ($discovered_devices) {
 
     // This discovery passed from wrapper and with process id
     if ($config['poller_id'] > 0 &&
-        $poller = dbFetchColumn('SELECT * FROM `pollers` WHERE `poller_id` = ?', [ $config['poller_id'] ])) {
+        $poller = dbFetchRow('SELECT * FROM `pollers` WHERE `poller_id` = ?', [ $config['poller_id'] ])) {
+      print_debug_vars($poller, 1);
       $host_id = get_local_id();
       $update = [];
       if ($poller['host_id'] != $host_id) {

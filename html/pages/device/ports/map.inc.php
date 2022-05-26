@@ -12,7 +12,7 @@
 
 ?>
 <div style="text-align: center; height: 100%;">
-    <object data="/map.php?device=<?php echo($device['device_id']); ?>&amp;format=svg" type="image/svg+xml" style="width: 100%; height:100%"></object>
+    <object data="/networkmap.php?device=<?php echo($device['device_id']); ?>&amp;format=svg" type="image/svg+xml" style="width: 100%; height:100%"></object>
 </div>
 
 <?php

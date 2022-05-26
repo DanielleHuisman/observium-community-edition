@@ -387,11 +387,18 @@ if (!isset($distro) && $poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.10
   elseif (preg_match('/ \d[\.\d]+(\-v\d+\w*)?\+ #\d+ .* arm/', $poll_device['sysDescr'])) {
     $distro = 'Raspbian';
   }
+  // * Armbian (Ubuntu)
+  // Linux hostname 5.10.60-sunxi #21.08.2 SMP Tue Sep 14 16:28:44 UTC 2021 armv7l
+  elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-sunxi #(?<distro_ver>\d+\.\d+(\.\d+)?) .* arm/', $poll_device['sysDescr'], $matches)) {
+    $distro = 'Armbian';
+    $distro_ver = $matches['distro_ver'];
+  }
   // * Arch Linux
   // Linux hostname 2.6.37-ARCH #1 SMP PREEMPT Sat Jan 29 20:00:33 CET 2011 x86_64
   // Linux hostname 4.19.86-1-ARCH #1 SMP PREEMPT Sat Nov 30 18:56:30 UTC 2019 armv6l
   // Linux hostname 5.10.27-2-ARCH #1 SMP Fri Apr 9 21:08:37 UTC 2021 armv6l
-  elseif (preg_match('/^Linux \S+ \d\S+\d+\-ARCH #\d/', $poll_device['sysDescr'])) {
+  // Linux hostname 5.10.79-2-raspberrypi-ARCH #1 SMP Tue Nov 16 20:32:00 UTC 2021 armv6l GNU/Linux
+  elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-ARCH #\d/', $poll_device['sysDescr'])) {
     $distro = 'Arch Linux';
   }
   // * CentOS 5:
@@ -416,6 +423,10 @@ if (!isset($distro) && $poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.10
       // centos-release-6-9.el6.12.3
       // centos-release-7-6.1810.2.el7.centos
       [ 'name' => 'centos-release',    'regex' => '/^centos\-release[\-_](?<version>\d.*)/', 'distro' => 'CentOS',
+        'transform' => [ [ 'action' => 'preg_replace', 'from' => '/^(\d+[\.\-]\d+).*/', 'to' => '$1' ],
+                         [ 'action' => 'replace', 'from' => '-', 'to' => '.' ] ] ],
+      // rocky-release-8.5-3.el8
+      [ 'name' => 'rocky-release',     'regex' => '/^rocky\-release[\-_](?<version>\d.*)/',  'distro' => 'Rocky',
         'transform' => [ [ 'action' => 'preg_replace', 'from' => '/^(\d+[\.\-]\d+).*/', 'to' => '$1' ],
                          [ 'action' => 'replace', 'from' => '-', 'to' => '.' ] ] ],
       // oraclelinux-release-6Server-1.0.2

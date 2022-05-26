@@ -6,7 +6,7 @@
 
  @package    observium
  @subpackage poller
- @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2021 Observium Limited
+ @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2022 Observium Limited
 """
 
 """
@@ -59,9 +59,10 @@
 try:
     # Import time module first for more accurate start time
     import time
+
     # start time
     s_time = time.time()
-except:
+except ImportError:
     print("ERROR: missing python module: time")
     exit(2)
 
@@ -73,7 +74,7 @@ try:
     import os
     import json
     import stat
-except:
+except ImportError:
     print("ERROR: missing one or more of the following python modules:")
     print("threading, sys, subprocess, os, json, stat")
     sys.exit(2)
@@ -84,7 +85,7 @@ def new_except_hook(exctype, value, traceback):
         Register global exepthook for ability stop execute wrapper by Ctrl+C
         See: https://stackoverflow.com/questions/6598053/python-global-exception-handling
     """
-    
+
     if exctype == KeyboardInterrupt:
         print("\n\nExiting by CTRL+C.\n\n")
         sys.exit(2)
@@ -108,10 +109,11 @@ class Colors:
 
 def logfile(log):
     """
-        Definition for write msg to log file
+        Definition for writing msg to log file
     """
 
-    log = "[%s] %s(%s): %s/%s: %s\n" % (time.strftime("%Y/%m/%d %H:%M:%S %z"), scriptname, os.getpid(), config['install_dir'], scriptname, log)
+    log = "[%s] %s(%s): %s/%s: %s\n" % (
+        time.strftime("%Y/%m/%d %H:%M:%S %z"), scriptname, os.getpid(), config['install_dir'], scriptname, log)
 
     # https://jira.observium.org/browse/OBS-2631
     # if the log file is a "character special device file" or a "FIFO (named pipe)" we must use mode 'w'
@@ -122,14 +124,14 @@ def logfile(log):
         else:
             fmode = 'a'
     except OSError:
-        print("\nLog file %s not exist.\n" % log_path)
+        print("\nLog file %s doesn't exist.\n" % log_path)
         return
 
     try:
         with open(log_path, fmode) as f:
             f.write(log)
     except IOError:
-        print("\nLog file %s write not permitted.\n" % log_path)
+        print("\nLog file %s is not writeable.\n" % log_path)
 
 
 # base script name
@@ -141,13 +143,14 @@ python_version = sys.version_info[:2]
 if python_version < (3, 0):
     try:
         import Queue
-    except:
+    except ImportError:
         print("ERROR: missing python module: Queue")
         sys.exit(2)
     try:
         import MySQLdb
+
         db_version = "MySQLdb " + MySQLdb.__version__
-    except:
+    except ImportError:
         print("ERROR: missing python module: MySQLdb")
         print("On Ubuntu: apt-get install python-mysqldb")
         print("On RHEL/CentOS: yum install MySQL-python")
@@ -156,17 +159,20 @@ if python_version < (3, 0):
 else:
     try:
         import queue as Queue
-    except:
+    except ImportError:
         print("ERROR: missing python module: queue")
         sys.exit(2)
+
     # MySQLdb not available for python3
     # http://stackoverflow.com/questions/4960048/python-3-and-mysql
     try:
         import pymysql as MySQLdb
+
         MySQLdb.install_as_MySQLdb()
         import MySQLdb
+
         db_version = "pymysql " + MySQLdb.__version__
-    except:
+    except ImportError:
         print("ERROR: missing python module: pymysql")
         print(" On Ubuntu >= 16.04 and Debian >= 9.0:")
         print("            sudo apt install python3-pymysql")
@@ -175,12 +181,11 @@ else:
         print("            sudo easy_install3 pip")
         print("            sudo pip3 install PyMySQL")
         # FIXME. I not know how install on RHEL and FreeBSD
-        print(" On other OSes install pip for python3 and than run from root user:")
+        print(" On other OSes install pip for python3 and then run from root user:")
         print("            pip3 install PyMySQL")
         # print(" On RHEL/CentOS: yum install MySQL-python")
         # print(" On FreeBSD: cd /usr/ports/*/py-MySQLdb && make install clean")
         sys.exit(2)
-
 
 """
     Parse Arguments
@@ -188,22 +193,34 @@ else:
     especially as more features want to be added to this wrapper.
     and
     Take the amount of threads we want to run in parallel from the commandline
-    if None are given or the argument was garbage, fall back to default of 8
+    if none are given or the argument was garbage, fall back to default of 8
 """
+workers_arg = True  # need for check compatibility with old syntax
 try:
     import argparse
+
     parser = argparse.ArgumentParser(description='Process Wrapper for Observium')
-    parser.add_argument('process', nargs='?', default='poller', help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
+    parser.add_argument('process', nargs='?', default='poller',
+                        help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
     # parser.add_argument('process', nargs='?', default='poller', choices=['poller', 'discovery', 'billing'], help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
-    parser.add_argument('-w', '--workers', nargs='?', type=int, default=0, help='Number of threads to spawn. Defauilt: CPUs x 2')
-    parser.add_argument('-p', '--poller_id', nargs='?', type=int, default=-1, help='Specify poller_id if this wrapper for partitioned poller. Default not used.')
+    parser.add_argument('-w', '--workers', nargs='?', type=int, default=0,
+                        help='Number of threads to spawn. Default: CPUs x 2')
+    parser.add_argument('-p', '--poller_id', nargs='?', type=int, default=-1,
+                        help='Specify poller_id for a partitioned poller. Usually not needed for partitioned operation.')
     parser.add_argument('-s', '--stats', action='store_true', help='Store total polling times to RRD.', default=False)
     parser.add_argument('-i', '--instances', nargs='?', type=int, default=-1, help='Process instances count.')
-    parser.add_argument('-n', '--number', nargs='?', type=int, default=-1, help='Instance id (number), must start from 0 and to be less than instances count.')
-    parser.add_argument('-g', '--include-groups', nargs='*', type=int, help='List of device group IDs for polling/discovery this group ids only. List is separated by spaces (-g 3 4 5).')
-    parser.add_argument('-e', '--exclude-groups', nargs='*', type=int, help='List of device group IDs for exclude polling/discovery this group ids.')
-    parser.add_argument('-d', '--debug', action='store_true', help='Enable debug output. WARNING, do not use this option unless you know what it does. This generates a lot of very huge files in TEMP dir.', default=False)
-    parser.add_argument('-t', '--test', action='store_true', help='Do not spawn processes, just test DB connection, config, etc.', default=False)
+    parser.add_argument('-n', '--number', nargs='?', type=int, default=-1,
+                        help='Instance id (number), must start from 0 and to be less than instances count.')
+    parser.add_argument('-g', '--include-groups', nargs='*', type=int,
+                        help='List of device group IDs to restrict polling/discovery these groups only. List is separated '
+                             'by spaces (-g 3 4 5).')
+    parser.add_argument('-e', '--exclude-groups', nargs='*', type=int,
+                        help='List of device group IDs to exclude from polling/discovery.')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='Enable debug output. WARNING, do not use this option unless you know what it does. This '
+                             'generates a lot of very large files in TEMP dir.', default=False)
+    parser.add_argument('-t', '--test', action='store_true',
+                        help='Do not spawn processes, just test DB connection, config, etc.', default=False)
     parser.add_argument('--host', help='Process hostname wildcard.')
 
     # Parse passed arguments
@@ -214,26 +231,30 @@ try:
     try:
         # poller-wrapper.py 16
         workers = int(args.process)
+        workers_arg = False
         process = 'poller'
-        print("WARNING! Using number of threads without command argument (-w or --workers) is deprecated! \nPlease replace your poller wrapper command line with:")
+        print("WARNING! Using number of threads without command argument (-w or --workers) is deprecated! \n"
+              "Please replace your poller wrapper command line with:")
         print("observium-wrapper poller -w %s" % workers)
     except ValueError:
         # observium-wrapper poller -w 16
         process = args.process
         workers = int(args.workers)
 
+    poller_id = int(args.poller_id)
     instances_count = int(args.instances)
     instance_number = int(args.number)
     stats = args.stats
     debug = args.debug
     test = args.test
 except ImportError:
-    ### FIXME, do not use this compatibility, just stop execute here
+    # FIXME, do not use this compatibility, just end execution here
     print("WARNING: missing the argparse python module:")
     print("On Ubuntu: apt-get install libpython%s.%s-stdlib" % python_version)
     print("On RHEL/CentOS: yum install python-argparse")
     print("On Debian: apt-get install python-argparse")
     print("Continuing with basic argument support.")
+    poller_id = -1
     instances_count = 1
     instance_number = 0
     stats = False
@@ -242,8 +263,9 @@ except ImportError:
     try:
         # poller-wrapper.py 16
         workers = int(sys.argv[1])
+        workers_arg = False
         process = 'poller'
-    except:
+    except ValueError:
         # observium-wrapper poller -w 16
         process = sys.argv[1]
         if not process:
@@ -275,8 +297,8 @@ processname = scriptname + ' ' + process
 ob_install_dir = os.path.dirname(os.path.realpath(__file__))
 config_file = ob_install_dir + '/config.php'
 
-def get_config_data():
 
+def get_config_data():
     config_cmd = ['/usr/bin/env', 'php', '%s/config_to_json.php' % ob_install_dir]
     # limit requested options only required (skip huge definitions)
     config_options = ['db_user', 'db_pass', 'db_host', 'db_name', 'db_port', 'db_socket',
@@ -303,7 +325,7 @@ except IOError as e:
 try:
     config = json.loads(get_config_data())
 except:
-    print("ERROR: Could not load or parse observium configuration, are PATHs correct?")
+    print("ERROR: Could not load or parse observium configuration from config_to_json.php, are PATHs correct?")
     sys.exit(2)
 
 if test:
@@ -350,42 +372,58 @@ except KeyError:
     log_path = config['install_dir'] + '/logs/observium.log'
 
 # Amount of threads
-try:
-    # use config option if set
-    amount_of_workers = int(config['poller-wrapper']['threads'])
-except KeyError:
+if process == 'poller':
+    try:
+        # use config option if set
+        amount_of_workers = int(config['poller-wrapper']['threads'])
+    except KeyError:
+        amount_of_workers = 0
+else:
     amount_of_workers = 0
 
-if amount_of_workers < 1 and workers > 0:
+if workers > 0 and (workers_arg or amount_of_workers < 1):
     # use amount threads passed as argument
+    # always prefer cmd arg
     amount_of_workers = workers
 
 if amount_of_workers < 1:
+    if process == 'poller':
+        max_workers = 256
+    else:
+        # set discovery workers limitation less than poller
+        max_workers = 8
+
     try:
         # use threads count based on cpus count
         import multiprocessing
+
         cpu_count = multiprocessing.cpu_count()
         amount_of_workers = cpu_count * 2
         # Limit maximum amount of worker based on CPU count
-        if amount_of_workers > 256:
-            print("WARNING: Too many CPU count detected, threads limited to 128 (detected: %s). For more threads please use configuration option $config['poller-wrapper']['threads'] or pass as argument -w [THREADS]" % (amount_of_workers))
-            amount_of_workers = 256
+        if amount_of_workers > max_workers:
+            print("WARNING: Very high CPU core count, %s threads limited to %s (detected: %s). For more threads"
+                  " please use configuration option $config['poller-wrapper']['threads']"
+                  " or pass as argument -w [THREADS]" % (process, max_workers, amount_of_workers))
+            amount_of_workers = max_workers
 
     except (ImportError, NotImplementedError):
         amount_of_workers = 8
-        print("WARNING: used default threads number %s. For change use configuration option or pass as argument -w [THREADS]" % (amount_of_workers))
+        print("WARNING: used default thread count of %s. To change this use configuration options"
+              " or pass as argument -w [THREADS]" % amount_of_workers)
 
 if test:
     cpu_count = 'unknown'
     if 'cpu_count' not in locals():
         try:
             import multiprocessing
+
             cpu_count = multiprocessing.cpu_count()
         except (ImportError, NotImplementedError):
             cpu_count = 'unknown'
 
-    print("Script: %s, Prosess: %s, Workers: %s, CPUs: %s, Instances: %s, InstanceID: %s" % (scriptname, process, amount_of_workers, cpu_count, instances_count, instance_number))
-    print("Stats: %s, Debug: %s, Test: %s" % (stats, debug, test))
+    print("Script: %s, Process: %s, Workers: %s, CPUs: %s, Instances: %s, InstanceID: %s" % (
+        scriptname, process, amount_of_workers, cpu_count, instances_count, instance_number))
+    print("Stats: %s, Remote RRD: %s, Debug: %s, Test: %s" % (stats, remote_rrd, debug, test))
     print("Versions:\n  Python - %s.%s.%s" % sys.version_info[:3])
     print("  DB - %s" % db_version)
 
@@ -417,7 +455,7 @@ if max_la <= 0:
 
 # partitioned poller
 poller_arg = False  # pass poller id to requested script
-if args.poller_id < 0:
+if poller_id < 0:
     # poller_id not passed from command line, use config or default
     try:
         poller_id = int(config['poller_id'])
@@ -426,7 +464,7 @@ if args.poller_id < 0:
 else:
     # poller_arg = args.poller_id > 0
     poller_arg = True
-    poller_id = args.poller_id
+    # poller_id = args.poller_id
 
 """
     Check mibs dir for stale .index files
@@ -447,9 +485,12 @@ try:
                 os.remove(mib_index)
             except:
                 # break loop because not permitted to remove files in mibs dir
-                print("WARNING: .index files are found in mibs directories which can't be removed (there aren't enough permissions)")
-                print("         see: http://www.observium.org/docs/faq/#all-my-hosts-seem-down-to-observium-snmp-doesnt-seem-to-work-anymore")
-                logfile("WARNING: .index files are found in mibs directories which can't be removed (there aren't enough permissions)")
+                print("WARNING: .index files are found in mibs directories which can't be removed "
+                      "(there aren't enough permissions)")
+                print("         see: http://www.observium.org/docs/faq/"
+                      "#all-my-hosts-seem-down-to-observium-snmp-doesnt-seem-to-work-anymore")
+                logfile("WARNING: .index files are found in mibs directories which can't be removed "
+                        "(there aren't enough permissions)")
                 break
 
 except:
@@ -464,11 +505,11 @@ devices_list = []
 
 try:
     # set db connection params
-    db_params = {'host':   db_server,
-                 'user':   db_username,
+    db_params = {'host': db_server,
+                 'user': db_username,
                  'passwd': db_password,
-                 'db':     db_dbname,
-                 'port':   db_port}
+                 'db': db_dbname,
+                 'port': db_port}
     if bool(db_socket):
         db_params['unix_socket'] = db_socket
     if "pymysql" in db_version:
@@ -524,9 +565,11 @@ if args.exclude_groups is not None:
     where_devices += " AND device_id NOT IN (%s)" % ",".join(map(str, exclude_devices))
 
 if poller_id > 0:
-    print(Colors.OKBLUE + 'INFO: This is poller_id ('+str(poller_id)+') using poller-restricted devices list' + Colors.ENDC)
+    print(Colors.OKBLUE + 'INFO: This is poller_id (' + str(poller_id) + ') using poller-restricted devices list' +
+          Colors.ENDC)
 else:
-    print(Colors.OKBLUE + 'This is the default poller. Will only poll devices with no specified poller set.' + Colors.ENDC)
+    print(Colors.OKBLUE + 'This is the default poller. Will only poll devices with no specified poller set.' +
+          Colors.ENDC)
     # Set default value of 0 for process tables and the like
     poller_id = 0
 
@@ -655,7 +698,6 @@ try:
 except:
     command = scriptname
 
-
 """
     Search if same poller wrapper proccesses running
     Protect from race condition
@@ -681,7 +723,8 @@ try:
             # print("PPID: %s, %s" % (test_ppid, int(test_ps[0])))
             # print(" UID: %s, %s" % (test_uid, int(test_ps[1])))
             # print("name: %s, %s" % (processname, test_ps[2]))
-            test_running = (test_ppid == int(test_ps[0])) and (test_uid == int(test_ps[1])) and (scriptname in test_ps[2])
+            test_running = (test_ppid == int(test_ps[0])) and (test_uid == int(test_ps[1])) and (
+                    scriptname in test_ps[2])
         except:
             # not exist pid
             pass
@@ -701,7 +744,7 @@ try:
 
 except:
     try:
-        ### FIXME. Remove this compatibility, always use from db process counts!
+        # FIXME. Remove this compatibility, always use from db process counts!
         ps_list = subprocess.check_output('ps ax | grep %s | grep -v grep' % scriptname, shell=True,
                                           universal_newlines=True)
         # divide by 2 because cron starts 2 processes (/bin/sh and main process)
@@ -715,8 +758,10 @@ except:
 # Default is 4 processes and 10 load average.
 # More than 4 already running poller-wrapper it's big trouble!
 if ps_count > max_running and la[1] >= max_la:
-    print("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (processname, ps_count, la[1]))
-    logfile("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (processname, ps_count, la[1]))
+    print("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (
+        processname, ps_count, la[1]))
+    logfile("URGENT: %s not started because already running %s processes, load average (5min) %.2f" % (
+        processname, ps_count, la[1]))
     sys.exit(2)
 
 # Increase count by current wrapper process
@@ -774,11 +819,12 @@ def update_wrapper_times(rrd_file, count, runtime, workers):
     if remote_rrd or not os.path.isfile(rrd_file):
         # Create RRD
         rrd_dst = ':GAUGE:' + str(config['rrd']['step'] * 2) + ':0:U'
-        cmd_create = config['rrdtool'] + ' create ' + rrd_file + ' DS:devices' + rrd_dst + ' DS:totaltime' + rrd_dst + ' DS:threads' + rrd_dst
+        cmd_create = config['rrdtool'] + ' create ' + rrd_file + ' DS:devices' + rrd_dst + ' DS:totaltime'
+        cmd_create += rrd_dst +' DS:threads' + rrd_dst
         cmd_create += ' --step ' + str(config['rrd']['step']) + ' ' + ' '.join(config['rrd']['rra'].split())
         if remote_rrd:
             # --no-overwrite available since 1.4.3
-            cmd_create += ' --no-overwrite --daemon ' + rrdcached_address
+            cmd_create += ' --no-overwrite --daemon ' + rrdcached_address + ' >/dev/null 2>&1'
         else:
             logfile(cmd_create)
         os.system(cmd_create)
@@ -808,7 +854,7 @@ def update_wrapper_count(rrd_file, count):
         cmd_create += ' --step ' + str(config['rrd']['step']) + ' ' + ' '.join(config['rrd']['rra'].split())
         if remote_rrd:
             # --no-overwrite available since 1.4.3
-            cmd_create += ' --no-overwrite --daemon ' + rrdcached_address
+            cmd_create += ' --no-overwrite --daemon ' + rrdcached_address + ' >/dev/null 2>&1'
         else:
             logfile(cmd_create)
         os.system(cmd_create)
@@ -917,11 +963,12 @@ print_queue = Queue.Queue()
 
 print("INFO: starting the %s at %s with %s threads" % (process, time.strftime("%Y/%m/%d %H:%M:%S"), amount_of_workers))
 if debug:
-    print("WARNING: DEBUG enabled, each %s %s store output to %s/observium_%s_id.debug (where id is %s_id)" % (entity, process, temp_path, process, entity))
+    print("WARNING: DEBUG enabled, each %s %s store output to %s/observium_%s_id.debug (where id is %s_id)" % (
+        entity, process, temp_path, process, entity))
 
 for device_id in devices_list:
     process_queue.put(device_id)
- 
+
 for i in range(amount_of_workers):
     t = threading.Thread(target=process_worker)
     t.setDaemon(True)
@@ -939,8 +986,9 @@ except (KeyboardInterrupt, SystemExit):
 
 total_time = time.time() - s_time
 
-la  = os.getloadavg()  # get new load average after polling
-msg = "processed %s %ss in %.2f seconds with %s threads, load average (5min) %.2f" % (len(devices_list), entity, total_time, amount_of_workers, la[1])
+la = os.getloadavg()  # get new load average after polling
+msg = "processed %s %ss in %.2f seconds with %s threads, load average (5min) %.2f" % \
+      (len(devices_list), entity, total_time, amount_of_workers, la[1])
 print("INFO: %s %s\n" % (processname, msg))
 logfile(msg)
 
@@ -957,7 +1005,8 @@ if process != 'discovery' and total_time > 300:
     if show_stopper:
         print("ERROR: Some devices are taking more than 300 seconds, the script cannot recommend you what to do.")
     else:
-        print("WARNING: Consider setting a minimum of %d threads. (This does not constitute professional advice!)" % recommend)
+        print("WARNING: Consider setting a minimum of %d threads. (This does not constitute professional advice!)" %
+              recommend)
     exit_code = 1
 
 """
@@ -965,6 +1014,7 @@ if process != 'discovery' and total_time > 300:
 """
 if process == 'poller' and stats:
     import socket
+
     localhost = socket.getfqdn()
     if localhost.find('.') == 0:
         localhost_t = subprocess.check_output(["/bin/hostname", "-f"], universal_newlines=True).strip()
@@ -973,17 +1023,17 @@ if process == 'poller' and stats:
 
     poller_stats = {
         'instances_count': instances_count,
-        'wrapper_count':   ps_count
+        'wrapper_count': ps_count
     }
     instance_stats = {
-        'hostname':        localhost,
+        'hostname': localhost,
         'instances_count': instances_count,  # this is need for check in calculate average
-        'workers_count':   amount_of_workers,
-        'devices_count':   len(devices_list),
-        'devices_ids':     devices_list,
-        'last_starttime':  '%.3f' % s_time,
-        'last_runtime':    '%.3f' % total_time,
-        'last_status':     exit_code,
+        'workers_count': amount_of_workers,
+        'devices_count': len(devices_list),
+        'devices_ids': devices_list,
+        'last_starttime': '%.3f' % s_time,
+        'last_runtime': '%.3f' % total_time,
+        'last_status': exit_code,
         # 'last_message':    msg
     }
 
@@ -1044,7 +1094,7 @@ if process == 'poller' and stats:
         cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
                        (json.dumps(poller_stats), 'poller_wrapper_stats'))
         # db.commit()
-        print("Number of rows updated: %d" % cursor.rowcount)
+        # print("Number of rows updated: %d" % cursor.rowcount)
     else:
         cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
                        (json.dumps(poller_stats), 'poller_wrapper_stats'))
@@ -1066,14 +1116,15 @@ if process == 'poller' and stats:
     rrd_path_total = rrd_name_base + '.rrd'
     rrd_path_count = rrd_name_base + '_count.rrd'
 
-    update_wrapper_times(rrd_path_total, poller_stats['total_devices_count'], poller_stats['average_runtime'], amount_of_workers)
+    update_wrapper_times(rrd_path_total, poller_stats['total_devices_count'], poller_stats['average_runtime'],
+                         amount_of_workers)
     update_wrapper_count(rrd_path_count, poller_stats['wrapper_count'])
 
     # Additionally per instance statistics
     if instances_count > 1:
         rrd_path_instance = rrd_name_base + '_' + str(instances_count) + '_' + str(instance_number) + '.rrd'
-        update_wrapper_times(rrd_path_instance, instance_stats['devices_count'], instance_stats['last_runtime'], amount_of_workers)
-
+        update_wrapper_times(rrd_path_instance, instance_stats['devices_count'], instance_stats['last_runtime'],
+                             amount_of_workers)
 
 # Remove process info from DB
 p_query = """DELETE FROM `observium_processes` WHERE `process_id` = %s"""

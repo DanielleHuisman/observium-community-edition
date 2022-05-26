@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     ajax
- * @author         Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package    observium
+ * @subpackage ajax
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -269,8 +267,7 @@ function print_dash_map ($vars, $width, $height)
 
 } // End show_map
 
-function print_dash_graph ($mod, $width, $height)
-{
+function print_dash_graph($mod, $width, $height) {
   global $config;
 
   $vars = $mod['vars'];
@@ -285,14 +282,11 @@ function print_dash_graph ($mod, $width, $height)
     exit();
   }
 
-  $timestamp_pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
-  if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from']))
-  {
+  if (isset($vars['timestamp_from']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_from'])) {
     $vars['from'] = strtotime($vars['timestamp_from']);
     unset($vars['timestamp_from']);
   }
-  if (isset($vars['timestamp_to']) && preg_match($timestamp_pattern, $vars['timestamp_to']))
-  {
+  if (isset($vars['timestamp_to']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_to'])) {
     $vars['to'] = strtotime($vars['timestamp_to']);
     unset($vars['timestamp_to']);
   }
@@ -318,24 +312,18 @@ function print_dash_graph ($mod, $width, $height)
 
   preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>.+)/', $vars['type'], $graphtype);
 
-  if (OBS_DEBUG)
-  {
+  if (OBS_DEBUG) {
     print_vars($graphtype);
   }
 
   $type    = $graphtype['type'];
   $subtype = $graphtype['subtype'];
 
-  if (is_numeric($vars['device']))
-  {
+  if (is_numeric($vars['device'])) {
     $device = device_by_id_cache($vars['device']);
-  }
-  elseif (!empty($vars['device']))
-  {
+  } elseif (!empty($vars['device'])) {
     $device = device_by_name($vars['device']);
-  }
-  elseif($type == "device" && is_numeric($vars['id']))
-  {
+  } elseif ($type === "device" && is_numeric($vars['id'])) {
     $device = device_by_id_cache($vars['id']);
   }
 
@@ -348,20 +336,17 @@ function print_dash_graph ($mod, $width, $height)
 
   $vars['id'] = $preserve_id;
 
-  if (!$auth)
-  {
+  if (!$auth) {
     print_error_permission();
     return;
   }
 
-  if(isset($config['entities'][$type]))
-  {
+  if (isset($config['entities'][$type])) {
     $entity = get_entity_by_id_cache($type, $vars['id']);
     entity_rewrite($type, $entity);
   }
 
-  if($type == 'bgp')
-  {
+  if ($type === 'bgp') {
     $entity = get_entity_by_id_cache('bgp_peer', $vars['id']);
     entity_rewrite('bgp_peer', $entity);
   }
@@ -408,16 +393,15 @@ function print_dash_graph ($mod, $width, $height)
 
   $subtype_text = (isset($config['graph_types'][$type][$subtype]) ? $config['graph_types'][$type][$subtype]['descr'] : nicecase($subtype));
 
-  if(!isset($graph_array['title']))
-  {
-    if($type == 'global')
+  if (!isset($graph_array['title'])) {
+    if ($type === 'global')
     {
       $title = "Global :: " . $subtype_text;
-    } elseif(strstr($type, "multi")){
-      $count = count($graph_array['id']);
+    } elseif (str_contains($type, "multi")) {
+      $count = safe_count($graph_array['id']);
       $title = $count . ' ' . nicecase(str_replace("multi-", '', $type)) . ' :: ' . $subtype_text;
-    }else{
-      $title = short_hostname($device['hostname'], $t_len / 2 - 2) . ($type == "device" ? ' :: ' : ' :: ' . truncate($entity['entity_shortname'], 32) . ' :: ' ) . $subtype_text;
+    } else {
+      $title = device_name($device, $t_len / 2 - 2) . ($type === "device" ? ' :: ' : ' :: ' . truncate($entity['entity_shortname'], 32) . ' :: ' ) . $subtype_text;
     }
   } else {
     $title = $graph_array['title'];
@@ -441,7 +425,7 @@ function print_dash_graph ($mod, $width, $height)
   //echo '    <div class="box-header with-border">' . $device['hostname'] . '<span class="pull-right">' . truncate($entity['entity_name'], 32) . '</span></div>';
 
   echo '  <div class="hover-hide ' . $title_div . '" style="z-index: 900; position: absolute; overflow: hidden;" class="widget-title"><h4 style="wwriting-mode: vertical-lr; ttext-orientation: mixed;" class="box-title">' .
-        '' . $title . '</h4>' .
+        '' . escape_html($title) . '</h4>' .
        '</div>' . PHP_EOL;
 
   echo '  <div class="box-content" style="overflow: hidden">';
@@ -452,4 +436,4 @@ function print_dash_graph ($mod, $width, $height)
 
 }
 
-?>
+// EOF

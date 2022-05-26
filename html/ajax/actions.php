@@ -30,33 +30,44 @@ $readwrite = $_SESSION['userlevel'] >= 10;
 
 switch ($vars['action']) {
   case "theme":
+    $pref = 'web_theme_default';
     if ($vars['value'] === 'reset') {
       session_unset_var("theme");
       if ($config['web_theme_default'] === 'system') {
         // Override default
         session_unset_var("theme_default");
       }
-      print_json_status('ok', 'Theme reset.');
-    } elseif (is_array($config['themes'][$vars['value']])) {
-      session_set_var("theme", $vars['value']);
-      if ($config['web_theme_default'] === 'system') {
-        // Override default
-        session_set_var("theme_default", $vars['value']);
+
+      if (del_user_pref($_SESSION['user_id'], $pref)) {
+        print_json_status('ok', 'Theme reset.');
       }
-      print_json_status('ok', 'Theme set.');
+    } elseif (isset($config['themes'][$vars['value']]) || $vars['value'] === 'system') {
+      if (set_user_pref($_SESSION['user_id'], $pref, serialize($vars['value']))) {
+        print_json_status('ok', 'Theme set.');
+      }
     } else {
       print_json_status('failed', 'Invalid theme.');
     }
     break;
 
   case "big_graphs":
-    session_set_var("big_graphs", TRUE);
-    print_json_status('ok', 'Big graphs set.');
+    $pref = 'graphs|size';
+    if (set_user_pref($_SESSION['user_id'], $pref, serialize('big'))) {
+      print_json_status('ok', 'Big graphs set.');
+      session_unset_var("big_graphs"); // clear old
+    }
+    //session_set_var("big_graphs", TRUE);
+    //print_json_status('ok', 'Big graphs set.');
     break;
 
-  case "small_graphs":
-    session_unset_var("big_graphs");
-    print_json_status('ok', 'Small graphs set.');
+  case "normal_graphs":
+    $pref = 'graphs|size';
+    if (set_user_pref($_SESSION['user_id'], $pref, serialize('normal'))) {
+      print_json_status('ok', 'Normal graphs set.');
+      session_unset_var("big_graphs"); // clear old
+    }
+    //session_unset_var("big_graphs");
+    //print_json_status('ok', 'Small graphs set.');
     break;
 
   case "touch_on":

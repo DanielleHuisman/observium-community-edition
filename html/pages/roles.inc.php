@@ -23,8 +23,7 @@ include($config['html_dir'].'/includes/user_menu.inc.php');
 
 register_html_title("User Groups");
 
-if(isset($vars['role_id']))
-{
+if (isset($vars['role_id'])) {
 
   // Load JS entity picker
   register_html_resource('js', 'tw-sack.js');
@@ -32,7 +31,7 @@ if(isset($vars['role_id']))
 
   $role = dbFetchRow("SELECT * FROM `roles` WHERE `role_id` = ?", array($vars['role_id']));
 
-  if(safe_count($role)){
+  if (!safe_empty($role)) {
 
 ?>
 
@@ -84,8 +83,7 @@ if(isset($vars['role_id']))
                 $group_members = dbFetchRows("SELECT * FROM `roles_users` WHERE `role_id` = ? AND `auth_mechanism` = ?", [ $role['role_id'], $config['auth_mechanism'] ]);
                 $user_list = auth_user_list();
 
-                if (safe_count($group_members))
-                {
+                if (!safe_empty($group_members)) {
                   echo '<div class="box-body no-padding">';
                   echo('<table class="table table-hover table-condensed">');
 
@@ -97,8 +95,7 @@ if(isset($vars['role_id']))
                   );
                   //echo(get_table_header($cols));
 
-                  foreach ($group_members as $user)
-                  {
+                  foreach ($group_members as $user) {
 
                     $user = array_merge((array)$user, (array)$user_list[$user['user_id']]);
 
@@ -198,16 +195,14 @@ if(isset($vars['role_id']))
 
             // Cache group permissions
             $role_perms['permission'] = [];
-            foreach (dbFetchRows("SELECT * FROM `roles_permissions` WHERE `role_id` = ?", array($vars['role_id'])) as $perm)
-            {
+            foreach (dbFetchRows("SELECT * FROM `roles_permissions` WHERE `role_id` = ?", array($vars['role_id'])) as $perm) {
               $role_perms['permission'][$perm['permission']] = TRUE;
             }
 
-            if (safe_count($role_perms['permission'])) {
+            if (!safe_empty($role_perms['permission'])) {
               echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-              foreach ($role_perms['permission'] as $perm => $status)
-              {
+              foreach ($role_perms['permission'] as $perm => $status) {
                 echo('<tr><td style="width: 1px;"></td>
                 <td style="overflow: hidden;"><span class="label">'.$perm.'</span>
                 <small>' . $config['permissions'][$perm]['descr'] . '</small></td>
@@ -262,12 +257,12 @@ if(isset($vars['role_id']))
                                                     'value'    => 'role_permission_add');
             $form_items['perms'] = array();
 
-            foreach ($config['permissions'] as $perm => $perm_data)
-            {
-              if (!in_array($perm, $permissions_list))
-              {
-                $form_items['perms'][$perm] = array('name'    => escape_html($perm),
-                                                    'subtext' => escape_html($perm_data['descr']));
+            foreach ($config['permissions'] as $perm => $perm_data) {
+              if (!in_array($perm, $permissions_list, TRUE)) {
+                $form_items['perms'][$perm] = [
+                  'name'    => $perm,
+                  'subtext' => $perm_data['descr']
+                ];
               }
             }
 
@@ -298,15 +293,12 @@ if(isset($vars['role_id']))
           //print_vars($role_perms);
 
           // Start bill Permissions
-          if (isset($config['enable_billing']) && $config['enable_billing'])
-          {
+          if (isset($config['enable_billing']) && $config['enable_billing']) {
             echo generate_box_open(array('header-border' => TRUE, 'title' => 'Bill Permissions'));
-            if (safe_count($role_perms['bill']))
-            {
+            if (!safe_empty($role_perms['bill'])) {
               echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-              foreach ($role_perms['bill'] as $bill_id => $status)
-              {
+              foreach ($role_perms['bill'] as $bill_id => $status) {
                 $bill = get_bill_by_id($bill_id);
 
                 echo('<tr><td style="width: 1px;"></td>
@@ -363,13 +355,13 @@ if(isset($vars['role_id']))
                                                    'value'    => 'role_entity_add');
 
             $form_items['bills'] = array();
-            foreach (dbFetchRows("SELECT * FROM `bills`") as $bill)
-            {
-              if (!in_array($bill['bill_id'], $permissions_list))
-              {
-                $form_items['bills'][$bill['bill_id']] = array('name'    => escape_html($bill['bill_name']),
-                                                               'subtext' => escape_html($bill['bill_descr']),
-                                                               'icon'    => $config['entities']['bill']['icon']);
+            foreach (dbFetchRows("SELECT * FROM `bills`") as $bill) {
+              if (!in_array($bill['bill_id'], $permissions_list)) {
+                $form_items['bills'][$bill['bill_id']] = [
+                  'name'    => $bill['bill_name'],
+                  'subtext' => $bill['bill_descr'],
+                  'icon'    => $config['entities']['bill']['icon']
+                ];
               }
             }
             $form['row'][0]['entity_id']   = array('type'     => 'multiselect',
@@ -391,20 +383,17 @@ if(isset($vars['role_id']))
 
 
           // Start entity group permissions
-          if (OBSERVIUM_EDITION != 'community')
-          {
+          if (OBSERVIUM_EDITION !== 'community') {
             echo generate_box_open(array('header-border' => TRUE, 'title' => 'Entity Group Permissions'));
 
-            if (safe_count($role_perms['group']))
-            {
+            if (!safe_empty($role_perms['group'])) {
               echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-              foreach ($role_perms['group'] as $group_id => $status)
-              {
+              foreach ($role_perms['group'] as $group_id => $status) {
                 $group = get_group_by_id($group_id);
 
                 echo('<tr><td style="width: 1px;"></td>
-                <td style="overflow: hidden;"><i class="'.$config['entities'][$group['entity_type']]['icon'].'"></i> '.generate_entity_link('group', $group).' '. ($status == 'rw' ? '<label class="label label-danger">RW</label>' : '') .'
+                <td style="overflow: hidden;"><i class="'.$config['entities'][$group['entity_type']]['icon'].'"></i> '.generate_entity_link('group', $group).' '. ($status === 'rw' ? '<label class="label label-danger">RW</label>' : '') .'
                 <small>' . $group['group_descr'] . '</small></td>
                 <td width="25">');
 
@@ -459,13 +448,13 @@ if(isset($vars['role_id']))
                                                    'value'    => 'role_entity_add');
 
             $form_items['groups'] = array();
-            foreach (dbFetchRows("SELECT * FROM `groups`") as $group)
-            {
-              if (!in_array($group['group_id'], $permissions_list))
-              {
-                $form_items['groups'][$group['group_id']] = array('name'    => escape_html($group['group_name']),
-                                                                  'subtext' => escape_html($group['group_descr']),
-                                                                  'icon'    => $config['entities'][$group['entity_type']]['icon']);
+            foreach (dbFetchRows("SELECT * FROM `groups`") as $group) {
+              if (!in_array($group['group_id'], $permissions_list)) {
+                $form_items['groups'][$group['group_id']] = [
+                  'name'    => $group['group_name'],
+                  'subtext' => $group['group_descr'],
+                  'icon'    => $config['entities'][$group['entity_type']]['icon']
+                ];
               }
             }
             $form['row'][0]['entity_id']   = array('type'     => 'multiselect',
@@ -496,12 +485,11 @@ if(isset($vars['role_id']))
           // Start device permissions
           echo generate_box_open(array('header-border' => TRUE, 'title' => 'Device Permissions'));
 
-          if (safe_count($role_perms['device']))
-          {
+          $role_perms_devices = !safe_empty($role_perms['device']);
+          if ($role_perms_devices) {
             echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-            foreach ($role_perms['device'] as $device_id => $status)
-            {
+            foreach ($role_perms['device'] as $device_id => $status) {
               $device = device_by_id_cache($device_id);
 
               echo('<tr><td style="width: 1px;"></td>
@@ -558,15 +546,15 @@ if(isset($vars['role_id']))
                                                  'value'    => 'role_entity_add');
 
           $form_items['devices'] = array();
-          foreach (dbFetchRows("SELECT * FROM `devices` ORDER BY `hostname`") as $device)
-          {
-            if (!in_array($device['device_id'], $permissions_list))
-            {
+          foreach (dbFetchRows("SELECT * FROM `devices` ORDER BY `hostname`") as $device) {
+            if (!in_array($device['device_id'], $permissions_list)) {
               //humanize_device($device);
-              $form_items['devices'][$device['device_id']] = array('name'    => escape_html($device['hostname']),
-                                                                   'subtext' => escape_html($device['location']),
-                                                                   //'class'   => $device['html_row_class'],
-                                                                   'icon'    => $config['entities']['device']['icon']);
+              $form_items['devices'][$device['device_id']] = [
+                'name'    => $device['hostname'],
+                'subtext' => $device['location'],
+                //'class'   => $device['html_row_class'],
+                'icon'    => $config['entities']['device']['icon']
+              ];
             }
           }
           $form['row'][0]['entity_id']   = array('type'     => 'multiselect',
@@ -587,12 +575,10 @@ if(isset($vars['role_id']))
 
           // Start port permissions
           echo generate_box_open(array('header-border' => TRUE, 'title' => 'Port Permissions'));
-          if (safe_count($role_perms['port']))
-          {
+          if (!safe_empty($role_perms['port'])) {
             echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-            foreach (array_keys($role_perms['port']) as $entity_id)
-            {
+            foreach (array_keys($role_perms['port']) as $entity_id) {
               $port   = get_port_by_id($entity_id);
               $device = device_by_id_cache($port['device_id']);
 
@@ -652,12 +638,10 @@ if(isset($vars['role_id']))
           $form['row'][0]['action']      = array('type'     => 'hidden',
                                                  'value'    => 'role_entity_add');
 
-          $form_items['devices'] = array();
-          foreach ($cache['devices']['hostname'] as $hostname => $device_id)
-          {
-            if (!array_key_exists($device_id, $role_perms['device']))
-            {
-              $form_items['devices'][$device_id] = escape_html($hostname);
+          $form_items['devices'] = [];
+          foreach ($cache['devices']['hostname'] as $hostname => $device_id) {
+            if (!$role_perms_devices || !array_key_exists($device_id, $role_perms['device'])) {
+              $form_items['devices'][$device_id] = $hostname;
             }
           }
           $form['row'][0]['device_id']   = array('type'     => 'select',
@@ -685,12 +669,10 @@ if(isset($vars['role_id']))
           // Start sensor permissions
           echo generate_box_open(array('header-border' => TRUE, 'title' => 'Sensor Permissions'));
 
-          if (safe_count($role_perms['sensor']))
-          {
+          if (!safe_empty($role_perms['sensor'])) {
             echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-            foreach (array_keys($role_perms['sensor']) as $entity_id)
-            {
+            foreach (array_keys($role_perms['sensor']) as $entity_id) {
               $sensor   = get_entity_by_id_cache('sensor', $entity_id);
               $device   = device_by_id_cache($sensor['device_id']);
 
@@ -748,11 +730,9 @@ if(isset($vars['role_id']))
 
           // FIXME, limit devices list only with sensors?
           $form_items['devices'] = array();
-          foreach ($cache['devices']['hostname'] as $hostname => $device_id)
-          {
-            if (!in_array($device_id, $permissions_list))
-            {
-              $form_items['devices'][$device_id] = escape_html($hostname);
+          foreach ($cache['devices']['hostname'] as $hostname => $device_id) {
+            if (!in_array($device_id, $permissions_list)) {
+              $form_items['devices'][$device_id] = $hostname;
             }
           }
           $form['row'][0]['device_id']   = array('type'     => 'select',
@@ -786,19 +766,17 @@ if(isset($vars['role_id']))
     </div>
 
     <?php
-} else
-  { // Invalid role_id
+  } else {
+    // Invalid role_id
 
     print_error("Invalid User Group");
-
   }
 
 } else { // if no role_id
 
   $roles = dbFetchRows("SELECT * FROM `roles` ORDER BY `role_name`");
 
-  if (safe_count($roles))
-  {
+  if (!safe_empty($roles)) {
 
     echo(generate_box_open());
     echo('<table class="table table-hover table-condensed">');

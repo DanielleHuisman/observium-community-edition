@@ -1,0 +1,1556 @@
+-- *****************************************************************
+-- FS-ROUTE-MIB.mib:  FS Route MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-ROUTE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        TimeTicks,
+        Unsigned32,
+        Integer32,
+        IpAddress
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        TEXTUAL-CONVENTION
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        IfIndex
+                FROM FS-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB               
+        fsMgmt
+                FROM FS-SMI;
+
+fsRouteMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs route mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 20}
+
+FSRouteProtoType ::= TEXTUAL-CONVENTION        
+   STATUS current                          
+   DESCRIPTION                             
+            "Routing protocol type." 
+   SYNTAX INTEGER {                        
+            other(1),  --notspecified
+            local(2),  --localinterface
+            netmgmt(3),  --staticroute
+            icmp(4),  --resultofICMPRedirect
+            egp(5),  --ExteriorGatewayProtocol
+            ggp(6),  --Gateway-GatewayProtocol
+            hello(7),  --FuzzBallHelloSpeak
+            rip(8),  --BerkeleyRIPorRIP-II
+            isis(9),  --DualIS-IS
+            esis(10),  --ISO9542
+            ciscoigrp(11),  --CiscoIGRP
+            bbnspfigp(12),  --BBNSPFIGP
+            ospf(13),  --OpenShortestPathFirst
+            bgp(14),  --BorderGatewayProtocol
+            idpr(15),  --InterDomainPolicyRouting
+            ciscoeigrp(16),  --CiscoEIGRP
+            max(17)  --MAXTYPE                        
+            }                                
+
+fsRouteMIBObjects OBJECT IDENTIFIER ::= { fsRouteMIB 1 }
+
+fsRouteServiceStatus OBJECT-TYPE
+    SYNTAX  EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+              "Route management function status"
+         ::={ fsRouteMIBObjects 1 }
+         
+fsRoutingProtoInfoTable OBJECT-TYPE
+     SYNTAX   SEQUENCE OF FSRoutingProtoInfoEntry
+     MAX-ACCESS   not-accessible
+     STATUS   current
+     DESCRIPTION
+        "The routing protocol infomation ."
+    ::= { fsRouteMIBObjects  2 }
+
+fsRoutingProtoInfoEntry OBJECT-TYPE
+    SYNTAX   FSRoutingProtoInfoEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "the entry of this table."
+   INDEX {   fsRoutingProtoInfoProtoType,
+             fsRoutingProtoInfoGateWay
+          }
+   ::= { fsRoutingProtoInfoTable 1 }
+   
+FSRoutingProtoInfoEntry ::=
+  SEQUENCE{
+     fsRoutingProtoInfoProtoType
+         FSRouteProtoType,
+     fsRoutingProtoInfoGateWay    
+         IpAddress,
+     fsRoutingProtoInfoDistance 
+         Unsigned32,
+     fsRoutingProtoInfoLastUpdate   
+         TimeTicks
+     }
+  
+fsRoutingProtoInfoProtoType   OBJECT-TYPE
+     SYNTAX   FSRouteProtoType
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "The routing protocol type"
+    ::= { fsRoutingProtoInfoEntry 1 }  
+             
+fsRoutingProtoInfoGateWay OBJECT-TYPE 
+     SYNTAX   IpAddress
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "For rip ,the gateway is this router's neighbor.
+         for ospf ,the gateway is  the router Id of this router,
+         New entry will be addded when router ID is changed."
+    ::= { fsRoutingProtoInfoEntry 2 }
+    
+fsRoutingProtoInfoDistance OBJECT-TYPE 
+     SYNTAX   Unsigned32
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "The routing protocol distance."
+    ::= { fsRoutingProtoInfoEntry 3 }
+    
+fsRoutingProtoInfoLastUpdate OBJECT-TYPE 
+     SYNTAX   TimeTicks
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "The last update time of the neighbor that be found.
+         or  router ID that it last change ."
+    ::= { fsRoutingProtoInfoEntry 4 }
+
+
+fsDefRoutingCfgTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF FSDefRoutingCfgEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "Default routing configuration."
+ ::= { fsRouteMIBObjects 3}
+ 
+fsDefRoutingCfgEntry OBJECT-TYPE
+     SYNTAX FSDefRoutingCfgEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+         "The entry define one routing protocol's default
+          routing configurate,if in rip routing configuration
+          only route map is valid to this default route parameter"
+     INDEX { fsDefRoutingCfgRoutingProtoType}
+ ::= { fsDefRoutingCfgTable 1 }
+
+ 
+FSDefRoutingCfgEntry ::=
+     SEQUENCE {
+     fsDefRoutingCfgRoutingProtoType 
+             FSRouteProtoType,
+     fsDefRoutingCfgAlways  
+             TruthValue,
+     fsDefRoutingCfgMetric
+             Unsigned32,
+     fsDefRoutingCfgMetricType  --only use in ospf
+             INTEGER,
+     fsDefRoutingCfgRouteMap
+             DisplayString,
+     fsDefRoutingCfgStatus
+             RowStatus
+              }
+fsDefRoutingCfgRoutingProtoType  OBJECT-TYPE
+     SYNTAX   FSRouteProtoType
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "index indicate that which routing protocol configuration mode is current mode."
+    ::= { fsDefRoutingCfgEntry 1 } 
+    
+fsDefRoutingCfgAlways OBJECT-TYPE
+     SYNTAX   TruthValue
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "Setting the value to TRUE indicates that always advertise default route."
+     DEFVAL{false}
+    ::= { fsDefRoutingCfgEntry 2 }  
+             
+fsDefRoutingCfgMetric OBJECT-TYPE
+     SYNTAX   Unsigned32(1..16777214) 
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "Set  ospf default metric value."
+     DEFVAL {10}
+    ::= { fsDefRoutingCfgEntry 3 }
+                             
+fsDefRoutingCfgMetricType OBJECT-TYPE
+     SYNTAX   INTEGER{                        
+                     type1(1),
+                     type2(2)
+                     }
+                   
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "Set  OSPF Link State type,this value is only 
+         valid in ospf configuration"
+     DEFVAL {type2}
+    ::= { fsDefRoutingCfgEntry 4 } 
+           
+fsDefRoutingCfgRouteMap OBJECT-TYPE
+     SYNTAX   DisplayString(SIZE(0..32))
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "Set  route's Route-map reference.Null string indicate that no any route-map
+        reference."
+     DEFVAL {""}
+    ::= { fsDefRoutingCfgEntry 5 }   
+          
+fsDefRoutingCfgStatus OBJECT-TYPE
+     SYNTAX   RowStatus
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "if this value is change to destroy,
+         this entry will be deleted"       
+    ::= { fsDefRoutingCfgEntry 6 }           
+
+
+         
+--Route map group
+fsRouteMapMIBObjects OBJECT IDENTIFIER ::= { fsRouteMIB 2 }         
+
+--fsRouteMapTable
+fsRouteMapTable OBJECT-TYPE
+     SYNTAX   SEQUENCE OF FSRouteMapEntry
+     MAX-ACCESS   not-accessible
+     STATUS   current
+     DESCRIPTION
+        "the route map table."
+    ::= { fsRouteMapMIBObjects  1 }
+
+fsRouteMapEntry OBJECT-TYPE
+    SYNTAX   FSRouteMapEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "the entry of this table."
+   INDEX {
+            fsRouteMapName,
+            fsRouteMapSequenceNumber
+          }
+   ::= { fsRouteMapTable 1 }
+   
+FSRouteMapEntry ::=
+  SEQUENCE{
+     fsRouteMapName
+         DisplayString,
+     fsRouteMapSequenceNumber
+         Unsigned32,
+     fsRouteMapOperType   
+         INTEGER,
+     fsRouteMapMatchMetric  
+         Unsigned32,
+     fsRouteMapMatchRouteType 
+         INTEGER,
+     fsRouteMapMetricValueType    
+         INTEGER,
+     fsRouteMapSetMetric  
+         Unsigned32,      
+    fsRouteMapSetLevel  
+         INTEGER,
+     fsRouteMapSetMetricType 
+         INTEGER,
+     fsRouteMapSetNexthopSt
+         ConfigStatus,          
+     fsRouteMapSetNexthop
+         IpAddress,
+     fsRouteMapStatus
+         RowStatus             
+           }   
+fsRouteMapName   OBJECT-TYPE  
+     SYNTAX   DisplayString(SIZE(1..32))
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "The route map name  ,A meaningful name for the route map. The
+        redistribute router configuration command uses this
+        name to reference the route map. Multiple route maps
+        might share the same map tag name.
+        
+        When this string be used as an index,Value of a sub-identifier equal 
+        ASCII value of corresponding character(first sub-identifier corresponds
+        first character of string). The number of sub-identifiers of this string
+        must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+        will be filled in tail."
+    ::= { fsRouteMapEntry 1 }    
+         
+fsRouteMapSequenceNumber   OBJECT-TYPE
+     SYNTAX   Unsigned32(0..65535)
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "Number that indicates the position of a new route map in the 
+         list of route maps already configured with the same name."
+     DEFVAL {10}
+    ::= { fsRouteMapEntry 2 }    
+
+fsRouteMapOperType   OBJECT-TYPE
+     SYNTAX   INTEGER
+                    { permit(1),
+                      deny(2)
+                     }
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        " If permit is specified and the match criteria are
+        met for this route map, the route is redistributed as
+        controlled by the set actions. If deny is specified, the route
+        is not redistributed.  "
+     DEFVAL {permit}
+    ::= { fsRouteMapEntry 3 }      
+    
+fsRouteMapMatchMetric   OBJECT-TYPE  
+     SYNTAX   Unsigned32(0..2147483647) 
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " Match the specified route metric. The metric-value can be
+          an IGRP 5-part metric with a value from 1 to 255.
+          0 indicate that this item will not be matched."
+     DEFVAL {0}
+    ::= { fsRouteMapEntry 4 }       
+    
+fsRouteMapMatchRouteType   OBJECT-TYPE  
+     SYNTAX   INTEGER{
+                	 notMatch(0),
+               	 internal(1),
+               	 external(2),
+                	 external-type1(3),
+                	 external-type2(4)                   	
+                	} 
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "  the route type value which route-map match,
+           internal: OSPF intra-area and interarea routes or EIGRP internal routes,
+           external: OSPF external routes(Type 1 or Type 2)or EIGRP external routes,
+           external-type1: OSPF external routes Type 1 
+           external-type2: OSPF external routes Type 2
+           'notMatch' indicate that this item will not be matched."
+     DEFVAL {notMatch}
+    ::= { fsRouteMapEntry 5}      
+
+fsRouteMapMetricValueType   OBJECT-TYPE  
+     SYNTAX INTEGER{
+           noOper(0),
+     		  replace(1),
+     		  add(2), 
+     		  reduce(3)
+     		} 
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " How to modify old metric vlaue.
+          'noOper':  metric value will not be modified.
+          'replace': old metric value will be replaced by  fsRouteMapSetMetric.
+          'add': new metric value will equal 'old metric vlaue + fsRouteMapSetMetric'
+          'reduce': new metric value will equal 'old metric vlaue - fsRouteMapSetMetric'"
+     DEFVAL {noOper}
+    ::= { fsRouteMapEntry 6 } 
+           
+fsRouteMapSetMetric   OBJECT-TYPE  
+     SYNTAX   Unsigned32(1..2147483647)
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " Set the metric value to the given redistributed routes (for
+         any protocol except IGRP or EIGRP). The metric value is
+         an integer from 1 to 255.
+         
+         fsRouteMapMetricValueType will decide real operation.  The value of
+         fsRouteMapSetMetric is invalid in fsRouteMapMetricValueType is 
+         'noOper'."
+     DEFVAL {1}
+    ::= { fsRouteMapEntry 7 }
+    
+fsRouteMapSetLevel   OBJECT-TYPE  
+     SYNTAX   INTEGER{
+     		  all(0),
+     		  stubarea(1), -- OSPF NSSA
+     		  backbone(2)  -- OSPF backbone areas
+     		} 
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "Set the level for routes that are advertised into the
+         specified area of the routing domain.
+         'all'indicate that routes will be advertised into all type area."
+     DEFVAL {all}
+    ::= { fsRouteMapEntry 8 }       
+    
+fsRouteMapSetMetricType   OBJECT-TYPE  
+     SYNTAX   INTEGER{
+                 	 noOper(0),
+               	 internal(1),
+                	 external(2),
+                	 type1(3),
+                	 type2(4)
+                	} 
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " set metric type,
+         'external' means   IS-IS external metric;
+         'internal' means   Use IGP metric as the MED for BGP;
+         'type-1  ' means  OSPF external type 1 metric;
+         'type-2 '  means  OSPF external type 2 metric.
+         'noOper'indicate that no any opertion will be done for this item."
+     DEFVAL {noOper}
+    ::= { fsRouteMapEntry 9}    
+
+fsRouteMapSetNexthopSt   OBJECT-TYPE  
+     SYNTAX ConfigStatus
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " How to modify nexthop vlaue.
+          'invalid': nexthop value will not be modified.
+          'valid':  nexthop value will be modified to fsRouteMapSetNexthop.
+          Setting this value to 'valid' have no any effect.This value will be changed 
+          to 'valid' when setting 'fsRouteMapSetNexthop'"
+     DEFVAL {invalid}
+    ::= { fsRouteMapEntry 10 } 
+           
+fsRouteMapSetNexthop   OBJECT-TYPE  
+     SYNTAX   IpAddress
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " Set the nexthop value to give the redistributed routes"
+    ::= { fsRouteMapEntry 11 }
+
+fsRouteMapStatus   OBJECT-TYPE  
+     SYNTAX   RowStatus
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        " if this value is destroy,the entry will be delete."
+    ::= { fsRouteMapEntry 12 }    
+
+
+--fsRouteMapMatchIpAddressTable
+
+fsRouteMapMatchIpAddressTable OBJECT-TYPE
+     SYNTAX   SEQUENCE OF FSRouteMapMatchIpAddressEntry 
+     MAX-ACCESS   not-accessible
+     STATUS   current
+     DESCRIPTION
+        "the match ip address item of the route map ."
+    ::= { fsRouteMapMIBObjects  2 }
+
+fsRouteMapMatchIpAddressEntry OBJECT-TYPE
+    SYNTAX   FSRouteMapMatchIpAddressEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "Match a standard access list by specifying the Acl name "
+   INDEX {
+            fsRouteMapName,      
+            fsRouteMapSequenceNumber, 
+            fsRouteMapMatchType,  
+            fsRouteMapMatchIpAddressAclName
+          }
+   ::= { fsRouteMapMatchIpAddressTable 1 }
+   
+FSRouteMapMatchIpAddressEntry ::=
+  SEQUENCE{
+     fsRouteMapMatchType
+         INTEGER,    
+     fsRouteMapMatchIpAddressAclName  
+         DisplayString,         
+     fsRouteMapMatchIpAddressStatus
+         RowStatus
+           }   
+
+fsRouteMapMatchType   OBJECT-TYPE  
+     SYNTAX   INTEGER{
+             destination(1),
+             nextHop(2),
+             source(3)
+     }
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "destination(1):match route destination ip address 
+         nextHop(2):match route nextHop ip address
+         source(3):match route source ip address
+        "
+    ::= { fsRouteMapMatchIpAddressEntry 1 }
+                  
+fsRouteMapMatchIpAddressAclName   OBJECT-TYPE  
+     SYNTAX   DisplayString(SIZE(1..32)) 
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "The acl name apply to ip address.
+        
+        When this string be used as an index,Value of a sub-identifier equal 
+        ASCII value of corresponding character(first sub-identifier corresponds
+        first character of string). The number of sub-identifiers of this string
+        must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+        will be filled in tail."
+    ::= { fsRouteMapMatchIpAddressEntry 2 }
+             
+fsRouteMapMatchIpAddressStatus  OBJECT-TYPE
+     SYNTAX   RowStatus                      
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "The entry status,if the value is destroy ,the 
+          entry will be deleted."
+    ::= { fsRouteMapMatchIpAddressEntry 3 }       
+    
+--fsRouteMapMatchTagTable
+
+fsRouteMapMatchTagTable OBJECT-TYPE
+     SYNTAX   SEQUENCE OF FSRouteMapMatchTagEntry
+     MAX-ACCESS   not-accessible
+     STATUS   current
+     DESCRIPTION
+        "Match a tag value item of route map "
+    ::= { fsRouteMapMIBObjects  3 }
+
+fsRouteMapMatchTagEntry OBJECT-TYPE
+    SYNTAX   FSRouteMapMatchTagEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "Match the specified tag value in a list of one or more route
+        tag values. Each can be an integer from 0 to 4294967295. "
+   INDEX {
+            fsRouteMapName,     
+            fsRouteMapSequenceNumber,
+            fsRouteMapMatchTagValue 
+          }
+   ::= { fsRouteMapMatchTagTable 1 }
+   
+FSRouteMapMatchTagEntry ::=
+  SEQUENCE{
+     fsRouteMapMatchTagValue  
+         Unsigned32,
+     fsRouteMapMatchTagStatus
+         RowStatus
+           }   
+fsRouteMapMatchTagValue   OBJECT-TYPE  
+     SYNTAX   Unsigned32(0..2147483647) 
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "  Match the specified tag value."
+    ::= { fsRouteMapMatchTagEntry 1 }   
+    
+fsRouteMapMatchTagStatus   OBJECT-TYPE
+     SYNTAX   RowStatus
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "  the entry status,if the value is destroy ,the 
+        entry will be deleted."
+    ::= { fsRouteMapMatchTagEntry 2 }
+
+
+--fsRouteMapMatchInterfaceTable
+
+fsRouteMapMatchInterfaceTable OBJECT-TYPE
+     SYNTAX   SEQUENCE OF FSRouteMapMatchInterfaceEntry
+     MAX-ACCESS   not-accessible
+     STATUS   current
+     DESCRIPTION
+        "Match Interface item of route map ."
+    ::= { fsRouteMapMIBObjects  4 }
+
+fsRouteMapMatchInterfaceEntry OBJECT-TYPE
+    SYNTAX   FSRouteMapMatchInterfaceEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "Match the specified next hop route out one of the specified
+       interfaces. "
+   INDEX {
+            fsRouteMapName,    
+            fsRouteMapSequenceNumber,  
+            fsRouteMapMatchInterfaceIfIndex                  
+          }
+   ::= { fsRouteMapMatchInterfaceTable 1 }
+   
+FSRouteMapMatchInterfaceEntry ::=
+  SEQUENCE{
+     fsRouteMapMatchInterfaceIfIndex
+            IfIndex,
+     fsRouteMapMatchInterfaceStatus
+            RowStatus
+           }   
+           
+fsRouteMapMatchInterfaceIfIndex   OBJECT-TYPE  
+     SYNTAX   IfIndex 
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+        "  The ifTable's ifIndex."
+    ::= { fsRouteMapMatchInterfaceEntry 1 }   
+    
+fsRouteMapMatchInterfaceStatus  OBJECT-TYPE
+     SYNTAX   RowStatus
+     MAX-ACCESS   read-create
+     STATUS   current
+     DESCRIPTION
+        "  the entry status,if the value is destroy ,the 
+        entry will be deleted."
+    ::= { fsRouteMapMatchInterfaceEntry 2 }
+         
+--Route redistribute group
+fsRouteRedistributeMIBObjects OBJECT IDENTIFIER ::= { fsRouteMIB 3 }
+
+--Routing Redistribute table
+fsRouteRedistributeTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSRouteRedistributeEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           " this table descripts the redistributing methods."
+       ::= { fsRouteRedistributeMIBObjects  1 }
+
+fsRouteRedistributeEntry OBJECT-TYPE
+       SYNTAX   FSRouteRedistributeEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "each entry descripts the methord,when Redistribute routes 
+           from one routing protocol to another routing protocol."
+      INDEX {fsRouteRedistributeProtocolCfg, 
+             fsRouteRedistributeProtocol
+            }
+      ::= { fsRouteRedistributeTable 1 }
+      
+FSRouteRedistributeEntry ::=
+     SEQUENCE{
+         fsRouteRedistributeProtocolCfg
+            FSRouteProtoType,
+         fsRouteRedistributeProtocol
+            FSRouteProtoType,
+         fsRouteRedistributeMetricValue
+            Unsigned32,
+         fsRouteRedistributeMetricType
+            INTEGER,
+         fsRouteRedistributeTagValue
+            Unsigned32,
+         fsRouteRedistributeRouteMapName
+            DisplayString,
+         fsRouteRedistributeStatus
+            RowStatus
+              }
+
+fsRouteRedistributeProtocolCfg OBJECT-TYPE
+       SYNTAX   FSRouteProtoType                       
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+           "The protocol which the redistributing will be setted in."  
+       ::={fsRouteRedistributeEntry 1}  
+       
+fsRouteRedistributeProtocol OBJECT-TYPE
+       SYNTAX   FSRouteProtoType
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+           "The protocol which routing will redistribute to ."  
+       ::={fsRouteRedistributeEntry 2}         
+          
+fsRouteRedistributeMetricValue OBJECT-TYPE
+        SYNTAX   Unsigned32(1..16777214)
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           "0 indicate that redistributing metric value will equal 
+            fsOspfRouteRedisDefMetricVal for OSPF or 
+            fsRipOffsetMetric for RIP. Other value indicate that
+            fsRouteRedistributeMetricValue will be set for new metric value
+            for redistribute routes,for rip this value only can be from 1 to 16."
+        DEFVAL {0}   
+        ::= { fsRouteRedistributeEntry 3 }   
+       
+fsRouteRedistributeMetricType  OBJECT-TYPE
+        SYNTAX   INTEGER{  
+                     type1(1),
+                     type2(2)
+                   }                        
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           " Metric type  value ."
+        DEFVAL {type2}   
+        ::= { fsRouteRedistributeEntry 4 }    
+       
+fsRouteRedistributeTagValue  OBJECT-TYPE
+        SYNTAX   Unsigned32(0..4294967295)
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           "  Set tag for routes redistributed into OSPF."
+        DEFVAL {0}             
+        ::= { fsRouteRedistributeEntry 5 } 
+              
+fsRouteRedistributeRouteMapName  OBJECT-TYPE
+        SYNTAX   DisplayString(SIZE(0..32))
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           "Set  route's Route-map reference.Null string indicate that no any route-map
+            reference."
+        DEFVAL {""}
+       ::= { fsRouteRedistributeEntry 6 }         
+           
+fsRouteRedistributeStatus  OBJECT-TYPE
+        SYNTAX   RowStatus        
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           "  the entry status,if the value is destroy ,then 
+              disable this redistribute."
+       ::= { fsRouteRedistributeEntry 7 } 
+
+fsRouteFilteringMIBObjects OBJECT IDENTIFIER ::= { fsRouteMIB 4 }
+--ip prefix-list table
+fsIpPrefixListTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSIpPrefixListEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           " this table descripts the ip prefix list."
+       ::= { fsRouteFilteringMIBObjects  1 }
+
+fsIpPrefixListEntry OBJECT-TYPE
+       SYNTAX   FSIpPrefixListEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "each entry descripts a prefix list"
+      INDEX {fsIpPrefixListName, 
+             fsIpPrefixListSequence
+            }
+      ::= { fsIpPrefixListTable 1 }
+      
+FSIpPrefixListEntry ::=
+     SEQUENCE{
+         fsIpPrefixListName
+            DisplayString,
+         fsIpPrefixListSequence
+            Unsigned32,
+         fsIpPrefixListOperMethod
+            INTEGER,
+         fsIpPrefixListIpAddress
+            IpAddress,
+         fsIpPrefixListMaskLength
+            Unsigned32,
+         fsIpPrefixListMinimumPrefixLength
+            Unsigned32,
+         fsIpPrefixListMaximumPrefixLength
+            Unsigned32,
+         fsIpPrefixListStatus
+            RowStatus
+              }
+
+fsIpPrefixListName OBJECT-TYPE
+       SYNTAX   DisplayString(SIZE(1..32))                       
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+           "name of ip prefix-list name."  
+       ::={fsIpPrefixListEntry 1}
+       
+fsIpPrefixListSequence OBJECT-TYPE
+       SYNTAX   Unsigned32(0..2147483647)                       
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+           "sequence can be set either automatically or manually. 
+           if 0 is seted,that means sequence will be created automatically.
+           In the case that sequential numbers are set manually, the
+           user may pick any number less than 2147483647 and more than 1. 
+           In the case that sequential number are set automatically, the sequential 
+           number will increase by a unit of five (5) per list. If a list
+           with no specified sequential number is created after a list
+           with a specified sequential number, the list will 
+           automatically pick the next multiple of five (5) as the 
+           list number. For example, if a list with number 2 already 
+           exists and a new list with no specified number is created,
+           the next list will be numbered 5. If lists 2 and 7 already
+           exist and a new list with no specified number is created, 
+           the new list will be numbered 10."  
+       ::={fsIpPrefixListEntry 2}
+       
+fsIpPrefixListOperMethod OBJECT-TYPE
+       SYNTAX   INTEGER{
+                         permit(1),
+                         deny(2)
+                       }                       
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "this field specifies whether the prefix for this entry 
+           is to permit or deny the listed prefix."  
+       ::={fsIpPrefixListEntry 3}
+       
+fsIpPrefixListIpAddress OBJECT-TYPE
+       SYNTAX   IpAddress                    
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "ip prefix-list ip address."  
+       ::={fsIpPrefixListEntry 4}
+       
+fsIpPrefixListMaskLength OBJECT-TYPE
+       SYNTAX  Unsigned32(0..32)                       
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "ip prefix-list mask length."  
+       ::={fsIpPrefixListEntry 5}
+       
+fsIpPrefixListMinimumPrefixLength OBJECT-TYPE
+       SYNTAX  Unsigned32(0..32)                       
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "this field specifies prefix length. The prefix list
+            will be applied if the prefix length is greater than 
+            or equal to fsIpPrefixListMinimumPrefixLength.
+            value '0' means that this parameter has no effect.
+            
+            The condition 'fsIpPrefixListMaximumPrefixLength 
+            >= fsIpPrefixListMinimumPrefixLength > fsIpPrefixListMaskLength'
+            must be satisfied when this value is not '0' "  
+       ::={fsIpPrefixListEntry 6}
+       
+fsIpPrefixListMaximumPrefixLength OBJECT-TYPE
+       SYNTAX Unsigned32(0..32)                         
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "this field specifies prefix length. The prefix list 
+            will be applied if the prefix length is less than or 
+            equal to fsIpPrefixListMaximumPrefixLength.
+            value '0' means that this parameter has no effect.
+            
+            The condition 'fsIpPrefixListMaximumPrefixLength 
+            >= fsIpPrefixListMinimumPrefixLength > fsIpPrefixListMaskLength'
+            must be satisfied when this value is not '0' "  
+       ::={fsIpPrefixListEntry 7}
+       
+fsIpPrefixListStatus OBJECT-TYPE
+       SYNTAX   RowStatus                    
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "the entry status,if the value is destroy ,then 
+            delete this ip prefix-list."  
+       ::={fsIpPrefixListEntry 8}  
+       
+       
+--distribute-list table
+--distribute-list is used for Filtering both input and output of the routing information
+fsDistributeListTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSDistributeListEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           " this table descripts the distribute list."
+       ::= { fsRouteFilteringMIBObjects  2 }
+
+fsDistributeListEntry OBJECT-TYPE
+       SYNTAX   FSDistributeListEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "distribute-list can be applied to both incoming
+           and outgoing routing information,Permit or deny 
+           routes from being advertised in routing updates
+           depending upon the action listed in the access list or ip prefix list."
+      INDEX {fsDistributeListCfgProtoType, 
+             fsDistributeListIfIndex,
+             fsDistributeListDirection,
+             fsDistributeListFilteringProtocol
+            }
+      ::= { fsDistributeListTable 1 }
+      
+FSDistributeListEntry ::=
+     SEQUENCE{
+         fsDistributeListCfgProtoType 
+             FSRouteProtoType,
+         fsDistributeListIfIndex
+             Unsigned32,
+         fsDistributeListDirection 
+            INTEGER,             
+         fsDistributeListFilteringProtocol
+            Unsigned32,
+         fsDistributeListFilterType
+            INTEGER,
+         fsDistributeListAclName
+            DisplayString,
+         fsDistributeListGateWayIpPrefixName
+            DisplayString,
+         fsDistributeListPrefixIpPrefixName
+            DisplayString,      
+         fsDistributeListStatus
+            RowStatus
+              }
+
+fsDistributeListCfgProtoType OBJECT-TYPE
+       SYNTAX   FSRouteProtoType                      
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+        "This index indicate that which routing protocol
+         configuration mode is current mode."
+       ::={fsDistributeListEntry 1}
+       
+fsDistributeListIfIndex OBJECT-TYPE
+       SYNTAX   Unsigned32                       
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+          "The interface that this distribute list apply to.
+           If this value is 0,it indicate that this distribute list apply in all 
+           interfaces.
+           Other value is equal to TEXTUAL-CONVENTION 'IfIndex' meaning."
+       ::={fsDistributeListEntry 2}
+
+fsDistributeListDirection OBJECT-TYPE
+       SYNTAX  INTEGER{
+                         out(1),
+                         in(2)
+                       }                        
+       MAX-ACCESS   read-only
+       STATUS   current
+       DESCRIPTION 
+           "If direct is 'in' the distribute list is applied to input packets£¬
+            If direct is 'out' the distribute list is applied to output packets."
+       ::={fsDistributeListEntry 3}
+
+fsDistributeListFilteringProtocol OBJECT-TYPE
+       SYNTAX Unsigned32              
+       MAX-ACCESS read-only
+       STATUS   current
+       DESCRIPTION 
+           "If this value is 0,it indicate that this distribute list will apply on 
+            all protocol.
+            
+            Other value is equal to TEXTUAL-CONVENTION 'FSRouteProtoType' meaning,
+            it indicate the protocol which this distribute list apply on."   
+       ::={fsDistributeListEntry 4}
+                     
+fsDistributeListFilterType OBJECT-TYPE
+       SYNTAX   INTEGER{
+                         acl(1),
+                         gateway(2),
+                         prefix(3),
+                         prefix-gateway(4)
+                       }                       
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "this field defines the filtering type which
+            distribute-list used ,
+            'acl' means filtering destination ip address of  route 
+              information in incoming or outing packets;
+            'gateway' means filtering source ip address and mask of incoming packets;
+            'prefix' means filtering destination ip address and mask of route
+             information in incoming or outing packets;
+            'prefix-gateway' means that firstly filtering  destination 
+             ip address and mask of route information in incoming or outing packets,
+             secondly filtering source ip address and mask of incoming packets.
+             if Prefix-list filter is configed,Access-list filter can not be configed;
+             if  Access-list filter is configed,Prefix-list filter can not be configed."  
+       ::={fsDistributeListEntry 5}
+       
+fsDistributeListAclName OBJECT-TYPE
+       SYNTAX DisplayString(SIZE (0..32))
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           " This field is valid when the field fsDistributeListFilterType's value
+             is 'acl',it's access list name that distribute-list reference to.
+             Null string indicate that the distribute list will not reference any ACL"
+       ::={fsDistributeListEntry 6}
+       
+fsDistributeListGateWayIpPrefixName OBJECT-TYPE
+       SYNTAX DisplayString(SIZE (0..32))
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           " this field is valid when the field fsDistributeListFilterType's value
+             is 'gateway',it's ip prefix list name that distribute-list source ip and mask
+             reference to.
+             
+             Null string indicate that the distribute list source ip and mask 
+             will not reference any ip prefix list." 
+       ::={fsDistributeListEntry 7}
+       
+fsDistributeListPrefixIpPrefixName OBJECT-TYPE
+       SYNTAX DisplayString(SIZE (0..32))
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           " this field is valid when the field fsDistributeListFilterType's value
+             is 'gateway',it's ip prefix list name that distribute-list destination 
+             ip and mask reference to.
+             
+             Null string indicate that the distribute list destination ip and mask 
+             will not reference any ip prefix list."   
+       ::={fsDistributeListEntry 8}
+              
+fsDistributeListStatus OBJECT-TYPE
+       SYNTAX   RowStatus        
+       MAX-ACCESS   read-create
+       STATUS   current
+       DESCRIPTION 
+           "the entry status,if the value is destroy ,then 
+            delete this distribute-list."  
+       ::={fsDistributeListEntry 9}
+                     
+fsipCidrRouteExtendMIBObjects OBJECT IDENTIFIER ::= { fsRouteMIB 5 }    
+fsipCidrRouteTable OBJECT-TYPE
+    SYNTAX   SEQUENCE OF FSIpCidrRouteEntry
+    MAX-ACCESS not-accessible
+    STATUS   current
+    DESCRIPTION
+       "This entity's IP Routing table."
+    REFERENCE
+       "RFC 1213 Section 6.6, The IP Group"
+    ::= { fsipCidrRouteExtendMIBObjects 1 }
+
+fsipCidrRouteEntry OBJECT-TYPE
+    SYNTAX   FSIpCidrRouteEntry
+    MAX-ACCESS not-accessible
+    STATUS   current
+    DESCRIPTION
+       "A particular route to  a  particular  destina-
+       tion, under a particular policy."
+    INDEX {
+        fsipCidrRouteDest,
+        fsipCidrRouteMask,
+        fsipCidrRouteTos,
+        fsipCidrRouteNextHop
+        }
+    ::= { fsipCidrRouteTable 1 }
+
+FSIpCidrRouteEntry ::=
+    SEQUENCE {
+        fsipCidrRouteDest
+            IpAddress,
+        fsipCidrRouteMask
+            IpAddress,
+        fsipCidrRouteTos
+             Integer32,
+        fsipCidrRouteNextHop
+            IpAddress,
+        fsipCidrRouteIfIndex
+            Integer32,
+        fsipCidrRouteType
+            INTEGER,
+        fsipCidrRouteProto
+            INTEGER,
+        fsipCidrRouteAge
+            Integer32,
+        fsipCidrRouteInfo
+            OBJECT IDENTIFIER,
+        fsipCidrRouteNextHopAS
+            Integer32,
+        fsipCidrRouteMetric1
+            Integer32,
+        fsipCidrRouteMetric2
+            Integer32,
+        fsipCidrRouteMetric3
+            Integer32,
+        fsipCidrRouteMetric4
+            Integer32,
+        fsipCidrRouteMetric5
+            Integer32,
+        fsipCidrRouteStatus
+            RowStatus,
+        fsipCidrOspfRouteType
+            INTEGER
+    }
+
+fsipCidrRouteDest OBJECT-TYPE
+    SYNTAX   IpAddress
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "The destination IP address of this route.
+
+       This object may not take a Multicast (Class  D)
+       address value.
+
+       Any assignment (implicit or  otherwise)  of  an
+       instance  of  this  object to a value x must be
+       rejected if the bitwise logical-AND of  x  with
+       the  value of the corresponding instance of the
+       ipCidrRouteMask object is not equal to x."
+    ::= { fsipCidrRouteEntry 1 }
+
+fsipCidrRouteMask OBJECT-TYPE
+    SYNTAX   IpAddress
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "Indicate the mask to be logical-ANDed with the
+       destination  address  before  being compared to
+       the value  in  the  ipCidrRouteDest  field.   For
+       those  systems  that  do  not support arbitrary
+       subnet masks, an agent constructs the value  of
+       the  ipCidrRouteMask  by  reference to the IP Ad-
+       dress Class.
+
+       Any assignment (implicit or  otherwise)  of  an
+       instance  of  this  object to a value x must be
+       rejected if the bitwise logical-AND of  x  with
+       the  value of the corresponding instance of the
+       ipCidrRouteDest object is not equal to ipCidrRoute-
+       Dest."
+    ::= { fsipCidrRouteEntry 2 }
+
+-- The following convention is included for specification
+-- of TOS Field contents.  At this time, the Host Requirements
+-- and the Router Requirements documents disagree on the width
+-- of the TOS field.  This mapping describes the Router
+-- Requirements mapping, and leaves room to widen the TOS field
+-- without impact to fielded systems.
+
+fsipCidrRouteTos OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "The policy specifier is the IP TOS Field.  The encoding
+       of IP TOS is as specified  by  the  following convention.
+       Zero indicates the default path if no more  specific
+       policy applies.
+
+       +-----+-----+-----+-----+-----+-----+-----+-----+
+       |                 |                       |     |
+       |   PRECEDENCE    |    TYPE OF SERVICE    |  0  |
+       |                 |                       |     |
+       +-----+-----+-----+-----+-----+-----+-----+-----+
+
+                IP TOS                IP TOS
+           Field     Policy      Field     Policy
+           Contents    Code      Contents    Code
+           0 0 0 0  ==>   0      0 0 0 1  ==>   2
+           0 0 1 0  ==>   4      0 0 1 1  ==>   6
+           0 1 0 0  ==>   8      0 1 0 1  ==>  10
+           0 1 1 0  ==>  12      0 1 1 1  ==>  14
+           1 0 0 0  ==>  16      1 0 0 1  ==>  18
+           1 0 1 0  ==>  20      1 0 1 1  ==>  22
+           1 1 0 0  ==>  24      1 1 0 1  ==>  26
+           1 1 1 0  ==>  28      1 1 1 1  ==>  30"
+    ::= { fsipCidrRouteEntry 3 }
+
+fsipCidrRouteNextHop OBJECT-TYPE
+    SYNTAX   IpAddress
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "On remote routes, the address of the next sys-
+       tem en route; Otherwise, 0.0.0.0."
+    ::= { fsipCidrRouteEntry 4 }
+
+fsipCidrRouteIfIndex OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "The ifIndex value which identifies  the  local
+       interface  through  which  the next hop of this
+       route should be reached."
+    DEFVAL { 0 }
+    ::= { fsipCidrRouteEntry 5 }
+
+fsipCidrRouteType OBJECT-TYPE
+    SYNTAX   INTEGER {
+                other    (1), -- not specified by this MIB
+                reject   (2), -- route which discards traffic
+                local    (3), -- local interface
+                remote   (4)  -- remote destination
+             }
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "The type of route.  Note that local(3)  refers
+       to  a route for which the next hop is the final
+       destination; remote(4) refers to  a  route  for
+       which  the  next  hop is not the final destina-
+       tion.
+
+       Routes which do not result in traffic forwarding or
+       rejection should not be displayed even if the
+       implementation keeps them stored internally.
+
+
+       reject (2) refers to a route which, if matched, discards
+       the message as unreachable. This is used in some
+       protocols as a means of correctly aggregating routes."
+    ::= { fsipCidrRouteEntry 6 }
+
+fsipCidrRouteProto OBJECT-TYPE
+    SYNTAX   INTEGER {
+                other     (1),  -- not specified
+                local     (2),  -- local interface
+                netmgmt   (3),  -- static route
+                icmp      (4),  -- result of ICMP Redirect
+
+                        -- the following are all dynamic
+                        -- routing protocols
+                egp        (5),  -- Exterior Gateway Protocol
+                ggp        (6),  -- Gateway-Gateway Protocol
+                hello      (7),  -- FuzzBall HelloSpeak
+                rip        (8),  -- Berkeley RIP or RIP-II
+                isIs       (9),  -- Dual IS-IS
+                esIs       (10), -- ISO 9542
+                ciscoIgrp  (11), -- Cisco IGRP
+                bbnSpfIgp  (12), -- BBN SPF IGP
+                ospf       (13), -- Open Shortest Path First
+                bgp        (14), -- Border Gateway Protocol
+                idpr       (15), -- InterDomain Policy Routing
+                ciscoEigrp (16), -- Cisco EIGRP
+                policy     (17)  -- FS private policy-route
+                
+             }
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "The routing mechanism via which this route was
+       learned.  Inclusion of values for gateway rout-
+       ing protocols is not  intended  to  imply  that
+       hosts should support those protocols."
+    ::= { fsipCidrRouteEntry 7 }
+
+fsipCidrRouteAge OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "The number of seconds  since  this  route  was
+       last  updated  or  otherwise  determined  to be
+       correct.  Note that no semantics of  `too  old'
+       can  be implied except through knowledge of the
+       routing  protocol  by  which  the   route   was
+       learned."
+    DEFVAL  { 0 }
+    ::= { fsipCidrRouteEntry 8 }
+
+fsipCidrRouteInfo OBJECT-TYPE
+    SYNTAX   OBJECT IDENTIFIER
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "A reference to MIB definitions specific to the
+       particular  routing protocol which is responsi-
+       ble for this route, as determined by the  value
+       specified  in the route's ipCidrRouteProto value.
+       If this information is not present,  its  value
+       should be set to the OBJECT IDENTIFIER { 0 0 },
+       which is a syntactically valid object  identif-
+       ier, and any implementation conforming to ASN.1
+       and the Basic Encoding Rules must  be  able  to
+       generate and recognize this value."
+    ::= { fsipCidrRouteEntry 9 }
+
+fsipCidrRouteNextHopAS OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "The Autonomous System Number of the Next  Hop.
+       The  semantics of this object are determined by
+       the routing-protocol specified in  the  route's
+       ipCidrRouteProto  value. When  this object is
+       unknown or not relevant its value should be set
+       to zero."
+    DEFVAL { 0 }
+    ::= { fsipCidrRouteEntry 10 }
+
+fsipCidrRouteMetric1 OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "The primary routing  metric  for  this  route.
+       The  semantics of this metric are determined by
+       the routing-protocol specified in  the  route's
+       ipCidrRouteProto  value.   If  this metric is not
+       used, its value should be set to -1."
+    DEFVAL { -1 }
+    ::= { fsipCidrRouteEntry 11 }
+
+fsipCidrRouteMetric2 OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "An alternate routing metric  for  this  route.
+       The  semantics of this metric are determined by
+       the routing-protocol specified in  the  route's
+       ipCidrRouteProto  value.   If  this metric is not
+       used, its value should be set to -1."
+    DEFVAL { -1 }
+    ::= { fsipCidrRouteEntry 12 }
+
+fsipCidrRouteMetric3 OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "An alternate routing metric  for  this  route.
+       The  semantics of this metric are determined by
+       the routing-protocol specified in  the  route's
+       ipCidrRouteProto  value.   If  this metric is not
+       used, its value should be set to -1."
+    DEFVAL { -1 }
+    ::= { fsipCidrRouteEntry 13 }
+
+fsipCidrRouteMetric4 OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "An alternate routing metric  for  this  route.
+       The  semantics of this metric are determined by
+       the routing-protocol specified in  the  route's
+       ipCidrRouteProto  value.   If  this metric is not
+       used, its value should be set to -1."
+    DEFVAL { -1 }
+    ::= { fsipCidrRouteEntry 14 }
+
+fsipCidrRouteMetric5 OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "An alternate routing metric  for  this  route.
+       The  semantics of this metric are determined by
+       the routing-protocol specified in  the  route's
+       ipCidrRouteProto  value.   If  this metric is not
+       used, its value should be set to -1."
+    DEFVAL { -1 }
+    ::= { fsipCidrRouteEntry 15 }
+
+fsipCidrRouteStatus OBJECT-TYPE
+    SYNTAX   RowStatus
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "The row status variable, used according to
+       row installation and removal conventions."
+    ::= { fsipCidrRouteEntry 16 }
+    
+fsipCidrOspfRouteType OBJECT-TYPE
+    SYNTAX   INTEGER
+             {
+               ospf-route    (0), --ospf intra area route 
+               ospf-ia-route (1), --ospf inter area route
+	       ospf-n1-route (2), --ospf nssa external type 1 route
+	       ospf-n2-route (3), --ospf nssa external type 2 route
+	       ospf-e1-route (4), --ospf external type 1 route 
+	       ospf-e2-route (5)  --OSPF external type 2 route
+             }
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+       "this field describles the ospf route entry's type,
+        it's valid when this route was learned by ospf protocol."
+    ::= { fsipCidrRouteEntry 17 }                     
+              
+fsRouteMIBConformance OBJECT IDENTIFIER ::= { fsRouteMIB 6 }
+fsRouteMIBCompliances OBJECT IDENTIFIER ::= { fsRouteMIBConformance 1 }
+fsRouteMIBGroups      OBJECT IDENTIFIER ::= { fsRouteMIBConformance 2 }
+
+
+-- compliance statements
+
+fsRouteMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS Route MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { 
+                        fsRouteMIBGroup,
+                        fsRouteInfoMIBGroup,
+                        fsRouteMapMIBGroup,
+                        fsRouteRedistributeMIBGroup ,
+                        fsRouteFilteringMibGroup,
+                        fsipCidrRouteMibGroup
+                 }
+        ::= { fsRouteMIBCompliances 1 }
+                
+-- units of conformance
+        
+fsRouteMIBGroup OBJECT-GROUP
+        OBJECTS {
+             fsRouteServiceStatus
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing route managment."
+        ::= { fsRouteMIBGroups 1 }        
+
+fsRouteInfoMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsRoutingProtoInfoProtoType,
+           fsRoutingProtoInfoGateWay    ,
+           fsRoutingProtoInfoDistance ,
+           fsRoutingProtoInfoLastUpdate,
+           
+           fsDefRoutingCfgRoutingProtoType,
+           fsDefRoutingCfgAlways  ,
+           fsDefRoutingCfgMetric,
+           fsDefRoutingCfgMetricType,
+           fsDefRoutingCfgRouteMap,
+           fsDefRoutingCfgStatus              
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing route information for all routing protocol."
+        ::= { fsRouteMIBGroups 2}
+                
+fsRouteMapMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsRouteMapName,
+           fsRouteMapSequenceNumber,
+           fsRouteMapOperType   ,
+           fsRouteMapMatchMetric  ,
+           fsRouteMapMatchRouteType ,
+           fsRouteMapMetricValueType    ,
+           fsRouteMapSetMetric  ,      
+           fsRouteMapSetLevel  ,
+           fsRouteMapSetMetricType ,
+           fsRouteMapSetNexthopSt,
+           fsRouteMapSetNexthopSt,
+           fsRouteMapStatus,
+           
+           fsRouteMapMatchIpAddressAclName,
+           fsRouteMapMatchType,    
+           fsRouteMapMatchIpAddressStatus,
+           
+           fsRouteMapMatchTagValue  ,
+           fsRouteMapMatchTagStatus,
+         
+           fsRouteMapMatchInterfaceIfIndex,
+           fsRouteMapMatchInterfaceStatus
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing route managment."
+        ::= { fsRouteMIBGroups 3 }   
+        
+fsRouteRedistributeMIBGroup OBJECT-GROUP
+        OBJECTS {
+--         fsRouteRedistributeDefMetricVal,
+        
+         fsRouteRedistributeProtocolCfg,
+         fsRouteRedistributeProtocol,
+         fsRouteRedistributeMetricValue,
+         fsRouteRedistributeMetricType,
+         fsRouteRedistributeTagValue,
+         fsRouteRedistributeRouteMapName,
+         fsRouteRedistributeStatus
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing route Redistributting."
+        ::= { fsRouteMIBGroups 4 }   
+        
+fsRouteFilteringMibGroup  OBJECT-GROUP
+        OBJECTS { 
+                  fsIpPrefixListName,
+                  fsIpPrefixListSequence,
+                  fsIpPrefixListOperMethod,
+                  fsIpPrefixListIpAddress,
+                  fsIpPrefixListMaskLength,
+                  fsIpPrefixListMinimumPrefixLength,
+                  fsIpPrefixListMaximumPrefixLength,
+                  fsIpPrefixListStatus,
+                  
+                  fsDistributeListCfgProtoType ,
+                  fsDistributeListIfIndex,
+                  fsDistributeListFilterType,
+                  fsDistributeListDirection ,
+                  fsDistributeListAclName,
+                  fsDistributeListGateWayIpPrefixName,
+                  fsDistributeListPrefixIpPrefixName,
+                  fsDistributeListFilteringProtocol,
+                  fsDistributeListStatus     
+                }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing route distribute-list."
+        ::= { fsRouteMIBGroups 5 }    
+        
+fsipCidrRouteMibGroup  OBJECT-GROUP
+        OBJECTS { 
+        fsipCidrRouteDest,
+        fsipCidrRouteMask,
+        fsipCidrRouteTos,
+        fsipCidrRouteNextHop,
+        fsipCidrRouteIfIndex,
+        fsipCidrRouteType,
+        fsipCidrRouteProto,
+        fsipCidrRouteAge,
+        fsipCidrRouteInfo,
+        fsipCidrRouteNextHopAS,
+        fsipCidrRouteMetric1,
+        fsipCidrRouteMetric2,
+        fsipCidrRouteMetric3,
+        fsipCidrRouteMetric4,
+        fsipCidrRouteMetric5,
+        fsipCidrRouteStatus,
+        fsipCidrOspfRouteType
+                }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing CIDR Route Table."
+        ::= { fsRouteMIBGroups 6 }             
+                
+END

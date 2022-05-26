@@ -63,8 +63,9 @@ function print_syslogs($vars)
           break;
         case 'tag':
         case 'program':
+          $condition = str_contains($value, '*') ? 'LIKE' : '=';
           $value = get_var_csv($value);
-          $where .= generate_query_values($value, $var);
+          $where .= generate_query_values($value, $var, $condition);
           break;
         case 'message':
           if (preg_match('/^!(=)?\s*(?<msg>.+)/', $value, $matches)) {
@@ -121,7 +122,7 @@ function print_syslogs($vars)
       $count = $tmp['rows'];
     }
   } else {
-    $count = count($entries);
+    $count = safe_count($entries);
   }
 
   if (!$count)
@@ -238,7 +239,7 @@ function generate_syslog_row($entry, $vars, $list = NULL)
                          'tab'     => 'logs',
                          'section' => 'syslog');
     if ($is_alert) { $device_vars['section'] = 'logalert'; }
-    $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
+    $string .= '    <td class="entity">' . generate_device_link_short($dev, $device_vars) . '</td>' . PHP_EOL;
   }
 
   // Alert Rule column (in syslog alerts)

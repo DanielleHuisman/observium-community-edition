@@ -14,8 +14,7 @@
 
 $port_module = 'vlan';
 
-if (!$ports_modules[$port_module] || is_device_mib($device, 'CISCO-VTP-MIB'))
-{
+if (!$ports_modules[$port_module] || is_device_mib($device, 'CISCO-VTP-MIB')) {
   // Module disabled, or Cisco device
   // Q-BRIDGE-MIB is default mib, need excludes
   return FALSE; // False for do not collect stats
@@ -70,32 +69,24 @@ if (snmp_status() && $use_baseports)
   // Collect trunk port ids and vlans
   //$trunk_ports = dbFetchColumn('SELECT DISTINCT `port_id` FROM `ports_vlans` WHERE `device_id` = ?', [ $device['device_id'] ]);
   $trunk_ports = [];
-  foreach (dbFetchRows('SELECT `port_id`, `vlan` FROM `ports_vlans` WHERE `device_id` = ?', [ $device['device_id'] ]) as $entry)
-  {
+  foreach (dbFetchRows('SELECT `port_id`, `vlan` FROM `ports_vlans` WHERE `device_id` = ?', [ $device['device_id'] ]) as $entry) {
     $trunk_ports[$entry['port_id']][] = $entry['vlan'];
   }
   print_debug_vars($trunk_ports);
 
-  $vlan_rows = array();
-  foreach ($dot1q_ports as $index => $entry)
-  {
+  $vlan_rows = [];
+  foreach ($dot1q_ports as $index => $entry) {
     $vlan_num = $entry['dot1qPvid'];
     $ifIndex  = $dot1d_baseports[$index]['dot1dBasePortIfIndex'];
-    if (isset($entry['jnxExVlanPortAccessMode']) && $entry['jnxExVlanPortAccessMode'] == 'trunk')
-    {
+    if (isset($entry['jnxExVlanPortAccessMode']) && $entry['jnxExVlanPortAccessMode'] === 'trunk') {
       $trunk = 'dot1Q';
-    }
-    elseif (isset($entry['dot1qPortAcceptableFrameTypes']) && $entry['dot1qPortAcceptableFrameTypes'] == 'admitOnlyVlanTagged')
-    {
+    } elseif (isset($entry['dot1qPortAcceptableFrameTypes']) && $entry['dot1qPortAcceptableFrameTypes'] === 'admitOnlyVlanTagged') {
       $trunk = 'dot1Q';
-    }
-    elseif ((isset($entry['dot1qPortIngressFiltering']) && $entry['dot1qPortIngressFiltering'] == 'true'))
-    {
-      // Additionally check if port have trunk ports
+    } elseif ((isset($entry['dot1qPortIngressFiltering']) && $entry['dot1qPortIngressFiltering'] === 'true')) {
+      // Additionally, check if port have trunk ports
       $port = get_port_by_index_cache($device, $ifIndex);
       print_debug("CHECK. ifIndex: $ifIndex, port_id: ".$port['port_id']);
-      if (isset($trunk_ports[$port['port_id']]) && (count($trunk_ports[$port['port_id']]) > 1 || $trunk_ports[$port['port_id']][0] != $vlan_num))
-      {
+      if (isset($trunk_ports[$port['port_id']]) && (count($trunk_ports[$port['port_id']]) > 1 || $trunk_ports[$port['port_id']][0] != $vlan_num)) {
         $trunk = 'dot1Q';
       } else {
         $trunk = ''; // access

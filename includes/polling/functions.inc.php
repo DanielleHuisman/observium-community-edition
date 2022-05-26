@@ -101,8 +101,7 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
   return TRUE;
 }
 
-function poll_device($device, $options)
-{
+function poll_device($device, $options) {
   global $config, $device, $polled_devices, $db_stats, $exec_status, $alert_rules, $alert_table, $graphs, $attribs;
 
   $device_start = utime();  // Start counting device poll time
@@ -114,9 +113,9 @@ function poll_device($device, $options)
   $attribs = get_entity_attribs('device', $device['device_id']);
   $model = get_model_array($device);
 
-  print_debug_vars($device);
-  print_debug_vars($attribs);
-  print_debug_vars($model);
+  print_debug_vars($device, 1);
+  print_debug_vars($attribs, 1);
+  print_debug_vars($model, 1);
 
   $pid_info = check_process_run($device); // This just clear stalled DB entries
   add_process_info($device); // Store process info
@@ -477,6 +476,19 @@ function poll_device($device, $options)
 
   check_entity('device', $device, $alert_metrics);
 
+  // Multi insert/update all checked entities by check_entity()
+  dbProcessMulti('alert_table');
+  /* CLEANME
+  print_debug_vars($GLOBALS['cache_db']);
+  if (isset($GLOBALS['cache_db']['alert_table']['update'])) {
+    dbUpdateMulti($GLOBALS['cache_db']['alert_table']['update'], 'alert_table');
+
+    //print_debug("Full update of 'alert_table' count: ".count($GLOBALS['cache_db']['alert_table'])." vs changed count: ".safe_count($GLOBALS['cache_db']['alert_table_test']));
+    // Clean
+    unset($GLOBALS['cache_db']['alert_table']['update']);
+  }
+  */
+
   echo(PHP_EOL);
 
   // Clean
@@ -730,20 +742,18 @@ function collect_table($device, $oids_def, &$graphs) {
       $graph_template .= "  'file'      => '$rrd_file',\n";
       $graph_template .= "  'ds'        => array(\n";
       $rrd_file_info = rrdtool_file_info(get_rrd_path($device, $rrd_file));
-      foreach ($rrd_file_info['DS'] as $ds => $nothing)
-      {
+      $ds_list = [];
+      foreach ($rrd_file_info['DS'] as $ds => $nothing) {
         $ds_list[] = $ds;
         $graph_template .= "    '$ds' => array('label' => '$ds'),\n";
       }
       $graph_template .= "  )\n);";
       $in_args = array_diff($rrd['ds_list'], $ds_list);
-      if ($in_args)
-      {
+      if ($in_args) {
         print_message("%rWARNING%n, in file '%W".$rrd_file_info['filename']."%n' different DS lists. NOT have: ".implode(', ', $in_args));
       }
       $in_file = array_diff($ds_list, $rrd['ds_list']);
-      if ($in_file)
-      {
+      if ($in_file) {
         print_message("%rWARNING%n, in file '%W".$rrd_file_info['filename']."%n' different DS lists. Excess: ".implode(', ', $in_file));
       }
 

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -42,8 +42,7 @@ register_html_resource('js', 'observium-entities.js');
   echo('<li>');
   // FIXME, currently users list more than 1000 have troubles with memory use
   // Do not generate this unusable dropdown form, need to switch ajax input
-  if (count($user_list) <= 512)
-  {
+  if (safe_count($user_list) <= 512) {
     $item = array('id'       => 'page',
                   'value'    => 'user_edit');
     echo(generate_form_element($item, 'hidden'));
@@ -142,23 +141,21 @@ register_html_resource('js', 'observium-entities.js');
           break;
 
         case "change_user":
-          if ($auth_secret_fail)
-          {
+          if ($auth_secret_fail) {
             // Incorrect auth secret, seems as someone try to hack system ;)
             print_debug("Incorrect admin auth, get out from here nasty hacker.");
           } else {
             $update_array = array();
             $vars['new_can_modify_passwd'] = (isset($vars['new_can_modify_passwd']) && $vars['new_can_modify_passwd'] ? 1 : 0);
-            foreach (array('realname', 'level', 'email', 'descr', 'can_modify_passwd') as $param)
-            {
-              if ($vars['new_' . $param] != $user_data[$param]) { $update_array[$param] = $vars['new_' . $param]; }
+            foreach (array('realname', 'level', 'email', 'descr', 'can_modify_passwd') as $param) {
+              if ($vars['new_' . $param] != $user_data[$param]) {
+                $update_array[$param] = $vars['new_' . $param];
+              }
             }
-            if (count($update_array))
-            {
+            if (count($update_array)) {
               $status = dbUpdate($update_array, 'users', '`user_id` = ?', array($vars['user_id']));
             }
-            if ($status)
-            {
+            if ($status) {
               print_success("User Info Changed.");
             } else {
               print_error("User Info not changed.");
@@ -167,8 +164,7 @@ register_html_resource('js', 'observium-entities.js');
           break;
       }
 
-      if ($status)
-      {
+      if ($status) {
         // Reload user info
         //$user_data = dbFetchRow("SELECT * FROM `users` WHERE `user_id` = ?", array($vars['user_id']));
         $user_data['username'] = auth_username_by_id($vars['user_id']);
@@ -179,10 +175,8 @@ register_html_resource('js', 'observium-entities.js');
     }
 
     // FIXME -- output messages!
-    if (($vars['submit'] == "user_perm_del" || $vars['action'] == "user_perm_del") && request_token_valid($vars))
-    {
-      if ($auth_secret_fail)
-      {
+    if (($vars['submit'] === "user_perm_del" || $vars['action'] === "user_perm_del") && request_token_valid($vars)) {
+      if ($auth_secret_fail) {
         // Incorrect auth secret, seems as someone try to hack system ;)
         print_debug("Incorrect admin auth, get out from here nasty hacker.");
       } else {
@@ -421,7 +415,7 @@ register_html_resource('js', 'observium-entities.js');
           $users = dbFetchRows("SELECT * FROM `users`");
 
           $role_list = [];
-          if (safe_count($role_membership)) {
+          if (!safe_empty($role_membership)) {
             echo '<div class="box-body no-padding">';
             echo('<table class="table table-hover table-condensed">');
 
@@ -537,15 +531,12 @@ register_html_resource('js', 'observium-entities.js');
   }
 
   // Start bill Permissions
-  if (isset($config['enable_billing']) && $config['enable_billing'])
-  {
+  if (isset($config['enable_billing']) && $config['enable_billing']) {
     echo generate_box_open(array('header-border' => TRUE, 'title' => 'Bill Permissions'));
-    if (count($user_permissions['bill']))
-    {
+    if (!safe_empty($user_permissions['bill'])) {
       echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-      foreach ($user_permissions['bill'] as $bill_id => $status)
-      {
+      foreach ($user_permissions['bill'] as $bill_id => $status) {
         $bill = get_bill_by_id($bill_id);
 
         echo('<tr><td style="width: 1px;"></td>
@@ -583,7 +574,7 @@ register_html_resource('js', 'observium-entities.js');
     }
 
     // Bills
-    $permissions_list = array_keys($user_permissions['bill']);
+    $permissions_list = array_keys((array)$user_permissions['bill']);
 
     $form = array('type'  => 'simple',
                   'style' => 'padding: 7px; margin: 0px;',
@@ -602,13 +593,13 @@ register_html_resource('js', 'observium-entities.js');
                                            'value'    => 'user_perm_add');
 
     $form_items['bills'] = array();
-    foreach (dbFetchRows("SELECT * FROM `bills`") as $bill)
-    {
-      if (!in_array($bill['bill_id'], $permissions_list))
-      {
-        $form_items['bills'][$bill['bill_id']] = array('name'    => escape_html($bill['bill_name']),
-                                                       'subtext' => escape_html($bill['bill_descr']),
-                                                       'icon'    => $config['entities']['bill']['icon']);
+    foreach (dbFetchRows("SELECT * FROM `bills`") as $bill) {
+      if (!in_array($bill['bill_id'], $permissions_list)) {
+        $form_items['bills'][$bill['bill_id']] = [
+          'name'    => $bill['bill_name'],
+          'subtext' => $bill['bill_descr'],
+          'icon'    => $config['entities']['bill']['icon']
+        ];
       }
     }
     $form['row'][0]['entity_id']   = array('type'     => 'multiselect',
@@ -629,16 +620,13 @@ register_html_resource('js', 'observium-entities.js');
   // End bill permissions
 
   // Start group permissions
-  if (OBSERVIUM_EDITION != 'community')
-  {
+  if (OBSERVIUM_EDITION !== 'community') {
     echo generate_box_open(array('header-border' => TRUE, 'title' => 'Group Permissions'));
 
-    if (count($user_permissions['group']))
-    {
+    if (!safe_empty($user_permissions['group'])) {
       echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-      foreach ($user_permissions['group'] as $group_id => $status)
-      {
+      foreach ($user_permissions['group'] as $group_id => $status) {
         $group = get_group_by_id($group_id);
 
         echo('<tr><td style="width: 1px;"></td>
@@ -676,7 +664,7 @@ register_html_resource('js', 'observium-entities.js');
     }
 
     // Groups
-    $permissions_list = array_keys($user_permissions['group']);
+    $permissions_list = array_keys((array)$user_permissions['group']);
 
     $form = array('type'  => 'simple',
                   'style' => 'padding: 7px; margin: 0px;',
@@ -695,13 +683,13 @@ register_html_resource('js', 'observium-entities.js');
                                            'value'    => 'user_perm_add');
 
     $form_items['groups'] = array();
-    foreach (dbFetchRows("SELECT * FROM `groups`") as $group)
-    {
-      if (!in_array($group['group_id'], $permissions_list))
-      {
-        $form_items['groups'][$group['group_id']] = array('name'    => escape_html($group['group_name']),
-                                                          'subtext' => escape_html($group['group_descr']),
-                                                          'icon'    => $config['entities'][$group['entity_type']]['icon']);
+    foreach (dbFetchRows("SELECT * FROM `groups`") as $group) {
+      if (!in_array($group['group_id'], $permissions_list)) {
+        $form_items['groups'][$group['group_id']] = [
+          'name'    => $group['group_name'],
+          'subtext' => $group['group_descr'],
+          'icon'    => $config['entities'][$group['entity_type']]['icon']
+        ];
       }
     }
     $form['row'][0]['entity_id']   = array('type'     => 'multiselect',
@@ -724,12 +712,11 @@ register_html_resource('js', 'observium-entities.js');
   // Start device permissions
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Device Permissions'));
 
-  if (count($user_permissions['device']))
-  {
+  $user_permissions_devices = !safe_empty($user_permissions['device']);
+  if ($user_permissions_devices) {
     echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-    foreach ($user_permissions['device'] as $device_id => $status)
-    {
+    foreach ($user_permissions['device'] as $device_id => $status) {
       $device = device_by_id_cache($device_id);
 
       echo('<tr><td style="width: 1px;"></td>
@@ -767,7 +754,8 @@ register_html_resource('js', 'observium-entities.js');
   }
 
   // Devices
-  $permissions_list = array_keys($user_permissions['device']);
+  $permissions_list = array_keys((array)$user_permissions['device']);
+
   // Display devices this user doesn't have Permissions to
   $form = array('type'  => 'simple',
                 'style' => 'padding: 7px; margin: 0px;',
@@ -786,15 +774,15 @@ register_html_resource('js', 'observium-entities.js');
                                          'value'    => 'user_perm_add');
 
   $form_items['devices'] = array();
-  foreach (dbFetchRows("SELECT * FROM `devices` ORDER BY `hostname`") as $device)
-  {
-    if (!in_array($device['device_id'], $permissions_list))
-    {
+  foreach (dbFetchRows("SELECT * FROM `devices` ORDER BY `hostname`") as $device) {
+    if (!in_array($device['device_id'], $permissions_list)) {
       //humanize_device($device);
-      $form_items['devices'][$device['device_id']] = array('name'    => escape_html($device['hostname']),
-                                                           'subtext' => escape_html($device['location']),
-                                                           //'class'   => $device['html_row_class'],
-                                                           'icon'    => $config['entities']['device']['icon']);
+      $form_items['devices'][$device['device_id']] = [
+        'name'    => $device['hostname'],
+        'subtext' => $device['location'],
+        //'class'   => $device['html_row_class'],
+        'icon'    => $config['entities']['device']['icon']
+      ];
     }
   }
   $form['row'][0]['entity_id']   = array('type'     => 'multiselect',
@@ -815,12 +803,10 @@ register_html_resource('js', 'observium-entities.js');
 
   // Start port permissions
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Port Permissions'));
-  if (count($user_permissions['port']))
-  {
+  if (!safe_empty($user_permissions['port'])) {
     echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-    foreach (array_keys($user_permissions['port']) as $entity_id)
-    {
+    foreach (array_keys($user_permissions['port']) as $entity_id) {
       $port   = get_port_by_id($entity_id);
       $device = device_by_id_cache($port['device_id']);
 
@@ -860,7 +846,7 @@ register_html_resource('js', 'observium-entities.js');
   }
 
   // Ports
-  $permissions_list = array_keys($user_permissions['port']);
+  $permissions_list = array_keys((array)$user_permissions['port']);
 
   // Display devices this user doesn't have Permissions to
   $form = array('type'  => 'simple',
@@ -879,12 +865,10 @@ register_html_resource('js', 'observium-entities.js');
   $form['row'][0]['action']      = array('type'     => 'hidden',
                                          'value'    => 'user_perm_add');
 
-  $form_items['devices'] = array();
-  foreach ($cache['devices']['hostname'] as $hostname => $device_id)
-  {
-    if (!array_key_exists($device_id, $user_permissions['device']))
-    {
-      $form_items['devices'][$device_id] = escape_html($hostname);
+  $form_items['devices'] = [];
+  foreach ($cache['devices']['hostname'] as $hostname => $device_id) {
+    if (!$user_permissions_devices || !array_key_exists($device_id, $user_permissions['device'])) {
+      $form_items['devices'][$device_id] = $hostname;
     }
   }
   $form['row'][0]['device_id']   = array('type'     => 'select',
@@ -912,12 +896,10 @@ register_html_resource('js', 'observium-entities.js');
   // Start sensor permissions
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Sensor Permissions'));
 
-  if (count($user_permissions['sensor']))
-  {
+  if (!safe_empty($user_permissions['sensor'])) {
     echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-    foreach (array_keys($user_permissions['sensor']) as $entity_id)
-    {
+    foreach (array_keys($user_permissions['sensor']) as $entity_id) {
       $sensor   = get_entity_by_id_cache('sensor', $entity_id);
       $device   = device_by_id_cache($sensor['device_id']);
 
@@ -955,7 +937,9 @@ register_html_resource('js', 'observium-entities.js');
       //print_warning('This user currently has no permitted sensors');
     }
 
-    $permissions_list = array_keys($user_permissions['sensor']);
+    // Sensors
+    $permissions_list = array_keys((array)$user_permissions['sensor']);
+
     // Display devices this user doesn't have Permissions to
     $form = array('type'  => 'simple',
                   'style' => 'padding: 7px; margin: 0px;',
@@ -975,11 +959,9 @@ register_html_resource('js', 'observium-entities.js');
 
     // FIXME, limit devices list only with sensors?
     $form_items['devices'] = array();
-    foreach ($cache['devices']['hostname'] as $hostname => $device_id)
-    {
-      if (!in_array($device_id, $permissions_list))
-      {
-        $form_items['devices'][$device_id] = escape_html($hostname);
+    foreach ($cache['devices']['hostname'] as $hostname => $device_id) {
+      if (!in_array($device_id, $permissions_list)) {
+        $form_items['devices'][$device_id] = $hostname;
       }
     }
     $form['row'][0]['device_id']   = array('type'     => 'select',
@@ -1021,16 +1003,13 @@ register_html_resource('js', 'observium-entities.js');
 
     //$users = dbFetchRows("SELECT * FROM `users` ORDER BY `username`");
 
-    $count = count($user_list);
-    if ($count)
-    {
+    if ($count = safe_count($user_list)) {
       pagination($vars, 0, TRUE); // Get default pagesize/pageno
       $pageno   = $vars['pageno'];
       $pagesize = $vars['pagesize'];
       $start    = $pagesize * $pageno - $pagesize;
       $pagination = $count >= $pagesize;
-      if ($pagination)
-      {
+      if ($pagination) {
         $users = array_slice($user_list, $start, $pagesize);
         echo(pagination($vars, $count));
       } else {
@@ -1050,8 +1029,7 @@ register_html_resource('js', 'observium-entities.js');
       );
       echo(get_table_header($cols));
 
-      foreach ($users as $user)
-      {
+      foreach ($users as $user) {
         humanize_user($user);
 
         $user['edit_url'] = generate_url(array('page' => 'user_edit', 'user_id' => $user['user_id']));
@@ -1071,8 +1049,7 @@ register_html_resource('js', 'observium-entities.js');
       echo('</table>');
       echo(generate_box_close());
 
-      if ($pagination)
-      {
+      if ($pagination) {
         echo(pagination($vars, $count));
       }
     } else {

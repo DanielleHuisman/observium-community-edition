@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -21,10 +21,9 @@ $scale = 0.01; // Internal to device itself
 // ROOMALERT32E-MIB::internal-dew-point-c.0 = INTEGER: 1304
 // ROOMALERT32E-MIB::internal-power.0 = INTEGER: 1
 
-$oids = snmpwalk_cache_oid($device, "internal", array(), "ROOMALERT32E-MIB");
+$oids = snmpwalk_cache_oid($device, "internal", [], "ROOMALERT32E-MIB");
 
-foreach($oids as $index => $entry)
-{
+foreach($oids as $index => $entry) {
   $oid_name = "internal-tempc";
   $oid_num = ".1.3.6.1.4.1.20916.1.8.1.1.1.2.$index";
   //$type = $mib."-".$oid_name;
@@ -55,7 +54,7 @@ foreach($oids as $index => $entry)
   $descr = "Internal Dew Point";
   $value = $entry['internal-dew-point-c'];
 
-  discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
+  discover_sensor_ng($device, 'dewpoint', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
 
   $oid_name = "internal-power";
   $oid_num = ".1.3.6.1.4.1.20916.1.8.1.1.3.1.$index";
@@ -89,28 +88,34 @@ foreach($oids as $index => $entry)
 // ROOMALERT32E-MIB::digital-sen2-2.0 = INTEGER: 8441
  ****/
 
-$oids = snmpwalk_cache_oid($device, "digital", array(), "ROOMALERT32E-MIB");
+$oids = snmpwalk_cache_oid($device, "digital", [], "ROOMALERT32E-MIB");
 
 $index = 0;
-for ($i = 1; $i <= 6; $i++)
-{
+for ($i = 1; $i <= 8; $i++) {
 
-  if (isset($oids[$index]["digital-sen$i-1"]))
-  {
+  if (isset($oids[$index]["digital-sen$i-1"])) {
     // Sensor is present.
-    if (!isset($oids[$index]["digital-sen$i-3"]))
-    {
-      // Temp sensor
+    if (!isset($oids[$index]["digital-sen$i-3"])) {
+      // Only Temp sensor
+
+      // ROOMALERT32E-MIB::digital-sen8-1.0 = INTEGER: 2125
+      // ROOMALERT32E-MIB::digital-sen8-2.0 = INTEGER: 7025
+
       $oid_name = "digital-sen$i-1";
       $oid_num = ".1.3.6.1.4.1.20916.1.8.1.2.$i.1.$index";
       $descr = "External Digital Sensor ".str_pad($i, 2, '0', STR_PAD_LEFT).": Temperature";
       $value = $oids[$index][$oid_name];
 
       discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
-    }
-    elseif (isset($oids[$index]["digital-sen$i-5"]))
-    {
+    } elseif (isset($oids[$index]["digital-sen$i-5"])) {
       // Don't hav any of these sensors, unable to test
+
+      // ROOMALERT32E-MIB::digital-sen1-1.0 = INTEGER: 2100
+      // ROOMALERT32E-MIB::digital-sen1-2.0 = INTEGER: 6980
+      // ROOMALERT32E-MIB::digital-sen1-3.0 = INTEGER: 3454
+      // ROOMALERT32E-MIB::digital-sen1-4.0 = INTEGER: 6980
+      // ROOMALERT32E-MIB::digital-sen1-5.0 = INTEGER: 2100
+
       // Temp/Humidity sensor
       $oid_name = "digital-sen$i-1";
       $oid_num = ".1.3.6.1.4.1.20916.1.8.1.2.$i.1.$index";
@@ -172,13 +177,11 @@ for ($i = 1; $i <= 6; $i++)
 // Switch Sensors
 // ROOMALERT32E-MIB::switch-sen1.0 = INTEGER: 1
 // ROOMALERT32E-MIB::switch-sen2.0 = INTEGER: 0
-$oids = snmpwalk_cache_oid($device, "switch", array(), "ROOMALERT32E-MIB");
+$oids = snmpwalk_cache_oid($device, "switch", [], "ROOMALERT32E-MIB");
 
 $l = 0;
-foreach($oids as $index => $entry)
-{
-  foreach($entry as $k => $value)
-  {
+foreach($oids as $index => $entry) {
+  foreach($entry as $k => $value) {
     //switches start counting from 1;
     $l++;
 

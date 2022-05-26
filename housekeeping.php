@@ -25,6 +25,12 @@ if (isset($options['V'])) {
   exit;
 }
 
+/* Prevent run housekeeping on remote pollers (that not needed)
+if ($config['poller_id'] !== 0) {
+  print_message("%yHouseKeeping only needs to be run on the main node.%n\n", 'color');
+  exit;
+}
+*/
 print_message("%g".OBSERVIUM_PRODUCT." ".OBSERVIUM_VERSION."\n%WHouseKeeping%n\n", 'color');
 if (OBS_DEBUG) { print_versions(); }
 

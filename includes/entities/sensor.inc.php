@@ -660,8 +660,7 @@ function sensor_limit_high($class, $value, $auto = TRUE)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function check_valid_sensors($device, $class, $valid, $poller_type = 'snmp')
-{
+function check_valid_sensors($device, $class, $valid, $poller_type = 'snmp') {
   $entries = dbFetchRows("SELECT * FROM `sensors` WHERE `device_id` = ? AND `sensor_class` = ? AND `poller_type` = ? AND `sensor_deleted` = '0'", array($device['device_id'], $class, $poller_type));
 
   if (safe_count($entries)) {
@@ -676,8 +675,7 @@ function check_valid_sensors($device, $class, $valid, $poller_type = 'snmp')
         dbUpdate(array('sensor_deleted' => '1'), 'sensors', '`sensor_id` = ?', array($entry['sensor_id']));
         //dbDelete('sensors-state', "`sensor_id` = ?", array($entry['sensor_id']));
 
-        foreach (get_entity_attribs('sensor', $entry['sensor_id']) as $attrib_type => $value)
-        {
+        foreach (get_entity_attribs('sensor', $entry['sensor_id']) as $attrib_type => $value) {
           del_entity_attrib('sensor', $entry['sensor_id'], $attrib_type);
         }
         log_event("Sensor deleted: ".$entry['sensor_class']." ".$entry['sensor_type']." ". $entry['sensor_index']." ".$entry['sensor_descr'], $device, 'sensor', $entry['sensor_id']);
@@ -848,6 +846,13 @@ function poll_sensor($device, $class, $unit, &$oid_cache) {
       $sensor_poll['sensor_event'] = check_thresholds($sensor_db['sensor_limit_low'],  $sensor_db['sensor_limit_low_warn'],
                                                       $sensor_db['sensor_limit_warn'], $sensor_db['sensor_limit'],
                                                       $sensor_poll['sensor_value']);
+      // Percent based classes, ignore invalid values.
+      // See: CPQIDA-MIB::cpqDaLogDrvPercentRebuild
+      if (in_array($class, [ "progress", "load", "capacity" ], TRUE) && ($sensor_poll['sensor_value'] < 0 || $sensor_poll['sensor_value'] > 100)) {
+        $sensor_poll['sensor_event'] = 'ignore';
+        $sensor_poll['sensor_status'] = 'Sensor beyond normal values.';
+      }
+
       if ($sensor_poll['sensor_event'] === 'alert') {
         $sensor_poll['sensor_status'] = 'Sensor critical thresholds exceeded.';
 

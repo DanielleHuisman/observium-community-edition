@@ -26,7 +26,7 @@ $menu_start = utime();
                 <span class="icon-bar"></span>
             </button>
             <a class="brand brand-observium" href="/" <?php if (isset($config['web']['logo'])) {
-               echo 'style="background: url(../images/' . escape_html($config['web']['logo']) . ') no-repeat;"';
+               echo 'style="background: url(../images/' . escape_html($config['web']['logo']) . ') no-repeat; background-size: contain;"';
             } ?> >&nbsp;</a>
             <div class="nav-collapse" id="main-nav">
                 <ul class="nav">
@@ -199,9 +199,12 @@ $menu_start = utime();
                    }
 
                    if (isset($config['enable_map']) && $config['enable_map'])
-                   { // FIXME link is wrong. Is this a supported feature?
+                   { // FIXME link is wrong. Is this a supported feature? No. It smells. HTML page was removed, map.php generator code remains. See replacement below.
                       $navbar['observium']['entries'][] = array('title' => 'Network Map', 'url' => generate_url(array('page' => 'map')), 'icon' => $config['icon']['netmap']);
                    }
+
+                   $navbar['observium']['entries'][] = array('title' => 'Network Map', 'url' => generate_url(array('page' => 'map')), 'icon' => $config['icon']['netmap']);
+
 
                    $navbar['observium']['entries'][] = array('title' => 'Event Log', 'url' => generate_url(array('page' => 'eventlog')), 'icon' => $config['icon']['eventlog']);
 
@@ -882,17 +885,13 @@ $(function() {
                            echo('  <ul class="dropdown-menu">');
 
                            // This definition not exist in community edition
-                           if (OBSERVIUM_EDITION !== 'community')
-                           {
-                              foreach($config['themes'] as $theme_name => $theme_data)
-                              {
-                                 if ($_SESSION['theme'] != $theme_name)
-                                 {
+                           if (OBSERVIUM_EDITION !== 'community') {
+                              foreach($config['themes'] as $theme_name => $theme_data) {
+                                 if ($_SESSION['theme'] !== $theme_name) {
                                     echo('<li><a href="#" onclick="ajax_action(\'theme\', \''.$theme_name.'\');" title="Switch to '.$theme_data['name'].'"><i class="'.$theme_data['icon'].'" style="font-size: 16px; color: #555;"></i> '.$theme_data['name'].'</a></li>');
                                  }
                               }
-                              if (isset($_SESSION['theme_default']))
-                              {
+                              if ($config['web_theme_default'] !== $_SESSION['theme'] && $config['web_theme_default'] !== 'system') {
                                 // Reset default
                                 echo('<li><a href="#" onclick="ajax_action(\'theme\', \'reset\');" title="Reset to default"><i class="sprite-refresh" style="font-size: 16px; color: #555;"></i> Reset</a></li>');
                               }
@@ -900,13 +899,10 @@ $(function() {
                               echo('    <li class="divider"></li>');
                            }
 
-                           if ($_SESSION['big_graphs'])
-                           {
-                               echo('<li><a href="#" onclick="ajax_action(\'small_graphs\');" title="Switch to normal graphs"><i class="' . $config['icon']['graphs-small'] . '" style="font-size: 16px; color: #555;"></i> Normal Graphs</a></li>');
-                           }
-                           else
-                           {
-                               echo('<li><a href="#" onclick="ajax_action(\'big_graphs\');" title="Switch to larger graphs"><i class="' . $config['icon']['graphs-large'] . '" style="font-size: 16px; color: #555;"></i> Large Graphs</a></li>');
+                           if ($config['graphs']['size'] === 'big') {
+                             echo('<li><a href="#" onclick="ajax_action(\'normal_graphs\');" title="Switch to normal graphs"><i class="' . $config['icon']['graphs-small'] . '" style="font-size: 16px; color: #555;"></i> Normal Graphs</a></li>');
+                           } else {
+                             echo('<li><a href="#" onclick="ajax_action(\'big_graphs\');" title="Switch to larger graphs"><i class="' . $config['icon']['graphs-large'] . '" style="font-size: 16px; color: #555;"></i> Large Graphs</a></li>');
                            }
 
                            echo('  </ul>');
@@ -918,14 +914,12 @@ $(function() {
                                     Profile</a></li>
                            <?php
 
-                           if ($_SESSION['userlevel'] >= 10)
-                           {
+                           if ($_SESSION['userlevel'] >= 10) {
                               echo('<li class="divider"></li>');
                               echo('<li class="dropdown-submenu">');
                               echo('  <a role="menuitem" tabindex="-1" href="' . generate_url(array('page' => 'user_add')) . '"><span><i class="' . $config['icon']['users'] . '"></i> Users & Groups</span></a>');
                               echo('  <ul class="dropdown-menu">');
-                              if (auth_usermanagement())
-                              {
+                              if (auth_usermanagement()) {
                                  echo('    <li><a href="' . generate_url(array('page' => 'user_add')) . '"><i class="' . $config['icon']['user-add'] . '"></i> Add User</a></li>');
                               }
                               echo('    <li><a href="' . generate_url(array('page' => 'user_edit')) . '"><i class="' . $config['icon']['user-edit'] . '"></i> Edit User</a></li>');
@@ -934,13 +928,13 @@ $(function() {
                               //   echo('    <li><a href="' . generate_url(array('page' => 'user_edit')) . '"><i class="' . $config['icon']['user-delete'] . '"></i> Remove User</a></li>');
                               //}
 
-                             echo('<li class="divider"></li>');
+                              echo('    <li class="divider"></li>');
 
-                             echo('    <li><a href="' . generate_url(array('page' => 'roles')) . '"><i class="' . $config['icon']['users'] . '"></i> Roles</a></li>');
+                              echo('    <li><a href="' . generate_url(array('page' => 'roles')) . '"><i class="' . $config['icon']['users'] . '"></i> Roles</a></li>');
 
-                             echo('<li class="divider"></li>');
+                              echo('    <li class="divider"></li>');
 
-                             echo('    <li><a href="' . generate_url(array('page' => 'authlog')) . '"><i class="' . $config['icon']['user-log'] . '"></i> Authentication Log</a></li>');
+                              echo('    <li><a href="' . generate_url(array('page' => 'authlog')) . '"><i class="' . $config['icon']['user-log'] . '"></i> Authentication Log</a></li>');
                               echo('  </ul>');
                               echo('</li>');
 
@@ -957,15 +951,13 @@ $(function() {
                            echo('<li class="divider"></li>');
 
                            navbar_entry(array('title' => 'Polling Information', 'url' => generate_url(array('page' => 'pollerlog')), 'icon' => $config['icon']['pollerlog']));
-                           if ($_SESSION['userlevel'] >= 7)
-                           {
+                           if ($_SESSION['userlevel'] >= 7) {
                               navbar_entry(array('title' => 'Process List', 'url' => generate_url(array('page' => 'processes')), 'icon' => $config['icon']['processes']));
                               navbar_entry(array('title' => 'OSes', 'url' => generate_url(array('page' => 'os')), 'icon' => $config['icon']['config']));
                               navbar_entry(array('title' => 'MIBs', 'url' => generate_url(array('page' => 'mibs')), 'icon' => $config['icon']['mibs']));
                            }
 
-                           if (auth_can_logout())
-                           {
+                           if (auth_can_logout()) {
                               ?>
                                <li class="divider"></li>
                                <li><a href="<?php echo(generate_url(array('page' => 'logout'))); ?>" title="Logout"><i

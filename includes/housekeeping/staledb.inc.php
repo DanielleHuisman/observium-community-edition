@@ -10,21 +10,6 @@
  *
  */
 
-// Fetch all existing entities
-$entities       = array();
-$entities_count = 0;
-$type_exclude   = array('bill', 'group'); // Exclude pseudo-entities from permissions checks
-
-$where          = " WHERE 1 " . generate_query_values($type_exclude, 'entity_type', '!=');
-foreach ($config['entity_tables'] as $table) {
-  $query = "SELECT DISTINCT `entity_type`, `entity_id` FROM `$table`" . $where;
-  foreach (dbFetchRows($query, NULL, $test) as $entry) {
-    $entities[$table][$entry['entity_type']][] = $entry['entity_id'];
-    $entities_count++;
-  }
-}
-
-
 // Store highest device ID so we don't delete data from devices that were added during our run.
 // Counting on mysql auto_increment to never give out a lower ID, obviously.
 //$max_id = -1;
@@ -41,62 +26,7 @@ foreach (dbFetchRows("SELECT `device_id` FROM `devices` ORDER BY `device_id` ASC
   }
 }
 
-//print_vars($entities);
-// Cleanup common entity tables with links to devices that on longer exist
-// Loop for found stale entity entries
-//print_vars($entities_count);
-foreach ($entities as $table => $entries) {
-  $entity_types = array_keys($entries); // Just limit for exist types
 
-  foreach ($devices as $device_id) {
-    $device_entities = get_device_entities($device_id, $entity_types);
-
-    foreach ($device_entities as $entity_type => $entity_ids) {
-      if (!isset($entries[$entity_type])) { continue; }
-      $entity_count = safe_count(array_intersect($entries[$entity_type], $entity_ids));
-      if (!$entity_count) { continue; }
-
-      $entities[$table][$entity_type] = array_diff($entries[$entity_type], $entity_ids);
-
-      $entities_count -= $entity_count;
-      if (safe_count($entities[$table][$entity_type]) === 0) {
-        unset($entities[$table][$entity_type]);
-        break;
-      }
-    }
-    if (safe_count($entities[$table]) === 0) {
-      unset($entities[$table]);
-      break;
-    }
-  }
-}
-//print_vars($entities);
-//print_vars($entities_count); echo PHP_EOL;
-
-if ($entities_count) {
-  if ($prompt) {
-    $answer = print_prompt("$entities_count entity entries in tables '".implode("', '", array_keys($entities))."' for non-existing devices will be deleted");
-  }
-  if ($answer) {
-    //$table_status = dbDelete($table, $where, array($max_id));
-    foreach ($entities as $table => $entries) {
-      foreach ($entries as $entity_type => $entity_ids) {
-        $where = '`entity_type` = ?' . generate_query_values($entity_ids, 'entity_id');
-        if (!$test) {
-          $table_status = dbDelete($table, $where, array($entity_type));
-        } else {
-          print_vars($where); echo PHP_EOL;
-        }
-      }
-    }
-    print_debug("Database cleanup for tables '".implode("', '", array_keys($entities))."': deleted $entities_count entries");
-    if (!$test) {
-      logfile("housekeeping.log", "Database cleanup for tables '".implode("', '", array_keys($entities))."': deleted $entities_count entries");
-    }
-  }
-} elseif ($prompt) {
-  print_message("No orphaned entity entries found.");
-}
 
 // Cleanup tables with links to devices that on longer exist
 foreach ($config['device_tables'] as $table) {
@@ -104,6 +34,9 @@ foreach ($config['device_tables'] as $table) {
   //$where = '`device_id` NOT IN (' . implode(',', $devices) . ') OR `device_id` > ?';
   if ($table === 'observium_processes') {
     $where .= ' AND `device_id` != 0';
+  } elseif ($table === 'eventlog') {
+    // Global events with device_id = 0
+    $where .= " AND `entity_type` NOT IN ('global', 'info')";
   }
 
   $rows  = dbFetchRows("SELECT 1 FROM `$table` WHERE $where", [ $max_id ], $test);
@@ -137,8 +70,8 @@ foreach ($config['device_tables'] as $table) {
       if ($table_status &&
           ($table === 'ipv4_addresses' || $table === 'ipv6_addresses')) {
         foreach ($network_ids as $network_id) {
-          if (!dbExist($table, $network_where, [ $network_id ], $test)) {
-            if (!$test) { $network_status = dbDelete($network_table, $network_where, array($network_id)); }
+          if (!dbExist($table, $network_where, [ $network_id ], $test) && !$test) {
+            $network_status = dbDelete($network_table, $network_where, array($network_id));
           }
         }
       }
@@ -156,6 +89,39 @@ if (dbExist('autodiscovery', '`remote_device_id` IS NOT NULL AND `remote_device_
   }
   print_debug("Deleted stale autodiscovery entries.");
 }
+
+// Cleanup common entity tables with links to devices that no longer exist
+// Loop for found stale entity entries
+/*
+ * Probably not the best idea to remove user-generated configuration like this, this very occasionally seems to delete billing ports
+ *
+$where = " WHERE " . generate_query_values([ 'bill', 'group' ], 'entity_type', '!=', FALSE); // Exclude pseudo-entities from permissions checks
+foreach ($config['entity_tables'] as $table) {
+  $query = "SELECT DISTINCT `entity_type` FROM `$table` $where";
+  foreach (dbFetchColumn($query, NULL, $test) as $entity_type) {
+    $translate = entity_type_translate_array($entity_type);
+    if (safe_empty($translate['device_id_field'])) { continue; }
+    $id_field = $translate['id_field'];
+    $query = 'SELECT `entity_id` FROM `'.$table.'` WHERE `entity_type` = ? AND `entity_id` NOT IN (SELECT `' . $id_field . '` FROM `' . $translate['table'] . '`)';
+    $ids = dbFetchColumn($query, [ $entity_type ], $test);
+    $count = safe_count($ids);
+    if ($count) {
+      if ($prompt) {
+        $answer = print_prompt("$count rows in table '$table' for non-existing '$entity_type' entities will be deleted");
+      }
+
+      // Remove stale entries
+      print_debug("Database cleanup for table '$table': deleted $count '$entity_type' entities");
+      if (!$test) {
+        $table_status = dbDelete($table, "`entity_type` = ? ".generate_query_values($ids, 'entity_id'), [ $entity_type ]);
+        logfile("housekeeping.log", "Database cleanup for table '$table': deleted $count '$entity_type' entities");
+      }
+    } elseif ($prompt) {
+      print_message("No orphaned rows found in table '$table' for '$entity_type' entities.");
+    }
+  }
+}
+*/
 
 // Cleanup duplicate entries in the device_graphs table
 $graphs = [];

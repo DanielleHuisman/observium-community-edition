@@ -233,21 +233,22 @@ class IncludesEncryptTest extends \PHPUnit\Framework\TestCase
     return $result;
   }
 
-  public function providerEncryptSodiumRandom()
-  {
+  public function providerEncryptSodiumRandom() {
     $charlist = ' 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~!@#$%^&*()_+-=[]{}\|/?,.<>;:"'."'";
     $string = generate_random_string(mt_rand(20, 40), $charlist);
 
     $result = array();
-    $result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES - 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES - 1));
-    $result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES - 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES));
-    $result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES - 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1));
-    $result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES - 1));
-    $result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES));
-    $result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1));
-    //$result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES + 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES - 1));
-    //$result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES + 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES));
-    //$result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES + 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1));
+    if (OBS_ENCRYPT_MODULE === 'sodium') {
+      $result[] = array( $string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES - 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES - 1) );
+      $result[] = array( $string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES - 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) );
+      $result[] = array( $string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES - 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1) );
+      $result[] = array( $string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES - 1) );
+      $result[] = array( $string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) );
+      $result[] = array( $string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1) );
+      //$result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES + 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES - 1));
+      //$result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES + 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES));
+      //$result[] = array($string, generate_random_string(SODIUM_CRYPTO_SECRETBOX_KEYBYTES + 1), generate_random_string(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1));
+    }
 
     return $result;
   }

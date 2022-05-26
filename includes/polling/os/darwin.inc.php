@@ -212,6 +212,9 @@ Software:
             case '16,1': $hardware .= ' 16" (2019)'; break;
             case '16,2': $hardware .= ' 13" (2020, 4)'; break;
             case '16,3': $hardware .= ' 13" (2020, 2)'; break;
+            case '16,4': $hardware .= ' 16" (2019, 5600M)'; break;
+
+            case '17,1': $hardware .= ' 13" (M1, 2020)'; break;
           }
         } elseif ($ident['base'] === 'MacBookAir') {
           switch ($ident['num']) {
@@ -229,6 +232,8 @@ Software:
 
             case '9,1': $hardware .= ' 13" (2020)'; break;
             //case '9,2': $hardware .= ' 13" (Early 2013)'; break;
+
+            case '10,1': $hardware .= ' 13" (M1, 2020)'; break;
           }
         } elseif ($ident['base'] === 'Macmini') {
           switch ($ident['num']) {
@@ -242,6 +247,8 @@ Software:
             case '7,1': $hardware .= ' (Late 2014)'; break;
 
             case '8,1': $hardware .= ' (Late 2018)'; break;
+
+            case '9,1': $hardware .= ' (M1, 2020)'; break;
           }
         } elseif ($ident['base'] === 'iMac') {
           switch ($ident['num']) {
@@ -266,9 +273,15 @@ Software:
             case '18,2': $hardware .= ' (Mid 2017, 4K)'; break;
             case '18,3': $hardware .= ' (Mid 2017, 5K)'; break;
 
-            case '19,1': $hardware .= ' (2019)'; break;
-            case '19,2': $hardware .= ' (2019, 4K)'; break;
+            case '19,1': $hardware .= ' 27-Inch (2019)'; break;
+            case '19,2': $hardware .= ' 21.5-Inch (2019, 4K)'; break;
             case '19,3': $hardware .= ' (2019, 5K)'; break;
+
+            case '20,1': $hardware .= ' 27-Inch (Mid 2020, 5K)'; break;
+            case '20,2': $hardware .= ' 27-Inch (Mid 2020, 5K, 5700/XT)'; break;
+
+            case '21,1': $hardware .= ' 24-Inch (M1, 2021)'; break; // 8-Core
+            case '21,2': $hardware .= ' 24-Inch (M1, 2021, 7c)'; break; // 7-Core
           }
         }
       } elseif (str_starts($hw_array['model_identifier'], [ 'PowerBook', 'PowerMac' ])) {

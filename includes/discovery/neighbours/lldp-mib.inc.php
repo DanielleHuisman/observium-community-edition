@@ -231,6 +231,8 @@ if ($lldp_array) {
       $lldp['lldpRemPortDesc'] = '';
     }
 
+    $remote_mac = $lldp['lldpRemChassisIdSubtype'] === 'macAddress' ? $lldp['lldpRemChassisId'] : NULL;
+
     // lldpRemPortId can be hex string
     if ($lldp['lldpRemPortIdSubtype'] !== 'macAddress') {
       // On Extreme platforms, they remove the leading 1: from ports. Put it back if there isn't a :.
@@ -241,10 +243,11 @@ if ($lldp_array) {
       } else {
         //$lldp['lldpRemPortId'] = snmp_hexstring($lldp['lldpRemPortId']);
       }
+    } elseif (safe_empty($remote_mac)) {
+      $remote_mac = $lldp['lldpRemPortId'];
     }
 
     // Clean MAC & IP
-    $remote_mac = $lldp['lldpRemChassisIdSubtype'] === 'macAddress' ? $lldp['lldpRemChassisId'] : NULL;
     if (isset($lldp['lldpRemMan']) && count($lldp['lldpRemMan']) > 1) {
       // Multiple IP addresses.. detect best?
       foreach (array_keys($lldp['lldpRemMan']) as $addr) {
@@ -321,7 +324,7 @@ if ($lldp_array) {
 
     if ($remote_device_id) {
       $if = $lldp['lldpRemPortDesc'];
-      $id = $lldp['lldpRemPortId'];
+      $id = trim($lldp['lldpRemPortId']);
 
       // lldpPortIdSubtype   -> lldpPortId
       //  interfaceAlias(1), ->  ifAlias

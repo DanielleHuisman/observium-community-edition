@@ -94,19 +94,19 @@ foreach (array_slice(array_keys($hpups_array),1) as $phase)
 $scale = 0.1;
 
 ## Input frequency
-$oid   = '1.3.6.1.4.1.232.165.3.3.1.0'; # CPQPOWER-MIB:upsInputFrequency.0
+$oid   = '.1.3.6.1.4.1.232.165.3.3.1.0'; # CPQPOWER-MIB:upsInputFrequency.0
 $value = $hpups_array[0]['upsInputFrequency'];
 $options = [ 'rename_rrd' => "CPQPOWER-MIB-upsInputFrequency.0" ];
 discover_sensor_ng($device, 'frequency', $mib, 'upsInputFrequency', $oid, '0', NULL, 'Input', $scale, $value, $options);
 
 ## Output Frequency
-$oid   = '1.3.6.1.4.1.232.165.3.4.2.0'; # CPQPOWER-MIB:upsOutputFrequency.0
+$oid   = '.1.3.6.1.4.1.232.165.3.4.2.0'; # CPQPOWER-MIB:upsOutputFrequency.0
 $value = $hpups_array[0]['upsOutputFrequency'];
 $options = [ 'rename_rrd' => "CPQPOWER-MIB-upsOutputFrequency.0" ];
 discover_sensor_ng($device, 'frequency', $mib, 'upsOutputFrequency', $oid, '0', NULL, 'Output', $scale, $value, $options);
 
 ## Bypass Frequency
-$oid   = '1.3.6.1.4.1.232.165.3.5.1.0'; # CPQPOWER-MIB:upsBypassFrequency.0
+$oid   = '.1.3.6.1.4.1.232.165.3.5.1.0'; # CPQPOWER-MIB:upsBypassFrequency.0
 $value = $hpups_array[0]['upsBypassFrequency'];
 $options = [ 'rename_rrd' => "CPQPOWER-MIB-upsBypassFrequency.0" ];
 discover_sensor_ng($device, 'frequency', $mib, 'upsBypassFrequency', $oid, '0', NULL, 'Bypass', $scale, $value, $options);

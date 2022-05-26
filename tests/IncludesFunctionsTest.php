@@ -101,7 +101,11 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
    */
   public function testSiToScaleValue($value, $scale, $result)
   {
-    $this->assertSame($result, $value * si_to_scale($scale));
+    if (method_exists($this, 'assertEqualsWithDelta')) {
+      $this->assertEqualsWithDelta($result, $value * si_to_scale($scale), 0.00001);
+    } else {
+      $this->assertSame($result, $value * si_to_scale($scale));
+    }
   }
 
   public function providerSiToScaleValue()
@@ -510,9 +514,9 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
   public function providerStateStringToNumeric2() {
     $results = array(
       // String statuses
-      array('pd-status', 'QSAN-SNMP-MIB', 'Checking (0%)',   2), // warning
-      array('pd-status', 'QSAN-SNMP-MIB', 'Online',          1), // ok
-      array('pd-status', 'QSAN-SNMP-MIB', 'ajhbxsjshab',     3), // alert
+      array('status', 'QSAN-SNMP-MIB', 'Checking (0%)',   2), // warning
+      array('status', 'QSAN-SNMP-MIB', 'Online',          1), // ok
+      array('status', 'QSAN-SNMP-MIB', 'ajhbxsjshab',     3), // alert
     );
     return $results;
   }
@@ -576,7 +580,7 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     );
     // String statuses
     $mib = 'QSAN-SNMP-MIB';
-    $results[] = [ 'pd-status',   'Checking (0%)',   NULL, $mib, [ 'value' => 2, 'name' => 'Checking (0%)', 'event' => 'warning', 'mib' => 'QSAN-SNMP-MIB' ] ];
+    $results[] = [ 'status',   'Checking (0%)',   NULL, $mib, [ 'value' => 2, 'name' => 'Checking (0%)', 'event' => 'warning', 'mib' => 'QSAN-SNMP-MIB' ] ];
     return $results;
   }
 

@@ -125,7 +125,7 @@ function get_authlog_array($vars)
     $array['count'] = dbFetchCell($query_count, $param);
     $array['pagination_html'] = pagination($vars, $array['count']);
   } else {
-    $array['count'] = count($array['entries']);
+    $array['count'] = safe_count($array['entries']);
   }
 
   // Query for last timestamp

@@ -13,7 +13,7 @@ use const PHP_EOL;
 
 final class HtmlHighlighter implements Highlighter
 {
-    public const HIGHLIGHT_PRE = 'pre';
+    const HIGHLIGHT_PRE = 'pre';
 
     /**
      * This flag tells us if queries need to be enclosed in <pre> tags
@@ -61,7 +61,7 @@ final class HtmlHighlighter implements Highlighter
         return '<span ' . $attributes . '>' . $value . '</span>';
     }
 
-    public function attributes(int $type) : ?string
+    public function attributes(int $type)
     {
         if (! isset(self::TOKEN_TYPE_TO_HIGHLIGHT[$type])) {
             return null;
@@ -88,6 +88,10 @@ final class HtmlHighlighter implements Highlighter
     public function output(string $string) : string
     {
         $string =trim($string);
+
+        // This is derp truncate for long list
+        $string = preg_replace('!(IN</span>\s*)(\()([^\)]+)(\))!', '$1$2<div class="text-truncate" onclick="revealHiddenOverflow(this)">$3</div>$4', $string);
+
         if (! $this->usePre) {
             return $string;
         }

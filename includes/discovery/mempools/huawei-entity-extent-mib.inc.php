@@ -6,15 +6,15 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 // Huawei VRP mempools
 
-$mempool_array = snmpwalk_cache_oid($device, "hwEntityMemUsage", array(), $mib);
+$mempool_array = snmpwalk_cache_oid($device, "hwEntityMemUsage", [], $mib);
 
-if (is_array($mempool_array)) {
+if (!safe_empty($mempool_array)) {
   $mempool_array = snmpwalk_cache_oid($device, "hwEntityMemSize", $mempool_array, $mib);
   $mempool_array = snmpwalk_cache_oid($device, "hwEntityMemUsageThreshold", $mempool_array, $mib);
   $mempool_array = snmpwalk_cache_oid($device, "entPhysicalName", $mempool_array, 'ENTITY-MIB');
@@ -42,6 +42,6 @@ if (is_array($mempool_array)) {
   }
 }
 
-unset ($mempool_array, $index, $descr, $total, $used, $percent);
+unset($mempool_array, $index, $descr, $total, $used, $percent);
 
 // EOF

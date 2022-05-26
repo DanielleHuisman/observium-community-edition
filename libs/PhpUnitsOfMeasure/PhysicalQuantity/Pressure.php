@@ -57,11 +57,13 @@ class Pressure extends AbstractPhysicalQuantity
 
         // Inch of Mercury
         $newUnit = UnitOfMeasure::linearUnitFactory('inHg', 1 / 0.00029530);
+        //$newUnit->addAlias('inhg');
         $newUnit->addAlias('inches of mercury');
         static::addUnit($newUnit);
 
         // Millimeter of Mercury
         $newUnit = UnitOfMeasure::linearUnitFactory('mmHg', 133.322387415);
+        //$newUnit->addAlias('mmhg');
         $newUnit->addAlias('millimeters of mercury');
         $newUnit->addAlias('millimetres of mercury');
         static::addUnit($newUnit);
@@ -78,6 +80,7 @@ class Pressure extends AbstractPhysicalQuantity
 
         // Kilo-pound per Square Inch
         $newUnit = UnitOfMeasure::linearUnitFactory('Mpsi', 6894757293.168);
+        //$newUnit->addAlias('mpsi');
         $newUnit->addAlias('megapounds per square inch');
         static::addUnit($newUnit);
     }

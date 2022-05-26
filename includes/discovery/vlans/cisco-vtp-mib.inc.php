@@ -13,8 +13,7 @@
 // Not sure why we check for VTP, but this data comes from that MIB, so... (I think just validate that here data exist)
 $vtpversion = snmp_get_oid($device, 'vtpVersion.0', 'CISCO-VTP-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
 
-switch ($vtpversion)
-{
+switch ($vtpversion) {
   case 'none':
   case '1':
   case '2':
@@ -24,24 +23,28 @@ switch ($vtpversion)
   case 'three':
     // FIXME - can have multiple VTP domains.
     $vtpdomains = snmpwalk_cache_oid($device, 'vlanManagementDomains', array(), 'CISCO-VTP-MIB');
-    $vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanEntry', array(), 'CISCO-VTP-MIB');
+    if (snmp_status()) {
+      //$vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanEntry', array(), 'CISCO-VTP-MIB');
+      $vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanState', [], 'CISCO-VTP-MIB');
+      $vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanType', $vtpvlans, 'CISCO-VTP-MIB');
+      $vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanName', $vtpvlans, 'CISCO-VTP-MIB');
+      $vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanMtu',  $vtpvlans, 'CISCO-VTP-MIB');
+      $vtpvlans = snmpwalk_cache_twopart_oid($device, 'vtpVlanIfIndex',  $vtpvlans, 'CISCO-VTP-MIB');
+    }
 
-    foreach ($vtpdomains as $vtp_domain_index => $vtpdomain)
-    {
+    foreach ($vtpdomains as $vtp_domain_index => $vtpdomain) {
       // Skip disabled vtp domains
-      if (in_array($vtpdomain['managementDomainRowStatus'], array('notInService', 'notReady', 'destroy')))
-      {
+      if (in_array($vtpdomain['managementDomainRowStatus'], array('notInService', 'notReady', 'destroy'))) {
         continue;
       }
 
-      if ($vtpdomain['managementDomainName'])
-      {
+      if ($vtpdomain['managementDomainName']) {
         echo("(Domain $vtp_domain_index ".$vtpdomain['managementDomainName'].")");
       } else {
         echo("(Domain $vtp_domain_index".")");
       }
-      foreach ($vtpvlans[$vtp_domain_index] as $vlan_id => $vlan)
-      {
+
+      foreach ($vtpvlans[$vtp_domain_index] as $vlan_id => $vlan) {
         // Skip extra entries with unknown state
         if (!isset($vlan['vtpVlanState'], $vlan['vtpVlanType'])) { continue; }
 
@@ -61,36 +64,30 @@ switch ($vtpversion)
 }
 
 // Check if per port vlans (with contexts) supported by Q-BRIDGE-MIB
-$check_ports_vlans = isset($config['os'][$device['os']]['snmp']['context']) &&
-                     $config['os'][$device['os']]['snmp']['context'];
-if ($check_ports_vlans && is_device_mib($device, 'Q-BRIDGE-MIB'))
-{
+$check_ports_vlans = isset($config['os'][$device['os']]['snmp']['virtual']) &&
+                     $config['os'][$device['os']]['snmp']['virtual'];
+if ($check_ports_vlans && is_device_mib($device, 'Q-BRIDGE-MIB')) {
   // This shit only seems to work on Cisco (probably only IOS/IOS-XE and NX-OS)
   // But don't worry, walking do only if vlans previously found
 
   list($ios_version) = explode('(', $device['version']);
 
-  if (strlen($device['snmp_context']))
-  {
+  if (!safe_empty($device['snmp_context'])) {
     // Already configured snmp context
     print_warning("WARNING: Device already configured with SNMP context, polling ports vlans not possible.");
     $check_ports_vlans = FALSE;
-  }
-  elseif ($device['snmp_version'] === 'v3' && $device['os'] === "ios" && ($ios_version * 10) <= 121)
-  {
+  } elseif ($device['snmp_version'] === 'v3' && $device['os'] === "ios" && ($ios_version * 10) <= 121) {
     // vlan context not worked on Cisco IOS <= 12.1 (SNMPv3)
     print_error("ERROR: For VLAN context to work on this device please use SNMP v2/v1 for this device (or upgrade IOS).");
     $check_ports_vlans = FALSE;
   }
 }
 
-if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking allowed (see above)
-{
+if ($check_ports_vlans && safe_count($discovery_vlans)) { // Per port vlans walking allowed (see above)
   // Fetch first domain index
   $vtp_domain_index = array_key_first($discovery_vlans);
 
-  foreach ($discovery_vlans[$vtp_domain_index] as $vlan_id => $entry)
-  {
+  foreach ($discovery_vlans[$vtp_domain_index] as $vlan_id => $entry) {
     /* Per port vlans */
 
     // /usr/bin/snmpbulkwalk -v2c -c kglk5g3l454@988  -OQUs  -m BRIDGE-MIB -M /opt/observium/mibs/ udp:sw2.ahf:161 dot1dStpPortEntry
@@ -101,21 +98,18 @@ if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking all
     // 0, 4095   For system use only. You cannot see or use these VLANs.
     // 1002-1005 Cisco defaults for FDDI and Token Ring. You cannot delete VLANs 1002-1005
     if (is_numeric($vlan_id) &&
-        $vlan_id != 4095 && ($vlan_id < 1002 || $vlan_id > 1005)) // Ignore reserved VLAN IDs
-    {
+        $vlan_id != 4095 && ($vlan_id < 1002 || $vlan_id > 1005)) { // Ignore reserved VLAN IDs
       $vlan_data = [];
 
       // Vlan specific context
-      if ($device['snmp_version'] === 'v3')
-      {
+      if ($device['snmp_version'] === 'v3') {
         $context = 'vlan-' . $vlan_id;
       } else {
         $context = $vlan_id;
       }
 
-      $context_valid = snmp_context_exist($device, $context, 'dot1dBasePortIfIndex', 'BRIDGE-MIB');
-      if ($context_valid)
-      {
+      $context_valid = snmp_virtual_exist($device, $context);
+      if ($context_valid) {
         $device_context = $device;
         // Add vlan context for snmp auth
         $device_context['snmp_context'] = $context;
@@ -123,14 +117,18 @@ if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking all
         //$device_context['snmp_retries'] = 1;
 
         $vlan_data = snmpwalk_cache_oid($device_context, "dot1dBasePortIfIndex", $vlan_data, "BRIDGE-MIB");
-        $vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortEntry",    $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
+        if (snmp_status()) {
+          // FIXME. disable STP by default?
+          $vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortEntry", $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
+          //$vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortPriority", $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
+          //$vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortState", $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
+          //$vlan_data = snmpwalk_cache_oid($device_context, "dot1dStpPortPathCost", $vlan_data, "BRIDGE-MIB:Q-BRIDGE-MIB");
+        }
         unset($device_context);
 
         // At this point vlan context is validated and exist
         $discovery_vlans[$vtp_domain_index][$vlan_id]['vlan_context'] = 1;
-      }
-      elseif ($context_valid === FALSE)
-      {
+      } elseif ($context_valid === FALSE) {
         // Stop loop for other vlans
         break;
       }
@@ -141,8 +139,7 @@ if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking all
                     str_pad("Priority", 10).str_pad("State", 15).str_pad("Cost", 10));
       }
 
-      foreach ($vlan_data as $vlan_port_id => $vlan_port)
-      {
+      foreach ($vlan_data as $vlan_port_id => $vlan_port) {
         $ifIndex = $vlan_port['dot1dBasePortIfIndex'];
         $discovery_ports_vlans[$ifIndex][$vlan_id] = array('vlan'     => $vlan_id,
                                                            // FIXME. move STP to separate table

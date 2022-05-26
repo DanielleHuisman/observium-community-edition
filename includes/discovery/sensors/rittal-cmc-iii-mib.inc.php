@@ -132,7 +132,7 @@ foreach($device_sensors as $device_index => $sensors) {
 
       switch ($entry['cmcIIIVarScale'][0]) {
         case '-':
-          $scale = 1 / (int)substr($entry['cmcIIIVarScale'], 1);
+          $scale = float_div(1, (int)substr($entry['cmcIIIVarScale'], 1));
           break;
         case '+':
           $scale = (int)substr($entry['cmcIIIVarScale'], 1);
@@ -174,7 +174,7 @@ foreach($device_sensors as $device_index => $sensors) {
       } elseif (str_ends($unit, 'V')) {
         $type = "voltage";
       } elseif ($unit === "%") {
-        if (str_icontains_array($name, 'RPM')) {
+        if (str_icontains_array($name, [ 'RPM', ' Fan', 'Valve' ]) || str_iends($entry['cmcIIIVarName'], 'Rpm')) {
           $type = "load";
         } elseif (str_icontains_array($name, 'Humidity')) {
           $type = "humidity";
@@ -183,7 +183,7 @@ foreach($device_sensors as $device_index => $sensors) {
         $type = "powerfactor";
         $scale_unit = -1; // why negative value?
       } elseif (str_contains_array($unit, 'l/min')) {
-        $type                   = "waterflow";
+        $type = "waterflow";
         $options['sensor_unit'] = 'l/min';
       } elseif (str_ends($unit, 'Hz') && $value != 0) {
         $type = 'frequency';
@@ -221,7 +221,7 @@ foreach($device_sensors as $device_index => $sensors) {
 
             switch ($entry['cmcIIIVarScale'][0]) {
               case '-':
-                $scale_limit = 1 / (int)substr($entry['cmcIIIVarScale'], 1);
+                $scale_limit = float_div(1, (int)substr($entry['cmcIIIVarScale'], 1));
                 break;
               case '+':
                 $scale_limit = (int)substr($entry['cmcIIIVarScale'], 1);
@@ -262,7 +262,7 @@ foreach($device_sensors as $device_index => $sensors) {
 
       switch ($entry['cmcIIIVarScale'][0]) {
         case '-':
-          $scale = 1 / (int)substr($entry['cmcIIIVarScale'], 1);
+          $scale = float_div(1, (int)substr($entry['cmcIIIVarScale'], 1));
           break;
         case '+':
           $scale = (int)substr($entry['cmcIIIVarScale'], 1);

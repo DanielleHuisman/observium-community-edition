@@ -113,7 +113,7 @@ function print_events($vars) {
                                'device'  => $entry['device_id'],
                                'tab'     => 'logs',
                                'section' => 'eventlog');
-          $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
+          $string .= '    <td class="entity">' . generate_device_link_short($dev, $device_vars) . '</td>' . PHP_EOL;
         }
       }
       if ($list['entity']) {
@@ -271,7 +271,7 @@ function get_events_array($vars)
     $array['count'] = dbFetchCell($query_count, $param);
     $array['pagination_html'] = pagination($vars, $array['count']);
   } else {
-    $array['count'] = count($array['entries']);
+    $array['count'] = safe_count($array['entries']);
   }
 
   // Query for last timestamp

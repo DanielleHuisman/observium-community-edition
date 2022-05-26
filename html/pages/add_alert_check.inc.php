@@ -306,7 +306,15 @@ if (!isset($vars['entity_type'])) {
                      ];
                      $metric_list['values'] = '';
                      if (is_array($entry['values'])) {
-                       $metric_list['values'] = '<span class="label">'.implode('</span>  <span class="label">', $entry['values']).'</span>';
+                       if (is_array_list($entry['values'])) {
+                         $values = $entry['values'];
+                       } else {
+                         $values = [];
+                         foreach ($entry['values'] as $value => $descr) {
+                           $values[] = "$value ($descr)";
+                         }
+                       }
+                       $metric_list['values'] = '<span class="label">'.implode('</span>  <span class="label">', $values).'</span>';
                      } elseif ($entry['type'] === 'integer') {
                        $metric_list['values'] = escape_html('<numeric>');
                        if (str_contains($metric, 'value')) {

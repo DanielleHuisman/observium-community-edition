@@ -108,11 +108,9 @@ if ($inputs || $outputs)
       //$oid      = ".1.3.6.1.4.1.318.1.1.1.9.3.3.1.16.$tindex.1.$p";
       //$value    = $cache['apc']["$tindex.1.$p"]['upsPhaseOutputPercentPower'];
 
-      if ($value != '' && $value != -1)
-      {
-        rename_rrd_entity($device, 'sensor', array('descr' => "$descr Load", 'class' => 'capacity', 'index' => "upsPhaseOutputPercentPower.$tindex.1.$p", 'type' => 'apc'),  // old
-                                             array('descr' => "$descr Load", 'class' => 'load',     'index' => "$tindex.1.$p",                            'type' => $type)); // new
-        discover_sensor('load', $device, $oid_num, "$tindex.1.$p", $type, "$descr Load", 1, $value);
+      if ($value != '' && $value != -1) {
+        $options = [ 'rename_rrd_full' => 'capacity-apc-upsPhaseOutputPercentPower.%index%' ];
+        discover_sensor('load', $device, $oid_num, "$tindex.1.$p", $type, "$descr Load", 1, $value, $options);
       }
 
       $oid_name = 'upsPhaseOutputLoad';

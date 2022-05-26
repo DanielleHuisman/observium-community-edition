@@ -1,19 +1,18 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage applications
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
 $cpu_counter = $app_data['cpu']['proc'];
 $time_counter = $app_data['cpu']['time'];
-$cpu_load_percent = round($cpu_counter / $time_counter * 100, 2);
+$cpu_load_percent = round(float_div($cpu_counter, $time_counter) * 100, 2);
 $background = get_percentage_colours($cpu_load_percent);
 
 $graph_array = array();

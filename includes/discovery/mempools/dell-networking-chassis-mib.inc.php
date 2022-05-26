@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,33 +6,29 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 // DELL-NETWORKING-CHASSIS-MIB::dellNetCpuUtilMemUsage.stack.1.1 = Gauge32: 41 percent
 // DELL-NETWORKING-CHASSIS-MIB::dellNetProcessorMemSize.stack.1.1 = INTEGER: 2029
 
-$mempool_array = snmpwalk_cache_threepart_oid($device, 'dellNetCpuUtilMemUsage', array(), $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-if (is_array($mempool_array))
-{
+$mempool_array = snmpwalk_cache_threepart_oid($device, 'dellNetCpuUtilMemUsage', [], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+if (!safe_empty($mempool_array)) {
   $mempool_array = snmpwalk_cache_threepart_oid($device, 'dellNetProcessorMemSize', $mempool_array, $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
-  if (OBS_DEBUG > 1 && count($mempool_array)) { print_vars($mempool_array); }
+  print_debug_vars($mempool_array);
 
-  foreach ($mempool_array as $type => $entry1)
-  {
+  foreach ($mempool_array as $type => $entry1) {
     // Hrm, this is possible for multiple types?
-    $first_unit = array_shift(array_keys($entry1));
-    foreach ($entry1 as $unit => $entry2)
-    {
+    $first_unit = array_key_first($entry1);
+
+    foreach ($entry1 as $unit => $entry2) {
       $mempool_count = count($entry2);
-      foreach ($entry2 as $mempool => $entry)
-      {
+      foreach ($entry2 as $mempool => $entry) {
         $index     = "{$type}.{$unit}.{$mempool}";
         $dot_index = ".{$index}";
-        $descr     = 'Unit ' . strval($unit - $first_unit);
-        if ($mempool_count > 1)
-        {
+        $descr     = 'Unit ' . ($unit - $first_unit);
+        if ($mempool_count > 1) {
           $descr  .= " Memory {$mempool}";
         }
 
@@ -50,6 +45,6 @@ if (is_array($mempool_array))
   }
 }
 
-unset ($mempool_array, $index, $descr, $precision, $total, $used, $percent);
+unset($mempool_array, $index, $descr, $precision, $total, $used, $percent);
 
 // EOF

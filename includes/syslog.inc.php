@@ -13,8 +13,7 @@
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 // FIXME. Use internal caching instead
-function get_cache($host, $value)
-{
+function get_cache($host, $value) {
   global $dev_cache;
 
   if (empty($host)) { return NULL; }
@@ -23,11 +22,12 @@ function get_cache($host, $value)
   // Check cache expiration
   $now = time();
   $expired = TRUE;
-  if (isset($dev_cache[$host]['lastchecked']))
-  {
-    if (($now - $dev_cache[$host]['lastchecked']) < 600) { $expired = FALSE; } // will expire after 10 min
+  if (isset($dev_cache[$host]['lastchecked']) && ($now - $dev_cache[$host]['lastchecked']) < 600) {
+    $expired = FALSE;
   }
-  if ($expired) { $dev_cache[$host]['lastchecked'] = $now; }
+  if ($expired) {
+    $dev_cache[$host]['lastchecked'] = $now;
+  }
 
   if (!isset($dev_cache[$host][$value]) || $expired) {
     switch($value) {
@@ -35,42 +35,54 @@ function get_cache($host, $value)
         // Try by map in config
         if (isset($GLOBALS['config']['syslog']['host_map'][$host])) {
           $new_host = $GLOBALS['config']['syslog']['host_map'][$host];
-          if (is_numeric($new_host))
-          {
+          if (is_numeric($new_host)) {
             // Check if device id exist
-            $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', array($new_host));
+            $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [ $new_host ]);
           } else {
-            $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', array($new_host, $new_host));
+            $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [ $new_host, $new_host ]);
           }
           // If syslog host map correct, return device id or try onward
-          if ($dev_cache[$host]['device_id'])
-          {
+          if ($dev_cache[$host]['device_id']) {
             return $dev_cache[$host]['device_id'];
+          }
+        } elseif (isset($GLOBALS['config']['syslog']['host_map_regexp'])) {
+          // Regexp conversions for hosts
+          foreach ($GLOBALS['config']['syslog']['host_map_regexp'] as $pattern => $to) {
+            $new_host = preg_replace($pattern, $to, $host);
+            if (!$new_host || $new_host === $host) { continue; } // skip same of false
+            if (is_intnum($new_host)) {
+              $dev_new = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [ $new_host ]);
+            } elseif (is_valid_hostname($new_host) || get_ip_version($new_host)) {
+              $dev_new = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [ $new_host, $new_host ]);
+            }
+
+            // If syslog host map correct, return device id or try onward
+            if ($dev_new) {
+              $dev_cache[$host]['device_id'] = $dev_new;
+              return $dev_cache[$host]['device_id'];
+            }
           }
         }
 
         // Localhost IPs, try detect as local system
-        if (in_array($host, array('127.0.0.1', '::1'))) {
-          if ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ?', array(get_localhost()))) {
+        if (in_array($host, [ '127.0.0.1', '::1' ])) {
+          if ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ?', [ get_localhost() ])) {
             $dev_cache[$host]['device_id'] = $localhost_id;
-          } elseif ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `sysName` = ?', array(get_localhost()))) {
+          } elseif ($localhost_id = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `sysName` = ?', [ get_localhost() ])) {
             $dev_cache[$host]['device_id'] = $localhost_id;
           }
           // NOTE in other cases localhost IPs associated with random device
         } else {
           // Try by hostname
-          $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', array($host, $host));
+          $dev_cache[$host]['device_id'] = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `hostname` = ? OR `sysName` = ?', [ $host, $host ]);
         }
 
         // If failed, try by IP
         if (!is_numeric($dev_cache[$host]['device_id'])) {
-          $ip = $host;
 
-          $ip_version = get_ip_version($ip);
-          if ($ip_version !== FALSE)
-          {
-            if ($ip_version === 6 && preg_match('/::ffff:(\d+\.\d+\.\d+\.\d+)/', $ip, $matches))
-            {
+          if ($ip_version = get_ip_version($host)) {
+            $ip = $host;
+            if ($ip_version === 6 && preg_match('/::ffff:(\d+\.\d+\.\d+\.\d+)/', $ip, $matches)) {
               // IPv4 mapped to IPv6, like ::ffff:192.0.2.128
               // See: http://jira.observium.org/browse/OBSERVIUM-1274
               $ip = $matches[1];
@@ -84,19 +96,16 @@ function get_cache($host, $value)
             $addresses = dbFetchRows($query, [ $ip, 0 ]);
             $address_count = safe_count($addresses);
 
-            if ($address_count)
-            {
+            if ($address_count) {
               $dev_cache[$host]['device_id'] = $addresses[0]['device_id'];
 
               // Additional checks if multiple addresses found
-              if ($address_count > 1)
-              {
-                foreach ($addresses as $entry)
-                {
+              if ($address_count > 1) {
+                foreach ($addresses as $entry) {
                   $device_tmp = device_by_id_cache($entry['device_id']);
-                  if ($device_tmp['disabled'] || !$device_tmp['status'])                     { continue; } // Skip disabled and down devices
-                  elseif ($entry['ifAdminStatus'] === 'down' ||                                            // Skip disabled ports
-                          in_array($entry['ifOperStatus'], array('down', 'lowerLayerDown'))) { continue; } // Skip down ports
+                  if ($device_tmp['disabled'] || !$device_tmp['status']) { continue; }   // Skip disabled and down devices
+                  if ($entry['ifAdminStatus'] === 'down' ||                                         // Skip disabled ports
+                      in_array($entry['ifOperStatus'], [ 'down', 'lowerLayerDown' ])) { continue; } // Skip down ports
 
                   // Override cached host device_id
                   $dev_cache[$host]['device_id'] = $entry['device_id'];
@@ -188,21 +197,17 @@ function process_syslog($line, $update)
     if ($update) {
       // Accurate timestamps
 
-      $syslog_id = dbInsert(
-        array(
-          'device_id' => $entry['device_id'],
-          'host'      => $entry['host'],
-          'program'   => $entry['program'],
-          'facility'  => $entry['facility'],
-          'priority'  => $entry['priority'],
-          'level'     => $entry['level'],
-          'tag'       => $entry['tag'],
-          'msg'       => $entry['msg'],
-          // Do not pass parsed timestamp
-          //'timestamp' => $entry['timestamp']
-        ),
-        'syslog'
-      );
+      $syslog_id = dbInsert([
+        'device_id' => $entry['device_id'],
+        'host'      => $entry['host'],
+        'program'   => $entry['program'],
+        'facility'  => $entry['facility'],
+        'priority'  => $entry['priority'],
+        'level'     => $entry['level'],
+        'tag'       => $entry['tag'],
+        'msg'       => $entry['msg'],
+        'timestamp' => $entry['timestamp']
+      ], 'syslog');
     }
 
 //$req_dump = print_r(array($entry, $rules, $device_rules), TRUE);
@@ -215,20 +220,16 @@ function process_syslog($line, $update)
 
       /// FIXME, I not know how 'syslog_rules_assoc' is filled, I pass rules to all devices
       /// FIXME, this is copy-pasted from above, while not have WUI for syslog_rules_assoc
-      foreach ($rules as $la_id => $rule)
-      {
+      foreach ($rules as $la_id => $rule) {
         // Skip processing syslog rule if device rule not cached (see: cache_syslog_rules_assoc() )
-        if (!empty($device_rules) && !isset($device_rules[$entry['device_id']][$la_id]))
-        {
+        if (!empty($device_rules) && !isset($device_rules[$entry['device_id']][$la_id])) {
           continue;
         }
 
-        if (preg_match($rule['la_rule'], $entry['msg_orig'], $matches)) // Match syslog by rule pattern
-        {
+        if (preg_match($rule['la_rule'], $entry['msg_orig'], $matches)) { // Match syslog by rule pattern
 
           // Mark no notification during maintenance
-          if (isset($maint['device'][$entry['device_id']]) || (isset($maint['global']) && $maint['global'] > 0))
-          {
+          if (isset($maint['device'][$entry['device_id']]) || (isset($maint['global']) && $maint['global'] > 0)) {
             $notified = '-1';
           } else {
             $notified = '0';
@@ -236,24 +237,24 @@ function process_syslog($line, $update)
 
           // Detect some common entities patterns in syslog message
 
-          $log_id = dbInsert(array('device_id' => $entry['device_id'],
-                                   'la_id'     => $la_id,
-                                   'syslog_id' => $syslog_id,
-                                   'timestamp' => $entry['timestamp'],
-                                   'program'   => $entry['program'],
-                                   'message'   => $entry['msg'], // Use cleared msg instead original (see process_syslog_line() tests)
-                                   'notified'  => $notified), 'syslog_alerts');
+          $log_id = dbInsert([
+            'device_id' => $entry['device_id'],
+            'la_id'     => $la_id,
+            'syslog_id' => $syslog_id,
+            'timestamp' => $entry['timestamp'],
+            'program'   => $entry['program'],
+            'message'   => $entry['msg'], // Use cleared msg instead original (see process_syslog_line() tests)
+            'notified'  => $notified
+          ], 'syslog_alerts');
 
           // Add notification to queue
-          if ($notified != '-1')
-          {
+          if ($notified != '-1') {
             $message_tags = syslog_generate_tags($entry, $rule);
 
             // Get contacts for $la_id
             $contacts = get_alert_contacts($entry['device_id'], $la_id, $notification_type);
 
-            foreach($contacts as $contact)
-            {
+            foreach($contacts as $contact) {
 
               $notification = [
                 'device_id'             => $entry['device_id'],
@@ -275,12 +276,9 @@ function process_syslog($line, $update)
       } // End foreach($rules)
 
     unset($os);
-  }
-  elseif ($config['syslog']['unknown_hosts'])
-  {
+  } elseif ($config['syslog']['unknown_hosts']) {
     // EXPERIMENTAL. Host not known, currently not used.
-    if ($update)
-    {
+    if ($update) {
       // Store entries for unknown hosts with NULL device_id
       $log_id = dbInsert(
         array(
@@ -303,9 +301,9 @@ function process_syslog($line, $update)
   return $entry;
 }
 
-function syslog_generate_tags($entry, $rule)
-{
-  $alert_unixtime = strtotime($entry['timestamp']);
+function syslog_generate_tags($entry, $rule) {
+  //$alert_unixtime = strtotime($entry['timestamp']);
+  $alert_unixtime = $entry['unixtime'];
 
   $la_id = $rule['la_id'];
 
@@ -318,7 +316,7 @@ function syslog_generate_tags($entry, $rule)
 
   $device = device_by_id_cache($entry['device_id']);
 
-  $message_tags = array(
+  $message_tags = [
     'ALERT_STATE'         => "SYSLOG",
     'ALERT_EMOJI'         => get_icon_emoji($alert_emoji),   // https://unicodey.com/emoji-data/table.htm
     'ALERT_EMOJI_NAME'    => $alert_emoji,
@@ -360,7 +358,7 @@ function syslog_generate_tags($entry, $rule)
     'DEVICE_LOCATION'     => $device['location'],
     'DEVICE_UPTIME'       => deviceUptime($device),
     'DEVICE_REBOOTED'     => format_unixtime($device['last_rebooted']),
-  );
+  ];
 
   $message_tags['TITLE'] = alert_generate_subject($device, 'SYSLOG', $message_tags);
 
@@ -409,22 +407,14 @@ function process_syslog_line($line) {
   // Filter by msg string
   if (str_contains_array($entry['msg'], $config['syslog']['filter'])) {
     return FALSE;
-  } elseif (isset($config['syslog']['filter_regex'])) {
+  }
+  if (isset($config['syslog']['filter_regex'])) {
     // FIXME. currently undocumented
     foreach ((array)$config['syslog']['filter_regex'] as $filter) {
       if (preg_match($filter, $entry['msg'])) {
         return FALSE;
       }
     }
-  }
-
-  // Accurate timestamp
-  $entry['unixtime'] = strtotime($entry['timestamp']);
-  if (abs($start_time - $entry['unixtime']) >= 60) {
-    // Seems as wrong time synchronization on device/server or something else.
-    // Use self time in this case
-    $entry['timestamp'] = date('Y-m-d H:i:s', $start_time);
-    $entry['unixtime']  = $start_time;
   }
 
   $entry['msg_orig'] = $entry['msg'];
@@ -582,14 +572,23 @@ function process_syslog_line($line) {
       unset($matches);
 
     } elseif ($os_group === 'unix') {
-      //1.1.1.1||9||6||6||/usr/sbin/cron[1305]:||2015-04-08 14:30:01|| (root) CMD (   /usr/libexec/atrun)||
       if (str_contains($entry['tag'], '/')) {
-        $tmp          = explode('/', $entry['tag']);
-        $entry['tag'] = end($tmp); // /usr/sbin/cron[1305]: -> cron[1305]:
-        // And same for program if it based on tag (from os definitions)
-        if (str_contains($entry['program'], '/')) {
-          $tmp              = explode('/', $entry['program']);
-          $entry['program'] = end($tmp);
+        if (preg_match('/^([\w\-]+)\(([\w\.\/]+)\)/', $entry['tag'], $matches)) {
+          // 0.0.0.0||9||5||5||run-parts(/etc/cron.hourly)[2654||2021-11-26 08:01:01|| starting 0anacron||run-parts(
+          // 0.0.0.0||9||5||5||run-parts(/etc/cron.hourly)[2655||2021-11-26 08:01:01|| finished 0anacron||run-parts(
+          $entry['tag'] = $matches[1] . ',' . $matches[2];
+          if (preg_match('/(?:starting|finished) (\w+)/', $entry['msg'], $matches)) {
+            $entry['program'] = $matches[1];
+          }
+        } else {
+          // 0.0.0.0||9||6||6||/usr/sbin/cron[1305]:||2015-04-08 14:30:01|| (root) CMD (   /usr/libexec/atrun)||
+          $tmp          = explode('/', $entry['tag']);
+          $entry['tag'] = end($tmp); // /usr/sbin/cron[1305]: -> cron[1305]:
+          // And same for program if it based on tag (from os definitions)
+          if (str_contains($entry['program'], '/')) {
+            $tmp              = explode('/', $entry['program']);
+            $entry['program'] = end($tmp);
+          }
         }
       }
       if (empty($entry['program'])) {
@@ -597,13 +596,24 @@ function process_syslog_line($line) {
       }
 
       // User_CommonName/123.213.132.231:39872 VERIFY OK: depth=1, /C=PL/ST=Malopolska/O=VLO/CN=v-lo.krakow.pl/emailAddress=root@v-lo.krakow.pl
-      if ($entry['facility'] === 'daemon' && preg_match('#/([0-9]{1,3}\.) {3}[0-9]{1,3}:[0-9]{4,} ([A-Z]([A-Za-z])+( ?)) {2,}:#', $entry['msg'])) {
+      if ($entry['facility'] === 'daemon' && preg_match('#/(\d{1,3}\.) {3}\d{1,3}:\d{4,} ([A-Z]([A-Za-z])+( ?)) {2,}:#', $entry['msg'])) {
         $entry['program'] = 'OpenVPN';
       }
       // pop3-login: Login: user=<username>, method=PLAIN, rip=123.213.132.231, lip=123.213.132.231, TLS
       // POP3(username): Disconnected: Logged out top=0/0, retr=0/0, del=0/1, size=2802
       elseif ($entry['facility'] === 'mail' && preg_match('/^(((pop3|imap)\-login)|((POP3|IMAP)\(.*\))):/', $entry['msg'])) {
         $entry['program'] = 'Dovecot';
+      }
+      elseif (preg_match('/^fail2ban[\.\-](\w\S+)/', $entry['program'], $matches)) {
+        // Fail2ban specific
+        $entry['program'] = 'fail2ban';
+        $entry['tag'] = $matches[1];
+        if (preg_match('/^\s*(?:\d.*?\[\d+\]: +)?([A-Z]{4,})\s+(.*)/', $entry['msg'], $matches)) {
+          $entry['tag'] .= ',' . $matches[1];
+          $entry['msg'] = $matches[2];
+        }
+        //print_vars($entry);
+        //print_vars($matches);
       }
       // SYSLOG CONNECTION BROKEN; FD='6', SERVER='AF_INET(123.213.132.231:514)', time_reopen='60'
       // 1.1.1.1||5||3||3||rsyslogd-2039:||2016-10-06 23:03:27|| Could no open output pipe '/dev/xconsole': No such file or directory [try http://www.rsyslog.com/e/2039 ]||rsyslogd-2039
@@ -734,17 +744,43 @@ function process_syslog_line($line) {
     $pattern_timestamp_wo_tz = '/^\s*\*?(?<wmd>(?<week>[a-z]{3,} +)?(?<month>[a-z]{3,} +)(?<date>\d{1,2} +)(?<year0>[12]\d{3} +)?)?(?<hms>\d{1,2}\:\d{1,2}\:\d{1,2}(?:\.\d+)?)(?<year>\s+[12]\d{3})?/i';
     $entry['msg'] = preg_replace([ $pattern_timestamp, $pattern_timestamp_wo_tz, $pettern_timestamp_rfc3339 ], '', $entry['msg']);
 
-    if (!strlen($entry['msg'])) {
+    if (safe_empty($entry['msg'])) {
       // Something wrong, msg empty
       return FALSE;
     }
 
+    // Accurate timestamp
+    // FIXME. Parse timestamps from syslog message above
+    switch ($GLOBALS['config']['timestamp']) {
+      case 'system':
+        // Default. Use Observium host system time
+        $entry['unixtime']  = $start_time;
+        $entry['timestamp'] = date('Y-m-d H:i:s', $start_time);
+        break;
+
+      case 'syslog':
+        $entry['unixtime'] = strtotime($entry['timestamp']);
+        break;
+
+      default:
+        $unixtime = strtotime($entry['timestamp']);
+        if (is_intnum($GLOBALS['config']['timestamp']) &&
+            abs($start_time - $unixtime) >= $GLOBALS['config']['timestamp']) {
+          $entry['unixtime'] = $unixtime;
+        } else {
+          // Seems as wrong time synchronization on device/server or something else.
+          // Use self time in this case
+          $entry['unixtime']  = $start_time;
+          $entry['timestamp'] = date('Y-m-d H:i:s', $start_time);
+        }
+    }
+
     // Wed Mar 26 12:54:17 2014 : Auth: Login incorrect (mschap: External script says Logon failure (0xc000006d)): [username] (from client 10.100.1.3 port 0 cli a4c3612a4077 via TLS tunnel)
-    if (strlen($entry['program'])) {
+    if (!safe_empty($entry['program'])) {
       // Always clear program from begining of message, ie Auth:, blabla[27346]:
       $pattern_program = '/^\s*'.preg_quote($entry['program'], '/').'(\[\d+\])?\s*:/i';
       $entry['msg']    = preg_replace($pattern_program, '', $entry['msg']);
-    } elseif (strlen($entry['facility'])) {
+    } elseif (!safe_empty($entry['facility'])) {
       // fallback, better than nothing...
       $entry['program'] = $entry['facility'];
     } else {

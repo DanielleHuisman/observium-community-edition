@@ -48,8 +48,7 @@ if (snmp_status()) {
 }
 
 // Rewrite IP-MIB array
-foreach ($oid_data as $ip_address => $entry)
-{
+foreach ($oid_data as $ip_address => $entry) {
   $ifIndex = $entry['ipAdEntIfIndex'];
   $ip_address_fix = explode('.', $ip_address);
   switch (count($ip_address_fix)) {
@@ -84,11 +83,6 @@ foreach ($oid_data as $ip_address => $entry)
     $entry['ipAdEntNetMask'] = '255.255.255.255';
   }
 
-  /*
-  $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
-                                                       'ip'      => $ip_address,
-                                                       'mask'    => $entry['ipAdEntNetMask']);
-  */
   $data = [
     'ifIndex' => $ifIndex,
     'ip'      => $ip_address,
@@ -109,6 +103,7 @@ foreach (array('ipAddressIfIndex', 'ipAddressType', 'ipAddressPrefix', 'ipAddres
 }
 //print_vars($oid_data);
 
+// IPv4 addresses
 if (!safe_count($ip_data[$ip_version])) {
   //IP-MIB::ipAddressIfIndex.ipv4."198.237.180.2" = 8
   //IP-MIB::ipAddressPrefix.ipv4."198.237.180.2" = ipAddressPrefixOrigin.8.ipv4."198.237.180.2".32
@@ -116,27 +111,38 @@ if (!safe_count($ip_data[$ip_version])) {
   //Origins: 1:other, 2:manual, 4:dhcp, 5:linklayer, 6:random
 
   // IPv4z (not sure, never seen)
-  if (isset($oid_data[$ip_version . 'z']))
-  {
+  if (isset($oid_data[$ip_version . 'z'])) {
     $oid_data[$ip_version] = array_merge((array)$oid_data[$ip_version], $oid_data[$ip_version . 'z']);
   }
 
   // Rewrite IP-MIB array
-  foreach ($oid_data[$ip_version] as $ip_address => $entry)
-  {
+  foreach ($oid_data[$ip_version] as $ip_address => $entry) {
     if (in_array($entry['ipAddressType'], $GLOBALS['config']['ip-address']['ignore_type'])) { continue; } // Skip broadcasts
     //$ip_address = str_replace($ip_version.'.', '', $key);
     $ifIndex = $entry['ipAddressIfIndex'];
+
+    // ipAddressOrigin.ipv4.169.254.1.1.23 = manual
+    $ip_address_fix = explode('.', $ip_address);
+    $index_prefix = NULL;
+    switch (safe_count($ip_address_fix)) {
+      case 5:
+        // get last number as prefix
+        $index_prefix = array_pop($ip_address_fix);
+        $ip_address = implode('.', $ip_address_fix);
+        break;
+      case 4:
+        // Common, no need for changes
+        break;
+      default:
+        print_debug("Unknown IP index: $ip_address");
+        continue 2;
+    }
     $tmp_prefix = explode('.', $entry['ipAddressPrefix']);
     $entry['ipAddressPrefix'] = end($tmp_prefix);
+    if (!is_intnum($entry['ipAddressPrefix']) && is_intnum($index_prefix)) {
+      $entry['ipAddressPrefix'] = $index_prefix;
+    }
 
-    /*
-    $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
-                                                         'ip'      => $ip_address,
-                                                         'prefix'  => $entry['ipAddressPrefix'],
-                                                         'type'    => $entry['ipAddressType'],
-                                                         'origin'  => $entry['ipAddressOrigin']);
-    */
     $data = [
       'ifIndex' => $ifIndex,
       'ip'      => $ip_address,
@@ -158,33 +164,49 @@ $ip_version = 'ipv6';
 //Origins: 1:other, 2:manual, 4:dhcp, 5:linklayer, 6:random
 
 // IPv6z
-if (isset($oid_data[$ip_version . 'z']))
-{
+if (isset($oid_data[$ip_version . 'z'])) {
   $oid_data[$ip_version] = array_merge((array)$oid_data[$ip_version], $oid_data[$ip_version . 'z']);
 }
 
 // Rewrite IP-MIB array
 $check_ipv6_mib = FALSE; // Flag for additionally check IPv6-MIB
-foreach ($oid_data[$ip_version] as $ip_snmp => $entry)
-{
-  $ip_address = hex2ip($ip_snmp);
+foreach ($oid_data[$ip_version] as $ip_snmp => $entry) {
+  if (str_contains($ip_snmp, '.')) {
+    // incorrect indexes with prefix
+    // ipAddressOrigin.ipv6.65152.0.0.0.521.4095.65033.51218.27 = manual
+    $ip_address_fix = explode('.', $ip_snmp);
+    $index_prefix = NULL;
+    switch (count($ip_address_fix)) {
+      case 9:
+        // get last number as prefix
+        $index_prefix = array_pop($ip_address_fix);
+        //break;
+      case 8:
+        $ip_address_fix = array_map('dechex', $ip_address_fix);
+        $ip_address = ip_uncompress(implode(':', $ip_address_fix));
+        break;
+      default:
+        print_debug("Unknown IP index: $ip_snmp");
+        continue 2;
+    }
+  } else {
+    // Common address index
+    $ip_address = hex2ip($ip_snmp);
+  }
   $ifIndex = $entry['ipAddressIfIndex'];
-  if ($entry['ipAddressPrefix'] === 'zeroDotZero')
-  {
+  if ($entry['ipAddressPrefix'] === 'zeroDotZero') {
     // Additionally walk IPV6-MIB, especially in JunOS because they spit at world standards
     // See: http://jira.observium.org/browse/OBSERVIUM-1271
     $check_ipv6_mib = TRUE;
+  } else {
+    $tmp_prefix               = explode('.', $entry['ipAddressPrefix']);
+    $entry['ipAddressPrefix'] = end($tmp_prefix);
   }
-  $tmp_prefix = explode('.', $entry['ipAddressPrefix']);
-  $entry['ipAddressPrefix'] = end($tmp_prefix);
+  if (!is_intnum($entry['ipAddressPrefix']) && is_intnum($index_prefix)) {
+    $entry['ipAddressPrefix'] = $index_prefix;
+    $check_ipv6_mib = FALSE;
+  }
 
-  /*
-  $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
-                                                       'ip'     => $ip_address,
-                                                       'prefix' => $entry['ipAddressPrefix'],
-                                                       'type'   => $entry['ipAddressType'],
-                                                       'origin' => $entry['ipAddressOrigin']);
-  */
   $data = [
     'ifIndex' => $ifIndex,
     'ip'      => $ip_address,

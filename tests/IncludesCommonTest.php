@@ -146,18 +146,22 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   {
     // We fudge this a little since it's difficult to mock time().
     // We simply make sure that we are not off by more than 2 secs.
+    if ($result > 0) {
+      // prevent long time running errors
+      $result = time() - $result;
+    }
     $this->assertLessThanOrEqual(2, age_to_unixtime($value, $min_age) - $result);
   }
 
   public function providerAgeToUnixtime()
   {
     return array(
-      array('3y 4M 6w 5d 3h 1m 3s', 1, time() - 109191663),
-      array('3y4M6w5d3h1m3s',       1, time() - 109191663),
-      array('1.5w',                 1,    time() - 907200),
-      array('30m',               7200,                  0),
-      array(-886732,                1,                  0),
-      array('Star Wars',            1,                  0),
+      array('3y 4M 6w 5d 3h 1m 3s', 1, 109191663),
+      array('3y4M6w5d3h1m3s',       1, 109191663),
+      array('1.5w',                 1,    907200),
+      array('30m',               7200,         0),
+      array(-886732,                1,         0),
+      array('Star Wars',            1,         0),
     );
   }
 
@@ -308,22 +312,20 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   /**
    * @group pid
    */
-  public function testGetPidInfo()
-  {
+  public function testGetPidInfo() {
 
     $pid = getmypid();
     $timezone = get_timezone(); // Get system timezone info, for correct started time conversion
 
     // Compare only this keys
-    $compare_keys = array('PID', 'PPID', 'UID', 'GID', 'COMMAND', 'STARTED', 'STARTED_UNIX', 'VSZ');
+    $compare_keys = [ 'PID', 'PPID', 'UID', 'GID', 'COMMAND', 'STARTED', 'STARTED_UNIX', 'VSZ' ];
 
     $test_pid_info['ps']       = get_pid_info($pid);
     $test_pid_info['ps_stats'] = get_pid_info($pid, TRUE);
     $test['ps']       = external_exec('/bin/ps -ww -o pid,ppid,uid,gid,tty,stat,time,lstart,args -p '.$pid, 1); // Set timeout 1sec for exec
     $test['ps_stats'] = external_exec('/bin/ps -ww -o pid,ppid,uid,gid,pcpu,pmem,vsz,rss,tty,stat,time,lstart,args -p '.$pid, 1); // Set timeout 1sec for exec
 
-    foreach ($test as $ps_type => $ps)
-    {
+    foreach ($test as $ps_type => $ps) {
       // Copy-pasted from function get_pid_info()
       $ps = explode("\n", rtrim($test[$ps_type]));
 
@@ -337,6 +339,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       $started_rfc  = array_shift($started) . ','; // Sun
       // Reimplode and convert to RFC2822 started date 'Sun, 20 Mar 2016 18:01:53 +0300'
       $started_rfc .= ' ' . ltrim($started[1], '0'); // 20
+      //$started_rfc .= ' ' . str_pad($started[1], 2, '0', STR_PAD_LEFT); // 20
       $started_rfc .= ' ' . $started[0]; // Mar
       $started_rfc .= ' ' . $started[3]; // 2016
       $started_rfc .= ' ' . $started[2]; // 18:01:53
@@ -348,19 +351,21 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       //print_vars($entries);
       //print_vars($started);
 
-      $pid_info = array();
-      foreach ($keys as $i => $key)
-      {
-        if (!in_array($key, $compare_keys)) { continue; }
+      $pid_info = [];
+      foreach ($keys as $i => $key) {
+        if (!in_array($key, $compare_keys, TRUE)) { continue; }
         $pid_info[$key] = $entries[$i];
       }
       $pid_info['STARTED_UNIX'] = strtotime($pid_info['STARTED']);
 
-      foreach ($test_pid_info[$ps_type] as $key => $tmp)
-      {
-        if (!in_array($key, $compare_keys))
-        {
+      foreach ($test_pid_info[$ps_type] as $key => $tmp) {
+        if (!in_array($key, $compare_keys, TRUE)) {
           unset($test_pid_info[$ps_type][$key]);
+        }
+        if ($key === 'STARTED') {
+          // Another derp fix for dates
+          // Wed, 01 Dec 2021 10:28:51 +0300
+          $test_pid_info[$ps_type][$key] = preg_replace('/, 0(\d) /', ', $1 ', $test_pid_info[$ps_type][$key]);
         }
       }
       ksort($test_pid_info[$ps_type]);
@@ -1241,32 +1246,34 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerGetTime
    * @group datetime
    */
-  public function testGetTime($value, $result)
-  {
+  public function testGetTime($value, $result) {
+    // prevent long time running errors
+    $result = time() - $result;
+
     $diff = abs((int)$result - get_time($value));
     $this->assertLessThanOrEqual(10, $diff); // +- 10 sec
   }
 
   public function providerGetTime()
   {
-    $now = time();
+    //$now = time();
     return array(
-      [ 'now',         $now ],
-      [ 'fiveminute',  $now - 300 ],      //time() - (5 * 60);
-      [ 'fourhour',    $now - 14400 ],    //time() - (4 * 60 * 60);
-      [ 'sixhour',     $now - 21600 ],    //time() - (6 * 60 * 60);
-      [ 'twelvehour',  $now - 43200 ],    //time() - (12 * 60 * 60);
-      [ 'day',         $now - 86400 ],    //time() - (24 * 60 * 60);
-      [ 'twoday',      $now - 172800 ],   //time() - (2 * 24 * 60 * 60);
-      [ 'week',        $now - 604800 ],   //time() - (7 * 24 * 60 * 60);
-      [ 'twoweek',     $now - 1209600 ],  //time() - (2 * 7 * 24 * 60 * 60);
-      [ 'month',       $now - 2678400 ],  //time() - (31 * 24 * 60 * 60);
-      [ 'twomonth',    $now - 5356800 ],  //time() - (2 * 31 * 24 * 60 * 60);
-      [ 'threemonth',  $now - 8035200 ],  //time() - (3 * 31 * 24 * 60 * 60);
-      [ 'sixmonth',    $now - 16070400 ], //time() - (6 * 31 * 24 * 60 * 60);
-      [ 'year',        $now - 31536000 ], //time() - (365 * 24 * 60 * 60);
-      [ 'twoyear',     $now - 63072000 ], //time() - (2 * 365 * 24 * 60 * 60);
-      [ 'threeyear',   $now - 94608000 ], //time() - (3 * 365 * 24 * 60 * 60);
+      [ 'now',         0 ],
+      [ 'fiveminute',  300 ],      //time() - (5 * 60);
+      [ 'fourhour',    14400 ],    //time() - (4 * 60 * 60);
+      [ 'sixhour',     21600 ],    //time() - (6 * 60 * 60);
+      [ 'twelvehour',  43200 ],    //time() - (12 * 60 * 60);
+      [ 'day',         86400 ],    //time() - (24 * 60 * 60);
+      [ 'twoday',      172800 ],   //time() - (2 * 24 * 60 * 60);
+      [ 'week',        604800 ],   //time() - (7 * 24 * 60 * 60);
+      [ 'twoweek',     1209600 ],  //time() - (2 * 7 * 24 * 60 * 60);
+      [ 'month',       2678400 ],  //time() - (31 * 24 * 60 * 60);
+      [ 'twomonth',    5356800 ],  //time() - (2 * 31 * 24 * 60 * 60);
+      [ 'threemonth',  8035200 ],  //time() - (3 * 31 * 24 * 60 * 60);
+      [ 'sixmonth',    16070400 ], //time() - (6 * 31 * 24 * 60 * 60);
+      [ 'year',        31536000 ], //time() - (365 * 24 * 60 * 60);
+      [ 'twoyear',     63072000 ], //time() - (2 * 365 * 24 * 60 * 60);
+      [ 'threeyear',   94608000 ], //time() - (3 * 365 * 24 * 60 * 60);
     );
   }
 
@@ -1310,7 +1317,8 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(1551607499,        DATE_RFC2822, 'Sun, 03 Mar 2019 10:04:59 +0000'),
       array(1551607499.3878,   DATE_RFC2822, 'Sun, 03 Mar 2019 10:04:59 +0000'),
       array(1551607499.3878,      'H:i:s.u', '10:04:59.387800'),
-      array(1551607499.3878,      'H:i:s.v', '10:04:59.387'),
+      //array(1551607499.3878,      'H:i:s.v', '10:04:59.387'),
+      array(1551607499.3873,      'H:i:s.v', '10:04:59.387'), // just prevent round in php 7.0
       array(1551607499.387867,    'H:i:s.u', '10:04:59.387867'),
       array('1551607499.387867',  'H:i:s.u', '10:04:59.387867'),
       array('1551607499.3878679', 'H:i:s.u', '10:04:59.387868'),
@@ -2029,7 +2037,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testIsArraySeq($result, $array)
   {
-    $this->assertSame($result, is_array_seq($array));
+    $this->assertSame($result, is_array_list($array));
   }
 
   public function providerIsArraySeq()
@@ -2136,6 +2144,19 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     // smart (incorrect) quotes
     $array[] = [
       '[«ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ»]',
+      [ 'ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ' ]
+    ];
+    $array[] = [
+      '{“method”:”sms.send_togroup”, “params”:{“access_token”:”0005gOjCOlMH8F2BP8″,”groupname”:”admins”,”message”:”mymessage”,”highpriority”:”1″}}',
+      [ 'method' => 'sms.send_togroup', 'params' => [ 'access_token' => '0005gOjCOlMH8F2BP8', 'groupname' => 'admins', 'message' => 'mymessage', 'highpriority' => '1' ] ]
+    ];
+    // ctrl chars
+    $array[] = [
+      '{"url":"https://<apiurl>","json":"{'."\r\n".'    \"ALERT_ID\": \"%ALERT_ID%\",'."\r\n".'    \"ALERT_MESSAGE\": \"%ALERT_MESSAGE%\",'."\r\n".'    \"ALERT_SEVERITY\": \"%ALERT_SEVERITY%\",'."\r\n".'    \"ALERT_STATE\": \"%ALERT_STATE%\",'."\r\n".'    \"ALERT_STATUS\": \"%ALERT_STATUS%\",'."\r\n".'    \"ALERT_TIMESTAMP\": \"%ALERT_TIMESTAMP%\",'."\r\n".'    \"CONDITIONS\": \"%CONDITIONS%\",'."\r\n".'    \"DEVICE_HOSTNAME\": \"%DEVICE_HOSTNAME%\",'."\r\n".'    \"DEVICE_SYSNAME\": \"%DEVICE_SYSNAME%\",'."\r\n".'    \"DURATION\": \"%DURATION%\",'."\r\n".'    \"ENTITY_LINK\": \"%ENTITY_LINK%\",'."\r\n".'    \"METRICS\": \"%METRICS%\",'."\r\n".'    \"TITLE\": \"%TITLE%\"'."\r\n".'}"}',
+      [ 'url' => 'https://<apiurl>', 'json' => '{    "ALERT_ID": "%ALERT_ID%",    "ALERT_MESSAGE": "%ALERT_MESSAGE%",    "ALERT_SEVERITY": "%ALERT_SEVERITY%",    "ALERT_STATE": "%ALERT_STATE%",    "ALERT_STATUS": "%ALERT_STATUS%",    "ALERT_TIMESTAMP": "%ALERT_TIMESTAMP%",    "CONDITIONS": "%CONDITIONS%",    "DEVICE_HOSTNAME": "%DEVICE_HOSTNAME%",    "DEVICE_SYSNAME": "%DEVICE_SYSNAME%",    "DURATION": "%DURATION%",    "ENTITY_LINK": "%ENTITY_LINK%",    "METRICS": "%METRICS%",    "TITLE": "%TITLE%"}' ]
+    ];
+    $array[] = [
+      "[\r\n".' "ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ" '."\r\n]",
       [ 'ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ' ]
     ];
     return $array;
@@ -2371,16 +2392,16 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerStrCompress
-   * @group string
+   * @group compress
    */
-  public function testStrCompress($string, $result) {
-    $this->assertSame($result, str_compress($string));
+  public function testStrCompress($string, $result, $encode = 'base64') {
+    $this->assertSame($result, str_compress($string, $encode));
   }
 
   /**
    * @depends testStrCompress
    * @dataProvider providerStrCompress
-   * @group string
+   * @group compress
    */
   public function testStrDecompress($result, $string) {
     $this->assertSame($result, str_decompress($string));
@@ -2389,7 +2410,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   /**
    * @depends testStrCompress
    * @dataProvider providerStrCompressRandom
-   * @group string
+   * @group compress
    */
   public function testStrCompressRandom($string) {
     $encode = str_compress($string);
@@ -2400,25 +2421,36 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   /**
    * @depends testStrDecompress
    * @dataProvider providerStrDecompress
-   * @group string
+   * @group compress
    */
   public function testStrDecompressInvalid($string, $result) {
     $this->assertSame($result, str_decompress($string));
   }
   public function providerStrCompress() {
     return [
-      // 681 chars compress to 180 chars
+      // 681 chars compressed to 120 chars (base64)
       [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.47 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.54 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.64 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.73 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.82 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.20',
-        '015500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01' ],
+        'AVUAqv-NkoEJADEIA1f5CUJj_fj7T_btBAkiiBweiiA2BKJPlpYwp6wTBHl7DxzSK2DGM297RgEz2zOf3asRIGQwxp5HXqVApUA1XjWBagIVK3ieCmR30PoB' ],
+      // 681 chars compressed to 180 chars (hex)
+      [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.47 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.54 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.64 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.73 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.82 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.20',
+        '015500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01',
+        'hex' ],
+      // 4225 chars compressed to 2260 chars (base64)
+      [ '603792,603795,735967,735962,706916,706931,692749,595380,716207,716197,834314,834237,834227,811153,811147,771424,771425,767750,767720,580799,580797,800238,602988,602987,778425,778406,778407,818925,818988,808167,808142,808143,736931,637484,811486,719059,768687,713042,713014,705867,603790,604635,799968,799990,799983,805612,733641,713864,797601,797599,734026,734024,740320,740324,710622,710591,741431,741400,834269,834274,822695,811485,795671,795638,603844,603845,812874,812866,703413,703427,718904,718953,816882,836314,836307,811132,811136,730931,730917,602000,602001,768844,768825,768826,584527,800325,800443,800444,704006,704004,718213,605635,614473,699119,809219,799013,781867,834928,810348,810344,837290,812181,812202,812179,812198,696049,696040,767203,742978,706948,706932,692750,595381,779344,779326,779327,741989,771373,17761,811154,811148,787755,617388,580800,800239,818926,818990,787965,768657,768658,705868,603791,604636,799969,799970,810690,810691,710623,710592,741417,741401,769964,620092,795655,795639,795640,703415,703429,836315,836308,811133,811137,811138,758080,591837,800326,601888,834931,810349,810345,812182,812204,812180,812200,777908,638004,718307,696041,710903,619539,813583,736360,630290,706917,706933,785242,741995,741996,713065,629651,815582,647028,647031,807790,807770,807771,705869,787393,608879,741435,741402,601878,836313,836324,740662,740642,800240,800241,812183,812192,714326,22756,718310,718312,788983,702011,730526,730441,813575,768067,767645,719586,628359,721547,721539,721551,721540,831999,831973,813882,809086,766933,766935,807789,767748,767744,807786,807787,580798,580793,580796,813888,788348,795654,795645,713204,713198,735964,758592,833556,833560,735938,758586,736513,47769,813883,765202,742010,785804,736745,709102,719061,779341,806057,806067,740186,742022,785808,719068,719069,765195,709098,779332,765194,709099,813885,810704,810700,816894,768842,816886,808511,797485,808515,811202,713206,735965,758593,713041,106040,591213,591023,713201,735940,591211,713018,758589,591025,800347,809090,594018,593642,814542,739551,800262,812177,800322,800266,779076,814539,584824,814538,594016,812175,618538,809087,812372,812401,813884,834222,708223,766351,710618,710613,710614,811720,834226,808163,708229,708231,650786,601582,811712,813887,585963,584958,619128,590360,620158,809093,741498,730930,741490,730923,809091,778607,778615,811151,808514,811165,813890,810347,707545,800465,765036,810357,800462,616617,616631,705885,705887,800331,809092,720660,704519,703414,834942,834947,785805,709103,736508,294034,740250,767886,719062,829759,785809,829764,767890,742119,782569,720648,736514,703424,719071,47770,709100,709101,719072,686510,813886,834319,595583,710620,811721,834312,710616,710615,595582,650791,834313,811714,294030,817096,716061,813889,809088,808510,832277,808503,808502,708224,708233,708232,582909,701990,702003,702010,779342,779334,797486,797479,550429,550425,550427,834306,834233,834210,765666,617384,591142,430351,767749,767746,584959,584957,619122,808136,808140,768843,768836,730929,730921,713040,713016,806058,829758,806068,829762,768652,788309,788350,805603,805611,805594,805595,805591,591210,591212,740318,740327,795657,795647,833742,833738,739846,739849,741428,741399,596541,596539,620021,834223,834167,834228,768491,806220,795668,795637,620053,740319,740330,768673,768672,768665,833558,833563,591022,591024,768852,799988,799979,591081,591082,811131,811135,612967,809222,809211,809224,768823,767885,767889,820386,820351,814543,584533,814540,814541,584529,619923,768674,768668,768667,584953,580794,629557,834925,805596,805597,837287,837284,812864,812865,812178,812196,720659,720649,720650,812395,812398,784444,30289,30290,587405,587407,706930,834267,834273,784442,813572,813573,799989,800000,800458,800461,599121,599132,587408,591141,602551,23716,23717,808146,808141,768663,602550,705871,594017,696680,618551,705883,705882,807788,834941,834945,765203,765196,765197,596542,596540,620034,741415,741407,741408,808155,834268,834275,779077,716616,816895,816903,800263,800245,810346,810356,585205,585199,586277,586279,696682,696678,580810,580812,834318,834322,741503,601882,601886,4853,5317,4865,5330,580809,580811,812870,812876,742011,742023,818620,742118,810705,703412,703421,741625,741626',
+        'AZoGZfk1V0mWBSEIu9BfgCjK_S_WGap70Xn-KpUhBKqj7qxfE87v1pm-hvW70ZMtqPz1rLvnd-bUi9_NXnEJOff3alduwiqt1gJk5inBxps399oGXNT3nhCs-J0Xd8aAfRGrHkxa8z7g9qd9gGgDb3iDHwl488XLvoK9DAVXbHzd_TZt2Q_bc-IMbn_No7MCGwjw4cZ5OEUBCcDuwrUz00-AHwkPjsXpxL6q3sntr7F9bkcSDjy6tWO1Ac92FLwVYJXRi9fCFGzYsNYQoQj2CC6sXlgcG09bTt8UKEr19jbwlfW4AdBMXO0swaKbb2ILlJV-D1GqduK6whmrZaDVwdARkgFZEWFIho7XEpRNQCN_-yzlr5iViL3LwLDCrzbIiAXLGhFEdDv3vljNZMLpmAVAkIPGI7ktSs1CihO-fECr70I64G2-JKxYWt0RDMIzyOAYRLcVOHOvuU-83gY4TXqDkaI3_LvDGwjMH-EyOfOGFC6Ym_d2muTbJMdZD7SmQ7dASPD5MZnk85isLSCH3p1W5PpcwzP3nrmX5l6be4rHXDoLcz9Ic6jMoSXy5DWHmCLsAzOQLz4DXY7JUyNgPEiQY4KMuXDMhWcSuHrrYwYMlEsIUr76Et2wMx_LDymqdG7GcJyb5dxsr8Ir3I6w4iKw-KMEKahMybFBpiAuR6Gr81TL1aBgBdMudbpOH3ly1lYIhjpGaJU0gtwLoaZl58CW3jdAJQLNDVohuB-k8zDMUQ1Z-pAsV-hxdJecvs8xK4ELvKmbACkQit7p32nfy7xk1W-GDjJ5Wq5nGPDoPaoLjIxU9R0pCKooFYgr1gRlum8jxlAzmAsvX1HUFvh4BeUVXNePlBWEZQSXppQkAJGmJrbjSDgKBKkOfSatCds_tuFarZ-hDO0zWQePdSrSbbONdtZSoouVqR6zyShS91UdRIKADPOZ2UbHkPaDGG_U2_gCmnlY7KjkYOTwHk-uvrwHesVnEPn-Kpl5hthcASOHAuHJ2E4J5vbnDR_Q9ZOjw4LW4hSIhH7c_vGzhRyPK3IDQsI6VkZygDLLkL2T6gpUcK2k5_KBYWnH4zge5Z6UP5Q3dQv1Rrk89Ku8IbXh_1m6e30hG78pCa59leHhm_QaUGJn7sOCqSFBSNL-xPMrbBO4pX5xWxuKTXq_tb16PrO9j7r3-KMYRc3AMKAzKUcKlkcEhjzQ1MS2OpYxGk8ogySVs4E2tJt7ed8I2NVPkJCoxSORyZvLF5GeiCd5uVEdFBL0RJgbUpDFHY5LqaJFSCzCq9BqlV8hiV6HhpB24lIxQxot_X10rYWZIb9xz3YPlMof3Ktn4iB-hIJkN_sqoCw5bO4EJ0DiNNJu8INVEfuwMVK0FchhGgnXFP6oL6E8IPRCckqqtDxrvW_2YaYXJxTvG61YjHiFvu_FRnzR2lkIuJ21zCrc7hVbp0Aot1RTt36QfgT30NEynI32gKjhUULOthXOcPrZctrbcPzmUobne6Wc4W2_uB03ckNHf_wac-85NyQPFFYjIRJg-Li3zSEzCpWNyxBrrFLdmVPOp8FhCVnWgO0ibgG6wjnB3ik4Bo_D0R6HS8BT-jSqSbPBZoVySsV7KgAK7Ce3bc6O4Zq6nmfLdaBJBsVUgm9SY1UQLAV8hYrQFr7nfD_rn1dsVEySOk7Rd8AJjbXxTbek4EGNG44hrTmf9KjdFauXY-215hsoPYXBW_J-Keg1b7fBDXVxXxaHf6jfTgFUhlOLqUGZAGR_3xXsRtgtRV-cpnFRu9VgJOG-UzZpBKVg9S2DnWa9suM8d5xPWpfB4s24cM731H-tqS8N34zs8U8T7Bp9esxSqmYpdLO-wyR1VwVOYMFhYG-BJhNosbTqaOTaataE9FA9ZMGsz4dtH57hmihfC-bAh9L5JuYvY224mpjfB99nwgce1TjRcEBpVf35it9wNLiVPkQAbPKbkz2mMTjkmezg6wMyJPhGs-9jxtljFrhreZL5oBxpFi__JJDiKnSSASfNBKpTHP1cPhyRF7sX-gyYzv_f599XJ-kIld8LqetNNy2Nmpij1LTOJ8BlWJ5xPNPuNBwPHeUhoA3XvF0GdRZLbmqw5qz4DeT-Pj3H4XgOx3Fz1Xd0q49ieGCAe1SC6L8GjdI4-Wsi1AjYwkjDCEpFU-cEY8eW4PorJMOwrKS6nR0ellEYNcF7pgUpMaKATIUIbfLisIQ0948PSX9mhsFTFCcQDlNk7-v19ZDnochfGFQKNg995PY6hv4D' ],
+      // 4225 chars compressed to 3390 chars (hex)
+      [ '603792,603795,735967,735962,706916,706931,692749,595380,716207,716197,834314,834237,834227,811153,811147,771424,771425,767750,767720,580799,580797,800238,602988,602987,778425,778406,778407,818925,818988,808167,808142,808143,736931,637484,811486,719059,768687,713042,713014,705867,603790,604635,799968,799990,799983,805612,733641,713864,797601,797599,734026,734024,740320,740324,710622,710591,741431,741400,834269,834274,822695,811485,795671,795638,603844,603845,812874,812866,703413,703427,718904,718953,816882,836314,836307,811132,811136,730931,730917,602000,602001,768844,768825,768826,584527,800325,800443,800444,704006,704004,718213,605635,614473,699119,809219,799013,781867,834928,810348,810344,837290,812181,812202,812179,812198,696049,696040,767203,742978,706948,706932,692750,595381,779344,779326,779327,741989,771373,17761,811154,811148,787755,617388,580800,800239,818926,818990,787965,768657,768658,705868,603791,604636,799969,799970,810690,810691,710623,710592,741417,741401,769964,620092,795655,795639,795640,703415,703429,836315,836308,811133,811137,811138,758080,591837,800326,601888,834931,810349,810345,812182,812204,812180,812200,777908,638004,718307,696041,710903,619539,813583,736360,630290,706917,706933,785242,741995,741996,713065,629651,815582,647028,647031,807790,807770,807771,705869,787393,608879,741435,741402,601878,836313,836324,740662,740642,800240,800241,812183,812192,714326,22756,718310,718312,788983,702011,730526,730441,813575,768067,767645,719586,628359,721547,721539,721551,721540,831999,831973,813882,809086,766933,766935,807789,767748,767744,807786,807787,580798,580793,580796,813888,788348,795654,795645,713204,713198,735964,758592,833556,833560,735938,758586,736513,47769,813883,765202,742010,785804,736745,709102,719061,779341,806057,806067,740186,742022,785808,719068,719069,765195,709098,779332,765194,709099,813885,810704,810700,816894,768842,816886,808511,797485,808515,811202,713206,735965,758593,713041,106040,591213,591023,713201,735940,591211,713018,758589,591025,800347,809090,594018,593642,814542,739551,800262,812177,800322,800266,779076,814539,584824,814538,594016,812175,618538,809087,812372,812401,813884,834222,708223,766351,710618,710613,710614,811720,834226,808163,708229,708231,650786,601582,811712,813887,585963,584958,619128,590360,620158,809093,741498,730930,741490,730923,809091,778607,778615,811151,808514,811165,813890,810347,707545,800465,765036,810357,800462,616617,616631,705885,705887,800331,809092,720660,704519,703414,834942,834947,785805,709103,736508,294034,740250,767886,719062,829759,785809,829764,767890,742119,782569,720648,736514,703424,719071,47770,709100,709101,719072,686510,813886,834319,595583,710620,811721,834312,710616,710615,595582,650791,834313,811714,294030,817096,716061,813889,809088,808510,832277,808503,808502,708224,708233,708232,582909,701990,702003,702010,779342,779334,797486,797479,550429,550425,550427,834306,834233,834210,765666,617384,591142,430351,767749,767746,584959,584957,619122,808136,808140,768843,768836,730929,730921,713040,713016,806058,829758,806068,829762,768652,788309,788350,805603,805611,805594,805595,805591,591210,591212,740318,740327,795657,795647,833742,833738,739846,739849,741428,741399,596541,596539,620021,834223,834167,834228,768491,806220,795668,795637,620053,740319,740330,768673,768672,768665,833558,833563,591022,591024,768852,799988,799979,591081,591082,811131,811135,612967,809222,809211,809224,768823,767885,767889,820386,820351,814543,584533,814540,814541,584529,619923,768674,768668,768667,584953,580794,629557,834925,805596,805597,837287,837284,812864,812865,812178,812196,720659,720649,720650,812395,812398,784444,30289,30290,587405,587407,706930,834267,834273,784442,813572,813573,799989,800000,800458,800461,599121,599132,587408,591141,602551,23716,23717,808146,808141,768663,602550,705871,594017,696680,618551,705883,705882,807788,834941,834945,765203,765196,765197,596542,596540,620034,741415,741407,741408,808155,834268,834275,779077,716616,816895,816903,800263,800245,810346,810356,585205,585199,586277,586279,696682,696678,580810,580812,834318,834322,741503,601882,601886,4853,5317,4865,5330,580809,580811,812870,812876,742011,742023,818620,742118,810705,703412,703421,741625,741626',
+        '019a0665f935574996052108bbd05f8028cafd2fd619aa7bd179fe2a952104aaa3eeac5f13ceefd699be86f5bbd1932da8fcf5acbbe777e6d48bdfcd5e710939f7f76a576ec22aadd60264e629c1c69b37f7da065cd4f79e10acf89d1777c6807d11ab1e4c5af33ee0f6a77d8068036f78831f0978f3c5cbbe82bd0c05576c7cddfd366dd90fdb73e20c6e7fcda3b3021b08f0e1c67938450109c0eec2b533d34f801f090f8ec5e9c4beaadec9edafb17d6e47120e3cbab563b501cf7614bc156095d18bd7c2146cd8b0d610a108f6082eac5e581c1b4f5b4edf14284af5f636f095f5b801d04c5ced2cc1a29b6f620b94957e0f51aa76e2bac219ab65a0d5c1d011920159116148868ed712944d40237ffb2ce5af989588bdcbc0b0c2af36c88805cb1a1144743bf7be58cd64c2e99805409083c623b92d4acd428a13be7c40abef423ae06dbe24ac585add110cc233c8e01844b7153873afb94fbcde06384d7a8391a237fcbbc31b08cc1fe13239f386142e989bf7769ae4db24c7590fb4a643b74048f0f93199e4f398ac2d2087de9d56e4fa5cc333f79eb997e65e9b7b8ac75c3a0b733f4873a8cca125f2e435879822ec0333902f3e035d8ec95323603c489063828cb970cc856712b87aeb63060c944b0852befa12ddb0331fcb0f29aa746ec6709c9be5dc6cafc22bdc8eb0e222b0f8a30429a84cc9b141a6202e47a1abf354cbd5a06005d32e75ba4e1f7972d65608863a4668953482dc0ba1a665e7c096de37402502cd0d5a21b81fa4f330cc510d59fa902c57e87174979cbecf312b810bbca99b0029108adee9df69dfcbbc64d56f860e32795aae6718f0e83daa0b8c8c54f51d2908aa2815882bd60465ba6f23c65033980b2f5f51d416f87805e5155cd78f941584650497a694240091a626b6e348380a04a90e7d26ad09db3fb6e15aad9fa10ced3359078f752ad26db38d76d652a28b95a91eb3c92852f7551d4482800cf399d946c790f683186fd4dbf8029a7958eca8e460e4f01e4faebebc077ac56710f9fe2a997986d85c01238702e1c9d84e09e6f6e70d1fd0f593a3c382d6e21488847edcfef1b3851c8f2b720342c23a5646728032cb90bd93ea0a5470ada4e7f2816169c7e3381ee59e943f9437750bf546b93cf4abbc21b5e1ff59ba7b7d211bbf2909ae7d95e1e19bf41a506267eec382a9214148d2fec4f32b6c13b8a57e715b1b8a4d7abfb5bd7a3eb3bd8fbaf7f8a31845cdc030a03329470a964704863cd0d4c4b63a96311a4f28832495b38136b49b7b79df08d8d54f9090a8c52391c99bcb17919e882779b9511d1412f444981b5290c51d8e4ba9a245482cc2abd06a955f21895e87869076e25231431a2dfd7d74ad859921bf71cf760f94ca1fdcab67e2207e84826437fb2aa02c396cee042740e234d26ef0835511fbb03152b415c8611a09d714fea82fa13c20f442724aaab43c6bbd6ff661a6172714ef1bad588c7885beefc5467cd1da5908b89db5cc2adcee155ba74028b75453b77e907e04f7d0d1329c8df680a8e15142ceb615ce70fad972dadb70fce65286e77ba59ce16dbfb81d377243477ffc1a73ef3937240f145623211260f8b8b7cd21330a958dcb106bac52dd9953cea7c1610959d680ed226e01bac239c1de2938068fc3d11e874bc053fa34aa49b3c16685724ac57b2a000aec27b76dce8ee19aba9e67cb75a04906c554826f526355102c057c858ad016bee77c3feb9f576c544c923a4ed177c0098db5f14db7a4e0418d1b8e21ad399ff4a8dd15ab9763edb5e61b283d85c15bf27e29e8356fb7c10d75715f16877fa8df4e015486538ba9419900647fdf15ec46d82d455f9ca67151bbd56024e1be53366904a560f52d839d66bdb2e33c779c4f5a97c1e2cdb870cef7d47fada92f0ddf8cecf14f13ec1a7d7acc52aa662974b3bec3247557054e60c161606f81261368b1b4ea68e4da6ad684f4503d64c1accf876d1f9ee19a285f0be6c087d2f926e62f636db89a98df07df67c2071ed538d170406955fdf98adf7034b8953e44006cf29b933da63138e499ece0eb033224f846b3ef63c6d96316b86b7992f9a01c69162fff2490e22a74920127cd04aa531cfd5c3e1c9117bb17fa0c98ceffdfe7df5727e90895df0ba9eb4d372d8d9a98a3d4b4ce27c065589e713cd3ee341c0f1de521a00dd7bc5d0675164b6e6ab0e6acf80de4fe3e3dc7e1780ec77173d57774ab8f627860807b5482e8bf068dd238f96b22d408d8c248c3084a4553e70463c796e0fa2b24c3b0aca4ba9d1d1e96511835c17ba6052931a2804c85086df2e2b08434f78f0f497f6686c1531427100e5364efebf5f590e7a1c85f18540a360f7de4f63a86fe03',
+        'hex' ],
     ];
   }
 
   public function providerStrCompressRandom() {
     $charlist = ' 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~!@#$%^&*()_+-=[]{}\|/?,.<>;:"'."'";
-    $result = array();
+    $result = [];
     for ($i=0; $i<20; $i++) {
       $string = generate_random_string(mt_rand(200, 4000), $charlist);
-      $result[] = array($string);
+      $result[] = [ $string ];
     }
     return $result;
   }
@@ -2426,8 +2458,54 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   public function providerStrDecompress() {
     return [
       [ '15500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01', FALSE ],
+      [ 'AVUAqv-NkoEJADEIA1f5CUJj_fj7T_btBAkiiBweiiA2BKJPlpYwp6wTBHl7DxzSK2DGM297RgEz2zOf3asRIGQwxp5HXqVApUA1XjWBagIVK3ieCmR30Po', FALSE ],
       [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40', FALSE ],
       [ NULL, FALSE ],
+    ];
+  }
+
+  /**
+   * @dataProvider providerIsValidParam
+   * @group string
+   */
+  public function testIsValidParam($string, $type, $result)
+  {
+    $this->assertSame($result, is_valid_param($string, $type));
+  }
+
+  public function providerIsValidParam()
+  {
+    return [
+      // common
+      [ '',          '', FALSE ],
+      [ '**--.--**', '', FALSE ],
+      // serial
+      [ '1234567890',                                    'serial', FALSE ],
+      [ 'Ã´Â¿i+',                                        'serial', FALSE ],
+      [ 'Ã´▒Â¿i+',                                       'serial', FALSE ],
+      [ '22:00:00:33:FF:AA',                             'serial', TRUE ],
+      [ '~!@#$%^&*()_+`1234567890-=[]\\{}|;: \'",./<>?', 'serial', TRUE ],
+    ];
+  }
+
+  /**
+   * @dataProvider providerEscapeHtml
+   * @group string
+   */
+  public function testEscapeHtml($value, $result) {
+    $this->assertSame($result, escape_html($value));
+  }
+
+  public function providerEscapeHtml() {
+    return [
+      [ '<div class="alert alert-info"><button type="button" class="close" data-dismiss="alert">&times;</button>',
+        '&lt;div class=&quot;alert alert-info&quot;&gt;&lt;button type=&quot;button&quot; class=&quot;close&quot; data-dismiss=&quot;alert&quot;&gt;&amp;times;&lt;/button&gt;' ],
+      // excludes
+      [ '<p>Text with <sup>sup</sup> and <sub>sub</sub> and newline <br/> <br />',
+        '&lt;p&gt;Text with <sup>sup</sup> and <sub>sub</sub> and newline <br/> <br />' ],
+      // entities
+      [ '<p>Text with entities &#x200B; &pi; &pipipi;',
+        '&lt;p&gt;Text with entities &#x200B; &pi; &amp;pipipi;' ],
     ];
   }
 

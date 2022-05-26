@@ -25,14 +25,18 @@
   memory allocated in memory-pools.
 
   FIXME: sgiKbMemoryUsed, sgiKbMemoryAvailable, sgiKbMemoryPoolAllocated (use HC bit)
+
+  Used is used memory, Available is memory not assigned to pools, PoolAllocated is memory assigned to poools.
+  Total is calculated with Available+PoolAllocated
 */
 
 $mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryAvailable', array(), $mib);
 $mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryUsed', $mempool_array, $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryPoolAllocated', array(), $mib);
 
 if (is_numeric($mempool_array[0]['sgiMemoryUsed']))
 {
-  discover_mempool($valid['mempool'], $device, 0, 'TIMETRA-SYSTEM-MIB', 'Memory', 1, $mempool_array[0]['sgiMemoryAvailable'], $mempool_array[0]['sgiMemoryUsed']);
+  discover_mempool($valid['mempool'], $device, 0, 'TIMETRA-SYSTEM-MIB', 'Memory', 1, ($mempool_array[0]['sgiMemoryAvailable']+$mempool_array[0]['sgiMemoryPoolAllocated']), $mempool_array[0]['sgiMemoryUsed']);
 }
 
 unset ($mempool_array);

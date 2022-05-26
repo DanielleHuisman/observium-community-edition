@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -15,7 +14,7 @@
 // hrStorageSize.1 = 160481280
 
 $mempool['total']  = 536870912; // 512Mb
-$mempool['free']   = snmp_get($device, 'hrStorageSize.1', '-OQUvs', 'HOST-RESOURCES-MIB');
+$mempool['free']   = snmp_get_oid($device, 'hrStorageSize.1', 'HOST-RESOURCES-MIB');
 $mempool['used']   = $mempool['total'] - $mempool['free'];
 
 // EOF

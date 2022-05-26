@@ -64,22 +64,37 @@ if (is_intnum($vars['device'])) {
 
 // $from, $to - unixtime (or rrdgraph time interval, i.e. '-1d', '-6w')
 // $timestamp_from, $timestamp_to - timestamps formatted as 'Y-m-d H:i:s'
-$timestamp_pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
-if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from'])) {
+if (isset($vars['timestamp_from']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_from'])) {
   $vars['from'] = strtotime($vars['timestamp_from']);
 }
-if (isset($vars['timestamp_to']) && preg_match($timestamp_pattern, $vars['timestamp_to'])) {
+if (isset($vars['timestamp_to']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_to'])) {
   $vars['to'] = strtotime($vars['timestamp_to']);
 }
 
-$from     = (isset($vars['from'])) ? $vars['from'] : time() - 86400;
-$to       = (isset($vars['to'])) ? $vars['to'] : time();
+// Validate rrdtool compatible time string and set to now/day if it's not valid
+if (preg_match(OBS_PATTERN_RRDTIME, $vars['to']))   { $to   = $vars['to'];   }// else { $to     = $config['time']['now']; }
+if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) { $from = $vars['from']; }// else { $from   = $config['time']['day']; }
 
-if ($from < 0) { $from = $to + $from; }
+if (isset($vars['period']) && is_numeric($vars['period'])) {
+  $to     = time();
+  $from   = time() - $vars['period'];
+  $period = $vars['period'];
+} elseif(preg_match('/[\-]*\d+[s|w|m|d|y|h]/', $vars['from'])) {
+  // It seems we have AT-style/timespec. Just pass it through (some features will break because we can't calculate period)
+  $from = $vars['from'];
+  if(preg_match('/[\-]*\d+[s|w|m|d|y|h]/', $vars['to'])) { $to = $vars['to']; } else { $to = 'NOW'; }
+} else {
+  $from = (isset($vars['from'])) ? $vars['from'] : time() - 86400;
+  $to   = (isset($vars['to'])) ? $vars['to'] : time();
+  if ($from < 0) { $from = $to + $from; }
+  $period = $to - $from;
+}
 
-$period = $to - $from;
-
-$prev_from = $from - $period;
+// Set prev_from & prev_to if we have a period
+if(isset($period)) {
+  $prev_from = $from - $period;
+  $prev_to   = $from;
+}
 
 $graph_include = FALSE;
 $definition_include = FALSE;

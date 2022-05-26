@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -21,22 +21,32 @@ ksort($mibs);
 
 $mibs_disabled = get_device_mibs_disabled($device);
 
-if ($vars['submit'])
-{
-  if ($readonly)
-  {
+if ($vars['submit']) {
+  if ($readonly) {
     print_error_permission('You have insufficient permissions to edit settings.');
   } else {
-    if ($vars['toggle_mib'] && isset($mibs[$vars['toggle_mib']]))
-    {
+    if ($vars['toggle_mib'] && isset($mibs[$vars['toggle_mib']])) {
       $mib = $vars['toggle_mib'];
 
       $mib_disabled = in_array($mib, $mibs_disabled);
-      if ($mib_disabled)
-      {
-        set_device_mib_enable($device, $mib, TRUE); // really just remove
+      if (!$config['mibs'][$mib]['enable']) {
+        // Globally disabled MIB
+        $where  = "`device_id` = ? AND `use` = ? AND `mib` = ?";
+        $params = [ $device['device_id'], 'mib', $mib ];
+        $disabled = dbFetchCell("SELECT `disabled` FROM `devices_mibs` WHERE $where", $params);
+        //r($disabled);
+        $mib_disabled = $disabled !== '0';
+        if ($mib_disabled) {
+          set_device_mib_enable($device, $mib);
+        } else {
+          set_device_mib_disable($device, $mib, TRUE); // really just remove
+        }
       } else {
-        set_device_mib_disable($device, $mib);
+        if ($mib_disabled) {
+          set_device_mib_enable($device, $mib, TRUE); // really just remove
+        } else {
+          set_device_mib_disable($device, $mib);
+        }
       }
 
       // reload attribs
@@ -57,9 +67,9 @@ if ($config['snmp']['errors']) {
   $sql         = 'SELECT * FROM `snmp_errors` WHERE `device_id` = ?;';
   foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry) {
     $timediff   = $entry['updated'] - $entry['added'];
-    $poll_count = round($timediff / $poll_period) + 1;
+    $poll_count = round(float_div($timediff, $poll_period)) + 1;
 
-    $entry['error_rate']          = $entry['error_count'] / $poll_count; // calculate error rate
+    $entry['error_rate'] = float_div($entry['error_count'], $poll_count); // calculate error rate
     if ($oid = str_decompress($entry['oid'])) {
       // 512 long oid strings is compressed
       $entry['oid'] = $oid;
@@ -100,36 +110,47 @@ print_warning("This page allows you to disable certain MIBs to be polled for a d
 
 <?php
 
-foreach ($mibs as $mib => $count)
-{
+foreach ($mibs as $mib => $count) {
   $mib_disabled = in_array($mib, $mibs_disabled);
   $mib_errors   = isset($snmp_errors[$mib]);
 
-  echo('<tr'. ($mib_errors ? ' class="error"' : '') . '><td><strong>'.$mib.'</strong></td><td>');
-
-  if ($mib_disabled)
-  {
+  if (!$config['mibs'][$mib]['enable']) {
+    // Globally disabled MIB
+    $where  = "`device_id` = ? AND `use` = ? AND `mib` = ?";
+    $params = [ $device['device_id'], 'mib', $mib ];
+    $disabled = dbFetchCell("SELECT `disabled` FROM `devices_mibs` WHERE $where", $params);
+    //r($disabled);
+    $mib_disabled = $disabled !== '0';
+  }
+  if ($mib_disabled) {
     $attrib_status = '<span class="label label-error">disabled</span>';
-    $toggle = 'Enable'; $btn_class = 'btn-success'; $btn_icon = 'icon-ok';
+    $toggle = 'Enable';
+    $btn_class = 'btn-success';
+    $btn_icon = 'icon-ok';
+    $class = ' class="ignore"';
   } else {
     $attrib_status = '<span class="label label-success">enabled</span>';
-    $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';
+    $toggle = "Disable";
+    $btn_class = "btn-danger";
+    $btn_icon = 'icon-remove';
+    $class = $mib_errors ? ' class="error"' : '';
   }
 
-  echo($attrib_status.'</td><td>');
+  echo('<tr'. $class . '><td><strong>' . $mib . '</strong></td><td>' . $attrib_status . '</td><td>');
 
-      $form = array('type'  => 'simple');
-      // Elements
-      $form['row'][0]['toggle_mib']  = array('type'     => 'hidden',
-                                             'value'    => $mib);
-      $form['row'][0]['submit']      = array('type'     => 'submit',
-                                             'name'     => $toggle,
-                                             'class'    => 'btn-mini '.$btn_class,
-                                             'icon'     => $btn_icon,
-                                             'right'    => TRUE,
-                                             'readonly' => $readonly,
-                                             'value'    => 'mib_toggle');
-      print_form($form); unset($form);
+  $form = [ 'type'  => 'simple' ];
+  // Elements
+  $form['row'][0]['toggle_mib']  = [ 'type'     => 'hidden',
+                                     'value'    => $mib ];
+  $form['row'][0]['submit']      = [ 'type'     => 'submit',
+                                     'name'     => $toggle,
+                                     'class'    => 'btn-mini '.$btn_class,
+                                     'icon'     => $btn_icon,
+                                     'right'    => TRUE,
+                                     'readonly' => $readonly,
+                                     'value'    => 'mib_toggle' ];
+  print_form($form);
+  unset($form);
 
   echo('</td></tr>');
 }

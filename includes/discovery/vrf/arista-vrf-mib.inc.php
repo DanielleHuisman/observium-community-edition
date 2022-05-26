@@ -45,7 +45,7 @@ foreach ($mpls_vpn_vrf as $vrf_name => $entry) {
   ];
 
   // Detect if VRF SNMP context exist
-  if (snmp_context_exist($device, $vrf_name)) {
+  if (snmp_virtual_exist($device, $vrf_name)) {
     $vrf_contexts[$vrf_name] = $vrf_name;
   }
 }

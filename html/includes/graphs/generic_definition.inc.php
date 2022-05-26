@@ -15,18 +15,19 @@ $graph_def = $config['graph_types'][$type][$subtype];
 // Set some defaults and convert $graph_def values to global values for use by common.inc.php.
 // common.inc.php needs converted to use $graph_def so we can remove this.
 
-if (isset($graph_def['name']))      { $graph_title = $graph_def['name']; }
-if (isset($graph_def['step']))      { $step = $graph_def['step']; }
-if (isset($graph_def['unit_text'])) { $unit_text = $graph_def['unit_text']; }
-if (isset($graph_def['scale_min'])) { $scale_min = $graph_def['scale_min']; }
-if (isset($graph_def['scale_max'])) { $scale_max = $graph_def['scale_max']; }
-if (isset($graph_def['legend']))    { $legend    = $graph_def['legend']; }
+if (isset($graph_def['name']))          { $graph_title = $graph_def['name']; }
+if (isset($graph_def['step']))          { $step = $graph_def['step']; }
+if (isset($graph_def['unit_text']))     { $unit_text = $graph_def['unit_text']; }
+if (isset($graph_def['scale_min']))     { $scale_min = $graph_def['scale_min']; }
+if (isset($graph_def['scale_max']))     { $scale_max = $graph_def['scale_max']; }
+if (isset($graph_def['legend']))        { $legend    = $graph_def['legend']; }
 if (isset($graph_def['log_y'])  && $graph_def['log_y'] == TRUE)    { $log_y = TRUE; } else { unset($log_y); } // Strange, if $log_y set to FALSE anyway legend logarithmic
 if (isset($graph_def['no_mag']) && $graph_def['no_mag'] == TRUE)   { $mag_unit = "' '"; } else { $mag_unit = '%S'; }
-if (isset($graph_def['num_fmt']))   { $num_fmt   = $graph_def['num_fmt']; } else { $num_fmt = '6.1'; }
-if (isset($graph_def['nototal']))   { $nototal   = $graph_def['nototal']; } else { $nototal = TRUE; }
-if (!isset($graph_def['colours']))    { $graph_def['colours']   = "mixed"; }
-if (isset($graph_def['colour_offset']))   { $c_i   = $graph_def['colour_offset']; } else { $c_i = 0; }
+if (isset($graph_def['num_fmt']))       { $num_fmt   = $graph_def['num_fmt']; } else { $num_fmt = '6.1'; }
+if (isset($graph_def['nototal']))       { $nototal   = $graph_def['nototal']; } else { $nototal = TRUE; }
+if (!isset($graph_def['colours']))      { $graph_def['colours']   = "mixed"; }
+if (isset($graph_def['colour_offset'])) { $c_i   = $graph_def['colour_offset']; } else { $c_i = 0; }
+
 if (isset($graph_def['file']) && isset($graph_def['index'])) // Indexed graphs
 {
   // Index can be TRUE/FALSE (for TRUE used global $index or $vars with key 'id') or name of used key from $vars
@@ -217,11 +218,15 @@ foreach ($graph_def['ds'] as $ds_name => $ds)
     }
     $cmd_graph .= " COMMENT:'\\l'";
 
-    if ($ds['line'] == TRUE)
-    {
+    if ($ds['line']) {
+      if (is_numeric($ds['line'])) {
+        $line = 'LINE' . $ds['line'];
+      } else {
+        $line = 'LINE1';
+      }
       $colour_line = darken_color($colour);
       //$cmd_graph .= ' LINE1:'.$ds_name.'#'.$colour_line.':"'.$descr.'"';
-      $cmd_graph .= ' LINE1:'.$ds_name.'#'.$colour_line;
+      $cmd_graph .= " $line:$ds_name#$colour_line";
       $descr = ''; // Reset descr
     }
 

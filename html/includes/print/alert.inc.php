@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -19,27 +19,21 @@
  *
  */
 // TESTME needs unit testing
-function build_alert_table_query($vars)
-{
-  $args = array();
+function build_alert_table_query($vars) {
   $where = ' WHERE 1 ';
   // default sort order
   $sort  = ' ORDER BY `device_id`, `alert_test_id`, `entity_type`, `entity_id` DESC ';
 
   // Loop through the vars building a sql query from relevant values
-  foreach ($vars as $var => $value)
-  {
-    if ($value != '')
-    {
-      switch ($var)
-      {
+  foreach ($vars as $var => $value) {
+    if (!safe_empty($value)) {
+      switch ($var) {
         // Search by device_id if we have a device or device_id
         case 'device_id':
           $where .= generate_query_values($value, 'device_id');
           break;
         case 'entity_type':
-          if ($value != 'all')
-          {
+          if ($value !== 'all') {
             $where .= generate_query_values($value, 'entity_type');
           }
           break;
@@ -50,23 +44,20 @@ function build_alert_table_query($vars)
           $where .= generate_query_values($value, 'alert_test_id');
           break;
         case 'status':
-          if ($value == 'failed_delayed') {
+          if ($value === 'failed_delayed') {
             $where .= " AND `alert_status` IN (0,2)";
-          } elseif ($value == 'failed')
-            {
-              $where .= " AND `alert_status` IN (0)";
-
-          } elseif ($value == 'suppressed')
-          {
+          } elseif ($value === 'failed') {
+            $where .= " AND `alert_status` IN (0)";
+          } elseif ($value === 'suppressed') {
             $where .= " AND `alert_status` = 3";
           }
           break;
         case 'sort':
-          if ($value == 'changed') {
-	    $sort = ' ORDER BY `last_changed` DESC ';
-          } elseif ($value == 'device') {
+          if ($value === 'changed') {
+	          $sort = ' ORDER BY `last_changed` DESC ';
+          } elseif ($value === 'device') {
             // fix this to sort by hostname
-	    $sort = ' ORDER BY `device_id` ';
+	          $sort = ' ORDER BY `device_id` ';
           }
           break;
       }
@@ -89,21 +80,20 @@ function build_alert_table_query($vars)
   //$query .= ' ORDER BY `device_id`, `alert_test_id`, `entity_type`, `entity_id` DESC ';
   $query .= $sort;
 
-  if (isset($vars['pagination']) && $vars['pagination'])
-  {
+  if (isset($vars['pagination']) && $vars['pagination']) {
     pagination($vars, 0, TRUE); // Get default pagesize/pageno
     $vars['start'] = $vars['pagesize'] * $vars['pageno'] - $vars['pagesize'];
     $query .= 'LIMIT '.$vars['start'].','.$vars['pagesize'];
   }
 
-  return array($query, $param, $query_count);
+  return array($query, [], $query_count);
 }
 
 /**
  * Display alert_table entries.
  *
  * @param array $vars
- * @return none
+ * @return void
  *
  */
 function print_alert_table($vars) {
@@ -230,9 +220,8 @@ function print_alert_table($vars) {
     echo('<td style="width: 1px;"></td>');
 
     // If we know the device, don't show the device
-    if ($list['device_id'])
-    {
-      echo('<td><span class="entity-title">'.generate_device_link($device, short_hostname($device['hostname'])).'</span></td>');
+    if ($list['device_id']) {
+      echo('<td><span class="entity-title">'.generate_device_link_short($device).'</span></td>');
     }
 
     // If we're showing all entity types, print the entity type here
@@ -245,7 +234,7 @@ function print_alert_table($vars) {
 
       // If we have a parent type, display it here.
       // FIXME - this is perhaps messy. Find a better way and a better layout. We can't have a new table column because it would be empty 90% of the time!
-      if(isset($entity_type['parent_type']))
+      if (isset($entity_type['parent_type']))
       {
         echo '  <i class="' . $config['entities'][$entity_type['parent_type']]['icon'] . '"></i> '.generate_entity_link($entity_type['parent_type'], $entity[$entity_type['parent_id_field']]).'</span> - ';
       }
@@ -283,9 +272,23 @@ function print_alert_table($vars) {
       $alert['state_popup'] .= '<table style="min-width: 400px;" class="table   table-striped table-condensed">';
       $alert['state_popup'] .= '<thead><tr><th>Metric</th><th>Cond</th><th>Value</th><th>Measured</th></tr></thead>';
 
-      foreach($state['failed'] as $test)
-      {
-        $alert['state_popup'] .= '<tr><td><strong>'.$test['metric'].'</strong></td><td>'.$test['condition'].'</td><td>'.format_value($test['value']).'</td><td><i class="red">'.format_value($state['metrics'][$test['metric']]).'</i></td></tr>';
+      foreach($state['failed'] as $test) {
+        $metric_def = $config['entities'][$alert['entity_type']]['metrics'][$test['metric']];
+
+        $format = NULL;
+        $symbol = '';
+        if (!safe_empty($test['value'])) {
+          if (isset($metric_def['format'])) {
+            $format = isset($entity[$metric_def['format']]) ? $entity[$metric_def['format']] : $metric_def['format'];
+          }
+          if (isset($metric_def['symbol'])) {
+            $symbol = isset($entity[$metric_def['symbol']]) ? $entity[$metric_def['symbol']] : $metric_def['symbol'];
+          }
+        }
+
+        $alert['state_popup'] .= '<tr><td><strong>'.$test['metric'].'</strong></td><td>'.$test['condition'].'</td><td>'.
+                                 format_value($test['value'], $format).$symbol.'</td><td><i class="red">'.
+                                 format_value($state['metrics'][$test['metric']], $format).$symbol.'</i></td></tr>';
       }
       $alert['state_popup'] .= '</table>';
       $alert['state_popup'] .= generate_box_close();
@@ -294,9 +297,10 @@ function print_alert_table($vars) {
     $alert['state_popup'] .= generate_entity_popup_graphs($alert, array('entity_type' => 'alert_entry'));
 
     // Print (i) icon with popup of state.
-    echo(overlib_link("", '<i class="icon-info-sign text-primary"></i>', $alert['state_popup'], NULL));
+    echo(overlib_link('', get_icon('info-sign', 'text-primary'), $alert['state_popup'], NULL));
 
-    echo('&nbsp;&nbsp;<a href="'.generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'alert', 'alert_entry' => $alert['alert_table_id'])).'"><i class="icon-cog text-muted"></i></a>');
+    echo('&nbsp;&nbsp;<a href="'.generate_url([ 'page' => 'device', 'device' => $device['device_id'], 'tab' => 'alert', 'alert_entry' => $alert['alert_table_id'] ]) . '">' .
+         get_icon('edit', 'text-muted') . '</a>');
     //echo '&nbsp;&nbsp;<a onclick="alert_ignore_until_ok('.$alert['alert_table_id'].')"><i class="icon-pause text-warning"></i></a>';
 
     echo '&nbsp;&nbsp;';

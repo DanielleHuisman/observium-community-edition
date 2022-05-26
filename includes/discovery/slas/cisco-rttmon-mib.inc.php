@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -26,13 +26,14 @@ $oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminTargetAddress", $oids, 'C
 //$oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminSourceAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
 //$oids = snmpwalk_cache_oid($device, "crttMonIPEchoAdminSourceAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB');
 
-foreach ($oids as $sla_index => $entry)
-{
-  if (!isset($entry['rttMonCtrlAdminStatus'])) { continue; } // Skip additional multiindex entries from table
+foreach ($oids as $sla_index => $entry) {
+  if (!isset($entry['rttMonCtrlAdminStatus']) ||      // Skip additional multiindex entries from table
+      $entry['rttMonCtrlOperState'] === 'inactive') { // Skip inactive entries
+    continue;
+  }
 
   // FIXME. Temporary hack, while this type of Jitter unsupported by Cisco
-  switch ($entry['rttMonCtrlAdminRttType'])
-  {
+  switch ($entry['rttMonCtrlAdminRttType']) {
     case '34':
       // See: https://jira.observium.org/browse/OBS-3053
       // https://community.cisco.com/t5/routing/ip-sla-path-jitter-snmp-mib/td-p/2890302
@@ -96,9 +97,8 @@ foreach ($oids as $sla_index => $entry)
   // Limits
   $data['sla_limit_high']      = ($entry['rttMonCtrlAdminTimeout']   > 0 ? $entry['rttMonCtrlAdminTimeout']   : 5000);
   $data['sla_limit_high_warn'] = ($entry['rttMonCtrlAdminThreshold'] > 0 ? $entry['rttMonCtrlAdminThreshold'] : 1000);
-  if ($data['sla_limit_high_warn'] >= $data['sla_limit_high'])
-  {
-    $data['sla_limit_high_warn'] = intval($data['sla_limit_high'] / 5);
+  if ($data['sla_limit_high_warn'] >= $data['sla_limit_high']) {
+    $data['sla_limit_high_warn'] = (int)($data['sla_limit_high'] / 5);
   }
 
   $sla_table['CISCO-RTTMON-MIB'][$sla_index] = $data; // Pull to array for main processing

@@ -6,8 +6,7 @@
  *
  * @package    observium
  * @subpackage housekeeping
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -92,7 +91,7 @@ if ($answer) {
           $table_rows['deleted'][] = [ $rrd_host, $rrd_dir, $rrd_count, '%rDeleted host%n' ];
           $rrd_stat['deleted']++;
           if (!$test) {
-            if (rmdir($rrd_dir)) {
+            if (delete_dir($rrd_dir)) {
               logfile("housekeeping.log", "Stale RRD directory [$rrd_dir] for nonexistent host [$rrd_host] - deleted.");
             } else {
               logfile("housekeeping.log", "Stale RRD directory [$rrd_dir] for nonexistent host [$rrd_host] - NOT DELETED, because no access to dir.");
@@ -115,7 +114,7 @@ if ($answer) {
           $table_rows['disabled'][] = [ $rrd_host, $rrd_dir, $rrd_count, '%mDisabled device%n (Last polled: ' . format_uptime(get_time() - $last_polled, 'short-2') . ' ago)' ];
           $rrd_stat['disabled']++;
           if (!$test) {
-            if (rmdir($rrd_dir)) {
+            if (delete_dir($rrd_dir)) {
               logfile("housekeeping.log", "Old RRD directory [$rrd_dir] for disabled device [$rrd_host] - deleted.");
               //log_event("Housekeeping: Removed RRD directory [$rrd_dir] for disabled device older than ".format_uptime(get_time() - $last_polled, 'short-2'), $rrd_device, 'device', $rrd_device, 7);
             } else {

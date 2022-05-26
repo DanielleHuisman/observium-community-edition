@@ -171,7 +171,7 @@ unset($navbar);
 if ($vars['view'] === 'minigraphs') {
   $timeperiods = array('-1d','-1w','-1m','-1y');
   $from = '-1d';
-  echo("<div style='display: block; clear: both; margin: auto; min-height: 500px;'>");
+  echo '<div class="row">';
   unset ($seperator);
 
   // FIXME - FIX THIS. UGLY.
@@ -180,7 +180,8 @@ if ($vars['view'] === 'minigraphs') {
 
     print_port_minigraph($port, $graph_type);
   }
-  echo("</div>");
+
+  echo '</div>';
 } elseif (is_alpha($vars['view']) && is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php')) {
   include($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php');
 } else {

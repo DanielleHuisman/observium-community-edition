@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -18,13 +17,10 @@ $mempool_array = snmpwalk_cache_oid($device, 's5ChasUtilEntry', array(), $mib);
 //$mempool_array = snmpwalk_cache_oid($device, 's5ChasComTable', $mempool_array, 'S5-CHASSIS-MIB:S5-REG-MIB');
 //print_vars($mempool_array);
 
-if (is_array($mempool_array))
-{
+if (!safe_empty($mempool_array)) {
   $i = 1;
-  foreach ($mempool_array as $index => $entry)
-  {
-    if (is_numeric($entry['s5ChasUtilMemoryAvailableMB']) && is_numeric($entry['s5ChasUtilMemoryTotalMB']))
-    {
+  foreach ($mempool_array as $index => $entry) {
+    if (is_numeric($entry['s5ChasUtilMemoryAvailableMB']) && is_numeric($entry['s5ChasUtilMemoryTotalMB'])) {
       $precision = 1024 * 1024;
       $total     = $entry['s5ChasUtilMemoryTotalMB'];
       //$total    *= $precision;
@@ -38,6 +34,6 @@ if (is_array($mempool_array))
   }
 }
 
-unset ($mempool_array, $index, $descr, $precision, $total, $used, $free);
+unset($mempool_array, $index, $descr, $precision, $total, $used, $free, $i);
 
 // EOF

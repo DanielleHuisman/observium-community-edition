@@ -14,9 +14,6 @@
 $notifications = array();
 $alerts        = array();
 
-// Enable caching, currently only for WUI
-include_once($config['install_dir'] .'/includes/cache.inc.php');
-
 include_once($config['html_dir'].'/includes/graphs/functions.inc.php');
 
 $print_functions = array('addresses', 'events', 'mac_addresses', 'rows',
@@ -150,15 +147,11 @@ function html_callback($buffer) {
  * @param boolean $auth this var or ($_SESSION['authenticated']) used for allow to use var_decode()
  * @return array array of vars
  */
-function get_vars($vars_order = array(), $auth = FALSE)
-{
-  if (is_string($vars_order))
-  {
+function get_vars($vars_order = [], $auth = FALSE) {
+  if (is_string($vars_order)) {
     $vars_order = explode(' ', $vars_order);
-  }
-  elseif (empty($vars_order) || !is_array($vars_order))
-  {
-    $vars_order = array('POST', 'URI', 'GET'); // Default order
+  } elseif (empty($vars_order) || !is_array($vars_order)) {
+    $vars_order = [ 'POST', 'URI', 'GET' ]; // Default order
   }
 
   // Content-Type=>application/x-www-form-urlencoded
@@ -174,27 +167,23 @@ function get_vars($vars_order = array(), $auth = FALSE)
                  '|(<\s*s\s*v\s*g.*(o\s*n\s*l\s*o\s*a\s*d|s\s*c\s*r\s*i\s*p\s*t))'.
                  '|<\s*i\s*m\s*g.*o\s*n\s*e\s*r\s*r\s*o\s*r)!i';
 
-  // Allow to use var_decode(), this prevent to use potentially unsafe serialize functions
+  // Allow using var_decode(), this prevents to use potentially unsafe serialize functions
   $auth = $auth || $_SESSION['authenticated'];
 
-  $vars = array();
-  foreach ($vars_order as $order)
-  {
+  $vars = [];
+  foreach ($vars_order as $order) {
     $order = strtoupper($order);
-    switch ($order)
-    {
+    switch ($order) {
       case 'JSON':
         //r(getallheaders());
         //exit;
 
         // https://stackoverflow.com/questions/8893574/php-php-input-vs-post
-        if (!in_array($content_type, [ 'application/x-www-form-urlencoded', 'multipart/form-data-encoded' ]))
-        {
+        if (!in_array($content_type, [ 'application/x-www-form-urlencoded', 'multipart/form-data-encoded' ])) {
           //$json = @json_decode(trim(file_get_contents("php://input")), TRUE, 512, OBS_JSON_DECODE);
           $json = safe_json_decode(trim(file_get_contents("php://input")));
 
-          if (is_array_assoc($json))
-          {
+          if (is_array_assoc($json)) {
             //$vars = array_merge_indexed($vars, $json);
             $vars = $json; // Currently just override $vars, see ajax actions
             //$vars_got['JSON'] = 1;
@@ -204,16 +193,13 @@ function get_vars($vars_order = array(), $auth = FALSE)
 
       case 'POST':
         // Parse POST variables into $vars
-        foreach ($_POST as $name => $value)
-        {
+        foreach ($_POST as $name => $value) {
           // Var names sanitize
           if (!preg_match(OBS_PATTERN_VAR_NAME, $name)) { continue; }
 
-          if (!isset($vars[$name]))
-          {
+          if (!isset($vars[$name])) {
             $vars[$name] = $auth ? var_decode($value) : $value;
-            if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
-            {
+            if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
               unset($vars[$name]);
             }
@@ -226,17 +212,15 @@ function get_vars($vars_order = array(), $auth = FALSE)
       case 'URL':
         // Parse URI into $vars
         $segments = explode('/', trim($_SERVER['REQUEST_URI'], '/'));
+        $compressed = $auth && in_array('compressed=1', $segments); // vars can be compressed by str_compress()
 
         //sr($segments);
         //r($_SERVER['REQUEST_URI']);
 
-        foreach ($segments as $pos => $segment)
-        {
+        foreach ($segments as $pos => $segment) {
           //$segment = urldecode($segment);
-          if ($pos == "0" && !str_contains_array($segment, '='))
-          {
-            if (!preg_match($prevent_xss, $segment))
-            {
+          if ($pos == "0" && !str_contains_array($segment, '=')) {
+            if (!preg_match($prevent_xss, $segment)) {
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
               $segment = urldecode($segment);
               $vars['page'] = $segment;
@@ -248,24 +232,25 @@ function get_vars($vars_order = array(), $auth = FALSE)
             // Var names sanitize
             if (!preg_match(OBS_PATTERN_VAR_NAME, $name)) { continue; }
 
-            if (!isset($vars[$name]))
-            {
-              if (!isset($value) || $value === '')
-              {
+            if (!isset($vars[$name])) {
+              if (!isset($value) || $value === '') {
                 $vars[$name] = 'yes';
               } else {
                 //r($value);
-                $value = str_replace('%7F', '/', urldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
-                if (preg_match($prevent_xss, $value))
-                {
+                if ($compressed && $value_uncompress = str_decompress($value)) {
+                  $value = $value_uncompress;
+                  unset($value_uncompress);
+                } else {
+                  $value = str_replace('%7F', '/', urldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
+                }
+                if (preg_match($prevent_xss, $value)) {
                   // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                   continue;
                 }
 
                 // Better to understand quoted vars
                 $vars[$name] = get_var_csv($value, $auth);
-                if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
-                {
+                if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
                   // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                   unset($vars[$name]);
                 }
@@ -278,24 +263,26 @@ function get_vars($vars_order = array(), $auth = FALSE)
 
       case 'GET':
         // Parse GET variable into $vars
-        foreach ($_GET as $name => $value)
-        {
+        $compressed = $auth && get_var_true($_GET['compressed']); // vars can be compressed by str_compress()
+        foreach ($_GET as $name => $value) {
           // Var names sanitize
           if (!preg_match(OBS_PATTERN_VAR_NAME, $name)) { continue; }
 
-          if (!isset($vars[$name]))
-          {
-            $value = str_replace('%7F', '/', urldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
-            if (preg_match($prevent_xss, $value))
-            {
+          if (!isset($vars[$name])) {
+            if ($compressed && $value_uncompress = str_decompress($value)) {
+              $value = $value_uncompress;
+              unset($value_uncompress);
+            } else {
+              $value = str_replace('%7F', '/', urldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
+            }
+            if (preg_match($prevent_xss, $value)) {
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
               continue;
             }
             
             // Better to understand quoted vars
             $vars[$name] = get_var_csv($value, $auth);
-            if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
-            {
+            if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
               unset($vars[$name]);
             }
@@ -308,18 +295,13 @@ function get_vars($vars_order = array(), $auth = FALSE)
   //print_success("Got [".implode(', ', array_keys($vars_got))."] vars ($content_type).");
 
   // Always convert location to array
-  if (isset($vars['location']))
-  {
-    if ($vars['location'] === '')
-    {
+  if (isset($vars['location'])) {
+    if ($vars['location'] === '') {
       // Unset location if is empty string
       unset($vars['location']);
-    }
-    elseif (is_array($vars['location']))
-    {
+    } elseif (is_array($vars['location'])) {
       // Additionally decode locations if array entries encoded
-      foreach ($vars['location'] as $k => $location)
-      {
+      foreach ($vars['location'] as $k => $location) {
         $vars['location'][$k] = $auth ? var_decode($location) : $location;
       }
     } else {
@@ -464,13 +446,13 @@ function datetime_preset($preset)
       $to   = date($end_fmt);
       break;
     case 'tmonth':
-      $tmonth = date('Y-m');
-      $from = $tmonth.'-01 00:00:00';
-      $to   = date($end_fmt, strtotime($tmonth.' next month - 1 hour'));
+      $from      = date('Y-m-01 00:00:00');
+      $to        = date('Y-m-t 23:59:59');
       break;
     case 'lmonth':
-      $from = date($begin_fmt, strtotime('previous month + 1 day'));
-      $to   = date($end_fmt);
+      $timestamp = strtotime('previous month');
+      $from      = date('Y-m-01 00:00:00', $timestamp);
+      $to        = date('Y-m-t 23:59:59', $timestamp);
       break;
     case 'tquarter':
     case 'lquarter':
@@ -892,36 +874,29 @@ function pagination(&$vars, $total, $return_vars = FALSE)
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_url($vars, $new_vars = array())
-{
-  $vars = ($vars) ? array_merge($vars, $new_vars) : $new_vars;
+function generate_url($vars, $new_vars = []) {
+  $vars = safe_count($vars) ? array_merge($vars, (array)$new_vars) : (array)$new_vars;
 
-  $url = urlencode($vars['page']);
-
-  if ($url[strlen($url)-1] !== '/') { $url .= '/'; }
+  $url = !safe_empty($vars['page']) ? urlencode($vars['page']) : '';
   unset($vars['page']);
 
-  foreach ($vars as $var => $value)
-  {
-    if ($var == "username" || $var == "password")
-    {
+  if (!str_ends($url, '/')) { $url .= '/'; }
+
+  foreach ($vars as $var => $value) {
+    if ($var === "username" || $var === "password") {
       // Ignore these vars. They shouldn't end up in URLs.
+      continue;
     }
-    else if (is_array($value))
-    {
+    if (is_array($value)) {
       $url .= urlencode($var) . '=' . var_encode($value) . '/';
-    }
-    else if ($value == "0" || $value != "" && strstr($var, "opt") === FALSE && is_numeric($var) === FALSE)
-    {
+    } elseif (!safe_empty($value) && !is_numeric($var) && !str_contains($var, "opt")) {
       $url .= urlencode($var) . '=' . urlencode(str_replace('/', '%7F', $value)).'/'; // %7F converted back to / in get_vars()
     }
   }
 
-  // If we're being generated outside of the web interface, prefix the generated URL to make it work properly.
-  if (is_cli())
-  {
-    if ($GLOBALS['config']['web_url'] == 'http://localhost:80/')
-    {
+  // If we're being generated outside the web interface, prefix the generated URL to make it work properly.
+  if (is_cli()) {
+    if ($GLOBALS['config']['web_url'] === 'http://localhost:80/') { // default
       // override default web_url by http://localhost/
       $url = 'http://'.get_localhost().'/'.$url;
     } else {
@@ -1286,29 +1261,29 @@ function generate_menu_link($url, $text, $count = NULL, $class = 'label', $escap
  * @param string $array Array of options
  */
 // TESTME needs unit testing
-function generate_menu_link_new($array)
-{
+function generate_menu_link_new($array) {
 
   $array = array_merge(array(
                            'count' => NULL,
                            'escape' => FALSE,
                            'class' => 'label'
-                         ), $array);
+                         ), (array)$array);
 
   $link_opts = '';
   if (isset($array['link_opts'])) { $link_opts .= ' ' . $array['link_opts']; }
   if (isset($array['alt']))       { $link_opts .= ' data-rel="tooltip" data-tooltip="'.$array['alt'].'"'; }
   if (isset($array['id']))        { $link_opts .= ' id="'.$array['id'].'"'; }
 
-  if (empty($array['url']) || $array['url'] == '#') { $array['url'] = 'javascript:void(0)'; }
+  if (empty($array['url']) || $array['url'] === '#' || isset($array['action'])) {
+    $array['url'] = 'javascript:void(0)';
+  }
 
   if ($array['escape']) { $array['text'] = escape_html($array['text']); }
 
   $output  = '<a role="menuitem" href="'.$array['url'].'" '.$link_opts.'>';
 
   $output .= '<span>';
-  if (isset($array['icon']))
-  {
+  if (isset($array['icon'])) {
     $output .= '<i class="' . $array['icon'] . '"></i>&nbsp;';
   }
   $output .= $array['text'] . '</span>';
@@ -1673,6 +1648,13 @@ function device_permitted($device_id)
 {
   global $permissions;
 
+  // If we've been passed an entity with device_id, just use that.
+  if(is_array($device_id) && isset($device_id['device_id'])) { $device_id = $device_id['device_id']; }
+
+  // If we still don't have a numeric device_id, return false because someone messed up.
+  if(!is_numeric($device_id)) { return FALSE; }
+
+  // Level >5 can see everything.
   if ($_SESSION['userlevel'] >= "5")
   {
     $allowed = true;
@@ -1985,9 +1967,7 @@ function get_nfsen_filename($hostname) {
 // Note, by default text NOT escaped.
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_ap_link($args, $text = NULL, $type = NULL, $escape = FALSE)
-{
-  global $config;
+function generate_ap_link($args, $text = NULL, $type = NULL, $escape = FALSE) {
 
   humanize_port($args);
 
@@ -1995,7 +1975,9 @@ function generate_ap_link($args, $text = NULL, $type = NULL, $escape = FALSE)
   if ($type) { $args['graph_type'] = $type; }
   if (!isset($args['graph_type'])) { $args['graph_type'] = 'port_bits'; }
 
-  if (!isset($args['hostname'])) { $args = array_merge($args, device_by_id_cache($args['device_id'])); }
+  if (!isset($args['hostname']) && $args['device_id']) {
+    $args = array_merge($args, device_by_id_cache($args['device_id']));
+  }
 
   $content = "<div class=entity-title>". $args['text'] . " - " . escape_html($args['port_label']) . "</div>";
   if ($args['ifAlias']) { $content .= escape_html($args['ifAlias']) . "<br />"; }
@@ -2004,25 +1986,24 @@ function generate_ap_link($args, $text = NULL, $type = NULL, $escape = FALSE)
   $graph_array['legend']   = "yes";
   $graph_array['height']   = "100";
   $graph_array['width']    = "340";
-  $graph_array['to']       = $config['time']['now'];
-  $graph_array['from']     = $config['time']['day'];
+  $graph_array['to']       = get_time();
+  $graph_array['from']     = get_time('day');
   $graph_array['id']       = $args['accesspoint_id'];
   $content .= generate_graph_tag($graph_array);
-  $graph_array['from']     = $config['time']['week'];
+  $graph_array['from']     = get_time('week');
   $content .= generate_graph_tag($graph_array);
-  $graph_array['from']     = $config['time']['month'];
+  $graph_array['from']     = get_time('month');
   $content .= generate_graph_tag($graph_array);
-  $graph_array['from']     = $config['time']['year'];
+  $graph_array['from']     = get_time('year');
   $content .= generate_graph_tag($graph_array);
   $content .= "</div>";
 
   $url = generate_ap_url($args);
-  if (port_permitted($args['interface_id'], $args['device_id']))
-  {
+  if (port_permitted($args['interface_id'], $args['device_id'])) {
     return overlib_link($url, $text, $content, $class, $escape);
-  } else {
-    return $text;
   }
+
+  return $text;
 }
 
 /**
@@ -2073,10 +2054,11 @@ function generate_ap_url($ap, $vars=array())
  * @return string
  */
 // TESTME needs unit testing
-function generate_query_permitted($type_array = array('device'), $options = array())
-{
-  if (!is_array($type_array)) { $type_array = array($type_array); }
-  $user_limited = ($_SESSION['userlevel'] < 5 ? TRUE : FALSE);
+function generate_query_permitted($type_array = [ 'device' ], $options = []) {
+  if (!is_array($type_array)) {
+    $type_array = [ $type_array ];
+  }
+  $user_limited = $_SESSION['userlevel'] < 5;
   $page = $GLOBALS['vars']['page'];
 
   // If device IDs stored in SESSION use it (used in ajax)
@@ -2095,20 +2077,17 @@ function generate_query_permitted($type_array = array('device'), $options = arra
   //$query_permitted = '';
   $query_part = [];
 
-  foreach ($type_array as $type)
-  {
-    switch ($type)
-    {
+  foreach ($type_array as $type) {
+    switch ($type) {
       // Devices permission query
       case 'device':
       case 'devices':
         $column = '`device_id`';
-        $query_permitted = array();
+        $query_permitted = [];
         if (isset($options['device_table'])) { $column = '`'.$options['device_table'].'`.'.$column; }
 
         // Show only permitted devices
-        if ($user_limited)
-        {
+        if ($user_limited) {
           if (safe_count($GLOBALS['permissions']['device'])) {
             $query_permitted[] = " $column IN (".
                                  implode(',', array_keys($GLOBALS['permissions']['device'])).
@@ -2121,7 +2100,7 @@ function generate_query_permitted($type_array = array('device'), $options = arra
         }
 
         // Also don't show ignored and disabled devices (except on 'device' and 'devices' pages)
-        $devices_excluded = array();
+        $devices_excluded = [];
         if (strpos($page, 'device') !== 0) {
           if ($options['hide_ignored'] && safe_count($GLOBALS['cache']['devices']['ignored'])) {
             $devices_excluded = array_merge($devices_excluded, $GLOBALS['cache']['devices']['ignored']);
@@ -2130,8 +2109,7 @@ function generate_query_permitted($type_array = array('device'), $options = arra
             $devices_excluded = array_merge($devices_excluded, $GLOBALS['cache']['devices']['disabled']);
           }
         }
-        if (count($devices_excluded))
-        {
+        if (count($devices_excluded)) {
           // Set query with excluded devices
           $query_permitted[] = " $column NOT IN (".
                                implode(',', array_unique($devices_excluded)).
@@ -2148,7 +2126,9 @@ function generate_query_permitted($type_array = array('device'), $options = arra
       case 'port':
       case 'ports':
         $column = '`port_id`';
-        if (isset($options['port_table'])) { $column = '`'.$options['port_table'].'`.'.$column; }
+        if (isset($options['port_table'])) {
+          $column = '`'.$options['port_table'].'`.'.$column;
+        }
 
         // If port IDs stored in SESSION use it (used in ajax)
         //if (!isset($GLOBALS['cache']['ports']) && isset($_SESSION['cache']['ports']))
@@ -2208,7 +2188,7 @@ function generate_query_permitted($type_array = array('device'), $options = arra
           }
         }
         // Don't show ignored ports (only on some pages!)
-        if (($page == 'overview' || $options['hide_ignored']) && safe_count($GLOBALS['cache']['ports']['ignored'])) {
+        if (($page === 'overview' || $options['hide_ignored']) && safe_count($GLOBALS['cache']['ports']['ignored'])) {
           $ports_excluded = array_merge($ports_excluded, $GLOBALS['cache']['ports']['ignored']);
           //foreach ($GLOBALS['cache']['ports']['ignored'] as $entry)
           //{
@@ -2217,8 +2197,7 @@ function generate_query_permitted($type_array = array('device'), $options = arra
           //$ports_excluded = array_unique($ports_excluded);
         }
         unset($entry);
-        if (count($ports_excluded))
-        {
+        if (count($ports_excluded)) {
           // Set query with excluded ports
           $query_permitted[] = $column . " NOT IN (".
                              implode(',', array_unique($ports_excluded)).
@@ -2227,10 +2206,16 @@ function generate_query_permitted($type_array = array('device'), $options = arra
         }
 
         // At the end excluded entries with empty/null port_id (wrong entries)
-        //$query_permitted[] = "($column != '' AND $column IS NOT NULL)";
-        $query_permitted[] = "$column IS NOT NULL";
+        if (!isset($options['port_null']) || !$options['port_null']) {
+          //$query_permitted[] = "($column != '' AND $column IS NOT NULL)";
+          $query_permitted[] = "$column IS NOT NULL";
+        } elseif (!$user_limited) {
+          // FIXME. derp code, need rewrite
+          $query_permitted[] = safe_count($query_permitted) ? "OR $column IS NULL" : "$column IS NULL";
+        }
+        $query_permitted = implode(" AND ", (array)$query_permitted);
 
-        $query_part[] = implode(" AND ", $query_permitted);
+        $query_part[] = str_replace(" AND OR ", ' OR ', $query_permitted);
         unset($query_permitted);
 
         break;
@@ -2324,49 +2309,313 @@ function dashboard_exists($dash_id)
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function get_user_prefs($user_id)
-{
+function get_user_prefs($user_id) {
   $prefs = array();
-  foreach (dbFetchRows("SELECT * FROM `users_prefs` WHERE `user_id` = ?", array($user_id)) as $entry)
-  {
+  foreach (dbFetchRows("SELECT * FROM `users_prefs` WHERE `user_id` = ?", array($user_id)) as $entry) {
     $prefs[$entry['pref']] = $entry;
   }
+
   return $prefs;
 }
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function get_user_pref($user_id, $pref)
-{
-  if ($entry = dbFetchRow("SELECT `value` FROM `users_prefs` WHERE `user_id` = ? AND `pref` = ?", array($user_id, $pref)))
-  {
+function get_user_pref($user_id, $pref) {
+  if ($entry = dbFetchRow("SELECT `value` FROM `users_prefs` WHERE `user_id` = ? AND `pref` = ?", array($user_id, $pref))) {
     return $entry['value'];
   }
-  else
-  {
-    return NULL;
-  }
+
+  return NULL;
 }
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function set_user_pref($user_id, $pref, $value)
-{
+function set_user_pref($user_id, $pref, $value) {
   //if (dbFetchCell("SELECT COUNT(*) FROM `users_prefs` WHERE `user_id` = ? AND `pref` = ?", array($user_id, $pref)))
-  if (dbExist('users_prefs', '`user_id` = ? AND `pref` = ?', array($user_id, $pref)))
-  {
+  if (dbExist('users_prefs', '`user_id` = ? AND `pref` = ?', array($user_id, $pref))) {
     $id = dbUpdate(array('value' => $value), 'users_prefs', '`user_id` = ? AND `pref` = ?', array($user_id, $pref));
   } else {
     $id = dbInsert(array('user_id' => $user_id, 'pref' => $pref, 'value' => $value), 'users_prefs');
   }
+
   return $id;
 }
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function del_user_pref($user_id, $pref)
-{
+function del_user_pref($user_id, $pref) {
   return dbDelete('users_prefs', "`user_id` = ? AND `pref` = ?", array($user_id, $pref));
+}
+
+// Load configuration from user SQL into supplied variable (pass by reference!)
+function load_user_config(&$load_config, $user_id) {
+  global $config;
+  /*
+  $config_defined = get_defined_settings(); // defined in config.php
+
+  // Override some whitelisted definitions from config.php
+  foreach ($config_defined as $key => $definition) {
+    //if (is_null($config['definitions_whitelist'])) { print_error("NULL on $key"); } else { print_warning("ARRAY on $key"); }
+    if (in_array($key, $GLOBALS['config']['definitions_whitelist']) && // Always use global config here!
+        is_array($definition) && is_array($config[$key]))
+    {
+      // Fix mib definitions for dumb users, who copied old defaults.php
+      //   where mibs was just MIB => 1,
+      //   This definition should be array
+      // Fetch first element and validate that this is array
+      if ($key === 'mibs' && !is_array(array_shift(array_values($definition)))) { continue; }
+
+      $config[$key] = array_replace_recursive($config[$key], $definition);
+    }
+  }
+  */
+  if (!$prefs = dbFetchRows("SELECT * FROM `users_prefs` WHERE `user_id` = ? AND `pref` NOT IN (?, ?)", [ $user_id, 'atom_key', 'api_key' ])) {
+    // No user prefs set
+    return FALSE;
+  }
+
+  // Always use global config here!
+  include($config['install_dir'] . '/includes/config-variables.inc.php');
+
+  // Same format as in global config!
+  // User prefs always override global config
+  //foreach (dbFetchRows("SELECT * FROM `config`") as $item) {
+  foreach ($prefs as $item) {
+    if (!isset($config_variable[$item['pref']]['useredit']) ||
+        !$config_variable[$item['pref']]['useredit']) {
+      // Load only permitted settings
+      print_debug("User [$user_id] setting '${item['pref']}' not permitted by definitions.");
+      continue;
+    }
+
+    // Convert boo|bee|baa config value into $config['boo']['bee']['baa']
+    $tree = explode('|', $item['pref']);
+
+    //if (array_key_exists($tree[0], $config_defined)) { continue; } // This complete skip option if first level key defined in $config
+
+    // Unfortunately, I don't know of a better way to do this...
+    // Perhaps using array_map() ? Unclear... hacky. :[
+    // FIXME use a loop with references! (cf. nested location menu)
+    switch (count($tree)) {
+      case 1:
+        //if (isset($config_defined[$tree[0]])) { continue; } // Note, false for null values
+        //if (array_key_exists($tree[0], $config_defined)) { break; }
+        $load_config[$tree[0]] = safe_unserialize($item['value']);
+        //r($load_config[$tree[0]]);
+        //r($_SESSION);
+        break;
+      case 2:
+        //if (isset($config_defined[$tree[0]][$tree[1]])) { break; } // Note, false for null values
+        $load_config[$tree[0]][$tree[1]] = safe_unserialize($item['value']);
+        break;
+      case 3:
+        //if (isset($config_defined[$tree[0]][$tree[1]][$tree[2]])) { break; } // Note, false for null values
+        $load_config[$tree[0]][$tree[1]][$tree[2]] = safe_unserialize($item['value']);
+        break;
+      case 4:
+        //if (isset($config_defined[$tree[0]][$tree[1]][$tree[2]][$tree[3]])) { break; } // Note, false for null values
+        $load_config[$tree[0]][$tree[1]][$tree[2]][$tree[3]] = safe_unserialize($item['value']);
+        break;
+      case 5:
+        //if (isset($config_defined[$tree[0]][$tree[1]][$tree[2]][$tree[3]][$tree[4]])) { break; } // Note, false for null values
+        $load_config[$tree[0]][$tree[1]][$tree[2]][$tree[3]][$tree[4]] = safe_unserialize($item['value']);
+        break;
+      default:
+        print_error("Too many array levels for SQL configuration parser!");
+    }
+  }
+}
+
+function process_sql_vars($vars) {
+  global $config;
+
+  // Always use global config here!
+  include($config['install_dir'] . '/includes/config-variables.inc.php');
+
+  $deletes = array();
+  $sets = array();
+  $errors = array();
+  $set_attribs = array(); // set obs_attribs
+
+  // Submit button pressed
+  foreach ($vars as $varname => $value) {
+    if (str_starts($varname, 'varset_')) {
+      $varname = substr($varname, 7);
+      $sqlname = str_replace('__', '|', $varname);
+      $sqlset  = get_var_true($value); // value sets in sql
+      $content = $vars[$varname];
+      $confname = '$config[\'' . implode("']['",explode('|',$sqlname)) . '\']';
+      $section = $config_variable[$sqlname]['section'];
+
+      if ($vars[$varname . '_custom']) {
+        $ok = FALSE;
+
+        if (isset($config_variable[$sqlname]['edition']) && $config_variable[$sqlname]['edition'] != OBSERVIUM_EDITION) {
+          // Skip variables not allowed for current Observium edition
+          continue;
+        }
+        if (isset($config_sections[$section]['edition']) && $config_sections[$section]['edition'] != OBSERVIUM_EDITION) {
+          // Skip sections not allowed for current Observium edition
+          continue;
+        }
+
+        // Split enum|foo|bar into enum  foo|bar
+        list($vartype, $varparams) = explode('|', $config_variable[$sqlname]['type'], 2);
+        $params = array();
+
+        // If a callback function is defined, use this to fill params.
+        if ($config_variable[$sqlname]['params_call'] && function_exists($config_variable[$sqlname]['params_call'])) {
+          $params = call_user_func($config_variable[$sqlname]['params_call']);
+          // Else if the params are defined directly, use these.
+        } elseif (is_array($config_variable[$sqlname]['params'])) {
+          $params = $config_variable[$sqlname]['params'];
+        } elseif (!empty($varparams)) {
+          // Else use parameters specified in variable type (e.g. enum|1|2|5|10)
+          foreach (explode('|', $varparams) as $param) {
+            $params[$param] = array('name' => nicecase($param));
+          }
+        }
+
+        switch ($vartype) {
+          case 'int':
+          case 'integer':
+          case 'float':
+            if (is_numeric($content)) {
+              $ok = TRUE;
+            } else {
+              $errors[] = $config_variable[$sqlname]['name'] . " ($confname) should be of <strong>numeric</strong> type. Setting '" . escape_html($content) . "' ignored.";
+            }
+            break;
+          case 'bool':
+          case 'boolean':
+            switch ($content) {
+              case 'on':
+              case '1':
+                $content = 1;
+                $ok = TRUE;
+                break;
+              case 'off': // Won't actually happen. When "unchecked" the field is simply not transmitted...
+              case '0':
+              case '':    // ... which we catch here.
+                $content = 0;
+                $ok = TRUE;
+                break;
+              default:
+                $ok = FALSE;
+                $errors[] = $config_variable[$sqlname]['name'] . " ($confname) should be of type <strong>bool</strong>. Setting '" . escape_html($content) . "' ignored.";
+            }
+            break;
+          case 'enum':
+            if (!array_key_exists($content, $params)) {
+              $ok = FALSE;
+              $errors[] = $config_variable[$sqlname]['name'] . " ($confname) should be one of <strong>" . implode(', ', $params) . "</strong>. Setting '" . escape_html($content) . "' ignored.";
+            } else {
+              $ok = TRUE;
+            }
+            break;
+          case 'enum-array':
+            //r($content);
+            //r($params);
+            foreach ($content as $value) {
+              // Check all values
+              if (!array_key_exists($value, $params)) {
+                $ok = FALSE;
+                $errors[] = $config_variable[$sqlname]['name'] . " ($confname) all values should be one of this list <strong>" . implode(', ', $params) . "</strong>. Settings '" . implode(', ', $content) . "' ignored.";
+                break;
+              }
+              $ok = TRUE;
+            }
+            break;
+          case 'enum-key-value':
+            //r($content);
+            //r($params);
+            if (isset($content['key'], $content['value'])) {
+              $tmp     = $content;
+              $content = [];
+              foreach ($tmp['key'] as $i => $key) {
+                if (safe_empty($key) && safe_empty($tmp['value'][$i])) { continue; } // skip empty key-value pair
+                $content[$key] = $tmp['value'][$i];
+              }
+              $ok = TRUE;
+              //r($content);
+            }
+            break;
+          case 'enum-freeinput':
+            //r($content);
+            //r($params);
+            // FIXME, need validate values
+            if (is_null($content)) {
+              // Empty array allowed, for override defaults
+              $content = array();
+              $ok = TRUE;
+            }
+            foreach ($content as $value) {
+              $ok = TRUE;
+            }
+            break;
+          case 'password':
+          case 'string':
+            $ok = TRUE;
+            break;
+          default:
+            $ok = FALSE;
+            $errors[] = $config_variable[$sqlname]['name'] . " ($confname) is of unknown type (" . $config_variable[$sqlname]['type'] . ")";
+            break;
+        }
+
+        if ($ok) {
+          $sets[$sqlname] = $content;
+
+          // Set an obs_attrib, example for syslog trigger
+          //r($config_variable[$sqlname]);
+          if (isset($config_variable[$sqlname]['set_attrib']) && strlen($config_variable[$sqlname]['set_attrib'])) {
+            $set_attribs[$config_variable[$sqlname]['set_attrib']] = $config['time']['now'];
+          }
+        }
+      } elseif ($sqlset) {
+        $deletes[] = $sqlname;
+
+        // Set an obs_attrib, example for syslog trigger
+        //r($config_variable[$sqlname]);
+        if (isset($config_variable[$sqlname]['set_attrib']) && strlen($config_variable[$sqlname]['set_attrib'])) {
+          $set_attribs[$config_variable[$sqlname]['set_attrib']] = $config['time']['now'];
+        }
+      }
+    }
+  }
+
+  return [ 'sets' => $sets, 'set_attribs' => $set_attribs, 'deletes' => $deletes, 'errors' => $errors ];
+}
+
+/**
+ * Convert amqp|conn|host into returning value of $arrayvar['amqp']['conn']['host']
+ *
+ * @param string $sqlname Variable name
+ * @param array $arrayvar Array where to see param
+ * @param Boolean $try_isset If True, return isset($sqlname) check, else return variable content
+ * @return mixed
+ */
+function sql_to_array($sqlname, $arrayvar, $try_isset = TRUE) {
+
+  list($key, $pop_sqlname) = explode('|', $sqlname, 2);
+
+  if (!is_array($arrayvar)) { return FALSE; }
+
+  $isset = array_key_exists($key, $arrayvar);
+
+  if (safe_empty($pop_sqlname)) {
+    // Reached the variable, return its content, or FALSE if it's not set
+    if ($try_isset) {
+      return $isset;
+    }
+    return $isset ? $arrayvar[$key] : NULL;
+  }
+
+  if ($isset) {
+    // Recurse to lower level
+    return sql_to_array($pop_sqlname, $arrayvar[$key], $try_isset);
+  }
+  return FALSE;
 }
 
 // TESTME needs unit testing
@@ -2535,8 +2784,7 @@ function register_html_alert($text, $title = NULL, $severity = 'info') {
  * @param string $html Section panel content
  */
 // TESTME needs unit testing
-function register_html_panel($html = '')
-{
+function register_html_panel($html = '') {
   $GLOBALS['cache_html']['page_panel'] = $html;
 }
 
@@ -2550,14 +2798,13 @@ function redirect_to_url($url)
   if (safe_empty($url) || $url === '#') { return; } // Empty url, do not redirect
 
   $parse = parse_url($url);
-  if (!isset($parse['scheme']) && !str_starts($url, '/'))
-  {
+  //r($url);
+  if (!isset($parse['scheme']) && !str_starts($url, '/')) {
     // When this is not full url or not started with /
     $url = '/' . $url;
   }
 
-  if (headers_sent())
-  {
+  if (headers_sent()) {
     // HTML headers already sent, use JS than
     register_html_resource('script', "location.href='$url'");
   } else {
@@ -2710,6 +2957,21 @@ function get_type_class($type, $group = "unknown") {
   $cache['type_class'][$group]['NEXT'] = $next;
 
   return $cache['type_class'][$group][$type]['class'];
+}
+
+/**
+ * Silly class to return a label using persistent class for a certain string/type within a given group
+ *
+ * @param string $type
+ * @param string $group
+ *
+ * @return string
+ */
+
+function get_type_class_label($type, $group = "unknown") {
+
+  return '<span class="label label-'.get_type_class($type, $group).'">'.$type.'</span>';
+
 }
 
 // EOF

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -80,7 +80,8 @@ $config['db']['debug']      = TRUE;        // If TRUE store errors in DB queries
 #$config['log_dir']       = $config['install_dir'] . "/logs";
 #$config['temp_dir']      = "/tmp";
 #$config['cache_dir']     = $config['temp_dir']    . "/observium_cache";
-#$config['nagplug_dir']   = '/usr/lib/nagios/plugins';
+#$config['nagplug_dir']   = '/usr/lib/nagios/plugins'; // Debian/Ubuntu
+#$config['nagplug_dir']   = '/usr/lib64/nagios/plugins'; // CentOS/RedHat/Fedora
 
 // What is my own hostname (used so observium can identify its host in its own database)
 #$config['own_hostname'] = "localhost"; // By default equals `hostname -f`
@@ -152,6 +153,7 @@ $config['rrd']['rra']  = $config['rrd']['rra_300']['default'];
 
 // RRDCacheD - Make sure it can write to your RRD dir!
 #$config['rrdcached']    = "unix:/var/run/rrdcached.sock";
+$config['rrd']['cache'] = TRUE;         // Use extra caching for remote RRDcacheD. WARNING. Don't change this until you know what you are doing
 
 $config['rrd_override'] = TRUE;         // Allow adding of devices if RRD directory already exists.
 
@@ -167,6 +169,7 @@ $config['snmp']['errors']         = TRUE;    // Collect and (auto)disable snmp q
 $config['debug_port']['spikes']   = FALSE;   // Additional only spikes debug, written to /tmp/port_debug_spikes.txt
 $config['unix-agent']['debug']    = TRUE;    // Store raw unix-agent output. See it on device showtech page
 $config['check_process']['alerter'] = TRUE;  // Ability for skip process checking. USE AT OWN RISK.
+$config['alerts']['reduce_db_updates'] = FALSE; // Ability for reduce updates in alert_table. This option disable update last_ok and broke "alert duration" USE AT OWN RISK.
 $config['web_debug_unprivileged'] = FALSE;   // Allow show debug information for Unprivileged (userlevel < 7) users in Web UI
 $config['php_debug']              = FALSE;   // Store all php errors in logs/php-error.log
 
@@ -189,9 +192,12 @@ $config['timestamp_format']  = 'Y-m-d H:i:s';
 $config['date_format']       = 'Y-m-d';
 $config['login_message']     = "Unauthorised access or use shall render the user liable to criminal and/or civil prosecution.";
 $config['login_remember_me'] = TRUE;        // Enable or disable the remember me feature.
+
+// User editable settings
 $config['web_mouseover']     = TRUE;        // Enable or disable mouseover popups.
 $config['web_mouseover_mobile'] = FALSE;    // Enable mouseover popups on Mobile phones and tablets. Disabled by default.
 $config['web_show_disabled'] = TRUE;        // Show or not disabled devices on major pages.
+$config['web_device_name']   = 'hostname';  // Default name to display device name. Allowed: hostname, sysname, purpose/description
 $config['web_pagesize']      = 100;         // Default pagesize for tables (items per page)
 $config['web_theme_default'] = 'light';     // Default theme 'light', 'dark', 'darkblue' or 'system' (based on MacOS/Windows system settings)
 
@@ -214,6 +220,7 @@ $config['overview_show_sysDescr'] = TRUE;   // FIXME. Not sure, still required?
 
 $config['rrdgraph_real_95th']             = FALSE;     // Set to TRUE if you want to display the 95% based on the highest value. (aka real 95%)
 $config['graphs']['style']                = "default"; // Possible values: default, mrtg
+$config['graphs']['size']                 = 'normal';  // Possible values: normal, big
 $config['graphs']['ports_scale_force']    = 1;         // Force scale also if real data more than selected scale
 $config['graphs']['ports_scale_default']  = "auto";    // Possible values: auto, speed, scales from $config['graphs']['ports_scale_list']
 $config['graphs']['ports_scale_list']     = [ '100Gbit', '50Gbit', '40Gbit', '25Gbit', '10Gbit', '5Gbit', '2.5Gbit', '1Gbit', '100Mbit', '10Mbit' ];
@@ -265,10 +272,10 @@ $config['autodiscovery']['snmp_scan']      = TRUE;   // Autodiscover hosts via S
 $config['autodiscovery']['libvirt']        = TRUE;   // Autodiscover hosts found via libvirt
 $config['autodiscovery']['vmware']         = TRUE;   // Autodiscover hosts found via vmware
 $config['autodiscovery']['proxmox']        = FALSE;  // Autodiscover hosts found via Proxmox VE agent app (beware timeouts during poller!)
-$config['autodiscovery']['ip_nets']        = array("127.0.0.0/8", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12");  // Networks to permit autodiscovery
+$config['autodiscovery']['ip_nets']        = [ "127.0.0.0/8", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12" ];  // Networks to permit autodiscovery
 $config['autodiscovery']['ping_skip']      = FALSE;  // Skip icmp echo checks during autodiscovery (beware timeouts during discovery!)
-$config['autodiscovery']['require_hostname'] = TRUE; // If TRUE, devices must have valid resolvable hostname (in DNS or /etc/hosts)
 $config['autodiscovery']['recheck_interval'] = 86400; // If host is found, but it is not discovered by any reason, the interval, when you can try another check (default 24 hours)
+$config['autodiscovery']['require_hostname'] = TRUE; // If TRUE, devices must have valid resolvable hostname (in DNS or /etc/hosts)
 
 // Mailer backend Settings
 
@@ -333,7 +340,8 @@ $config['statsd']['host']                  = '127.0.0.1';
 $config['statsd']['port']                  = '8125';
 
 // Data caching
-$config['cache']['enable']                 = FALSE;     // Can enable/disable caching (currently only in WUI)
+$config['cache']['enable']                 = FALSE;     // Can enable/disable caching
+$config['cache']['enable_cli']             = TRUE;      // Can enable/disable caching in CLI (used for fast remote rrdcaching)
 $config['cache']['ttl']                    = 300;       // Default time to live for cache objects (5 min)
 $config['cache']['driver']                 = 'auto';    // Driver for use caching (auto, zendshm, apcu, sqlite, files)
 
@@ -401,41 +409,42 @@ $config['rrdgraph']['light'] .= " -c GRID#a5a5a5 -c MGRID#FF9999 -c FRAME#5e5e5e
 $config['rrdgraph']['dark']  = "-c BACK#00000000 -c SHADEA#00000000 -c SHADEB#00000000 -c FONT#CCCCCC -c CANVAS#00000000";
 $config['rrdgraph']['dark'] .= " -c GRID#ffffff00 -c MGRID#ffffff10 -c FRAME#CCCCCC -c AXIS#BBBBBB -c ARROW#BBBBBB -R normal";
 
-#$config['graph_colours'] = array("000066","330066","990066","990066","CC0033","FF0000"); // Purple to Red
-#$config['graph_colours'] = array("006600","336600","996600","996600","CC3300","FF0000"); // Green to Red
-#$config['graph_colours'] = array("002200","004400","006600","008800","00AA00","00CC00"); // Green
-#$config['graph_colours'] = array("220000","440000","660000","880000","AA0000","CC0000"); // Red
-#$config['graph_colours'] = array("001122","002244","003366","004488","0055AA","0066CC"); // Blue
-#$config['graph_colours'] = array("002233","004466","006699","0088CC","0099FF");          // Sky-Blue
-#$config['graph_colours'] = array("110022","330066","440088","6600AA","8800FF");          // Purple
-#$config['graph_colours'] = array("002200","004400","006600","008800","00AA00","00AA00","00CC00"); // Forest Greens
+#$config['graph_colours'] = [ "000066","330066","990066","990066","CC0033","FF0000" ]; // Purple to Red
+#$config['graph_colours'] = [ "006600","336600","996600","996600","CC3300","FF0000" ]; // Green to Red
+#$config['graph_colours'] = [ "002200","004400","006600","008800","00AA00","00CC00" ]; // Green
+#$config['graph_colours'] = [ "220000","440000","660000","880000","AA0000","CC0000" ]; // Red
+#$config['graph_colours'] = [ "001122","002244","003366","004488","0055AA","0066CC" ]; // Blue
+#$config['graph_colours'] = [ "002233","004466","006699","0088CC","0099FF" ];          // Sky-Blue
+#$config['graph_colours'] = [ "110022","330066","440088","6600AA","8800FF" ];          // Purple
+#$config['graph_colours'] = [ "002200","004400","006600","008800","00AA00","00AA00","00CC00" ]; // Forest Greens
 
-$config['graph_colours']['mixed-5']   = array('1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A');
-$config['graph_colours']['mixed-6']   = array('1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A', 'B15928');
-$config['graph_colours']['mixed-7']   = array('CC0000', '008C00', '4096EE', '73880A', 'F03F5C', '36393D', 'FF0084'); // old mixed
-$config['graph_colours']['mixed-10']  = array('A6CEE3', '1F78B4', 'B2DF8A', '33A02C', 'FB9A99', 'E31A1C', 'FDBF6F', 'FF7F00', 'CAB2D6', '6A3D9A');
-$config['graph_colours']['mixed-10b'] = array('A6CEE3', 'B2DF8A', 'FB9A99', 'FDBF6F', 'CAB2D6', '1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A');
-$config['graph_colours']['mixed-10c'] = array('1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A', 'A6CEE3', 'B2DF8A', 'FB9A99', 'FDBF6F', 'CAB2D6');
-$config['graph_colours']['mixed-q12'] = array('8DD3C7', 'FFFFB3', 'BEBADA', 'FB8072', '80B1D3', 'FDB462', 'B3DE69', 'FCCDE5', 'D9D9D9', 'BC80BD', 'CCEBC5', 'FFED6F');
-$config['graph_colours']['mixed-18']  = array('365C81', 'D8929F', 'A99DCB', '6CA4D5', '8BA15F', 'E9CA5D', 'DF9933', 'D33627', '881C45', 'C74379', '9B2F82', '345AA8', '88C3C9', '519466', 'A7C662', 'BA723D', '864A23', '253371');
+// FIXME. How to see palete: https://javier.xyz/cohesive-colors/?src=A6CEE3,1F78B4,B2DF8A,33A02C,FB9A99,E31A1C,FDBF6F,FF7F00,CAB2D6,6A3D9A&overlay=FF9C00&intensity=0.31
+$config['graph_colours']['mixed-5']   = [ '1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A' ];
+$config['graph_colours']['mixed-6']   = [ '1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A', 'B15928' ];
+$config['graph_colours']['mixed-7']   = [ 'CC0000', '008C00', '4096EE', '73880A', 'F03F5C', '36393D', 'FF0084' ]; // old mixed                  // CC0000,008C00,4096EE,73880A,F03F5C,36393D,FF0084
+$config['graph_colours']['mixed-10']  = [ 'A6CEE3', '1F78B4', 'B2DF8A', '33A02C', 'FB9A99', 'E31A1C', 'FDBF6F', 'FF7F00', 'CAB2D6', '6A3D9A' ]; // A6CEE3,1F78B4,B2DF8A,33A02C,FB9A99,E31A1C,FDBF6F,FF7F00,CAB2D6,6A3D9A
+$config['graph_colours']['mixed-10b'] = [ 'A6CEE3', 'B2DF8A', 'FB9A99', 'FDBF6F', 'CAB2D6', '1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A' ]; // A6CEE3,B2DF8A,FB9A99,FDBF6F,CAB2D6,1F78B4,33A02C,E31A1C,FF7F00,6A3D9A
+$config['graph_colours']['mixed-10c'] = [ '1F78B4', '33A02C', 'E31A1C', 'FF7F00', '6A3D9A', 'A6CEE3', 'B2DF8A', 'FB9A99', 'FDBF6F', 'CAB2D6' ]; // 1F78B4,33A02C,E31A1C,FF7F00,6A3D9A,A6CEE3,B2DF8A,FB9A99,FDBF6F,CAB2D6
+$config['graph_colours']['mixed-q12'] = [ '8DD3C7', 'FFFFB3', 'BEBADA', 'FB8072', '80B1D3', 'FDB462', 'B3DE69', 'FCCDE5', 'D9D9D9', 'BC80BD', 'CCEBC5', 'FFED6F' ];
+$config['graph_colours']['mixed-18']  = [ '365C81', 'D8929F', 'A99DCB', '6CA4D5', '8BA15F', 'E9CA5D', 'DF9933', 'D33627', '881C45', 'C74379', '9B2F82', '345AA8', '88C3C9', '519466', 'A7C662', 'BA723D', '864A23', '253371' ];
 $config['graph_colours']['mixed']     = $config['graph_colours']['mixed-18'];
 
-$config['graph_colours']['oranges']   = array('FFC344', 'FCB53D', 'F9A836', 'F69A2F', 'F48D28', 'F17F22', 'EE721B', 'EC6414', 'E9570D', 'E64906', 'E43C00');
-$config['graph_colours']['greens']    = array('B6D14B', 'A4C445', '92B73F', '80AA39', '6E9D33', '5C902E', '4A8328', '387622', '26691C', '145C16', '034F11');
-$config['graph_colours']['reds']      = array('FF7373', 'F66767', 'ED5C5C', 'E45050', 'DB4545', 'D23939', 'C92E2E', 'C02222', 'B71616', 'AE0B0B', 'A60000');
-$config['graph_colours']['pinks']     = array('E881B1', 'DE76A7', 'D46C9D', 'CA6293', 'C15889', 'B74E7F', 'AD4475', 'A43A6B', '9A3061', '902657', '871C4E');
-$config['graph_colours']['blues']     = array('A0A0E5', '9090D3', '8080C1', '7070AF', '60609D', '50508C', '40407A', '303068', '1F1F56', '0F0F44', '000033');
-$config['graph_colours']['purples']   = array('CC7CCC', 'BD6FBD', 'AF63AF', 'A156A1', '934A93', '853E85', '773177', '692569', '5B185B', '4D0C4D', '3F003F');
-$config['graph_colours']['peach']     = array('FC998C', 'F38E81', 'EA8476', 'E1796B', 'D86F61', 'CF6456', 'C65A4B', 'BD4F41', 'B44536', 'AB3A2B', 'A23021');
-$config['graph_colours']['yellow']    = array('FFD683', 'FACF79', 'F5C970', 'F0C267', 'EBBC5D', 'E6B554', 'E1AF4B', 'DCA841', 'D7A238', 'D29B2F', 'CD9526');
-$config['graph_colours']['red2']      = array('FD627A', 'F05870', 'E34E66', 'D7455C', 'CA3B52', 'BE3248', 'B1283E', 'A41E34', '98152A', '8B0B20', '7F0216');
-$config['graph_colours']['bluegrey']  = array('CFD8DC', 'B0BEC5', '90A4AE', '78909C', '607D8B', '546E7A', '455A64', '37474F', '263238');
-$config['graph_colours']['lgreen']    = array('C5E1A5', '33691E');
-$config['graph_colours']['reds_8']    = array('FEE0D2', 'FCBBA1', 'FC9272', 'FB6A4A', 'EF3B2C', 'CB181D', 'A50F15', '67000D');
+$config['graph_colours']['oranges']   = [ 'FFC344', 'FCB53D', 'F9A836', 'F69A2F', 'F48D28', 'F17F22', 'EE721B', 'EC6414', 'E9570D', 'E64906', 'E43C00' ];
+$config['graph_colours']['greens']    = [ 'B6D14B', 'A4C445', '92B73F', '80AA39', '6E9D33', '5C902E', '4A8328', '387622', '26691C', '145C16', '034F11' ];
+$config['graph_colours']['reds']      = [ 'FF7373', 'F66767', 'ED5C5C', 'E45050', 'DB4545', 'D23939', 'C92E2E', 'C02222', 'B71616', 'AE0B0B', 'A60000' ];
+$config['graph_colours']['pinks']     = [ 'E881B1', 'DE76A7', 'D46C9D', 'CA6293', 'C15889', 'B74E7F', 'AD4475', 'A43A6B', '9A3061', '902657', '871C4E' ];
+$config['graph_colours']['blues']     = [ 'A0A0E5', '9090D3', '8080C1', '7070AF', '60609D', '50508C', '40407A', '303068', '1F1F56', '0F0F44', '000033' ];
+$config['graph_colours']['purples']   = [ 'CC7CCC', 'BD6FBD', 'AF63AF', 'A156A1', '934A93', '853E85', '773177', '692569', '5B185B', '4D0C4D', '3F003F' ];
+$config['graph_colours']['peach']     = [ 'FC998C', 'F38E81', 'EA8476', 'E1796B', 'D86F61', 'CF6456', 'C65A4B', 'BD4F41', 'B44536', 'AB3A2B', 'A23021' ];
+$config['graph_colours']['yellow']    = [ 'FFD683', 'FACF79', 'F5C970', 'F0C267', 'EBBC5D', 'E6B554', 'E1AF4B', 'DCA841', 'D7A238', 'D29B2F', 'CD9526' ];
+$config['graph_colours']['red2']      = [ 'FD627A', 'F05870', 'E34E66', 'D7455C', 'CA3B52', 'BE3248', 'B1283E', 'A41E34', '98152A', '8B0B20', '7F0216' ];
+$config['graph_colours']['bluegrey']  = [ 'CFD8DC', 'B0BEC5', '90A4AE', '78909C', '607D8B', '546E7A', '455A64', '37474F', '263238' ];
+$config['graph_colours']['lgreen']    = [ 'C5E1A5', '33691E' ];
+$config['graph_colours']['reds_8']    = [ 'FEE0D2', 'FCBBA1', 'FC9272', 'FB6A4A', 'EF3B2C', 'CB181D', 'A50F15', '67000D' ];
 $config['graph_colours']['default']   = $config['graph_colours']['blues'];
 
-$config['graph_colours']['juniperive'] = array('F7C729', '52A6EF');
-$config['graph_colours']['percents']  = array('55FF00', '00FFD5', '00D5FF', '00AAFF', '0080FF', '0055FF', '0000FF', '8000FF', 'D400FF', 'FF00D4', 'FF0080', 'FF0000');
+$config['graph_colours']['juniperive'] = [ 'F7C729', '52A6EF' ];
+$config['graph_colours']['percents']  = [ '55FF00', '00FFD5', '00D5FF', '00AAFF', '0080FF', '0055FF', '0000FF', '8000FF', 'D400FF', 'FF00D4', 'FF0080', 'FF0000' ];
 
 // Uniform "data" graph colours
 
@@ -445,19 +454,23 @@ $config['colours']['graphs']['data'] = ['in_area'  => '84BB5C', 'in_line'  => '3
 $config['colours']['graphs']['pkts'] = ['in_area'  => 'AA66AA', 'in_line'  => '553355', 'in_max'  => 'CC88CC60',
                                         'out_area' => 'FFDD88', 'out_line' => 'FF6600', 'out_max' => 'FFEFAA60'];
 
-$config['group_colours'][] = array('in' => 'blues',  'out' => 'purples');
-$config['group_colours'][] = array('in' => 'greens', 'out' => 'greens');
-$config['group_colours'][] = array('in' => 'reds',   'out' => 'oranges');
-$config['group_colours'][] = array('in' => 'blues',  'out' => 'purples');
-$config['group_colours'][] = array('in' => 'greens', 'out' => 'greens');
-$config['group_colours'][] = array('in' => 'reds',   'out' => 'oranges');
+$config['colours']['graphs']['errors'] = ['in_area'  => 'FF3300CC', 'in_line'  => 'FF3300', 'in_max'  => 'FF330060',
+                                          'out_area' => 'FF6633CC', 'out_line' => 'FF6633', 'out_max' => 'FF330060'];
+
+
+$config['group_colours'][] = [ 'in' => 'blues',  'out' => 'purples' ];
+$config['group_colours'][] = [ 'in' => 'greens', 'out' => 'greens' ];
+$config['group_colours'][] = [ 'in' => 'reds',   'out' => 'oranges' ];
+$config['group_colours'][] = [ 'in' => 'blues',  'out' => 'purples' ];
+$config['group_colours'][] = [ 'in' => 'greens', 'out' => 'greens' ];
+$config['group_colours'][] = [ 'in' => 'reds',   'out' => 'oranges' ];
 
 // Front page settings
 
 // General settings
 $config['frontpage']['eventlog']['items']          = 15;           // Only show the last XX items of the eventlog view
 $config['frontpage']['syslog']['items']            = 25;           // Only show the last XX items of the syslog view
-$config['frontpage']['syslog']['priority']         = array('emerg','alert','crit','err','warning','notice'); // Show syslog entries only with this priorities (default: Notification)
+$config['frontpage']['syslog']['priority']         = [ 'emerg','alert','crit','err','warning','notice' ]; // Show syslog entries only with this priorities (default: Notification)
 
 // Map overview settings
 $config['frontpage']['map']['api']                 = "carto";      // Set to google-mc if you have a lot of devices. (Allowed: carto, google, google-mc)
@@ -511,7 +524,7 @@ $config['frontpage']['micrograph_settings']['width']           = 125;
 $config['frontpage']['micrograph_settings']['height']          = 30;
 
 // Frontpage order you can use: status_summary, map, device_status_boxes, overall_traffic, custom_traffic, minigraphs, splitlog, syslog, eventlog
-$config['frontpage']['order']           = array('status_summary', 'map', 'device_status_boxes', 'device_status', 'eventlog');
+$config['frontpage']['order']           = [ 'status_summary', 'map', 'device_status_boxes', 'device_status', 'eventlog' ];
 
 
 // Enable version checker & stats
@@ -545,11 +558,14 @@ $config['billing']['base']              = 1000; // Set the base to divider bytes
 
 // External Integration
 
+// Rancid
 #$config['rancid_version']               = '2'; // In generate-rancid.php use delimeter ':' (by default) and ';' for v3
-#$config['rancid_configs']               = array('/var/lib/rancid/network/configs/');
+#$config['rancid_configs'][]             = '/var/lib/rancid/network/configs/';
 #$config['rancid_suffix']                = 'yourdomain.com'; // Domain suffix for non-FQDN device names
 $config['rancid_ignorecomments']        = 0; // Ignore lines starting with #
 $config['rancid_revisions']             = 10; // Show such last count revisions in device page
+
+// Collectd
 #$config['collectd_dir']                 = '/var/lib/collectd/rrd';
 
 // Smokeping
@@ -753,7 +769,11 @@ $config['ignore_mempool_regexp'][] = '/ \((reserved|image)\)$/';
 // FIXME. Rename to $config['sensors']['ignore_name_regexp']
 #$config['ignore_sensor'][] = 'EXAMPLE';
 #$config['ignore_sensor_string'][] = 'EXAMPLE';
-$config['ignore_sensor_regexp'][] = '/(OSR-7600|C6K)\ Clock\ FRU\ 2/'; // Always ignore Cisco Clock 2 sensors
+// OSR-7600 Clock FRU 1 OK Sensor - Clock 1 OK Sensor
+// OSR-7600 Clock FRU 1 In Using Sensor - Clock 1 In Using Sensor
+$config['ignore_sensor_regexp'][] = '/(OSR\-7600|C6K) Clock FRU \d/'; // Always ignore Cisco Clock 2 sensors
+// Chassis 2 clock 2 clock-inuse Sensor
+$config['ignore_sensor_regexp'][] = '/^Chassis \d+ clock \d clock/';
 
 // Toner ignore
 // FIXME. Rename to $config['toners']['ignore_name']
@@ -830,7 +850,7 @@ $config['auth_ldap_recursive'] = TRUE;                // Active Directory recurs
 $config['auth_ldap_recursive_maxdepth'] = 3;          // Max depth for recursive lookup
 $config['auth_ldap_prefix'] = "uid=";
 $config['auth_ldap_suffix'] = ",ou=People,dc=example,dc=com";
-#$config['auth_ldap_group']  = array("cn=observium,ou=groups,dc=example,dc=com");
+#$config['auth_ldap_group']  = [ "cn=observium,ou=groups,dc=example,dc=com" ];
 $config['auth_ldap_groupbase'] = "ou=groups,dc=example,dc=com";
 $config['auth_ldap_groupreverse'] = FALSE;            // Enable/disable resolving of group memberships using the 'memberOf' attribute on the user
 
@@ -858,7 +878,7 @@ $config['auth_ldap_groupmemberattr'] = "memberUid";   // Use your unique attribu
 #$config['auth_ldap_groups']['support']['level'] = 1; // Only login access, for access to devices/entities require bind entity permissions
 
 // RADIUS Authentication
-$config['auth_radius_server']  = array('127.0.0.1'); // RADIUS server list
+$config['auth_radius_server']  = [ '127.0.0.1' ]; // RADIUS server list
 $config['auth_radius_port']    = 1812;               // Server port
 $config['auth_radius_timeout'] = 5;                  // Timeout in seconds
 $config['auth_radius_retries'] = 2;                  // Number of retries to reconnect to RADIUS server
@@ -878,9 +898,17 @@ $config['auth_radius_groupmemberattr'] = 'Filter-Id';  // Attribute number or na
 // Syslog Settings
 
 $config['syslog']['unknown_hosts']    = FALSE;       // Allow collect syslog messages from unknown hosts (Work in Progress)
+
+$config['syslog']['timestamp']        = 'system';    // Use timestamp from Observium system or from syslog server.
+                                                     // You can set this param to number of seconds,
+                                                     // when diff timestams of system and syslog greater this use syslog (instead system)
+
 // Mapping (unknown) syslog hosts to device (id or hostname)
 //$config['syslog']['host_map']['localhost'] = 'my.device.name'; // device hostname/sysname
 //$config['syslog']['host_map']['127.0.0.1'] = 1;                // or device id
+// Mapping syslog hosts by regexps, see examples:
+//$config['syslog']['host_map_regexp']['/^(\w[^\.\s]+)$/'] = '$1.mydomain.com'; // host -> host.mydomain.com
+//$config['syslog']['host_map_regexp']['/^(\S+)-re\d+/']   = '$1';              // junos-re0 -> junos
 
 $config['syslog']['filter'][]         = 'last message repeated';
 $config['syslog']['filter'][]         = 'Connection from UDP: [';
@@ -920,10 +948,10 @@ $config['housekeeping']['rrd']['disabled'] = FALSE;      // Delete rrd dirs for 
 // Virtualization
 
 $config['enable_libvirt'] = 0; // Enable Libvirt VM support
-$config['libvirt_protocols']    = array("qemu+ssh","xen+ssh"); // Mechanisms used, add or remove if not using this on any of your machines.
+$config['libvirt_protocols']    = [ "qemu+ssh","xen+ssh" ]; // Mechanisms used, add or remove if not using this on any of your machines.
 
 // Unix Agent settings
-$config['unix-agent']['port'] = 36602; // Default agent port
+$config['unix-agent']['port']       = 36602; // Default agent port
 
 // WMI poller settings
 $config['wmi']['domain']    = "";             // Shorthand Domain/Workgroup (ie. NOT domain.local.com)
@@ -1040,6 +1068,7 @@ $config['discovery_modules']['raid']                      = 0;
 // Ports extension modules
 
 $config['port_descr_parser']                              = "includes/port-descr-parser.inc.php"; // Parse port descriptions into fields
+$config['port_descr_regexp']                              = [ "/^(?<type>\w+):\s*(?<descr>\w[^\[\(\{]*)(\s*\[(?<speed>.+)\])?(\s*\((?<notes>.+)\))?(\s*\{(?<circuit>.+)\})?/" ];
 $config['enable_ports_etherlike']                      = 0; // Enable Polling EtherLike-MIB (doubles interface processing time)
 $config['enable_ports_junoseatmvp']                    = 0; // Enable JunOSe ATM VC Discovery/Poller
 $config['enable_ports_adsl']                           = 1; // Enable ADSL-LINE-MIB
@@ -1049,6 +1078,7 @@ $config['enable_ports_ipifstats']                      = 1; // Enable graphing o
 $config['enable_ports_jnx_cos_qstat']                  = 1; // Enable graphing of CoS queues per-port.
 $config['enable_ports_sros_egress_qstat']              = 1; // Enable graphing of egress queues per-port.
 $config['enable_ports_sros_ingress_qstat']             = 1; // Enable graphing of ingress queues per-port.
+$config['enable_ports_64bit']                          = 1; // Prefer 64bit counters.
 $config['enable_ports_separate_walk']                  = 0; // Walk separate IF-MIB tables instead global ifEntry, ifXEntry
 
 // Observium WIP API Settings

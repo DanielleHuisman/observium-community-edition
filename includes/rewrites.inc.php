@@ -430,8 +430,7 @@ function humanize_bgp(&$peer)
   $peer['humanized'] = TRUE;
 }
 
-function process_port_label(&$this_port, $device)
-{
+function process_port_label(&$this_port, $device) {
   global $config;
 
   //file_put_contents('/tmp/process_port_label_'.$device['hostname'].'_'.$this_port['ifIndex'].'.port', var_export($this_port, TRUE)); ///DEBUG
@@ -447,8 +446,7 @@ function process_port_label(&$this_port, $device)
   if (isset($config['os'][$device['os']]['ifDescr_ifAlias']) && $config['os'][$device['os']]['ifDescr_ifAlias'] &&
       $this_port['ifType'] === 'ethernetCsmacd' && $this_port['ifDescr'] !== $this_port['ifName'] &&
       $this_port['ifDescr'] !== '-' && !str_starts($this_port['ifDescr'], 'Allied Teles')) {
-    if (empty($this_port['ifAlias']) ||
-        $this_port['ifName'] === $this_port['ifAlias']) {
+    if (empty($this_port['ifAlias']) || $this_port['ifName'] === $this_port['ifAlias']) {
       $this_port['ifAlias'] = $this_port['ifDescr'];
     }
   }
@@ -461,7 +459,7 @@ function process_port_label(&$this_port, $device)
     unset($config['os'][$device['os']]['ifname']);
     $version_parts = explode('.', $device['version']);
     if ($version_parts[0] > 2 || ($version_parts[0] == 2 && $version_parts[1] > 1)) {
-      if ($this_port['ifName'] == '') {
+      if (safe_empty($this_port['ifName'])) {
         $this_port['port_label'] = $this_port['ifDescr'];
       } else {
         $this_port['port_label'] = $this_port['ifName'];
@@ -470,61 +468,49 @@ function process_port_label(&$this_port, $device)
   }
 
   // This happen on some liebert UPS devices or when device have memory leak (ie Eaton Powerware)
-  if (isset($config['os'][$device['os']]['ifType_ifDescr']) && $config['os'][$device['os']]['ifType_ifDescr'] && $this_port['ifIndex'])
-  {
+  if (isset($config['os'][$device['os']]['ifType_ifDescr']) && $config['os'][$device['os']]['ifType_ifDescr'] && $this_port['ifIndex']) {
     $len = strlen($this_port['ifDescr']);
     $type = rewrite_iftype($this_port['ifType']);
     if ($type && ($len === 0 || $len > 255 ||
                   isHexString($this_port['ifDescr']) ||
-                  preg_match('/(.)\1{4,}/', $this_port['ifDescr'])))
-    {
+                  preg_match('/(.)\1{4,}/', $this_port['ifDescr']))) {
       $this_port['ifDescr'] = $type . ' ' . $this_port['ifIndex'];
       print_debug("Port 'ifDescr' rewritten: '' -> '" . $this_port['ifDescr'] . "'");
     }
   }
 
-  if (isset($config['os'][$device['os']]['ifname']))
-  {
-    if ($this_port['ifName'] == '')
-    {
+  if (isset($config['os'][$device['os']]['ifname'])) {
+    if (safe_empty($this_port['ifName'])) {
       $this_port['port_label'] = $this_port['ifDescr'];
     } else {
       $this_port['port_label'] = $this_port['ifName'];
     }
-  }
-  elseif (isset($config['os'][$device['os']]['ifalias']))
-  {
+  } elseif (isset($config['os'][$device['os']]['ifalias'])) {
     $this_port['port_label'] = $this_port['ifAlias'];
   } else {
-    if ($this_port['ifDescr'] === '' && $this_port['ifName'] !== '')
-    {
+    if ($this_port['ifDescr'] === '' && $this_port['ifName'] !== '') {
       // Some new NX-OS have empty ifDescr
       $this_port['port_label'] = $this_port['ifName'];
     } else {
       $this_port['port_label'] = $this_port['ifDescr'];
     }
-    if (isset($config['os'][$device['os']]['ifindex']))
-    {
+    if (isset($config['os'][$device['os']]['ifindex'])) {
       $this_port['port_label'] .= ' ' . $this_port['ifIndex'];
     }
   }
 
   // Process label by os definition rewrites
   $oid = 'port_label';
-  if (isset($config['os'][$device['os']][$oid]))
-  {
+  if (isset($config['os'][$device['os']][$oid])) {
     $this_port['port_label'] = preg_replace('/\ {2,}/', ' ', $this_port['port_label']); // clear 2 and more spaces
 
     $oid_base  = $oid.'_base';
     $oid_num   = $oid.'_num';
     $oid_short = $oid.'_short';
-    foreach ($config['os'][$device['os']][$oid] as $pattern)
-    {
-      if (preg_match($pattern, $this_port[$oid], $matches))
-      {
+    foreach ($config['os'][$device['os']][$oid] as $pattern) {
+      if (preg_match($pattern, $this_port[$oid], $matches)) {
         //print_debug_vars($matches);
-        if (isset($matches[$oid]))
-        {
+        if (isset($matches[$oid])) {
           // if exist 'port_label' match reference
           $this_port[$oid] = $matches[$oid];
         } else {
@@ -533,14 +519,11 @@ function process_port_label(&$this_port, $device)
         }
         print_debug("Port '$oid' rewritten: '" . $this_port[$oid] . "' -> '" . $this_port[$oid] . "'");
 
-        if (isset($matches[$oid_base]))
-        {
+        if (isset($matches[$oid_base])) {
           $this_port[$oid_base] = $matches[$oid_base];
         }
-        if (isset($matches[$oid_num]))
-        {
-          if ($device['os'] == 'cisco-altiga' && $matches[$oid_num] === '') // This derp only for altiga (I hope so)
-          {
+        if (isset($matches[$oid_num])) {
+          if ($device['os'] === 'cisco-altiga' && $matches[$oid_num] === '') { // This derp only for altiga (I hope so)
             // See cisco-altiga os definition
             // If port_label_num match set, but it empty, use ifIndex as num
             $this_port[$oid_num] = $this_port['ifIndex'];
@@ -550,15 +533,13 @@ function process_port_label(&$this_port, $device)
           }
         }
 
-        // Additionally possible to parse port_label_short
-        if (isset($matches[$oid_short]))
-        {
+        // Additionally, possible to parse port_label_short
+        if (isset($matches[$oid_short])) {
           $this_port[$oid_short] = $matches[$oid_short];
         }
 
-        // Additionally possible to parse ifAlias from ifDescr (ie timos)
-        if (isset($matches['ifAlias']))
-        {
+        // Additionally, possible to parse ifAlias from ifDescr (ie timos)
+        if (isset($matches['ifAlias'])) {
           $this_port['ifAlias'] = $matches['ifAlias'];
         }
         break;
@@ -569,29 +550,23 @@ function process_port_label(&$this_port, $device)
     $this_port['port_label'] = rewrite_ifname($this_port['port_label'], FALSE);
   }
 
-  if (!isset($this_port['port_label_base'])) // skip when already set by previous processing, ie os definitions
-  {
+  if (!isset($this_port['port_label_base'])) { // skip when already set by previous processing, ie os definitions
     // Extract bracket part from port label and remove it
     $label_bracket = '';
-    if (preg_match('/\s*(\([^\)]+\))$/', $this_port['port_label'], $matches))
-    {
+    if (preg_match('/\s*(\([^\)]+\))$/', $this_port['port_label'], $matches)) {
       // GigaVUE-212 Port  8/48 (Network Port)
       // rtif(172.20.30.46/28)
       print_debug('Port label ('.$this_port['port_label'].') matched #1'); // Just for find issues
       $label_bracket = $this_port['port_label']; // fallback
       list($this_port['port_label']) = explode($matches[0], $this_port['port_label'], 2);
-    }
-    elseif (preg_match('!^10*(?:/10*)*\s*[MGT]Bit\s+(.*)!i', $this_port['port_label'], $matches))
-    {
+    } elseif (preg_match('!^10*(?:/10*)*\s*[MGT]Bit\s+(.*)!i', $this_port['port_label'], $matches)) {
       // remove 10/100 Mbit part from beginning, this broke detect label_base/label_num (see hirschmann-switch os)
       // 10/100 MBit Ethernet Switch Interface 6
       // 1 MBit Ethernet Switch Interface 6
       print_debug('Port label ('.$this_port['port_label'].') matched #2'); // Just for find issues
       $label_bracket = $this_port['port_label']; // fallback
       $this_port['port_label'] = $matches[1];
-    }
-    elseif (preg_match('/^(.+)\s*:\s+(.+)/', $this_port['port_label'], $matches))
-    {
+    } elseif (preg_match('/^(.+)\s*:\s+(.+)/', $this_port['port_label'], $matches)) {
       // Another case with colon
       // gigabitEthernet 1/0/24 : copper
       // port 3: Gigabit Fiber
@@ -602,8 +577,7 @@ function process_port_label(&$this_port, $device)
 
     // Detect port_label_base and port_label_num
     //if (preg_match('/\d+(?:(?:[\/:](?:[a-z])?[\d\.:]+)+[a-z\d\.\:]*(?:[\-\_][\w\.\:]+)*|\/\w+$)/i', $this_port['port_label'], $matches))
-    if (preg_match('/\d+((?<periodic>(?:[\/:]([a-z]*\d+|[a-z]+[a-z0-9\-\_]*)(?:\.\d+)?)+)(?<last>[\-\_\.][\w\.\:]+)*|\/\w+$)/i', $this_port['port_label'], $matches))
-    {
+    if (preg_match('/\d+((?<periodic>(?:[\/:]([a-z]*\d+|[a-z]+[a-z0-9\-\_]*)(?:\.\d+)?)+)(?<last>[\-\_\.][\w\.\:]+)*|\/\w+$)/i', $this_port['port_label'], $matches)) {
       // Multipart numeric
       /*
       1/1/1
@@ -640,9 +614,7 @@ function process_port_label(&$this_port, $device)
       $this_port['port_label_num'] = $matches[0];
       list($this_port['port_label_base']) = explode($matches[0], $this_port['port_label'], 2);
       $this_port['port_label'] = $this_port['port_label_base'] . $this_port['port_label_num']; // Remove additional part (after port number)
-    }
-    elseif (preg_match('/(?<port_label_num>(?:\d+[a-z])?\d[\d\.\:]*(?:[\-\_]\w+)?)(?: [a-z()\[\] ]+)?$/i', $this_port['port_label'], $matches))
-    {
+    } elseif (preg_match('/(?<port_label_num>(?:\d+[a-z])?\d[\d\.\:]*(?:[\-\_]\w+)?)(?: [a-z()\[\] ]+)?$/i', $this_port['port_label'], $matches)) {
       // Simple numeric
       /*
       GigaVUE-212 Port  1 (Network Port)
@@ -679,8 +651,7 @@ function process_port_label(&$this_port, $device)
     }
 
     // When not empty label brackets and empty numeric part, re-add brackets to label
-    if (!empty($label_bracket) && $this_port['port_label_num'] == '')
-    {
+    if (!empty($label_bracket) && safe_empty($this_port['port_label_num'])) {
       // rtif(172.20.30.46/28)
       $this_port['port_label'] = $label_bracket;
       $this_port['port_label_base'] = $this_port['port_label'];
@@ -689,8 +660,7 @@ function process_port_label(&$this_port, $device)
   }
 
   // Make short version (do not escape)
-  if (isset($this_port['port_label_short']))
-  {
+  if (isset($this_port['port_label_short'])) {
     // Short already parsed from definitions (not sure if need additional shorting)
     $this_port['port_label_short'] = short_ifname($this_port['port_label_short'], NULL, FALSE);
   } else {
@@ -721,37 +691,43 @@ function process_port_label(&$this_port, $device)
 /**
  * Humanize port.
  *
- * Returns a the $port array with processed information:
+ * Returns a $port array with processed information:
  * label, humans_speed, human_type, html_class and human_mac
  * row_class, table_tab_colour
  *
  * Escaping should not be done here, since these values are used in the API too.
  *
  * @param array $port
- * @return array $port
+ * @return void
  *
  */
 // TESTME needs unit testing
-function humanize_port(&$port)
-{
+function humanize_port(&$port) {
   global $config, $cache;
 
   // Exit if already humanized
-  if (isset($peer['humanized']) && $port['humanized']) { return; }
+  if (isset($port['humanized']) && $port['humanized']) { return; }
 
-  $port['attribs'] = get_entity_attribs('port', $port['port_id']);
+  // Pre-check if port attribs for device exist
+  if (!isset($GLOBALS['cache']['devices_attribs'][$port['device_id']]['port'])) {
+    $GLOBALS['cache']['devices_attribs'][$port['device_id']]['port'] = dbExist('entity_attribs', '`entity_type` = ? AND `device_id` = ?', [ 'port', $port['device_id'] ]);
+  }
+  // Speedup queries, when not exist attribs
+  if ($GLOBALS['cache']['devices_attribs'][$port['device_id']]['port']) {
+    $port['attribs'] = get_entity_attribs('port', $port['port_id']);
+  } else {
+    $port['attribs'] = [];
+  }
 
   // If we can get the device data from the global cache, do it, else pull it from the db (mostly for external scripts)
-  if (is_array($GLOBALS['cache']['devices']['id'][$port['device_id']]))
-  {
+  if (is_array($GLOBALS['cache']['devices']['id'][$port['device_id']])) {
     $device = &$GLOBALS['cache']['devices']['id'][$port['device_id']];
   } else {
     $device = device_by_id_cache($port['device_id']);
   }
 
   // Workaround for devices/ports who long time not updated and have empty port_label
-  if (empty($port['port_label']) || strlen($port['port_label_base'].$port['port_label_num']) == 0)
-  {
+  if (safe_empty($port['port_label']) || safe_empty($port['port_label_base'].$port['port_label_num'])) {
     process_port_label($port, $device);
   }
 
@@ -770,19 +746,15 @@ function humanize_port(&$port)
   $port['row_class'] = "";
   $port['icon'] = 'port-ignored'; // Default
   $port['admin_status'] = $port['ifAdminStatus'];
-  if     ($port['ifAdminStatus'] == "down")
-  {
+  if ($port['ifAdminStatus'] === "down") {
     $port['admin_status'] = 'disabled';
     $port['row_class'] = "disabled";
     $port['icon'] = 'port-disabled';
     $port['admin_class'] = "disabled";
-  }
-  elseif ($port['ifAdminStatus'] == "up")
-  {
+  } elseif ($port['ifAdminStatus'] === "up") {
     $port['admin_status'] = 'enabled';
     $port['admin_class']  = 'primary';
-    switch ($port['ifOperStatus'])
-    {
+    switch ($port['ifOperStatus']) {
       case 'up':
         $port['table_tab_colour'] = "#194B7F"; $port['row_class'] = "ok";      $port['icon'] = 'port-up'; $port['oper_class'] = "primary";
         break;
@@ -806,8 +778,7 @@ function humanize_port(&$port)
   }
 
   // If the device is down, colour the row/tab as 'warning' meaning that the entity is down because of something below it.
-  if ($device['status'] == '0')
-  {
+  if ($device['status'] == '0') {
     $port['table_tab_colour'] = "#ff6600";
     $port['row_class'] = "warning";
     $port['icon'] = 'port-ignored';
@@ -822,8 +793,7 @@ function humanize_port(&$port)
   $port['out_rate'] = $port['ifOutOctets_rate'] * 8;
 
   // Colour in bps based on speed if > 50, else by UI convention.
-  if ($port['ifSpeed'] > 0)
-  {
+  if ($port['ifSpeed'] > 0) {
     $in_perc  = round($port['in_rate']/$port['ifSpeed']*100);
     $out_perc = round($port['out_rate']/$port['ifSpeed']*100);
   } else {
@@ -831,8 +801,7 @@ function humanize_port(&$port)
     $in_perc  = 0;
     $out_perc = 0;
   }
-  if ($port['in_rate'] == 0)
-  {
+  if ($port['in_rate'] == 0) {
     $port['bps_in_style'] = '';
   } elseif ($in_perc < '50') {
     $port['bps_in_style'] = 'color: #008C00;';
@@ -841,8 +810,7 @@ function humanize_port(&$port)
   }
 
   // Colour out bps based on speed if > 50, else by UI convention.
-  if ($port['out_rate'] == 0)
-  {
+  if ($port['out_rate'] == 0) {
     $port['bps_out_style'] = '';
   } elseif ($out_perc < '50') {
     $port['bps_out_style'] = 'color: #394182;';
@@ -937,7 +905,7 @@ $rewrite_cpqida_hardware = array(
   'sa-p410'    => 'Smart Array P410',
   'sa-p410i'   => 'Smart Array P410i',
   'sa-p411'    => 'Smart Array P411',
-  'sa-b110i'   => 'Smart Array B110i SATA RAID',
+  'sa-b110i'   => 'Smart Array B110i',
   'sa-p712m'   => 'Smart Array P712m',
   'sa-p711m'   => 'Smart Array P711m',
   'sa-p812'    => 'Smart Array P812',
@@ -1265,16 +1233,12 @@ function rewrite_adslLineType($adslLineType)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function short_hostname($hostname, $len = NULL, $escape = TRUE)
-{
+function short_hostname($hostname, $len = NULL, $escape = TRUE) {
   $len = (is_numeric($len) ? (int)$len : (int)$GLOBALS['config']['short_hostname']['length']);
 
-  if (function_exists('custom_shorthost'))
-  {
+  if (function_exists('custom_shorthost')) {
     $short_hostname = custom_shorthost($hostname, $len);
-  }
-  else if (function_exists('custom_short_hostname'))
-  {
+  } elseif (function_exists('custom_short_hostname')) {
     $short_hostname = custom_short_hostname($hostname, $len);
   } else {
 
@@ -1283,9 +1247,8 @@ function short_hostname($hostname, $len = NULL, $escape = TRUE)
     $parts = explode('.', $hostname);
     $short_hostname = $parts[0];
     $i = 1;
-    while ($i < count($parts) && strlen($short_hostname.'.'.$parts[$i]) < $len)
-    {
-      $short_hostname = $short_hostname.'.'.$parts[$i];
+    while ($i < count($parts) && strlen($short_hostname.'.'.$parts[$i]) < $len) {
+      $short_hostname .= '.' . $parts[$i];
       $i++;
     }
   }

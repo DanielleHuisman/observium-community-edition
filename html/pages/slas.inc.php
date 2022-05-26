@@ -103,31 +103,25 @@ $sql = generate_sla_query($vars_filter);
 
 $rtt_types = [];
 $sla_owners = [];
-foreach (dbFetchRows($sql) as $sla)
-{
+foreach (dbFetchRows($sql) as $sla) {
   $owner = ($sla['sla_owner'] == '' ? OBS_VAR_UNSET : $sla['sla_owner']);
-  if (!isset($vars['rtt_type']) || $vars['rtt_type'] == $sla['rtt_type'])
-  {
-    if (!isset($sla_owners[$owner]))
-    {
+  if (!isset($vars['rtt_type']) || $vars['rtt_type'] === $sla['rtt_type']) {
+    if (!isset($sla_owners[$owner])) {
       $sla_owners[$owner] = nicecase($owner);
     }
   }
 
-  if (!isset($vars['owner']) || $vars['owner'] == $owner)
-  {
+  if (!isset($vars['owner']) || $vars['owner'] === $owner) {
     $rtt_type = $sla['rtt_type'];
 
-    if (isset($config['sla_type_labels'][$rtt_type]))
-    {
+    if (isset($config['sla_type_labels'][$rtt_type])) {
       $rtt_label = $config['sla_type_labels'][$rtt_type];
     } else {
       $rtt_label = nicecase($rtt_type);
     }
 
-    // Combinate different types with same label
-    if (!in_array($rtt_type, $rtt_types[$rtt_label]))
-    {
+    // Combine different types with same label
+    if (!isset($rtt_types[$rtt_label]) || !in_array($rtt_type, $rtt_types[$rtt_label])) {
       $rtt_types[$rtt_label][] = $rtt_type;
     }
   }
@@ -139,7 +133,7 @@ foreach ($rtt_types as $text => $type)
 {
   $type = implode(',', $type);
 
-  if ($vars['rtt_type'] == $type) { $navbar['options'][$type]['class'] = 'active'; }
+  if ($vars['rtt_type'] === $type) { $navbar['options'][$type]['class'] = 'active'; }
   $navbar['options'][$type]['url']  = generate_url(array('page' => 'slas', 'rtt_type' => $type));
   $navbar['options'][$type]['text'] = $text;
 }
@@ -147,10 +141,8 @@ foreach ($rtt_types as $text => $type)
 // Owners
 $navbar['options']['owner'] = array('text' => 'Owners', 'right' => 'true');
 
-foreach ($sla_owners as $owner => $name)
-{
-  if ($owner == $vars['owner'] || in_array($owner, $vars['owner']) )
-  {
+foreach ($sla_owners as $owner => $name) {
+  if (!safe_empty($vars['owner']) && in_array($owner, (array)$vars['owner'])) {
     $navbar['options']['owner']['class'] = 'active';
     $navbar['options']['owner']['url']   = generate_url($vars, array('owner' => NULL));
     $navbar['options']['owner']['text'] .= ' ('.$name.')';
@@ -168,8 +160,7 @@ $groups = get_type_groups('sla');
 $navbar['options']['group'] = array('text' => 'Groups', 'right' => TRUE, 'community' => FALSE);
 foreach ($groups as $group)
 {
-  if ($group['group_id'] == $vars['group'] || in_array($group['group_id'], $vars['group']) )
-  {
+  if (!safe_empty($vars['group']) && in_array($group['group_id'], (array)$vars['group'])) {
     $navbar['options']['group']['class'] = 'active';
     $navbar['options']['group']['url']   = generate_url($vars, array('group' => NULL));
     $navbar['options']['group']['text'] .= ' ('.$group['group_name'].')';
@@ -185,8 +176,7 @@ $navbar['options']['graphs']['text']  = 'Graphs';
 $navbar['options']['graphs']['icon']  = $config['icon']['graphs'];
 $navbar['options']['graphs']['right'] = TRUE;
 
-if ($vars['view'] == 'graphs')
-{
+if ($vars['view'] === 'graphs') {
   $navbar['options']['graphs']['class'] = 'active';
   $navbar['options']['graphs']['url']   = generate_url($vars, array('view' => NULL));
 } else {

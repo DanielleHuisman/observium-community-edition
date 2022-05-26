@@ -43,18 +43,16 @@ foreach (get_device_mibs_permitted($device) as $mib)
 }
 
 // Try discovery IP addresses in VRF SNMP contexts (currently actual only on Cisco Nexus)
-if (empty($device['snmp_context']) && // Device not already with context
-    isset($config['os'][$device['os']]['snmp']['context']) && $config['os'][$device['os']]['snmp']['context'] && // Context permitted for os
-    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) // SNMP VRF context discovered for device
-{
+if (safe_empty($device['snmp_context']) && // Device not already with context
+    isset($config['os'][$device['os']]['snmp']['virtual']) && $config['os'][$device['os']]['snmp']['virtual'] && // Context permitted for os
+    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) { // SNMP VRF context discovered for device
   // Keep original device array
   $device_original = $device;
 
-  foreach ($vrf_contexts as $vrf_name => $snmp_context)
-  {
-    print_message("Addresses in VRF: $vrf_name...");
-
-    $device['snmp_context'] = $snmp_context;
+  foreach ($vrf_contexts as $vrf_name => $snmp_virtual) {
+    print_message("Addresses in Virtual Routing: $vrf_name...");
+    $device = snmp_virtual_device($device_original, $snmp_virtual);
+    //$device['snmp_context'] = $snmp_context;
     if (!$device['snmp_retries']) {
       // force less retries on vrf requests.. if not set in db
       $device['snmp_retries'] = 1;

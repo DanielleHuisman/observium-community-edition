@@ -185,6 +185,8 @@ function generate_storage_row($storage, $vars) {
   $table_cols = 8;
   if ($vars['page'] !== "device" && $vars['popup'] != TRUE) { $table_cols++; } // Add a column for device.
 
+  if(isset($vars['graph_type']) && $vars['graph_type'] == "perc") 
+
   $graph_array           = array();
   $graph_array['to']     = $config['time']['now'];
   $graph_array['id']     = $storage['storage_id'];
@@ -234,21 +236,30 @@ function generate_storage_row($storage, $vars) {
     </tr>
   ';
 
-  if ($vars['view'] === "graphs") { $vars['graph'] = "usage"; }
-  if ($vars['graph'])
+  if ($vars['view'] === "graphs" && !isset($vars['graph'])) { $vars['graph'] = "bytes,perc"; }
+
+
+
+  if (isset($vars['graph']))
   {
-    $row .= '<tr class="' . $storage['row_class'] . '">';
-    $row .= '<td class="state-marker"></td>';
-    $row .= '<td colspan="' . $table_cols . '">';
+      $graph_types = explode(',', $vars['graph']);
 
-    unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
-    $graph_array['to']     = $config['time']['now'];
-    $graph_array['id']     = $storage['storage_id'];
-    $graph_array['type']   = 'storage_'.$vars['graph'];
+      foreach ($graph_types AS $graph_type) {
+          $graph_type = 'storage_'.$graph_type;
 
-    $row .= generate_graph_row($graph_array, TRUE);
+          $row .= '<tr class="' . $storage['row_class'] . '">';
+          $row .= '<td class="state-marker"></td>';
+          $row .= '<td colspan="' . $table_cols . '">';
 
-    $row .= '</td></tr>';
+          unset($graph_array['height'], $graph_array['width'], $graph_array['legend']);
+          $graph_array['to'] = $config['time']['now'];
+          $graph_array['id'] = $storage['storage_id'];
+          $graph_array['type'] = $graph_type;
+
+          $row .= generate_graph_row($graph_array, TRUE);
+
+          $row .= '</td></tr>';
+      }
   } # endif graphs
 
   return $row;

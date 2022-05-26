@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -18,7 +18,7 @@ if (!$vars['entity_type']) { $vars['entity_type'] = "all"; }
 $navbar['class'] = "navbar-narrow";
 $navbar['brand'] = "Alert Types";
 
-$types = dbFetchRows("SELECT DISTINCT `entity_type` FROM `alert_table` WHERE 1" . generate_query_permitted(array('alert')));
+$types = dbFetchRows("SELECT DISTINCT `entity_type` FROM `alert_table` WHERE 1" . generate_query_permitted([ 'alert' ]));
 
 $types_count = safe_count($types);
 
@@ -29,10 +29,8 @@ if ($vars['entity_type'] === 'all') {
   $navbar['options']['all']['url'] = generate_url($vars, array('page' => 'alerts', 'entity_type' => NULL));
 }
 
-foreach ($types as $thing)
-{
-  if ($vars['entity_type'] == $thing['entity_type'])
-  {
+foreach ($types as $thing) {
+  if ($vars['entity_type'] == $thing['entity_type']) {
     $navbar['options'][$thing['entity_type']]['class'] = "active";
     $navbar['options'][$thing['entity_type']]['url'] = generate_url($vars, array('page' => 'alerts', 'entity_type' => NULL));
   } else {
@@ -48,37 +46,41 @@ $navbar['options_right']['filters']['text']      = 'Filter';
 $navbar['options_right']['filters']['icon']      = $config['icon']['filter'];
 //$navbar['options_right']['filters']['link_opts'] = 'data-hover="dropdown" data-toggle="dropdown"';
 
-$filters = array('all'     => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['info'],
-                                       'text'  => 'All'),
+$filters = [
+  'all' => [
+    'url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
+    'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
+    'icon'  => $config['icon']['info'],
+    'text'  => 'All'
+  ],
+  'failed_delayed' => [
+    'url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'failed_delayed')),
+    'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
+    'icon'  => $config['icon']['important'],
+    'text'  => 'Failed & Delayed'
+  ],
+  'failed' => [
+    'url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'failed')),
+    'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
+    'icon'  => $config['icon']['stop'],
+    'text'  => 'Failed'
+  ],
+  'suppressed' => [
+    'url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'suppressed')),
+    'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
+    'icon'  => $config['icon']['shutdown'],
+    'text'  => 'Suppressed'
+  ]
+];
 
-                 'failed_delayed' => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'failed_delayed')),
-                                       'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['important'],
-                                       'text'  => 'Failed & Delayed'),
-
-                 'failed'     => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'failed')),
-                                       'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['stop'],
-                                       'text'  => 'Failed'),
-
-                 'suppressed' => array('url'   => generate_url($vars, array('page' => 'alerts', 'status' => 'suppressed')),
-                                       'url_o' => generate_url($vars, array('page' => 'alerts', 'status' => 'all')),
-                                       'icon'  => $config['icon']['shutdown'],
-                                       'text'  => 'Suppressed')
-);
-
-foreach ($filters as $option => $option_array)
-{
+foreach ($filters as $option => $option_array) {
 
   $navbar['options_right']['filters']['suboptions'][$option]['text'] = $option_array['text'];
   $navbar['options_right']['filters']['suboptions'][$option]['icon'] = $option_array['icon'];
 
-  if ($vars['status'] == $option)
-  {
+  if ($vars['status'] == $option) {
     $navbar['options_right']['filters']['suboptions'][$option]['class'] = "active";
-    if ($vars['status'] != "all") {
+    if ($vars['status'] !== "all") {
       $navbar['options_right']['filters']['class'] = "active";
     }
     $navbar['options_right']['filters']['suboptions'][$option]['url'] = $option_array['url_o'];

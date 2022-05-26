@@ -1,0 +1,1126 @@
+-- file: NOTIFICATION-MIB.my
+-- Changes:
+-- author:qiaoqiangguo
+--opcom公共MIB
+--更改记录：1、取消原来的告警表，增加了当前告警表和历史告警表 2005-10-14 10:33
+--          2、当前告警表和历史告警表的索引,rcCurNotifsAlarmIndex和rcHisNotifsAlarmIndex的属性都改为:not-accessible 2005-10-24 9:29
+--          3、添加端口告警trap屏蔽表 
+--          4、增加Trap Sink的Community设置, 
+--          5、增加rcNotifsTrapLocation作为发送Trap绑定的变量
+--       	6、告警屏蔽表采用告警trap OID做索引，告警编号从1开始排，不再使用告警trap的OID做索引。
+--       	7、rcCurNotifsAlarmType、rcHisNotifsAlarmType改为trap的OID，类型为OBJECT IDENTIFIER 。
+--          8、当前告警表和历史告警表改变，绑定变量改由字节串表示，增加一个绑定变量个数。
+--12.29
+--          1. 明确索引rcNotifsFilterAlarmTrapOID为IMPLIED类型
+--          1.增加了当前告警表中告警发生时间的节点 rcCurNotifsAlarmDeclareTime  2006-7-28 11:32
+--2006-11-7 11:39
+--          1、添加rcNotifsTrapFilterSwitch和rcNotifsAlarmFilterControl节点，用于设备上的告警过滤开关控制
+--2006-12-19 10:39
+--          1、增加了rcNotifsAlarmOutputGroup节点，用于定义告警输出组的状态
+--          2、增加了rcNotifsAlarmOutputEnable节点，用于控制告警对应的输出组  
+--2011-10-18
+--			1、增加了rcNotifsTrapAutoSaveEnable节点，用于控制告警管理配置自动保存
+--			2、当前告警表大小配置节点rcCurNotifsAlarmTableMaxSize改为RO，用户不可配置   
+--			3、a)删除端口告警反转模式节点rcNotifsPortAlarmInverseMode，增加网元告警反转模式节点rcNotifsAlarmInverseMode
+--			   b)告警反转端口表项不支持创建，由read-create修改为read-only或read-write,同时删除行状态节点rcNotifsPortAlarmInverseRowStatus  
+--			   c)增加了rcNotifsAlarmInverseBanchEnable节点，用于批量配置端口告警反转
+--			4、增加了rcCurNotifsAlarmTableDeleteByAlarmOID节点，根据Trap的OID删除当前告警表中的告警
+--			5、历史告警表增加
+--			   a)rcHisNotifsAlarmClearTime, 告警清除的时间
+--			   b)rcHisNotifsAlarmCause，进入历史告警表的原因
+--2011-11-15
+--			1、删除当前告警表节点rcCurNotifsAlarmTableDeleteByAlarmOID 增加全部删除和不删除的定义值
+--			2、修改命名拼写错误	rcNotifsAlarmInverseBanchEnable 改为 rcNotifsAlarmInverseBatchEnable
+--2013-1-6
+--			1、  wuxiaoli rcNotifsTrapFilterSwitch增加枚举值  locked_off
+--2013-11-12
+--			1、  zhaobaolin rcNotifsTrapRepeatIndex告警健壮性中告警重发请求
+--			2、  zhaobaolin  rcNotifsTrapCurrentIndex告警健壮性中当前告警序列号    
+--2014-03-04
+--			1、	 zhaobaolin rcNotifsPortAlarmFilterMonitoringDisable 修改size（4-256）改为（4-512）    
+--			2、	 zhaobaolin rcNotifsPortAlarmFilterTrapEnable   修改size（4-256）改为（4-512）   
+--2014-11-20
+--			1、  zhaobaolin add rcCurNotifsAlarmEntry.rcCurNotifsAlarmRelativeTime  使用64bit数字表示告警产生时间，防止时间反转情况 
+--2015-1-5
+--			1、  kuanglili add rcNotifsConfObjects.rcNotifsTrapRelateEnable  		告警相关性开关使能或禁止
+--			2、  kuanglili add rcNotifsConfObjects.rcNotifsTrapRelateDelayTimes  	 告警相关性延迟等待周期
+
+     RAISECOM-NOTIFICATION-MIB DEFINITIONS ::= BEGIN
+     
+     IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32, IpAddress
+            FROM SNMPv2-SMI
+        TruthValue, TimeStamp, DisplayString, RowStatus
+            FROM SNMPv2-TC
+        optSysMgmt
+            FROM RAISECOM-BASE-MIB;
+             
+             
+    raisecomNotifisMib   MODULE-IDENTITY
+        LAST-UPDATED "0512291200Z"
+        ORGANIZATION "opcom Software Working Group"
+        CONTACT-INFO
+            "
+             www.raisecom.com
+            "
+        DESCRIPTION
+            "The MIB module to describe Notification objects."
+    ::= { optSysMgmt 3 }
+      
+     -- This is the MIB module for the Notification objects
+      
+      
+     rcNotifsConfObjects        OBJECT IDENTIFIER ::= { raisecomNotifisMib 1 }
+     rcNotifsObjects            OBJECT IDENTIFIER ::= { raisecomNotifisMib 2 }
+     rcNotifsPortFilterConfig  OBJECT IDENTIFIER ::= { rcNotifsConfObjects 15 }
+     rcNotifsPortAlarmFilterConfig  OBJECT IDENTIFIER ::= { rcNotifsConfObjects 60 }
+     rcNotifsPortAlarmInverseConfig  OBJECT IDENTIFIER ::= { rcNotifsConfObjects 61 }
+       
+     --Groups in the notification MIB module
+      
+       
+
+    rcNotifsTrapVersion  OBJECT-TYPE
+        SYNTAX     INTEGER {
+                snmpv1(1),
+                snmpv2c(2)
+            }
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "
+                发送告警的版本号
+            "
+        DEFVAL { snmpv2c }
+        ::= { rcNotifsConfObjects 1 }
+        
+    rcNotifsTrapEnable OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                 发送告警使能
+            "
+        DEFVAL {true}
+        ::= { rcNotifsConfObjects  3 }
+
+
+    rcNotifsTrapTotalNumber  OBJECT-TYPE
+        SYNTAX     Integer32 
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+            "
+                --发送的告警Trap总数，如果同一个Trap发至多个Sink，只计算一个。
+        ::= { rcNotifsConfObjects 5 }
+ 
+    rcNotifsTrapLocation  OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                告警发生的部位，格式为ShelfSSSlotLLPortP:DeviceDDPortPP: DeviceDDPortPPLogicalLL……,只用于变量绑定，读无意义 
+            "
+              --此变量为绑定告警变量用
+        ::= { rcNotifsConfObjects 6 } 
+        
+     rcNotifsTrapFilterSwitch OBJECT-TYPE
+        SYNTAX INTEGER {
+			              on(1),
+			              off(2),
+			              locked_off(3)
+			           }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+               告警过滤开关控制
+               on: 打开，只有不受过滤开关控制的告警可以上报
+               off: 关闭，告警发送不受此开关控制   
+               locked_off:锁定告警过滤开关为off状态
+            "
+  
+        ::= { rcNotifsConfObjects 7 } 
+        
+     rcNotifsAlarmOutputGroup OBJECT-TYPE
+        SYNTAX INTEGER 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+               告警输出组定义，定义了每个告警输出组的状态
+               某些设备需要外接告警输出设备来产生声光告警，本节点定义了外接告警输出组对应不同的输出设备，
+               具体告警输出组和外接告警输出设备的对应关系由产品确定。
+               用bit表示：
+               0--告警输出状态为off， 1--告警输出状态为on
+               
+               Bit1：表示告警输出组1状态
+               Bit2：表示告警输出组2状态
+               Bit3：表示告警输出组3状态
+               Bit4：表示告警输出组4状态
+               Bit5：表示告警输出组5状态
+               ...
+               Bit32：表示告警输出组32状态
+            "
+  
+        ::= { rcNotifsConfObjects 8 } 
+        
+       
+-- rcTrapSinkTable
+
+    rcNotifsTrapSinkTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcNotifsTrapSinkEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Trap Sink Table"
+        ::= { rcNotifsConfObjects 10 }
+    
+    rcNotifsTrapSinkEntry OBJECT-TYPE
+        SYNTAX  RcNotifsTrapSinkEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Trap Sink Table."
+        INDEX   { rcNotifsTrapIndex }
+        ::= { rcNotifsTrapSinkTable 1 }
+     
+    RcNotifsTrapSinkEntry ::=SEQUENCE
+        {
+        rcNotifsTrapIndex
+            Integer32,
+        rcNotifsTrapTarget
+            IpAddress,
+        rcNotifsTrapPort
+            Integer32
+        }
+        
+   rcNotifsTrapIndex OBJECT-TYPE
+        SYNTAX Integer32 (1..8)
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+            "
+                --接收告警IP地址的索引。
+        ::= { rcNotifsTrapSinkEntry 1 }
+
+   rcNotifsTrapTarget OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS  read-write
+        STATUS current
+        DESCRIPTION
+            "
+                接收告警的地址。
+            "
+        ::= { rcNotifsTrapSinkEntry 2 }
+
+    rcNotifsTrapPort OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "
+                接收告警的端口号。
+            "
+        DEFVAL {162}
+        ::= { rcNotifsTrapSinkEntry 3 }
+        
+-- rc Alarm filter Table
+
+    rcNotifsAlarmFilterTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcNotifsAlarmFilterEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Alarm Filter table"
+        ::= { rcNotifsConfObjects 11 }
+    
+    rcNotifsAlarmFilterEntry OBJECT-TYPE
+        SYNTAX  RcNotifsAlarmFilterEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Alarm Filter Table."
+        INDEX   { IMPLIED rcNotifsFilterAlarmTrapOID }
+        ::= { rcNotifsAlarmFilterTable 1 }
+     
+    RcNotifsAlarmFilterEntry ::=SEQUENCE
+        {
+        rcNotifsFilterAlarmTrapOID
+            OBJECT IDENTIFIER,
+        rcNotifsAlarmTrapEnable
+            TruthValue,
+        rcNotifsAlarmTrapLogEnable
+            TruthValue,
+        rcNotifsAlarmFilterControl
+        	TruthValue,
+        rcNotifsAlarmOutputEnable
+        	INTEGER,
+        rcNotifsAlarmMonitoringDisable
+            TruthValue
+        }
+        
+    rcNotifsFilterAlarmTrapOID  OBJECT-TYPE
+        SYNTAX OBJECT IDENTIFIER 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+            告警trap的OID
+            告警屏蔽表的索引。
+            "
+                
+        ::= { rcNotifsAlarmFilterEntry 1 }
+     
+     rcNotifsAlarmTrapEnable OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警自动上报使能，对于不自动上报的告警，
+                只保存在当前告警表中，不发送trap
+                缺省所有告警都自动上报。
+            "
+        DEFVAL {true}
+        ::= { rcNotifsAlarmFilterEntry  2 }
+          
+    
+    rcNotifsAlarmTrapLogEnable OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                alarm trap sys log enable
+            "
+        DEFVAL {true}
+        ::= { rcNotifsAlarmFilterEntry  3 }
+     
+     
+    rcNotifsAlarmFilterControl OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警过滤开关是否能控制该告警发送
+                TRUE: 表示可以控制
+                FALSE：表示不可以控制
+            "
+        DEFVAL {true}
+        ::= { rcNotifsAlarmFilterEntry  4 }   
+        
+    rcNotifsAlarmOutputEnable OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+               告警触发输出组定义，定义了对每种告警输出组触发使能
+               某些设备需要外接告警输出设备来产生声光告警，本节点定义了外接告警输出组对应不同的输出设备，
+               具体告警输出组和外接告警输出设备的对应关系由产品确定。暂时定义5组输出。
+               用bit表示：
+               0--表示不触发该告警组输出， 1--表示触发该告警组输出
+               
+               Bit1：表示触发告警输出组1使能状态
+               Bit2：表示触发告警输出组2使能状态
+               Bit3：表示触发告警输出组3使能状态
+               Bit4：表示触发告警输出组4使能状态
+               Bit5：表示触发告警输出组5使能状态
+               ...
+               Bit32：表示触发告警输出组32使能状态
+            "
+        DEFVAL {0}
+        ::= { rcNotifsAlarmFilterEntry  5 }   
+        
+	rcNotifsAlarmMonitoringDisable OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警屏蔽使能，缺省情况下对所有告警进行监控，
+                对于设置了告警屏蔽的告警将不进行监控。
+                缺省所有告警监视使能（告警屏蔽禁止）。
+            "
+        DEFVAL {false}
+        ::= { rcNotifsAlarmFilterEntry  6 }
+     
+--   port trap enable config table
+    
+    
+	rcNotifsPortFilterIndexNext OBJECT-TYPE
+           SYNTAX   INTEGER
+           MAX-ACCESS  read-only
+           STATUS      current
+           DESCRIPTION
+           "
+     	    		端口告警屏蔽表的下一个可用索引
+           "
+        ::= { rcNotifsPortFilterConfig 1 }
+        
+    rcNotifsPortFilterTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcNotifsPortFilterEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Alarm Port filter table"
+        ::= { rcNotifsPortFilterConfig 2 }
+    
+    rcNotifsPortFilterEntry OBJECT-TYPE
+        SYNTAX  RcNotifsPortFilterEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the alarm port filter Table."
+        INDEX   { rcNotifsPortFilterIndex }
+        ::= { rcNotifsPortFilterTable 1 }
+     
+    RcNotifsPortFilterEntry ::=SEQUENCE
+        {
+        rcNotifsPortFilterIndex
+            Integer32,
+        rcNotifsPortIfIndex
+            Integer32,
+        rcNotifsPortFilterRowStatus
+            RowStatus
+        }
+ 
+ 	 rcNotifsPortFilterIndex OBJECT-TYPE
+          SYNTAX  Integer32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "
+                 端口告警屏蔽表索引
+                 "
+      ::= { rcNotifsPortFilterEntry 1 }
+      
+      rcNotifsPortIfIndex OBJECT-TYPE
+          SYNTAX  Integer32
+          MAX-ACCESS  read-create
+          STATUS  current
+          DESCRIPTION
+                 "
+               屏蔽告警的端口索引
+                 "
+      ::= { rcNotifsPortFilterEntry 2 }
+      
+       rcNotifsPortFilterRowStatus OBJECT-TYPE
+        SYNTAX     RowStatus
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "   
+     	    		行状态
+            "
+        ::= { rcNotifsPortFilterEntry 3 }
+
+	rcNotifsTrapPhysicalID OBJECT-TYPE
+	    SYNTAX      OCTET STRING (SIZE (0..12))
+	    MAX-ACCESS  read-only
+	    STATUS      current
+	    DESCRIPTION
+	            "The index for this entry. It's a UNNID described as a octect string 
+	            Byte    1   2    3   4   5   6   7   8  9   10 11  
+	                 Shelf Slot Hop  Hop1ID  Hop2ID Hop3ID  Hop4ID 
+	            Byte 0 indicates Shelf ID of the UUID. Shelf id starts from 1.
+	            Byte 1 indicates Slot ID of the UNIID. Slot id starts from 0.
+	            Byte 2 is Hop, means how many hops from the local card to remote device. 
+	            HopNID means relative ID of this hop. Each Hop ID occupies 2 bytes.
+	            For local card, the Hop is zero.
+	            Limitation for the string is 12 bytes now. That means maximum hops is 4. 
+	            If you need to support more than 4 hops, the defination of SYTAX should 
+	            be changed."
+	    ::= { rcNotifsConfObjects 20 }
+
+	rcNotifsTrapIfIndex OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+	            "A unique value for each interface.  Its value
+	            ranges between 1 and the value of ifNumber.  The
+	            value for each interface must remain constant at
+	            least from one re-initialization of the entity's
+	            network management system to the next re-
+	            initialization."
+	    ::= { rcNotifsConfObjects 21 }
+
+	rcNotifsTrapBindVariable1 OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+	            "
+	            "
+	    ::= { rcNotifsConfObjects 22 }
+
+	rcNotifsTrapBindVariable2 OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+	            "
+	            "
+	    ::= { rcNotifsConfObjects 23 }
+
+	rcNotifsTrapBindVariable3 OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+	            "
+	            "
+	    ::= { rcNotifsConfObjects 24 }
+
+	rcNotifsTrapBindIpAddress OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+	            "
+	            "
+	    ::= { rcNotifsConfObjects 25 }
+
+    rcNotifsTrapInhibitEnable OBJECT-TYPE
+        SYNTAX     INTEGER {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警抑制使能配置。
+            "
+        DEFVAL { enable }
+        ::= { rcNotifsConfObjects 30 }
+
+    rcNotifsTrapDelayEnable OBJECT-TYPE
+        SYNTAX     INTEGER {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警延迟使能
+            "
+        DEFVAL { disable }
+        ::= { rcNotifsConfObjects 40 }
+
+    rcNotifsTrapDelayStartingTime OBJECT-TYPE
+        SYNTAX     INTEGER 
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警延迟起始时间。
+            "
+        ::= { rcNotifsConfObjects 41 }
+
+    rcNotifsTrapDelayEndTime OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警延迟结束时间。
+            "
+        ::= { rcNotifsConfObjects 42 }
+
+    rcNotifsTrapAutoSaveEnable OBJECT-TYPE
+        SYNTAX     INTEGER {
+                enable(1),
+                disable(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                enable or disable alarm configs and inverse states auto saving.
+            "
+        ::= { rcNotifsConfObjects 45 }
+
+    rcNotifsPortAlarmFilterTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcNotifsPortAlarmFilterEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Alarm Port filter table"
+        ::= { rcNotifsPortAlarmFilterConfig 11 }
+    
+    rcNotifsPortAlarmFilterEntry OBJECT-TYPE
+        SYNTAX  RcNotifsPortAlarmFilterEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the alarm port filter Table."
+        INDEX   { rcNotifsPortAlarmFilterPhysicalID, rcNotifsPortAlarmFilterIfIndex }
+        ::= { rcNotifsPortAlarmFilterTable 1 }
+     
+    RcNotifsPortAlarmFilterEntry ::=SEQUENCE
+        {
+        rcNotifsPortAlarmFilterPhysicalID
+            OCTET STRING,
+        rcNotifsPortAlarmFilterIfIndex
+            Integer32,
+        rcNotifsPortAlarmFilterRowStatus
+            RowStatus,
+        rcNotifsPortAlarmFilterTrapEnable
+            OCTET STRING,
+        rcNotifsPortAlarmFilterMonitoringDisable
+            OCTET STRING
+        }
+
+	rcNotifsPortAlarmFilterPhysicalID OBJECT-TYPE
+	    SYNTAX      OCTET STRING (SIZE (0..12))
+	    MAX-ACCESS  read-create
+	    STATUS      current
+	    DESCRIPTION
+	            "The index for this entry. It's a UNNID described as a octect string 
+	            Byte    1   2    3   4   5   6   7   8  9   10 11  
+	                 Shelf Slot Hop  Hop1ID  Hop2ID Hop3ID  Hop4ID 
+	            Byte 0 indicates Shelf ID of the UUID. Shelf id starts from 1.
+	            Byte 1 indicates Slot ID of the UNIID. Slot id starts from 0.
+	            Byte 2 is Hop, means how many hops from the local card to remote device. 
+	            HopNID means relative ID of this hop. Each Hop ID occupies 2 bytes.
+	            For local card, the Hop is zero.
+	            Limitation for the string is 12 bytes now. That means maximum hops is 4. 
+	            If you need to support more than 4 hops, the defination of SYTAX should 
+	            be changed."
+	    ::= { rcNotifsPortAlarmFilterEntry 1 }
+      
+    rcNotifsPortAlarmFilterIfIndex OBJECT-TYPE
+          SYNTAX  Integer32
+          MAX-ACCESS  read-create
+          STATUS  current
+          DESCRIPTION
+                 "
+               屏蔽告警的端口索引
+                 "
+      ::= { rcNotifsPortAlarmFilterEntry 2 }
+
+    rcNotifsPortAlarmFilterTrapEnable OBJECT-TYPE
+        SYNTAX     OCTET STRING (SIZE(4..512))
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "
+            配置基于端口的告警自动上报，具体格式如下：
+            ALARM_ID_NUM ID1 ID2 ID3 ……
+            每个关键字占四个字节
+            其中，ALARM_ID_NUM表示不要自动上报的告警ID数目，其中0XFFFFFFFF表示不上报该端口所有告警
+            其中0X00000000表示上报该端口所有告警
+            ID1、ID2、…………IDn表示要屏蔽的告警的ID号。
+            ID和告警OID最后一个字段一致。
+            "
+        ::= { rcNotifsPortAlarmFilterEntry 10 }
+
+    rcNotifsPortAlarmFilterMonitoringDisable OBJECT-TYPE
+        SYNTAX     OCTET STRING (SIZE(4..512))
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "
+            配置基于端口的告警屏蔽，具体格式如下：
+            ALARM_ID_NUM ID1 ID2 ID3 ……
+            每个关键字占四个字节
+            其中，ALARM_ID_NUM表示要屏蔽该端口的告警ID数目，其中0XFFFFFFFF表示屏蔽该端口所有告警
+            其中0X00000000表示不屏蔽该端口任何告警
+            ID1、ID2、…………IDn表示要屏蔽的告警的ID号。
+            ID和告警OID最后一个字段一致。
+            "
+        ::= { rcNotifsPortAlarmFilterEntry 11 }
+
+	rcNotifsPortAlarmFilterRowStatus OBJECT-TYPE
+        SYNTAX     RowStatus
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "   
+     	    		行状态
+            "
+        ::= { rcNotifsPortAlarmFilterEntry 30 }
+
+ 	rcNotifsPortAlarmFilterTableSize OBJECT-TYPE
+          SYNTAX  Integer32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "
+                 当前端口告警过滤表数目
+                 "
+      ::= { rcNotifsPortAlarmFilterConfig 10 }
+
+    rcNotifsPortAlarmInverseTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcNotifsPortAlarmInverseEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Alarm Port filter table"
+        ::= { rcNotifsPortAlarmInverseConfig 11 }
+
+    rcNotifsPortAlarmInverseEntry OBJECT-TYPE
+        SYNTAX  RcNotifsPortAlarmInverseEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the alarm port filter Table."
+        INDEX   { rcNotifsPortAlarmInversePhysicalID, rcNotifsPortAlarmInverseIfIndex }
+        ::= { rcNotifsPortAlarmInverseTable 1 }
+
+    RcNotifsPortAlarmInverseEntry ::=SEQUENCE
+        {
+        rcNotifsPortAlarmInversePhysicalID
+            OCTET STRING,
+        rcNotifsPortAlarmInverseIfIndex
+            Integer32,
+        rcNotifsPortAlarmInverseEnable
+        	INTEGER
+        }
+ 
+	rcNotifsPortAlarmInversePhysicalID OBJECT-TYPE
+	    SYNTAX      OCTET STRING (SIZE (0..12))
+	    MAX-ACCESS  read-only
+	    STATUS      current
+	    DESCRIPTION
+	            "The index for this entry. It's a UNNID described as a octect string 
+	            Byte    1   2    3   4   5   6   7   8  9   10 11  
+	                 Shelf Slot Hop  Hop1ID  Hop2ID Hop3ID  Hop4ID 
+	            Byte 0 indicates Shelf ID of the UUID. Shelf id starts from 1.
+	            Byte 1 indicates Slot ID of the UNIID. Slot id starts from 0.
+	            Byte 2 is Hop, means how many hops from the local card to remote device. 
+	            HopNID means relative ID of this hop. Each Hop ID occupies 2 bytes.
+	            For local card, the Hop is zero.
+	            Limitation for the string is 12 bytes now. That means maximum hops is 4. 
+	            If you need to support more than 4 hops, the defination of SYTAX should 
+	            be changed."
+	    ::= { rcNotifsPortAlarmInverseEntry 1 }
+      
+    rcNotifsPortAlarmInverseIfIndex OBJECT-TYPE
+          SYNTAX  Integer32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "
+               告警反转的端口索引
+                 "
+      ::= { rcNotifsPortAlarmInverseEntry 2 }
+
+
+    rcNotifsPortAlarmInverseEnable OBJECT-TYPE
+        SYNTAX INTEGER {
+			              enable(1),
+			              disable(2)
+			           }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "
+               enable：告警反转使能
+               disable: 告警反转关闭 
+               
+               注：网元是自动恢复模式且端口没有最高级告警，如果配置该端口告警反转使能，SNMP操作返回错误码 
+			   12：INCONSISTENT_VALUE
+
+            "
+        ::= { rcNotifsPortAlarmInverseEntry 4 } 
+
+ 	rcNotifsPortAlarmInverseTableSize OBJECT-TYPE
+          SYNTAX  Integer32
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+                 "
+                 当前端口告警反转表数目
+                 "
+      ::= { rcNotifsPortAlarmInverseConfig 10 }  
+      
+    rcNotifsAlarmInverseMode OBJECT-TYPE
+        SYNTAX INTEGER {
+			              off(1),
+			              auto(2),
+			              manual(3)
+			           }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "
+               off：非反转模式
+               auto: 自动恢复模式
+               manual: 人工恢复模式
+            "
+  
+       ::= { rcNotifsPortAlarmInverseConfig 9 } 
+        
+    rcNotifsAlarmInverseBatchEnable OBJECT-TYPE
+		SYNTAX      OCTET STRING (SIZE (0..1024))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "
+				批量下发端口告警反转配置     
+				PORT_NUM PORT_1 PORT_2...
+				其中PORT_NUM是配置的端口数量，PORT_n是一个端口的配置信息，格式为	|PHYID_LEN|PHYID|INDEX|CFG_DATA|
+				PHYID_LEN 4字节，PHYID由PHYID_LEN个字节组成，IFINDEX 4字节，CFG_DATA 4个字节。    
+				
+				注：网元是自动恢复模式且端口没有最高级告警，配置该端口告警使能会不成功。如果全部端口配置成功返回成功，否则返回失败。
+       
+			"
+  
+       ::= { rcNotifsPortAlarmInverseConfig 12 }    
+       
+	rcNotifsTrapRepeatIndex OBJECT-TYPE
+	SYNTAX            OCTET STRING (SIZE(0..32)) 
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "
+	   告警trap重发请求序列号列表
+	   格式为（1-3,5）
+	   "
+	::= { rcNotifsConfObjects 70 }	
+
+	rcNotifsTrapCurrentIndex OBJECT-TYPE
+	SYNTAX            INTEGER  
+	MAX-ACCESS        read-only
+	STATUS            current 
+	DESCRIPTION
+	   "
+	   当前trap序列号
+	   主要用于比较网管的当前最大序号和系统软件当前最大序号
+	   "   
+	::= { rcNotifsConfObjects 71 }   
+	
+	rcNotifsTrapRelateEnable OBJECT-TYPE
+	 SYNTAX INTEGER {
+			              enable(1),
+			              disable(2)
+			        }
+  
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "
+	   告警相关性开关使能或禁止
+	   "   
+	::= { rcNotifsConfObjects 72 }
+    
+    rcNotifsTrapRelateDelayTimes OBJECT-TYPE
+	SYNTAX            INTEGER  
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "
+	   告警相关性处理等待周期
+	   "   
+	::= { rcNotifsConfObjects 73 }   
+
+  
+       
+-- rcNotifsObjects
+--current alarm table
+    rcCurNotifsAlarmTableSize OBJECT-TYPE
+        SYNTAX     Integer32        
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "
+                当前告警表告警数目
+            "
+        ::= { rcNotifsObjects 1 }
+    
+        
+    rcCurNotifsAlarmTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcCurNotifsAlarmEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "
+                当前告警表
+            "
+        ::= { rcNotifsObjects 2 }
+  
+    rcCurNotifsAlarmEntry OBJECT-TYPE
+        SYNTAX  RcCurNotifsAlarmEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Alarm Table."
+        INDEX   { rcCurNotifsAlarmIndex }
+        ::= { rcCurNotifsAlarmTable 1 }
+   
+    RcCurNotifsAlarmEntry ::=SEQUENCE
+        {
+        rcCurNotifsAlarmIndex
+            Integer32,
+        rcCurNotifsAlarmType
+            OBJECT IDENTIFIER,
+        rcCurNotifsAlarmBindVarNum
+            Integer32,
+        rcCurNotifsAlarmBindVar
+            OCTET STRING,   
+       rcCurNotifsAlarmDeclareTime
+            TimeStamp,
+       rcCurNotifsAlarmRelativeTime
+       		Counter64
+        }  
+        
+    rcCurNotifsAlarmIndex  OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "
+            	告警表的索引。
+            "
+                
+        ::= { rcCurNotifsAlarmEntry 1 }
+        
+    rcCurNotifsAlarmType  OBJECT-TYPE
+        SYNTAX OBJECT IDENTIFIER 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                告警类型，对应于告警Trap的OID。
+            "
+        ::= { rcCurNotifsAlarmEntry 2 } 
+        
+    rcCurNotifsAlarmBindVarNum  OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                告警中绑定的变量个数。
+            "
+        ::= { rcCurNotifsAlarmEntry 3 } 
+        
+    rcCurNotifsAlarmBindVar  OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+            	|byte[1] |byte[2]        |byte[3]~byte[len1+2]|byte[len1+3]|byte[len1+4]   |byte[len1+5]~byte[len1+len2+4]|...
+            	|VAR1类型|VAR1 长度(len1)|VAR1值              |VAR2类型    |VAR2 长度(len2)|VAR2值                        |...
+            	|          绑定变量1                           |             绑定变量2                        |...
+                告警绑定的变量值，其中每组的第１个字节表示绑定的变量类型(0:INTEGER，1,OCTET STRING，2:Display String，3:ID),
+                第２个字节表示绑定的变量长度，后面的字节表示变量的值，绑定变量的类型可以为
+                任意，告警TRAP定义的绑定变量都在这里。
+            " 
+        ::= { rcCurNotifsAlarmEntry 4 } 
+      
+    rcCurNotifsAlarmDeclareTime  OBJECT-TYPE
+        SYNTAX TimeStamp 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                Alarm发生的时间。
+            "
+        ::= { rcCurNotifsAlarmEntry 5 }   
+        
+      rcCurNotifsAlarmRelativeTime   OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                Alarm发生的时间(8字节)。
+            "
+        ::= { rcCurNotifsAlarmEntry 6 }  
+
+--history alarm table
+
+    rcHisNotifsAlarmTableSize OBJECT-TYPE
+        SYNTAX     Integer32 
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "
+                历史告警表大小
+            "
+        ::= { rcNotifsObjects 3 }
+          
+    rcHisNotifsAlarmTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcHisNotifsAlarmEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "历史告警表"
+        ::= { rcNotifsObjects 4 }
+  
+    rcHisNotifsAlarmEntry OBJECT-TYPE
+        SYNTAX  RcHisNotifsAlarmEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "An entry in the Alarm Table."
+        INDEX   { rcHisNotifsAlarmIndex }
+        ::= { rcHisNotifsAlarmTable 1 }
+   
+    RcHisNotifsAlarmEntry ::=SEQUENCE
+        {
+        rcHisNotifsAlarmIndex
+            Integer32,
+        rcHisNotifsAlarmType
+            OBJECT IDENTIFIER,
+        rcHisNotifsAlarmBindVarNum
+            Integer32,
+        rcHisNotifsAlarmBindVar
+            OCTET STRING,
+        rcHisNotifsAlarmDeclareTime
+            TimeStamp,   
+        rcHisNotifsAlarmClearTime
+            TimeStamp,
+        rcHisNotifsAlarmCause
+        	INTEGER
+
+        }  
+        
+    rcHisNotifsAlarmIndex  OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "
+            "
+                --告警表的索引。
+        ::= { rcHisNotifsAlarmEntry 1 }
+        
+    rcHisNotifsAlarmType  OBJECT-TYPE
+        SYNTAX OBJECT IDENTIFIER 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                告警类型，对应于告警Trap的OID。
+            "
+        ::= { rcHisNotifsAlarmEntry 2 } 
+        
+    rcHisNotifsAlarmBindVarNum  OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                告警中绑定的变量个数。
+            "
+        ::= { rcHisNotifsAlarmEntry 3 } 
+      
+    rcHisNotifsAlarmBindVar  OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+            	|byte[1] |byte[2]        |byte[3]~byte[len1+2]|byte[len1+3]|byte[len1+4]   |byte[len1+5]~byte[len1+len2+4]|...
+            	|VAR1类型|VAR1 长度(len1)|VAR1值              |VAR2类型    |VAR2 长度(len2)|VAR2值                        |...
+            	|          绑定变量1                           |             绑定变量2                        |...
+                告警绑定的变量值，其中每组的第１个字节表示绑定的变量类型(0:INTEGER，1,OCTET STRING，2:Display String，3:ID),
+                第２个字节表示绑定的变量长度，后面的字节表示变量的值，绑定变量的类型可以为
+                任意，告警TRAP定义的绑定变量都在这里。
+            "
+        ::= { rcHisNotifsAlarmEntry 4 } 
+        
+    rcHisNotifsAlarmDeclareTime  OBJECT-TYPE
+        SYNTAX TimeStamp 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                Alarm发生的时间。
+            "
+        ::= { rcHisNotifsAlarmEntry 5 }  
+        
+    rcHisNotifsAlarmClearTime  OBJECT-TYPE
+        SYNTAX TimeStamp 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "
+                Alarm清除的时间。
+            "
+        ::= { rcHisNotifsAlarmEntry 6 } 
+          
+    rcHisNotifsAlarmCause  OBJECT-TYPE
+			SYNTAX INTEGER {
+			   auto(1),
+			   manual(2)
+			}
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION
+            "
+                Alarm清除的时间。
+            "
+        ::= { rcHisNotifsAlarmEntry 7 }   
+        
+
+
+	rcCurNotifsAlarmTableCmd OBJECT-TYPE
+        SYNTAX     OCTET STRING (SIZE(2..1024))
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+            删除当前告警表命令，具体格式如下：
+            ALARM_INDEX_NUM INDEX1 INDEX2 INDEX3 ……
+            每个关键字占四个个字节
+            其中，ALARM_INDEX_NUM表示要删除告警索引数目，其中0XFFFFFFFF表示删除所有告警
+            其中0X00000000表示不删除任何告警
+            INDEX1、INDEX2、…………INDEXn表示要删除的告警的索引。
+            "
+        ::= { rcNotifsObjects 10 } 
+          
+	rcCurNotifsAlarmTableDeleteByAlarmOID OBJECT-TYPE
+        SYNTAX     OCTET STRING (SIZE(4..1024))
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+			根据Trap的OID删除当前告警表中的告警            
+			ALARM_NUM ALARM_1 ALARM_2…
+			其中ALARM_ NUM表示要删除告警数目，4字节，其中0XFFFFFFFF表示删除所有告警，其中0X00000000表示不删除任何告警；
+			ALARM_n的格式为	|PHYID_LEN|PHYID|IFINDEX|OID_LEN|ALARM_OID|,
+			PHYID_LEN 4字节，PHYID由PHYID_LEN个字节组成，IFINDEX 4字节，OID_LEN 4字节，ALARM_OID 告警完整OID信息，OID_LEN×4个字节。
+			"
+        ::= { rcNotifsObjects 11 }
+
+
+    rcCurNotifsAlarmTableMaxSize OBJECT-TYPE
+        SYNTAX     Integer32 (500..2000)      
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "
+                当前告警表大小，缺省是1000
+                有效范围是100-2000
+            "
+        ::= { rcNotifsObjects 20 }
+
+    rcCurNotifsAlarmTableStorageMode  OBJECT-TYPE
+        SYNTAX     INTEGER {
+                loop(1),
+                stop(2)
+            }
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "
+                告警存储模式，支持停止和绕接两种模式
+            "
+        DEFVAL { loop }
+        ::= { rcNotifsObjects 21 }
+
+ END

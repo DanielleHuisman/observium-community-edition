@@ -1,0 +1,2129 @@
+
+-- File Name : LIGHTPAD-MIB.mib
+-- Date      : Thu Mar 31 16:01:25 BRST 2009
+-- Author    : AdventNet Agent Toolkit Java Edition - MIB Editor 6
+-- Authors	 : Marcelo Uesono <uesono@padtec.com.br>, Lavoisier J.L.Farias <lavoisier@padtec.com.br>, Thiago Ribeiro Mendes <thiago.mendes@padtec.com.br>, Daniel Araujo <daniel@padtec.com.br>, Denis Neves <dsantos@padtec.com.br>
+-- 		This MIB was changed at September 10th-2008 in  order to add the field boarModel for the following traps: alarmStartNotification, alarmEndNotification, alarmAckNotification, eventNotification
+--      This MIB was changed at September 22nd-2008 in  order to remove the fields alarmAckDate, alarmAckUser, alarmAckDescription for the following traps: alarmStartNotification and alarmEndNotification
+--      This MIB was updated at January 2009 to provide Network Management System alarms and information. The following tables were added: circuitTrailTable, networkAlarmTable, otsTrailTable and omsTrailTable. The following notification were added: networkAlarmStartNotification, networkAlarmEndNotification and networkAlarmAckNotification. When a trail is removed at the Management System, the current alarms of this trail are ended.
+--      This MIB was changed at January 22nd-2009 in order to add the fields networkAlarmNeNameSource, networkAlarmBoardNameSource, networkAlarmPortNameSource, networkAlarmNeNameDestination, networkAlarmBoardNameDestination, and networkAlarmPortNameDestination to the networkAlarmTable,  networkAlarmStartNotification, and networkAlarmEndNotification.
+--      This MIB was changed at March 31st-2009 to support estimated BER Metric
+--      This MIB was changed at April 23rd-2009 to include the networkAlarmChangeNotification
+--      This MIB was changed at May 12th-2009 to include the field boardState in boardTable and new eventType: boardInOperation ( 4 ) and boardInTest ( 5 )
+--      This MIB was changed at Sep 16th-2010 to add new types of performance
+--      This MIB was changed at Aug 28th-2014 to add table boardPerformanceTable (but was only used in v3_13_1_20140114_patchs_GERLP881)
+--		This MIB was updated at Jun 30th-2015 to add field alarmId for the following traps: alarmStartNotification, alarmEndNotification and alarmAckNotification
+--		This MIB was updated at Jul 07th-2015 to add comment about alarmId not is sent when parameter -DsendalarmId as value false.
+--		This MIB was updated at Jan 02nd-2017 to add table trailAssociationTable relation OtsId between OmsId.
+--		This MIB was updated at Jan 02nd-2017 to add table circuitAssociationOmsTable relation CircuitId between OmsId.
+--		This MIB was changed at Aug 03rd-2018 to use table boardPerformanceTable to fix SNIV-69 (Fixed OID for board performance measures)
+--		This MIB was changed at Jul 15rd-2020 Refactoring to RFC-2580 compliance.
+
+METROPAD3	DEFINITIONS ::= BEGIN
+	IMPORTS
+		RowStatus, DateAndTime, TruthValue
+			FROM SNMPv2-TC
+		snmp
+			FROM RFC1213-MIB
+		enterprises, MODULE-IDENTITY, OBJECT-TYPE, Integer32, NOTIFICATION-TYPE, TimeTicks, IpAddress
+			FROM SNMPv2-SMI
+		MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+			FROM SNMPv2-CONF;
+
+	moduleIdentity	MODULE-IDENTITY
+		LAST-UPDATED	"200904231617Z"
+		ORGANIZATION	"Padtec S/A http://www.padtec.com.br"
+		CONTACT-INFO	"SAC: sac@padtec.com.br"
+		DESCRIPTION		"This Module is responsible to map all the Padtec Manageable Equipment to SNMP."
+		REVISION		"200904231617Z"
+		DESCRIPTION		"This Revision contais the NMS capabilities."
+		::=  {  enterprises  1  }
+
+	org	OBJECT IDENTIFIER
+		::=  {  iso  3  }
+
+	dod	OBJECT IDENTIFIER
+		::=  {  org  6  }
+
+	internet	OBJECT IDENTIFIER
+		::=  {  dod  1  }
+
+	private	OBJECT IDENTIFIER
+		::=  {  internet  4  }
+
+	enterprises	OBJECT IDENTIFIER
+		::=  {  private  1  }
+
+	padtec	OBJECT IDENTIFIER
+		::=  {  enterprises  14846  }
+
+	metropad3	OBJECT IDENTIFIER
+		::=  {  padtec  3  }
+
+	lightpadMIBGroups OBJECT IDENTIFIER ::= { moduleIdentity 1 }
+
+	neTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  NeEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all the Network Elements which were associated at the Management System. A network element at Padtec platform is a supervisor unit that manages a bundle of boards and has a network transport function at the network."
+		::=  { metropad3  1 }
+
+	neEntry	OBJECT-TYPE
+		SYNTAX		NeEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The Network Element."
+		INDEX		{  neId  }
+		::=  { neTable 1 }
+
+	NeEntry  ::=  SEQUENCE {
+		neId  Integer32,
+		neName  OCTET STRING,
+		neNetwork  OCTET STRING,
+		neMap  OCTET STRING,
+		neRowStatus  RowStatus
+		}
+
+
+	neId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  neEntry  1  }
+
+
+	neName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is an unique identifier that describes the Name of Network Element. At Padtec system, this name is unique and duplication are not allowed."
+		::=  {  neEntry  2  }
+
+
+	neNetwork	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the network or system which contains the current NE Name."
+		::=  {  neEntry  3  }
+
+
+	neMap	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the map which contains the current NE Name."
+		::=  {  neEntry  4  }
+
+
+	neRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  neEntry  5  }
+
+	boardTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  BoardEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all boards managed by Padtec Network Management System."
+		::=  { metropad3  2 }
+
+	boardEntry	OBJECT-TYPE
+		SYNTAX		BoardEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The managed board."
+		INDEX		{  boardId  }
+		::=  { boardTable 1 }
+
+	BoardEntry  ::=  SEQUENCE {
+		boardId  Integer32,
+		boardPart  Integer32,
+		boardSerial  Integer32,
+		boardModel  OCTET STRING,
+		boardName  OCTET STRING,
+		boardDescription  OCTET STRING,
+		boardSubRack  Integer32,
+		boardSlot  Integer32,
+		boardVersion  OCTET STRING,
+		boardNeName  OCTET STRING,
+		boardNeMap  OCTET STRING,
+		boardState  INTEGER,
+		boardRowStatus  RowStatus,
+		boardRackPosition  Integer32
+		}
+
+
+	boardId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  boardEntry  1  }
+
+
+	boardPart	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the part number which defines the model of Padtec board which is being managed."
+		::=  {  boardEntry  2  }
+
+
+	boardSerial	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the serial number which defines the serial number of determined model of Padtec board which is being managed."
+		::=  {  boardEntry  3  }
+
+
+	boardModel	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the model name of the Padtec board which is being managed."
+		::=  {  boardEntry  4  }
+
+
+	boardName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name defined by the user of Padtec Network Management System."
+		::=  {  boardEntry  5  }
+
+
+	boardDescription	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the description fullfilled by the user of Padtec Network Management System."
+		::=  {  boardEntry  6  }
+
+
+	boardRackPosition	OBJECT-TYPE
+		SYNTAX			Integer32  ( 0 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of rack position on which the board of correspondent entry is placed."
+		::=  {  boardEntry  14  }
+
+
+	boardSubRack	OBJECT-TYPE
+		SYNTAX			Integer32  ( 0 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of sub-rack on which the board of correspondent entry is placed."
+		::=  {  boardEntry  7  }
+
+
+	boardSlot	OBJECT-TYPE
+		SYNTAX			Integer32  ( 0 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of slot on which the board of correspondent entry is placed."
+		::=  {  boardEntry  8  }
+
+
+	boardVersion	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the board Version"
+		::=  {  boardEntry  9  }
+
+
+	boardNeName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of NE which the correspondent board entry is placed."
+		::=  {  boardEntry  10  }
+
+
+	boardNeMap	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the map which contains the current NE Name."
+		::=  {  boardEntry  11  }
+
+	boardState      OBJECT-TYPE
+		SYNTAX			INTEGER { operation ( 1 ) , test ( 2 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It identifies the state of the board."
+		::=  {  boardEntry  12  }
+
+
+	boardRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  boardEntry  13  }
+
+	alarmTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  AlarmEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all the alarms which are raised by Padtec Network Management System. This table does NOT have events."
+		::=  { metropad3  3 }
+
+	alarmEntry	OBJECT-TYPE
+		SYNTAX		AlarmEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The alarm at Padtec Network Management System."
+		INDEX		{  alarmId  }
+		::=  { alarmTable 1 }
+
+	AlarmEntry  ::=  SEQUENCE {
+		alarmId  Integer32,
+		alarmType  Integer32,
+		alarmSeverity  INTEGER,
+		alarmName  OCTET STRING,
+		alarmBoardPart  Integer32,
+		alarmBoardSerial  Integer32,
+		alarmBoardSubRack  Integer32,
+		alarmBoardSlot  Integer32,
+		alarmStart  DateAndTime,
+		alarmEnd  DateAndTime,
+		alarmAckDate  DateAndTime,
+		alarmAckDescription  OCTET STRING,
+		alarmAckUser  OCTET STRING,
+		alarmNeName  OCTET STRING,
+		alarmNeMap  OCTET STRING,
+		alarmRowStatus  RowStatus,
+		alarmBoardRackPosition Integer32,
+		alarmResource OCTET STRING
+		}
+
+
+	alarmId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		accessible-for-notify
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  alarmEntry  1  }
+
+
+	alarmType	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is an integer which describes in a unique manner the alarm at Padtec Network Management System. Different types of boards have different numbers of alarmTypes. For instance, the LOS Alarm has an identifier for the Board amplifier, and has a different one for the OTN trasponder board."
+		::=  {  alarmEntry  2  }
+
+
+	alarmSeverity	OBJECT-TYPE
+		SYNTAX			INTEGER  { clear ( 1 ) , warning ( 2 ) , minor ( 3 ) , major ( 4 ) , critical ( 5 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It identifies the severity of each alarm."
+		::=  {  alarmEntry  3  }
+
+
+	alarmName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding alarm. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  alarmEntry  4  }
+
+
+	alarmBoardPart	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the part number at the boardTable. Every alarm has to have a associated board identified at boardTable."
+		::=  {  alarmEntry  5  }
+
+
+	alarmBoardSerial	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the serial number at the boardTable. Every alarm has to have a associated board identified at boardTable."
+		::=  {  alarmEntry  6  }
+
+
+	alarmBoardRackPosition	OBJECT-TYPE
+		SYNTAX			Integer32  ( 0 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of rack position on which the board of correspondent entry is placed."
+		::=  {  alarmEntry  17  }
+
+
+	alarmResource	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding alarm. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  alarmEntry  18  }
+
+
+	alarmBoardSubRack	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of sub-rack on which the board of correspondent entry is placed."
+		::=  {  alarmEntry  7  }
+
+
+	alarmBoardSlot	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of slot on which the board of correspondent entry is placed."
+		::=  {  alarmEntry  8  }
+
+
+	alarmStart	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the alarm started, .i.e.,the date and time when the alarm was raised."
+		::=  {  alarmEntry  9  }
+
+
+	alarmEnd	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the alarm ended, .i.e.,the date and time when the alarm was ended. All active alarms have this field as an empty value."
+		::=  {  alarmEntry  10  }
+
+
+	alarmAckDate	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the alarm was acknowledged."
+		::=  {  alarmEntry  11  }
+
+
+	alarmAckDescription	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the description corresponding to the text inputed by the user of Padtec Network Management System, or by anotehr NMS that acknowledge the corresponding alarm."
+		::=  {  alarmEntry  12  }
+
+
+	alarmAckUser	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of the user that acknowledged the alarm of Padtec Network Management System. If the alarm was acknowledged by another NMS, so this field will have the value equals to the word NMS."
+		::=  {  alarmEntry  13  }
+
+
+	alarmNeName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of Network Element at neTable on which the event has been identified."
+		::=  {  alarmEntry  14  }
+
+
+	alarmNeMap	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the map which contains the current NE Name."
+		::=  {  alarmEntry  15  }
+
+
+	alarmRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  alarmEntry  16  }
+
+	eventTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  EventEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all the events which are raised by Padtec Network Management System. This table does NOT have alarms. So, all the commands sent to the boards are registered at this table."
+		::=  { metropad3  4 }
+
+	eventEntry	OBJECT-TYPE
+		SYNTAX		EventEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The event which is raised by Padtec Network Management System."
+		INDEX		{  eventId  }
+		::=  { eventTable 1 }
+
+	EventEntry  ::=  SEQUENCE {
+		eventId  Integer32,
+		eventType  INTEGER,
+		eventName  OCTET STRING,
+		eventBoardPart  Integer32,
+		eventBoardSerial  Integer32,
+		eventBoardSubRack  Integer32,
+		eventBoardSlot  Integer32,
+		eventTime  DateAndTime,
+		eventNeName  OCTET STRING,
+		eventNeMap  OCTET STRING,
+		eventRowStatus  RowStatus,
+		eventBoardRackPosition Integer32
+		}
+
+
+	eventId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  eventEntry  1  }
+
+
+	eventType	OBJECT-TYPE
+		SYNTAX			INTEGER  { newNe ( 0 ) , removeNe ( 1 ) , newBoard ( 2 ) , removeBoard ( 3 ) , boardInOperation ( 4 ) , boardInTest ( 5 ), updateNE (6) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is an integer which describes in a unique manner the event at Padtec Network Management System."
+		::=  {  eventEntry  2  }
+
+
+	eventName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  eventEntry  3  }
+
+
+	eventBoardPart	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the part number at the boardTable. Every event has to have a associated board identified at boardTable."
+		::=  {  eventEntry  4  }
+
+
+	eventBoardSerial	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the serial number at the boardTable. Every event has to have a associated board identified at boardTable."
+		::=  {  eventEntry  5  }
+
+	eventBoardRackPosition	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of rack position on which the board of correspondent entry is placed."
+		::=  {  eventEntry  12  }
+
+
+	eventBoardSubRack	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of sub-rack on which the board of correspondent entry is placed."
+		::=  {  eventEntry  6  }
+
+
+	eventBoardSlot	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the number of slot on which the board of correspondent entry is placed."
+		::=  {  eventEntry  7  }
+
+
+	eventTime	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the event happen."
+		::=  {  eventEntry  8  }
+
+
+	eventNeName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of Network Element at NE Table on which the event has been identified."
+		::=  {  eventEntry  9  }
+
+
+	eventNeMap	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the map which contains the current NE Name."
+		::=  {  eventEntry  10  }
+
+
+	eventRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  eventEntry  11  }
+
+	performanceTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  PerformanceEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all the measurements which are stored by Padtec Network Management System. "
+		::=  { metropad3  5 }
+
+	performanceEntry	OBJECT-TYPE
+		SYNTAX		PerformanceEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"A performance measure stored by Padtec Network Management System."
+		INDEX		{  performanceId  }
+		::=  { performanceTable 1 }
+
+	PerformanceEntry  ::=  SEQUENCE {
+		performanceId  Integer32,
+		performanceBoardPart  Integer32,
+		performanceBoardSerial  Integer32,
+		performanceType  INTEGER,
+		performancePortType  INTEGER,
+		performancePortNumber  Integer32,
+		performanceValue  Integer32,
+		performanceRate  OCTET STRING,
+		performanceTime  DateAndTime,
+		performanceNeName  OCTET STRING,
+		performanceNeMap  OCTET STRING,
+		performanceRowStatus  RowStatus,
+		performanceOid  Integer32
+
+		}
+
+
+	performanceId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  performanceEntry  1  }
+
+
+	performanceBoardPart	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the part number at the boardTable. Every performance measurement is associated with a board identified at boardTable."
+		::=  {  performanceEntry  2  }
+
+
+	performanceBoardSerial	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the serial number at the boardTable. Every performance measurement is associated with a board identified at boardTable."
+		::=  {  performanceEntry  3  }
+
+
+	performanceType	OBJECT-TYPE
+		SYNTAX			INTEGER
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the type of the performance measurement has been taken. See the list of types at the manual."
+		::=  {  performanceEntry  5  }
+
+
+	performancePortType	OBJECT-TYPE
+		SYNTAX			INTEGER  { client ( 1 ) , wdm ( 2 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the type of port of the Padtec Board on which the performance measurement has been taken."
+		::=  {  performanceEntry  6  }
+
+
+	performancePortNumber	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds the port number of the Padtec Board on which the performance measurenebt has been taken."
+		::=  {  performanceEntry  7  }
+
+
+	performanceValue	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the performance measurements multipled by 100, in such way that is possible to represent measurements with 2 number precisions. For instance, if the value is 12.25 dBm, then the corresponding value at this table will be 1225."
+		::=  {  performanceEntry  8  }
+
+
+	performanceRate	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the performance measurements which are displayed at scientific notation. Therefore, all the error rates, transmission rates are mapped at this column."
+		::=  {  performanceEntry  9  }
+
+
+	performanceTime	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the Date and Time when the performance measurement was stored by the Padtec Network Management System."
+		::=  {  performanceEntry  10  }
+
+
+	performanceNeName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of NE which the correspondent board entry is placed."
+		::=  {  performanceEntry  11  }
+
+
+	performanceNeMap	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the map which contains the current NE Name."
+		::=  {  performanceEntry  12  }
+
+	performanceOid	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the part number at the boardTable. Every performance measurement is associated with a board identified at boardTable."
+		::=  {  performanceEntry  14  }
+
+
+	performanceRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  performanceEntry  13  }
+
+
+
+	serverStatus	OBJECT IDENTIFIER
+		::=  {  metropad3  6  }
+
+	alarmStartNotification	NOTIFICATION-TYPE
+		OBJECTS			{ alarmName, alarmBoardPart, alarmBoardSerial, alarmBoardRackPosition, alarmBoardSlot, alarmBoardSubRack, alarmNeName, alarmNeMap, alarmType, alarmSeverity, alarmStart, alarmRowStatus, boardModel, alarmId }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification when an alarm is raised. alarmId not is sent when parameter -DsendalarmId as value false."
+		::=  {  metropad3  7  }
+
+	alarmEndNotification	NOTIFICATION-TYPE
+		OBJECTS			{ alarmName, alarmBoardPart, alarmBoardSerial, alarmBoardRackPosition, alarmBoardSlot, alarmBoardSubRack, alarmNeName, alarmNeMap, alarmType, alarmSeverity, alarmEnd, alarmRowStatus, boardModel, alarmId }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification when an alarm is terminated. obs alarmId not is sent when parameter -DsendalarmId as value false."
+		::=  {  metropad3  8  }
+
+	alarmAckNotification	NOTIFICATION-TYPE
+		OBJECTS			{ alarmName, alarmBoardPart, alarmBoardSerial, alarmBoardRackPosition, alarmBoardSlot, alarmBoardSubRack, alarmNeName, alarmNeMap, alarmType, alarmSeverity, alarmStart, alarmEnd, alarmAckDate, alarmAckUser, alarmAckDescription, alarmRowStatus, boardModel, alarmId }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification when an alarm is acknowledge. obs alarmId not is sent when parameter -DsendalarmId as value false."
+		::=  {  metropad3  9  }
+
+	eventNotification	NOTIFICATION-TYPE
+		OBJECTS			{ eventName, eventBoardPart, eventBoardSerial, eventBoardRackPosition, eventBoardSlot, eventBoardSubRack, eventNeName, eventNeMap, eventType, eventTime, eventRowStatus, boardModel }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification when an event happen."
+		::=  {  metropad3  10  }
+
+
+	isAliveNotification	NOTIFICATION-TYPE
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification to show system is still alive."
+		::=  {  metropad3  11  }
+
+    isRecreateAlarmsNotification	NOTIFICATION-TYPE
+	 	OBJECTS			{ alarmsNotificationBoardPart, alarmsNotificationBoardSerial, alarmsNotificationBoardName, alarmsNotificationNeName }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification to recreate Alarmes"
+		::=  {  metropad3  24  }
+
+	isStatusNotification	NOTIFICATION-TYPE
+	    OBJECTS			{ statusAgente, uptimeAgente }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification to show system is still alive."
+		::=  {  metropad3  25  }
+
+
+    statusAgente	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  isStatusNotification  1  }
+
+	uptimeAgente	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  isStatusNotification  2  }
+
+	alarmsNotificationBoardPart	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  isRecreateAlarmsNotification  1  }
+
+
+	alarmsNotificationBoardSerial	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  isRecreateAlarmsNotification  2  }
+
+    alarmsNotificationBoardName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  isRecreateAlarmsNotification  3  }
+
+
+	alarmsNotificationNeName OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding event. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  isRecreateAlarmsNotification  4  }
+
+	networkAlarmTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  NetworkAlarmEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains the Padtec Network Management System alarms. This table does NOT have system events (see eventTable) neither EMS alarms (see alarmTable)."
+		::=  { metropad3  12 }
+
+	networkAlarmEntry	OBJECT-TYPE
+		SYNTAX		NetworkAlarmEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The Padtec Network Management System alarms."
+		INDEX		{  networkAlarmId  }
+		::=  { networkAlarmTable 1 }
+
+	NetworkAlarmEntry  ::=  SEQUENCE {
+		networkAlarmId  Integer32,
+		networkAlarmSeverity  INTEGER,
+		networkAlarmKey  Integer32,
+		networkAlarmGroup  INTEGER,
+		networkAlarmStart  DateAndTime,
+		networkAlarmEnd  DateAndTime,
+		networkAlarmNetworkName  OCTET STRING,
+		networkAlarmResource  OCTET STRING,
+		networkAlarmLayer  INTEGER,
+		networkAlarmNeName  OCTET STRING,
+		networkAlarmBoardName  OCTET STRING,
+		networkAlarmName  OCTET STRING,
+		networkAlarmType  INTEGER,
+		networkAlarmNeNameSource  OCTET STRING,
+		networkAlarmBoardNameSource  OCTET STRING,
+		networkAlarmPortNameSource  OCTET STRING,
+		networkAlarmNeNameDestination  OCTET STRING,
+		networkAlarmBoardNameDestination  OCTET STRING,
+                networkAlarmPortNameDestination  OCTET STRING,
+		networkAlarmAck  TruthValue,
+		networkAlarmAckDate  DateAndTime,
+		networkAlarmAckUser  OCTET STRING,
+		networkAlarmRowStatus  RowStatus
+		}
+
+
+	networkAlarmId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  networkAlarmEntry  1  }
+
+
+	networkAlarmSeverity	OBJECT-TYPE
+		SYNTAX			INTEGER  { indeterminated ( 0 ) , clear ( 1 ) , warning ( 2 ) , minor ( 3 ) , major ( 4 ) , critical ( 5 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It identifies the severity of each alarm."
+		::=  {  networkAlarmEntry  2  }
+
+
+	networkAlarmKey	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is an integer which describes in a unique manner the alarm at Padtec Network Management System."
+		::=  {  networkAlarmEntry  3  }
+
+
+	networkAlarmGroup	OBJECT-TYPE
+		SYNTAX			INTEGER { communicationsAlarm ( 2 ) , environmentalAlarm ( 3 ) , equipmentAlarm ( 4 ) , processingErrorAlarm ( 10 ) , qualityOfServiceAlarm ( 11 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The category of this alarm as defined by CCITT Recommendation X.733."
+		::=  {  networkAlarmEntry  4  }
+
+
+	networkAlarmStart	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the alarm started, .i.e.,the date and time when the event happened."
+		::=  {  networkAlarmEntry  5  }
+
+
+	networkAlarmEnd	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the alarm ended. All active (not cleared ones) alarms show the value 1969-12-31,22:0:0.0,-3:0."
+		::=  {  networkAlarmEntry  6  }
+
+
+	networkAlarmNetworkName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the network affected by the alarm."
+		::=  {  networkAlarmEntry  7  }
+
+
+	networkAlarmResource	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the affected trail or circuit."
+		::=  {  networkAlarmEntry  8  }
+
+
+	networkAlarmLayer	OBJECT-TYPE
+		SYNTAX			INTEGER  { ots ( 1 ) , oms ( 2 ) , circuit ( 3 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The Layer of the alarm: tranport (1), multiplex (2) or end-to-end (3)."
+		::=  {  networkAlarmEntry  9  }
+
+
+	networkAlarmNeName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of Network Element at NE Table on which the event has been identified."
+		::=  {  networkAlarmEntry  10  }
+
+
+	networkAlarmBoardName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the affected board."
+		::=  {  networkAlarmEntry  11  }
+
+
+	networkAlarmName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a text that describes the name of the corresponding alarm. It has the same text as viewed by the user of Padtec Network Management System."
+		::=  {  networkAlarmEntry  12  }
+
+
+	networkAlarmType	OBJECT-TYPE
+		SYNTAX			INTEGER  { ots ( 1 ) , otsClient ( 2 ) , och ( 3 ) , circuit ( 4 ) , oam ( 5 ) , otn25G ( 6 ) , otu1 ( 7 ) , odu1 ( 8 ) , sdh ( 9 ) , otn10G ( 10 ) , otu2 ( 11 ) , odu2 ( 12 ) , opu2 ( 13 ) , equipment ( 14 ) , management ( 15 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"Shows the kind of this network alarm."
+		::=  {  networkAlarmEntry  13  }
+
+	networkAlarmNeNameSource	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the source NE of the affected trail or circuit."
+		::=  {  networkAlarmEntry  14  }
+
+	networkAlarmBoardNameSource	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the source board of the affected trail or circuit."
+		::=  {  networkAlarmEntry  15  }
+
+	networkAlarmPortNameSource	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the source port/interface of the affected trail or circuit."
+		::=  {  networkAlarmEntry  16  }
+
+	networkAlarmNeNameDestination	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the destination NE of the affected trail or circuit."
+		::=  {  networkAlarmEntry  17  }
+
+	networkAlarmBoardNameDestination	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the destination board of the affected trail or circuit."
+		::=  {  networkAlarmEntry  18  }
+
+	networkAlarmPortNameDestination	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the destination port/interface of the affected trail or circuit."
+		::=  {  networkAlarmEntry  19  }
+
+
+	networkAlarmAck	OBJECT-TYPE
+		SYNTAX			TruthValue
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"Identifies if the alarm was acknowledged. This object has the value 'true(1)', if this alarm was acknowledged and the value 'false(2)' otherwise."
+		::=  {  networkAlarmEntry  20  }
+
+
+	networkAlarmAckDate	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the Date and Time when the alarm was acknowledged or 1969-12-31,22:0:0.0,-3:0 for alarms not acknowledged."
+		::=  {  networkAlarmEntry  21  }
+
+
+	networkAlarmAckUser	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of the user that acknowledged the alarm of Padtec Network Management System. If the alarm was acknowledged by another NMS, so this field will have the value equals to the word NMS. This field will have the value equals to the word N/A if the corresponding alarm was not acknowledged."
+		::=  {  networkAlarmEntry  22  }
+
+
+	networkAlarmRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  networkAlarmEntry  23  }
+
+	otsTrailTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  OtsTrailEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all OTS trails."
+		::=  { metropad3  13 }
+
+	otsTrailEntry	OBJECT-TYPE
+		SYNTAX		OtsTrailEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The OTS Trail."
+		INDEX		{  otsTrailId  }
+		::=  { otsTrailTable 1 }
+
+	OtsTrailEntry  ::=  SEQUENCE {
+		otsTrailId  Integer32,
+		otsTrailName  OCTET STRING,
+		otsTrailDescription  OCTET STRING,
+		otsTrailFiberType  OCTET STRING,
+		otsTrailDistance  Integer32,
+		otsTrailSourceNE  OCTET STRING,
+		otsTrailSourceBoard  OCTET STRING,
+		otsTrailSourcePort  OCTET STRING,
+		otsTrailDestinationNE  OCTET STRING,
+		otsTrailDestinationBoard  OCTET STRING,
+		otsTrailDestinationPort  OCTET STRING,
+		otsTrailDatabaseId  Integer32,
+		otsTrailRowStatus  RowStatus
+		}
+
+
+	otsTrailId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  otsTrailEntry  1  }
+
+	otsTrailName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this trail OTS."
+		::=  {  otsTrailEntry  2  }
+
+
+	otsTrailDescription	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The description of this trail OTS."
+		::=  {  otsTrailEntry  3  }
+
+
+	otsTrailFiberType	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The type of optical fiber."
+		::=  {  otsTrailEntry  4  }
+
+	otsTrailDistance	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The distance of this OTS Trail in kilometers multipled by 100, in such way that is possible to represent measurements with 2 number precisions. For instance, if the value is 90.25 km, then the corresponding value at this table will be 9025."
+		::=  {  otsTrailEntry  5  }
+
+
+	otsTrailSourceNE	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OTS trail's source NE. See neTable."
+		::=  {  otsTrailEntry  6  }
+
+
+	otsTrailSourceBoard	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OTS trail's source board. See boardTable."
+		::=  {  otsTrailEntry  7  }
+
+
+	otsTrailSourcePort	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OTS trail's source port/interface."
+		::=  {  otsTrailEntry  8  }
+
+
+	otsTrailDestinationNE	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OTS trail's destination NE. See neTable."
+		::=  {  otsTrailEntry  9  }
+
+
+	otsTrailDestinationBoard	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OTS trail's destination board. See boardTable."
+		::=  {  otsTrailEntry  10  }
+
+
+	otsTrailDestinationPort		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OTS trail's destination port/interface."
+		::=  {  otsTrailEntry  11  }
+
+	otsTrailDatabaseId	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table. The id's negatives represents back path."
+		::=  {  otsTrailEntry  12  }
+
+
+	otsTrailRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  otsTrailEntry  13  }
+
+	omsTrailTable		OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  OmsTrailEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all Optical Multiplex Section (OMS) Trails."
+		::=  { metropad3  14 }
+
+	omsTrailEntry		OBJECT-TYPE
+		SYNTAX		OmsTrailEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"The Optical Multiplex Section (OMS)."
+		INDEX		{  omsTrailId  }
+		::=  { omsTrailTable 1 }
+
+	OmsTrailEntry  ::=  SEQUENCE {
+		omsTrailId  Integer32,
+		omsTrailName  OCTET STRING,
+		omsTrailDescription  OCTET STRING,
+		omsTrailSourceNE  OCTET STRING,
+		omsTrailSourceBoard  OCTET STRING,
+		omsTrailSourcePort  OCTET STRING,
+		omsTrailDestinationNE  OCTET STRING,
+		omsTrailDestinationBoard  OCTET STRING,
+		omsTrailDestinationPort  OCTET STRING,
+		omsTrailDatabaseId Integer32,
+		omsTrailRowStatus  RowStatus
+		}
+
+
+	omsTrailId	OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  omsTrailEntry  1  }
+
+
+	omsTrailName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The identifier of the OMS Trail."
+		::=  {  omsTrailEntry  2  }
+
+
+	omsTrailDescription		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The description of the OMS Trail."
+		::=  {  omsTrailEntry  3  }
+
+
+	omsTrailSourceNE		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OMS trail's source NE. See neTable."
+		::=  {  omsTrailEntry  4  }
+
+
+	omsTrailSourceBoard		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OMS trail's source board. See boardTable."
+		::=  {  omsTrailEntry  5  }
+
+
+	omsTrailSourcePort		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OMS trail's source port/interface."
+		::=  {  omsTrailEntry  6  }
+
+
+	omsTrailDestinationNE		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OMS trail's destination NE. See neTable."
+		::=  {  omsTrailEntry  7  }
+
+
+	omsTrailDestinationBoard	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OMS trail's destination board. See boardTable."
+		::=  {  omsTrailEntry  8  }
+
+
+	omsTrailDestinationPort		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this OMS trail's destination port/interface."
+		::=  {  omsTrailEntry  9  }
+
+	omsTrailDatabaseId	OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The identifier of the OMS Trail. The id's negatives represents back path."
+		::=  {  omsTrailEntry   10  }
+
+
+	omsTrailRowStatus		OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  omsTrailEntry  11  }
+
+	circuitTrailTable		OBJECT-TYPE
+		SYNTAX			SEQUENCE  OF  CircuitTrailEntry
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"Contains all circuit end-to-end trails."
+		::=  { metropad3  15 }
+
+	circuitTrailEntry		OBJECT-TYPE
+		SYNTAX			CircuitTrailEntry
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"The circuit end-to-end trail."
+		INDEX			{  circuitTrailId  }
+		::=  { circuitTrailTable 1 }
+
+	CircuitTrailEntry  ::=  SEQUENCE {
+		circuitTrailId  Integer32,
+		circuitTrailName  OCTET STRING,
+		circuitTrailDescription  OCTET STRING,
+		circuitTrailClientName  OCTET STRING,
+		circuitTrailClientId  OCTET STRING,
+		circuitTrailService  OCTET STRING,
+		circuitTrailSourceNetwork  OCTET STRING,
+		circuitTrailSourceNE  OCTET STRING,
+		circuitTrailSourceBoard  OCTET STRING,
+		circuitTrailSourcePort  OCTET STRING,
+		circuitTrailDestinationNetwork  OCTET STRING,
+		circuitTrailDestinationNE  OCTET STRING,
+		circuitTrailDestinationBoard  OCTET STRING,
+		circuitTrailDestinationPort  OCTET STRING,
+		circuitTrailDatabaseId Integer32,
+		circuitTrailRowStatus  RowStatus
+		}
+
+
+	circuitTrailId			OBJECT-TYPE
+		SYNTAX			Integer32  ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table."
+		::=  {  circuitTrailEntry  1  }
+
+
+	circuitTrailName		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"Identifier of the end-to-end circuit."
+		::=  {  circuitTrailEntry  2  }
+
+
+	circuitTrailDescription		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The description of the end-to-end circuit"
+		::=  {  circuitTrailEntry  3  }
+
+
+	circuitTrailClientName		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the client of the circuit."
+		::=  {  circuitTrailEntry  4  }
+
+
+	circuitTrailClientId		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The identifier of the client of circuit."
+		::=  {  circuitTrailEntry  5  }
+
+
+	circuitTrailService		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The service of the end-to-end circuit."
+		::=  {  circuitTrailEntry  6  }
+
+
+	circuitTrailSourceNetwork	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the circuit's source network."
+		::=  {  circuitTrailEntry  7  }
+
+
+	circuitTrailSourceNE		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's source NE. See neTable."
+		::=  {  circuitTrailEntry  8  }
+
+
+	circuitTrailSourceBoard		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's source board. See boardTable."
+		::=  {  circuitTrailEntry  9  }
+
+
+	circuitTrailSourcePort		OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's source port/interface."
+		::=  {  circuitTrailEntry  10  }
+
+
+	circuitTrailDestinationNetwork	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's destination network."
+		::=  {  circuitTrailEntry  11  }
+
+
+	circuitTrailDestinationNE	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's destination NE. See neTable."
+		::=  {  circuitTrailEntry  12  }
+
+
+	circuitTrailDestinationBoard	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's destination board. See boardTable."
+		::=  {  circuitTrailEntry  13  }
+
+
+	circuitTrailDestinationPort	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of this circuit's destination port/interface."
+		::=  {  circuitTrailEntry  14  }
+
+	circuitTrailDatabaseId			OBJECT-TYPE
+		SYNTAX			Integer32  ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is a unique ID to identifiy a row of this table. The id's negatives represents back path."
+		::=  {  circuitTrailEntry  15  }
+
+
+
+	circuitTrailRowStatus		OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  circuitTrailEntry  16  }
+
+	networkAlarmStartNotification	NOTIFICATION-TYPE
+		OBJECTS			{ networkAlarmSeverity, networkAlarmKey, networkAlarmGroup, networkAlarmStart, networkAlarmNetworkName, networkAlarmResource, networkAlarmLayer, networkAlarmNeName, networkAlarmBoardName, networkAlarmName, networkAlarmType, networkAlarmNeNameSource, networkAlarmBoardNameSource, networkAlarmPortNameSource, networkAlarmNeNameDestination, networkAlarmBoardNameDestination, networkAlarmPortNameDestination, networkAlarmAck }
+		STATUS			current
+		DESCRIPTION		"Start of an alarm. Contains all the information of the alarm and should be used for logging purposes."
+		::=  {  metropad3  16  }
+
+	networkAlarmEndNotification	NOTIFICATION-TYPE
+		OBJECTS			{ networkAlarmSeverity, networkAlarmKey, networkAlarmGroup, networkAlarmStart, networkAlarmEnd, networkAlarmNetworkName, networkAlarmResource, networkAlarmLayer, networkAlarmNeName, networkAlarmBoardName, networkAlarmName, networkAlarmType, networkAlarmNeNameSource, networkAlarmBoardNameSource, networkAlarmPortNameSource, networkAlarmNeNameDestination, networkAlarmBoardNameDestination, networkAlarmPortNameDestination, networkAlarmAck }
+		STATUS			current
+		DESCRIPTION		"End of an alarm. Contains all the information of the alarm and should be used for logging purposes."
+		::=  {  metropad3  17  }
+
+	networkAlarmAckNotification	NOTIFICATION-TYPE
+		OBJECTS			{ networkAlarmSeverity, networkAlarmKey, networkAlarmGroup, networkAlarmStart, networkAlarmEnd, networkAlarmNetworkName, networkAlarmResource, networkAlarmLayer, networkAlarmNeName, networkAlarmBoardName, networkAlarmName, networkAlarmType, networkAlarmAck, networkAlarmAckDate, networkAlarmAckUser }
+		STATUS			current
+		DESCRIPTION		"Acknowledgement of an alarm. The alarm may not be terminated."
+		::=  {  metropad3  18  }
+
+	serverMasterIp	OBJECT-TYPE
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the IP Address of the configured Master Server."
+		::=  {  serverStatus  1  }
+
+	serverSlaveIp	OBJECT-TYPE
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the IP Address of the configured Slave Server."
+		::=  {  serverStatus  2  }
+
+	serverIsActive	OBJECT-TYPE
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the IP Address of the current server which is as active."
+		::=  {  serverStatus  3  }
+
+	serverVersion	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It has the version of the Padtec Network Management System."
+		::=  {  serverStatus  4  }
+
+	serverBuild			OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		" It has the number of the build at the following notation yyyymmdd. Therefore, this field has a value like yyyymmdd. Where yyyy corresponds to the year, mm to the month (1..12) and dd to the day (1..31)."
+		::=  {  serverStatus  5  }
+
+	serverUpTime			OBJECT-TYPE
+		SYNTAX			TimeTicks
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the period of time that happened since the current Active Master is running."
+		::=  {  serverStatus  6  }
+
+	serverSo	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the operating system on whoch the server is being installed."
+		::=  {  serverStatus  7  }
+
+	serverFreeDiskSpace		OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It has the total of free space at the partition on which the server is running. This partition to be monitored can be configured at the Padtec Network Management System. Padtec strongly advice to set this partittion to that one on which the database keep the data tables stored."
+		::=  {  serverStatus  8  }
+
+	serverSync	OBJECT-TYPE
+		SYNTAX			TruthValue
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It identifies if the master and slave servers have the database synchronized."
+		::=  {  serverStatus  9  }
+
+	networkEventLogTable		OBJECT-TYPE
+		SYNTAX			SEQUENCE  OF  NetworkEventLogEntry
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"This table has the events which are raised by Padtec Network Management System."
+		::=  { metropad3  19 }
+
+	networkEventLogEntry		OBJECT-TYPE
+		SYNTAX			NetworkEventLogEntry
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"The event which is raised by Padtec Network Management System."
+		INDEX			{  networkEventLogId  }
+		::=  { networkEventLogTable 1 }
+
+	NetworkEventLogEntry  ::=  SEQUENCE {
+		networkEventLogId  Integer32,
+		networkEventLogTime  DateAndTime,
+		networkEventLogResourceType  INTEGER,
+		networkEventLogResourceName  OCTET STRING,
+		networkEventLogAction  INTEGER,
+		networkEventLogRowStatus  RowStatus
+		}
+
+
+	networkEventLogId		OBJECT-TYPE
+		SYNTAX			Integer32 ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of this table."
+		::=  {  networkEventLogEntry  1  }
+
+
+	networkEventLogTime			OBJECT-TYPE
+			SYNTAX			DateAndTime
+			MAX-ACCESS		read-only
+			STATUS			current
+			DESCRIPTION		"It is the Date and Time when the event happen."
+		::=  {  networkEventLogEntry  2  }
+
+	networkEventLogResourceType	OBJECT-TYPE
+		SYNTAX			INTEGER {network ( 1 ) , ots ( 2 ) , oms ( 3 ) , circuit ( 4 ), omsotsrelation( 5 ), circuitomsrelation( 6 )}
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The type of the resource affected by this event."
+		::=  {  networkEventLogEntry  3  }
+
+
+	networkEventLogResourceName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The name of the resource affected by this event."
+		::=  {  networkEventLogEntry  4  }
+
+
+	networkEventLogAction		OBJECT-TYPE
+		SYNTAX			INTEGER  { add ( 1 ) , change ( 2 ) , remove ( 3 ) }
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"The executed action."
+		::=  {  networkEventLogEntry  5  }
+
+
+	networkEventLogRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  networkEventLogEntry  6  }
+
+	networkEventLogNotification	NOTIFICATION-TYPE
+		OBJECTS			{ networkEventLogTime, networkEventLogResourceType, networkEventLogResourceName, networkEventLogAction, networkEventLogRowStatus }
+		STATUS			current
+		DESCRIPTION		"It corresponds to a notification when an event is raised by Padtec Network Management System."
+		::=  {  metropad3  20  }
+
+	networkAlarmChangeNotification	NOTIFICATION-TYPE
+		OBJECTS			{ networkAlarmSeverity, networkAlarmKey, networkAlarmGroup, networkAlarmStart, networkAlarmNetworkName, networkAlarmResource, networkAlarmLayer, networkAlarmNeName, networkAlarmBoardName, networkAlarmName, networkAlarmType, networkAlarmNeNameSource, networkAlarmBoardNameSource, networkAlarmPortNameSource, networkAlarmNeNameDestination, networkAlarmBoardNameDestination, networkAlarmPortNameDestination, networkAlarmAck }
+		STATUS			current
+		DESCRIPTION		"Change of a network alarm. Contains all the information of a network alarm and should be used for logging purposes."
+		::=  {  metropad3  21  }
+
+		trailAssociationTable OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  TrailAssociationEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"This table represents all the contained OTS belonging to the same OMS Trail."
+		::=  { metropad3  22 }
+
+	trailAssociationEntry	OBJECT-TYPE
+		SYNTAX			TrailAssociationEntry
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"The event which is raised by Padtec Network Management System."
+		INDEX 	{ omsOtsAssociationTrailIdIndex }
+		::=  { trailAssociationTable 1 }
+
+	TrailAssociationEntry  ::=  SEQUENCE {
+		omsOtsAssociationTrailIdIndex Integer32,
+		omsOtsAssociationOtsTrailId  Integer32,
+		omsOtsAssociationOmsTrailId  Integer32,
+		omsOtsAssociationRowStatus  RowStatus
+		}
+
+	omsOtsAssociationTrailIdIndex	OBJECT-TYPE
+		SYNTAX			Integer32 ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of this table."
+		::=  {  trailAssociationEntry  1  }
+
+	omsOtsAssociationOtsTrailId		OBJECT-TYPE
+		SYNTAX			Integer32 ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of the OTS Trail table. The id's negatives represents back path."
+		::=  {  trailAssociationEntry  2  }
+
+	omsOtsAssociationOmsTrailId		OBJECT-TYPE
+		SYNTAX			Integer32 ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of the OMS Trail table. The id's negatives represents back path."
+		::=  {  trailAssociationEntry  3  }
+
+	omsOtsAssociationRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  trailAssociationEntry  4  }
+
+	circuitAssociationOmsTable OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  TrailAssociationEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"This table represents all the contained OTS belonging to the same OMS Trail."
+		::=  { metropad3  23 }
+
+	circuitAssociationOmsEntry	OBJECT-TYPE
+		SYNTAX			CircuitAssociationOmsEntry
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"The event which is raised by Padtec Network Management System."
+		INDEX 	{ circuitOmsAssociationTrailIdIndex }
+		::=  { circuitAssociationOmsTable 1 }
+
+	CircuitAssociationOmsEntry  ::=  SEQUENCE {
+		circuitOmsAssociationTrailIdIndex Integer32,
+		circuitOmsAssociationCircuitTrailId Integer32,
+		circuitOmsAssociationOmsTrailId  Integer32,
+		circuitOmsAssociationRowStatus  RowStatus
+		}
+
+	circuitOmsAssociationTrailIdIndex	OBJECT-TYPE
+		SYNTAX			Integer32 ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of this table. The id's negatives represents back path."
+		::=  {  circuitAssociationOmsEntry  1  }
+
+	circuitOmsAssociationCircuitTrailId		OBJECT-TYPE
+		SYNTAX			Integer32 ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of the Circuit Trail table. The id's negatives represents back path."
+		::=  {  circuitAssociationOmsEntry  2  }
+
+	circuitOmsAssociationOmsTrailId		OBJECT-TYPE
+		SYNTAX			Integer32 ( -2147483648 .. 2147483647  )
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is unique ID to identifiy a row of the OMS Trail table. "
+		::=  {  circuitAssociationOmsEntry  3  }
+
+	circuitOmsAssociationRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  circuitAssociationOmsEntry  4  }
+
+	boardPerformanceTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  BoardPerformanceEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"Contains all the measurements which are stored by Padtec Network Management System. "
+		::=  { metropad3  26 }
+
+	boardPerformanceEntry	OBJECT-TYPE
+		SYNTAX		BoardPerformanceEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	"A performance measure stored by Padtec Network Management System."
+		INDEX		{  boardPerformanceBoardPart, boardPerformanceBoardSerial, boardPerformanceType, boardPerformancePortNumber, boardPerformancePortType  }
+		::=  { boardPerformanceTable 1 }
+
+	BoardPerformanceEntry  ::=  SEQUENCE {
+		boardPerformanceBoardPart  Integer32,
+		boardPerformanceBoardSerial  Integer32,
+		boardPerformanceType  INTEGER,
+		boardPerformancePortNumber  Integer32,
+		boardPerformancePortType  INTEGER,
+		boardPerformanceValue  Integer32,
+		boardPerformanceRate  OCTET STRING,
+		boardPerformanceTime  DateAndTime,
+		boardPerformanceNeName  OCTET STRING,
+		boardPerformanceNeMap  OCTET STRING,
+		boardPerformanceRowStatus  RowStatus
+		}
+
+	boardPerformanceBoardPart	OBJECT-TYPE
+		SYNTAX			Integer32 ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the part number at the boardTable. Every performance measurement is associated with a board identified at boardTable."
+		::=  {  boardPerformanceEntry  1  }
+
+
+	boardPerformanceBoardSerial	OBJECT-TYPE
+		SYNTAX			Integer32 ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It is a number corresponding to the serial number at the boardTable. Every performance measurement is associated with a board identified at boardTable."
+		::=  {  boardPerformanceEntry  2  }
+
+
+	boardPerformanceType	OBJECT-TYPE
+		SYNTAX			INTEGER ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It corresponds to the type of the performance measurement has been taken. See the list of types at the manual."
+		::=  {  boardPerformanceEntry  3  }
+
+	boardPerformancePortNumber	OBJECT-TYPE
+		SYNTAX			Integer32 ( 1 .. 2147483647  )
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It corresponds the port number of the Padtec Board on which the performance measurenebt has been taken."
+		::=  {  boardPerformanceEntry  4  }
+
+	boardPerformancePortType	OBJECT-TYPE
+		SYNTAX			INTEGER  { client ( 1 ) , wdm ( 2 ) }
+		MAX-ACCESS		not-accessible
+		STATUS			current
+		DESCRIPTION		"It corresponds to the type of port of the Padtec Board on which the performance measurement has been taken."
+		::=  {  boardPerformanceEntry  5  }
+
+	boardPerformanceValue	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the performance measurements multipled by 100, in such way that is possible to represent measurements with 2 number precisions. For instance, if the value is 12.25 dBm, then the corresponding value at this table will be 1225."
+		::=  {  boardPerformanceEntry  6  }
+
+
+	boardPerformanceRate	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the performance measurements which are displayed at scientific notation. Therefore, all the error rates, transmission rates are mapped at this column."
+		::=  {  boardPerformanceEntry  7  }
+
+
+	boardPerformanceTime	OBJECT-TYPE
+		SYNTAX			DateAndTime
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It corresponds to the Date and Time when the performance measurement was stored by the Padtec Network Management System."
+		::=  {  boardPerformanceEntry  8  }
+
+
+	boardPerformanceNeName	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It is the name of NE which the correspondent board entry is placed."
+		::=  {  boardPerformanceEntry  9  }
+
+
+	boardPerformanceNeMap	OBJECT-TYPE
+		SYNTAX			OCTET STRING
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		"It describes the map which contains the current NE Name."
+		::=  {  boardPerformanceEntry  10  }
+
+
+	boardPerformanceRowStatus	OBJECT-TYPE
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-create
+		STATUS			current
+		DESCRIPTION		"The RowStatus of this entry."
+		::=  {  boardPerformanceEntry  11  }
+    
+    lightpadNotificationsGroup NOTIFICATION-GROUP
+        NOTIFICATIONS
+    			     {
+    			     networkAlarmChangeNotification,
+    			     networkEventLogNotification,
+    			     networkAlarmAckNotification,
+    			     networkAlarmEndNotification,
+    			     networkAlarmStartNotification,
+    			     isStatusNotification,
+    			     isRecreateAlarmsNotification,
+    			     isAliveNotification,
+    			     eventNotification,
+    			     alarmEndNotification,
+    			     alarmStartNotification,
+    			     alarmAckNotification
+    			     }
+        STATUS        current
+        DESCRIPTION
+        "The collection of notifications used to indicate lightpad MIB
+        data consistency and general status information."
+        ::= { lightpadMIBGroups 1 }
+    
+    lightpadGroup OBJECT-GROUP
+        OBJECTS {
+                uptimeAgente,
+                statusAgente,
+                neRowStatus,
+                neMap,
+                neNetwork,
+                neName
+                }
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 2 }
+    
+    boardPerformanceGroup OBJECT-GROUP
+        OBJECTS { 
+                boardPerformanceRowStatus,
+                boardPerformanceNeMap,
+                boardPerformanceNeName,
+                boardPerformanceTime,
+                boardPerformanceRate,
+                boardPerformanceValue
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 3 }
+    
+    circuitOmsAssociationGroup OBJECT-GROUP
+        OBJECTS { 
+                circuitOmsAssociationRowStatus,
+                circuitOmsAssociationOmsTrailId,
+                circuitOmsAssociationCircuitTrailId
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 4 }
+    
+    omsOtsAssociationGroup OBJECT-GROUP
+        OBJECTS { 
+                omsOtsAssociationRowStatus,
+                omsOtsAssociationOmsTrailId,
+                omsOtsAssociationOtsTrailId
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 5 }
+    
+    networkEventLogGroup OBJECT-GROUP
+        OBJECTS { 
+                networkEventLogRowStatus,
+                networkEventLogAction,
+                networkEventLogResourceName,
+                networkEventLogResourceType,
+                networkEventLogTime
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 6 }
+    
+    serverGroup OBJECT-GROUP
+        OBJECTS { 
+                serverSync,
+                serverFreeDiskSpace,
+                serverSo,
+                serverUpTime,
+                serverBuild,
+                serverVersion,
+                serverIsActive,
+                serverSlaveIp,
+                serverMasterIp
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 7 }
+    
+    circuitTrailGroup OBJECT-GROUP
+        OBJECTS { 
+                circuitTrailRowStatus,
+                circuitTrailDatabaseId,
+                circuitTrailDestinationPort,
+                circuitTrailDestinationBoard,
+                circuitTrailDestinationNE,
+                circuitTrailDestinationNetwork,
+                circuitTrailSourcePort,
+                circuitTrailSourceBoard,
+                circuitTrailSourceNE,
+                circuitTrailSourceNetwork,
+                circuitTrailService,
+                circuitTrailClientId,
+                circuitTrailClientName,
+                circuitTrailDescription,
+                circuitTrailName
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 8 }
+    
+    omsTrailGroup OBJECT-GROUP
+        OBJECTS { 
+                omsTrailRowStatus,
+                omsTrailDatabaseId,
+                omsTrailDestinationPort,
+                omsTrailDestinationBoard,
+                omsTrailDestinationNE,
+                omsTrailSourcePort,
+                omsTrailSourceBoard,
+                omsTrailSourceNE,
+                omsTrailDescription,
+                omsTrailName
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 9 }
+    
+    otsTrailGroup OBJECT-GROUP
+        OBJECTS { 
+                otsTrailRowStatus,
+                otsTrailDatabaseId,
+                otsTrailDestinationPort,
+                otsTrailDestinationBoard,
+                otsTrailDestinationNE,
+                otsTrailSourcePort,
+                otsTrailSourceBoard,
+                otsTrailSourceNE,
+                otsTrailDistance,
+                otsTrailFiberType,
+                otsTrailDescription,
+                otsTrailName
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 10 }
+    
+    networkAlarmObjectGroup OBJECT-GROUP
+        OBJECTS { 
+                networkAlarmRowStatus,
+                networkAlarmAckUser,
+                networkAlarmAckDate,
+                networkAlarmAck,
+                networkAlarmPortNameDestination,
+                networkAlarmBoardNameDestination,
+                networkAlarmNeNameDestination,
+                networkAlarmPortNameSource,
+                networkAlarmBoardNameSource,
+                networkAlarmNeNameSource,
+                networkAlarmType,
+                networkAlarmName,
+                networkAlarmBoardName,
+                networkAlarmNeName,
+                networkAlarmLayer,
+                networkAlarmResource,
+                networkAlarmNetworkName,
+                networkAlarmEnd,
+                networkAlarmStart,
+                networkAlarmGroup,
+                networkAlarmKey,
+                networkAlarmSeverity
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 11 }
+    
+    alarmsNotificationGroup OBJECT-GROUP
+        OBJECTS { 
+                alarmsNotificationNeName,
+                alarmsNotificationBoardName,
+                alarmsNotificationBoardSerial,
+                alarmsNotificationBoardPart
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 12 }
+    
+    performanceGroup OBJECT-GROUP
+        OBJECTS { 
+                performanceRowStatus,
+                performanceOid,
+                performanceNeMap,
+                performanceNeName,
+                performanceTime,
+                performanceRate,
+                performanceValue,
+                performancePortNumber,
+                performancePortType,
+                performanceType,
+                performanceBoardSerial,
+                performanceBoardPart
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 13 }
+    
+    eventGroup OBJECT-GROUP
+        OBJECTS { 
+                eventRowStatus,
+                eventNeMap,
+                eventNeName,
+                eventTime,
+                eventBoardSlot,
+                eventBoardSubRack,
+                eventBoardRackPosition,
+                eventBoardSerial,
+                eventBoardPart,
+                eventName,
+                eventType
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 14 }
+    
+    alarmGroup OBJECT-GROUP
+        OBJECTS { 
+                alarmRowStatus,
+                alarmNeMap,
+                alarmNeName,
+                alarmAckUser,
+                alarmAckDescription,
+                alarmAckDate,
+                alarmEnd,
+                alarmStart,
+                alarmBoardSlot,
+                alarmBoardSubRack,
+                alarmResource,
+                alarmBoardRackPosition,
+                alarmBoardSerial,
+                alarmBoardPart,
+                alarmName,
+                alarmSeverity,
+                alarmType,
+                alarmId
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 15 }
+    
+    boardGroup OBJECT-GROUP
+        OBJECTS { 
+                boardRowStatus,
+                boardState,
+                boardNeMap,
+                boardNeName,
+                boardVersion,
+                boardSlot,
+                boardSubRack,
+                boardRackPosition,
+                boardDescription,
+                boardName,
+                boardModel,
+                boardSerial,
+                boardPart
+                }
+    
+        STATUS  current
+        DESCRIPTION
+        "A collection of objects providing basic instrumentation and
+        control of an SNMPv2 entity."
+        ::= { lightpadMIBGroups 16 }
+        
+END

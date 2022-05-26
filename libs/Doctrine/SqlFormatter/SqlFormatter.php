@@ -33,7 +33,7 @@ final class SqlFormatter
     /** @var Tokenizer */
     private $tokenizer;
 
-    public function __construct(?Highlighter $highlighter = null)
+    public function __construct(Highlighter $highlighter = null)
     {
         $this->tokenizer   = new Tokenizer();
         $this->highlighter = $highlighter ?? (PHP_SAPI === 'cli' ? new CliHighlighter() : new HtmlHighlighter());

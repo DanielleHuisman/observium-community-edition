@@ -1,21 +1,19 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 // Pagination
 echo(pagination($vars, $ports_count));
 
-if ($vars['pageno'])
-{
+if ($vars['pageno']) {
   $ports = array_chunk($ports, $vars['pagesize']);
   $ports = $ports[$vars['pageno']-1];
 }
@@ -23,8 +21,7 @@ if ($vars['pageno'])
 
 // Populate ports array (much faster for large systems)
 $port_ids = array();
-foreach ($ports as $p)
-{
+foreach ($ports as $p) {
   $port_ids[] = $p['port_id'];
 }
 $where = ' WHERE `ports`.`port_id` IN (' . implode(',', $port_ids) . ') ';
@@ -61,19 +58,16 @@ $cols = array(
   'traffic_perc'  => array('Traffic %', 'style="width: 90px;"'),
   'packets'       => array('Packets', 'style="width: 90px;"'),
   'speed'         => array('Speed', 'style="width: 90px;"'),    
-                     array('MAC Address', 'style="width: 150px;"'),
+  'mac'           => array('MAC Address', 'style="width: 150px;"')
 );
 
 echo get_table_header($cols, $vars);
 echo '<tbody>' . PHP_EOL;
 
 $ports_disabled = 0; $ports_down = 0; $ports_up = 0; $ports_total = 0;
-foreach ($ports as $port)
-{
-
+foreach ($ports as $port) {
   $ports_total++;
   print_port_row($port, $vars);
-
 }
 
 echo '</tbody></table>';

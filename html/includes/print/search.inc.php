@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -1606,8 +1606,8 @@ SCRIPT;
                          'yesterday'  => 'Yesterday',
                          'tweek'      => 'This week',
                          'lweek'      => 'Last week',
-                         'tmonth'     => 'This month',
-                         'lmonth'     => 'Last month',
+                         'tmonth'     => 'This month ('.date('F').')',
+                         'lmonth'     => 'Last month ('.date('F', strtotime('previous month')).')',
                          'tquarter'   => 'This quarter',
                          'lquarter'   => 'Last quarter',
                          'tyear'      => 'This year',
@@ -2108,7 +2108,8 @@ SCRIPT;
       $nbsp = 0;
       if (array_key_exists('icon', $item)) { $button_icon = trim($item['icon']); }
       if (!safe_empty($button_icon)) {
-        $string .= '<i class="'.$button_icon.'" style="margin-right: 0px;"></i>'; // Override margin style, here used "own" margin
+        //$string .= '<i class="'.$button_icon.'" style="margin-right: 0px;"></i>'; // Override margin style, here used "own" margin
+        $string .= get_icon($button_icon, $item['icon_class'], [ 'style' => 'margin-right: 0px;' ]); // Override margin style, here used "own" margin
         $nbsp++;
       }
 

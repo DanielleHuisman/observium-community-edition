@@ -10,8 +10,8 @@
  *
  */
 
-if (is_device_mib($device, 'UCD-SNMP-MIB'))
-{
+if (!is_device_mib($device, 'UCD-SNMP-MIB')) { return; }
+
   $load_rrd  = "ucd_load.rrd";
   $cpu_rrd   = "ucd_cpu.rrd";
   $mem_rrd   = "ucd_mem.rrd";
@@ -97,23 +97,21 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
     }
 
     $ucd_ss_cpu = [];
-    foreach ($cpu_oids as $oid)
-    {
-      if ($ss_cpu_valid[$oid])
-      {
+    foreach ($cpu_oids as $oid) {
+      if ($ss_cpu_valid[$oid]) {
         $value = $ss[$oid];
-        $perc  = $ss[$oid] / $ss_cpu_total * 100;
         $filename = "ucd_".$oid.".rrd";
         rrdtool_create($device, $filename, " DS:value:COUNTER:600:0:U");
         rrdtool_update($device, $filename, "N:".$value);
         $graphs['ucd_ss_cpu'] = TRUE;
+        // Perc unused, only set graph ucd_ss_cpu
+        $perc = fdiv($ss[$oid], $ss_cpu_total) * 100;
         $ucd_ss_cpu[$oid]['perc'] = $perc;
       }
     }
 
     // WHY
-    if (safe_count($ucd_ss_cpu))
-    {
+    if (safe_count($ucd_ss_cpu)) {
       $device_state['ucd_ss_cpu']  = $ucd_ss_cpu;
     }
 
@@ -178,8 +176,7 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
     }
 
     // Check to see that the OIDs are actually populated before we make the rrd
-    if (is_numeric($mem_array['totalreal']) && is_numeric($mem_array['availreal']) && is_numeric($mem_array['totalfree']))
-    {
+    if (is_numeric($mem_array['totalreal']) && is_numeric($mem_array['availreal']) && is_numeric($mem_array['totalfree'])) {
       //rrdtool_create($device, $mem_rrd, $mem_rrd_create);
       //rrdtool_update($device, $mem_rrd,  array($memTotalSwap, $memAvailSwap, $memTotalReal, $memAvailReal, $memTotalFree, $memShared, $memBuffer, $memCached));
       rrdtool_update_ng($device, 'ucd_memory', $mem_array);
@@ -194,8 +191,7 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
       $device_state['ucd_mem']['mem_buffer'] = $mem_array['buffered']; //$memBuffer;
       $device_state['ucd_mem']['mem_cached'] = $mem_array['cached']; //$memCached;
 
-      if (isset($attribs['ucd_memory_bad']) && $attribs['ucd_memory_bad'])
-      {
+      if (isset($attribs['ucd_memory_bad']) && $attribs['ucd_memory_bad']) {
         $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'];
       } else {
         $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'] - $mem_array['cached'] - $mem_array['buffered'];
@@ -226,6 +222,5 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
   unset($ss, $load_rrd, $load_raw, $snmpdata);
   unset($memTotalSwap, $memAvailSwap, $memTotalReal, $memAvailReal, $memTotalFree, $memShared, $memBuffer, $memCached);
   unset($key, $mem_rrd, $mem_rrd_create, $collect_oids, $value, $filename, $cpu_rrd, $cpu_rrd_create, $oid);
-} # end is_device_mib()
 
 // EOF

@@ -203,23 +203,8 @@ if ($updated && $update_message) {
                                       'readonly'    => $readonly,
                                       'value'       => $override_sysLocation_bool);
 
-      $poller_list = array();
-      $poller_list[0] = [ 'name' => 'Default Poller' ];
-      if ($config['poller_id'] != 0) {
-        $poller_list[0]['group'] = 'External';
-      }
-      foreach(dbFetchRows("SELECT * FROM `pollers`") as $poller) {
-        $poller_list[$poller['poller_id']] = [
-          'name'    => $poller['poller_name'],
-          'subtext' => $poller['host_id']
-          //'subtext' => $poller['host_uname']
-        ];
-        if ($config['poller_id'] != $poller['poller_id']) {
-          $poller_list[$poller['poller_id']]['group'] = 'External';
-        }
-      }
-
-      $form['row'][4]['poller_id']      = array(
+      $poller_list = get_pollers();
+      $form['row'][4]['poller_id'] = array(
                                       'type'        => 'select',
                                       'community'   => FALSE, // not available on community edition
                                       'name'        => 'Poller',
@@ -245,7 +230,7 @@ if ($updated && $update_message) {
                                       'palette'     => 'yellow',
                                       'name'        => 'Device ignore',
                                       //'fieldset'    => 'edit',
-                                      'placeholder' => 'Ignore device for alerting and notifications.',
+                                      'placeholder' => 'Suppress alerts and notifications and hide in some UI elements.',
                                       'readonly'    => $readonly,
                                       'value'       => $device['ignore']);
       $form['row'][7]['disabled'] = array(

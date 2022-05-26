@@ -287,7 +287,7 @@ if (!empty($agent_data['app']['bind']['global']))
   $rrd_data = "";
   foreach ($rrtypes as $rrtype)
   {
-    $rrd_data .= ":".$query_in[$rrtype];
+    $rrd_data .= ":".(safe_empty($query_in[$rrtype]) ? 'U' : $query_in[$rrtype]);
   }
   rrdtool_update($device, $rrd_filename,  "N".$rrd_data);
 
@@ -306,7 +306,7 @@ if (!empty($agent_data['app']['bind']['global']))
   $rrd_data = "";
   foreach ($ns_stats_fields as $field)
   {
-    $rrd_data .= ":".$ns_stats[$field];
+    $rrd_data .= ":".(safe_empty($ns_stats[$field]) ? 'U' : $ns_stats[$field]);
   }
   rrdtool_update($device, $rrd_filename,  "N".$rrd_data);
 
@@ -324,7 +324,7 @@ if (!empty($agent_data['app']['bind']['global']))
   $rrd_data = "";
   foreach ($zone_maint_fields as $field)
   {
-    $rrd_data .= ":".$zone_maint[$field];
+    $rrd_data .= ":".(safe_empty($zone_maint[$field]) ? 'U' : $zone_maint[$field]);
   }
   rrdtool_update($device, $rrd_filename,  "N".$rrd_data);
 
@@ -338,7 +338,7 @@ if (!empty($agent_data['app']['bind']['global']))
     $rrd_data = "";
     foreach ($rrtypes as $rrtype)
     {
-      $rrd_data .= ":".$view_data[$rrtype];
+      $rrd_data .= ":".(safe_empty($view_data[$rrtype]) ? 'U' : $view_data[$rrtype]);
     }
     rrdtool_update($device, $rrd_filename,  "N".$rrd_data);
   }
@@ -359,7 +359,7 @@ if (!empty($agent_data['app']['bind']['global']))
     $rrd_data = "";
     foreach ($resolver_fields as $field)
     {
-      $rrd_data .= ":".$view_data[$field];
+      $rrd_data .= ":".(safe_empty($view_data[$field]) ? 'U' : $view_data[$field]);
     }
     rrdtool_update($device, $rrd_filename,  "N".$rrd_data);
   }
@@ -380,8 +380,8 @@ if (!empty($agent_data['app']['bind']['global']))
     $rrd_data = "";
     foreach ($rrtypes as $rrtype)
     {
-      $rrd_data .= ":".$view_data[$rrtype];
-      $rrd_data .= ":".$view_data['!'.$rrtype];
+      $rrd_data .= ":".(safe_empty($view_data[$rrtype]) ? 'U' : $view_data[$rrtype]);
+      $rrd_data .= ":".(safe_empty($view_data['!'.$rrtype]) ? 'U' : $view_data['!'.$rrtype]);
     }
     rrdtool_update($device, $rrd_filename,  "N".$rrd_data);
   }

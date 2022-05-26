@@ -309,7 +309,7 @@ relay
       case str_starts($ent['entPhysicalClass'], [ 'cpu', 'processor', 'cpm' ]):
         $icon = 'processor';
         break;
-      case str_starts($ent['entPhysicalClass'], [ 'disk', 'flash', 'mda' ]):
+      case str_starts($ent['entPhysicalClass'], [ 'disk', 'flash', 'mda', 'storage', 'drive' ]):
         $icon = 'storage';
         break;
       case str_starts($ent['entPhysicalClass'], 'power'):

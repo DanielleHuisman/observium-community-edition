@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -21,11 +20,9 @@ print_debug_vars($dot1dBasePortIfIndex);
 $zyxelTransceiverDdmiEntry   = snmpwalk_multipart_oid($device, 'zyxelTransceiverDdmiEntry', array(), 'ZYXEL-TRANSCEIVER-MIB');
 print_debug_vars($zyxelTransceiverDdmiEntry);
 
-foreach ($zyxelTransceiverDdmiEntry as $baseport => $transeiver)
-{
-  if ($zyxelTransceiverSerialEntry[$baseport]['zyTransceiverSerialModuleType'] == 'nonoperational' ||
-      $zyxelTransceiverSerialEntry[$baseport]['zyTransceiverSerialTransceiver'] == 'N/A')
-  {
+foreach ($zyxelTransceiverDdmiEntry as $baseport => $transeiver) {
+  if ($zyxelTransceiverSerialEntry[$baseport]['zyTransceiverSerialModuleType'] === 'nonoperational' ||
+      $zyxelTransceiverSerialEntry[$baseport]['zyTransceiverSerialTransceiver'] === 'okWithoutDdm') {
     continue;
   }
   $transeiver_name = $zyxelTransceiverSerialEntry[$baseport]['zyTransceiverSerialVendor'] . ' ' .

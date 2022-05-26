@@ -5,20 +5,17 @@
 include(__DIR__ . '/../includes/sql-config.inc.php');
 include(__DIR__ . '../html/includes/functions.inc.php');
 
-class IncludesSyslogTest extends \PHPUnit\Framework\TestCase
-{
+class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
 
   /**
   * @dataProvider providerProcessSyslogLine
   * @group process
   */
-  public function testProcessSyslogLine($line, $result)
-  {
+  public function testProcessSyslogLine($line, $result) {
     // Create fake device array from syslog line
     list($os) = explode('||', $line, 2);
     $device = array('hostname' => $os, 'device_id' => crc32($os), 'os' => $os);
-    if (isset($GLOBALS['config']['os'][$os]['os_group']))
-    {
+    if (isset($GLOBALS['config']['os'][$os]['os_group'])) {
       $device['os_group'] = $GLOBALS['config']['os'][$os]['os_group'];
     }
     //var_dump($GLOBALS['config']['os'][$os]);
@@ -29,7 +26,9 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase
     $dev_cache[$host]['lastchecked'] = time();
     $dev_cache[$host]['device_id']  = $device['device_id'];
     $dev_cache[$host]['os']         = $device['os'];
-    $dev_cache[$host]['os_group']   = $device['os_group'];
+    if (isset($device['os_group'])) {
+      $dev_cache[$host]['os_group'] = $device['os_group'];
+    }
     $GLOBALS['dev_cache'] = $dev_cache;
 
     // Override config syslog filter
@@ -80,6 +79,30 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase
                                            'msg'       => 'action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]',
                                            'msg_orig'  => 'action \'action 18\' suspended, next retry is Wed Mar 14 06:56:20 2018 [try http://www.rsyslog.com/e/2007 ]',
                                            ));
+    $result[] = [ 'linux||9||5||5||run-parts(/etc/cron.hourly)[2654||2021-11-26 08:01:01|| starting 0anacron||run-parts(',
+                  [ 'facility'  => 'cron', 'priority' => '5', 'level' => '5',
+                    'tag'       => 'run-parts,/etc/cron.hourly', 'program' => '0ANACRON',
+                    'msg'       => 'starting 0anacron',
+                    'msg_orig'  => 'starting 0anacron', ]
+    ];
+    $result[] = [ 'linux||3||6||6||fail2ban-client[20598]:||2018-06-07 14:36:03|| 2018-06-07 14:36:03,699 fail2ban.server         [20601]: INFO    Starting Fail2ban v0.9.3||fail2ban-client',
+                  [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+                    'tag'       => 'client,INFO', 'program' => 'FAIL2BAN',
+                    'msg'       => 'Starting Fail2ban v0.9.3',
+                    'msg_orig'  => '2018-06-07 14:36:03,699 fail2ban.server         [20601]: INFO    Starting Fail2ban v0.9.3', ]
+    ];
+    $result[] = [ 'linux||3||6||6||fail2ban-server:||2021-11-12 11:51:25|| Server ready||fail2ban-server',
+                  [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+                    'tag'       => 'server', 'program' => 'FAIL2BAN',
+                    'msg'       => 'Server ready',
+                    'msg_orig'  => 'Server ready', ]
+    ];
+    $result[] = [ 'linux||3||5||5||fail2ban.actions[4314]:||2021-11-26 11:15:57|| NOTICE [sshd] Unban 116.98.170.132||fail2ban.actions',
+                  [ 'facility'  => 'daemon', 'priority' => '5', 'level' => '5',
+                    'tag'       => 'actions,NOTICE', 'program' => 'FAIL2BAN',
+                    'msg'       => '[sshd] Unban 116.98.170.132',
+                    'msg_orig'  => 'NOTICE [sshd] Unban 116.98.170.132', ]
+    ];
     // from group definition
     $result[] = array('linux||10||5||5||sshd[9071]:||2018-03-20 17:40:43|| PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=221.194.47.243  user=root||sshd',
                                      array('facility'  => 'authpriv', 'priority' => '5', 'level' => '5',
@@ -124,6 +147,12 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase
                                            'msg'       => 'Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)',
                                            'msg_orig'  => 'Сезон 1 Scrape error: Could not connect to tracker (announcer.c:1279)',
                                            ));
+    $result[] = [ 'linux||3||5||5||dbus[523]:||2021-11-26 11:07:35|| [system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)||dbus',
+                  [ 'facility'  => 'daemon', 'priority' => '5', 'level' => '5',
+                    'tag'       => 'dbus[523],system', 'program' => 'DBUS',
+                    'msg'       => '[system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)',
+                    'msg_orig'  => '[system] Activating service name=\'org.freedesktop.problems\' (using servicehelper)', ]
+    ];
     // Another repeated message
     $result[] = array('freebsd||1||4||4||message||2018-03-21 14:50:37|| repeated 2 times||message',
                                      FALSE);

@@ -10,6 +10,45 @@
  *
  */
 
+/// MOVEME. states.inc.php
+function get_bits_state_array($hex, $mib = NULL, $object = NULL, $bits_def = NULL)
+{
+  global $config;
+
+  // Fetch validate BITS definition
+  if (is_array($bits_def))
+  {
+    // Use passed bits definitions
+    $def = $bits_def;
+  }
+  else if (strlen($mib) && strlen($object) &&
+           isset($config['mibs'][$mib]['states_bits'][$object]))
+  {
+    $def = $config['mibs'][$mib]['states_bits'][$object];
+  }
+  if (empty($def))
+  {
+    print_debug("Incorrect BITS state definition passed.");
+    return NULL;
+  }
+  print_debug_vars($def);
+
+  //$bit_array = array_reverse(str_split(hex2binmap($hex)));
+  $bit_array = str_split(hex2binmap($hex));
+  print_debug_vars($bit_array);
+
+  $state_array = [];
+  foreach ($bit_array as $bit => $value)
+  {
+    if ($value)
+    {
+      $state_array[$bit] = $def[$bit]['name'];
+    }
+  }
+
+  return $state_array;
+}
+
 /**
  * Return normalized state array by type, mib and value (numeric or string)
  *
@@ -349,8 +388,7 @@ function discover_status_definition($device, $mib, $entry)
 }
 
 // Compatibility wrapper!
-function discover_status($device, $numeric_oid, $index, $type, $status_descr, $value = NULL, $options = array(), $poller_type = NULL)
-{
+function discover_status($device, $numeric_oid, $index, $type, $status_descr, $value = NULL, $options = array(), $poller_type = NULL) {
   if (isset($poller_type)) { $options['poller_type'] = $poller_type; }
 
   return discover_status_ng($device, '', '', $numeric_oid, $index, $type, $status_descr, $value, $options);
@@ -375,21 +413,24 @@ function discover_status($device, $numeric_oid, $index, $type, $status_descr, $v
  *
  * @return bool
  */
-function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status_descr, $value = NULL, $options = array())
-{
+function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status_descr, $value = NULL, $options = []) {
   global $config;
 
-  $poller_type   = (isset($options['poller_type']) ? $options['poller_type'] : 'snmp');
+  $poller_type = (isset($options['poller_type']) ? $options['poller_type'] : 'snmp');
 
   $status_deleted = 0;
 
   // Init main
-  $param_main = array('oid' => 'status_oid', 'status_descr' => 'status_descr', 'status_deleted' => 'status_deleted',
-                      'index' => 'status_index', 'mib' => 'status_mib', 'object' => 'status_object');
+  $param_main = [
+    'oid' => 'status_oid', 'status_descr' => 'status_descr', 'status_deleted' => 'status_deleted',
+    'index' => 'status_index', 'mib' => 'status_mib', 'object' => 'status_object'
+  ];
 
   // Init optional
-  $param_opt = array('entPhysicalIndex', 'entPhysicalClass', 'entPhysicalIndex_measured',
-                     'measured_class', 'measured_entity', 'measured_entity_label', 'status_map');
+  $param_opt = [
+    'entPhysicalIndex', 'entPhysicalClass', 'entPhysicalIndex_measured',
+    'measured_class', 'measured_entity', 'measured_entity_label', 'status_map'
+  ];
   foreach ($param_opt as $key) {
     $$key = $options[$key] ?: NULL;
   }
@@ -421,7 +462,7 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
     $params = array($device['device_id'], $mib, $object, $type, $index, $poller_type);
     $status_exist = dbExist('status', $where, $params);
 
-    // Check if old format of status was exist, than rename rrd
+    // Check if old format of status was exist, then rename rrd
     if (!$status_exist) {
       $old_where  = ' WHERE `device_id` = ? AND `status_type` = ? AND `status_index` = ? AND `poller_type`= ?';
       $old_index  = $object . '.' . $index;
@@ -444,21 +485,20 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
     $status_exist = dbExist('status', $where, $params);
   }
   //if (dbFetchCell('SELECT COUNT(*) FROM `status`' . $where, $params) == '0')
-  if (!$status_exist)
-  {
-    $status_insert = array('poller_type'  => $poller_type,
-                           'device_id'    => $device['device_id'],
-                           'status_index' => $index,
-                           'status_type'  => $type,
-                           //'status_id'    => $status_id,
-                           'status_value' => $value,
-                           'status_polled' => time(), //array('NOW()'), // this field is INT(11)
-                           'status_event' => $state_array['event'],
-                           'status_name'  => $state_array['name']
-    );
+  if (!$status_exist) {
+    $status_insert = [
+      'poller_type'  => $poller_type,
+      'device_id'    => $device['device_id'],
+      'status_index' => $index,
+      'status_type'  => $type,
+      //'status_id'    => $status_id,
+      'status_value' => $value,
+      'status_polled' => time(), //array('NOW()'), // this field is INT(11)
+      'status_event' => $state_array['event'],
+      'status_name'  => $state_array['name']
+    ];
 
-    foreach ($param_main as $key => $column)
-    {
+    foreach ($param_main as $key => $column) {
       $status_insert[$column] = $$key;
     }
 
@@ -504,13 +544,11 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
 
   // Rename old (converted) RRDs to definition format
   // Allow with changing class or without
-  if (isset($options['rename_rrd_full']))
-  {
+  if (isset($options['rename_rrd_full'])) {
     // Compatibility with sensor option
     $options['rename_rrd'] = $options['rename_rrd_full'];
   }
-  if (isset($options['rename_rrd']))
-  {
+  if (isset($options['rename_rrd'])) {
     $rrd_tags = array('index' => $index, 'type' => $type, 'mib' => $mib, 'object' => $object, 'oid' => $object);
     $options['rename_rrd'] = array_tag_replace($rrd_tags, $options['rename_rrd']);
     $old_rrd               = 'status-' . $options['rename_rrd'];
@@ -522,10 +560,10 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
     rename_rrd($device, $old_rrd, $new_rrd);
   }
 
-  if (strlen($mib))
-  {
-    $GLOBALS['valid']['status'][$mib][$type][$index] = 1;
+  if ($new_definition) {
+    $GLOBALS['valid']['status'][$mib][$object][$index] = 1;
   } else {
+    // without $mib/$object
     $GLOBALS['valid']['status']['__'][$type][$index] = 1;
   }
 
@@ -535,34 +573,34 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function check_valid_status($device, $valid, $poller_type = 'snmp')
-{
-  $entries = dbFetchRows("SELECT * FROM `status` WHERE `device_id` = ? AND `poller_type` = ? AND `status_deleted` = '0'", array($device['device_id'], $poller_type));
+function check_valid_status($device, $valid, $poller_type = 'snmp') {
+  $entries = dbFetchRows("SELECT * FROM `status` WHERE `device_id` = ? AND `poller_type` = ? AND `status_deleted` = ?", [ $device['device_id'], $poller_type, 0 ]);
 
-  if (is_array($entries) && count($entries))
-  {
-    foreach ($entries as $entry)
-    {
+  if (!safe_empty($entries)) {
+    foreach ($entries as $entry) {
       $index = $entry['status_index'];
       $type  = $entry['status_type'];
-      if ($poller_type == 'snmp')
-      {
-        $mib = strlen($entry['status_mib']) ? $entry['status_mib'] : '__';
+      if ($poller_type === 'snmp') {
+        if (!safe_empty($entry['status_mib']) && !safe_empty($entry['status_object'])) {
+          // New definitions use Object instead type
+          $mib = $entry['status_mib'];
+          $type = $entry['status_object'];
+        } else {
+          $mib = '__';
+        }
       } else {
         // For ipmi and unix-agent
         $mib = 'state';
       }
-      if (!$valid[$mib][$type][$index])
-      {
+
+      if (!$valid[$mib][$type][$index]) {
         echo("-");
         print_debug("Status deleted: $index -> $type");
         //dbDelete('status',       "`status_id` = ?", array($entry['status_id']));
-        //dbDelete('status-state', "`status_id` = ?", array($entry['status_id']));
 
-        dbUpdate(array('status_deleted' => '1'), 'status', '`status_id` = ?', array($entry['status_id']));
+        dbUpdate([ 'status_deleted' => '1' ], 'status', '`status_id` = ?', [ $entry['status_id'] ]);
 
-        foreach (get_entity_attribs('status', $entry['status_id']) as $attrib_type => $value)
-        {
+        foreach (get_entity_attribs('status', $entry['status_id']) as $attrib_type => $value) {
           del_entity_attrib('status', $entry['status_id'], $attrib_type);
         }
         log_event("Status deleted: ".$entry['status_class']." ".$entry['status_type']." ". $entry['status_index']." ".$entry['status_descr'], $device, 'status', $entry['status_id']);

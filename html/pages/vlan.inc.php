@@ -39,6 +39,9 @@ if ($_SESSION['userlevel'] < 5) {
 
       if (is_array($vlan['names'])) {
         ksort($vlan['names']);
+        $first_vlan = array_keys($vlan['names'])[0];
+      } else {
+        $first_vlan = "VLAN $vlan_id";
       }
 
       // Fixme - improve method of choosing which name to use.
@@ -46,7 +49,7 @@ if ($_SESSION['userlevel'] < 5) {
 
       echo '<tr>';
       echo '<td>' . $vlan_id . '</td>';
-      echo '<td>' . generate_link(array_keys($vlan['names'])[0], array('page' => 'vlan', 'vlan_id' => $vlan_id)) . '</td>';
+      echo '<td>' . generate_link($first_vlan, array('page' => 'vlan', 'vlan_id' => $vlan_id)) . '</td>';
       echo '<td><span class="label label-primary">' . $vlan['counts']['devices'] . '</span></td>';
       echo '<td><span class="label label-suppressed">' . $vlan['counts']['ports_tagged'] . '</span>
                 <span class="label label-success">' . $vlan['counts']['ports_untagged'] . '</span></td>';

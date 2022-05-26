@@ -410,11 +410,12 @@ function generate_counter_row($counter, $vars)
   }
 
   // FIXME -- Generify this. It's not just for counters.
-  if ($vars['page'] == "device" && $vars['tab'] != "overview")
-  {
-    $row .= '        <td>' .  (strlen($counter['counter_mib']) ? '<a href="https://mibs.observium.org/mib/'.$counter['counter_mib'].'/" target="_blank">' .nicecase($counter['counter_mib']) .'</a>' : '') . ( ( strlen($counter['counter_mib']) && strlen($counter['counter_object'])) ? '::' : '') .(strlen($counter['counter_mib']) ? '<a href="https://mibs.observium.org/mib/'.$counter['counter_mib'].'/#'.$counter['counter_object'].'" target="_blank">' .$counter['counter_object'] .'</a>' : ''). '.'.$counter['counter_index'].'</td>' . PHP_EOL;
+  if ($vars['page'] === "device" && $vars['tab'] !== "overview") {
+    $row .= '        <td>' . (!safe_empty($counter['counter_mib']) ? '<a href="'.OBSERVIUM_MIBS_URL.'/'.$counter['counter_mib'].'/" target="_blank">' . nicecase($counter['counter_mib']) .'</a>' : '') .
+            ( ( !safe_empty($counter['counter_mib']) && !safe_empty($counter['counter_object'])) ? '::' : '') .
+            (!safe_empty($counter['counter_mib']) ? '<a href="'.OBSERVIUM_MIBS_URL.'/'.$counter['counter_mib'].'/#'.$counter['counter_object'].'" target="_blank">' . $counter['counter_object'] .'</a>' : '') .
+            '.'.$counter['counter_index'].'</td>' . PHP_EOL;
     $table_cols++;
-
   }
 
   // Disable show thresholds

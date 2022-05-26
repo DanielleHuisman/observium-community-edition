@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -62,7 +61,7 @@ if (is_numeric($vars['id']) && ($auth || port_permitted($vars['id'])))
   $title_array[] = array('text' => 'Ports', 'url' => generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'ports')));
   $title_array[] = array('text' => escape_html($port['port_label']) . (strlen($port['ifAlias']) ? " (".escape_html($port['ifAlias']).")" : ''), 'url' => generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'port', 'port' => $port['port_id'])));
 
-  $graph_title = short_hostname($device['hostname']) . " :: " . strtolower($port['port_label_short']);
+  $graph_title = device_name($device, TRUE) . " :: " . $port['port_label_short'];
   $rrd_filename = get_port_rrdfilename($port, NULL, TRUE);
 
   if ($vars['type'] == 'port_bits')

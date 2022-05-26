@@ -29,6 +29,18 @@ echo generate_box_open(array('title' => 'Poller Performance'));
 print_graph_row($graph_array);
 echo generate_box_close();
 
+$sql = "SELECT `process_command`, `process_name`, `process_start`, `poller_id` FROM `observium_processes` WHERE `device_id` = ? ORDER BY `process_ppid`, `process_start`";
+if ($processes = dbFetchRows($sql, [ $device['device_id'] ])) {
+  echo generate_box_open(array('title' => 'Running Processes'));
+  $cols = [
+    //'Process ID', 'PID', 'PPID', 'UID',
+    'Command', 'Name', 'Started', 'Poller ID'
+    //'Device'
+  ];
+  echo build_table($processes, [ 'columns' => $cols, 'process_start' => 'unixtime' ]);
+  echo generate_box_close();
+}
+
 $navbar = array('brand' => "Performance", 'class' => "navbar-narrow");
 
 $navbar['options']['overview']['text']       = 'Overview';
@@ -173,7 +185,7 @@ foreach ($device['state']['poller_mod_perf'] as $module => $time)
 {
   if ($time > 0.001)
   {
-    $perc = round($time / $device['last_polled_timetaken'] * 100, 2, 2);
+    $perc = round(float_div($time, $device['last_polled_timetaken']) * 100, 2, 2);
 
     echo('    <tr>
       <td><strong>'.$module.'</strong></td>

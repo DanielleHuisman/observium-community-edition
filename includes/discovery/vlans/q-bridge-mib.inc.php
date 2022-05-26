@@ -18,13 +18,10 @@ if (is_device_mib($device, 'CISCO-VTP-MIB')) {
 $domain_index = '1';
 
 if (safe_count($discovery_vlans[$domain_index]) &&
-    (is_device_mib($device, 'CISCOSB-vlan-MIB') ||
-     is_device_mib($device, 'RADLAN-vlan-MIB') ||
-     is_device_mib($device, 'Dell-vlan-MIB') ||
-     is_device_mib($device, 'DLINK-3100-vlan-MIB') ||
-     is_device_mib($device, 'EDGECORE-vlan-MIB') ||
-     is_device_mib($device, 'NETGEAR-RADLAN-vlan-MIB'))) {
-  // Already discovered RADLAN based vlans
+    is_device_mib($device, [ 'CISCOSB-vlan-MIB', 'RADLAN-vlan-MIB', 'Dell-vlan-MIB',
+                             'DLINK-3100-vlan-MIB', 'EDGECORE-vlan-MIB', 'NETGEAR-RADLAN-vlan-MIB',
+                             'IEEE8021-Q-BRIDGE-MIB' ])) {
+  // Already discovered by RADLAN based vlans or IEEE8021-Q-BRIDGE-MIB
   return;
 }
 

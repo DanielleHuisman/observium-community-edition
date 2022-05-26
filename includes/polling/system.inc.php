@@ -6,21 +6,20 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 unset($cache['devices']['uptime'][$device['device_id']]);
 
-$poll_device = array();
+$poll_device = [];
 
 $include_order = 'default'; // Default MIBs first (not sure, need more use cases)
 $include_dir = "includes/polling/system";
 include("includes/include-dir-mib.inc.php");
 
 // 5. Always keep SNMPv2-MIB::sysUpTime.0 as last point for uptime
-$uptimes = array('use'       => 'sysUpTime',
-                 'sysUpTime' => $poll_device['sysUpTime']);
+$uptimes = [ 'use' => 'sysUpTime', 'sysUpTime' => $poll_device['sysUpTime'] ];
 
 // Find MIB-specific SNMP data via OID fetch: sysDescr, sysLocation, sysContact, sysName, sysUpTime
 $system_metatypes = [ 'sysDescr', 'sysLocation', 'sysContact', 'sysName', 'sysUpTime', 'reboot' ]; // 'snmpEngineID' ];
@@ -32,8 +31,7 @@ $poll_device['sysName'] = strtolower($poll_device['sysName']);
 print_debug_vars($poll_device);
 
 // If polled time not set by MIB include, set to unixtime
-if (!isset($polled))
-{
+if (!isset($polled)) {
   $polled = time();
 }
 
@@ -45,21 +43,23 @@ if (!isset($polled))
 
 // 5. As last point used sysUptime (see above)
 
-// 1. Unix-agent uptime is highest priority, since mostly accurate
-if (isset($agent_data['uptime']))
-{
+if (isset($agent_data['uptime'])) {
   list($agent_data['uptime']) = explode(' ', $agent_data['uptime']);
   $uptimes['unix-agent'] = round($agent_data['uptime']);
+} elseif (isset($wmi['uptime'])) {
+  $uptimes['wmi'] = round($wmi['uptime']);
 }
 
-if (is_numeric($agent_data['uptime']) && $agent_data['uptime'] > 0)
-{
+if (is_numeric($agent_data['uptime']) && $agent_data['uptime'] > 0) {
+  // 1. Unix-agent uptime is highest priority, since mostly accurate
   $uptimes['use']     = 'unix-agent';
   $uptimes['message'] = 'Using UNIX Agent Uptime';
-}
-// 2. Uptime from os specific OID, see in includes/polling/system MIB specific
-elseif (isset($poll_device['device_uptime']) && is_numeric($poll_device['device_uptime']) && $poll_device['device_uptime'] > 0)
-{
+} elseif (is_numeric($wmi['uptime']) && $wmi['uptime'] > 0) {
+  // 1. WMI uptime is highest priority, since mostly accurate (for Windows)
+  $uptimes['use']     = 'wmi';
+  $uptimes['message'] = 'Using WMI Uptime';
+} elseif (isset($poll_device['device_uptime']) && is_numeric($poll_device['device_uptime']) && $poll_device['device_uptime'] > 0) {
+  // 2. Uptime from os specific OID, see in includes/polling/system MIB specific
   // Get uptime by some custom way in device os poller, see example in wowza-engine os poller
   $uptimes['device_uptime'] = round($poll_device['device_uptime']);
   $uptimes['use']           = 'device_uptime';
@@ -70,8 +70,7 @@ elseif (isset($poll_device['device_uptime']) && is_numeric($poll_device['device_
   // sysUpTime resets when SNMP service restarted, but hrSystemUptime resets at 49.7 days (always),
   // Now we use LanMgr-Mib-II-MIB::comStatStart.0 as reboot time instead
   if ($device['os'] !== 'windows' &&
-      $device['snmp_version'] !== 'v1' && is_device_mib($device, 'HOST-RESOURCES-MIB'))
-  {
+      $device['snmp_version'] !== 'v1' && is_device_mib($device, 'HOST-RESOURCES-MIB')) {
     // HOST-RESOURCES-MIB::hrSystemUptime.0 = Wrong Type (should be Timeticks): 1632295600
     // HOST-RESOURCES-MIB::hrSystemUptime.0 = Timeticks: (63050465) 7 days, 7:08:24.65
     $hrSystemUptime = snmp_get_oid($device, 'hrSystemUptime.0', 'HOST-RESOURCES-MIB');
@@ -319,25 +318,27 @@ print_debug_vars($poll_device);
 
 // Check if snmpEngineID changed
 $force_discovery = FALSE;
-if (strlen($poll_device['snmpEngineID'] . $device['snmpEngineID']) && $poll_device['snmpEngineID'] != $device['snmpEngineID']) {
-  $update_array['snmpEngineID'] = $poll_device['snmpEngineID'];
-  if ($device['snmpEngineID']) {
+
+if ($poll_device['snmpEngineID'] != $device['snmpEngineID']) {
+  $update_array['snmpEngineID'] = (string) $poll_device['snmpEngineID'];
+
+  if (!safe_empty($device['snmpEngineID']) && !safe_empty($poll_device['snmpEngineID'])) {
     // snmpEngineID changed, force full device rediscovery
     log_event('snmpEngineID changed: '.$device['snmpEngineID'].' -> '.$poll_device['snmpEngineID'].' (probably the device was replaced). The device will be rediscovered.', $device, 'device', $device['device_id'], 4);
     $force_discovery = TRUE;
     force_discovery($device);
   } else {
     log_event('snmpEngineID -> '.$poll_device['snmpEngineID'], $device, 'device', $device['device_id']);
+  }
 
-    if (strlen($poll_device['snmpEngineID']) === 0) {
-      $poll_empty_count++;
-    } else {
-      $poll_empty_count--;
-    }
+  if (safe_empty($poll_device['snmpEngineID'])) {
+    $poll_empty_count++;
+  } else {
+    $poll_empty_count--;
   }
 }
 
-$oids = array('sysObjectID', 'sysContact', 'sysName', 'sysDescr');
+$oids = [ 'sysObjectID', 'sysContact', 'sysName', 'sysDescr' ];
 foreach ($oids as $oid) {
   $poll_device[$oid] = snmp_fix_string($poll_device[$oid]);
   //print_vars($poll_device[$oid]);
@@ -345,7 +346,7 @@ foreach ($oids as $oid) {
     $update_array[$oid] = $poll_device[$oid] ?: [ 'NULL' ];
     log_event("$oid -> '".$poll_device[$oid]."'", $device, 'device', $device['device_id']);
 
-    if (strlen($poll_device[$oid]) === 0) {
+    if (safe_empty($poll_device[$oid])) {
       $poll_empty_count++;
     } else {
       $poll_empty_count--;

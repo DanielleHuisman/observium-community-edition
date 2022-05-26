@@ -611,9 +611,9 @@ function poll_counter($device, &$oid_cache)
 
     // Rate /s
     $value_diff = int_sub($counter_poll['counter_value'], $counter_db['counter_value']);
-    $counter_poll['counter_rate'] = $value_diff / $counter_polled_period;
-    $counter_poll['counter_rate_min'] = $value_diff / ($counter_polled_period / 60);
-    $counter_poll['counter_rate_5min'] = $value_diff / ($counter_polled_period / 300); // This is mostly same as count per poll period
+    $counter_poll['counter_rate'] = float_div($value_diff, $counter_polled_period);
+    $counter_poll['counter_rate_min'] = float_div($value_diff, ($counter_polled_period / 60));
+    $counter_poll['counter_rate_5min'] = float_div($value_diff, ($counter_polled_period / 300)); // This is mostly same as count per poll period
     print_debug('Rate /sec: (' . $counter_poll['counter_value'] . ' - ' . $counter_db['counter_value'] . '(='.$value_diff.')) / ' . $counter_polled_period . ' = ' . $counter_poll['counter_rate']);
     print_debug('Rate /min: ' . $counter_poll['counter_rate_min']);
     print_debug('Rate /5min: ' . $counter_poll['counter_rate_5min']);
@@ -636,10 +636,10 @@ function poll_counter($device, &$oid_cache)
           print_debug("Hour rate by history: ".$counter_poll['counter_value']." - $value");
         }
         break;
-      } else {
-        // Clear old entries
-        unset($counter_poll['counter_history'][$polled_time]);
       }
+
+      // Clear old entries
+      unset($counter_poll['counter_history'][$polled_time]);
     }
     // Just if initially not exist history
     if (!isset($counter_poll['counter_rate_hour']))

@@ -115,7 +115,7 @@ $cryptoalgo = [
                                       'width'       => '250px',
                                       'value'       => $vars['hostname']
       );
-      if (dbExist('pollers')) {
+      if (OBS_DISTRIBUTED) {
         $poller_list = [];
         $poller_list[0] = [ 'name' => 'Default Poller' ];
         if ($config['poller_id'] != 0) {

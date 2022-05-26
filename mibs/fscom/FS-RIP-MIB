@@ -1,0 +1,633 @@
+-- *****************************************************************
+-- FS-RIP-MIB.mib:  FS RIP MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-RIP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        TimeTicks,
+        Unsigned32,
+        Integer32,
+        Counter32,
+        IpAddress
+                FROM SNMPv2-SMI
+        DisplayString,
+        RowStatus
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP 
+                FROM SNMPv2-CONF
+        IfIndex
+                FROM FS-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB
+        fsMgmt
+                FROM FS-SMI;
+
+fsRIPMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs Rip mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 13}
+
+fsRIPMIBObjects OBJECT IDENTIFIER ::= { fsRIPMIB 1 }
+
+---
+---RIP GROUP
+---
+fsRipEnable OBJECT-TYPE
+    SYNTAX EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+          "Rip management function status"
+    DEFVAL { disabled }
+          ::={ fsRIPMIBObjects 1 } 
+
+fsRipUpdateTime OBJECT-TYPE
+    SYNTAX Integer32 (0..2147483647)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+                "The rate (time in seconds between updates) at which routing updates are sent."
+    DEFVAL {30}
+        ::={ fsRIPMIBObjects 2 } 
+
+fsRipInvalidTime OBJECT-TYPE
+    SYNTAX Integer32 (1..2147483647)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+                "The interval of time (in seconds) after which a route is declared invalid."
+    DEFVAL {180}        
+        ::={ fsRIPMIBObjects 3 } 
+
+fsRipHolddownTime OBJECT-TYPE
+    SYNTAX Integer32 (0..2147483647)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+         "The amount of time (in seconds) that must pass before a route 
+         is removed from the routing table"
+    DEFVAL {120}
+    ::={ fsRIPMIBObjects 4 }
+    
+fsRipRecommendSetting OBJECT-TYPE
+    SYNTAX INTEGER{ 
+            ripv1(1),
+            ripv2(2),
+            compatible(3)
+        }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+              "User can set this object to 1,2,3.
+               1 means that the system sending and receiving RIP version1 packets,
+               2 means that the system sending and receiving RIP version2 packets,
+               3 means that the system sending RIP version1 packets and receiving both
+                 RIP version1 and RIP version2 packets.
+                 
+               If the system RIP interface configuration has been modified by user,this 
+               object will be 4."
+    DEFVAL {3}
+        ::={fsRIPMIBObjects 5}
+ 
+ 
+-- The RIP Interface Status Table.
+
+fsRipIfStatTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSRipIfStatEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "A list of subnets which require separate
+           status monitoring in RIP."
+       ::= { fsRIPMIBObjects 6 }
+
+fsRipIfStatEntry OBJECT-TYPE
+       SYNTAX   FSRipIfStatEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "A Single Routing Domain in a single Subnet."
+      INDEX { fsRipIfStatIfIndex }
+      ::= { fsRipIfStatTable 1 }
+
+FSRipIfStatEntry ::=
+        SEQUENCE {
+        fsRipIfStatIfIndex
+                IfIndex,
+        fsRipIfStatRcvBadPackets
+                Counter32,
+        fsRipIfStatRcvBadRoutes
+                Counter32,
+        fsRipIfStatSentUpdates
+                Counter32
+            }
+
+fsRipIfStatIfIndex OBJECT-TYPE
+        SYNTAX   IfIndex
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "VID of vlan which each net interface associate."
+       ::= { fsRipIfStatEntry 1 }
+
+fsRipIfStatRcvBadPackets OBJECT-TYPE
+        SYNTAX   Counter32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The number of RIP response packets received by
+           the RIP process which were subsequently discarded
+           for any reason (e.g. a version 0 packet, or an
+           unknown command type)."
+       ::= { fsRipIfStatEntry 2 }
+
+fsRipIfStatRcvBadRoutes OBJECT-TYPE
+        SYNTAX   Counter32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The number of routes, in valid RIP packets,
+           which were ignored for any reason (e.g. unknown
+           address family, or invalid metric)."
+       ::= { fsRipIfStatEntry 3 }
+
+fsRipIfStatSentUpdates OBJECT-TYPE
+        SYNTAX   Counter32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The number of triggered RIP updates actually
+           sent on this interface.  This explicitly does
+           NOT include full updates sent containing new
+           information."
+       ::= { fsRipIfStatEntry 4 }
+ 
+-- The RIP Interface Configuration Table.
+
+fsRipIfConfTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSRipIfConfEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "A list of interfaces which require separate
+           configuration in RIP."
+       ::= { fsRIPMIBObjects  7 }
+
+fsRipIfConfEntry OBJECT-TYPE
+       SYNTAX   FSRipIfConfEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "A Single Routing Domain in a single interface."
+      INDEX { fsRipIfConfIfIndex }
+      ::= { fsRipIfConfTable 1 }
+
+    FSRipIfConfEntry ::=
+        SEQUENCE {
+         fsRipIfConfIfIndex
+                IfIndex,
+         fsRipIfConfAuthType
+                INTEGER,
+         fsRipIfConfAuthKeyChain
+                DisplayString,
+         fsRipIfConfSend
+                INTEGER,
+         fsRipIfConfReceive
+                INTEGER,
+         fsRipIfPassiveStatus
+                EnabledStatus,
+         fsRipIfBroadcastEnable       
+                EnabledStatus,
+         fsRipIfAdminStat 
+                EnabledStatus               
+     }
+
+fsRipIfConfIfIndex OBJECT-TYPE
+        SYNTAX   IfIndex
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "IfIndex vale of vlan interface."
+       ::= { fsRipIfConfEntry 1 }
+
+ 
+fsRipIfConfAuthType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                    noAuthentication(1),
+                    simplePassword (2),
+                    md5(3)    
+                 }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "The type of Authentication used on this
+           interface."
+       DEFVAL { noAuthentication }
+       ::= { fsRipIfConfEntry 2 }
+
+fsRipIfConfAuthKeyChain OBJECT-TYPE
+        SYNTAX   DisplayString(SIZE(1..32))
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "The key chain name which interface associated. It indicate that 
+            this interface doesn't match any key chain which this string is null"
+        REFERENCE
+           "fsAuthenKeyChainName in FS-AUTHEN-KEY-MIB."   
+       ::= { fsRipIfConfEntry 3 }
+
+fsRipIfConfSend OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    ripVersion1 (1),
+                    rip1Compatible (2),
+                    ripVersion2 (3)                     
+                 }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "What the router sends on this interface.
+           ripVersion1 implies sending RIP updates compliant
+           with  RFC  1058.   rip1Compatible implies
+           broadcasting RIP-2 updates using RFC 1058 route
+           subsumption rules.  ripVersion2 implies
+           multicasting RIP-2 updates.  ripV1Demand indicates
+           the use of Demand RIP on a WAN interface under RIP
+           Version 1 rules.  ripV2Demand indicates the use of
+           Demand RIP on a WAN interface under Version 2 rules."
+       DEFVAL { rip1Compatible }
+       ::= { fsRipIfConfEntry 4 }
+
+fsRipIfConfReceive OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    rip1 (1),
+                    rip2 (2),
+                    rip1OrRip2 (3)
+                 }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "This indicates which version of RIP updates
+           are to be accepted.  Note that rip2 and
+           rip1OrRip2 implies reception of multicast
+           packets."
+       DEFVAL { rip1OrRip2 }
+       ::= { fsRipIfConfEntry 5 }
+
+fsRipIfPassiveStatus  OBJECT-TYPE
+       SYNTAX EnabledStatus
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+             " The interface will not send routing updates if this value is 'enabled'"
+       DEFVAL { disabled }
+             ::={ fsRipIfConfEntry 6 } 
+
+fsRipIfBroadcastEnable OBJECT-TYPE
+       SYNTAX EnabledStatus
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+             "Enable or disable broadcast updats of RIP in this interface"
+       DEFVAL { disabled }
+             ::={ fsRipIfConfEntry 7 }
+
+fsRipIfAdminStat OBJECT-TYPE
+        SYNTAX   EnabledStatus
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The RIP  interface's  administrative  status.
+           The  value formed on the interface, and the in-
+           terface will be advertised as an internal route
+           to  some  area.   The  value 'disabled' denotes
+           that the interface is external to RIP."
+       ::= { fsRipIfConfEntry 8 }
+
+                   
+fsRipOffsetMetric OBJECT-TYPE
+    SYNTAX Integer32 (1..15)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+         "This object means the value of increasing incoming 
+           and outgoing metrics to routes learned via RIP "
+    DEFVAL {1}
+    ::={ fsRIPMIBObjects 8 }
+
+fsRipAdministrativeDistance OBJECT-TYPE
+    SYNTAX Integer32 (0..255)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+                "This object specified the priority of route information learned via RIP."
+    ::={ fsRIPMIBObjects 9}  
+
+fsRipValidateUpdateSrcEnable  OBJECT-TYPE
+    SYNTAX EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+          "This object allow of enabling or disabling validate the
+           source IP address of incoming RIP routing updates."
+    DEFVAL { enabled }
+          ::={ fsRIPMIBObjects 10 } 
+
+fsRipPassiveStatus  OBJECT-TYPE
+       SYNTAX EnabledStatus
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+             "The fsRipIfPassiveStatus of a interface equal to this object value
+              when this interface is created. If you change this object value to 'enabled'
+              or 'disabled'all interfaces which have exist will also change their 
+              fsRipIfPassiveStatus to 'enabled' or 'disabled'."
+       DEFVAL { disabled }
+             ::={ fsRIPMIBObjects 11 } 
+
+
+fsRipNextDueIn  OBJECT-TYPE
+       SYNTAX TimeTicks
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+             "Waitting time interval before next update packet generatting 
+             in units of second"
+             ::={ fsRIPMIBObjects 12 }
+
+-- The RIP Interface Offset Table.
+fsRipIfOffsetTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSRipIfOffsetEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "The interface configuration about offset.
+            Apply an offset list to routing metrics to increase incoming and 
+            outgoing metrics to routes learned through RIP. You can limit 
+            the offset list with an access list or an interface."
+       ::= { fsRIPMIBObjects 13 }
+
+fsRipIfOffsetEntry OBJECT-TYPE
+       SYNTAX   FSRipIfOffsetEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "the entry of this table."
+      INDEX { fsRipIfOffsetIfIndex,fsRipIfOffsetMethod }
+      ::= { fsRipIfOffsetTable 1 }
+
+FSRipIfOffsetEntry ::=
+        SEQUENCE {
+        fsRipIfOffsetIfIndex
+                Integer32,
+        fsRipIfOffsetMethod
+                INTEGER,
+        fsRipIfOffsetAclName
+                DisplayString,
+        fsRipIfOffsetMetric
+                Unsigned32,                
+        fsRipIfOffsetStatus
+                RowStatus
+            }
+
+fsRipIfOffsetIfIndex OBJECT-TYPE
+        SYNTAX   Integer32 (0..2147483647)
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "the interface that this offset list apply to.
+               
+                If this value is 0,it indicate that this offset list apply in all 
+                interfaces except the interfaceswhich which have not Offset configure.
+                
+                Other value is equal to TEXTUAL-CONVENTION IfIndex meaning,this offset
+                list will apply in only the designate interface"
+       ::= { fsRipIfOffsetEntry 1 }
+
+fsRipIfOffsetMethod OBJECT-TYPE
+        SYNTAX   INTEGER{
+                         out(1),
+                         in(2)
+                        }
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "the offset list apply to incoming routes or 
+           outgoing routes."
+       ::= { fsRipIfOffsetEntry 2 }
+
+fsRipIfOffsetAclName OBJECT-TYPE
+        SYNTAX   DisplayString(SIZE(1..32))
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           " the offset list with Access list name ."
+       ::= { fsRipIfOffsetEntry 3 }
+       
+fsRipIfOffsetMetric OBJECT-TYPE
+        SYNTAX   Unsigned32(0..16)
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           "the offset list with offset value,
+            in condition the value will be added to route metric."
+       ::= { fsRipIfOffsetEntry 4 }
+
+fsRipIfOffsetStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           " if this value is setted destroy,
+             the entry will be deleted ."
+       ::= { fsRipIfOffsetEntry 5 }                    
+
+
+--network table
+fsRipNetworkTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSRipNetworkEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "the network for rip routing."
+       ::= { fsRIPMIBObjects 14 }
+
+fsRipNetworkEntry OBJECT-TYPE
+       SYNTAX   FSRipNetworkEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "the entry of this table."
+      INDEX { fsRipNetworkAddr }
+      ::= { fsRipNetworkTable 1 }
+
+FSRipNetworkEntry ::=
+        SEQUENCE {
+        fsRipNetworkAddr
+                IpAddress,
+        fsRipNetworkMask
+                IpAddress,                
+        fsRipNetworkStatus
+                RowStatus
+            }
+
+fsRipNetworkAddr OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "define a network for rip routing ."
+       ::= { fsRipNetworkEntry 1 }
+
+fsRipNetworkMask OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "define a network's mask for rip routing ."
+       ::= { fsRipNetworkEntry 2 }
+              
+fsRipNetworkStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+               "if destroy is setted,
+                this entry will be deleted ."
+       ::= { fsRipNetworkEntry 3 }
+
+--neighbor table
+fsRipNeighborTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF FSRipNeighborEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "the neighbor for rip routing."
+       ::= { fsRIPMIBObjects 15 }
+
+fsRipNeighborEntry OBJECT-TYPE
+       SYNTAX   FSRipNeighborEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "the entry of this table."
+      INDEX { fsRipNeighborIndex }
+      ::= { fsRipNeighborTable 1 }
+
+FSRipNeighborEntry ::=
+        SEQUENCE {
+        fsRipNeighborIndex
+                IpAddress,
+        fsRipNeighborStatus
+                RowStatus
+            }
+
+fsRipNeighborIndex OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "define a neighbor for rip  ."
+       ::= { fsRipNeighborEntry 1 }
+       
+fsRipNeighborStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+               "if destroy is setted,
+                this entry will be deleted."
+       ::= { fsRipNeighborEntry 2 }
+             
+fsRIPMIBConformance OBJECT IDENTIFIER ::= { fsRIPMIB 2 }
+fsRIPMIBCompliances OBJECT IDENTIFIER ::= { fsRIPMIBConformance 1 }
+fsRIPMIBGroups      OBJECT IDENTIFIER ::= { fsRIPMIBConformance 2 }
+
+
+-- compliance statements
+
+fsRIPMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS Snooping Dhcp MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { fsRipMIBGroup,
+                                   fsRIPExtendMIBGroup  
+                 }
+        ::= { fsRIPMIBCompliances 1 }
+                
+-- units of conformance
+
+fsRipMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsRipEnable,
+           fsRipUpdateTime,
+           fsRipInvalidTime,
+           fsRipHolddownTime,
+           fsRipRecommendSetting,
+           fsRipIfStatIfIndex,
+           fsRipIfStatRcvBadPackets,
+           fsRipIfStatRcvBadRoutes,
+           fsRipIfStatSentUpdates,           
+           fsRipIfConfIfIndex,
+           fsRipIfConfAuthType,
+           fsRipIfConfAuthKeyChain,
+           fsRipIfConfSend,
+           fsRipIfConfReceive,
+           fsRipIfPassiveStatus,
+           fsRipIfBroadcastEnable,
+           fsRipIfAdminStat,
+           fsRipOffsetMetric,
+           fsRipAdministrativeDistance,
+           fsRipValidateUpdateSrcEnable
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing rip managment."
+        ::= { fsRIPMIBGroups 1 }
+
+fsRIPExtendMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsRipNextDueIn,
+           
+           fsRipIfOffsetIfIndex,
+           fsRipIfOffsetMethod,
+           fsRipIfOffsetAclName,
+           fsRipIfOffsetMetric,                
+           fsRipIfOffsetStatus,
+           
+           fsRipNetworkAddr,
+           fsRipNetworkMask,
+           fsRipNetworkStatus,
+           
+           fsRipNeighborIndex,
+           fsRipNeighborStatus        
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing rip extend managment."
+        ::= { fsRIPMIBGroups 2 }
+                
+        
+END

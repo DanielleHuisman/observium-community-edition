@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package        observium
  * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -23,17 +22,15 @@
  *
  * @param array $vars
  *
- * @return none
+ * @return void
  *
  */
-function print_bgp_peer_table($vars)
-{
+function print_bgp_peer_table($vars) {
     // Get bgp peers array
     $entries = get_bgp_array($vars);
     //r($entries);
 
-    if (!$entries['count'])
-    {
+    if (!$entries['count']) {
         // There have been no entries returned. Print the warning.
         print_warning('<h4>No BGP peers found!</h4>');
         return;
@@ -41,13 +38,11 @@ function print_bgp_peer_table($vars)
 
     // Entries have been returned. Print the table.
     $list = array('device' => FALSE);
-    if ($vars['page'] != 'device')
-    {
+    if ($vars['page'] !== 'device') {
         $list['device'] = TRUE;
     }
 
-    switch ($vars['graph'])
-    {
+    switch ($vars['graph']) {
         case 'prefixes_ipv4unicast':
         case 'prefixes_ipv4multicast':
         case 'prefixes_ipv4vpn':
@@ -72,11 +67,12 @@ function print_bgp_peer_table($vars)
         array(NULL, 'class="state-marker"'),
         array(NULL, 'style="width: 1px;"'),
         'device'  => array('Local address', 'style="width: 150px;"'),
+        'local_as' => [ 'Local AS / VRF', 'style="width: 110px;"' ],
         array(NULL, 'style="width: 20px;"'),
         'peer_ip' => array('Peer address', 'style="width: 150px;"'),
+        'peer_as' => [ 'Remote AS', 'style="width: 90px;"' ],
         'type'    => array('Type', 'style="width: 50px;"'),
         array('Family', 'style="width: 50px;"'),
-        'peer_as' => 'Remote AS',
         'state'   => 'State',
         'uptime'  => 'Uptime / Updates',
     );
@@ -89,16 +85,13 @@ function print_bgp_peer_table($vars)
     {
         $local_dev  = device_by_id_cache($peer['device_id']);
         $local_as   = ($list['device'] ? ' (AS' . $peer['human_local_as'] . ')' : '');
-        $local_name = generate_device_link($local_dev, short_hostname($local_dev['hostname'], 18), array('tab' => 'routing', 'proto' => 'bgp'));
+        $local_name = generate_device_link_short($local_dev, [ 'tab' => 'routing', 'proto' => 'bgp' ], 18);
         $local_ip   = generate_device_link($local_dev, $peer['human_localip'] . $local_as, array('tab' => 'routing', 'proto' => 'bgp'));
         $peer_as    = 'AS' . $peer['human_remote_as'];
-        if ($peer['peer_device_id'])
-        {
+        if ($peer['peer_device_id']) {
             $peer_dev  = device_by_id_cache($peer['peer_device_id']);
-            $peer_name = generate_device_link($peer_dev, short_hostname($peer_dev['hostname'], 18), array('tab' => 'routing', 'proto' => 'bgp'));
-        }
-        else
-        {
+            $peer_name = generate_device_link_short($peer_dev, [ 'tab' => 'routing', 'proto' => 'bgp' ], 18);
+        } else {
             $peer_name = $peer['reverse_dns'];
         }
         $peer_ip        = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
@@ -150,11 +143,17 @@ function print_bgp_peer_table($vars)
             $string .= '     <td class="state-marker"></td>' . PHP_EOL;
             $string .= '     <td></td>' . PHP_EOL;
             $string .= '     <td style="white-space: nowrap" class="entity">' . $local_ip . '<br />' . $local_name . '</td>' . PHP_EOL;
+            $string .= '     <td><strong><span class="label label-' . $peer['peer_local_class'] . '">AS' . $peer['human_local_as'] . '</span></strong>';
+            if (!safe_empty($peer['virtual_name'])) {
+              $vitual_type = isset($GLOBALS['config']['os'][$local_dev['os']]['snmp']['virtual_type']) ? nicecase($GLOBALS['config']['os'][$local_dev['os']]['snmp']['virtual_type']) : 'VRF';
+              $string .= '<br /><span class="label">'.$vitual_type.': '.$peer['virtual_name'].'</span>';
+            }
+            $string .= '</td>' . PHP_EOL;
             $string .= '     <td><span class="text-success"><i class="glyphicon glyphicon-arrow-right"></i></span></td>' . PHP_EOL;
             $string .= '     <td style="white-space: nowrap" class="entity">' . $peer_ip . '<br />' . $peer_name . '</td>' . PHP_EOL;
-            $string .= '     <td><span class="label label-' . $peer['peer_type_class'] . '">' . $peer['peer_type'] . '</span>' . ($peer['local_as'] != $peer['bgpLocalAs'] ? '<br /><span class="label label-' . $peer['peer_local_class'] . '">AS' . $peer['human_local_as'] . '</span>' : '') . '</td>' . PHP_EOL;
-            $string .= '     <td>' . implode('<br />', $peer_afis_html) . '</td>' . PHP_EOL;
             $string .= '     <td><strong>' . $peer_as . '</strong><br />' . $peer['astext'] . '</td>' . PHP_EOL;
+            $string .= '     <td><span class="label label-' . $peer['peer_type_class'] . '">' . $peer['peer_type'] . '</span></td>' . PHP_EOL;
+            $string .= '     <td>' . implode('<br />', $peer_afis_html) . '</td>' . PHP_EOL;
             $string .= '     <td><strong><span class=" label label-' . $peer['admin_class'] . '">' . $peer['bgpPeerAdminStatus'] . '</span><br /><span class="label label-' . $peer['state_class'] . '">' . $peer['bgpPeerState'] . '</span></strong></td>' . PHP_EOL;
             $string .= '     <td style="white-space: nowrap">' . format_uptime($peer['bgpPeerFsmEstablishedTime']) . '<br />
                 Updates: <i class="icon-circle-arrow-down text-success"></i> ' . format_si($peer['bgpPeerInUpdates']) . ' <i class="icon-circle-arrow-up text-primary"></i> ' . format_si($peer['bgpPeerOutUpdates']) . '</td>' . PHP_EOL;
@@ -162,8 +161,7 @@ function print_bgp_peer_table($vars)
 
         // Graphs
         $peer_graph = FALSE;
-        switch ($vars['graph'])
-        {
+        switch ($vars['graph']) {
             case 'prefixes_ipv4unicast':
             case 'prefixes_ipv4multicast':
             case 'prefixes_ipv4vpn':
@@ -204,9 +202,8 @@ function print_bgp_peer_table($vars)
                 break;
         }
 
-        if ($peer_graph)
-        {
-            $graph_array['to'] = $config['time']['now'];
+        if ($peer_graph) {
+            $graph_array['to'] = get_time();
             $string            .= '  <tr class="' . $peer['html_row_class'] . '">' . PHP_EOL;
             $string            .= '    <td class="state-marker"></td><td colspan="10" style="white-space: nowrap">' . PHP_EOL;
 
@@ -245,7 +242,7 @@ function print_bgp_peer_table($vars)
  */
 function get_bgp_array($vars)
 {
-    $array = array();
+    $array = [];
 
     // With pagination? (display page numbers in header)
     $array['pagination'] = (isset($vars['pagination']) && $vars['pagination']);
@@ -261,12 +258,9 @@ function get_bgp_array($vars)
     // Begin query generate
     $param = array();
     $where = ' WHERE 1 ';
-    foreach ($vars as $var => $value)
-    {
-        if ($value != '')
-        {
-            switch ($var)
-            {
+    foreach ($vars as $var => $value) {
+        if ($value != '') {
+            switch ($var) {
                 case "group":
                 case "group_id":
                     $values = get_group_entities($value);
@@ -281,10 +275,10 @@ function get_bgp_array($vars)
                     $where .= generate_query_values($value, 'peer_device_id');
                     break;
                 case 'local_ip':
-                    $where .= generate_query_values($value, 'bgpPeerLocalAddr');
+                    $where .= generate_query_values(ip_uncompress($value), 'bgpPeerLocalAddr');
                     break;
                 case 'peer_ip':
-                    $where .= generate_query_values($value, 'bgpPeerRemoteAddr');
+                    $where .= generate_query_values(ip_uncompress($value), 'bgpPeerRemoteAddr');
                     break;
                 case 'local_as':
                     $where .= generate_query_values(bgp_asdot_to_asplain($value), 'local_as');
@@ -293,32 +287,23 @@ function get_bgp_array($vars)
                     $where .= generate_query_values(bgp_asdot_to_asplain($value), 'bgpPeerRemoteAs');
                     break;
                 case 'type':
-                    if ($value == 'external' || $value == 'ebgp')
-                    {
+                    if ($value === 'external' || $value === 'ebgp') {
                         $where .= generate_query_values($cache_bgp['external'], 'bgpPeer_id');
-                    }
-                    elseif ($value == 'internal' || $value == 'ibgp')
-                    {
+                    } elseif ($value === 'internal' || $value === 'ibgp') {
                         $where .= generate_query_values($cache_bgp['internal'], 'bgpPeer_id');
                     }
                     break;
                 case 'adminstatus':
-                    if ($value == 'stop')
-                    {
+                    if ($value === 'stop') {
                         $where .= generate_query_values($cache_bgp['start'], 'bgpPeer_id', '!='); // NOT IN
-                    }
-                    elseif ($value == 'start')
-                    {
+                    } elseif ($value === 'start') {
                         $where .= generate_query_values($cache_bgp['start'], 'bgpPeer_id');
                     }
                     break;
                 case 'state':
-                    if ($value == 'down')
-                    {
+                    if ($value === 'down') {
                         $where .= generate_query_values($cache_bgp['up'], 'bgpPeer_id', '!='); // NOT IN
-                    }
-                    elseif ($value == 'up')
-                    {
+                    } elseif ($value === 'up') {
                         $where .= generate_query_values($cache_bgp['up'], 'bgpPeer_id');
                     }
                     break;
@@ -340,33 +325,36 @@ function get_bgp_array($vars)
 
     $query = 'SELECT `hostname`, `bgpLocalAs`, bgpPeers.* ' . $query;
     
-    if($vars['sort_order'] == 'desc') { $sort_dir = ' DESC'; }
+    $sort_dir = $vars['sort_order'] === 'desc' ? ' DESC' : '';
 
-        switch($vars['sort'])
-        {
-            case "device":
-                $sort = " ORDER BY `hostname`".$sort_dir;
-                break;
+    switch($vars['sort']) {
+        case "device":
+            $sort = " ORDER BY `hostname`".$sort_dir;
+            break;
 
-            case "peer_ip":
-                $sort = " ORDER BY `bgpPeerRemoteAddr`".$sort_dir;
-                break;
+        case "local_as":
+            $sort = " ORDER BY `local_as`$sort_dir, `virtual_name`$sort_dir";
+            break;
 
-            case "peer_as":
-                $sort = " ORDER BY `bgpPeerRemoteAs`".$sort_dir;
-                break;
+        case "peer_ip":
+            $sort = " ORDER BY `bgpPeerRemoteAddr`".$sort_dir;
+            break;
 
-            case 'state':
-                $sort = " ORDER BY `bgpPeerAdminStatus`".$sort_dir.", `bgpPeerState`".$sort_dir;
-                break;
+        case "peer_as":
+            $sort = " ORDER BY `bgpPeerRemoteAs`".$sort_dir;
+            break;
 
-            case 'uptime':
-                $sort = " ORDER BY `bgpPeerFsmEstablishedTime`".$sort_dir;
-                break;
+        case 'state':
+            $sort = " ORDER BY `bgpPeerAdminStatus`".$sort_dir.", `bgpPeerState`".$sort_dir;
+            break;
 
-            default:
-                $sort = " ORDER BY `hostname`".$sort_dir.", `bgpPeerRemoteAs`".$sort_dir.", `bgpPeerRemoteAddr`".$sort_dir;
-        }
+        case 'uptime':
+            $sort = " ORDER BY `bgpPeerFsmEstablishedTime`".$sort_dir;
+            break;
+
+        default:
+            $sort = " ORDER BY `hostname`".$sort_dir.", `bgpPeerRemoteAs`".$sort_dir.", `bgpPeerRemoteAddr`".$sort_dir;
+    }
 
     $query .= $sort;
     $query .= " LIMIT $start,$pagesize";
@@ -394,14 +382,11 @@ function get_bgp_array($vars)
     }
 
     // Query BGP peers count
-    if ($array['pagination'])
-    {
+    if ($array['pagination']) {
         $array['count']           = dbFetchCell($query_count, $param);
         $array['pagination_html'] = pagination($vars, $array['count']);
-    }
-    else
-    {
-        $array['count'] = count($array['entries']);
+    } else {
+        $array['count'] = safe_count($array['entries']);
     }
 
     return $array;

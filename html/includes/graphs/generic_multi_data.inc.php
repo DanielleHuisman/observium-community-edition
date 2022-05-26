@@ -47,13 +47,13 @@ foreach ($rrd_filenames as $key => $rrd_filename)
 
   if ($vars['previous'])
   {
-    $rrd_options .= " DEF:".$in."octets" . $i . "X=".$rrd_filename_escape.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
-    $rrd_options .= " DEF:".$out."octets" . $i . "X=".$rrd_filename_escape.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
-    $rrd_options .= " SHIFT:".$in."octets" . $i . "X:$period";
-    $rrd_options .= " SHIFT:".$out."octets" . $i . "X:$period";
+    $rrd_options .= " DEF:".$in.$i."X=".$rrd_filename_escape.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$out.$i."X=".$rrd_filename_escape.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " SHIFT:".$in.$i."X:$period";
+    $rrd_options .= " SHIFT:".$out.$i."X:$period";
 
-    $rrd_multi['in_thingX'][]  = "inoctets" .  $i;
-    $rrd_multi['out_thingX'][] = "outoctets" . $i;
+    $rrd_multi['in_thingX'][]  = "in".$i."X";
+    $rrd_multi['out_thingX'][] = "out".$i."X";
   }
   $i++;
 }
@@ -70,7 +70,7 @@ if ($i)
   }
 
   $rrd_options .= " CDEF:".$in."octets=" . rrd_aggregate_dses($rrd_multi['in_thing']);
-  $rrd_options .= " CDEF:".$in."octets=" . rrd_aggregate_dses($rrd_multi['out_thing']);
+  $rrd_options .= " CDEF:".$out."octets=" . rrd_aggregate_dses($rrd_multi['out_thing']);
 
   $rrd_options .= " CDEF:doutoctets=outoctets,-1,*";
   $rrd_options .= " CDEF:inbits=inoctets,8,*";
@@ -82,10 +82,8 @@ if ($i)
 
   if ($vars['previous'] == "yes")
   {
-
-    $rrd_options .= " CDEF:".$in."octetsX=" . rrd_aggregate_dses($rrd_multi['in_thingX']);
-    $rrd_options .= " CDEF:".$in."octetsX=" . rrd_aggregate_dses($rrd_multi['out_thingX']);
-
+    $rrd_options .= " CDEF:".$in."octetsX=" . rrd_aggregate_dses($rrd_multi['in_thingX']);;
+    $rrd_options .= " CDEF:".$out."octetsX=" . rrd_aggregate_dses($rrd_multi['in_thingX']);
     $rrd_options .= " CDEF:doutoctetsX=outoctetsX,-1,*";
     $rrd_options .= " CDEF:inbitsX=inoctetsX,8,*";
     $rrd_options .= " CDEF:outbitsX=outoctetsX,8,*";
@@ -124,8 +122,8 @@ if ($i)
   {
     $rrd_options .= " AREA:in".$format."X#99999999:";
     $rrd_options .= " AREA:dout".$format."X#99999999:";
-    $rrd_options .= " LINE1:in".$format."X#666666:";
-    $rrd_options .= " LINE1:dout".$format."X#666666:";
+    //$rrd_options .= " LINE1:in".$format."X#666666:";
+    //$rrd_options .= " LINE1:dout".$format."X#666666:";
   }
 
 }

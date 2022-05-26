@@ -12,19 +12,16 @@
 
 // If we've been given a hostname, try to retrieve the device_id
 
-if (isset($vars['device']) && !is_numeric($vars['device']))
-{
+if (isset($vars['device']) && !is_numeric($vars['device'])) {
   $vars['hostname'] = $vars['device'];
   unset($vars['device']);
 }
 
-if (empty($vars['device']) && !empty($vars['hostname']))
-{
+if (safe_empty($vars['device']) && !safe_empty($vars['hostname'])) {
   $vars['device'] = get_device_id_by_hostname($vars['hostname']);
 
   // If device lookup fails, generate an error.
-  if (empty($vars['device']))
-  {
+  if (! $vars['device']) {
     print_error('<h4>Invalid Hostname</h4>
                    A device matching the given hostname was not found. Please retype the hostname and try again.');
     return;
@@ -32,8 +29,7 @@ if (empty($vars['device']) && !empty($vars['hostname']))
 }
 
 // If there is no device specified in the URL, generate an error.
-if (empty($vars['device']))
-{
+if (safe_empty($vars['device'])) {
   print_error('<h4>No device specified</h4>
                    A valid device was not specified in the URL. Please retype and try again.');
   return;
@@ -41,8 +37,7 @@ if (empty($vars['device']))
 
 // Allow people to see this page if they have permission to see one of the ports, but don't show them tabs.
 $permit_tabs = array();
-if ($vars['tab'] === "port" && is_numeric($vars['device']) && (isset($vars['port']) || isset($vars['ifdescr'])))
-{
+if ($vars['tab'] === "port" && is_numeric($vars['device']) && (isset($vars['port']) || isset($vars['ifdescr']))) {
   // If we've been given a 'ifdescr' variable, try to work out the port_id from this
   if (!is_numeric($vars['port']) && !empty($vars['ifdescr']))
   {
@@ -85,7 +80,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     $tab = "overview";
   }
 
-  $select[$tab] = "active";
+  $select[$tab] = "active"; // FIXME. ????
 
   // Populate device array from pre-populated cache
   $device = device_by_id_cache($vars['device']);
@@ -111,7 +106,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
   //// DEV
 
   // Start to cache panel
-  // NOTE. Also this panel content can be moved to html/includes/panels/device.inc.php (instead ob_cache() here)
+  /* NOTE. Also this panel content can be moved to html/includes/panels/device.inc.php (instead ob_cache() here)
     ob_start();
 
     print_device_header($device, array('no_graphs' => TRUE));
@@ -187,13 +182,13 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
 
     unset($graph_array, $panel_html);
 
-  // End panel
+  // End panel */
 
   // Print the device header
 
-  echo '<div class="hidden-xl">';
-  print_device_header($device);
-  echo '</div>';
+  //echo '<div class="hidden-xl">';
+  print_device_header($device, [ 'div-class' => 'hidden-xl' ]);
+  //echo '</div>';
 
   // Show tabs if the user has access to this device
 
@@ -637,7 +632,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
       $navbar['options']['tools']['suboptions']['connect']       = array('text' => 'Connect', 'icon' => 'sprite-config', 'url' => '#');
       $navbar['options']['tools']['suboptions']['connect']['entries']       = $connect_entries;
       $navbar['options']['tools']['suboptions']['divider_2']  = array('divider' => TRUE);
-
+      
       $navbar['options']['tools']['suboptions']['delete']['url']  = "#modal-delete_device";
       $navbar['options']['tools']['suboptions']['delete']['text'] = 'Delete Device';
       $navbar['options']['tools']['suboptions']['delete']['link_opts'] = 'data-toggle="modal"';

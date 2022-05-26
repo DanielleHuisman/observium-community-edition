@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage cache
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -60,7 +60,7 @@ function get_cache_key($key, $global = FALSE) {
  * Call to getItem() method for retrieve an Item for cached object
  *
  * @param string $key Item identifier (key), for WUI key auto prepended with current user identificator (by get_cache_key())
- * @return object Object with cache Item
+ * @return object|void Object with cache Item
  */
 function get_cache_item($key) {
   if (defined('OBS_CACHE_LINK') &&
@@ -196,6 +196,8 @@ function set_cache_item($item, $data, $params = array()) {
   $cache_time = microtime(TRUE) - $start;
 
   if (OBS_DEBUG || OBS_CACHE_DEBUG) {
+    //print_vars($save);
+    //print_vars($observium_cache->hasItem($item->getKey()));
     print_warning('<span class="text-info">WROTE TO CACHE</span> // TTL: '.$item->getTtl().'s // Expiration: <strong>' . $item->getExpirationDate()->format(Datetime::RFC2822) . '</strong><br />' .
                   'Key: <strong>' . $item->getKey() . '</strong> // Tags: <strong>' . $item->getTagsAsString() . '</strong><br />' .
                   'Driver: <strong>'.str_ireplace(array('phpFastCache\\Drivers\\', '\\Item'), '', get_class($item)).'</strong> // Write time: ' . sprintf("%.7f", $cache_time) . ' ms');
@@ -244,8 +246,8 @@ function del_cache_items($tags) {
  * Used "workaround" as described here:
  * https://github.com/PHPSocialNetwork/phpfastcache/issues/413#issuecomment-270692658
  *
- * @param array $tags Array of tags for clear
- * @return int Unixtime when last expired cache cleared
+ * @param array $tag Array of tags for clear
+ * @return int|void Unixtime when last expired cache cleared
  */
 function del_cache_expired($tag = '') {
   if (defined('OBS_CACHE_LINK') &&
@@ -445,7 +447,7 @@ define('OBS_CACHE_DEBUG', isset($_SERVER['PATH_INFO']) && str_contains($_SERVER[
 
 // Do not load phpFastCache classes if caching mechanism not enabled or not supported
 if (!$config['cache']['enable']) {
-  if (OBS_DEBUG || OBS_CACHE_DEBUG) {
+  if (OBS_CACHE_DEBUG || (defined('OBS_DEBUG') && OBS_DEBUG)) {
     if (PHP_VERSION_ID < 50600) {
       print_error('<span class="text-danger">CACHE DISABLED.</span> You use too old php version, see <a href="' . OBSERVIUM_DOCS_URL . '/software_requirements/">minimum software requirements</a>.');
     } else {
@@ -455,11 +457,25 @@ if (!$config['cache']['enable']) {
   return;
 }
 
+if (is_cli()) {
+  if (!$config['cache']['enable_cli'] || OBS_PROCESS_NAME === 'config_to_json') {
+    if (OBS_CACHE_DEBUG || (defined('OBS_DEBUG') && OBS_DEBUG)) {
+      print_cli('%RCACHE DISABLED.%n Disabled in config.');
+    }
+    return;
+  }
+
+  // Syslog have different dir permissions
+  $cache_key = OBS_PROCESS_NAME === 'syslog' ? 'syslog' : 'cli';
+} else {
+  $cache_key = 'wui'; // do not use $_SERVER['hostname'] as key
+}
+
 /**
- * Temporary hardcoded caching in files, will improved later with other providers
+ * Temporary hardcoded caching in files, will improve later with other providers
  */
 
-define('OBS_CACHE_LINK', 'observium_cache'); // Variable name for call to cache class
+const OBS_CACHE_LINK = 'observium_cache'; // Variable name for call to cache class
 
 // Call the phpFastCache
 use phpFastCache\CacheManager;
@@ -479,7 +495,7 @@ if (PHP_VERSION_ID >= 70300) {
   CacheManager::setDefaultConfig($cache_config);
 }
 */
-$cache_key = is_cli() ? 'cli' : 'wui'; // do not use $_SERVER['hostname'] as key
+
 $cache_driver = 'files'; // If other drivers not detected, use files as fallback
 if (str_istarts($config['cache']['driver'], 'auto')) {
   // Detect avialable drivers,
@@ -510,7 +526,8 @@ foreach ($detect_driver as $entry) {
       }
       break;
     case 'apcu':
-      if (extension_loaded('apcu') && ini_get('apc.enabled')) {
+      if (extension_loaded('apcu') && !is_cli() && ini_get('apc.enabled')) {
+        // NOTE. APCu unusable in CLI
         $cache_driver = 'apcu';
         break 2;
       }
@@ -569,7 +586,11 @@ switch($cache_driver) {
       $GLOBALS[OBS_CACHE_LINK] = CacheManager::getInstance($cache_driver);
     } catch (Exception $e) {
       print_debug('Cache driver '.ucfirst($cache_driver).' not functional. Caching disabled!');
-      $GLOBALS[OBS_CACHE_LINK] = CacheManager::getInstance('Devfalse'); // disable caching
+      //logfile('debug.log', 'Cache driver '.ucfirst($cache_driver).' not functional. Caching disabled in '.OBS_PROCESS_NAME);
+      //CacheManager::setDefaultConfig(new \Phpfastcache\Drivers\Devfalse\Config());
+      //$GLOBALS[OBS_CACHE_LINK] = CacheManager::getInstance('Devfalse'); // disable caching
+      CacheManager::setDefaultConfig(new \Phpfastcache\Drivers\Devnull\Config());
+      $GLOBALS[OBS_CACHE_LINK] = CacheManager::getInstance('Devnull'); // disable caching
     }
     break;
 

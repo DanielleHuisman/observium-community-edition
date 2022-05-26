@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -78,9 +78,12 @@ if (snmp_status()) {
       $entity_array = snmpwalk_cache_oid($device, $oid, $entity_array, 'ARISTA-ENTITY-SENSOR-MIB');
       if (!snmp_status()) { break; }
     }
+  } elseif (is_device_mib($device, 'ARUBAWIRED-POWERSUPPLY-MIB')) {
+    $t_entity_array = snmpwalk_cache_oid($device, 'arubaWiredPSUName', [], 'ARUBAWIRED-POWERSUPPLY-MIB');
+    $t_entity_array = snmpwalk_cache_oid($device, 'arubaWiredPSUMaximumPower', $t_entity_array, 'ARUBAWIRED-POWERSUPPLY-MIB');
   }
 
-  $entitysensor = array(
+  $entitysensor = [
     'voltsDC'   => 'voltage',
     'voltsAC'   => 'voltage',
     'amperes'   => 'current',
@@ -91,7 +94,7 @@ if (snmp_status()) {
     'celsius'   => 'temperature',
     'dBm'       => 'dbm',
     'truthvalue' => 'state'
-  );
+  ];
 
   /// DEVEL
   //print_debug_vars($entity_array);
@@ -154,12 +157,22 @@ if (snmp_status()) {
       $value = $entry['entPhySensorValue'];
 
       if ($type === 'temperature') {
-        if ($value * $scale > 200 || $value == 0) { $ok = FALSE; }
+        if (isset($valid['sensor'][$type]['ARUBAWIRED-TEMPSENSOR-MIB-arubaWiredTempSensorTemperature'])) {
+          // duplicate sensors
+          $ok = FALSE;
+        } elseif ($value * $scale > 200 || $value == 0) {
+          $ok = FALSE;
+        }
+      } elseif ($type === 'fanspeed') {
+        if (isset($valid['sensor'][$type]['ARUBAWIRED-FAN-MIB-arubaWiredFanRPM'])) {
+          // duplicate sensors
+          $ok = FALSE;
+        }
       }
       if ($value == -127 || $value == -1000000000) {
         // Optic RX/TX watt sensors on Arista
         $ok = FALSE;
-      } elseif ($value == 0 && !$entry['entPhysicalDescr'] && !$entry['entPhysicalName']) {
+      } elseif ($value == 0 && safe_empty($entry['entPhysicalDescr']) && safe_empty($entry['entPhysicalName'])) {
         $ok = FALSE;
       }
 
@@ -177,6 +190,13 @@ if (snmp_status()) {
           if ($device['os_group'] === 'extremeware' &&
               !str_contains_array($descr, [ $port['port_label'], $port['port_label_short'] ])) {
             $descr = $port['port_label'] . ' ' . $descr;
+          } elseif (isset($port['sensor_multilane']) && $port['sensor_multilane']) {
+            // Multilane sensors, some rewrites
+            list($match) = explode('/', $port['ifDescr']); // Ethernet56/1 -> Ethernet56
+            if (preg_match("! $match(\/(?<lane>\d))?!", $descr, $matches)) {
+              $descr = str_replace($matches[0], '', $descr);
+              $descr = $port['port_label'] . (isset($matches['lane']) ? ' Lane ' . $matches['lane'] : '') . ' ' . $descr;
+            }
           }
         }
       }
@@ -184,6 +204,7 @@ if (snmp_status()) {
       // Set thresholds for numeric sensors
       $limits = [];
       if (isset($entry['aristaEntSensorThresholdHighCritical'])) {
+        // ARISTA-ENTITY-SENSOR-MIB
         foreach ([ 'limit_high'      => 'aristaEntSensorThresholdHighCritical',
                    'limit_low'       => 'aristaEntSensorThresholdLowCritical',
                    'limit_low_warn'  => 'aristaEntSensorThresholdLowWarning',
@@ -193,6 +214,17 @@ if (snmp_status()) {
           } else {
             // The MIB can return -1000000000 or +1000000000, if there should be no threshold there.
             $limits['limit_auto'] = FALSE;
+          }
+        }
+      } elseif ($type === 'power' && is_device_mib($device, 'ARUBAWIRED-POWERSUPPLY-MIB')) {
+        // ARUBAWIRED-POWERSUPPLY-MIB
+        foreach ($t_entity_array as $t_index => $t_entry) {
+          // ENTITY-SENSOR-MIB::entPhysicalName.7401 = STRING: Power sensor for power supply 1/2
+          // ARUBAWIRED-POWERSUPPLY-MIB::arubaWiredPSUName.1.2 = STRING: 1/2
+          if ($t_entry['arubaWiredPSUMaximumPower'] > 0 &&
+              str_ends($entry['entPhysicalName'], ' '.$t_entry['arubaWiredPSUName'])) {
+            $limits['limit_high'] = $t_entry['arubaWiredPSUMaximumPower'];
+            break;
           }
         }
       } elseif (isset($t_entity_array[$index])) {

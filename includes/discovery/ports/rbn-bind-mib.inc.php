@@ -14,10 +14,9 @@
 /// but only informational fields (without stats)
 
 // Try Ports in VRF SNMP contexts
-if (empty($device['snmp_context']) && // Device not already with context
-    isset($config['os'][$device['os']]['snmp']['context']) && $config['os'][$device['os']]['snmp']['context'] && // Context permitted for os
-    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) // SNMP VRF context discovered for device
-{
+if (safe_empty($device['snmp_context']) && // Device not already with context
+    isset($config['os'][$device['os']]['snmp']['virtual']) && $config['os'][$device['os']]['snmp']['virtual'] && // Context permitted for os
+    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) { // SNMP VRF context discovered for device
   // Keep original device array
   $device_original = $device;
   $vrf_ports = [];
@@ -27,8 +26,7 @@ if (empty($device['snmp_context']) && // Device not already with context
     'ifType', 'ifOperStatus', 'ifName', 'ifAlias'
   ];
 
-  foreach ($vrf_contexts as $vrf_name => $snmp_context)
-  {
+  foreach ($vrf_contexts as $vrf_name => $snmp_context) {
     print_message("Ports in VRF: $vrf_name...");
 
     $device['snmp_context'] = $snmp_context;
@@ -37,8 +35,7 @@ if (empty($device['snmp_context']) && // Device not already with context
     $port_stats_vrf = snmpwalk_cache_oid($device, 'ifDescr', [], "IF-MIB");
 
     $has_unique_ports = FALSE;
-    foreach ($port_stats_vrf as $ifIndex => $entry)
-    {
+    foreach ($port_stats_vrf as $ifIndex => $entry) {
       if (!isset($port_stats[$ifIndex])) {
         $has_unique_ports = TRUE;
         break;
@@ -51,8 +48,7 @@ if (empty($device['snmp_context']) && // Device not already with context
         $port_stats_vrf = snmpwalk_cache_oid($device, $oid, $port_stats_vrf, "IF-MIB");
       }
 
-      foreach ($port_stats_vrf as $ifIndex => $entry)
-      {
+      foreach ($port_stats_vrf as $ifIndex => $entry) {
         // Merge stats
         if (!isset($port_stats[$ifIndex])) {
           $entry['vrf_name'] = $vrf_name;

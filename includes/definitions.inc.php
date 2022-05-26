@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -70,73 +70,83 @@ define('OBS_PERMIT_EDIT',          8); // Can edit
 define('OBS_PERMIT_ADMIN',        16); // Can add/remove
 define('OBS_PERMIT_ALL', OBS_PERMIT_ACCESS | OBS_PERMIT_READ | OBS_PERMIT_SECURE | OBS_PERMIT_EDIT | OBS_PERMIT_ADMIN); // Permit all
 
+const OBS_DB_NO_LEADING_AND = 1; // Do not add leading AND to result query (default add)
+const OBS_DB_IFNULL         = 2; // Add IFNULL() for column compare
+
 // Configuration view levels
 define('OBS_CONFIG_BASIC',          1); // 0001: Basic view, 0001
 define('OBS_CONFIG_ADVANCED',       3); // 0011: Advanced view, includes basic
 define('OBS_CONFIG_EXPERT',         7); // 0111: Expert view, includes advanced and basic
 
 // Common regex patterns
-define('OBS_PATTERN_START', '%(?:^|[\s\"\(=])');       // Beginning of any pattern, matched string can start from newline, space, double quote, opening parenthesis, equal sign
-define('OBS_PATTERN_END',   '(?:[\s\"\),]|[\:\.]\ |\.?$)%i'); // End of any pattern, matched string can ended with endline, space, double quote, closing parenthesis, comma, dot
-define('OBS_PATTERN_END_U', OBS_PATTERN_END . 'u');    // ++Unicode
+const OBS_PATTERN_START = '%(?:^|[\s\"\(=])';       // Beginning of any pattern, matched string can start from newline, space, double quote, opening parenthesis, equal sign
+const OBS_PATTERN_END   = '(?:[\s\"\),]|[\:\.]\ |\.?$)%i'; // End of any pattern, matched string can ended with endline, space, double quote, closing parenthesis, comma, dot
+const OBS_PATTERN_END_U = OBS_PATTERN_END . 'u';    // ++Unicode
 
 // IPv4 string in group \1 or 'ipv4'
-define('OBS_PATTERN_IPV4',      '(?<ipv4>(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]))');
-define('OBS_PATTERN_IPV4_FULL', OBS_PATTERN_START . OBS_PATTERN_IPV4 . OBS_PATTERN_END);
+const OBS_PATTERN_IPV4 = '(?<ipv4>(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]))';
+const OBS_PATTERN_IPV4_FULL = OBS_PATTERN_START . OBS_PATTERN_IPV4 . OBS_PATTERN_END;
 // IPv4 netmask string in group \1 or 'ipv4_mask'
-define('OBS_PATTERN_IPV4_MASK',  '(?<ipv4_mask>(?:0|128|192|224|240|248|252|254)\.0\.0\.0|255\.(?:0|128|192|224|240|248|252|254)\.0\.0|255\.255\.(?:0|128|192|224|240|248|252|254)\.0|255\.255\.255\.(?:0|128|192|224|240|248|252|254|255))');
+const OBS_PATTERN_IPV4_MASK = '(?<ipv4_mask>(?:0|128|192|224|240|248|252|254)\.0\.0\.0|255\.(?:0|128|192|224|240|248|252|254)\.0\.0|255\.255\.(?:0|128|192|224|240|248|252|254)\.0|255\.255\.255\.(?:0|128|192|224|240|248|252|254|255))';
 // IPv4 inverse netmask string in group \1 or 'ipv4_inverse_mask'
-define('OBS_PATTERN_IPV4_INVERSE_MASK', '(?<ipv4_inverse_mask>(?:255|127|63|31|15|7|3|1|0)\.255\.255\.255|0\.(?:255|127|63|31|15|7|3|1|0)\.255\.255|0\.0\.(?:255|127|63|31|15|7|3|1|0)\.255|0\.0\.0\.(?:255|127|63|31|15|7|3|1|0))');
+const OBS_PATTERN_IPV4_INVERSE_MASK = '(?<ipv4_inverse_mask>(?:255|127|63|31|15|7|3|1|0)\.255\.255\.255|0\.(?:255|127|63|31|15|7|3|1|0)\.255\.255|0\.0\.(?:255|127|63|31|15|7|3|1|0)\.255|0\.0\.0\.(?:255|127|63|31|15|7|3|1|0))';
 // IPv4 network string in group \1 or 'ipv4_network', additionally 'ipv4', 'ipv4_prefix' or 'ipv4_mask' or 'ipv4_inverse_mask'
-define('OBS_PATTERN_IPV4_NET',  '(?<ipv4_network>' . OBS_PATTERN_IPV4 . '\/(?:(?<ipv4_prefix>3[0-2]|[1-2][0-9]|[0-9])|' . OBS_PATTERN_IPV4_MASK . '|' . OBS_PATTERN_IPV4_INVERSE_MASK . '))');
-define('OBS_PATTERN_IPV4_NET_FULL', OBS_PATTERN_START . OBS_PATTERN_IPV4_NET . OBS_PATTERN_END);
+const OBS_PATTERN_IPV4_NET = '(?<ipv4_network>' . OBS_PATTERN_IPV4 . '\/(?:(?<ipv4_prefix>3[0-2]|[1-2][0-9]|[0-9])|' . OBS_PATTERN_IPV4_MASK . '|' . OBS_PATTERN_IPV4_INVERSE_MASK . '))';
+const OBS_PATTERN_IPV4_NET_FULL = OBS_PATTERN_START . OBS_PATTERN_IPV4_NET . OBS_PATTERN_END;
 
 // IPv6 string in group \1 or 'ipv6'
-define('OBS_PATTERN_IPV6',      '(?<ipv6>(?:(?:(?:[a-f\d]{1,4}:){5}[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){4}:[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){3}(?::[a-f\d]{1,4}){1,2}|(?:[a-f\d]{1,4}:){2}(?::[a-f\d]{1,4}){1,3}|[a-f\d]{1,4}:(?::[a-f\d]{1,4}){1,4}|(?:[a-f\d]{1,4}:){1,5}|:(?::[a-f\d]{1,4}){1,5}|:):(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])|(?:[a-f\d]{1,4}:){7}[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){6}:[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){5}(?::[a-f\d]{1,4}){1,2}|(?:[a-f\d]{1,4}:){4}(?::[a-f\d]{1,4}){1,3}|(?:[a-f\d]{1,4}:){3}(?::[a-f\d]{1,4}){1,4}|(?:[a-f\d]{1,4}:){2}(?::[a-f\d]{1,4}){1,5}|[a-f\d]{1,4}:(?::[a-f\d]{1,4}){1,6}|(?:[a-f\d]{1,4}:){1,7}:|:(?::[a-f\d]{1,4}){1,7}|::))');
-define('OBS_PATTERN_IPV6_FULL', OBS_PATTERN_START . OBS_PATTERN_IPV6 . OBS_PATTERN_END);
+const OBS_PATTERN_IPV6 = '(?<ipv6>(?:(?:(?:[a-f\d]{1,4}:){5}[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){4}:[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){3}(?::[a-f\d]{1,4}){1,2}|(?:[a-f\d]{1,4}:){2}(?::[a-f\d]{1,4}){1,3}|[a-f\d]{1,4}:(?::[a-f\d]{1,4}){1,4}|(?:[a-f\d]{1,4}:){1,5}|:(?::[a-f\d]{1,4}){1,5}|:):(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])|(?:[a-f\d]{1,4}:){7}[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){6}:[a-f\d]{1,4}|(?:[a-f\d]{1,4}:){5}(?::[a-f\d]{1,4}){1,2}|(?:[a-f\d]{1,4}:){4}(?::[a-f\d]{1,4}){1,3}|(?:[a-f\d]{1,4}:){3}(?::[a-f\d]{1,4}){1,4}|(?:[a-f\d]{1,4}:){2}(?::[a-f\d]{1,4}){1,5}|[a-f\d]{1,4}:(?::[a-f\d]{1,4}){1,6}|(?:[a-f\d]{1,4}:){1,7}:|:(?::[a-f\d]{1,4}){1,7}|::))';
+const OBS_PATTERN_IPV6_FULL = OBS_PATTERN_START . OBS_PATTERN_IPV6 . OBS_PATTERN_END;
 // IPv6 network string in group \1 or 'ipv6_network', additionally 'ipv6', 'ipv6_prefix'
-define('OBS_PATTERN_IPV6_NET',  '(?<ipv6_network>' . OBS_PATTERN_IPV6 . '\/(?<ipv6_prefix>12[0-8]|1[0-1][0-9]|[0-9]{1,2}))');
-define('OBS_PATTERN_IPV6_NET_FULL', OBS_PATTERN_START . OBS_PATTERN_IPV6_NET . OBS_PATTERN_END);
+const OBS_PATTERN_IPV6_NET = '(?<ipv6_network>' . OBS_PATTERN_IPV6 . '\/(?<ipv6_prefix>12[0-8]|1[0-1][0-9]|[0-9]{1,2}))';
+const OBS_PATTERN_IPV6_NET_FULL = OBS_PATTERN_START . OBS_PATTERN_IPV6_NET . OBS_PATTERN_END;
 
 // IPv4 or IPv6 string in group \1 or 'ip'
-define('OBS_PATTERN_IP',        '(?<ip>' . OBS_PATTERN_IPV4 . '|' . OBS_PATTERN_IPV6 . ')');
-define('OBS_PATTERN_IP_FULL',   OBS_PATTERN_START . OBS_PATTERN_IP . OBS_PATTERN_END);
+const OBS_PATTERN_IP = '(?<ip>' . OBS_PATTERN_IPV4 . '|' . OBS_PATTERN_IPV6 . ')';
+const OBS_PATTERN_IP_FULL = OBS_PATTERN_START . OBS_PATTERN_IP . OBS_PATTERN_END;
 // IPv4 or IPv6 network string in group \1 or 'ip_network'
-define('OBS_PATTERN_IP_NET',      '(?<ip_network>' . OBS_PATTERN_IPV4_NET . '|' . OBS_PATTERN_IPV6_NET . ')');
-define('OBS_PATTERN_IP_NET_FULL', OBS_PATTERN_START . OBS_PATTERN_IP_NET . OBS_PATTERN_END);
+const OBS_PATTERN_IP_NET = '(?<ip_network>' . OBS_PATTERN_IPV4_NET . '|' . OBS_PATTERN_IPV6_NET . ')';
+const OBS_PATTERN_IP_NET_FULL = OBS_PATTERN_START . OBS_PATTERN_IP_NET . OBS_PATTERN_END;
 
 // MAC string in group \1 or 'mac'
-define('OBS_PATTERN_MAC',       '(?<mac>(?:[a-f\d]{1,2}(?:\:[a-f\d]{1,2}){5}|[a-f\d]{2}(?:\-[a-f\d]{2}){5}|[a-f\d]{2}(?:\ [a-f\d]{2}){5}|[a-f\d]{4}(?:\.[a-f\d]{4}){2}|(?:0x)?[a-f\d]{12}))');
-define('OBS_PATTERN_MAC_FULL',  OBS_PATTERN_START . OBS_PATTERN_MAC . OBS_PATTERN_END);
+const OBS_PATTERN_MAC = '(?<mac>(?:[a-f\d]{1,2}(?:\:[a-f\d]{1,2}){5}|[a-f\d]{2}(?:\-[a-f\d]{2}){5}|[a-f\d]{2}(?:\ [a-f\d]{2}){5}|[a-f\d]{4}(?:\.[a-f\d]{4}){2}|(?:0x)?[a-f\d]{12}))';
+const OBS_PATTERN_MAC_FULL = OBS_PATTERN_START . OBS_PATTERN_MAC . OBS_PATTERN_END;
 
 // FQDN string in group \1 or 'domain'
 //define('OBS_PATTERN_FQDN',      '(?<domain>(?:(?:(?:xn--)?[a-z0-9_]+(?:\-[a-z0-9_]+)*\.)+(?:[a-z]{2,}|xn--[a-z0-9]{4,}))|localhost)'); // Alternative, less correct
 //define('OBS_PATTERN_FQDN',      '(?<domain>(?:(?:(?=[a-z0-9\-_]{1,63}\.)(?:xn--)?[a-z0-9_]+(?:\-[a-z0-9_]+)*\.)+(?:[a-z]{2,63}|xn--[a-z0-9]{4,}))|localhost)'); // Punicode, Non-unicode
-define('OBS_PATTERN_FQDN',      '(?<domain>(?:(?:(?=[\p{L}\d\-_]{1,63}\.)(?:xn--)?[\p{L}\d_]+(?:\-[\p{L}\d_]+)*\.)+(?:[\p{L}]{2,63}|xn--[a-z\d]{4,}))|localhost)');
-define('OBS_PATTERN_FQDN_FULL', OBS_PATTERN_START . OBS_PATTERN_FQDN . OBS_PATTERN_END_U);
+const OBS_PATTERN_FQDN = '(?<domain>(?:(?:(?=[\p{L}\d\-_]{1,63}\.)(?:xn--)?[\p{L}\d_]+(?:\-[\p{L}\d_]+)*\.)+(?:[\p{L}]{2,63}|xn--[a-z\d]{4,}))|localhost)';
+const OBS_PATTERN_FQDN_FULL = OBS_PATTERN_START . OBS_PATTERN_FQDN . OBS_PATTERN_END_U;
 
 // pattern for email only (without Name, ie: user@domain.name)
 // Email string in group \1 or 'email', additional groups: 'user', 'domain'
-define('OBS_PATTERN_EMAIL',     '(?<email>(?<user>[\p{L}\d\.\'_\%\+\-]{1,63}|\"[\p{L}\d\.\'_\%\+\-\ \\\\]{1,63}\")@' . OBS_PATTERN_FQDN . ')');
-define('OBS_PATTERN_EMAIL_FULL', OBS_PATTERN_START . OBS_PATTERN_EMAIL . OBS_PATTERN_END_U);
+const OBS_PATTERN_EMAIL = '(?<email>(?<user>[\p{L}\d\.\'_\%\+\-]{1,63}|\"[\p{L}\d\.\'_\%\+\-\ \\\\]{1,63}\")@' . OBS_PATTERN_FQDN . ')';
+const OBS_PATTERN_EMAIL_FULL = OBS_PATTERN_START . OBS_PATTERN_EMAIL . OBS_PATTERN_END_U;
 // pattern for Full email with Name (ie: "My Name" <user@domain.name>), but name is optional
 // Long Email string in group \1 or 'email_long', additional groups: 'name', 'email', 'user', 'domain'
-define('OBS_PATTERN_EMAIL_LONG', '(?<email_long>(?<name>[\"\'][\p{L}\d\.\'_\%\+\-\ \\\\]+[\"\']|(?:[\p{L}\d\.\'_\%\+\-]+\ )*[\p{L}\d\.\'_\%\+\-]+)?\s*<' . OBS_PATTERN_EMAIL . '>)');
-define('OBS_PATTERN_EMAIL_LONG_FULL', OBS_PATTERN_START . OBS_PATTERN_EMAIL_LONG . OBS_PATTERN_END_U);
+const OBS_PATTERN_EMAIL_LONG = '(?<email_long>(?<name>[\"\'][\p{L}\d\.\'_\%\+\-\ \\\\]+[\"\']|(?:[\p{L}\d\.\'_\%\+\-]+\ )*[\p{L}\d\.\'_\%\+\-]+)?\s*<' . OBS_PATTERN_EMAIL . '>)';
+const OBS_PATTERN_EMAIL_LONG_FULL = OBS_PATTERN_START . OBS_PATTERN_EMAIL_LONG . OBS_PATTERN_END_U;
 
 //define('OBS_PATTERN_URL',       '(?<url>(?:(?:https?|ftp)://)(?:\S+(?::\S*)?@|\d{1,3}(?:\.\d{1,3}){3}|(?:(?:[a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)(?:\.(?:[a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)*(?:\.[a-z\x{00a1}-\x{ffff}]{2,6}))(?::\d+)?(?:[^\s]*)?)');
 //define('OBS_PATTERN_URL_FULL',  OBS_PATTERN_START . OBS_PATTERN_URL . OBS_PATTERN_END_U);
 
 // SNMP HEX-STRING group \1 or 'hex'
-define('OBS_PATTERN_SNMP_HEX',  '(?<hex>[a-f\d]{2}(\ +[a-f\d]{2})*)\ ?');
+const OBS_PATTERN_SNMP_HEX = '(?<hex>[a-f\d]{2}(\ +[a-f\d]{2})*)\ ?';
 // SNMP NUMERIC OID group \1 or 'oid_num'
-define('OBS_PATTERN_SNMP_OID_NUM',  '/^(?<oid_num>\.?(\d+(?:\.\d+)+))$/');
+const OBS_PATTERN_SNMP_OID_NUM = '/^(?<oid_num>\.?(\d+(?:\.\d+)+))$/';
+
+// Split graph type with subtype
+const OBS_PATTERN_GRAPH_TYPE = '/^(?<type>[a-z\d\-]+)_(?<subtype>[a-z\d\-_]+)/i';
+// timestamps formatted as 'Y-m-d H:i:s'
+const OBS_PATTERN_TIMESTAMP = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
+const OBS_PATTERN_WINDOWSTIME = '/^(?<year>\d{4})(?<month>\d{2})(?<day>\d{2})(?<hour>\d{2})(?<min>\d{2})(?<sec>\d{2}\.\d+)(\+\d+)?$/';
+const OBS_PATTERN_RRDTIME   = '/^(\-?\d+|[\-\+]\d+[dwmysh]|now)$/i';
 
 // patterns for validating kind of used data
-define('OBS_PATTERN_ALPHA',    '/^[\w\.\-]+$/');
-define('OBS_PATTERN_NOPRINT',  '/[^\p{L}\p{N}\p{P}\p{S} ]/u'); // Non-printable UTF8 chars
-define('OBS_PATTERN_NOLATIN',  '/[^\p{Common}\p{Latin}]/u');   // Non Latin (UTF8?) chars
-define('OBS_PATTERN_VAR_NAME', '/^\w[\w\s\.\-+]*(\[[\w\.\-+]*\])*$/');
+const OBS_PATTERN_ALPHA = '/^[\w\.\-]+$/';
+const OBS_PATTERN_NOPRINT = '/[^\p{L}\p{N}\p{P}\p{S} ]/u'; // Non-printable UTF8 chars
+const OBS_PATTERN_NOLATIN = '/[^\p{Common}\p{Latin}]/u';   // Non Latin (UTF8?) chars
+const OBS_PATTERN_VAR_NAME = '/^\w[\w\s\.\-+]*(\[[\w\.\-+]*\])*$/';
 
 // Json flags
 define('OBS_JSON_BIGINT_AS_STRING', PHP_VERSION_ID >= 50400 && PHP_INT_SIZE > 4 && !(defined('JSON_C_VERSION'))); // Check if BIGINT supported
@@ -190,23 +200,24 @@ if (function_exists('bcadd')) {
 
 // Minimum supported versions
 // NOTE. Minimum supported versions equals to latest in minimum supported RHEL (7.x at 02.2021)
-define('OBS_MIN_PHP_VERSION',     '5.6.26'); // PHP (15 Sep 2016, https://www.php.net/releases/index.php)
+const OBS_MIN_PHP_VERSION = '5.6.26'; // PHP (15 Sep 2016, https://www.php.net/releases/index.php)
 //define('OBS_MIN_PYTHON2_VERSION', '2.7.12'); // Python 2 (26 June 2016, https://www.python.org/doc/versions/)
-define('OBS_MIN_PYTHON2_VERSION', '2.7.5');  // last in RHEL/CentOS 7 (and Ubuntu LTS 14.04)
-define('OBS_MIN_PYTHON3_VERSION', '3.5.2');  // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
-define('OBS_MIN_MYSQL_VERSION',   '5.6.5');  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
+const OBS_MIN_PYTHON2_VERSION = '2.7.5';  // last in RHEL/CentOS 7 (and Ubuntu LTS 14.04)
+const OBS_MIN_PYTHON3_VERSION = '3.5.2';  // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
+const OBS_MIN_MYSQL_VERSION   = '5.6.5';  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
 //define('OBS_MIN_MARIADB_VERSION', '10.0');   // MySQL 5.6 mostly equals with MariaDB 10.0: https://mariadb.com/kb/en/timestamp/
-define('OBS_MIN_MARIADB_VERSION', '5.5.68'); // 5.5.68 last in RHEL/CentOS 7 and 5.5.63 in Ubuntu LTS 14.04
-define('OBS_MIN_RRD_VERSION',     '1.4.8');  // last in RHEL/CentOS 7
+const OBS_MIN_MARIADB_VERSION = '5.5.68'; // 5.5.68 last in RHEL/CentOS 7 and 5.5.63 in Ubuntu LTS 14.04
+const OBS_MIN_RRD_VERSION     = '1.4.8';  // last in RHEL/CentOS 7
 //define('OBS_MIN_RRD_VERSION',     '1.5.5');  // RRDTool (10 Nov 2015, https://github.com/oetiker/rrdtool-1.x/tags)
 
 // Minimum possible unixtime, only for validate passed unixtime
 //define('OBS_MIN_UNIXTIME', 946684800); // 01/01/2000 @ 12:00am (UTC), just in most cases unixtime not possible less than this date (net-snmp released in 2000, any network device not have uptime longest)
-define('OBS_MIN_UNIXTIME', 504921600); // 01/01/1986 @ 12:00am (UTC), not network devices produces before this date :)
+const OBS_MIN_UNIXTIME = 504921600; // 01/01/1986 @ 12:00am (UTC), not network devices produces before this date :)
 
 // OBSERVIUM URLs
-define('OBSERVIUM_URL',          'https://www.observium.org');
-define('OBSERVIUM_DOCS_URL',     'https://docs.observium.org');
+const OBSERVIUM_URL = 'https://www.observium.org';
+const OBSERVIUM_DOCS_URL = 'https://docs.observium.org';
+const OBSERVIUM_MIBS_URL = 'https://mibs.observium.org/mib';
 
 // Set QUIET
 define('OBS_QUIET', isset($options['q']));
@@ -220,7 +231,7 @@ if (isset($options['d'])) {
   ini_set('display_startup_errors', 1);
   if (OBS_DEBUG > 1) {
     //ini_set('error_reporting', E_ALL ^ E_NOTICE); // FIXME, too many warnings ;)
-    ini_set('error_reporting', E_ALL ^ E_NOTICE ^ E_WARNING);
+    ini_set('error_reporting', E_ALL ^ E_DEPRECATED ^ E_NOTICE ^ E_WARNING);
   } else {
     ini_set('error_reporting', E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR); // Only various errors
   }
@@ -258,9 +269,9 @@ if (isset($options['d'])) {
     ini_set('display_errors', 1);
     ini_set('display_startup_errors', 1);
     //ini_set('error_reporting', E_ALL ^ E_NOTICE);
-    ini_set('error_reporting', E_ALL ^ E_NOTICE ^ E_WARNING);
+    ini_set('error_reporting', E_ALL ^ E_DEPRECATED ^ E_NOTICE ^ E_WARNING);
   } // else not set anything before auth
-  
+
 } else {
   define('OBS_DEBUG', 0);
   ini_set('display_errors', 0);
@@ -320,8 +331,8 @@ if (!isset($config['template_dir']))  { $config['template_dir'] = $config['insta
 else                                  { $config['template_dir'] = rtrim($config['template_dir'], ' /'); }
 if (!isset($config['cache_dir']))     { $config['cache_dir']    = $config['temp_dir'] . '/observium_cache'; }
 else                                  { $config['cache_dir']    = rtrim($config['cache_dir'], ' /'); }
-if (!isset($config['nagplug_dir']))   { $config['nagplug_dir']   = '/usr/lib/nagios/plugins'; }
-else                                  { $config['nagplug_dir']   = rtrim($config['nagplug_dir'], ' /'); }
+#if (!isset($config['nagplug_dir']))   { $config['nagplug_dir']   = '/usr/lib/nagios/plugins'; }
+#else                                  { $config['nagplug_dir']   = rtrim($config['nagplug_dir'], ' /'); }
 
 // Load random_compat (for PHP 5.x)
 require_once("random_compat/random.php");
@@ -329,14 +340,15 @@ require_once("random_compat/random.php");
 // Load hash-compat (for < PHP 5.6)
 require_once("hash-compat/hash_equals.php");
 
-// Collect php errors mostly fr catch php8 errors
-if ($config['php_debug']) {
-  ini_set('error_reporting', E_ALL ^ E_WARNING ^ E_STRICT);
+// Collect php errors mostly for catch php8 errors
+if ($config['php_debug'] && !defined('__PHPUNIT_PHAR__')) {
+  ini_set('error_reporting', E_ALL ^ E_DEPRECATED ^ E_NOTICE ^ E_WARNING ^ E_STRICT);
   ini_set("error_log", $config['log_dir'] . "/php-errors.log");
 }
 
 // Debug nicer functions
-if ((defined('OBS_DEBUG') && OBS_DEBUG) || strlen($_SERVER['REMOTE_ADDR'])) {
+if ((defined('OBS_DEBUG') && OBS_DEBUG) ||
+    (isset($_SERVER['REMOTE_ADDR']) && !empty($_SERVER['REMOTE_ADDR']))) {
   // Nicer for print_vars(), for WUI loaded always,
   // Required php tokenizer extension!
   if (!function_exists('rt') && function_exists('token_get_all') &&
@@ -345,8 +357,11 @@ if ((defined('OBS_DEBUG') && OBS_DEBUG) || strlen($_SERVER['REMOTE_ADDR'])) {
   }
 }
 
+require($config['install_dir'] . '/includes/definitions/version.inc.php');
+
 // Community specific definition
-if (is_file($config['install_dir'].'/includes/definitions/definitions.dat')) {
+if (OBSERVIUM_EDITION === 'community' &&
+    is_file($config['install_dir'].'/includes/definitions/definitions.dat')) {
   //var_dump($config);
   $config_tmp = file_get_contents($config['install_dir'].'/includes/definitions/definitions.dat');
   $config_tmp = gzuncompress($config_tmp);
@@ -366,7 +381,6 @@ $definition_files = [
   'entities',     // Entity type definitions
   'rewrites',     // Rewriting array definitions
   'mibs',         // MIB definitions
-  'models',       // Hardware model definitions (leave it after os and rewrites)
   'vendors',      // Vendor/manufacturer definitions
   'geo',          // Geolocation api definitions
   'vm',           // Virtual Machine definitions
@@ -794,8 +808,6 @@ require_once($config['install_dir'] . "/includes/db.inc.php");
 if (OBS_DB_SKIP !== TRUE) {
   $GLOBALS[OBS_DB_LINK] = dbOpen($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
 }
-
-require($config['install_dir'] . '/includes/definitions/version.inc.php');
 
 // Base user levels
 

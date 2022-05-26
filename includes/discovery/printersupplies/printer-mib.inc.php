@@ -30,8 +30,7 @@ foreach ($prt_supplies as $entry)
   }
 }
 
-foreach ($prt_supplies as $index => $entry)
-{
+foreach ($prt_supplies as $index => $entry) {
   // prtMarkerSuppliesMarkerIndex.1.1 = 1
   // prtMarkerSuppliesMarkerIndex.1.8 = 1
   // prtMarkerSuppliesMarkerIndex.1.9 = 1
@@ -81,25 +80,22 @@ foreach ($prt_supplies as $index => $entry)
   $level    = $entry['prtMarkerSuppliesLevel'];
   $capacity = $entry['prtMarkerSuppliesMaxCapacity'];
 
-  if (($level < 0 || $capacity < 0) && is_device_mib($device, 'RicohPrivateMIB'))
-  {
+  if (($level < 0 || $capacity < 0) && is_device_mib($device, 'RicohPrivateMIB')) {
     // Skip unknown toners on ricoh printers (use self mib)
     continue;
   }
-  else if ($level == '-1' || $capacity == '-1')
-  {
+
+  if ($level == '-1' || $capacity == '-1') {
     // Unlimited
     $level    = 100;
     $capacity = 100;
   }
 
-  if ($capacity > 0 && $level >= 0)
-  {
+  if ($capacity > 0 && $level >= 0) {
     $level = percent($level, $capacity, FALSE);
   }
 
-  switch ($entry['prtMarkerSuppliesSupplyUnit'])
-  {
+  switch ($entry['prtMarkerSuppliesSupplyUnit']) {
     // other(1), unknown(2), tenThousandthsOfInches(3), micrometers(4),
     // impressions(7), sheets(8), hours(11), thousandthsOfOunces(12),
     // tenthsOfGrams(13), hundrethsOfFluidOunces(14), tenthsOfMilliliters(15),
@@ -109,53 +105,45 @@ foreach ($prt_supplies as $index => $entry)
     default:
       $unit = 'percent';
   }
-  $update_array = array('description'   => $descr,
-                        'index'         => $index,
-                        'oid'           => $oid,
-                        'mib'           => 'jetdirect', // FIXME - this confuses, use correct mib name in the future
-                        //'mib'           => $mib,
-                        'unit'          => $unit,
-                        'level'         => $level,
-                        'capacity'      => $capacity,
-                        'capacity_oid'  => $capacity_oid);
+  $update_array = [
+    'description'   => $descr,
+    'index'         => $index,
+    'oid'           => $oid,
+    'mib'           => 'jetdirect', // FIXME - this confuses, use correct mib name in the future
+    //'mib'           => $mib,
+    'unit'          => $unit,
+    'level'         => $level,
+    'capacity'      => $capacity,
+    'capacity_oid'  => $capacity_oid
+  ];
 
   // Attach Colorant entry if exist
   list($hrDeviceIndex, $prtMarkerSuppliesIndex) = explode('.', $index);
   if (isset($entry['prtMarkerSuppliesColorantIndex']) &&
-      isset($prt_colorant[$hrDeviceIndex][$entry['prtMarkerSuppliesColorantIndex']]))
-  {
+      isset($prt_colorant[$hrDeviceIndex][$entry['prtMarkerSuppliesColorantIndex']])) {
     $entry = array_merge($entry, $prt_colorant[$hrDeviceIndex][$entry['prtMarkerSuppliesColorantIndex']]);
-    if (isset($entry['prtMarkerColorantValue']))
-    {
+    if (isset($entry['prtMarkerColorantValue'])) {
       //$update_array['colour'] = snmp_hexstring($entry['prtMarkerColorantValue']);
       $update_array['colour'] = $entry['prtMarkerColorantValue']; // Forced ASCII
     }
   }
 
   // Colorant table empty, try detect colour by description
-  if (!isset($update_array['colour']))
-  {
-    foreach ($GLOBALS['config']['toner'] as $colour => $strings)
-    {
-      foreach ($strings as $str)
-      {
-        if (stripos($descr, $str) !== FALSE)
-        {
-          $update_array['colour'] = $colour;
-          break 2;
-        }
+  if (!isset($update_array['colour'])) {
+    foreach ($GLOBALS['config']['toner'] as $colour => $strings) {
+      if (str_icontains_array($descr, (array)$strings)) {
+        $update_array['colour'] = $colour;
+        break;
       }
     }
   }
 
-  switch ($entry['prtMarkerSuppliesType'])
-  {
+  switch ($entry['prtMarkerSuppliesType']) {
     case 'toner':
     case 'tonerCartridge':
     case 'ink':
     case 'inkCartridge':
-      if (!isset($update_array['colour']) && $toner_count === 1)
-      {
+      if (!isset($update_array['colour']) && $toner_count === 1) {
         $update_array['colour'] = 'black';
       }
       $update_array['type']   = str_replace('Cartridge', '', $entry['prtMarkerSuppliesType']);
@@ -178,7 +166,11 @@ foreach ($prt_supplies as $index => $entry)
       print_debug("Could not handle resource type " . $entry['prtMarkerSuppliesType']);
       continue 2;
   }
-  discover_printersupply($valid['printersupplies'], $device, $update_array);
+
+  // Skip duplicate toners, see: https://jira.observium.org/browse/OBS-3971
+  $update_array['skip_if_valid_exist'] = $update_array['type'].'->RicohPrivateMIB';
+
+  discover_printersupply($device, $update_array);
 }
 
 echo(PHP_EOL);

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -71,29 +71,34 @@ function add_device_vars($vars) {
   // Add device to remote poller,
   // only validate vars and add to pollers_actions
   if (is_intnum($vars['poller_id']) && $vars['poller_id'] != $config['poller_id']) {
-    print_message("Requested add device $hostname to remote poller id [${vars['poller_id']}].");
+    print_message("Requested add device with hostname '$hostname' to remote Poller [${vars['poller_id']}].");
     if (!(is_valid_hostname($hostname) || get_ip_version($hostname))) {
       // Failed DNS lookup
-      print_error("Hostname $hostname is not valid.");
+      print_error("Hostname '$hostname' is not valid.");
       return FALSE;
     }
     if (!dbExist('pollers', '`poller_id` = ?', [ $vars['poller_id'] ])) {
       // Incorrect Poller ID
-      print_error("Device with hostname $hostname not added. Unknown target Poller requested.");
+      print_error("Device with hostname '$hostname' not added. Unknown target Poller requested.");
+      return FALSE;
+    }
+    if ($tmp_id = dbFetchCell('SELECT `poller_id` FROM `observium_actions` WHERE `action` = ? AND `identifier` = ?', [ 'device_add', $hostname ])) {
+      // Incorrect Poller ID
+      print_error("Already queued addition device with hostname '$hostname' on remote Poller [$tmp_id].");
       return FALSE;
     }
     if (dbExist('devices', '`hostname` = ?', [ $hostname ])) {
       // found in database
-      print_error("Already got device with hostname ($hostname).");
+      print_error("Already got device with hostname '$hostname'.");
       return FALSE;
     }
     if (function_exists('add_action_queue') &&
         $action_id = add_action_queue('device_add', $hostname, $vars)) {
-      print_message("Device with hostname $hostname added to queue [$action_id] for addition on remote Poller [${vars['poller_id']}].");
-      log_event("Device with hostname $hostname added to queue [$action_id] for addition on remote Poller [${vars['poller_id']}].", NULL, 'info', NULL, 7);
+      print_message("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [${vars['poller_id']}].");
+      log_event("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [${vars['poller_id']}].", NULL, 'info', NULL, 7);
       return TRUE;
     }
-    print_error("Device with hostname $hostname not added. Incorrect addition to actions queue.");
+    print_error("Device with hostname '$hostname' not added. Incorrect addition to actions queue.");
     return FALSE;
   }
 
@@ -434,6 +439,222 @@ function add_device($hostname, $snmp_version = array(), $snmp_port = 161, $snmp_
   }
 
   return $return;
+}
+
+/**
+ * Detect the device's OS
+ *
+ * Order for detect:
+ *  if device rechecking (know old os): complex discovery (all), sysObjectID, sysDescr, file check
+ *  if device first checking:           complex discovery (except network), sysObjectID, sysDescr, complex discovery (network), file check
+ *
+ * @param array $device Device array
+ * @return string Detected device os name
+ */
+function get_device_os($device) {
+  global $config, $table_rows, $cache_os;
+
+  // If $recheck sets as TRUE, verified that 'os' corresponds to the old value.
+  // recheck only if old device exist in definitions
+  $recheck = isset($config['os'][$device['os']]);
+
+  // Always force snmpwalk in os discovery without bulk for prevent fetch timeouts
+  // https://jira.observium.org/browse/OBS-3922
+  if (!isset($device['snmp_nobulk'])) {
+    $device['snmp_nobulk'] = TRUE;
+  }
+
+  $sysDescr     = snmp_fix_string(snmp_get_oid($device, 'sysDescr.0', 'SNMPv2-MIB'));
+  $sysDescr_ok  = $GLOBALS['snmp_status'] || $GLOBALS['snmp_error_code'] === OBS_SNMP_ERROR_EMPTY_RESPONSE; // Allow empty response for sysDescr (not timeouts)
+  $sysObjectID  = snmp_cache_sysObjectID($device);
+
+  // Cache discovery os definitions
+  cache_discovery_definitions();
+  $discovery_os = $GLOBALS['cache']['discovery_os'];
+  $cache_os = array();
+
+  $table_rows    = array();
+  $table_opts    = array('max-table-width' => TRUE); // Set maximum table width as available columns in terminal
+  $table_headers = array('%WOID%n', '');
+  $table_rows[] = array('sysDescr',    $sysDescr);
+  $table_rows[] = array('sysObjectID', $sysObjectID);
+  print_cli_table($table_rows, $table_headers, NULL, $table_opts);
+  //print_debug("Detect OS. sysDescr: '$sysDescr', sysObjectID: '$sysObjectID'");
+
+  $table_rows    = array(); // Reinit
+  //$table_opts    = array('max-table-width' => 200);
+  $table_headers = array('%WOID%n', '%WMatched definition%n', '');
+  // By first check all sysObjectID
+  foreach ($discovery_os['sysObjectID'] as $def => $cos) {
+    if (match_oid_num($sysObjectID, $def)) {
+      // Store matched OS, but by first need check by complex discovery arrays!
+      $sysObjectID_def = $def;
+      $sysObjectID_os  = $cos;
+      //print_debug_vars($sysObjectID_def);
+      //print_debug_vars($sysObjectID_os);
+      break;
+    }
+  }
+
+  if ($recheck) {
+    $table_desc = 'Re-Detect OS matched';
+    $old_os = $device['os'];
+
+    /*
+    if (!$sysDescr_ok && !empty($old_os)) {
+      // If sysDescr empty - return old os, because some snmp error
+      print_debug("ERROR: sysDescr not received, OS re-check stopped.");
+      return $old_os;
+    }
+    */
+
+    // Recheck by complex discovery array
+    // Yes, before sysObjectID, because complex more accurate and can intersect with it!
+    foreach ($discovery_os['discovery'][$old_os] as $def) {
+      if (match_discovery_oids($device, $def, $sysObjectID, $sysDescr)) {
+        print_cli_table($table_rows, $table_headers, $table_desc . " ($old_os: ".$config['os'][$old_os]['text'].'):', $table_opts);
+        return $old_os;
+      }
+    }
+    foreach ($discovery_os['discovery_network'][$old_os] as $def) {
+      if (match_discovery_oids($device, $def, $sysObjectID, $sysDescr)) {
+        print_cli_table($table_rows, $table_headers, $table_desc . " ($old_os: ".$config['os'][$old_os]['text'].'):', $table_opts);
+        return $old_os;
+      }
+    }
+
+    /** DISABLED.
+     * Recheck only by complex, networked and file rules
+
+    // Recheck by sysObjectID
+    if ($sysObjectID_os)
+    {
+    // If OS detected by sysObjectID just return it
+    $table_rows[] = array('sysObjectID', $sysObjectID_def, $sysObjectID);
+    print_cli_table($table_rows, $table_headers, $table_desc . " ($old_os: ".$config['os'][$old_os]['text'].'):', $table_opts);
+    return $sysObjectID_os;
+    }
+
+    // Recheck by sysDescr from definitions
+    foreach ($discovery_os['sysDescr'][$old_os] as $pattern)
+    {
+    if (preg_match($pattern, $sysDescr))
+    {
+    $table_rows[] = array('sysDescr', $pattern, $sysDescr);
+    print_cli_table($table_rows, $table_headers, $table_desc . " ($old_os: ".$config['os'][$old_os]['text'].'):', $table_opts);
+    return $old_os;
+    }
+    }
+     */
+
+    // Recheck by include file (moved to end!)
+
+    // Else full recheck 'os'!
+    unset($os, $file);
+
+  } // End recheck
+
+  $table_desc = 'Detect OS matched';
+
+  // Check by complex discovery arrays (except networked)
+  // Yes, before sysObjectID, because complex more accurate and can intersect with it!
+  foreach ($discovery_os['discovery'] as $cos => $defs) {
+    foreach ($defs as $def) {
+      if (match_discovery_oids($device, $def, $sysObjectID, $sysDescr)) {
+        $os = $cos;
+        if (OBS_DEBUG && $sysObjectID_os && $sysObjectID_os !== $cos) {
+          print_cli("OS %b$cos%n discovered by complex definition match, but also found %r$sysObjectID_os%n by exact sysObjectID '$sysObjectID_def' definition.\n");
+        }
+        break 2;
+      }
+    }
+  }
+
+  // Check by sysObjectID
+  if (!$os && $sysObjectID_os) {
+    // If OS detected by sysObjectID just return it
+    $os = $sysObjectID_os;
+    $table_rows[] = array('sysObjectID', $sysObjectID_def, $sysObjectID);
+    print_cli_table($table_rows, $table_headers, $table_desc . " ($os: ".$config['os'][$os]['text'].'):', $table_opts);
+    return $os;
+  }
+
+  if (!$os && $sysDescr) {
+    // Check by sysDescr from definitions
+    foreach ($discovery_os['sysDescr'] as $cos => $patterns) {
+      foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $sysDescr)) {
+          $table_rows[] = array('sysDescr', $pattern, $sysDescr);
+          $os = $cos;
+          break 2;
+        }
+      }
+    }
+  }
+
+  // Check by complex discovery arrays, now networked
+  if (!$os) {
+    foreach ($discovery_os['discovery_network'] as $cos => $defs) {
+      foreach ($defs as $def) {
+        if (match_discovery_oids($device, $def, $sysObjectID, $sysDescr)) {
+          $os = $cos;
+          break 2;
+        }
+      }
+    }
+  }
+
+  if (!$os) {
+    $path = $config['install_dir'] . '/includes/discovery/os';
+    $sysObjectId = $sysObjectID; // old files use wrong variable name
+
+    // Recheck first
+    $recheck_file = FALSE;
+    if ($recheck && $old_os) {
+      if (is_file($path . "/$old_os.inc.php")) {
+        $recheck_file = $path . "/$old_os.inc.php";
+      } elseif (isset($config['os'][$old_os]['discovery_os']) &&
+                is_file($path . '/'.$config['os'][$old_os]['discovery_os'] . '.inc.php')) {
+        $recheck_file = $path . '/'.$config['os'][$old_os]['discovery_os'] . '.inc.php';
+      }
+
+      if ($recheck_file) {
+        print_debug("Including $recheck_file");
+
+        $sysObjectId = $sysObjectID; // old files use wrong variable name
+        include($recheck_file);
+
+        if ($os && $os == $old_os) {
+          $table_rows[] = array('file', $recheck_file, '');
+          print_cli_table($table_rows, $table_headers, $table_desc . " ($old_os: ".$config['os'][$old_os]['text'].'):', $table_opts);
+          return $old_os;
+        }
+      }
+    }
+
+    // Check all other by include file
+    $dir_handle = @opendir($path) or die("Unable to open $path");
+    while ($file = readdir($dir_handle)) {
+      if (preg_match('/\.inc\.php$/', $file) && $file !== $recheck_file) {
+        print_debug("Including $file");
+
+        include($path . '/' . $file);
+
+        if ($os) {
+          $table_rows[] = array('file', $file, '');
+          break; // Stop while if os detected
+        }
+      }
+    }
+    closedir($dir_handle);
+  }
+
+  if ($os) {
+    print_cli_table($table_rows, $table_headers, $table_desc . " ($os: ".$config['os'][$os]['text'].'):', $table_opts);
+    return $os;
+  }
+
+  return 'generic';
 }
 
 /**
@@ -831,7 +1052,7 @@ function delete_device($id, $delete_rrd = FALSE) {
 
     }
 
-    log_event("Deleted device: $host", $id, 'device', $id, 5); // severity 5, for logging user/console info
+    log_event("Deleted device: $host", NULL, 'info', $id, 5); // severity 5, for logging user/console info
     $ret .= " * Deleted device: $host";
   }
 
@@ -882,9 +1103,24 @@ function device_status_array(&$device) {
   return [ 'status' => $status, 'status_type' => $status_type, 'message' => $status_message ];
 }
 
-function device_host($device) {
+/**
+ * Return device hostname or ip address, based on setting $config['use_ip']
+ *
+ * @param array $device Device array
+ * @param boolean $brackets When TRUE, return IPv6 addresses with square brackets
+ *
+ * @return string
+ */
+function device_host($device, $brackets = FALSE) {
   // Return cached IP (only for poller, other processes not resolve IPs)
-  return (OBS_PROCESS_NAME === 'poller' && $GLOBALS['config']['use_ip'] && !safe_empty($device['ip'])) ? $device['ip'] : $device['hostname'];
+  if (OBS_PROCESS_NAME === 'poller' && $GLOBALS['config']['use_ip'] && !safe_empty($device['ip'])) {
+    // Return IPv6 addresses with square brackets
+    return ($brackets && str_contains($device['ip'], ':') ? '[' . $device['ip'] . ']' : $device['ip']);
+  }
+
+  // Use brackets when hostname is just IPv6 address
+  return ($brackets && str_contains($device['hostname'], ':') ? '[' . $device['hostname'] . ']' : $device['hostname']);
+  //return $device['hostname'];
 }
 
 /**
@@ -1306,10 +1542,15 @@ function poll_device_mib_metatypes($device, $metatypes, &$poll_device = []) {
 
               // Additional Oids for current metaparam (see IMM-MIB hardware definition)
               if (isset($entry['oid_extra']) && is_valid_param($value, $metatype)) {
+                $snmp_next = isset($entry['oid_next']); // Main value use get next?
                 $extra = [];
                 foreach ((array)$entry['oid_extra'] as $oid_extra) {
                   //$value_extra = trim(snmp_hexstring(snmp_get_oid($device, $oid_extra, $mib)));
-                  $value_extra = snmp_get_oid($device, $oid_extra, $mib, NULL, $flags);
+                  if ($snmp_next && !str_contains($oid_extra, '.')) {
+                    $value_extra = snmp_getnext_oid($device, $oid_extra, $mib, NULL, $flags);
+                  } else {
+                    $value_extra = snmp_get_oid($device, $oid_extra, $mib, NULL, $flags);
+                  }
                   if (snmp_status() && !safe_empty($value_extra)) {
                     $extra[] = $value_extra;
                   }

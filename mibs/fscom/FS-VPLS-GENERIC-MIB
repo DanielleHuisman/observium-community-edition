@@ -1,0 +1,891 @@
+FS-VPLS-GENERIC-MIB DEFINITIONS ::= BEGIN
+      IMPORTS
+      NOTIFICATION-TYPE, MODULE-IDENTITY, OBJECT-TYPE,
+      Unsigned32, Counter32, transmission
+         FROM SNMPv2-SMI                    -- RFC2578
+
+      MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+         FROM SNMPv2-CONF                   -- RFC2580
+
+      TruthValue, RowStatus, StorageType
+         FROM SNMPv2-TC                     -- RFC2579
+
+      SnmpAdminString
+         FROM SNMP-FRAMEWORK-MIB            -- RFC3411
+
+      PwIndexType
+         FROM PW-TC-STD-MIB
+
+--  We need to add this for vpls instance
+			InterfaceIndexOrZero
+        FROM IF-MIB                        -- [RFC2863]
+
+      VPNIdOrZero
+         FROM VPN-TC-STD-MIB                -- RFC4265
+
+      fsMgmt
+         FROM FS-SMI
+      ;
+
+    -- Vpls BGP Autodiscovery specific Textual Convention
+    FSVplsBgpRouteDistinguisher ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+          "Syntax for a route distinguisher. For a complete
+           definition of a route distinguisher, see [RFC4364].
+           For more details on use of a route distinguisher
+           for a VPLS service, see [RFC4761]"
+      REFERENCE
+          "[RFC4364]"
+      SYNTAX  OCTET STRING(SIZE (0..256))
+
+    FSVplsBgpRouteTarget ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+          "Syntax for a route target. For a complete
+           definition of a route target, see [RFC4364]."
+      REFERENCE
+          "[RFC4364]"
+      SYNTAX  OCTET STRING(SIZE (0..256))
+
+    FSVplsBgpRouteTargetType ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+       "Used to define the type of a route target usage.
+        Route targets can be specified to be imported,
+        exported, or both.  For a complete definition of a
+        route target, see [RFC4364]."
+      REFERENCE
+        "[RFC4364]"
+      SYNTAX INTEGER { import(1), export(2), both(3) }
+
+   fsvplsGenericDraft01MIB MODULE-IDENTITY
+      LAST-UPDATED "201004281200Z"  -- 28 April 2010 12:00:00 GMT
+      ORGANIZATION "FS.COM Inc.."
+      CONTACT-INFO
+                "
+                Tel: 400-865-2852
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+
+      DESCRIPTION
+          "Copyright (C) FS Networks.
+           This MIB module contains generic managed object definitions
+           for Virtual Private LAN Services as in [RFC4762] and
+           [RFC4761]
+
+           This MIB module enables the use of any underlying PseudoWire
+           network."
+      -- Revision history.
+      REVISION
+          "201004281200Z"  -- 28 April 2010 12:00:00 GMT
+      DESCRIPTION
+          "Changes from previous version:
+           1) Moved LDP Specific information to VPLS-LDP-MIB
+           2) Created the fsvplsStatusTable to store status information.
+          "
+      REVISION
+          "201006041200Z"  -- 4 June 2010 12:00:00 GMT
+
+
+      DESCRIPTION "Initial version"
+           ::= { fsMgmt 77 }
+
+   -- Top-level components of this MIB.
+
+   -- Notifications
+   fsvplsNotifications OBJECT IDENTIFIER
+                                 ::= { fsvplsGenericDraft01MIB 0 }
+   -- Tables, Scalars
+   fsvplsObjects       OBJECT IDENTIFIER
+                                 ::= { fsvplsGenericDraft01MIB 1 }
+   -- Conformance
+   fsvplsConformance   OBJECT IDENTIFIER
+                                 ::= { fsvplsGenericDraft01MIB 2 }
+
+   -- PW Virtual Connection Table
+
+   fsvplsConfigIndexNext OBJECT-TYPE
+      SYNTAX            Unsigned32
+      MAX-ACCESS        read-only
+      STATUS            current
+      DESCRIPTION
+          "This object contains an appropriate value to be used
+           for fsvplsConfigIndex when creating entries in the
+           fsvplsConfigTable. The value 0 indicates that no
+           unassigned entries are available.  To obtain the
+           value of fsvplsConfigIndex for a new entry in the
+           fsvplsConfigTable, the manager issues a management
+           protocol retrieval operation to obtain the current
+           value of fsvplsConfigIndex.  After each retrieval
+           operation, the agent should modify the value to
+           reflect the next unassigned index.  After a manager
+           retrieves a value the agent will determine through
+           its local policy when this index value will be made
+           available for reuse."
+      ::= { fsvplsObjects 1 }
+
+      fsvplsConfigTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF FSVplsConfigEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table specifies information for configuring
+                and monitoring Virtual Private Lan Services(VPLS).
+                "
+          ::= { fsvplsObjects 2 }
+
+      fsvplsConfigEntry OBJECT-TYPE
+          SYNTAX          FSVplsConfigEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+           "A row in this table represents a Virtual Private Lan
+            Service(VPLS) in a packet network. It is indexed by
+            fsvplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row is created by the operator or by the agent if a
+            VPLS service is created by non-SNMP application or
+            due to autodiscovery process.
+
+            None of the read-create objects values can be
+            changed when fsvplsConfigRowStatus is in the active(1)
+            state. Changes are allowed when the fsvplsConfigRowStatus
+            is in notInService(2) or notReady(3) states only.
+            If the operator need to change one of the values
+            for an active row the fsvplsConfigRowStatus should be
+            first changed to notInService(2), the objects may
+            be changed now, and later to active(1) in order to
+            re-initiate the signaling process with the new
+            values in effect.
+            "
+          INDEX           { fsvplsConfigIndex }
+          ::= { fsvplsConfigTable 1 }
+
+     FSVplsConfigEntry ::=
+        SEQUENCE {
+         fsvplsConfigIndex                                Unsigned32,
+         fsvplsConfigName                                 SnmpAdminString,
+         fsvplsConfigDescr                                SnmpAdminString,
+         fsvplsConfigAdminStatus                          INTEGER,
+         fsvplsConfigMacLearning                          TruthValue,
+         fsvplsConfigDiscardUnknownDest                   TruthValue,
+         fsvplsConfigMacAging                             TruthValue,
+         fsvplsConfigFwdFullHighWatermark                 Unsigned32,
+         fsvplsConfigFwdFullLowWatermark                  Unsigned32,
+         fsvplsConfigRowStatus                            RowStatus,
+         fsvplsConfigMtu                                  Unsigned32,
+         fsvplsConfigVpnId                                VPNIdOrZero,
+         fsvplsConfigServiceType                          INTEGER,
+         fsvplsConfigServiceSignal                        INTEGER
+          }
+
+      fsvplsConfigIndex  OBJECT-TYPE
+          SYNTAX          Unsigned32  (1..2147483647)
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Unique index for the conceptual row identifying
+                a VPLS service."
+          ::= { fsvplsConfigEntry 1 }
+
+      fsvplsConfigName  OBJECT-TYPE
+          SYNTAX          SnmpAdminString
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "A textual name of the VPLS.
+                If there is no local name, or this object is
+                otherwise not applicable, then this object MUST
+                contain a zero-length octet string."
+          DEFVAL           { "" }
+          ::= { fsvplsConfigEntry 2 }
+
+      fsvplsConfigDescr  OBJECT-TYPE
+          SYNTAX          SnmpAdminString
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "A textual string containing information about the
+               VPLS service. If there is no information for this VPLS
+               service, then this object MUST contain a zero-length
+               octet string."
+          DEFVAL           { "" }
+          ::= { fsvplsConfigEntry 3 }
+
+      fsvplsConfigAdminStatus OBJECT-TYPE
+          SYNTAX          INTEGER {
+                              up(1),
+                              down(2),
+                              testing(3)   -- in some test mode
+
+                          }
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "The desired administrative state of the VPLS
+                service. If the administrative status of the
+                Vpls service is changed to enable then this
+                service is able to utilize the pseudo wire to
+                perform the tasks of a VPLS service.
+                The testing(3) state indicates that no operational
+                packets can be passed. "
+          DEFVAL           { up }
+          ::= { fsvplsConfigEntry 4 }
+
+      fsvplsConfigMacLearning OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies if MAC Learning is enabled
+                in this service. If this object is true then Mac
+                Learning is enabled. If false, then Mac Learning is
+                disabled."
+          DEFVAL          { true }
+          ::= { fsvplsConfigEntry 5 }
+
+      fsvplsConfigDiscardUnknownDest OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "If the value of this object is 'true', then frames
+                received with an unknown destination MAC are discarded
+                in this VPLS. If 'false', then the packets are
+                processed."
+          DEFVAL          { false }
+          ::= { fsvplsConfigEntry 6 }
+
+      fsvplsConfigMacAging OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "If the value of this object is 'true'
+                then the MAC aging process is enabled in
+                this VPLS. If 'false', then the MAC aging process
+                is disabled"
+          DEFVAL          { true }
+          ::= { fsvplsConfigEntry 7 }
+
+      fsvplsConfigFwdFullHighWatermark OBJECT-TYPE
+          SYNTAX          Unsigned32 (0..100)
+          UNITS           "percentage"
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies the utilization of the
+                forwarding database for this VPLS instance at
+                which the fsvplsFwdFullAlarmRaised notification
+                will be sent."
+          DEFVAL          { 100 }
+          ::= { fsvplsConfigEntry 8 }
+
+      fsvplsConfigFwdFullLowWatermark OBJECT-TYPE
+          SYNTAX          Unsigned32 (0..100)
+          UNITS           "percentage"
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies the utilization of the
+                forwarding database for this VPLS instance
+                at which the fsvplsFwdFullAlarmCleared
+                notification will be sent."
+          DEFVAL          { 80 }
+          ::= { fsvplsConfigEntry 9 }
+
+      fsvplsConfigRowStatus OBJECT-TYPE
+          SYNTAX          RowStatus
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "For creating, modifying, and deleting this row.
+                None of the read-create objects in the
+                conceptual rows may be changed when this
+                object is in the active(1) state."
+          ::= { fsvplsConfigEntry 10 }
+
+      fsvplsConfigMtu OBJECT-TYPE
+          SYNTAX          Unsigned32 (46..1530)
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The value of this object specifies the MTU of this
+                vpls instance."
+          DEFVAL          { 1500 }
+          ::= { fsvplsConfigEntry 11 }
+
+      fsvplsConfigVpnId OBJECT-TYPE
+          SYNTAX          VPNIdOrZero
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This objects indicates the IEEE 802-1990
+                VPN ID of the associated VPLS service."
+-- Ed note: Should we import the VPNIdOrZero TC or
+--              define a new TC?
+          ::= { fsvplsConfigEntry 12 }
+
+      fsvplsConfigServiceType OBJECT-TYPE
+          SYNTAX          INTEGER {
+                           vlan     (1),
+                           ethernet (2)
+                          }
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The value of this object specifies the type of
+                service emulated by this vpls instance. Invalid for RFC 4762"
+          DEFVAL          { vlan }
+          ::= { fsvplsConfigEntry 13 }
+
+      fsvplsConfigServiceSignal   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   manual        (1),
+                                   autodiscovery (2)
+                           }
+           MAX-ACCESS      read-create
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 vpls is created with LDP or BGP signalling.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { fsvplsConfigEntry 14}
+
+
+-- VPLS Status table
+
+      fsvplsStatusTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF FSVplsStatusEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+                "This table provides information for monitoring
+                Virtual Private Lan Services(VPLS).
+                "
+          ::= { fsvplsObjects 3 }
+
+      fsvplsStatusEntry OBJECT-TYPE
+          SYNTAX          FSVplsStatusEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+
+          DESCRIPTION
+           "A row in this table represents a Virtual Private Lan
+            Service(VPLS) in a packet network. It is indexed by
+            fsvplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row in this table is automatically created by the agent
+            when a VPLS service is configured.
+            "
+          INDEX           { fsvplsConfigIndex }
+          ::= { fsvplsStatusTable 1 }
+
+     FSVplsStatusEntry ::=
+        SEQUENCE {
+         fsvplsStatusOperStatus                        INTEGER,
+         fsvplsStatusPeerCount                         Counter32
+          }
+
+      fsvplsStatusOperStatus OBJECT-TYPE
+          SYNTAX          INTEGER {
+                              up(1),
+                              down(2)
+                          }
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "The current operational state of this VPLS Service."
+          ::= { fsvplsStatusEntry 1 }
+
+      fsvplsStatusPeerCount OBJECT-TYPE
+          SYNTAX          Counter32
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "This objects specifies the number of peers
+                present in this vpls instance."
+          ::= { fsvplsStatusEntry 2 }
+
+
+      -- VPLS PW Binding Table
+
+      fsvplsPwBindTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF FSVplsPwBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table provides an association between a
+                VPLS service and the corresponding Pseudo
+                Wires. A service can have more than one Pseudo
+                Wire association. Pseudo Wires are defined in
+                the pwTable"
+          ::= { fsvplsObjects 4 }
+
+      fsvplsPwBindEntry OBJECT-TYPE
+          SYNTAX          FSVplsPwBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Each row represents an association between a
+                VPLS instance and one or more Pseudo Wires
+                defined in the pwTable. Each index is unique
+                in describing an entry in this table. However
+                both indexes are required to define the one
+                to many association of service to
+                pseudowire."
+          INDEX  { fsvplsConfigIndex,fsvplsPwBindIndex }
+          ::= { fsvplsPwBindTable 1 }
+
+      FSVplsPwBindEntry ::=
+          SEQUENCE {
+							fsvplsPwBindIndex            Unsigned32,
+              fsvplsPwBindConfigType       INTEGER,
+              fsvplsPwBindType             INTEGER
+          }
+
+     fsvplsPwBindIndex  OBJECT-TYPE
+          SYNTAX          Unsigned32
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Unique index for PW bind in vpls instance."
+          ::= { fsvplsPwBindEntry 1 }
+
+-- fsvplsPwBindConfigType depends on vpls implementation type.
+      fsvplsPwBindConfigType   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   manual        (1),
+                                   autodiscovery (2)
+                           }
+           MAX-ACCESS      read-only
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 whether the Pseudo Wire binding was created
+                 manually or via autodiscovery.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { fsvplsPwBindEntry 2}
+
+--  This is hub pw or spoke pw
+      fsvplsPwBindType   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   mesh  (1),
+                                   spoke (2)
+                           }
+           MAX-ACCESS      read-only
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 whether the Pseudo Wire binding is of
+                 type mesh or spoke.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { fsvplsPwBindEntry 3 }
+
+
+-- fsvplsBgpADConfigTable
+
+      fsvplsBgpADConfigTable OBJECT-TYPE
+            SYNTAX          SEQUENCE OF FSVplsBgpADConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "This table specifies information for configuring
+             BGP Auto-discovery parameters for a given Vpls service.
+            "
+            ::= { fsvplsObjects 5 }
+
+      fsvplsBgpADConfigEntry OBJECT-TYPE
+            SYNTAX          FSVplsBgpADConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "A row in this table represents BGP based autodiscovery
+             is in use for this instance of Vpls.
+             A row in this table is indexed by fsvplsConfigIndex, which
+             uniquely identifies a single VPLS.
+             None of the read-create objects can be changed when
+             vplsBGPADConfigRowStatus is in active(1) state. Changes
+             are allowed when the vplsBGPADConfigRowStatus is in
+             notInService(2) or notReady(3) states only.
+             If the operator need to change one of the values
+             for an active row the fsvplsConfigRowStatus should be
+             first changed to notInService(2), the objects may
+             be changed now, and later to active(1) in order to
+             re-initiate the signaling process with the new
+             values in effect.
+            "
+            INDEX      { fsvplsConfigIndex }
+            ::= { fsvplsBgpADConfigTable 1 }
+
+      FSVplsBgpADConfigEntry ::=
+         SEQUENCE {
+          fsvplsBgpADConfigRouteDistinguisher   FSVplsBgpRouteDistinguisher,
+          fsvplsBgpADConfigRowStatus            RowStatus
+         }
+
+      fsvplsBgpADConfigRouteDistinguisher OBJECT-TYPE
+            SYNTAX          FSVplsBgpRouteDistinguisher
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " The route distinguisher for this VPLS. See [RFC4364]
+            for a complete definition of a route distinguisher.
+            for more details on use of a route distinguisher
+            for a VPLS service, see [RFC4761]
+            "
+            ::= { fsvplsBgpADConfigEntry 1 }
+
+      fsvplsBgpADConfigRowStatus OBJECT-TYPE
+            SYNTAX          RowStatus
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " For creating, modifying, and deleting this row.
+            None of the read-create objects in the
+            conceptual rows may be changed when this
+            object is in the active(1) state.
+            "
+            ::= { fsvplsBgpADConfigEntry 2 }
+
+
+    -- fsvplsBgpRteTargetTable
+
+      fsvplsBgpRteTargetTable   OBJECT-TYPE
+            SYNTAX          SEQUENCE OF FSVplsBgpRteTargetEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            " This table specifies the list of Route Targets
+              imported or exported by BGP during auto-discovery of VPLS.
+            "
+            ::= { fsvplsObjects 6 }
+
+      fsvplsBgpRteTargetEntry   OBJECT-TYPE
+            SYNTAX          FSVplsBgpRteTargetEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+              "An entry in this table specifies the value of the
+               Route Target being used by BGP. Depending on the value
+               of vplsBgpRteTargetType an RT might be exported or
+               imported or both. Every VPLS which
+              uses auto-discovery for finding peer nodes can import and
+              export multiple Route Targets. This representation allows
+              support for hierarchical VPLS.
+            "
+            INDEX     { fsvplsConfigIndex, fsvplsBgpRteTargetIndex }
+            ::= { fsvplsBgpRteTargetTable 1 }
+
+      FSVplsBgpRteTargetEntry ::=
+         SEQUENCE {
+          fsvplsBgpRteTargetIndex          Unsigned32,
+          fsvplsBgpRteTargetRTType         FSVplsBgpRouteTargetType,
+          fsvplsBgpRteTargetRT             FSVplsBgpRouteTarget,
+          fsvplsBgpRteTargetRTRowStatus    RowStatus
+         }
+
+      fsvplsBgpRteTargetIndex   OBJECT-TYPE
+            SYNTAX          Unsigned32
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "This index along with fsvplsConfigIndex,identifies one entry
+             in the fsvplsBgpRteTargetTable. By keeping fsvplsConfigIndex
+             constant and using new value of fsvplsBgpRteTargetIndex user
+              can configure multiple Route Targets for the same Vpls.
+            "
+            ::= {fsvplsBgpRteTargetEntry  1 }
+
+      fsvplsBgpRteTargetRTType  OBJECT-TYPE
+            SYNTAX          FSVplsBgpRouteTargetType
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " Used to define the type of a route target usage.
+              Route targets can be specified to be imported,
+              exported, or both.  For a complete definition of a
+              route target, see [RFC4364]."
+            ::= { fsvplsBgpRteTargetEntry 2 }
+
+      fsvplsBgpRteTargetRT     OBJECT-TYPE
+            SYNTAX          FSVplsBgpRouteTarget
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " The route target associated with the VPLS service.
+              For more details on use of route targets
+              for a VPLS service, see [RFC4761] "
+            ::= { fsvplsBgpRteTargetEntry 3 }
+
+      fsvplsBgpRteTargetRTRowStatus     OBJECT-TYPE
+            SYNTAX          RowStatus
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            "This variable is used to create, modify, and/or
+             delete a row in this table.  When a row in this
+             table is in active(1) state, no objects in that row
+             can be modified "
+            ::= { fsvplsBgpRteTargetEntry 4 }
+
+--  fsvplsIfBindTable
+
+          fsvplsIfBindTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF FSVplsIfBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table provides an association between a
+                VPLS service and interface. A service can bind
+                more than one interface. "
+          ::= { fsvplsObjects 7 }
+
+      fsVplsIfBindEntry OBJECT-TYPE
+          SYNTAX          FSVplsIfBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Each row represents an association between a
+                VPLS instance and one or more interface. Each
+                index is unique in describing an entry in this table. "
+          INDEX  { fsvplsConfigIndex,fsvplsIfBindIndex}
+          ::= { fsvplsIfBindTable 1 }
+
+      FSVplsIfBindEntry ::=
+          SEQUENCE {
+			        fsvplsIfBindIndex           InterfaceIndexOrZero,
+							fsvplsSiteId                Unsigned32,
+							fsvplsIfRowStatus           RowStatus
+          }
+
+     fsvplsIfBindIndex  OBJECT-TYPE
+          SYNTAX          InterfaceIndexOrZero
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "Interface index for vpls instance.
+               "
+          ::= { fsVplsIfBindEntry 1 }
+
+     fsvplsSiteId  OBJECT-TYPE
+          SYNTAX          Unsigned32
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "VE id associated with the VPLS service.
+               "
+          ::= { fsVplsIfBindEntry 2 }
+
+		fsvplsIfRowStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This variable is used to create, modify, and/or
+             delete a row in this table.  When a row in this
+             table is in active(1) state, no objects in that row
+             can be modified except vplsBgpSiteRowStatus."
+        ::= { fsVplsIfBindEntry 3 }
+
+
+      -- VPLS Service Notifications
+
+      fsvplsFwdFullAlarmRaised NOTIFICATION-TYPE
+          OBJECTS {
+              fsvplsConfigVpnId,
+              fsvplsConfigFwdFullHighWatermark,
+              fsvplsConfigFwdFullLowWatermark
+          }
+          STATUS          current
+          DESCRIPTION
+               "The fsvplsFwdFullAlarmRaised notification is
+                generated when the utilization of the Forwarding
+                database is above the value specified by
+                fsvplsConfigFwdFullHighWatermark."
+          ::= { fsvplsNotifications 1 }
+
+      fsvplsFwdFullAlarmCleared NOTIFICATION-TYPE
+          OBJECTS {
+              fsvplsConfigVpnId,
+              fsvplsConfigFwdFullHighWatermark,
+              fsvplsConfigFwdFullLowWatermark
+          }
+          STATUS          current
+          DESCRIPTION
+               "The fsvplsFwdFullAlarmCleared notification is
+                generated when the utilization of the Forwarding
+                database is below the value specified by
+                fsvplsConfigFwdFullLowWatermark."
+          ::= { fsvplsNotifications 2 }
+
+   -- Compliance requirement for read-only implementations.
+
+   fsvplsCompliances
+     OBJECT IDENTIFIER ::= { fsvplsConformance 1 }
+   fsvplsModuleFullCompliance MODULE-COMPLIANCE
+      STATUS current
+      DESCRIPTION
+           "Compliance requirement for implementations that
+            provide full support for VPLS-GENERIC-DRAFT-01-MIB.
+            Such devices can then be monitored and configured using
+            this MIB module."
+      MODULE -- this module
+
+          MANDATORY-GROUPS {
+               fsvplsGroup,
+               fsvplsPwBindGroup,
+               fsvplsNotificationGroup
+           }
+
+      ::= { fsvplsCompliances 1 }
+
+
+   fsvplsModuleReadOnlyCompliance MODULE-COMPLIANCE
+      STATUS current
+      DESCRIPTION
+           "Compliance requirement for implementations that only
+            provide read-only support for VPLS-GENERIC-DRAFT-01-MIB.
+            Such devices can then be monitored but cannot be
+            configured using this MIB modules."
+
+      MODULE -- this module
+
+          MANDATORY-GROUPS {
+               fsvplsGroup,
+               fsvplsPwBindGroup,
+               fsvplsNotificationGroup
+           }
+
+           OBJECT          fsvplsConfigName
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+
+           OBJECT          fsvplsConfigDescr
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigAdminStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigMacLearning
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigDiscardUnknownDest
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigMacAging
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigFwdFullHighWatermark
+           MIN-ACCESS      read-only
+           DESCRIPTION
+
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigFwdFullLowWatermark
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigRowStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigMtu
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsConfigServiceType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          fsvplsPwBindConfigType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+           OBJECT          fsvplsPwBindType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+      ::= { fsvplsCompliances 2 }
+
+-- Units of conformance.
+
+      fsvplsGroups
+        OBJECT IDENTIFIER ::= { fsvplsConformance 2 }
+
+
+      fsvplsGroup OBJECT-GROUP
+          OBJECTS {
+              fsvplsConfigName,
+              fsvplsConfigDescr,
+              fsvplsConfigAdminStatus,
+              fsvplsConfigMacLearning,
+              fsvplsConfigDiscardUnknownDest,
+              fsvplsConfigMacAging,
+              fsvplsConfigVpnId,
+              fsvplsConfigFwdFullHighWatermark,
+              fsvplsConfigFwdFullLowWatermark,
+              fsvplsConfigRowStatus,
+              fsvplsConfigIndexNext,
+              fsvplsConfigMtu,
+              fsvplsConfigServiceType,
+              fsvplsStatusOperStatus,
+              fsvplsStatusPeerCount
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of objects supporting
+                management of L2VPN VPLS services"
+          ::= { fsvplsGroups 1 }
+
+      fsvplsPwBindGroup OBJECT-GROUP
+          OBJECTS {
+              fsvplsPwBindConfigType,
+              fsvplsPwBindType
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of objects supporting
+                management of
+                Pseudo Wire (PW) Binding to VPLS."
+          ::= { fsvplsGroups 2 }
+
+      fsvplsNotificationGroup NOTIFICATION-GROUP
+          NOTIFICATIONS   {
+              fsvplsFwdFullAlarmRaised,
+              fsvplsFwdFullAlarmCleared
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of notifications supporting
+                the  Notifications generated for
+                VPLS Services"
+          ::= { fsvplsGroups 3 }
+END

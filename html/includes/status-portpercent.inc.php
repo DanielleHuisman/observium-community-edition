@@ -47,8 +47,8 @@ foreach ($options['groups'] as $type => $data) {
 $totalIn=0;
 $totalOut=0;
 foreach ($totals_array as $type => $dir) {
-        $totalIn = $totalIn + $dir[in];
-        $totalOut = $totalOut + $dir[out];
+        $totalIn = $totalIn + $dir['in'];
+        $totalOut = $totalOut + $dir['out'];
 }
 
 
@@ -77,13 +77,12 @@ $table_height = ($table_row_height * count($totals_array)) + $table_padding;
 
 if($table_height < $table_min_height) { $table_height = $table_min_height; }
 
-foreach ($totals_array as $type => $dir)
-{
-  $percentIn = $dir["in"] / $totalIn * 100;
-  $percentOut = $dir["out"] / $totalOut * 100;
-  $percent = ($dir["in"]+$dir["out"]) / ($totalIn+$totalOut) * 100;
+foreach ($totals_array as $type => $dir) {
+  $percentIn = float_div($dir["in"], $totalIn) * 100;
+  $percentOut = float_div($dir["out"], $totalOut) * 100;
+  $percent = float_div(($dir["in"] + $dir["out"]), ($totalIn + $totalOut)) * 100;
 
-  if(!isset($colours[$i])) { $i = 0; }
+  if (!isset($colours[$i])) { $i = 0; }
 
   $color = $config['graph_colours']['mixed'][$i];
   $class = $classes[$i];

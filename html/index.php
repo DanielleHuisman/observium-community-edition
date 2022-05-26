@@ -64,19 +64,34 @@ ob_start('html_callback');
 
   include($config['html_dir'] . "/includes/authenticate.inc.php");
 
-  $theme_default = isset($_SESSION['theme_default']) ? $_SESSION['theme_default'] : $config['web_theme_default'];
+  // default theme set in global or user setting
+  $theme_default = $config['web_theme_default'];
+  /*
   if (isset($_SESSION['theme'], $_COOKIE['screen_scheme']) &&
       $theme_default === 'system' &&
-      $_SESSION['theme'] !== $_COOKIE['screen_scheme'])
-  {
+      $_SESSION['theme'] !== $_COOKIE['screen_scheme']) {
     // Reset session theme if system theme changed
     session_unset_var('theme');
   }
-  if (!isset($_SESSION['theme']) || !isset($config['themes'][$_SESSION['theme']]))
-  {
+  */
+
+  if ($theme_default === 'system' && isset($_COOKIE['screen_scheme'])) {
+    // Cookie screen_scheme sets by js, only light or dark
+    $theme = $_COOKIE['screen_scheme'];
+  } else {
+    $theme = $theme_default;
+  }
+  if (!isset($config['themes'][$theme])) {
+    // Fallback
+    $theme = 'light';
+  }
+  if (!isset($_SESSION['theme']) || $_SESSION['theme'] !== $theme) {
+    session_set_var('theme', $theme);
+  }
+  /*
+  if (!isset($_SESSION['theme']) || !isset($config['themes'][$_SESSION['theme']])) {
     // Set default theme
-    if ($theme_default === 'system' && isset($_COOKIE['screen_scheme']))
-    {
+    if ($theme_default === 'system' && isset($_COOKIE['screen_scheme'])) {
       // Cookie screen_scheme sets by js, only light or dark
       $theme = $_COOKIE['screen_scheme'];
     } else {
@@ -85,10 +100,10 @@ ob_start('html_callback');
     //$_SESSION['theme'] = isset($config['themes'][$theme]) ? $theme : 'light';
     session_set_var('theme', isset($config['themes'][$theme]) ? $theme : 'light');
   }
+  */
   $_SESSION['mode'] = $config['themes'][$_SESSION['theme']]['type'];
 
-  if (isset($config['themes'][$_SESSION['theme']]['css']))
-  {
+  if (isset($config['themes'][$_SESSION['theme']]['css'])) {
     register_html_resource('css', $config['themes'][$_SESSION['theme']]['css']);
   } else {
     // Fallback in community edition
@@ -142,7 +157,7 @@ ob_start('html_callback');
     }
   }
 
-  if ($vars['widescreen'] === "yes") {
+  if (get_var_true($vars['widescreen'])) {
     session_set_var('widescreen', 1);
     unset($vars['widescreen']);
   } elseif ($vars['widescreen'] === "no") {
@@ -150,17 +165,8 @@ ob_start('html_callback');
     unset($vars['widescreen']);
   }
 
-  if ($vars['big_graphs'] === "yes") {
-    session_set_var('big_graphs', 1);
-    unset($vars['big_graphs']);
-  } elseif ($vars['big_graphs'] === "no") {
-    session_unset_var('big_graphs');
-    unset($vars['big_graphs']);
-  }
-
   // FIXME this block still needed?
-  if ($_SESSION['widescreen'])
-  {
+  if ($_SESSION['widescreen']) {
     // Widescreen style additions
     register_html_resource('css', 'styles-wide.css');
   }
@@ -213,13 +219,11 @@ if ($_SESSION['authenticated']) {
 
   <?php
 
-  if ($_SESSION['authenticated'])
-  {
+  if ($_SESSION['authenticated']) {
 
     // Execute form actions
     if (isset($vars['action']) && is_alpha($vars['action']) &&
-        is_file($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php"))
-    {
+        is_file($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php")) {
       include($config['html_dir'] . "/includes/actions/" . $vars['action'] . ".inc.php");
     }
 
@@ -228,8 +232,7 @@ if ($_SESSION['authenticated']) {
 
     // Authenticated. Print a page.
     if (isset($vars['page']) && is_alpha($vars['page']) &&
-        is_file($config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php"))
-    {
+        is_file($config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php")) {
       $page_file = $config['html_dir'] . "/pages/" . $vars['page'] . ".inc.php";
     } else {
       $vars['page'] = 'dashboard';
@@ -241,49 +244,47 @@ if ($_SESSION['authenticated']) {
 
     //include($page_file);
 
-        if ($config['pages'][$vars['page']]['custom_panel'])
-        {
-          include($page_file);
-        }
-        else
-        {
+    if (is_alpha($vars['page'])) {
+      if ($vars['page'] === 'graphs' && preg_match(OBS_PATTERN_GRAPH_TYPE, $vars['type'], $graphtype)) {
+        $panel_name = $graphtype['type'];
+      } else {
+        $panel_name = $vars['page'];
+      }
+      //r($panel_name);
+      if ($config['pages'][$panel_name]['custom_panel']) {
+        include($page_file);
+      } else {
+        echo '<div class="row">';
 
-          echo '<div class="row">';
-
-          if ($config['pages'][$vars['page']]['no_panel'])
-          {
-            echo '<div class="col-lg-12">';
-          }
-          else
-          {
-            echo '
+        if ($config['pages'][$panel_name]['no_panel']) {
+          echo '<div class="col-lg-12">';
+        } else {
+          echo '
       <div class="col-xl-4 visible-xl">
         <div id="myAffix" data-spy="affix" data-offset-top="60">
         ##PAGE_PANEL##
         </div>
       </div>
     <div class="col-xl-8 col-lg-12">';
-          }
-
-          include($page_file);
-          echo '</div>';
         }
 
-
-    // Register default panel if custom not set
-    if (!isset($GLOBALS['cache_html']['page_panel']))
-    {
-      if (is_alpha($vars['page']) &&
-          is_file($config['html_dir'] . "/includes/panels/" . $vars['page'] . ".inc.php")) {
-        $panel_file = $config['html_dir'] . "/includes/panels/" . $vars['page'] . ".inc.php";
-      } else {
-        $panel_file = $config['html_dir'] . "/includes/panels/default.inc.php";
+        include($page_file);
+        echo '</div>';
       }
-      ob_start();
-      include($panel_file);
-      $panel_html = ob_get_clean();
 
-      register_html_panel($panel_html);
+      // Register default panel if custom not set
+      if (!isset($GLOBALS['cache_html']['page_panel'])) {
+        if (is_file($config['html_dir'] . "/includes/panels/" . $panel_name . ".inc.php")) {
+          $panel_file = $config['html_dir'] . "/includes/panels/" . $panel_name . ".inc.php";
+        } else {
+          $panel_file = $config['html_dir'] . "/includes/panels/default.inc.php"; // default
+        }
+        ob_start();
+        include($panel_file);
+        $panel_html = ob_get_clean();
+
+        register_html_panel($panel_html);
+      }
     }
 
   } elseif ($config['auth_mechanism'] === 'cas' || $config['auth_mechanism'] === 'remote') {
@@ -301,11 +302,9 @@ if ($_SESSION['authenticated']) {
   unset($cache);
   $cachesize = $fullsize - memory_get_usage();
 
-  if ($cachesize < 0)
-  {
+  if ($cachesize < 0) {
     $cachesize = 0;
   } // Silly PHP!
-
   ?>
 
 </div>

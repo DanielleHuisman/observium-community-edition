@@ -11,53 +11,50 @@ include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for tes
 include(__DIR__ . '/../includes/functions.inc.php');
 include(__DIR__ . '/../includes/port-descr-parser.inc.php');
 
-class IncludesPortDescrParserTest extends \PHPUnit\Framework\TestCase
-{
+class IncludesPortDescrParserTest extends \PHPUnit\Framework\TestCase {
   /**
   * @dataProvider providerParser
   */
-  public function testParser($string, $result)
-  {
+  public function testParser($string, $result) {
     global $config;
 
     // Add in custom interface groups for testing
-    $config['int_groups'] = array('TestGroup1', 'TestGroup2');
+    $config['int_groups'] = [ 'TestGroup1', 'TestGroup2', 'abr' ];
 
-    $this->assertSame($result, custom_port_parser(array('ifAlias' => $string)));
+    $this->assertSame($result, custom_port_parser([ 'ifAlias' => $string ]));
   }
 
-  public function providerParser()
-  {
+  public function providerParser() {
     return array(
       array('Cust: Example Customer',
             array('type'    => 'cust',
                   'descr'   => 'Example Customer',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       array('Cust: Example Customer {CIRCUIT}',
             array('type'    => 'cust',
                   'descr'   => 'Example Customer',
                   'circuit' => 'CIRCUIT',
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       array('Cust: Example Customer [SPEED]',
             array('type'    => 'cust',
                   'descr'   => 'Example Customer',
-                  'circuit' => null,
+                  //'circuit' => null,
                   'speed'   => 'SPEED',
-                  'notes'   => null,
+                  //'notes'   => null,
             )
       ),
       array('Cust: Example Customer (NOTE)',
             array('type'    => 'cust',
                   'descr'   => 'Example Customer',
-                  'circuit' => null,
-                  'speed'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
                   'notes'   => 'NOTE',
             )
       ),
@@ -65,7 +62,7 @@ class IncludesPortDescrParserTest extends \PHPUnit\Framework\TestCase
             array('type'    => 'cust',
                   'descr'   => 'Example Customer',
                   'circuit' => 'CIRCUIT',
-                  'speed'   => null,
+                  //'speed'   => null,
                   'notes'   => 'NOTE',
             )
       ),
@@ -74,13 +71,13 @@ class IncludesPortDescrParserTest extends \PHPUnit\Framework\TestCase
                   'descr'   => 'Example Customer',
                   'circuit' => 'CIRCUIT',
                   'speed'   => 'SPEED',
-                  'notes'   => null,
+                  //'notes'   => null,
             )
       ),
       array('Cust: Example Customer [SPEED] (NOTE)',
             array('type'    => 'cust',
                   'descr'   => 'Example Customer',
-                  'circuit' => null,
+                  //'circuit' => null,
                   'speed'   => 'SPEED',
                   'notes'   => 'NOTE',
             )
@@ -189,6 +186,18 @@ class IncludesPortDescrParserTest extends \PHPUnit\Framework\TestCase
             )
       ),
 
+      # Issues
+      [
+        'ABR: aepripb1 - RIPATRANSONE {OPEN FIBER E0000000044} [1Gbit]',
+        [
+          'type'    => 'abr',
+          'descr'   => 'aepripb1 - RIPATRANSONE',
+          'circuit' => 'OPEN FIBER E0000000044',
+          'speed'   => '1Gbit',
+          //'notes'   => NULL,
+        ]
+      ],
+
       # Errors
 
       # Missing description
@@ -203,60 +212,60 @@ class IncludesPortDescrParserTest extends \PHPUnit\Framework\TestCase
       array('Core: Example {CIRCUIT',
             array('type'    => 'core',
                   'descr'   => 'Example',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       # B0rken circuit
       array('Core: Example CIRCUIT}',
             array('type'    => 'core',
                   'descr'   => 'Example CIRCUIT',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       # B0rken speed
       array('Core: Example [SPEED',
             array('type'    => 'core',
                   'descr'   => 'Example',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       # B0rken speed
       array('Core: Example SPEED]',
             array('type'    => 'core',
                   'descr'   => 'Example SPEED',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       # B0rken notes
       array('Core: Example (NOTE',
             array('type'    => 'core',
                   'descr'   => 'Example',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
       # B0rken notes
       array('Core: Example NOTE)',
             array('type'    => 'core',
                   'descr'   => 'Example NOTE',
-                  'circuit' => null,
-                  'speed'   => null,
-                  'notes'   => null,
+                  //'circuit' => null,
+                  //'speed'   => null,
+                  //'notes'   => null,
             )
       ),
+
       # Bogus type
-      array('Foo: Example {CIRCUIT} [SPEED] (NOTE)',
-            array(),
-      ),
+      [ 'Foo: Example {CIRCUIT} [SPEED] (NOTE)',
+        [], ],
     );
   }
 }

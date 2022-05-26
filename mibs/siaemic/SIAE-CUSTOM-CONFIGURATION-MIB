@@ -1,0 +1,790 @@
+-- ----------------------------------------------------------------------------
+--
+--  SIAE MICROELETTRONICA s.p.a.
+--
+--  Via Michelangelo Buonarroti, 21
+--  20093 - Cologno Monzese
+--  Milano
+--  ITALY
+--
+-- ----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+
+SIAE-CUSTOM-CONFIGURATION-MIB
+        DEFINITIONS ::= BEGIN
+
+        IMPORTS
+             MODULE-IDENTITY, OBJECT-TYPE,
+             Integer32, IpAddress
+        FROM SNMPv2-SMI
+             TEXTUAL-CONVENTION,
+             DisplayString, RowStatus
+        FROM SNMPv2-TC
+             siaeMib
+        FROM SIAE-TREE-MIB;
+
+    customCfgMib MODULE-IDENTITY
+        LAST-UPDATED "201507210000Z"
+        ORGANIZATION "SIAE MICROELETTRONICA spa"
+        CONTACT-INFO
+            "SIAE MICROELETTONICA s.p.a.
+             Via Michelangelo Buonarroti, 21
+             20093 - Cologno Monzese
+             Milano - ITALY
+             Phone :  +39-02-27325-1
+             E-mail: help@siaemic.com
+            "
+        DESCRIPTION
+            "Configuration tool MIB for statically configure
+             the Network Element.
+             "
+        REVISION "201507210000Z"
+        DESCRIPTION
+            "Initial version 01.00.00
+            "
+    ::= { siaeMib 97 }
+
+----------------------------------------------------------------------------------
+--  Textual Conventions
+----------------------------------------------------------------------------------
+    CfgFtpTranferStatus ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "This Textual Convention describes the configuration tool upload
+             status:
+             - inProgress:  the configuration tool upload is in progress
+             - completed:   the configuration tool upload is not running
+             - interrupted: the configuration tool upload has been
+                            abnormally stopped
+            "
+        SYNTAX INTEGER {
+                         none        (0),
+                         inProgress  (1),
+                         completed   (2),
+                         interrupted (3)
+                       }
+
+    CfgToolFtpTransferFailureReason ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "This Textual Convention describes the reasons of an uploading
+             failue:
+             - connectFailure:      connection to the FTP/SFTP server has failed
+             - fileTransferFailure: file was not transferred
+             - fileSavingFailure:   saving into local non-volatile memory has
+                                    failed
+             - aborted:             interrupted by user
+            "
+        SYNTAX BITS    {
+                         connectFailure      (0),
+                         fileTransferFailure (1),
+                         fileSavingFailure   (2),
+                         aborted             (3)
+                       }
+
+
+    ExecutionStatus ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "This Textual Convention describes the type of the script execution
+             status:
+             - notStarted:    the configuration list execution has not been
+                              started
+             - running:       the configuration list execution is in progress
+             - completed:     the configuration list execution has been fully
+                              applied
+             - interrupted:   the configuration list execution was interrupted
+            "
+        SYNTAX INTEGER {
+                         notStarted     (1),
+                         running        (2),
+                         completed      (3),
+                         interrupted    (4)
+                       }
+
+    ScriptType ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+            "The type of the script to either create or delete a configuration.
+            "
+        SYNTAX INTEGER {
+                         constructor (1),
+                         destructor  (2)
+                       }
+
+
+------ Beginning --------------------------------------------------------------
+
+    customCfgMibVersion  OBJECT-TYPE
+         SYNTAX      INTEGER
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "Numerical version of this module.
+              The string version of this MIB have the following format:
+                 XX.YY.ZZ
+              so, for example, the value 1 should be interpreted as 00.00.01
+              and the value 10001 should be interpreted as 01.00.01.
+             "
+         DEFVAL      {1}
+         ::= { customCfgMib 1 }
+
+------- Begin of customCfgToolTable
+--
+    customCfgToolTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF  CustomCfgToolEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "Table with entries describing the custom configuration tools.
+             "
+        ::=  { customCfgMib  2 }
+
+    customCfgToolEntry OBJECT-TYPE
+         SYNTAX      CustomCfgToolEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "A row in the customCfgToolTable."
+         INDEX { customCfgToolId }
+        ::=  { customCfgToolTable 1 }
+
+    CustomCfgToolEntry  ::=
+         SEQUENCE {
+            customCfgToolId                     Integer32,
+            customCfgToolRowStatus              RowStatus,
+            customCfgToolDescription            DisplayString,
+            customCfgToolConstructorName        DisplayString,
+            customCfgToolDestructorName         DisplayString,
+            customCfgToolFtpServerIpAddress     IpAddress,
+            customCfgToolFtpConstructorName     DisplayString,
+            customCfgToolFtpDestructorName      DisplayString,
+            customCfgToolUploadActionRequest    INTEGER,
+            customCfgToolUploadStatus           CfgFtpTranferStatus,
+            customCfgToolUploadFailure          CfgToolFtpTransferFailureReason
+         }
+
+    customCfgToolId OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This object identifies the configuration tool.
+             "
+         ::= { customCfgToolEntry 1 }
+
+    customCfgToolRowStatus OBJECT-TYPE
+         SYNTAX       RowStatus
+         MAX-ACCESS   read-create
+         STATUS       current
+         DESCRIPTION
+             "The rowstatus of each configuration tool entry.
+              This object is used to manage the creation and deletion of
+              conceptual rows in customCfgToolTable.
+              To create a row in this table, a manager should set rowstatus
+              to createAndWait(5) (createAndGo(4) is rejected).
+              Until values of all objects in the row are appropriately
+              configured, the value of the corresponding instance of rowstatus
+              is notReady(3).
+              When the configuration scripts are both successfully uploaded
+              into the equipment, then the rowstatus column turns into
+              notInService(2); the manager must set rowstatus to active(1) to
+              make the conceptual row available.
+              The content of customCfgToolTable can be changed only if this
+              object is notInService(2).
+              A configuration tool cannot be deleted or changed if the
+              constructor or the destructor is inserted in an execution list
+              (see customCfgListTable and customCfgExecListTable) not run yet.
+             "
+         ::= { customCfgToolEntry 2 }
+
+    customCfgToolDescription OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..255))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "ASCII string for describing the configuration tool and the
+              version of the configuration tool.
+             "
+         ::= { customCfgToolEntry 3 }
+
+    customCfgToolConstructorName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..32))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "ASCII string for the name of the script built to apply the
+              configuration. This field is set by the Network Element when
+              the upload of the related script has been completed.
+             "
+         ::= { customCfgToolEntry 4 }
+
+    customCfgToolDestructorName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..32))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "ASCII string for the name of the script built to remove the
+              configuration. This field is set by the Network Element when
+              the upload of the related script has been completed.
+             "
+         ::= { customCfgToolEntry 5 }
+
+    customCfgToolFtpServerIpAddress OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "Ip address of the connected SNMP manager from which the
+              configuration tool is uploaded. if this object is set '0.0.0.0',
+              then the IP address of server is read from incoming ethernet
+              packet with a SNMP-SET of customCfgToolUploadActionRequest.
+             "
+         DEFVAL      {0}
+         ::= { customCfgToolEntry 6 }
+
+    customCfgToolFtpConstructorName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..255))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "ASCII string for the full filename of the script used to create a
+              configuration. This field is set by the SNMP manager.
+              Once the upload is completed, the SNMP agent will empty
+              this field and copy its value into customCfgContructorScriptName
+              by removing the path.
+             "
+         ::= { customCfgToolEntry 7 }
+
+    customCfgToolFtpDestructorName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..255))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "ASCII string for the full filename of the script used to delete a
+              configuration. This field is set by the SNMP manager.
+              Once the upload is completed, the SNMP agent will empty
+              this field and copy its value into customCfgContructorScriptName
+              by removing the path.
+             "
+         ::= { customCfgToolEntry 8 }
+
+    customCfgToolUploadActionRequest OBJECT-TYPE
+         SYNTAX      INTEGER {
+                               notActive           (0),
+                               loadCfg             (1),
+                               loadCfgContructor   (2),
+                               loadCfgDestructor   (3),
+                               removeCfg           (4)
+                             }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "This object is used to start the actions for a configuration tool
+              entry:
+              -upload/reload of the file scripts of a configuration tool
+              -remove a configuration tool entry
+             "
+         DEFVAL      {notActive}
+         ::= { customCfgToolEntry 9 }
+
+    customCfgToolUploadStatus OBJECT-TYPE
+         SYNTAX      CfgFtpTranferStatus
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "A field to identify that NE is uploading the configuration tool;
+              the configuration tool cannot start running the script
+              until the upload of both configuration scripts has been completed.
+             "
+         DEFVAL      {none}
+         ::= { customCfgToolEntry 10 }
+
+    customCfgToolUploadFailure OBJECT-TYPE
+         SYNTAX      CfgToolFtpTransferFailureReason
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "The status of the last performed upload procedure.
+             "
+         ::= { customCfgToolEntry 11 }
+
+--
+------- End of customCfgToolTable
+
+------- Begin of customCfgFlushActionRequest
+--
+    customCfgFlushActionRequest OBJECT-TYPE
+         SYNTAX  INTEGER     {
+                               notActive    (0),
+                               startRemove  (1)
+                             }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "This object is used to remove all the loaded configuration tools.
+             "
+         ::= { customCfgMib  3 }
+--
+------- End of customCfgFlushActionRequest
+
+------- Begin of customCfgListTable
+--
+    customCfgListTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF  CustomCfgListEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "Table with entries reporting the execution lists built by
+              SNMP manager.
+             "
+        ::=  { customCfgMib  4 }
+
+    customCfgListEntry OBJECT-TYPE
+         SYNTAX      CustomCfgListEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "A row in the customCfgListTable.
+             "
+         INDEX { customCfgListId }
+        ::=  { customCfgListTable 1 }
+
+    CustomCfgListEntry  ::=
+       SEQUENCE {
+            customCfgListId             Integer32,
+            customCfgListRowStatus      RowStatus,
+            customCfgListName           DisplayString,
+            customCfgListStatus         ExecutionStatus,
+            customCfgListActionRequest  INTEGER
+         }
+
+    customCfgListId OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This object identifies the configuration list.
+             "
+         ::= { customCfgListEntry 1 }
+
+    customCfgListRowStatus OBJECT-TYPE
+         SYNTAX       RowStatus
+         MAX-ACCESS   read-create
+         STATUS       current
+         DESCRIPTION
+             "The rowstatus of each entry of customCfgListTable.
+              This object is used to manage the creation and deletion of
+              conceptual rows in customCfgListTable.
+              To create a row in this table, a manager should set rowstatus
+              to createAndWait(5) or createAndGo(4) and the SNMP agent
+              configures the rowstatus respectively notInService(2) or
+              active(1).
+              When manager completes the creations of the related entries in
+              the customCfgExecListTable, it must set rowstatus to active(1)
+              in order to make the conceptual row available for the execution.
+              When the manager wants to insert/delete a new entry in
+              customCfgExecListTable for this list, it must set this object
+              to notInService(2); after having added/deleted the entry in
+              customCfgExecListTable, it must set again this object to
+              active(1). After execution of the list was started, the list
+              cannot be changed, but only removed: in other words, this item
+              cannot be set notInService (2), but only to destroy (6). 
+              When a row in this table is deleted, the related entries in
+              customCfgExecListTable are removed too.
+             "
+         ::= { customCfgListEntry 2 }
+
+    customCfgListName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..32))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "The ASCII string identifying the list name. By default, this
+              object is set to LIST-N where N is the value of customCfgListId.
+             "
+         ::= { customCfgListEntry 3 }
+
+    customCfgListStatus OBJECT-TYPE
+         SYNTAX      ExecutionStatus
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "This object reports the configuration list status.
+              Until the execution list is not executed, this object shows
+              the value notStarted(1).
+              The status is changed to inExecution(2) when the list execution
+              has been started, and then in completed(3) or interrupted(4) at
+              the end of the execution.
+             "
+         DEFVAL      {notStarted}
+         ::= { customCfgListEntry 4 }
+
+   customCfgListActionRequest OBJECT-TYPE
+         SYNTAX      INTEGER    {
+                                  notActive (0),
+                                  run       (1)
+                                }
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "The command set by SNMP manager to ask the Network Element
+              to start the execution of the scripts included the list.
+              The execution can be started if the scripts belong to
+              a valid configuration tool.
+             "
+         DEFVAL      {notActive}
+         ::= { customCfgListEntry 5 }
+
+--
+------- End of customCfgListTable
+
+------- Begin of customCfgExecListTable
+--
+    customCfgExecListTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF  CustomCfgExecListEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "Table with entries content of execution lists.
+             "
+        ::=  { customCfgMib  5 }
+
+    customCfgExecListEntry OBJECT-TYPE
+         SYNTAX      CustomCfgExecListEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "A row in the customCfgExecListTable.
+             "
+         INDEX { customCfgListId,  customCfgExecElementNumber }
+        ::=  { customCfgExecListTable 1 }
+
+    CustomCfgExecListEntry  ::=
+       SEQUENCE {
+            customCfgExecElementNumber   Integer32,
+            customCfgExecRowStatus       RowStatus,
+            customCfgExecToolId          Integer32,
+            customCfgExecScriptType      ScriptType,
+            customCfgExecScriptStatus    ExecutionStatus
+         }
+
+    customCfgExecElementNumber OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This object identifies the order of the execution of the scripts
+              assigned to the configuration list.
+             "
+         ::= { customCfgExecListEntry 1 }
+
+    customCfgExecRowStatus OBJECT-TYPE
+         SYNTAX       RowStatus
+         MAX-ACCESS   read-create
+         STATUS       current
+         DESCRIPTION
+             "The rowstatus of each entry of customCfgExecListTable.
+              This object is used to manage the creation and deletion of
+              conceptual rows in customCfgExecListTable.
+              To create a row in this table, a manager should set rowstatus to
+              createAndWait(5) (createAndGo(4) is rejected).
+              Until values of all objects in the row are appropriately
+              configured, the value of the corresponding instance of rowstatus
+              is notReady(3): if the selected script belongs to a valid
+              configuration tool (rowStatus is active in  customCfgToolTable),
+              then the rowstatus column turns into notInService(2); manager
+              must set rowstatus to active(1) in order to make the conceptual
+              row available.
+              The content of customCfgExecListTable can be changed only if
+              this object is configured to notInService(2).
+              The rowstatus is changed to notInService(2) when the related
+              configuration tool entry is deleted or updated by the manager.
+             "
+         ::= { customCfgExecListEntry 2 }
+
+    customCfgExecToolId OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "This object identifies the configuration tool.
+             "
+         ::= { customCfgExecListEntry 3 }
+
+    customCfgExecScriptType OBJECT-TYPE
+         SYNTAX      ScriptType
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "The type of the script to either apply or remove
+              the configuration identified by customCfgExecToolId.
+             "
+         ::= { customCfgExecListEntry 4 }
+
+    customCfgExecScriptStatus OBJECT-TYPE
+         SYNTAX      ExecutionStatus
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "This object reports the list element status.
+              Until tthe execution list is not executed, this object shows
+              the value notStarted(1).
+              The status is changed to inExecution(2) when the element
+              execution has been started, and then in completed(3) or
+              interrupted(4) at the end of the execution.
+             "
+         DEFVAL      {notStarted}
+         ::= { customCfgExecListEntry 5 }
+
+--
+------- End of customCfgExecListTable
+
+------- Begin of customCfgCurrentExecPointTable
+--
+    customCfgCurrentExecPointTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF  CustomCfgExecPointEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "Table with one entry reporting the current execution point.
+             "
+        ::=  { customCfgMib  6}
+
+    customCfgExecPointListEntry OBJECT-TYPE
+         SYNTAX      CustomCfgExecPointEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "A row in the customCfgCurrentExecPointTable.
+             "
+         INDEX { customCfgExecPointId }
+        ::=  { customCfgCurrentExecPointTable 1 }
+
+    CustomCfgExecPointEntry  ::=
+       SEQUENCE {
+            customCfgExecPointId             Integer32,
+            customCfgExecPointListId         Integer32,
+            customCfgExecPointListElementId  Integer32,
+            customCfgExecPointScriptName     DisplayString,
+            customCfgExecPointScriptLine     Integer32,
+            customCfgExecPointScriptRows     Integer32
+         }
+
+    customCfgExecPointId OBJECT-TYPE
+         SYNTAX      Integer32 (1)
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This object identifies the current execution point.
+             "
+         ::= { customCfgExecPointListEntry 1 }
+
+    customCfgExecPointListId OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "This object identifies the configuration list."
+         ::= { customCfgExecPointListEntry 2 }
+
+    customCfgExecPointListElementId OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "This object with customCfgExecPointListId identifies
+              the element of the configuration tool."
+         ::= { customCfgExecPointListEntry 3 }
+
+    customCfgExecPointScriptName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..32))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "This object shows the current script name running."
+         ::= { customCfgExecPointListEntry 4 }
+    
+     customCfgExecPointScriptLine OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "The row of the script that is running."
+         ::= { customCfgExecPointListEntry 5 }
+
+     customCfgExecPointScriptRows OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "The total number of rows of the script that is running."
+         ::= { customCfgExecPointListEntry 6 }
+
+--
+------- End of customCfgExecPointTable
+
+------- Begin of customCfgActualConfigTable
+--
+    customCfgActualConfigTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF CustomCfgActualConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "Table showing the customizations applied by each script.
+             "
+        ::=  { customCfgMib  7 }
+
+    customCfgActualConfigEntry OBJECT-TYPE
+         SYNTAX      CustomCfgActualConfigEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "A row in the customCfgActualConfigTable.
+             "
+         INDEX { customCfgActualConfigName }
+        ::=  { customCfgActualConfigTable 1 }
+
+    CustomCfgActualConfigEntry  ::=
+       SEQUENCE {
+            customCfgActualConfigName           DisplayString,
+            customCfgActualConfigRowStatus      RowStatus,
+            customCfgActualConfigDescription    DisplayString,
+            customCfgActualConfigVersion        DisplayString
+         }
+
+    customCfgActualConfigName OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..32))
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "The unique ASCII string to identfiy the actual configuration type 
+              (e.g. ROLE, QOS, RADIO ...).
+             "
+         ::= { customCfgActualConfigEntry 1 }
+
+     customCfgActualConfigRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "The rowstatus of each entry of customCfgActualConfigTable.
+              This object is used to manage the creation and deletion of
+              conceptual rows in customCfgActualConfigTable.
+              To create a row in this table, a manager should set rowstatus to
+              createAndWait(5) (createAndGo(4) is rejected).
+              Until values of all object in the row are appropriately
+              configured, the value of the corresponding instance of rowstatus
+              is notReady(3). Then the rowstatus column turns into
+              notInService(2); the manager must set rowstatus to active(1) in
+              order to make the conceptual row available.
+
+              Each row in this table should be created by the constructor
+              script and removed by the destructor script. To an SNMP manager
+              is forbidden to set this object.
+             "
+         ::= { customCfgActualConfigEntry 2 }
+
+    customCfgActualConfigDescription OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0..255))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "The ASCII string containing the description of the customizations
+              made by a script.
+              This string is set by each script during its execution.
+             "
+         DEFVAL      {""}
+         ::= { customCfgActualConfigEntry 3 }
+
+    customCfgActualConfigVersion OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(0|5))
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+             "The ASCII string containing the version of the customizations
+              made by a script. This string is set by each script during its
+              execution. The format of the strig should be:
+
+                major.minor
+
+              for example: 10.44
+
+              SNMP agent doesn't perform any check on this syntax. 
+             "
+         DEFVAL      {""}
+         ::= { customCfgActualConfigEntry 4 }
+
+--
+-------  End of customCfgActualConfigTable
+
+--
+------- The following objects are used to map the "action"
+------- (delete record, transfer the log using FTP ...):
+--
+    customCfgFtpLogTransfer OBJECT IDENTIFIER::= {customCfgMib 8}
+
+    customCfgLogActionRequest  OBJECT-TYPE
+        SYNTAX      INTEGER     {
+                                  none                (0),
+                                  deleteScriptExecLog (1),
+                                  readScriptExecLog   (2),
+                                  deleteFaileCmdLog   (3),
+                                  readFailedCmdLog    (4)
+
+                                }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object is used to delete or to read the LOG using FTP
+             (file transfer).
+            "
+        ::= { customCfgFtpLogTransfer 1 }
+
+    customCfgLogFtpFilename  OBJECT-TYPE
+        SYNTAX      DisplayString    (SIZE(0..255))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Path and file name used when the log is transferred using FTP
+             (customCfgLogActionRequest set to readScriptExecLog or 
+              readFailedCmdLog ).
+            "
+        ::= { customCfgFtpLogTransfer 2 }
+
+    customCfgLogServerIpAddress  OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Ip address of the SNMP manager connected to which the log
+             is downloaded/uploaded, if this object is set '0.0.0.0',
+             then the IP address of server is read from incoming ethernet
+             packet with a SNMP-SET of customCfgLogActionRequest."
+        DEFVAL { 0 }
+        ::= { customCfgFtpLogTransfer 3 }
+
+    customCfgLogDownloadStatus OBJECT-TYPE
+         SYNTAX      CfgFtpTranferStatus
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "A field to identify that NE is downloading a log.
+             "
+         DEFVAL      {none}
+         ::= { customCfgFtpLogTransfer 4 }
+
+    customCfgLogDownloadFailure OBJECT-TYPE
+         SYNTAX      CfgToolFtpTransferFailureReason
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "The status of the last performed download procedure.
+             "
+         ::= { customCfgFtpLogTransfer 5 }
+
+--
+------ End group -----------------------------------------------------------------
+
+END
+

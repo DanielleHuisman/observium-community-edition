@@ -205,43 +205,27 @@ foreach (array_merge(array('os' => 1, 'system' => 1), $config['poller_modules'])
   <tbody>
 
 <?php
-foreach (array_keys($config) as $module)
-{
+foreach (array_keys($config) as $module) {
   if (!str_starts($module, 'enable_ports_')) { continue; }
 
-  $module_status = $config[$module];
   $attrib_set = isset($attribs[$module]);
   $module_name = str_replace('enable_ports_', '', $module);
-  // Enabled/disabled by os definition
-  if (isset($config['os'][$device['os']]['modules']['ports_'.$module_name]))
-  {
-    $module_status = $config['os'][$device['os']]['modules']['ports_'.$module_name];
-  }
+  $module_status = is_module_enabled($device, 'ports_'.$module_name, 'poller', FALSE);
 
   // Last ports module poll time and row class
   $module_row_class = '';
-  if ($module_name == 'separate_walk')
-  {
+  if ($module_name === 'separate_walk' || $module_name === '64bit') {
     $module_time = ''; // nothing to show for this pseudo-module
-  }
-  elseif (!isset($device_state['poller_ports_perf'][$module_name]))
-  {
+  } elseif (!isset($device_state['poller_ports_perf'][$module_name])) {
     $module_time = '--';
-  }
-  elseif ($device_state['poller_ports_perf'][$module_name] < 0.01)
-  {
+  } elseif ($device_state['poller_ports_perf'][$module_name] < 0.01) {
     $module_time = $device_state['poller_ports_perf'][$module_name] . 's';
-  }
-  else
-  {
+  } else {
     $module_time = format_value($device_state['poller_ports_perf'][$module_name]) . 's';
 
-    if ($device_state['poller_ports_perf'][$module_name] > 10)
-    {
+    if ($device_state['poller_ports_perf'][$module_name] > 10) {
       $module_row_class = 'error';
-    }
-    elseif ($device_state['poller_ports_perf'][$module_name] > 3)
-    {
+    } elseif ($device_state['poller_ports_perf'][$module_name] > 3) {
       $module_row_class = 'warning';
     }
   }
@@ -255,29 +239,21 @@ foreach (array_keys($config) as $module)
   $toggle = 'Enable'; $btn_class = 'btn-success'; $btn_icon = 'icon-ok';
   $value  = 'Toggle';
   $disabled = FALSE;
-  if ($module == 'enable_ports_junoseatmvp' && $device['os'] != 'junose') /// FIXME. see here includes/discovery/junose-atm-vp.inc.php
-  {
+  if ($module === 'enable_ports_junoseatmvp' && $device['os'] !== 'junose') { /// FIXME. see here includes/discovery/junose-atm-vp.inc.php
     $attrib_status = '<span class="label label-default">excluded</span>';
     $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
     $disabled = TRUE;
-  }
-  elseif (($attrib_set && $attribs[$module]) || (!$attrib_set && $module_status))
-  {
+  } elseif (($attrib_set && $attribs[$module]) || (!$attrib_set && $module_status)) {
     $attrib_status = '<span class="label label-success">enabled</span>';
     $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';
-  }
-  elseif ($module == 'enable_ports_separate_walk' && !$attrib_set)
-  {
+  } elseif ($module === 'enable_ports_separate_walk' && !$attrib_set) {
     // Model definition can override os definition
-    $model_separate_walk = isset($model['ports_separate_walk']) ? $model['ports_separate_walk'] : $config['os'][$device['os']]['ports_separate_walk'];
-    if ($model_separate_walk && $ports_total_count > 10)
-    {
+    $model_separate_walk = isset($model['ports_separate_walk']) && $model['ports_separate_walk'];
+    if ($model_separate_walk && $ports_total_count > 10) {
       $attrib_status = '<span class="label label-warning">FORCED</span>';
       $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';
       $value  = 'Disable';
-    }
-    elseif ((int)$device['state']['poller_mod_perf']['ports'] < 20 && $ports_total_count <= 10)
-    {
+    } elseif ((int)$device['state']['poller_mod_perf']['ports'] < 20 && $ports_total_count <= 10) {
       $attrib_status = '<span class="label label-default">excluded</span>';
       $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
       $disabled = TRUE;

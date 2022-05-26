@@ -74,28 +74,25 @@ function print_addresses($vars)
             // Part of network string
             $where .= ' AND 0'; // Nothing!
           }
-          $where_netscaler .= ' AND 0'; // Currently unsupported for netscaller
+          $where_netscaler .= ' AND 0'; // Currently, unsupported for Netscaller
           break;
         case 'address':
-          if (!is_array($value))
-          {
+          if (!is_array($value)) {
             $value = explode(',', $value);
           }
           // Remove prefix part
-          $addr = array();
-          foreach ($value as $tmp)
-          {
+          $addr = [];
+          foreach ($value as $tmp) {
             list($addr[], $mask) = explode('/', $tmp);
           }
-          if ($ids = get_entity_ids_ip_by_network($address_type, $addr))
-          {
+          if ($ids = get_entity_ids_ip_by_network($address_type, $addr)) {
             // Full network with prefix
             $where .= generate_query_values($ids, 'A.ip_address_id');
           } else {
             $where .= ' AND 0'; // Nothing!
           }
-          if (get_ip_version($addr))
-          {
+          /// FIXME. Netscaller hack
+          if (count($addr) && get_ip_version($addr[0])) {
             // Netscaller for valid IP address
             $where_netscaler .= generate_query_values($addr, 'N.vsvr_ip');
           } else {

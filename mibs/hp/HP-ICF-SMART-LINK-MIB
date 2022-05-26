@@ -14,7 +14,7 @@ IMPORTS
    FROM HP-ICF-OID;
 
    hpicfSmartLinkMIB MODULE-IDENTITY
-       LAST-UPDATED "201303200000Z" -- March 20, 2013
+       LAST-UPDATED "202106100000Z" -- June 10, 2021
        ORGANIZATION "HP Networking"
        CONTACT-INFO "Hewlett-Packard Company
                      8000 Foothills Blvd.
@@ -28,6 +28,16 @@ IMPORTS
                      typically configured in service provider or
                      enterprise networks where users do not want to 
                      run STP on the device."
+
+       REVISION     "202106100000Z" -- June 10, 2021
+       DESCRIPTION  "Added hpicfSmartLinkGroupPrimaryPort,
+                     hpicfSmartLinkGroupPrimaryPortState,
+                     hpicfSmartLinkGroupSecondaryPortState,
+                     hpicfSmartLinkPrimaryFlushPktTx,
+                     hpicfSmartLinkPrimaryFlushPktLastUpdate,
+                     hpicfSmartLinkGroupSecondaryPort,
+                     hpicfSmartLinkSecondaryFlushPktTx,
+                     hpicfSmartLinkSecondaryFlushPktLastUpdate objects"
 
        REVISION     "201303200000Z" -- March 20, 2013
        DESCRIPTION  "Initial version"
@@ -141,7 +151,9 @@ IMPORTS
        hpicfSmartLinkGroupProtectedVlan4k OCTET STRING,
        hpicfSmartLinkGroupTrapControl     TruthValue,
        hpicfSmartLinkGroupClearStats      TruthValue,
-       hpicfSmartLinkGroupRowStatus       RowStatus
+       hpicfSmartLinkGroupRowStatus       RowStatus,
+       hpicfSmartLinkGroupPrimaryPort   Integer32,
+       hpicfSmartLinkGroupSecondaryPort      Integer32
    }
 
    hpicfSmartLinkGroupIndex OBJECT-TYPE
@@ -190,10 +202,10 @@ IMPORTS
        STATUS       current
        DESCRIPTION  "The object specifies the preemption mechanism for
                      this group.
-                     off(1) - No preemption happens from master to
-                     slave.
+                     off(1) - No preemption happens from primary to
+                     secondary.
 
-                     role(2) - The master always preempts to slave after
+                     role(2) - The primary always preempts to secondary after
                      the time specified in
                      hpicfSmartLinkGroupPreemptionDelay."
        DEFVAL { off }
@@ -300,6 +312,26 @@ IMPORTS
                      the RowStatus is 'active'."
        ::= { hpicfSmartLinkGroupEntry 13 }
 
+   hpicfSmartLinkGroupPrimaryPort  OBJECT-TYPE
+       SYNTAX       Integer32 (0..65535)
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION  "This object is used to configure primary port of
+                     this group. The value of 0 (zero) indicates that
+                     primary port is not configured for this group."
+       DEFVAL {0}
+       ::= { hpicfSmartLinkGroupEntry 14 }
+
+   hpicfSmartLinkGroupSecondaryPort  OBJECT-TYPE
+       SYNTAX       Integer32 (0..65535)
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION  "This object is used to configure secondary port of
+                     this group. The value of 0 (zero) indicates that
+                     secondary port is not configured for this group."
+       DEFVAL {0}
+       ::= { hpicfSmartLinkGroupEntry 15 }
+
    hpicfSmartLinkExtendedGroupTable OBJECT-TYPE
        SYNTAX       SEQUENCE OF HpicfSmartLinkExtendedGroupEntry
        MAX-ACCESS   not-accessible
@@ -318,12 +350,18 @@ IMPORTS
        ::= { hpicfSmartLinkExtendedGroupTable 1 }
 
    HpicfSmartLinkExtendedGroupEntry ::= SEQUENCE {
-       hpicfSmartLinkGroupMasterPortState  	INTEGER,
-       hpicfSmartLinkGroupSlavePortState	INTEGER,
-       hpicfSmartLinkMasterFlushPktTx		Counter64,
-       hpicfSmartLinkMasterFlushPktLastUpdate	DateAndTime,
-       hpicfSmartLinkSlaveFlushPktTx		Counter64,
-       hpicfSmartLinkSlaveFlushPktLastUpdate	DateAndTime
+       hpicfSmartLinkGroupMasterPortState         INTEGER,
+       hpicfSmartLinkGroupSlavePortState	  INTEGER,
+       hpicfSmartLinkMasterFlushPktTx		  Counter64,
+       hpicfSmartLinkMasterFlushPktLastUpdate	  DateAndTime,
+       hpicfSmartLinkSlaveFlushPktTx		  Counter64,
+       hpicfSmartLinkSlaveFlushPktLastUpdate	  DateAndTime,
+       hpicfSmartLinkGroupPrimaryPortState  	  INTEGER,
+       hpicfSmartLinkGroupSecondaryPortState	  INTEGER,
+       hpicfSmartLinkPrimaryFlushPktTx          Counter64,
+       hpicfSmartLinkPrimaryFlushPktLastUpdate  DateAndTime,
+       hpicfSmartLinkSecondaryFlushPktTx		  Counter64,
+       hpicfSmartLinkSecondaryFlushPktLastUpdate	  DateAndTime
    }
 
    hpicfSmartLinkGroupMasterPortState  OBJECT-TYPE
@@ -404,6 +442,85 @@ IMPORTS
        DESCRIPTION  "This MIB object indicates the time at which the 
                      last flush packet was sent on slave port."
        ::= { hpicfSmartLinkExtendedGroupEntry 6 }
+
+   hpicfSmartLinkGroupPrimaryPortState  OBJECT-TYPE
+       SYNTAX       INTEGER{
+                       uninitialized(1),
+                       active(2),
+                       standby(3),
+                       down(4)
+                    }
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION  "The status of an interface participating in Smart
+                     link operation.
+                     uninitialized (1) - A value of 'uninitialized'
+                        indicates that, the interface is not configured.
+                     active(2) - A value of 'active' indicates that,
+			the interface is actively forwarding traffic.
+                     standby(3) - A value of 'standby' indicates that,
+			the interface is ready to forward traffic if
+                        the active interface goes down.
+                     down(4) - A value of 'down' indicates that,
+                        the interface is physically down. "
+        DEFVAL	{ uninitialized }
+        ::= { hpicfSmartLinkExtendedGroupEntry 7 }
+
+   hpicfSmartLinkGroupSecondaryPortState  OBJECT-TYPE
+       SYNTAX       INTEGER {
+                       uninitialized(1),
+                       active(2),
+                       standby(3),
+                       down(4)
+                    }
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION  "The status of an interface participating in Smart
+                     link operation.
+                     uninitialized (1) - A value of ' uninitialized '
+                                         indicates that, the interface
+                                         is not configured.
+                     active(2) - A value of 'active' indicates that,
+	                         the interface is actively forwarding
+                                 traffic.
+                     standby(3) - A value of 'standby' indicates that,
+                                  the interface is ready to forward
+                                  traffic if the active interface goes
+                                  down.
+                     down(4) - A value of 'down' indicates that,
+	                       the interface is physically down."
+       DEFVAL	{ uninitialized }
+       ::= { hpicfSmartLinkExtendedGroupEntry 8 }
+
+   hpicfSmartLinkPrimaryFlushPktTx OBJECT-TYPE
+       SYNTAX       Counter64
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION  "Number of flush packets sent on primary port."
+       ::= { hpicfSmartLinkExtendedGroupEntry 9 }
+
+   hpicfSmartLinkPrimaryFlushPktLastUpdate OBJECT-TYPE
+       SYNTAX       DateAndTime
+       MAX-ACCESS   read-only 
+       STATUS       current
+       DESCRIPTION  "This MIB object indicates the time at which the
+                     last flush packet was sent on primary port."
+       ::= { hpicfSmartLinkExtendedGroupEntry 10 }
+
+   hpicfSmartLinkSecondaryFlushPktTx OBJECT-TYPE
+       SYNTAX       Counter64
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION  "Number of flush packets sent on secondary port."
+       ::= { hpicfSmartLinkExtendedGroupEntry 11 }
+
+   hpicfSmartLinkSecondaryFlushPktLastUpdate OBJECT-TYPE
+       SYNTAX       DateAndTime
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION  "This MIB object indicates the time at which the
+                     last flush packet was sent on secondary port."
+       ::= { hpicfSmartLinkExtendedGroupEntry 12 }
 
    -- Smart link Port table
 
@@ -530,11 +647,25 @@ IMPORTS
                     hpicfSmartLinkGroupMasterPortState,
                     hpicfSmartLinkGroupSlavePortState	
                }
-       STATUS       current
+       STATUS       deprecated
        DESCRIPTION  "A hpicfSmartLinkPortStateChangeNotification is 
                      generated when standby port transits to active 
                      state."
        ::= { hpicfSmartLinkNotifications 2 }
+
+   hpicfSmartLinkPortStateChangeNotification1 NOTIFICATION-TYPE
+       OBJECTS {
+                    hpicfSmartLinkNotifyGroupIndex,
+                    hpicfSmartLinkGroupMasterPortState,
+                    hpicfSmartLinkGroupSlavePortState,
+                    hpicfSmartLinkGroupPrimaryPortState,
+                    hpicfSmartLinkGroupSecondaryPortState	
+               }
+       STATUS       current
+       DESCRIPTION  "A hpicfSmartLinkPortStateChangeNotification1 is 
+                     generated when standby port transits to active 
+                     state."
+       ::= { hpicfSmartLinkNotifications 3 }
 
    -- Conformance
 
@@ -546,7 +677,7 @@ IMPORTS
    -- Compliance Statements
 
    hpicfSmartLinkCompliance1 MODULE-COMPLIANCE
-       STATUS       current
+       STATUS       deprecated
        DESCRIPTION  "The compliance statement"
        MODULE       -- this module
        MANDATORY-GROUPS {
@@ -557,6 +688,19 @@ IMPORTS
                     hpicfSmartLinkNotificationObjectsGroup
 		}
        ::= { hpicfSmartLinkCompliances 1 }
+
+   hpicfSmartLinkCompliance2 MODULE-COMPLIANCE
+       STATUS       current
+       DESCRIPTION  "The compliance statement"
+       MODULE       -- this module
+       MANDATORY-GROUPS {
+                    hpicfSmartLinkGlobalGroup,
+                    hpicfSmartLinkGroupsGroup1, 
+                    hpicfSmartLinkPortGroup,
+                    hpicfSmartLinkNotificationGroup1,
+                    hpicfSmartLinkNotificationObjectsGroup
+		}
+       ::= { hpicfSmartLinkCompliances 2 }
 
    -- units of conformance 
    
@@ -595,7 +739,7 @@ IMPORTS
                     hpicfSmartLinkSlaveFlushPktLastUpdate,
                     hpicfSmartLinkGroupRowStatus       	
                  }
-       STATUS       current
+       STATUS       deprecated
        DESCRIPTION  "These objects are used for managing and monitoring
                      Smart link groups."
        ::= { hpicfSmartLinkConformanceGroups 2 } 
@@ -626,9 +770,51 @@ IMPORTS
        NOTIFICATIONS {
                     hpicfSmartLinkPortStateChangeNotification
                      }
-       STATUS       current
+       STATUS       deprecated
        DESCRIPTION  "Group of notifications for Smart link interfaces."
        ::= {hpicfSmartLinkConformanceGroups 5}
+
+   hpicfSmartLinkGroupsGroup1 OBJECT-GROUP
+       OBJECTS  {
+                    hpicfSmartLinkGroupMasterPort,  		
+                    hpicfSmartLinkGroupSlavePort,   		
+                    hpicfSmartLinkGroupSendControlVlan,  	
+                    hpicfSmartLinkGroupPreemptionMode,       
+                    hpicfSmartLinkGroupPreemptionDelay,       	
+                    hpicfSmartLinkGroupProtectedVlan1k, 	
+                    hpicfSmartLinkGroupProtectedVlan2k,	
+                    hpicfSmartLinkGroupProtectedVlan3k, 	
+                    hpicfSmartLinkGroupProtectedVlan4k, 	
+                    hpicfSmartLinkGroupTrapControl,
+                    hpicfSmartLinkGroupClearStats,
+                    hpicfSmartLinkGroupMasterPortState,	
+                    hpicfSmartLinkGroupSlavePortState,
+                    hpicfSmartLinkMasterFlushPktTx,
+                    hpicfSmartLinkMasterFlushPktLastUpdate,
+                    hpicfSmartLinkSlaveFlushPktTx,
+                    hpicfSmartLinkSlaveFlushPktLastUpdate,
+                    hpicfSmartLinkGroupRowStatus,
+                    hpicfSmartLinkGroupPrimaryPort,
+                    hpicfSmartLinkGroupPrimaryPortState,
+                    hpicfSmartLinkGroupSecondaryPortState,
+                    hpicfSmartLinkPrimaryFlushPktTx,
+                    hpicfSmartLinkPrimaryFlushPktLastUpdate,
+                    hpicfSmartLinkGroupSecondaryPort,
+                    hpicfSmartLinkSecondaryFlushPktTx,
+                    hpicfSmartLinkSecondaryFlushPktLastUpdate
+                 }
+       STATUS       current
+       DESCRIPTION  "These objects are used for managing and monitoring
+                     Smart link groups."
+       ::= { hpicfSmartLinkConformanceGroups 6 } 
+   
+       hpicfSmartLinkNotificationGroup1 NOTIFICATION-GROUP
+       NOTIFICATIONS {
+                    hpicfSmartLinkPortStateChangeNotification1
+                     }
+       STATUS       current
+       DESCRIPTION  "Group of notifications for Smart link interfaces."
+       ::= {hpicfSmartLinkConformanceGroups 7}
 
 END
  

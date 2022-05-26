@@ -17,15 +17,27 @@ $vlans_db        = array();
 $ports_vlans_db  = array();
 $ports_vlans     = array();
 
-$vlans_db_raw = dbFetchRows("SELECT * FROM `vlans` WHERE `device_id` = ?;", array($device['device_id']));
-foreach ($vlans_db_raw as $vlan_db)
-{
+$vlans_db_raw = dbFetchRows("SELECT * FROM `vlans` WHERE `device_id` = ?;", [ $device['device_id'] ]);
+foreach ($vlans_db_raw as $vlan_db) {
+  if (isset($vlans_db[$vlan_db['vlan_domain']][$vlan_db['vlan_vlan']])) {
+    // Clean duplicates
+    print_debug("Duplicate VLAN entry in DB found:");
+    print_debug_vars($vlan_db);
+    dbDelete('vlans', '`vlan_id` = ?', [$vlan_db['vlan_id']]);
+    continue;
+  }
   $vlans_db[$vlan_db['vlan_domain']][$vlan_db['vlan_vlan']] = $vlan_db;
 }
 
-$ports_vlans_db_raw = dbFetchRows("SELECT * FROM `ports_vlans` WHERE `device_id` = ?;", array($device['device_id']));
-foreach ($ports_vlans_db_raw as $vlan_db)
-{
+$ports_vlans_db_raw = dbFetchRows("SELECT * FROM `ports_vlans` WHERE `device_id` = ?;", [ $device['device_id'] ]);
+foreach ($ports_vlans_db_raw as $vlan_db) {
+  if (isset($ports_vlans_db[$vlan_db['port_id']][$vlan_db['vlan']])) {
+    // Clean duplicates
+    print_debug("Duplicate Port VLAN entry in DB found:");
+    print_debug_vars($vlan_db);
+    dbDelete('ports_vlans', '`port_vlan_id` = ?', [$vlan_db['port_vlan_id']]);
+    continue;
+  }
   $ports_vlans_db[$vlan_db['port_id']][$vlan_db['vlan']] = $vlan_db;
 }
 print_debug_vars($ports_vlans_db);
@@ -45,7 +57,7 @@ foreach ($discovery_vlans as $domain_index => $vlans)
     echo(" $vlan_id");
     $vlan_update = array();
 
-    // Currently vlan_context param only actual for CISCO-VTP-MIB
+    // Currently, vlan_context param only actual for CISCO-VTP-MIB
     if (!isset($vlan['vlan_context']))
     {
       $vlan['vlan_context'] = 0;

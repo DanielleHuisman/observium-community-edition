@@ -1,17 +1,14 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
-
-$i_i = 0;
 
 echo generate_box_open();
 
@@ -33,17 +30,22 @@ $cef_query = 'SELECT `cef_switching`.`device_id`, `cef_switching`.`afi`, `cef_sw
   LEFT JOIN `cef_prefix` ON `cef_switching`.`device_id` = `cef_switching`.`device_id`
     AND `cef_switching`.`entPhysicalIndex` = `cef_prefix`.`entPhysicalIndex`
     AND `cef_switching`.`afi` = `cef_prefix`.`afi`
-  WHERE 1'.generate_query_permitted(array('device'), array('device_table' => 'cef_switching')).'
+  WHERE 1'.generate_query_permitted([ 'device' ], [ 'device_table' => 'cef_switching' ]).'
   GROUP BY `cef_switching`.`device_id`, `cef_switching`.`afi`';
 
-foreach (dbFetchRows($cef_query) as $instance)
-{
+foreach (dbFetchRows($cef_query) as $instance) {
   $device = device_by_id_cache($instance['device_id']);
 
   echo('<tr>');
-  echo('  <td class="entity-title">'.generate_device_link($device, 0, array('tab' => 'routing', 'proto' => 'cef')). '</td>');
+  echo('  <td class="entity-title">'.generate_device_link($device, NULL, [ 'tab' => 'routing', 'proto' => 'cef' ]). '</td>');
   echo '  <td>';
-  if ($instance['afi'] == "ipv4") { echo '<span class="label label-success">IPv4</span>'; } elseif($instance['afi'] == "ipv6") { echo '<span class="label label-info">IPv6</span>'; } else { echo $instance['afi']; }
+  if ($instance['afi'] === "ipv4") {
+    echo '<span class="label label-success">IPv4</span>';
+  } elseif ($instance['afi'] === "ipv6") {
+    echo '<span class="label label-info">IPv6</span>';
+  } else {
+    echo $instance['afi'];
+  }
   echo '</td>';
   echo('  <td>'.$instance['cef_pfx'] . '</td>');
   echo('  <td>'.$instance['paths'] . '</td>');

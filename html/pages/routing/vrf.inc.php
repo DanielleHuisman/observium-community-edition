@@ -94,9 +94,9 @@ $link_array = array('page'    => 'routing',
     foreach (dbFetchRows("SELECT * FROM `vrfs` WHERE 1".$GLOBALS['cache']['where']['devices_permitted']." GROUP BY `vrf_rd`") as $vrf)
     {
       echo('<tr>');
-      echo('<td style="width: 240px;"><a class="entity" href="'.generate_url($link_array,array('vrf' => $vrf['vrf_rd'])).'">' . $vrf['vrf_name'] . '</a><br /><span class="small">' . $vrf['vrf_descr'] . '</span></td>');
-      echo('<td style="width: 100px;" class="small">' . $vrf['vrf_rd'] . '</td>');
-      #echo('<td style="width: 200px;" class="small">' . $vrf['vrf_descr'] . '</td>');
+      echo('<td style="width: 240px;"><a class="entity" href="'.generate_url($link_array,array('vrf' => $vrf['vrf_rd'])).'">' . $vrf['vrf_name'] . '</a><br />
+              <span class="small">' . $vrf['vrf_descr'] . '</span></td>');
+      echo('<td style="width: 75px;"><span class="label label-primary">' . $vrf['vrf_rd'] . '</span></td>');
       echo('<td>');
 
       echo generate_box_open();
@@ -105,7 +105,7 @@ $link_array = array('page'    => 'routing',
       $x=1;
       foreach ($vrf_devices[$vrf['vrf_rd']] as $device)
       {
-        echo('<tr><td style="width: 150px;"><span class="entity">'.generate_device_link($device, short_hostname($device['hostname'])) .'</span>');
+        echo('<tr><td style="width: 150px;"><span class="entity">'.generate_device_link_short($device) .'</span>');
 
         if ($device['vrf_name'] != $vrf['vrf_name']) {
           echo(generate_tooltip_link(NULL, '&nbsp;'.get_icon('exclamation'), "Expected Name : ".$vrf['vrf_name']."<br />Configured : ".$device['vrf_name']));
@@ -129,9 +129,9 @@ $link_array = array('page'    => 'routing',
               $port['to'] = $config['time']['now'];
               $port['bg'] = "#".$bg;
               $port['graph_type'] = "port_".$vars['graph'];
-              echo("<div style='display: block; padding: 3px; margin: 3px; min-width: 135px; max-width:135px; min-height:75px; max-height:75px;
-                 text-align: center; float: left; background-color: " . OBS_COLOUR_LIST_B_B . ";'>
-                 <div style='font-weight: bold;'>".short_ifname($port['ifDescr'])."</div>");
+              echo '<div class="box box-solid" style="display: block; padding: 3px; margin: 3px; min-width: 135px; max-width:135px; min-height:75px; max-height:75px;
+                 text-align: center; float: left;"">
+                 <div style="font-weight: bold;">'.short_ifname($port['ifDescr']).'</div>';
               generate_port_thumbnail($port);
               echo("<div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
                 </div>");

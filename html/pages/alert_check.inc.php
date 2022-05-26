@@ -136,6 +136,7 @@ if (!$readonly && $vars['action'])
 
     print_message("Deleted all traces of alert checker ".$vars['alert_test_id']);
     unset($vars['alert_test_id']);
+    return;
   }
 
   if ($rows_updated > 0)
@@ -369,7 +370,15 @@ humanize_alert_check($check);
       ];
       $metric_list['values'] = '';
       if (is_array($entry['values'])) {
-        $metric_list['values'] = '<span class="label">'.implode('</span>  <span class="label">', $entry['values']).'</span>';
+        if (is_array_list($entry['values'])) {
+          $values = $entry['values'];
+        } else {
+          $values = [];
+          foreach ($entry['values'] as $value => $descr) {
+            $values[] = "$value ($descr)";
+          }
+        }
+        $metric_list['values'] = '<span class="label">'.implode('</span>  <span class="label">', $values).'</span>';
       } elseif ($entry['type'] === 'integer') {
         $metric_list['values'] = escape_html('<numeric>');
         if (str_contains($metric, 'value')) {
@@ -582,7 +591,7 @@ humanize_alert_check($check);
     $form['row'][0]['alert_test_id'] = array(
                                     'type'        => 'hidden',
                                     'fieldset'    => 'body',
-                                    'value'       => escape_html($check['alert_test_id']));
+                                    'value'       => $check['alert_test_id']);
     $form['row'][0]['action']     = array(
                                       'type'        => 'hidden',
                                       'fieldset'    => 'body',
@@ -867,7 +876,7 @@ echo generate_box_close(array('footer_content' => $footer_content));
         'width'       => '320px',
         'rows'        => 3,
         'placeholder' => TRUE,
-        'value'       => escape_html(implode("\n", $assoc_dev_text)));
+        'value'       => implode("\n", $assoc_dev_text));
       $form['row'][7]['assoc_entity_conditions_' . $assoc['alert_assoc_id']] = array(
         'type'        => 'textarea',
         'fieldset'    => 'body',
@@ -876,7 +885,7 @@ echo generate_box_close(array('footer_content' => $footer_content));
         'width'       => '320px',
         'rows'        => 3,
         'placeholder' => TRUE,
-        'value'       => escape_html(implode("\n", $assoc_entity_text)));
+        'value'       => implode("\n", $assoc_entity_text));
 
       $form['row'][99]['close'] = array(
         'type'      => 'submit',
@@ -1086,7 +1095,7 @@ echo generate_box_close(array('footer_content' => $footer_content));
     $form['row'][0]['alert_test_id'] = array(
                                     'type'        => 'hidden',
                                     'fieldset'    => 'body',
-                                    'value'       => escape_html($check['alert_test_id']));
+                                    'value'       => $check['alert_test_id']);
     $form['row'][0]['contact_id'] = array(
                                     'type'        => 'hidden',
                                     'fieldset'    => 'body',
@@ -1145,7 +1154,7 @@ echo generate_box_close(array('footer_content' => $footer_content));
     $form['row'][0]['alert_test_id'] = array(
                                     'type'        => 'hidden',
                                     'fieldset'    => 'body',
-                                    'value'       => escape_html($check['alert_test_id']));
+                                    'value'       => $check['alert_test_id']);
     $form['row'][0]['contact_id'] = array(
                                     'type'        => 'hidden',
                                     'fieldset'    => 'body',
@@ -1259,13 +1268,13 @@ echo generate_box_close(array('footer_content' => $footer_content));
   $all_contacts = dbFetchRows('SELECT * FROM `alert_contacts` WHERE `contact_disabled` = 0 ORDER BY `contact_method`, `contact_descr`');
 
   if (safe_count($all_contacts)) {
-    $form_items = array();
-    foreach ($all_contacts as $contact)
-    {
-      if (!isset($c_exist[$contact['contact_id']]))
-      {
-        $form_items['contacts'][$contact['contact_id']] = array('name'    => escape_html($contact['contact_descr']),
-                                                                'subtext' => escape_html($contact['contact_method']));
+    $form_items = [];
+    foreach ($all_contacts as $contact) {
+      if (!isset($c_exist[$contact['contact_id']])) {
+        $form_items['contacts'][$contact['contact_id']] = [
+          'name'    => $contact['contact_descr'],
+          'subtext' => $contact['contact_method']
+        ];
       }
     }
 

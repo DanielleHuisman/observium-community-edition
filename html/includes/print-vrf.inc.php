@@ -12,9 +12,9 @@
 
 echo "<tr>";
 
-echo '<td width=200 class=entity-title><a href="'.generate_url(array('page' => 'routing', 'protocol' => 'vrf', 'vrf' => $vrf['vrf_rd'])).'">' . $vrf['vrf_name'] . '</a></td>';
-echo '<td width=150 class=small>' . $vrf['vrf_descr'] . '</td>';
-echo '<td width=100 class=small>' . $vrf['vrf_rd'] . '</td>';
+echo '<td style="width: 200px" class=entity-title><a href="'.generate_url(array('page' => 'routing', 'protocol' => 'vrf', 'vrf' => $vrf['vrf_rd'])).'">' . $vrf['vrf_name'] . '</a><br />';
+echo '<span class=small>' . $vrf['vrf_descr'] . '</span></td>';
+echo '<td style="width: 75px" class=small><span class="label label-primary">' . $vrf['vrf_rd'] . '</span></td>';
 
 echo '<td class="entity">';
 foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifVrf` = ?", array($device['device_id'], $vrf['vrf_id'])) as $port) {

@@ -316,10 +316,10 @@ print_debug_vars(get_device_mibs_permitted($device), 1);
 // Detect (if possible) exist snmp contexts on device (currently only on Cisco IOS, IOS-XE and NX-OS
 /* DISABLED, while not know what TODO with this,
  * currently same functionality only for Cisco Nexis in VRF module
-if (isset($config['os'][$device['os']]['snmp']['context_oid']))
+if (isset($config['os'][$device['os']]['snmp']['virtual_oid']))
 {
   $contexts = [];
-  foreach (snmpwalk_values($device, $config['os'][$device['os']]['snmp']['context_oid'], []) as $context)
+  foreach (snmpwalk_values($device, $config['os'][$device['os']]['snmp']['virtual_oid'], []) as $context)
   {
     if ($context !== '')
     {

@@ -1,0 +1,1413 @@
+--MibName=raisecomAlarm
+-- *****************************************************************
+-- RAISECOM-MPLS-LSPV-MIB.mib:  RAISECOM MPLS LSPV MIB
+--
+-- August 2011, yangguodong
+--                                                        
+-- Copyright (c) 1996-2011 by Raisecom Technology Co., Ltd. 
+-- All rights reserved.
+-- 01,20111231,yangkewei,ROS00008218,advent mib编译检查
+-- *****************************************************************
+--
+
+  RAISECOM-MPLS-LSPV-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+     Integer32, Unsigned32, Gauge32,
+     TimeTicks, Counter32, Counter64,
+     IpAddress, Opaque, mib-2,
+     zeroDotZero
+        FROM SNMPv2-SMI                 -- [RFC2578]
+     TEXTUAL-CONVENTION,TruthValue, RowStatus,DateAndTime
+        FROM SNMPv2-TC                     -- [RFC2579]   
+     SnmpAdminString
+       FROM SNMP-FRAMEWORK-MIB         -- [RFC3411]       
+     ifIndex, InterfaceIndex             FROM IF-MIB 
+     PwIDType,PwAttachmentIdentifierType                            
+     FROM PW-TC-STD-MIB                 -- [RFC5542] 
+     
+     InetAddressType, InetAddress,InetAddressPrefixLength
+     FROM INET-ADDRESS-MIB          -- RFC2851
+                         
+     raisecomAgent
+				FROM RAISECOM-BASE-MIB
+     ;
+ 
+  raisecomMplsLspv MODULE-IDENTITY
+     LAST-UPDATED "201103120000Z"  -- 12 March 2011 00:00:00 GMT
+     ORGANIZATION "Raisecom Technology Co., Ltd."
+     CONTACT-INFO
+        "Raisecom Science & Technology Co., ltd.
+        E-mail: support@raisecom.com ."
+     DESCRIPTION
+        "This MIB module contains managed object definitions for
+         MPLS. "
+        ::= { raisecomAgent 43 }
+	raisecomMplsLspvGlobalObejcts OBJECT IDENTIFIER ::= { raisecomMplsLspv 1 }   
+	raisecomMplsLspvPingObejcts OBJECT IDENTIFIER ::= { raisecomMplsLspv 2 }   
+	raisecomMplsLspvTracertObejcts OBJECT IDENTIFIER ::= { raisecomMplsLspv 3 }   
+	raisecomMplsLspvConformances OBJECT IDENTIFIER ::= { raisecomMplsLspv 4 } 
+
+
+	
+
+    ---- User-defined types  
+	TargetFecSubType ::= TEXTUAL-CONVENTION
+	   STATUS       current
+	   DESCRIPTION
+	            "Describes the type of fec which will be tested"
+	            
+	   SYNTAX       INTEGER {
+	                     ldp-Ipv4-Lsp(1),       --LDP lSP
+	                     rsvp-Ipv4-Lsp(2),      -- e.g.Rsvp Lsp which is tunnel     
+	                     not-Assigned(3),       -- e.g.,   
+	                     pw-128-deprecated(4),  --Deprecated PW which is used for vpws
+	                     pw-128(5),             --Current Pw which is used for vpws
+	                     pw-129(6),             --Pw which is used for vpls     
+	                     generic-Ipv4-Lsp(7),   --This FEC is used if the protocol advertising the label is unknown or may change during the course of the LSP
+	                     nil(8) --  Nil fec was used for fec proper validation 
+	                   } 
+
+	RelpyMode ::= TEXTUAL-CONVENTION
+	   STATUS       current
+	   DESCRIPTION
+	            "Describes mpls echo reply mode"
+	            
+	   SYNTAX       INTEGER {
+	                     udp-Reply(1),                  --返回UDP报文
+	                     udp-Alert-Reply(2),            --带有routealert的UDP报文
+	                     level-ControlChannel-Reply(3) --带有控制信道的返回报文
+	                     }  
+	ResponseStatus ::= TEXTUAL-CONVENTION
+	   STATUS       current
+	   DESCRIPTION
+	            "Describes mpls echo request response status"
+	            
+	   SYNTAX       INTEGER {
+	                     responseReceived(1),               --收到返回报文
+	                     requestTimedOut(2),                --报文超时
+	                     requestSendFailed(3),              --发送报文失败
+	                     unknown(4)                         --未知问题
+	                     }
+	LabelStack ::= TEXTUAL-CONVENTION
+        STATUS                current
+        DESCRIPTION
+            "This type was used for label stack."
+        SYNTAX                OCTET STRING (SIZE(1..64)) 
+        
+
+	LspRole ::= TEXTUAL-CONVENTION
+	   STATUS       current
+	   DESCRIPTION
+	            "Describes role of lsp path"
+	            
+	   SYNTAX       INTEGER {
+	                     lsp_ingress(1),               --lsp的入节点
+	                     lsp_transit(2),               --lsp的中间节点
+	                     lsp_egress(3)                --lsp的出节点
+	                     }
+
+ 
+
+                   
+	--end user defined type         
+
+    --start Global config ---   
+    raisecomMplsLspvGlobalReceiveEnable  OBJECT-TYPE    
+	SYNTAX            TruthValue
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION    
+        "Enable or disable the device process received 
+        mpls echo request pdu"    
+ 	DEFVAL { true }
+	::= { raisecomMplsLspvGlobalObejcts 1}    
+	    
+    raisecomMplsLspvGlobalFecCheckEnable  OBJECT-TYPE    
+	SYNTAX            TruthValue
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION    
+        "Enable or disable the device perform fec check when
+        receiving mpls echo request pdu."    
+ 	DEFVAL { false }
+	::= { raisecomMplsLspvGlobalObejcts 2}    
+    
+    --end Global config --
+
+
+
+	
+	--raisecomMplsPing MIB define start --                
+    raisecomMplsLspvPingMaxConcurrentRequests  OBJECT-TYPE    
+	SYNTAX            Unsigned32
+    UNITS             "requests"	
+	MAX-ACCESS        read-only
+	STATUS            current 
+	DESCRIPTION    
+        "The maximum number of concurrent active mpls Ping requests
+ 	    that are allowed within an agent implementation.  A value
+ 	    of 0 for this object implies that there is no limit for
+ 	    the number of concurrent active requests in effect.
+ 	 	
+ 	 	The limit applies only to new requests being activated.
+ 	    When a new value is set, the agent will continue processing
+ 	    all the requests already active, even if their number
+ 	    exceeds the limit just imposed.	"    
+ 	DEFVAL { 10 }
+	::= { raisecomMplsLspvPingObejcts 1}         
+	
+	raisecomMplsLspvPingCtlTable   OBJECT-TYPE 
+     SYNTAX        SEQUENCE OF RaisecomMplsLspvPingCtlEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "Defines the mpls Ping Control Table for providing, via SNMP,
+         the capability of performing mpls Ping operations at
+         a target fec.  The results of these operations are
+         stored in the raisecomMplsLspvPingResultsTable and the
+         PingProbeHistoryTable."
+     ::= { raisecomMplsLspvPingObejcts 2 }   
+     
+	raisecomMplsLspvPingCtlEntry   OBJECT-TYPE
+     SYNTAX        RaisecomMplsLspvPingCtlEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "Defines an entry in the raisecomMplsLspvPingCtlTable. 
+         The first index element, PingCtlOwnerIndex, is of type 
+         SnmpAdminString,a textual convention that allows for 
+         use of the SNMPv3
+
+         View-Based Access Control Model (RFC 2575 [11], VACM)
+         and allows an management application to identify its
+         entries.  The second index, PingCtlTestName (also an
+         SnmpAdminString), enables the same management
+         application to have multiple outstanding requests."
+     INDEX  {
+              raisecomMplsLspvPingCtlOwnerIndex,
+              raisecomMplsLspvPingCtlTestName 
+            }
+            ::= { raisecomMplsLspvPingCtlTable 1 }
+            
+	RaisecomMplsLspvPingCtlEntry ::= SEQUENCE {
+        raisecomMplsLspvPingCtlOwnerIndex               SnmpAdminString, 
+        raisecomMplsLspvPingCtlTestName                 SnmpAdminString,
+        raisecomMplsLspvPingCtlTargetFecType            TargetFecSubType, 
+        raisecomMplsLspvPingCtlPwId                     PwIDType,
+        raisecomMplsLspvPingCtlVsi                      PwAttachmentIdentifierType,    
+        raisecomMplsLspvPingCtlTunnelName               SnmpAdminString,
+        raisecomMplsLspvPingCtlTargetFecAddressType     InetAddressType,
+        raisecomMplsLspvPingCtlTargetFecAddress         InetAddress, 
+        raisecomMplsLspvPingCtlTargetFecAddressPrefix   InetAddressPrefixLength,  
+        raisecomMplsLspvPingCtlNextHopAddress           InetAddress,
+        raisecomMplsLspvPingCtlDataSize                 Unsigned32,    
+        raisecomMplsLspvPingCtlTimeOut                  Unsigned32,
+        raisecomMplsLspvPingCtlProbeCount               Unsigned32,    
+        raisecomMplsLspvPingCtlAdminStatus              INTEGER,
+        raisecomMplsLspvPingCtlFrequency                Unsigned32,
+        raisecomMplsLspvPingCtlTtl                      Unsigned32,  
+        raisecomMplsLspvPingCtlExp                      Unsigned32,  
+        raisecomMplsLspvPingCtlReplyDscp                Unsigned32,
+        raisecomMplsLspvPingCtlReplyPadTlv              TruthValue,
+        raisecomMplsLspvPingCtlReplyMode                RelpyMode,   
+        raisecomMplsLspvPingCtlSourceAddressType        InetAddressType,
+        raisecomMplsLspvPingCtlSourceAddress            InetAddress,   
+        raisecomMplsLspvPingCtlRowStatus                RowStatus
+      } 
+      
+  
+	raisecomMplsLspvPingCtlOwnerIndex OBJECT-TYPE
+	SYNTAX        SnmpAdminString (SIZE(0..32))
+	MAX-ACCESS    not-accessible
+	STATUS        current
+	DESCRIPTION
+         "First index of mpls Ping control table."
+     ::= { raisecomMplsLspvPingCtlEntry 1 } 
+     
+ 	raisecomMplsLspvPingCtlTestName OBJECT-TYPE
+	SYNTAX        SnmpAdminString (SIZE(0..32))
+	MAX-ACCESS    not-accessible
+	STATUS        current
+	DESCRIPTION
+        "The name of the Ping test.  This is locally unique, within
+        the scope of an raisecomMplsLspvPingCtlOwnerIndex."
+     ::= { raisecomMplsLspvPingCtlEntry 2 }     
+     
+ 	raisecomMplsLspvPingCtlTargetFecType OBJECT-TYPE
+	SYNTAX        TargetFecSubType
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "The type of target fec which will be tested.It contains lsp,pw,tunnel
+         and vpls test." 
+    DEFVAL {Ldp-Ipv4-Lsp}
+     ::= { raisecomMplsLspvPingCtlEntry 3 }   
+     
+  	raisecomMplsLspvPingCtlPwId OBJECT-TYPE
+	SYNTAX        PwIDType
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "This object was used when test vpws connective" 
+     ::= { raisecomMplsLspvPingCtlEntry 4 }
+  
+  	raisecomMplsLspvPingCtlVsi OBJECT-TYPE
+	SYNTAX        PwAttachmentIdentifierType
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "This object stands for VPN ID which was used for vpls" 
+     ::= { raisecomMplsLspvPingCtlEntry 5 } 
+     
+  	raisecomMplsLspvPingCtlTunnelName OBJECT-TYPE
+	SYNTAX        SnmpAdminString
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "The canonical name assigned to the tunnel." 
+    DEFVAL {""}
+     ::= { raisecomMplsLspvPingCtlEntry 6 }  
+      
+    raisecomMplsLspvPingCtlTargetFecAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The address type of target fec which will be tested."  
+    ::= { raisecomMplsLspvPingCtlEntry 7 }  
+    
+    raisecomMplsLspvPingCtlTargetFecAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The address of target fec which will be tested."
+    ::= { raisecomMplsLspvPingCtlEntry 8 }  
+    
+    raisecomMplsLspvPingCtlTargetFecAddressPrefix OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The prefix length of target fec address."
+    ::= { raisecomMplsLspvPingCtlEntry 9 }   
+    
+    raisecomMplsLspvPingCtlNextHopAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The next hop address.This object was used to 
+         identify the specic path when there are Multiple paths
+         to the target."
+    ::= { raisecomMplsLspvPingCtlEntry 10 }    
+    
+    raisecomMplsLspvPingCtlDataSize OBJECT-TYPE
+    SYNTAX     Unsigned32(100..1500)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "Specifies the size of the data portion to be
+ 	      transmitted in a mpls Ping operation, in octets."   
+    DEFVAL {100} 	
+    ::= { raisecomMplsLspvPingCtlEntry 11 }    
+    
+    raisecomMplsLspvPingCtlTimeOut OBJECT-TYPE
+    SYNTAX     Unsigned32(1..3600)  
+    UNITS      "seconds"    
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "Specifies the time-out value, in seconds, for a
+ 	      remote mpls Ping operation."
+    ::= { raisecomMplsLspvPingCtlEntry 12 }   
+    
+    raisecomMplsLspvPingCtlProbeCount OBJECT-TYPE
+    SYNTAX     Unsigned32(1..3600)  
+    UNITS      "seconds"    
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the number of times to perform a mpls Ping
+        operation at a remote target fec."
+ 	DEFVAL {5}
+    ::= { raisecomMplsLspvPingCtlEntry 13 }
+    
+    raisecomMplsLspvPingCtlAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          enabled(1), -- test should be started
+
+                          disabled(2) -- test should be stopped
+                        }
+    
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Reflects the desired state that a raisecomMplsLspvPingCtlEntry should be
+        in:
+
+           enabled(1)  - Attempt to activate the test as defined by
+                         this raisecomMplsLspvPingCtlEntry.
+           disabled(2) - Deactivate the test as defined by this
+                         raisecomMplsLspvPingCtlEntry.
+
+        Refer to the corresponding raisecomMplsLspvPingResultsOperStatus to
+        determine the operational state of the test defined by
+        this entry."
+ 	DEFVAL {disabled}
+    ::= { raisecomMplsLspvPingCtlEntry 14 }  
+    
+    raisecomMplsLspvPingCtlFrequency OBJECT-TYPE
+    SYNTAX     Unsigned32(1..3600)  
+    UNITS      "seconds"    
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "The number of seconds to wait before repeating a mpls Ping test
+        as defined by the value of the various objects in the
+        corresponding row."
+ 	DEFVAL {1}
+    ::= { raisecomMplsLspvPingCtlEntry 15 }      
+    
+    raisecomMplsLspvPingCtlTtl OBJECT-TYPE
+    SYNTAX     Unsigned32(1..255) 
+    UNITS      "time-to-live value" 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the time-to-live value"
+ 	DEFVAL {64}
+    ::= { raisecomMplsLspvPingCtlEntry 16 }  
+    
+    raisecomMplsLspvPingCtlExp OBJECT-TYPE
+    SYNTAX     Unsigned32(0..7) 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the MPLS experimental field value 
+        in the MPLS header for an MPLS echo request. 
+        Valid values are from 0 to 7. Default is 0."
+ 	DEFVAL {0}
+    ::= { raisecomMplsLspvPingCtlEntry 17 }    
+    
+    raisecomMplsLspvPingCtlReplyDscp OBJECT-TYPE
+    SYNTAX     Unsigned32(0..63) 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Provides the capability to request a specific 
+        class of service (CoS) in an echo reply by providing
+        a differentiated services code point (DSCP) value.
+        The echo reply is returned with the IP header type 
+        of service (ToS) byte set to the value specified in 
+        the reply dscp command."
+ 	DEFVAL {0}
+    ::= { raisecomMplsLspvPingCtlEntry 18 }    
+        
+    raisecomMplsLspvPingCtlReplyPadTlv OBJECT-TYPE
+    SYNTAX     TruthValue 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This was used for testing the ability of the sender of an 
+        echo reply to support the copy pad TLV 
+        to echo reply."
+ 	DEFVAL {false}
+    ::= { raisecomMplsLspvPingCtlEntry 19 }   
+    
+    raisecomMplsLspvPingCtlReplyMode OBJECT-TYPE
+    SYNTAX     RelpyMode 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the mode of mpls Echo reply message."
+ 	DEFVAL {udp-Reply}
+    ::= { raisecomMplsLspvPingCtlEntry 20 } 
+    
+    raisecomMplsLspvPingCtlSourceAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the source address Type"
+    DEFVAL { unknown } 
+    ::= { raisecomMplsLspvPingCtlEntry 21 }     
+    
+    raisecomMplsLspvPingCtlSourceAddress OBJECT-TYPE
+    SYNTAX     InetAddress 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the source address. The default address
+        is transport inteface address.This address is used 
+        as the destination address in the MPLS echo response."
+    ::= { raisecomMplsLspvPingCtlEntry 22 }    
+    
+    raisecomMplsLspvPingCtlRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This object allows entries to be created and deleted
+ 	     in the raisecomMplsLspvPingCtlTable.  Deletion of an entry in
+ 	     this table results in a deletion of all corresponding (same
+ 	     raisecomMplsLspvPingCtlOwnerIndex and raisecomMplsLspvPingCtlTestName
+ 	     index values) raisecomMplsLspvPingCtlResultsTable,
+ 	     raisecomMplsLspvPingProbeHistoryTable entries."
+    ::= { raisecomMplsLspvPingCtlEntry 23 } 
+    
+    
+    raisecomMplsLspvPingResultsTable   OBJECT-TYPE 
+    SYNTAX        SEQUENCE OF RaisecomMplsLspvPingResultsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Defines the mpls Ping Results Table for providing
+        the capability of performing mpls Ping operations at
+        a target fec   The results of these operations are
+        stored in the raisecomMplsLspvPingResultsTable."
+     ::= { raisecomMplsLspvPingObejcts 3 }  
+     
+	raisecomMplsLspvPingResultsEntry   OBJECT-TYPE
+    SYNTAX        RaisecomMplsLspvPingResultsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Defines an entry in the raisecomMplsLspvPingResultsTable.
+        The raisecomMplsLspvPingResultsTable has the same indexing
+        as the raisecomMplsLspvPingCtlTable in order for a 
+        raisecomMplsLspvPingResultsEntry tocorrespond to the 
+        raisecomMplsLspvPingResultsEntry that caused 
+        it to be created."
+     INDEX  {
+              raisecomMplsLspvPingCtlOwnerIndex,
+              raisecomMplsLspvPingCtlTestName 
+            }
+            ::= { raisecomMplsLspvPingResultsTable 1 }  
+
+	RaisecomMplsLspvPingResultsEntry ::= SEQUENCE {
+        raisecomMplsLspvPingResultsOperStatus            INTEGER, 
+        raisecomMplsLspvPingResultsMinRtt                Unsigned32,
+        raisecomMplsLspvPingResultsMaxRtt                Unsigned32,    
+        raisecomMplsLspvPingResultsAverageRtt            Unsigned32,
+        raisecomMplsLspvPingResultsProbeResponses        Unsigned32,    
+        raisecomMplsLspvPingResultsSentProbes            Unsigned32,
+        raisecomMplsLspvPingResultsRttSumOfSquares       Unsigned32,
+        raisecomMplsLspvPingResultsLastGoodProbe         DateAndTime 
+      } 
+
+    raisecomMplsLspvPingResultsOperStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          enabled(1),   -- test is in progress
+                          disabled(2),  -- test has stopped
+                          completed(3)  -- Test is completed
+                        }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Reflects the operational state of a raisecomMplsLspvPingCtlEntry:
+           enabled(1)   - Test is active.
+           disabled(2)  - Test has stopped.
+           completed(3) - Test is completed"
+    ::= { raisecomMplsLspvPingResultsEntry 1 } 
+    
+    raisecomMplsLspvPingResultsMinRtt OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS       "milliseconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The minimum mpls Ping round-trip-time (RTT) received.  A value
+        of 0 for this object implies that no RTT has been received."
+    ::= { raisecomMplsLspvPingResultsEntry 2 } 
+    
+    raisecomMplsLspvPingResultsMaxRtt OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS       "milliseconds" 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The maximum mpls Ping round-trip-time (RTT) received.  A value
+        of 0 for this object implies that no RTT has been received."
+    ::= { raisecomMplsLspvPingResultsEntry 3 } 
+    
+    raisecomMplsLspvPingResultsAverageRtt OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS       "milliseconds" 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The current average mpls Ping round-trip-time (RTT)."
+    ::= { raisecomMplsLspvPingResultsEntry 4 }   
+    
+    raisecomMplsLspvPingResultsProbeResponses OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS       "responses" 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Number of responses received for the corresponding
+
+        raisecomMplsLspvPingCtlEntry and raisecomMplsLspvPingResultsEntry.
+        The value of this object MUST be reported as 0 when no probe 
+        responses have been received."
+    ::= { raisecomMplsLspvPingResultsEntry 5 }   
+    
+    raisecomMplsLspvPingResultsSentProbes OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS       "probes" 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The value of this object reflects the number of probes sent
+        for the corresponding raisecomMplsLspvPingCtlEntry and 
+        raisecomMplsLspvPingResultsEntry.The value of this object 
+        MUST be reported as 0 when no probes have been sent."
+    ::= { raisecomMplsLspvPingResultsEntry 6 }  
+    
+    raisecomMplsLspvPingResultsRttSumOfSquares OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS       "milliseconds" 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object contains the sum of the squares for all 
+        mpls Ping responses received.  Its purpose is to 
+        enable standard deviation calculation.  The value of this 
+        object MUST be reported as 0 when no Ping responses have been
+        received."
+    ::= { raisecomMplsLspvPingResultsEntry 7 }  
+    
+    raisecomMplsLspvPingResultsLastGoodProbe OBJECT-TYPE
+    SYNTAX     DateAndTime 
+    UNITS       "probes" 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Date and time when the last response was received for
+        a probe."
+    ::= { raisecomMplsLspvPingResultsEntry 8 }  
+    
+    raisecomMplsLspvPingProbeHistoryTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF RaisecomMplsLspvPingProbeHistoryEntry 
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Defines a table for storing the results of a mpls Ping
+        operation.specifies each probe result."
+    ::= { raisecomMplsLspvPingObejcts 4 }      
+    
+    raisecomMplsLspvPingProbeHistoryEntry OBJECT-TYPE
+    SYNTAX     RaisecomMplsLspvPingProbeHistoryEntry 
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Defines an entry in the raisecomMplsLspvPingProbeHistoryTable.
+        The first two index elements identify the raisecomMplsLspvPingCtlEntry that a PingProbeHistoryEntry belongs
+        to.  The third index element selects a single probe result."
+    INDEX {
+             raisecomMplsLspvPingCtlOwnerIndex,
+             raisecomMplsLspvPingCtlTestName,
+             raisecomMplsLspvPingProbeHistoryIndex
+           }
+    ::= { raisecomMplsLspvPingProbeHistoryTable 1 }   
+    
+	RaisecomMplsLspvPingProbeHistoryEntry ::= SEQUENCE {
+        raisecomMplsLspvPingProbeHistoryIndex                  Unsigned32, 
+        raisecomMplsLspvPingProbeHistoryStatus                 ResponseStatus,
+        raisecomMplsLspvPingProbeHistoryReturnCode             Unsigned32,
+        raisecomMplsLspvPingProbeHistoryReturnSubCode          Unsigned32,
+        raisecomMplsLspvPingProbeHistoryReplyAddressType       InetAddressType,
+        raisecomMplsLspvPingProbeHistoryReplyAddress           InetAddress,
+        raisecomMplsLspvPingProbeHistoryReplyDataSize          Unsigned32,
+        raisecomMplsLspvPingProbeHistoryResponse               Unsigned32
+     }
+       
+    raisecomMplsLspvPingProbeHistoryIndex OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..'ffffffff'h)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "An entry in this table is created when the result of
+        a mpls Ping probe is determined.  The initial 2 instance
+        identifier index values identify the raisecomMplsLspvPingCtlEntry
+        that a probe result (raisecomMplsLspvPingProbeHistoryEntry) belongs
+        to."
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 1 }  
+    
+    raisecomMplsLspvPingProbeHistoryStatus OBJECT-TYPE
+    SYNTAX     ResponseStatus    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The result operstaus of each mpls Ping probe."
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 2 } 
+    
+    raisecomMplsLspvPingProbeHistoryReturnCode OBJECT-TYPE
+    SYNTAX     Unsigned32(0..13)    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The response return code."
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 3 }      
+    
+    raisecomMplsLspvPingProbeHistoryReturnSubCode OBJECT-TYPE
+    SYNTAX     Unsigned32    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The response return sub code."
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 4 }     
+    
+    raisecomMplsLspvPingProbeHistoryReplyAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The response address type." 
+    DEFVAL { unknown } 
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 5 }  
+
+    raisecomMplsLspvPingProbeHistoryReplyAddress OBJECT-TYPE
+    SYNTAX     InetAddress    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The response address."     
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 6 }   
+    
+    raisecomMplsLspvPingProbeHistoryReplyDataSize OBJECT-TYPE
+    SYNTAX     Unsigned32    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The size of reply packet."     
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 7 }    
+    
+    raisecomMplsLspvPingProbeHistoryResponse OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    UNITS      "milliseconds"   
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The amount of time measured in milliseconds from when
+ 	     a probe was sent to when its response was received or
+ 	     when it timed out.  The value of this object is reported
+ 	     as 0 when it is not possible to transmit a probe"     
+    ::= { raisecomMplsLspvPingProbeHistoryEntry 8 } 
+
+
+  --end of raisecom mpls  Ping
+  
+     
+  --start of traceroute --
+  	--raisecomMplsTracert MIB define start --                
+    raisecomMplsLspvTracertMaxConcurrentRequests  OBJECT-TYPE    
+	SYNTAX            Unsigned32
+    UNITS             "requests"	
+	MAX-ACCESS        read-only
+    STATUS            current 
+	DESCRIPTION    
+        "The maximum number of concurrent active mpls Tracert requests
+ 	    that are allowed within an agent implementation.  A value
+ 	    of 0 for this object implies that there is no limit for
+ 	    the number of concurrent active requests in effect.
+ 	    
+ 	    The limit applies only to new requests being activated.
+ 	    When a new value is set, the agent will continue processing
+ 	    all the requests already active, even if their number
+ 	    exceeds the limit just imposed.	"    
+ 	DEFVAL { 10 }
+	::= { raisecomMplsLspvTracertObejcts 1}         
+	
+	raisecomMplsLspvTracertCtlTable   OBJECT-TYPE 
+     SYNTAX        SEQUENCE OF RaisecomMplsLspvTracertCtlEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "Defines the mpls Tracert Control Table for providing, via SNMP,
+         the capability of performing mpls Tracert operations at
+         a target fec.  The results of these operations are
+         stored in the raisecomMplsLspvTracertResultsTable and the
+         raisecomMplsLspvTracertProbeHistoryTable."
+     ::= { raisecomMplsLspvTracertObejcts 2 }   
+     
+	raisecomMplsLspvTracertCtlEntry   OBJECT-TYPE
+     SYNTAX        RaisecomMplsLspvTracertCtlEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "Defines an entry in the raisecomMplsLspvTracertCtlTable. 
+         The first index element, TracertCtlOwnerIndex, is of type 
+         SnmpAdminString,a textual convention that allows for 
+         use of the SNMPv3
+
+         View-Based Access Control Model (RFC 2575 [11], VACM)
+         and allows an management application to identify its
+         entries.  The second index, TracertCtlTestName (also an
+         SnmpAdminString), enables the same management
+         application to have multiple outstanding requests."
+     INDEX  {
+              raisecomMplsLspvTracertCtlOwnerIndex,
+              raisecomMplsLspvTracertCtlTestName 
+            }
+            ::= { raisecomMplsLspvTracertCtlTable 1 }
+            
+	RaisecomMplsLspvTracertCtlEntry ::= SEQUENCE {
+        raisecomMplsLspvTracertCtlOwnerIndex               SnmpAdminString, 
+        raisecomMplsLspvTracertCtlTestName                 SnmpAdminString,
+        raisecomMplsLspvTracertCtlTargetFecType            TargetFecSubType, 
+        raisecomMplsLspvTracertCtlPwId                     PwIDType,
+        raisecomMplsLspvTracertCtlVsi                      PwAttachmentIdentifierType,    
+        raisecomMplsLspvTracertCtlTunnelName               SnmpAdminString,
+        raisecomMplsLspvTracertCtlTargetFecAddressType     InetAddressType,
+        raisecomMplsLspvTracertCtlTargetFecAddress         InetAddress, 
+        raisecomMplsLspvTracertCtlTargetFecAddressPrefix   InetAddressPrefixLength,  
+        raisecomMplsLspvTracertCtlNextHopAddress           InetAddress,
+        raisecomMplsLspvTracertCtlTimeOut                  Unsigned32,
+        raisecomMplsLspvTracertCtlAdminStatus              INTEGER,
+        raisecomMplsLspvTracertCtlMaxTtl                   Unsigned32,  
+        raisecomMplsLspvTracertCtlExp                      Unsigned32,  
+        raisecomMplsLspvTracertCtlReplyDscp                Unsigned32,
+        raisecomMplsLspvTracertCtlReplyPadTlv              TruthValue,
+        raisecomMplsLspvTracertCtlReplyMode                RelpyMode,   
+        raisecomMplsLspvTracertCtlSourceAddressType        InetAddressType,
+        raisecomMplsLspvTracertCtlSourceAddress            InetAddress,     
+        raisecomMplsLspvTracertCtlFlagFec                  TruthValue,
+        raisecomMplsLspvTracertCtlRowStatus                RowStatus
+      } 
+      
+  
+	raisecomMplsLspvTracertCtlOwnerIndex OBJECT-TYPE
+	SYNTAX        SnmpAdminString (SIZE(0..32))
+	MAX-ACCESS    not-accessible
+	STATUS        current
+	DESCRIPTION
+         "First index of mpls Tracert control table."
+     ::= { raisecomMplsLspvTracertCtlEntry 1 } 
+     
+ 	raisecomMplsLspvTracertCtlTestName OBJECT-TYPE
+	SYNTAX        SnmpAdminString (SIZE(0..32))
+	MAX-ACCESS    not-accessible
+	STATUS        current
+	DESCRIPTION
+        "The name of the Tracert test.  This is locally unique, within
+        the scope of an raisecomMplsLspvTracertCtlOwnerIndex."
+     ::= { raisecomMplsLspvTracertCtlEntry 2 }     
+     
+ 	raisecomMplsLspvTracertCtlTargetFecType OBJECT-TYPE
+	SYNTAX        TargetFecSubType
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "The type of target fec which will be tested.It contains lsp、pw、tunnel
+         and vpls test." 
+    DEFVAL {ldp-Ipv4-Lsp}
+     ::= { raisecomMplsLspvTracertCtlEntry 3 }   
+     
+  	raisecomMplsLspvTracertCtlPwId OBJECT-TYPE
+	SYNTAX        PwIDType
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "This object was used when test vpws connective" 
+     ::= { raisecomMplsLspvTracertCtlEntry 4 }
+  
+  	raisecomMplsLspvTracertCtlVsi OBJECT-TYPE
+	SYNTAX        PwAttachmentIdentifierType
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "This object stands for VPN ID which was used for vpls" 
+     ::= { raisecomMplsLspvTracertCtlEntry 5 } 
+     
+  	raisecomMplsLspvTracertCtlTunnelName OBJECT-TYPE
+	SYNTAX        SnmpAdminString
+	MAX-ACCESS    read-create
+	STATUS        current
+	DESCRIPTION
+         "The canonical name assigned to the tunnel." 
+    DEFVAL {""}
+     ::= { raisecomMplsLspvTracertCtlEntry 6 }  
+      
+    raisecomMplsLspvTracertCtlTargetFecAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The address type of target fec which will be tested."  
+    ::= { raisecomMplsLspvTracertCtlEntry 7 }  
+    
+    raisecomMplsLspvTracertCtlTargetFecAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The address of target fec which will be tested."
+    ::= { raisecomMplsLspvTracertCtlEntry 8 }  
+    
+    raisecomMplsLspvTracertCtlTargetFecAddressPrefix OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The prefix length of target fec address."
+    ::= { raisecomMplsLspvTracertCtlEntry 9 }   
+    
+    raisecomMplsLspvTracertCtlNextHopAddress OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "The next hop address.This object was used to 
+         identify the specic path when there are Multiple paths
+         to the target."
+    ::= { raisecomMplsLspvTracertCtlEntry 10 }    
+    
+    
+    raisecomMplsLspvTracertCtlTimeOut OBJECT-TYPE
+    SYNTAX     Unsigned32(1..3600)  
+    UNITS      "seconds"    
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+         "Specifies the time-out value, in seconds, for a
+ 	      remote mpls Tracert operation."
+ 	DEFVAL {3}
+    ::= { raisecomMplsLspvTracertCtlEntry 11 }   
+        
+    raisecomMplsLspvTracertCtlAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          enabled(1), -- test should be started
+
+                          disabled(2) -- test should be stopped
+                        }
+    
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Reflects the desired state that a raisecomMplsLspvTracertCtlEntry should be
+        in:
+
+           enabled(1)  - Attempt to activate the test as defined by
+                         this raisecomMplsLspvTracertCtlEntry.
+           disabled(2) - Deactivate the test as defined by this
+                         raisecomMplsLspvTracertCtlEntry.
+
+        Refer to the corresponding raisecomMplsLspvTracertResultsOperStatus to
+        determine the operational state of the test defined by
+        this entry."
+ 	DEFVAL {disabled}
+    ::= { raisecomMplsLspvTracertCtlEntry 12 }  
+      
+    
+    raisecomMplsLspvTracertCtlMaxTtl OBJECT-TYPE
+    SYNTAX     Unsigned32(1..255) 
+    UNITS      "time-to-live value" 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the time-to-live value"
+ 	DEFVAL {64}
+    ::= { raisecomMplsLspvTracertCtlEntry 13 }  
+    
+    raisecomMplsLspvTracertCtlExp OBJECT-TYPE
+    SYNTAX     Unsigned32(0..7) 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the MPLS experimental field value 
+        in the MPLS header for an MPLS echo request. 
+        Valid values are from 0 to 7. Default is 0."
+ 	DEFVAL {0}
+    ::= { raisecomMplsLspvTracertCtlEntry 14 }    
+    
+    raisecomMplsLspvTracertCtlReplyDscp OBJECT-TYPE
+    SYNTAX     Unsigned32(0..63) 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Provides the capability to request a specific 
+        class of service (CoS) in an echo reply by providing
+        a differentiated services code point (DSCP) value.
+        The echo reply is returned with the IP header type 
+        of service (ToS) byte set to the value specified in 
+        the reply dscp command."
+ 	DEFVAL {0}
+    ::= { raisecomMplsLspvTracertCtlEntry 15 }    
+        
+    raisecomMplsLspvTracertCtlReplyPadTlv OBJECT-TYPE
+    SYNTAX     TruthValue 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This was used for testing the ability of the sender of an 
+        echo reply to support the copy pad TLV 
+        to echo reply."
+ 	DEFVAL {false}
+    ::= { raisecomMplsLspvTracertCtlEntry 16 }   
+    
+    raisecomMplsLspvTracertCtlReplyMode OBJECT-TYPE
+    SYNTAX     RelpyMode 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the mode of mpls Echo reply mode."
+ 	DEFVAL {udp-Reply}
+    ::= { raisecomMplsLspvTracertCtlEntry 17 } 
+    
+    raisecomMplsLspvTracertCtlSourceAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the source address Type"
+    DEFVAL { unknown } 
+    ::= { raisecomMplsLspvTracertCtlEntry 18 }     
+    
+    raisecomMplsLspvTracertCtlSourceAddress OBJECT-TYPE
+    SYNTAX     InetAddress 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies the source address. The default address
+        is transport inteface address.This address is used 
+        as the destination address in the MPLS echo response."
+    ::= { raisecomMplsLspvTracertCtlEntry 19 }    
+ 
+    raisecomMplsLspvTracertCtlFlagFec OBJECT-TYPE
+    SYNTAX     TruthValue 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "Specifies whether sender wants the receiver to perform FEC Stack validation "
+    ::= { raisecomMplsLspvTracertCtlEntry 20 } 
+    
+    raisecomMplsLspvTracertCtlRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This object allows entries to be created and deleted
+ 	     in the raisecomMplsLspvTracertCtlTable.  Deletion of an entry in
+ 	     this table results in a deletion of all corresponding (same
+ 	     raisecomMplsLspvTracertCtlOwnerIndex and raisecomMplsLspvTracertCtlTestName
+ 	     index values) raisecomMplsLspvTracertCtlResultsTable,
+ 	     raisecomMplsLspvTracertProbeHistoryTable entries."
+    ::= { raisecomMplsLspvTracertCtlEntry 21 } 
+    
+    
+    raisecomMplsLspvTracertResultsTable   OBJECT-TYPE 
+    SYNTAX        SEQUENCE OF RaisecomMplsLspvTracertResultsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Defines the mpls Tracert Results Table for providing
+        the capability of performing mpls Tracert operations at
+        a target fec   The results of these operations are
+        stored in the raisecomMplsLspvTracertResultsTable."
+     ::= { raisecomMplsLspvTracertObejcts 3 }  
+     
+	raisecomMplsLspvTracertResultsEntry   OBJECT-TYPE
+    SYNTAX        RaisecomMplsLspvTracertResultsEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Defines an entry in the raisecomMplsLspvTracertResultsTable.
+        The raisecomMplsLspvTracertResultsTable has the same indexing
+        as the raisecomMplsLspvTracertCtlTable in order for a 
+        raisecomMplsLspvTracertResultsEntry to
+
+        correspond to the raisecomMplsLspvTracertResultsEntry that caused 
+        it to be created."
+     INDEX  {
+              raisecomMplsLspvTracertCtlOwnerIndex,
+              raisecomMplsLspvTracertCtlTestName 
+            }
+            ::= { raisecomMplsLspvTracertResultsTable 1 }  
+
+	RaisecomMplsLspvTracertResultsEntry ::= SEQUENCE {
+        raisecomMplsLspvTracertResultsOperStatus            INTEGER, 
+        raisecomMplsLspvTracertResultsCurHopCount           Gauge32
+       } 
+
+    raisecomMplsLspvTracertResultsOperStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          enabled(1),   -- test is in progress
+                          disabled(2),  -- test has stopped
+                          completed(3)  -- Test is completed
+                        }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Reflects the operational state of a TracertCtlEntry:
+           enabled(1)   - Test is active.
+           disabled(2)  - Test has stopped.
+           completed(3) - Test is completed"
+    ::= { raisecomMplsLspvTracertResultsEntry 1 } 
+    
+    raisecomMplsLspvTracertResultsCurHopCount OBJECT-TYPE
+    SYNTAX     Gauge32 
+    UNITS       "hops"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Reflects the current mpls TTL value (from 1 to
+ 	     255) for a remote mpls Tracert operation.
+ 	     Maximum TTL value is determined by
+ 	     raisecomMplsLspvTracertCtlMaxTtl."
+    ::= { raisecomMplsLspvTracertResultsEntry 2 } 
+    
+
+    raisecomMplsLspvTracertProbeHistoryTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF RaisecomMplsLspvTracertProbeHistoryEntry 
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Defines a table for storing the results of a mpls Tracert
+        operation.specifies each probe result."
+    ::= { raisecomMplsLspvTracertObejcts 4 }      
+    
+    raisecomMplsLspvTracertProbeHistoryEntry OBJECT-TYPE
+    SYNTAX     RaisecomMplsLspvTracertProbeHistoryEntry 
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Defines an entry in the raisecomMplsLspvTracertProbeHistoryTable.
+        The first two index elements identify the raisecomMplsLspvTracertCtlEntry that a TracertProbeHistoryEntry belongs
+        to.  The third index element selects a single probe result."
+    INDEX {
+             raisecomMplsLspvTracertCtlOwnerIndex,
+             raisecomMplsLspvTracertCtlTestName,      
+             raisecomMplsLspvTracertProbeHistoryHopIndex,  
+             raisecomMplsLspvTracertProbeHistoryProbeIndex
+      
+           }
+    ::= { raisecomMplsLspvTracertProbeHistoryTable 1 }   
+    
+	RaisecomMplsLspvTracertProbeHistoryEntry ::= SEQUENCE {
+        raisecomMplsLspvTracertProbeHistoryHopIndex                   Unsigned32, 
+        raisecomMplsLspvTracertProbeHistoryProbeIndex                 Unsigned32,
+        raisecomMplsLspvTracertProbeHistoryStatus                     ResponseStatus,  
+        raisecomMplsLspvTracertProbeHistoryDMAddressType              InetAddressType, 
+        raisecomMplsLspvTracertProbeHistoryDMAddress                  InetAddress, 
+        raisecomMplsLspvTracertProbeHistoryDMInterfaceAddress         InetAddress,
+        raisecomMplsLspvTracertProbeHistoryDMLabelStack               LabelStack,
+        raisecomMplsLspvTracertProbeHistoryReturnCode                 Unsigned32,
+        raisecomMplsLspvTracertProbeHistoryReturnSubCode              Unsigned32, 
+        raisecomMplsLspvTracertProbeHistoryReplyAddressType           InetAddressType,
+        raisecomMplsLspvTracertProbeHistoryReplyAddress               InetAddress,
+        raisecomMplsLspvTracertProbeHistoryResponse                   Unsigned32,
+        raisecomMplsLspvTracertProbeHistoryReplyRole                  LspRole
+        
+       }
+        
+    raisecomMplsLspvTracertProbeHistoryHopIndex OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+         "Indicates which hop in a mpls traceroute path the probe's
+          results are for."   
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 1 } 
+    
+    raisecomMplsLspvTracertProbeHistoryProbeIndex OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..10)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Indicates the index of a probe for a particular
+         hop in a mpls traceroute path. "  
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 2 }  
+       
+    raisecomMplsLspvTracertProbeHistoryStatus OBJECT-TYPE
+    SYNTAX     ResponseStatus    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The result operstaus of each mpls traceroute probe."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 3 }   
+    
+    raisecomMplsLspvTracertProbeHistoryDMAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This objects indicates the type of address stored
+        in the Down stream Tlv"
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 4 }  
+    
+    raisecomMplsLspvTracertProbeHistoryDMAddress OBJECT-TYPE
+    SYNTAX     InetAddress    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This objects indicates the address stored
+        in the Down stream Tlv"
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 5 }     
+    
+    raisecomMplsLspvTracertProbeHistoryDMInterfaceAddress OBJECT-TYPE
+    SYNTAX     InetAddress    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This objects indicates the interface address stored
+        in the Down stream Tlv"
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 6 }   
+    
+    raisecomMplsLspvTracertProbeHistoryDMLabelStack OBJECT-TYPE
+    SYNTAX     LabelStack    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "This objects indicates the label stack stored
+        in the Down stream Tlv"
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 7 } 
+
+    raisecomMplsLspvTracertProbeHistoryReturnCode OBJECT-TYPE
+    SYNTAX     Unsigned32(0..13)    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The response return code."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 8 }      
+    
+    raisecomMplsLspvTracertProbeHistoryReturnSubCode OBJECT-TYPE
+    SYNTAX     Unsigned32    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The response return sub code."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 9 }   
+    
+    raisecomMplsLspvTracertProbeHistoryReplyAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The address type of reply."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 10 }  
+    
+    raisecomMplsLspvTracertProbeHistoryReplyAddress OBJECT-TYPE
+    SYNTAX     InetAddress    
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The address of reply."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 11 }  
+
+    raisecomMplsLspvTracertProbeHistoryResponse OBJECT-TYPE
+    SYNTAX     Unsigned32  
+    UNITS      "milliseconds"  
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The amount of time measured in milliseconds from when
+ 	     a probe was sent to when its response was received or
+ 	     when it timed out.  The value of this object is reported
+ 	     as 0 when it is not possible to transmit a probe."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 12 }    
+    
+    raisecomMplsLspvTracertProbeHistoryReplyRole OBJECT-TYPE
+    SYNTAX     LspRole
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The type of reply router in the lsp path."
+    ::= { raisecomMplsLspvTracertProbeHistoryEntry 13 }             
+  --end of raisecom mpls     
+  
+  --start of mpls lsp verification conformance --
+    raisecomMplsLspvGroups      OBJECT IDENTIFIER ::= { raisecomMplsLspvConformances 1 }
+    raisecomMplsLspvCompliances OBJECT IDENTIFIER ::= { raisecomMplsLspvConformances 2 }
+
+
+-- MIB groupings
+
+    raisecomMplsLspVGlobalGroup    OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspVGlobalFunctionEnable,  
+        raisecomMplsLspVGlobalFecCheckEnable,
+        raisecomMplsLspVpingMaxConcurrentRequests,
+        raisecomMplsLspVtracertMaxConcurrentRequests
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to configure the
+            mpls lsp verification implementation behavior.
+
+            This group is mandatory for agents which implement the mpls lsp verification."
+    ::= { raisecomMplsLspvGroups 1 }
+
+    raisecomMplsLspVpingCtlGroup    OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspvPingCtlOwnerIndex,
+        raisecomMplsLspvPingCtlTestName,                 
+        raisecomMplsLspvPingCtlTargetFecType,            
+        raisecomMplsLspvPingCtlPwId,                     
+        raisecomMplsLspvPingCtlVsi,                      
+        raisecomMplsLspvPingCtlTunnelName,               
+        raisecomMplsLspvPingCtlTargetFecAddressType,     
+        raisecomMplsLspvPingCtlTargetFecAddress,         
+        raisecomMplsLspvPingCtlTargetFecAddressPrefix,   
+        raisecomMplsLspvPingCtlNextHopAddress,           
+        raisecomMplsLspvPingCtlDataSize,                 
+        raisecomMplsLspvPingCtlTimeOut,                  
+        raisecomMplsLspvPingCtlProbeCount,               
+        raisecomMplsLspvPingCtlAdminStatus,              
+        raisecomMplsLspvPingCtlFrequency,                
+        raisecomMplsLspvPingCtlTtl,                      
+        raisecomMplsLspvPingCtlExp,                      
+        raisecomMplsLspvPingCtlReplyDscp,                
+        raisecomMplsLspvPingCtlReplyPadTlv,              
+        raisecomMplsLspvPingCtlReplyMode,                
+        raisecomMplsLspvPingCtlSourceAddressType,        
+        raisecomMplsLspvPingCtlSourceAddress,            
+        raisecomMplsLspvPingCtlRowStatus                
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to configure the
+            mpls ping implementation behavior.
+
+            This group is mandatory for agents which implement the mpls ping
+            and have the capability of controling mpls ping configure."
+    ::= { raisecomMplsLspvGroups 2 }
+
+    raisecomMplsLspVpingResultsGroup    OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspvPingResultsOperStatus,           
+        raisecomMplsLspvPingResultsMinRtt,               
+        raisecomMplsLspvPingResultsMaxRtt,               
+        raisecomMplsLspvPingResultsAverageRtt,           
+        raisecomMplsLspvPingResultsProbeResponses,       
+        raisecomMplsLspvPingResultsSentProbes,           
+        raisecomMplsLspvPingResultsRttSumOfSquares,      
+        raisecomMplsLspvPingResultsLastGoodProbe
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to configure the
+            mpls ping implementation behavior.
+
+            This group is mandatory for agents which implement the mpls ping
+            and have the capability of checking mpls ping results."
+    ::= { raisecomMplsLspvGroups 3 }
+
+    raisecomMplsLspVpingProbeHistoryGroup    OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspvPingProbeHistoryIndex,            
+        raisecomMplsLspvPingProbeHistoryStatus,           
+        raisecomMplsLspvPingProbeHistoryReturnCode,       
+        raisecomMplsLspvPingProbeHistoryReturnSubCode,    
+        raisecomMplsLspvPingProbeHistoryReplyAddressType, 
+        raisecomMplsLspvPingProbeHistoryReplyAddress,     
+        raisecomMplsLspvPingProbeHistoryReplyDataSize,    
+        raisecomMplsLspvPingProbeHistoryResponse         
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent mpls ping
+            reception statistics.
+
+            This group is mandatory for agents which implement the mpls ping
+            and have the capability of checking mpls ping history."
+    ::= { raisecomMplsLspvGroups 4 }
+
+    RaisecomMplsLspvTracertCtlGroup    OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspvTracertCtlOwnerIndex,            
+        raisecomMplsLspvTracertCtlTestName,              
+        raisecomMplsLspvTracertCtlTargetFecType,         
+        raisecomMplsLspvTracertCtlPwId,                  
+        raisecomMplsLspvTracertCtlVsi,                   
+        raisecomMplsLspvTracertCtlTunnelName,            
+        raisecomMplsLspvTracertCtlTargetFecAddressType,  
+        raisecomMplsLspvTracertCtlTargetFecAddress,      
+        raisecomMplsLspvTracertCtlTargetFecAddressPrefix,
+        raisecomMplsLspvTracertCtlNextHopAddress,        
+        raisecomMplsLspvTracertCtlTimeOut,               
+        raisecomMplsLspvTracertCtlAdminStatus,           
+        raisecomMplsLspvTracertCtlMaxTtl,                
+        raisecomMplsLspvTracertCtlExp,                   
+        raisecomMplsLspvTracertCtlReplyDscp,             
+        raisecomMplsLspvTracertCtlReplyPadTlv,           
+        raisecomMplsLspvTracertCtlReplyMode,             
+        raisecomMplsLspvTracertCtlSourceAddressType,     
+        raisecomMplsLspvTracertCtlSourceAddress,         
+        raisecomMplsLspvTracertCtlFlagFec,               
+        raisecomMplsLspvTracertCtlRowStatus             
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent mpls traceroute
+            transmission statistics.
+
+            This group is mandatory for agents which implement the mpls traceroute
+            and have the capability of controling mpls traceroute configuration."
+    ::= { raisecomMplsLspvGroups 5 }
+
+	RaisecomMplsLspvTracertResultsGroup  OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspvTracertResultsOperStatus,   
+        raisecomMplsLspvTracertResultsCurHopCount  
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent mpls traceroute
+            Local System Information.  
+            
+            This group is mandatory for agents which implement the mpls traceroute
+            and have the capability of checking mpls traceroute results."
+    ::= { raisecomMplsLspvGroups 6 }
+
+	RaisecomMplsLspvTracertProbeHistoryGroup  OBJECT-GROUP
+    OBJECTS {
+        raisecomMplsLspvTracertProbeHistoryHopIndex,            
+        raisecomMplsLspvTracertProbeHistoryProbeIndex,          
+        raisecomMplsLspvTracertProbeHistoryStatus,              
+        raisecomMplsLspvTracertProbeHistoryDMAddressType,       
+        raisecomMplsLspvTracertProbeHistoryDMAddress,           
+        raisecomMplsLspvTracertProbeHistoryDMInterfaceAddress,  
+        raisecomMplsLspvTracertProbeHistoryDMLabelStack,        
+        raisecomMplsLspvTracertProbeHistoryReturnCode,          
+        raisecomMplsLspvTracertProbeHistoryReturnSubCode,       
+        raisecomMplsLspvTracertProbeHistoryReplyAddressType,    
+        raisecomMplsLspvTracertProbeHistoryReplyAddress,        
+        raisecomMplsLspvTracertProbeHistoryResponse,            
+        raisecomMplsLspvTracertProbeHistoryReplyRole           
+    }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent mpls traceroute
+            reception statistics.
+
+            This group is mandatory for agents which implement the mpls traceroute
+            and have the capability of checking mpls traceroute history."
+    ::= { raisecomMplsLspvGroups 7 }
+     
+     
+  -- compliance statements
+
+   raisecomMplsLspvCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for SNMP entities which implement
+            the RAISECOM-MPLS-LSPV-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { raisecomMplsLspVGlobalGroup, 
+                           raisecomMplsLspVpingCtlGroup, 
+                           raisecomMplsLspVpingResultsGroup, 
+                           raisecomMplsLspVpingProbeHistoryGroup, 
+                           raisecomMplsLspVtracertCtlGroup, 
+                           raisecomMplsLspVtracertResultsGroup,
+                           raisecomMplsLspVtracertProbeHistoryGroup
+        }
+    ::= { raisecomMplsLspvCompliances 1 }
+
+  
+  --end of mpls lsp verification conformance--
+          
+  END

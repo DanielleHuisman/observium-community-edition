@@ -106,7 +106,7 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       // Expand
       array($device_linux, 'ENTITY-MIB', 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB'),
       array($device_ios,   'ENTITY-MIB', 'ENTITY-MIB:CISCO-ENTITY-VENDORTYPE-OID-MIB'),
-      array($device_vrp,   'ENTITY-MIB', 'ENTITY-MIB:HUAWEI-TC-MIB:H3C-ENTITY-VENDORTYPE-OID-MIB'),
+      array($device_vrp,   'ENTITY-MIB', 'ENTITY-MIB:HUAWEI-TC-MIB:HUAWEI-ENTITY-VENDORTYPE-MIB:H3C-ENTITY-VENDORTYPE-OID-MIB'),
     );
     return $results;
   }

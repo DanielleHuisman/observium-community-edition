@@ -12,8 +12,7 @@
 
 $supply_data = dbFetchRows("SELECT * FROM `printersupplies` WHERE `device_id` = ?", array($device['device_id']));
 
-foreach ($supply_data as $supply)
-{
+foreach ($supply_data as $supply) {
   echo("Checking " . $supply['supply_descr'] . " (" . nicecase($supply['supply_type']) . ")... ");
 
   // Fetch level and capacity
@@ -23,15 +22,11 @@ foreach ($supply_data as $supply)
   // Level
   $level = $data[$supply['supply_oid']];
 
-  if ($supply['supply_mib'] == 'RicohPrivateMIB')
-  {
-    if ($level == '-100')
-    {
+  if ($supply['supply_mib'] === 'RicohPrivateMIB') {
+    if ($level == '-100') {
       // Toner near empty
       $level = '5'; // ~ 1-20%
-    }
-    else if ($level == '-3')
-    {
+    } elseif ($level == '-3') {
       $level = '80'; // ~ 10-100%
     }
 
@@ -44,8 +39,7 @@ foreach ($supply_data as $supply)
      *  A value of (-3) means that the printer knows that there is some supply/remaining space,
      *  respectively.
      */
-    switch ($level)
-    {
+    switch ($level) {
       case '-1':
         $level = 100; // Unlimit
         break;
@@ -59,12 +53,9 @@ foreach ($supply_data as $supply)
   }
 
   // Capacity
-  if (strlen($supply['supply_capacity_oid']))
-  {
+  if (!safe_empty($supply['supply_capacity_oid'])) {
     $capacity = $data[$supply['supply_capacity_oid']];
-  }
-  else if ($supply['supply_capacity'])
-  {
+  } elseif ($supply['supply_capacity']) {
     $capacity = $supply['supply_capacity'];
   } else {
     $capacity = 100;
@@ -75,8 +66,7 @@ foreach ($supply_data as $supply)
    *  The value (-1) means other and specifically indicates that the sub-unit places
    *  no restrictions on this parameter. The value (-2) means unknown.
    */
-  switch ($capacity)
-  {
+  switch ($capacity) {
     case '-1':
       $capacity = 100; // Unlimit
       break;
@@ -106,8 +96,7 @@ foreach ($supply_data as $supply)
   $supply_update = array();
   if ($supply['supply_value']    != $supplyperc) { $supply_update['supply_value']    = $supplyperc; }
   if ($supply['supply_capacity'] != $capacity)   { $supply_update['supply_capacity'] = $capacity; }
-  if ($supply_update)
-  {
+  if ($supply_update) {
     dbUpdate($supply_update, 'printersupplies', '`supply_id` = ?', array($supply['supply_id']));
   }
 

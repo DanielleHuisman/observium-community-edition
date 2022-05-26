@@ -17,7 +17,7 @@
 
 // Getting APs
 
-$accesspoints_snmp = snmpwalk_cache_oid($device, "trpzApConfApConfigTable", $accesspoints_snmp, "TRAPEZE-NETWORKS-AP-CONFIG-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$accesspoints_snmp = snmpwalk_cache_oid($device, "trpzApConfApConfigTable", [], "TRAPEZE-NETWORKS-AP-CONFIG-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 if (OBS_DEBUG > 1) { print_vars($accesspoints_snmp); }
 
 $accesspoints_db = dbFetchRows("SELECT `name`, `model`, `location`, `fingerprint`, `serial`, `device_id`, `ap_number` FROM `wifi_accesspoints` WHERE `device_id` = ?", array($device['device_id']));
@@ -28,24 +28,24 @@ foreach ($accesspoints_db as $accesspoint_db)
 }
 
 // Mapping OIDs<>DB
-$db_oids = array('trpzApConfApConfigRemoteSiteName' => 'location',
-                 'trpzApConfApConfigApName'         => 'name',
-                 'trpzApConfApConfigApModelName'    => 'model',
-                 'trpzApConfApConfigFingerprint'    => 'fingerprint',
-                 'trpzApConfApConfigApSerialNum'    => 'serial');
+$db_oids = [
+  'trpzApConfApConfigRemoteSiteName' => 'location',
+  'trpzApConfApConfigApName'         => 'name',
+  'trpzApConfApConfigApModelName'    => 'model',
+  'trpzApConfApConfigFingerprint'    => 'fingerprint',
+  'trpzApConfApConfigApSerialNum'    => 'serial'
+];
 
 // Goes through the SNMP APs data
-foreach ($accesspoints_snmp as $ap_number => $accesspoint_snmp)
-{
-  foreach ($db_oids as $db_oid => $db_value)
-  {
+foreach ($accesspoints_snmp as $ap_number => $accesspoint_snmp) {
+  $db_insert = [];
+  foreach ($db_oids as $db_oid => $db_value) {
     $db_insert[$db_value] = $accesspoint_snmp[$db_oid];
   } // DB: wifi_accesspoint_id, device_id, number, name, serial, model, location, fingerprint, delete
   $db_insert['device_id'] = $device['device_id'];
   $db_insert['ap_number'] = $ap_number;
-  if (OBS_DEBUG && count($db_insert)) { print_vars($db_insert); }
-  if (!is_array($ap_db[$ap_number]))
-  {
+  print_debug_vars($db_insert);
+  if (!is_array($ap_db[$ap_number])) {
     $accesspoint_id = dbInsert($db_insert, 'wifi_accesspoints');
     echo('+');
   }

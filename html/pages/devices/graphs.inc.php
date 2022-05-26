@@ -15,25 +15,20 @@ echo '<div class="row">';
 if(!isset($vars['graph'])) { $vars['graph'] = 'bits'; }
 
 $row = 0;
-foreach ($devices as $device)
-{
+foreach ($devices as $device) {
 
-  if (device_permitted($device['device_id']))
-  {
+  if (device_permitted($device['device_id'])) {
     $row_colour = is_intnum($row / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
 
-    if (!$location_filter || $device['location'] == $location_filter)
-    {
+    if (!$location_filter || $device['location'] == $location_filter) {
       $graph_type = "device_".$vars['graph'];
 
       $graph_array           = array();
 
       // FIXME -- definitions and use grid
 
-      if ($_SESSION['widescreen'])
-      {
-        if ($_SESSION['big_graphs'])
-        {
+      if ($_SESSION['widescreen']) {
+        if ($config['graphs']['size'] === 'big') {
           $width_div = 586;
           $width = 508;
           $height = 149;
@@ -45,8 +40,7 @@ foreach ($devices as $device)
           $height_div = 180;
         }
       } else {
-        if ($_SESSION['big_graphs'])
-        {
+        if ($config['graphs']['size'] === 'big') {
           $width_div = 614;
           $width = 533;
           $height = 159;
@@ -61,8 +55,8 @@ foreach ($devices as $device)
 
       $graph_array['height'] = 100;
       $graph_array['width']  = 212;
-      if (preg_match('/^(\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['to']))   { $graph_array['to']   = $vars['to'];   } else { $graph_array['to']     = $config['time']['now']; }
-      if (preg_match('/^(\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['from'])) { $graph_array['from'] = $vars['from']; } else { $graph_array['from']   = $config['time']['day']; }
+      if (preg_match(OBS_PATTERN_RRDTIME, $vars['to']))   { $graph_array['to']   = $vars['to'];   } else { $graph_array['to']     = $config['time']['now']; }
+      if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) { $graph_array['from'] = $vars['from']; } else { $graph_array['from']   = $config['time']['day']; }
 
       $graph_array['device']     = $device['device_id'];
       $graph_array['type']   = $graph_type;

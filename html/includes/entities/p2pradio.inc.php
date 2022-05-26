@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -109,7 +109,9 @@ function generate_p2pradio_row($radio, $vars)
          <td class="state-marker"></td>
          <td></td>';
 
-  if ($vars['page'] != "device"  && $vars['popup'] != TRUE) { $row .=('<td class="entity">' . generate_device_link($device, short_hostname($device['hostname'])) . '</td>'); }
+  if ($vars['page'] != "device" && $vars['popup'] != TRUE) {
+    $row .=('<td class="entity">' . generate_device_link_short($device) . '</td>');
+  }
 
   $row .= '
          <td class="entity">' . generate_entity_link('p2pradio', $radio) . '</td>

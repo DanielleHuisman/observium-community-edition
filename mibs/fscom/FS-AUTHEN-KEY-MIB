@@ -1,0 +1,339 @@
+-- *****************************************************************
+-- FS-AUTHEN-KEY-MIB.mib:  FS Authentication Key MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-AUTHEN-KEY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Unsigned32
+                FROM SNMPv2-SMI
+        DisplayString,
+        RowStatus,
+        DateAndTime,
+        TEXTUAL-CONVENTION
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus
+                FROM FS-TC        
+        fsMgmt
+                FROM FS-SMI;
+
+fsAuthenKeyMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines authentication key managment mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 24}
+
+
+
+fsAuthenKeyMIBObjects OBJECT IDENTIFIER ::= { fsAuthenKeyMIB 1 }
+
+
+FSKeyTimeMode ::= TEXTUAL-CONVENTION        
+   STATUS current                          
+   DESCRIPTION                             
+            "Time managment mode of key." 
+   SYNTAX INTEGER {                        
+            infinite(1), -- Key will be valid all along when the key start to become effective
+            duration(2), -- Key will be valid for designate duration when the key start to 
+                         -- become effective.  
+            end-time(3)  -- Key will be valid when the key start to become effective till
+                         -- designate end time reach.                           
+  }                        
+  
+--    Key management is a method of controlling authentication keys used by some protocol. Not 
+-- all protocols can use key management. To manage authentication keys, define a  key chain, 
+-- identify the keys that belong to the key chain, and specify how long each key is valid. Each
+-- key has its own key identifier (specified with the key chain and key number),
+-- which is stored locally. 
+--     The combination of the key identifier and the interface associated with the message
+-- uniquely identifies the authentication algorithm and Message Digest 5 (MD5) authentication
+-- key in use.
+--     You can configure multiple keys with life times. Only one authentication packet is sent,
+-- regardless of how many valid keys exist. The software examines the key numbers in order from
+-- lowest to highest, and uses the first valid key it encounters. The lifetimes allow for 
+-- overlap during key changes. Note that the router must know these lifetimes.
+
+fsAuthenKeyChainTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSAuthenKeyChainEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of key chain entries."
+        ::= { fsAuthenKeyMIBObjects 1 }
+    
+fsAuthenKeyChainEntry OBJECT-TYPE
+        SYNTAX FSAuthenKeyChainEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains key chain."  
+        INDEX { fsAuthenKeyChainName }
+        ::= { fsAuthenKeyChainTable 1 }
+        
+FSAuthenKeyChainEntry ::= 
+        SEQUENCE {
+                fsAuthenKeyChainName DisplayString,
+                fsAuthenKeyChainEntryStatus ConfigStatus
+        } 
+           
+fsAuthenKeyChainName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key chain name of this entry.This value is unique for every entry
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsAuthenKeyChainEntry  1 }
+                
+fsAuthenKeyChainEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set its value to invalid will delete this entry.
+            set its value to valid has no effect."
+        ::= { fsAuthenKeyChainEntry 2 }
+
+
+fsAuthenKeyTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSAuthenKeyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of authentication key entries."
+        ::= { fsAuthenKeyMIBObjects 2 }
+    
+fsAuthenKeyEntry OBJECT-TYPE
+        SYNTAX FSAuthenKeyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains authentication key parameters.
+                                
+                We must set all specifies valid values for the 
+                non-defaulted configuration objects, certainly, it should
+                also modify  the default values for the other configuration 
+                objects if the defaults are not appropriate.
+                                       
+                Once the appropriate instance of all the configuration
+                objects have been created or set,the row status should be set
+                to active to initiate the request."  
+        INDEX { fsKeyChainName,fsAuthenKeyNumber }
+        ::= { fsAuthenKeyTable 1 }
+        
+FSAuthenKeyEntry ::= 
+        SEQUENCE {
+                fsKeyChainName DisplayString,
+                fsAuthenKeyNumber Integer32,
+                fsKeyString DisplayString,
+                fsAuthenKeyReceiveFSTime DateAndTime,
+                fsAuthenKeyReceiveTimeMode FSKeyTimeMode,
+                fsAuthenKeyReceiveEndTime DateAndTime,
+                fsAuthenKeyReceiveDuration Unsigned32,
+                fsAuthenKeySendFSTime DateAndTime,
+                fsAuthenKeySendTimeMode FSKeyTimeMode,
+                fsAuthenKeySendEndTime DateAndTime,
+                fsAuthenKeySendDuration Unsigned32,
+                fsAuthenReceiveKeyState       INTEGER,
+                fsAuthenSendKeyState       INTEGER,
+                fsAuthenKeyEntryStauts RowStatus 
+        }
+
+fsKeyChainName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key chain name of this key belong to which indentified in fsAuthenKeyChainEntry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsAuthenKeyEntry  1 }
+
+fsAuthenKeyNumber OBJECT-TYPE
+        SYNTAX Integer32(0..2147483647)
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+               "The number identify a unique key in the key chain."
+        ::= { fsAuthenKeyEntry 2 }
+
+fsKeyString OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..80))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key String of the key. The string can contain from 1 to
+             80 uppercase and lowercase alphanumeric characters,
+             but the first character cannot be a number."
+        ::= { fsAuthenKeyEntry  3 }
+           
+fsAuthenKeyReceiveFSTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The start time which the key can be received."
+        ::= { fsAuthenKeyEntry 4 }
+        
+fsAuthenKeyReceiveTimeMode OBJECT-TYPE
+        SYNTAX FSKeyTimeMode
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The time mode of key receive."
+        ::= { fsAuthenKeyEntry 5 }
+
+fsAuthenKeyReceiveEndTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The end time which the key can be received."
+        ::= { fsAuthenKeyEntry 6 }
+
+fsAuthenKeyReceiveDuration OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The duration time which the key is valid, in units of second."
+        ::= { fsAuthenKeyEntry 7 }
+        
+fsAuthenKeySendFSTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The start time which the key can be send."
+        ::= { fsAuthenKeyEntry 8 }
+        
+fsAuthenKeySendTimeMode OBJECT-TYPE
+        SYNTAX FSKeyTimeMode
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The time mode of key send."
+        ::= { fsAuthenKeyEntry 9 }
+
+fsAuthenKeySendEndTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The end time which the key can be send."
+        ::= { fsAuthenKeyEntry 10 }
+
+fsAuthenKeySendDuration OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The duration time which the key is valid,in units of second."
+        ::= { fsAuthenKeyEntry 11 }        
+
+fsAuthenReceiveKeyState OBJECT-TYPE
+        SYNTAX INTEGER{
+                  valid(1),
+                  invalid(2)
+               }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The key is valid or invalid currently for receiving."
+        ::= { fsAuthenKeyEntry 12 }        
+        
+fsAuthenSendKeyState OBJECT-TYPE
+        SYNTAX INTEGER{
+                  valid(1),
+                  invalid(2)
+               }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The key is valid or invalid currently for sending."
+        ::= { fsAuthenKeyEntry 13 }        
+                  
+fsAuthenKeyEntryStauts OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status for this list."
+        ::= { fsAuthenKeyEntry 14 }
+ 
+-- conformance information
+
+fsAuthenKeyChainMIBConformance OBJECT IDENTIFIER ::= { fsAuthenKeyMIB 2 }
+fsAuthenKeyChainMIBCompliances OBJECT IDENTIFIER ::= { fsAuthenKeyChainMIBConformance 1 }
+fsAuthenKeyChainMIBGroups      OBJECT IDENTIFIER ::= { fsAuthenKeyChainMIBConformance 2 }
+
+
+-- compliance statements
+
+fsAuthenKeyChainMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS Acl MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { fsAuthenKeyChainMIBGroup }
+        ::= { fsAuthenKeyChainMIBCompliances 1 }
+        
+        
+-- units of conformance
+
+fsAuthenKeyChainMIBGroup OBJECT-GROUP
+        OBJECTS {
+                fsAuthenKeyChainName,
+                fsAuthenKeyChainEntryStatus,        
+                fsKeyChainName,
+                fsAuthenKeyNumber, 
+                fsKeyString, 
+                fsAuthenKeyReceiveFSTime ,
+                fsAuthenKeyReceiveTimeMode, 
+                fsAuthenKeyReceiveEndTime ,
+                fsAuthenKeyReceiveDuration, 
+                fsAuthenKeySendFSTime ,
+                fsAuthenKeySendTimeMode ,
+                fsAuthenKeySendEndTime ,
+                fsAuthenKeySendDuration, 
+                fsAuthenReceiveKeyState,
+                fsAuthenSendKeyState,
+                fsAuthenKeyEntryStauts 
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing acl (echo) ability to a
+                FS agent."
+        ::= { fsAuthenKeyChainMIBGroups 1 }        
+        
+END

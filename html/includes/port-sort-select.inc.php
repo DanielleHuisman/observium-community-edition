@@ -1,18 +1,16 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-switch ($vars['sort'])
-{
+switch ($vars['sort']) {
   case 'traffic':
     $select .= ',`ifOctets_rate`';
     break;

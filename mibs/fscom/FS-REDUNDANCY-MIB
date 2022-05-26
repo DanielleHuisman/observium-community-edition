@@ -1,0 +1,276 @@
+-- *****************************************************************
+-- FS-REDUNDANCY-MIB.mib:  FS redundancy and pluggable MIB file
+--
+-- Sep.2003,  guody
+--
+-- Copyright (c) 2002 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-REDUNDANCY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32
+                FROM SNMPv2-SMI
+        DisplayString
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        fsMgmt
+                FROM FS-SMI;
+
+fsRedundancyMIB MODULE-IDENTITY
+        LAST-UPDATED "200309100000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs redundancy mibs."
+        REVISION      "200309200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 34}
+
+fsRedundancyMIBObjects OBJECT IDENTIFIER ::= { fsRedundancyMIB 1 }
+
+fsRedundancyForceSwitchover OBJECT-TYPE
+        SYNTAX INTEGER 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Setting any values except for 0 resets the current supervisor engine and enables the redundancy standby
+             supervisor engine to start working. The object value is always be 0. "
+        ::= { fsRedundancyMIBObjects 1 }
+
+fsMainCPU OBJECT-TYPE
+   	SYNTAX  INTEGER {
+                increasing(0), -- Supervisor engine in slot with low number is prior to be in the master state.
+                decreasing(1)  -- Supervisor engine in slot with high number is prior to be in the master state.
+             }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "The object determines which supervisor engine is prior to be in the master state when redundancy event occurs.
+           In fact, it might be inconsistent with the expectation. For example, the supervisor engine prior to be in the 
+           master state fails to start." 
+        ::= { fsRedundancyMIBObjects 2 }
+
+
+fsPluggableMIBObjects OBJECT IDENTIFIER ::= { fsRedundancyMIB 2 } 
+
+fsPluggableModuleInfoTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSPluggableModuleInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Table of entrance to the module settings." 
+        ::= { fsPluggableMIBObjects  1 }
+    
+fsPluggableModuleInfoEntry OBJECT-TYPE
+        SYNTAX FSPluggableModuleInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entrance to the module settings."  
+        INDEX { fsPluggableModuleInfoDeviceIndex, fsPluggableModuleInfoSlotIndex }
+        ::= { fsPluggableModuleInfoTable 1 }
+
+FSPluggableModuleInfoEntry ::= 
+        SEQUENCE {
+             fsPluggableModuleInfoDeviceIndex Integer32,
+             fsPluggableModuleInfoSlotIndex Integer32,
+             fsPluggableModuleStatus INTEGER,
+             fsPluggableModuleConfigType INTEGER,
+             fsPluggableModuleConfigSwVer DisplayString,
+             fsPluggableModuleOnlineSwVer DisplayString,
+             fsPluggableModuleConfigInfoDescr DisplayString,
+             fsPluggableModuleOnlineInfoDescr DisplayString,
+             fsPluggableModuleConfigPortsNum Integer32,
+             fsPluggableModuleOnlinePortsNum Integer32,
+             fsPluggableModuleAction  INTEGER
+        }
+    
+fsPluggableModuleInfoDeviceIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The index of device which the module is in." 
+        ::= { fsPluggableModuleInfoEntry 1 }
+    
+fsPluggableModuleInfoSlotIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The index of slot which the module is in."  
+        ::= { fsPluggableModuleInfoEntry 2 }
+
+fsPluggableModuleStatus  OBJECT-TYPE
+        SYNTAX  INTEGER {
+                none(0),          --Module is not existed. Module type has not been pre-set, either.  
+                ok(1),            --Module works normally.
+                installed(2),     --Pre-set the module  
+                conflict(3),      --Conflict between the pre-set module and actual plugged module type. 
+                removed(4),       --Remove the module 
+                uninstalled(5),   --Unistall the module, but the module is still plugged. 
+                verIncompatible(6), --Version incompatibility 
+                cannot-fsup(7), --Can not start the module  
+                resetting(8),       --Resetting the module 
+                master(9),          --Supervisor engine is in the master state. 
+                backup(10)          --Supervisor engine is in the backup state. 
+                
+             }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Module state."
+        ::= { fsPluggableModuleInfoEntry 3 }
+
+
+
+fsPluggableModuleConfigType OBJECT-TYPE
+        SYNTAX INTEGER{
+                none(0),     --The module has not been plugged.
+                m6800-24T-4SFP-4GT(1),
+                m6800-32T-4SFP-GT(2), 
+                m6800-32FMT(3), 
+                m6800-12GB(4),
+                m6800-24SFP(5), 
+                m6800-12SFP-GT(6),
+                m6800-1XENPAK(7),
+                m6800-2XENPAK(8),
+                m6800-MSC(9),
+                m6800-CM(10),
+                m6800-24GT-8SFP(11)
+             }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Use this object to add the module configuration. Without setting any type(none), the system automatically 
+             sets all parameters to the default value according to module type to be back. When the object are reading,
+             the system is back to the set type of none." 
+	::= { fsPluggableModuleInfoEntry 4 }
+
+fsPluggableModuleConfigSwVer OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "Version of configured module." 
+        ::= { fsPluggableModuleInfoEntry 5 }
+
+
+fsPluggableModuleOnlineSwVer OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "The actual version of the plugged module." 
+        ::= { fsPluggableModuleInfoEntry 6 }
+
+
+fsPluggableModuleConfigInfoDescr OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Module name configuration. Different models have different module names.
+             It is null when there is no module configuration." 
+        ::= { fsPluggableModuleInfoEntry 7 }
+    
+fsPluggableModuleOnlineInfoDescr  OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Module name of actual plugged module.Different models have different module names.
+             It is null when there is no module configuration." 
+        ::= { fsPluggableModuleInfoEntry 8 }           
+
+fsPluggableModuleConfigPortsNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Configure the module port numbe."
+        ::= { fsPluggableModuleInfoEntry 9 }
+
+fsPluggableModuleOnlinePortsNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The actual port number of the plugged module."  
+        ::= { fsPluggableModuleInfoEntry 10 }
+
+fsPluggableModuleAction  OBJECT-TYPE
+        SYNTAX INTEGER{
+                none(0),         --Read the information  
+                reset(1),        --Reset the module 
+                clearAllConf(2), --Restore all the module configurations to the default 
+                uninstall(3)     --Unistall this module 
+              }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This object contains the operations to the module:
+             Module reset(1)
+             Restore all settings to the default value(2)
+             Module remove(3)
+             When reading the object value, it always be back to zero." 
+        ::= { fsPluggableModuleInfoEntry 11 }           
+
+
+fsRedundancyMIBConformance OBJECT IDENTIFIER ::= { fsRedundancyMIB 3 }
+fsRedundancyMIBCompliances OBJECT IDENTIFIER ::= { fsRedundancyMIBConformance 1 }
+fsRedundancyMIBGroups      OBJECT IDENTIFIER ::= { fsRedundancyMIBConformance 2 }
+
+
+-- compliance statements
+
+fsRedundancyMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS System MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { fsRedundancyMIBGroup
+                 }
+        ::= { fsRedundancyMIBCompliances 1 }
+                
+-- units of conformance
+
+fsRedundancyMIBGroup OBJECT-GROUP
+        OBJECTS {
+               fsRedundancyForceSwitchover, 
+               fsMainCPU,
+               fsPluggableModuleInfoDeviceIndex,
+               fsPluggableModuleInfoSlotIndex,
+               fsPluggableModuleStatus,
+               fsPluggableModuleConfigType,
+               fsPluggableModuleConfigSwVer,
+               fsPluggableModuleOnlineSwVer,
+               fsPluggableModuleConfigInfoDescr,
+               fsPluggableModuleOnlineInfoDescr,
+               fsPluggableModuleConfigPortsNum,
+               fsPluggableModuleOnlinePortsNum,
+               fsPluggableModuleAction
+
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing system information and
+                opertion to a FS agent."
+        ::= { fsRedundancyMIBGroups  1 } 
+  
+END
+

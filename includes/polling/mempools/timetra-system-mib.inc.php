@@ -15,7 +15,7 @@ $mib = 'TIMETRA-SYSTEM-MIB';
 
 if (!is_array($cache_storage[$mib]))
 {
-  foreach (array('sgiMemoryAvailable', 'sgiMemoryUsed') as $oid)
+  foreach (array('sgiMemoryAvailable', 'sgiMemoryUsed', 'sgiMemoryPoolAllocated') as $oid)
   {
     $cache_mempool = snmpwalk_cache_oid($device, $oid, $cache_mempool, $mib);
   }
@@ -25,7 +25,7 @@ if (!is_array($cache_storage[$mib]))
   $cache_mempool = $cache_storage[$mib];
 }
 
-$mempool['total'] = $cache_mempool[$index]['sgiMemoryAvailable'];
+$mempool['total'] = $cache_mempool[$index]['sgiMemoryAvailable'] + $cache_mempool[$index]['sgiMemoryPoolAllocated'];
 $mempool['used']  = $cache_mempool[$index]['sgiMemoryUsed'];
 
 // EOF

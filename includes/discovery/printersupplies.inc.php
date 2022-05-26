@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -12,16 +11,16 @@
  *
  */
 
-$valid['printersupplies'] = array();
+$GLOBALS['valid']['printersupply'] = [];
 
 // Include all discovery modules by MIB
 $include_dir = "includes/discovery/printersupplies";
 include("includes/include-dir-mib.inc.php");
 
-check_valid_printer_supplies($device, $valid);
+check_valid_printer_supplies($device);
 
 echo(PHP_EOL);
 
-unset($valid['printersupplies']);
+unset($GLOBALS['valid']['printersupply']);
 
 // EOF

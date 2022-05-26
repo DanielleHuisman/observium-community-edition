@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -40,7 +39,8 @@ header("Content-type: image/svg+xml");
 /********** HTTP GET Based Conf ***********/
 $ifnum    = $port['ifIndex'];             // BSD / SNMP interface name / number
 $ifname   = escape_html($port['port_label']);  //Interface name that will be showed on top right of graph
-$hostname = short_hostname($device['hostname']);
+//$hostname = short_hostname($device['hostname']);
+$hostname = escape_html(device_name($device, TRUE));
 
 if($vars['title']) { $ifname = escape_html($vars['title']); }
 

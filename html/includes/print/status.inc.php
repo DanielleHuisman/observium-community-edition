@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -59,10 +58,10 @@ function print_status_old($options)
     foreach ($entries as $device)
     {
       $string .= '  <tr>' . PHP_EOL;
-      $string .= '    <td class="entity">' . generate_device_link($device, short_hostname($device['hostname'])) . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . generate_device_link_short($device) . '</td>' . PHP_EOL;
       // $string .= '    <td><span class="badge badge-inverse">Device</span></td>' . PHP_EOL;
       $string .= '    <td><span class="label label-important">Device Down</span></td>' . PHP_EOL;
-      $string .= '    <td class="entity"><i class="'.$config['icon']['devices'].'"></i> ' . generate_device_link($device, short_hostname($device['hostname'])) . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity"><i class="'.$config['icon']['devices'].'"></i> ' . generate_device_link_short($device) . '</td>' . PHP_EOL;
       // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($device['location'], 30)) . '</td>' . PHP_EOL;
       $string .= '    <td style="white-space: nowrap">' . deviceUptime($device, 'short') . '</td>' . PHP_EOL;
       $string .= '  </tr>' . PHP_EOL;
@@ -85,10 +84,10 @@ function print_status_old($options)
       foreach ($entries as $device)
       {
         $string .= '  <tr>' . PHP_EOL;
-        $string .= '    <td class="entity">' . generate_device_link($device, short_hostname($device['hostname'])) . '</td>' . PHP_EOL;
+        $string .= '    <td class="entity">' . generate_device_link_short($device) . '</td>' . PHP_EOL;
         // $string .= '    <td><span class="badge badge-inverse">Device</span></td>' . PHP_EOL;
         $string .= '    <td><span class="label label-success">Device Rebooted</span></td>' . PHP_EOL;
-        $string .= '    <td class="entity"><i class="'.$config['icon']['devices'].'"></i> ' . generate_device_link($device, short_hostname($device['hostname'])) . '</td>' . PHP_EOL;
+        $string .= '    <td class="entity"><i class="'.$config['icon']['devices'].'"></i> ' . generate_device_link_short($device) . '</td>' . PHP_EOL;
         // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($device['location'], 30)) . '</td>' . PHP_EOL;
         $string .= '    <td style="white-space: nowrap">Uptime ' . format_uptime($device['uptime'], 'short') . '</td>' . PHP_EOL;
         $string .= '  </tr>' . PHP_EOL;
@@ -129,7 +128,7 @@ function print_status_old($options)
       }
       humanize_port($port);
       $string .= '  <tr>' . PHP_EOL;
-      $string .= '    <td class="entity">' . generate_device_link($port, short_hostname($port['hostname'])) . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . generate_device_link_short($port) . '</td>' . PHP_EOL;
       // $string .= '    <td><span class="badge badge-info">Port</span></td>' . PHP_EOL;
       $string .= '    <td><span class="label label-important">Port Down</span></td>' . PHP_EOL;
       $string .= '    <td class="entity">' . get_icon('port') . ' ' . generate_port_link_short($port) . '</td>' . PHP_EOL;
@@ -156,7 +155,7 @@ function print_status_old($options)
     {
       humanize_port($port);
       $string .= '  <tr>' . PHP_EOL;
-      $string .= '    <td class="entity">' . generate_device_link($port, short_hostname($port['hostname'])) . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . generate_device_link_short($port) . '</td>' . PHP_EOL;
       // $string .= '    <td><span class="badge badge-info">Port</span></td>' . PHP_EOL;
       $string .= '    <td><span class="label label-important">Port Errors</span></td>' . PHP_EOL;
       $string .= '    <td class="entity">' . get_icon('port') . ' ' . generate_port_link_short($port, NULL, 'port_errors') . '</td>' . PHP_EOL;
@@ -195,7 +194,7 @@ function print_status_old($options)
         $peer_ip = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
 
         $string .= '  <tr>' . PHP_EOL;
-        $string .= '    <td class="entity">' . generate_device_link($peer, short_hostname($peer['hostname']), array('tab' => 'routing', 'proto' => 'bgp')) . '</td>' . PHP_EOL;
+        $string .= '    <td class="entity">' . generate_device_link_short($peer, [ 'tab' => 'routing', 'proto' => 'bgp' ]) . '</td>' . PHP_EOL;
         // $string .= '    <td><span class="badge badge-warning">BGP</span></td>' . PHP_EOL;
         $string .= '    <td><span class="label label-warning" title="' . $bgpstates . '">BGP ' . nicecase($peer['bgpPeerState']) . '</span></td>' . PHP_EOL;
         $string .= '    <td class="entity" style="white-space: nowrap"><i class="'.$config['icon']['bgp'].'"></i> ' . $peer_ip . '</td>' . PHP_EOL;
@@ -247,7 +246,7 @@ function generate_alert_entries($vars)
                      'entity_id'   => $alert['entity_id'],
                      'entity_link' => ($alert['entity_type'] != "device" ? generate_entity_link($alert['entity_type'], $alert['entity_id'],NULL, NULL, TRUE, TRUE) : NULL),
                      'device_id' => $device['device_id'],
-                     'device_link' => generate_device_link($device, short_hostname($device['hostname'])),
+                     'device_link' => generate_device_link_short($device),
                      'time' => $alert['changed']);
   }
 
@@ -266,24 +265,20 @@ function generate_alert_entries($vars)
  * devices, uptime, ports, errors, services, bgp
  *
  * @param array $options
- * @return TRUE
+ *
+ * @return void|true
  *
  */
-function print_status_boxes($options, $limit = NULL)
-{
-  if(isset($options['widget_type']) && $options['widget_type'] == 'alert_boxes')
-  {
+function print_status_boxes($options, $limit = NULL) {
+  if (isset($options['widget_type']) && $options['widget_type'] === 'alert_boxes') {
     $status_array = generate_alert_entries(array('status' => 'failed')); //, 'entity_id' => '1'));
-  } else
-  {
-    $status_array = get_status_array($options);
+  } elseif ($status_array = get_status_array($options)) {
     $status_array = array_sort($status_array, 'sev', 'SORT_DESC');
   }
 
-  $count = count($status_array);
+  $count = safe_count($status_array);
 
-  if ($count == 0)
-  {
+  if ($count === 0) {
     echo '<div class="alert statusbox alert-info" style="border-left: 1px; width: 80%; height: 75px; margin-left:10%; float:none; display: block;">';
     echo '<div style="margin: auto; line-height: 75px; text-align: center;">There are currently no ongoing alert events.</div>';
     echo '</div>';
@@ -387,7 +382,7 @@ function get_status_array($options)
       $boxes[] = array('sev' => 100,
                        'class' => 'Device',
                        'event' => 'Down',
-                       'device_link' => generate_device_link($device, short_hostname($device['hostname'])),
+                       'device_link' => generate_device_link_short($device),
                        'time' => deviceUptime($device, 'short-3'),
                        'icon_tag' => '<i class="' . $config['entities']['device']['icon'] . '"></i>');
     }
@@ -411,7 +406,7 @@ function get_status_array($options)
         $boxes[] = array('sev' => 10,
                          'class' => 'Device',
                          'event' => 'Rebooted',
-                         'device_link' => generate_device_link($device, short_hostname($device['hostname'])),
+                         'device_link' => generate_device_link_short($device),
                          'time' => deviceUptime($device, 'short-3'),
                          'location' => $device['location'],
                          'icon_tag' => '<i class="' . $config['entities']['device']['icon'] . '"></i>');
@@ -455,7 +450,7 @@ function get_status_array($options)
       $boxes[] = array('sev' => 50,
                        'class' => 'Port',
                        'event' => 'Down',
-                       'device_link' => generate_device_link($port, short_hostname($port['hostname'])),
+                       'device_link' => generate_device_link_short($port),
                        'entity_link' => generate_port_link_short($port),
                        'time' => format_uptime($config['time']['now'] - strtotime($port['ifLastChange'])),
                        'location' => $device['location'],
@@ -488,7 +483,7 @@ function get_status_array($options)
       $boxes[] = array('sev' => $sev,
                        'class' => 'Port',
                        'event' => 'Errors',
-                       'device_link' => generate_device_link($device, short_hostname($device['hostname'])),
+                       'device_link' => generate_device_link_short($device),
                        'entity_link' => generate_port_link_short($port),
                        'time' => $port['string'],
                        'location' => $device['location'],
@@ -513,11 +508,11 @@ function get_status_array($options)
         humanize_bgp($peer);
         $peer_ip = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
 
-        $peer['wide'] = (strstr($peer['bgpPeerRemoteAddr'], ':')) ? TRUE : FALSE;
+        $peer['wide'] = str_contains($peer['bgpPeerRemoteAddr'], ':');
         $boxes[] = array('sev' => 75,
                          'class' => 'BGP Session',
                          'event' => 'Down',
-                         'device_link' => generate_device_link($peer, short_hostname($peer['hostname'])),
+                         'device_link' => generate_device_link_short($peer),
                          'entity_link' => $peer_ip,
                          'wide' => $peer['wide'],
                          'time' => format_uptime($peer['bgpPeerFsmEstablishedTime'], 'short-3'),

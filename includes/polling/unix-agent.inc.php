@@ -18,7 +18,7 @@ global $valid, $agent_sensors;
 // use
 // if ($device['os_group'] == "unix")
 // {
-  echo("Observium UNIX Agent: ");
+  print_cli_heading("Observium UNIX Agent");
 
   // Use port configured in config (or defaults)
   $agent_port = $config['unix-agent']['port'];

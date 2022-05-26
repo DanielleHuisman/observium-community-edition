@@ -14,15 +14,29 @@
 
 $i = 0;
 
-foreach (dbFetchRows("SELECT * FROM `devices`") as $device)
-{
+$where = [];
+$args  = [];
+
+if(!safe_empty($vars['poller_id'])) {
+  $where[] = "`poller_id` = ?";
+  $args[]  = $vars['poller_id'];
+}
+
+$query = "SELECT * FROM `devices`";
+if(safe_count($where)) {
+  $query .= " WHERE ";
+  $query .= implode(" AND ", $where);
+}
+
+foreach (dbFetchRows($query, $args) as $device) {
+  $devices[$device['device_id']] = $device;
+
   // Reference the cache.
   //$device = &$cache['devices']['id'][$id];
 
   $device['state'] = safe_unserialize($device['device_state']);
 
-  foreach($device['state']['poller_mod_perf'] AS $mod => $time)
-  {
+  foreach($device['state']['poller_mod_perf'] as $mod => $time) {
     $mods[$mod]['time'] += $time;
     $mods[$mod]['count']++;
     $mod_total += $time;
@@ -38,13 +52,11 @@ foreach (dbFetchRows("SELECT * FROM `devices`") as $device)
 
 $devices = array_sort_by($devices, 'mod_time', SORT_DESC, SORT_NUMERIC);
 
-foreach ($devices AS $device_id => $device)
-{
+foreach ($devices AS $device_id => $device) {
 
   $rrd_filename = get_rrd_path($device, 'perf-pollermodule-'.$vars['module'].'.rrd');
 
-  if (rrd_is_file($rrd_filename))
-  {
+  if (rrd_is_file($rrd_filename, TRUE)) {
 
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = str_pad($device['hostname'],25) ." (".$device['os'].")";
@@ -66,6 +78,4 @@ $nototal = 1;
 
 include($config['html_dir']."/includes/graphs/generic_multi_simplex_separated.inc.php");
 
-
-
-?>
+// EOF

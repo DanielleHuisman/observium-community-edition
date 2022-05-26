@@ -188,6 +188,7 @@ print_cli_heading("%WCompleted polling run at ".date("Y-m-d H:i:s"), 0);
 // Total MySQL usage
 $mysql_time = 0;
 $mysql_count = 0;
+$mysql_times = [];
 foreach($db_stats as $cmd => $count) {
   if (isset($db_stats[$cmd.'_sec'])) {
     $mysql_times[] = ucfirst(str_replace("fetch", "", $cmd))."[".$count."/".round($db_stats[$cmd.'_sec'],3)."s]";
@@ -237,8 +238,8 @@ if (!isset($options['q'])) {
   print_cli_data('Memory usage', formatStorage(memory_get_usage(TRUE), 2, 4).' (peak: '.formatStorage(memory_get_peak_usage(TRUE), 2, 4).')', 0);
   print_cli_data('MySQL Usage', implode(" ", $mysql_times) . ' ('.round($mysql_time, 3).'s '.round($mysql_time/$poller_time*100, 3).'%)', 0);
 
-
   $rrd_time = 0;
+  $rrd_times = [];
   foreach($GLOBALS['rrdtool'] as $cmd => $data) {
     $rrd_times[] = $cmd."[".$data['count']."/".round($data['time'],3)."s]";
     $rrd_time += $data['time'];
@@ -248,7 +249,7 @@ if (!isset($options['q'])) {
 
   $snmp_time = 0;
   $snmp_times = [];
-  foreach($GLOBALS['snmp_stats'] AS $cmd => $data) {
+  foreach($GLOBALS['snmp_stats'] as $cmd => $data) {
     $snmp_times[] = $cmd."[".$data['count']."/".round($data['time'],3)."s]";
     $snmp_time += $data['time'];
   }

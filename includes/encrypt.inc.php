@@ -92,16 +92,33 @@ function encrypt_mcrypt($string, $key) {
 function decrypt_mcrypt($encrypted, $key) {
   // Mcrypt deprecated in php > 7.0
   $key = pad_key($key);
-  return trim(mcrypt_decrypt(MCRYPT_RIJNDAEL_256, $key, safe_base64_decode($encrypted), MCRYPT_MODE_ECB), "\t\n\r\0\x0B");
+  $string = trim(mcrypt_decrypt(MCRYPT_RIJNDAEL_256, $key, safe_base64_decode($encrypted), MCRYPT_MODE_ECB), "\t\n\r\0\x0B");
+  if (!ctype_print($string)) {
+    // Incorrect encrypted strings, but I not sure if always correct!
+    //print_vars($string);
+    return FALSE;
+  }
+  return $string;
 }
 
-// DOCME needs phpdoc block
+/**
+ * Safe variant of base64_encode()
+ * @param $string
+ *
+ * @return string
+ */
 function safe_base64_encode($string) {
   $data = base64_encode($string);
   return str_replace(array('+','/','='), array('-','_',''), $data);
 }
 
-// DOCME needs phpdoc block
+/**
+ * Safe variant of base64_decode()
+ *
+ * @param $string
+ *
+ * @return string
+ */
 function safe_base64_decode($string) {
   $data = str_replace(array('-','_'), array('+','/'), $string);
   $mod4 = strlen($data) % 4;

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -178,19 +178,23 @@ $setting = 'page_refresh';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Refresh pages';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'enum'; // Normally this setting is just int, but we limit it with a pre-defined list
-$config_variable[$setting]['params']     = array(0    => array('name' =>   'Manually', 'icon' => 'icon-ban-circle'),
-                                                 60   => array('name' =>   '1 minute', 'icon' => 'icon-refresh'),
-                                                 120  => array('name' =>  '2 minutes', 'icon' => 'icon-refresh'),
-                                                 300  => array('name' =>  '5 minutes', 'icon' => 'icon-refresh'),
-                                                 900  => array('name' => '15 minutes', 'icon' => 'icon-refresh'),
-                                                 1800 => array('name' => '30 minutes', 'icon' => 'icon-refresh'));
+$config_variable[$setting]['params']     = [
+  0    => [ 'name' =>   'Manually', 'icon' => 'icon-ban-circle' ],
+  60   => [ 'name' =>   '1 minute', 'icon' => 'icon-refresh' ],
+  120  => [ 'name' =>  '2 minutes', 'icon' => 'icon-refresh' ],
+  300  => [ 'name' =>  '5 minutes', 'icon' => 'icon-refresh' ],
+  900  => [ 'name' => '15 minutes', 'icon' => 'icon-refresh' ],
+  1800 => [ 'name' => '30 minutes', 'icon' => 'icon-refresh' ]
+];
 $config_variable[$setting]['shortdesc']  = "Defines an autorefresh for pages in the web interface. If it's unset pages won't auto refresh.";
 
 $setting = "web_always_paginate";
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Always show pagination for lists';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Forces the UI to always generation pagination sections above and below lists. Useful to show total counts or to set pagination below 100 where required.';
 
@@ -198,6 +202,7 @@ $setting = "web_pagesize";
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Default pagination size';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'enum|10|20|50|100|500|1000|10000|50000';
 $config_variable[$setting]['shortdesc']  = 'The default number of items per page used by the web UI when paginating large tables. Default is 100.';
 
@@ -205,6 +210,7 @@ $setting = 'web_mouseover';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Mouseover popups';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable mouseover popups with extra information and graphs.';
 
@@ -212,6 +218,7 @@ $setting = 'web_mouseover_mobile';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Mouseover popups on Mobile phones/tablets';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Allow display of mouseover popups on Mobile devices.';
 
@@ -219,8 +226,20 @@ $setting = 'web_show_disabled';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Show disabled devices';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Whether to show disabled devices on major pages or not. (To hide disabled devices and their ports/alerts/etc, set this to FALSE).';
+
+$setting = 'web_device_name';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Default name to display device';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['hostname']    = [ 'name' => 'Hostname (default)' ];
+$config_variable[$setting]['params']['sysName']     = [ 'name' => 'sysName' ];
+$config_variable[$setting]['params']['description'] = [ 'name' => 'Description' ];
+$config_variable[$setting]['shortdesc']  = 'Default name to display device name. Allowed: hostname (default), sysName, description. When sysname or description empty, fallback as hostname.';
 
 $setting = 'web_enable_showtech';
 $config_variable[$setting]['section']    = $section;
@@ -240,6 +259,8 @@ $setting = 'web_theme_default';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Appearance';
 $config_variable[$setting]['name']       = 'Default Theme';
+$config_variable[$setting]['edition']    = 'pro';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'enum';
 $config_variable[$setting]['params']['light']    = array('name' => 'Light (default)', 'icon' => 'sprite-sun');
 $config_variable[$setting]['params']['dark']     = array('name' => 'Dark',            'icon' => 'sprite-moon');
@@ -254,6 +275,13 @@ $config_variable[$setting]['subsection'] = 'Caching';
 $config_variable[$setting]['name']       = 'Enable/disable caching';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster page generation, on very large installs. Not recommended for smaller installs.';
+
+$setting = 'cache|enable_cli';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Caching';
+$config_variable[$setting]['name']       = 'Enable/disable caching in CLI';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster Polling/Discovery operations with distributed installs. Not recommended for small installs.';
 
 $setting = 'cache|ttl';
 $config_variable[$setting]['section']     = $section;
@@ -390,6 +418,7 @@ $setting = 'rrdgraph_real_95th';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Graphs';
 $config_variable[$setting]['name']       = 'Display 95% percentile';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable or disable display the 95% based on the highest value for ports (aka real 95%).';
 
@@ -397,10 +426,22 @@ $setting = 'graphs|style';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Graphs';
 $config_variable[$setting]['name']       = 'Graph style';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['default'] = array('name' => 'Default');
-$config_variable[$setting]['params']['mrtg']    = array('name' => 'MRTG');
+$config_variable[$setting]['params']['default'] = [ 'name' => 'Default' ];
+$config_variable[$setting]['params']['mrtg']    = [ 'name' => 'MRTG' ];
 $config_variable[$setting]['shortdesc']  = 'Use alternative graph style. NOTE: MRTG style currently works only for port bits graphs.';
+
+$setting = 'graphs|size';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Graph size';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+//$config_variable[$setting]['params']['small']  = [ 'name' => 'Small' ];
+$config_variable[$setting]['params']['normal'] = [ 'name' => 'Normal' ];
+$config_variable[$setting]['params']['big']    = [ 'name' => 'Large' ];
+$config_variable[$setting]['shortdesc']  = 'Common graphs view size on most pages (not at all).';
 
 $setting = 'graphs|stacked_processors';
 $config_variable[$setting]['section']    = $section;
@@ -409,14 +450,14 @@ $config_variable[$setting]['name']       = 'Enable Stacked Processor Graphs';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable the use of stacked processor graphs for OS types with "processor_stacked" enabled.';
 
-
 $setting = 'graphs|ports_scale_default';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Graphs';
 $config_variable[$setting]['name']       = 'Ports graph default scale';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['auto']  = array('name' => 'Autoscale');
-$config_variable[$setting]['params']['speed'] = array('name' => 'Interface Speed');
+$config_variable[$setting]['params']['auto']  = [ 'name' => 'Autoscale' ];
+$config_variable[$setting]['params']['speed'] = [ 'name' => 'Interface Speed' ];
 foreach ($config['graphs']['ports_scale_list'] as $entry) {
   $speed = (int)unit_string_to_numeric($entry, 1000);
   $config_variable[$setting]['params'][$entry] = formatRates($speed, 4, 4);
@@ -435,6 +476,7 @@ $setting = 'graphs|always_draw_max';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Graphs';
 $config_variable[$setting]['name']       = 'Always draw "Max" area on graphs';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Always draw the Max RRA on graphs. By default this is suppressed for graphs of one week or shorter.';
 
@@ -543,6 +585,13 @@ $config_variable[$setting]['subsection'] = 'Ports Modules';
 $config_variable[$setting]['name']       = 'Enable Polling FDB count';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable Polling FDB count.';
+
+$setting = 'enable_ports_64bit';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Ports Modules';
+$config_variable[$setting]['name']       = 'Poll 64bit counters';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Prefer 64bit (HC) counters when available.';
 
 //$setting = 'enable_ports_separate_walk';
 //$config_variable[$setting]['section']    = $section;
@@ -1625,6 +1674,19 @@ $config_variable[$setting]['name']       = 'Enable Syslog DEBUG';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = "Enable store RAW syslog lines into logs/debug.log file. Make sure that logs dir and debug.log file have write permission for your syslog server user. For example in Ubuntu rsyslog uses user syslog, add write permission for it: `sudo chmod o+w ".$config['log_dir']."/debug.log`";
 $config_variable[$setting]['set_attrib'] = 'syslog_config_changed'; //set_obs_attrib('syslog_config_changed', time()); // Trigger reload syslog script
+
+$setting = 'syslog|timestamp';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Timestamp';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['system'] = [ 'name' => 'System (default)' ];
+$config_variable[$setting]['params']['syslog'] = [ 'name' => 'Syslog' ];
+$config_variable[$setting]['params']['60']     = [ 'name' => '1 min difference' ];
+$config_variable[$setting]['params']['3600']   = [ 'name' => '1 hour difference' ];
+$config_variable[$setting]['params']['86400']  = [ 'name' => '1 day difference' ];
+$config_variable[$setting]['shortdesc']  = 'Use timestamp from Observium system (default) or from syslog server. You can set this param to number of seconds, when diff timestams of system and syslog greater this use syslog (instead system).';
+$config_variable[$setting]['set_attrib'] = 'syslog_config_changed';
 
 $setting = 'syslog|fifo';
 $config_variable[$setting]['section']    = $section;

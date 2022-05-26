@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -19,7 +19,7 @@ define('OBS_PROCESS_NAME', basename($scriptname, '.php'));
 $base_dir = isset($config['install_dir']) ? $config['install_dir'] : dirname(__DIR__);
 
 // Clear config array, we're starting with a clean state
-$config = array();
+$config = [];
 
 require($base_dir."/includes/defaults.inc.php");
 require($base_dir."/config.php");
@@ -34,6 +34,20 @@ require_once($config['install_dir'] . "/includes/common.inc.php");
 
 // Die if exec/proc_open functions disabled in php.ini. This install not functional for run Observium.
 if (!is_exec_available()) { die; }
+
+if (PHP_VERSION_ID < 80100) {
+  try {
+    //date_create('now');
+    new DateTime('now');
+  } catch(Exception $e) {
+    if (strpos($e->getMessage(), 'date.timezone') !== FALSE) {
+      // Fix incorrect timezone setting and prevent fatal exception in DateTime
+      ini_set('date.timezone', date_default_timezone_get());
+    }
+    //echo $e->getMessage();
+    //var_dump($e);
+  }
+}
 
 // Load definitions
 $def_start = microtime(TRUE);
@@ -51,7 +65,7 @@ require_once($config['install_dir'] . "/includes/functions.inc.php");
 //   $GLOBALS[OBS_DB_LINK] = dbOpen($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
 // }
 
-if (!$GLOBALS[OBS_DB_LINK]) {
+if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
   if (defined('OBS_DB_SKIP') && OBS_DB_SKIP === TRUE) {
     print_warning("WARNING: In PHP Unit tests we can skip DB connect. But if you test db functions, check your configs.");
   } else {
@@ -72,7 +86,7 @@ if (!$GLOBALS[OBS_DB_LINK]) {
   //]
   $db_modes_exclude = [ 'STRICT_TRANS_TABLES', 'STRICT_ALL_TABLES', 'ONLY_FULL_GROUP_BY',
                         'NO_ZERO_DATE', 'NO_ZERO_IN_DATE', 'ERROR_FOR_DIVISION_BY_ZERO' ];
-  $db_modes_update  = array();
+  $db_modes_update  = [];
   foreach ($db_modes_exclude as $db_mode_exclude) {
     if (in_array($db_mode_exclude, $db_modes)) {
       $db_modes_update[] = $db_mode_exclude;
@@ -80,7 +94,7 @@ if (!$GLOBALS[OBS_DB_LINK]) {
   }
   if (count($db_modes_update)) {
     $db_modes = array_diff($db_modes, $db_modes_update);
-    dbQuery('SET SESSION `sql_mode` = ?', array(implode(',', $db_modes)));
+    dbQuery('SET SESSION `sql_mode` = ?', [ implode(',', $db_modes) ]);
     print_debug('DB mode(s) disabled: '.implode(', ', $db_modes_update));
   }
   //register_shutdown_function('dbClose');
@@ -144,8 +158,7 @@ include($config['install_dir']."/config.php");
 
 // Init RRDcached
 
-if (isset($config['rrdcached']) && !preg_match('!^\s*(unix:)?/!i', $config['rrdcached']))
-{
+if (isset($config['rrdcached']) && !preg_match('!^\s*(unix:)?/!i', $config['rrdcached'])) {
   // RRD files located on remote server
   define('OBS_RRD_NOLOCAL', TRUE);
 } else {
@@ -154,27 +167,24 @@ if (isset($config['rrdcached']) && !preg_match('!^\s*(unix:)?/!i', $config['rrdc
 
 // Init StatsD
 
-if ($config['statsd']['enable'] && class_exists('StatsD'))
-{
+if ($config['statsd']['enable'] && class_exists('StatsD')) {
   //$statsd = new StatsD(array('host' => $config['statsd']['host'], 'port' => $config['statsd']['port']));
-  StatsD::$config = array(
+  StatsD::$config = [
     'host' => $config['statsd']['host'],
     'port' => $config['statsd']['port'],
-  );
+  ];
 }
 
 
 // Escape all cmd paths
 //FIXME, move all cmd config into $config['cmd'][path]
-$cmds = array('rrdtool', 'fping', 'fping6', 'snmpwalk', 'snmpget',
-              'snmpbulkget', 'snmpbulkwalk', 'snmptranslate', 'whois',
-              'mtr', 'nmap', 'ipmitool', 'virsh', 'dot', 'unflatten',
-              'neato', 'sfdp', 'svn', 'git', 'wmic', 'file', 'wc',
-              'sudo', 'tail', 'cut', 'tr',
-             );
+$cmds = [ 'rrdtool', 'fping', 'fping6', 'snmpwalk', 'snmpget',
+          'snmpbulkget', 'snmpbulkwalk', 'snmptranslate', 'whois',
+          'mtr', 'nmap', 'ipmitool', 'virsh', 'dot', 'unflatten',
+          'neato', 'sfdp', 'svn', 'git', 'wmic', 'file', 'wc',
+          'sudo', 'tail', 'cut', 'tr' ];
 
-foreach ($cmds as $path)
-{
+foreach ($cmds as $path) {
   if (isset($config[$path])) { $config[$path] = escapeshellcmd($config[$path]); }
 }
 unset($cmds, $path);
@@ -235,70 +245,71 @@ if (is_cli() && isset($config['external_url'])) {
 
 // If we're on SSL, let's properly detect it
 if (is_ssl()) {
+  //print_vars($_SERVER["HTTP_HOST"]);
+  //print_vars($_SERVER["SERVER_NAME"]);
   $config['base_url'] = preg_replace('/^http:/', 'https:', $config['base_url']);
   $config['base_url'] = preg_replace('!^(https://[^/]+?):443(/)!', '$1$2', $config['base_url']);
 }
 
 // Old variable backwards compatibility
-if (isset($config['rancid_configs']) && !is_array($config['rancid_configs'])) { $config['rancid_configs'] = array($config['rancid_configs']); }
-if (isset($config['auth_ldap_group']) && !is_array($config['auth_ldap_group'])) { $config['auth_ldap_group'] = array($config['auth_ldap_group']); }
-if (isset($config['auth_ldap_kerberized']) && $config['auth_ldap_kerberized'] && $config['auth_mechanism'] === 'ldap') { $config['auth']['remote_user'] = TRUE; }
+if (isset($config['rancid_configs']) && !is_array($config['rancid_configs'])) {
+  $config['rancid_configs'] = [ $config['rancid_configs'] ];
+}
+if (isset($config['auth_ldap_group']) && !is_array($config['auth_ldap_group'])) {
+  $config['auth_ldap_group'] = [ $config['auth_ldap_group'] ];
+}
+if (isset($config['auth_ldap_kerberized']) && $config['auth_ldap_kerberized'] && $config['auth_mechanism'] === 'ldap') {
+  $config['auth']['remote_user'] = TRUE;
+}
 
 // Reset possible old geocode api
 $config['geocoding']['api'] = strtolower(trim($config['geocoding']['api']));
 if (!isset($config['geo_api'][$config['geocoding']['api']]) ||
-    !$config['geo_api'][$config['geocoding']['api']]['enable'])
-{
+    !$config['geo_api'][$config['geocoding']['api']]['enable']) {
   $config['geocoding']['api'] = 'geocodefarm';
 }
 
 //print_vars($config['location_map']);
-if (isset($config['location_map']))
-{
+if (isset($config['location_map'])) {
   $config['location']['map'] = array_merge((array)$config['location_map'], (array)$config['location']['map']);
   unset($config['location_map']);
 }
 //print_vars($config['location']['map']);
 //print_vars($config['location']['map_regexp']);
-if ($config['location']['menu']['type'] === 'geocoded')
-{
-  if (isset($config['geocoding']['enable']) && !$config['geocoding']['enable'])            { $config['location']['menu']['type'] = 'plain'; }
-  elseif (isset($config['location_menu_geocoded']) && !$config['location_menu_geocoded']) { $config['location']['menu']['type'] = 'plain'; }
+if ($config['location']['menu']['type'] === 'geocoded') {
+  if (isset($config['geocoding']['enable']) && !$config['geocoding']['enable']) {
+    $config['location']['menu']['type'] = 'plain';
+  } elseif (isset($config['location_menu_geocoded']) && !$config['location_menu_geocoded']) {
+    $config['location']['menu']['type'] = 'plain';
+  }
 }
 
 // Compat xdp ignore options
-if (isset($config['bad_xdp']))
-{
+if (isset($config['bad_xdp'])) {
   $config['xdp']['ignore_hostname'] = array_merge((array)$config['xdp']['ignore_hostname'], (array)$config['bad_xdp']);
 }
-if (isset($config['bad_xdp_regexp']))
-{
+if (isset($config['bad_xdp_regexp'])) {
   $config['xdp']['ignore_hostname_regex'] = array_merge((array)$config['xdp']['ignore_hostname_regex'], (array)$config['bad_xdp_regexp']);
 }
-if (isset($config['bad_xdp_platform']))
-{
+if (isset($config['bad_xdp_platform'])) {
   $config['xdp']['ignore_platform'] = array_merge((array)$config['xdp']['ignore_platform'], (array)$config['bad_xdp_platform']);
 }
 
 // Compat for adama ;)
-if (isset($config['sensors_limits_events']))
-{
+if (isset($config['sensors_limits_events'])) {
   $config['sensors']['limits_events'] = $config['sensors_limits_events'];
 }
 
 // Security fallback check
-if (isset($config['auth']['remote_user']) && $config['auth']['remote_user'] && !isset($_SERVER['REMOTE_USER']))
-{
+if (isset($config['auth']['remote_user']) && $config['auth']['remote_user'] && !isset($_SERVER['REMOTE_USER'])) {
   // Disable remote_user, Apache did not pass a username! Misconfigured?
   // FIXME log this somewhere?
   $config['auth']['remote_user'] = FALSE;
 }
 
 // Database currently stores v6 networks non-compressed, check for any compressed subnet and expand them
-foreach ($config['ignore_common_subnet'] as $i => $content)
-{
-  if (str_contains($content, ':'))
-  {
+foreach ($config['ignore_common_subnet'] as $i => $content) {
+  if (str_contains($content, ':')) {
     // NOTE. ipv6_networks have uncompressed but not fixed length
     $config['ignore_common_subnet'][$i] = ip_uncompress($content, FALSE);
   }
@@ -306,10 +317,8 @@ foreach ($config['ignore_common_subnet'] as $i => $content)
 
 unset($i); unset($content);
 
-// Disable phpFastCache for PHP less than 5.6, since it unsupported
-if ($config['cache']['enable'] && PHP_VERSION_ID < 50600) {
-  $config['cache']['enable'] = FALSE;
-}
+// Load phpFastCache (after load sql config!)
+include_once($config['install_dir'] . '/includes/cache.inc.php');
 
 // Generate poller id if we're a partitioned poller and we don't yet have one.
 /*
@@ -322,6 +331,9 @@ else
 if (OBSERVIUM_EDITION === 'community') {
   // Distributed pollers not available on community edition
   $config['poller_id'] = 0;
+
+  // Not possible Distributed pollers in CE
+  define('OBS_DISTRIBUTED', FALSE);
 } elseif (isset($options['p']) && is_intnum($options['p']) && $options['p'] >= 0) {
   // Poller id passed in poller wrapper
   $config['poller_id'] = (int) $options['p'];
@@ -342,6 +354,9 @@ if (OBSERVIUM_EDITION === 'community') {
     $config['poller_id'] = (int) $options['p'];
   }
   */
+
+  // Definitely distributed
+  define('OBS_DISTRIBUTED', TRUE);
 } elseif (isset($config['poller_name'])) {
   $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `poller_name` = ?", array($GLOBALS['config']['poller_name']));
 
@@ -359,9 +374,14 @@ if (OBSERVIUM_EDITION === 'community') {
   }
   unset($poller_id, $poller);
 
+  // Definitely distributed
+  define('OBS_DISTRIBUTED', TRUE);
 } else {
   // Default poller
   $config['poller_id'] = 0;
+
+  // Detect distributed
+  define('OBS_DISTRIBUTED', dbExist('pollers'));
 }
 
 // EOF

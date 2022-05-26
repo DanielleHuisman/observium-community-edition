@@ -328,68 +328,81 @@ function get_ip_prefix($entry) {
  * @param string $address IP address string
  * @return mixed IP version or FALSE if passed incorrect address
  */
-function get_ip_version($address)
-{
-  $address_version = FALSE;
-  if      (strpos($address, '/') !== FALSE)
-  {
+function get_ip_version($address) {
+
+  if (str_contains($address, '/')) {
     // Dump condition,
     // IPs with CIDR not correct for us here
+    return FALSE;
   }
-  //else if (strpos($address, '.') !== FALSE && Net_IPv4::validateIP($address))
-  elseif (preg_match('%^'.OBS_PATTERN_IPV4.'$%', $address))
-  {
+
+  $address_version = FALSE;
+  if (preg_match('%^'.OBS_PATTERN_IPV4.'$%', $address)) {
     $address_version = 4;
-  }
-  //else if (strpos($address, ':') !== FALSE && Net_IPv6::checkIPv6($address))
-  elseif (preg_match('%^'.OBS_PATTERN_IPV6.'$%i', $address))
-  {
+  } elseif (preg_match('%^'.OBS_PATTERN_IPV6.'$%i', $address)) {
     $address_version = 6;
   }
+
   return $address_version;
 }
 
 /**
  * Function for compress IPv6 address and keep as is IPv4 (already compressed)
  *
- * @param string $address IPv4 or IPv6 address
+ * @param string|array $address IPv4 or IPv6 address
  * @param bool   $force If true, an already compressed IP address will be compressed again
  *
- * @return string Compressed address string
+ * @return string|array Compressed address string
  */
-function ip_compress($address, $force = TRUE)
-{
+function ip_compress($address, $force = TRUE) {
+
+  // Recursive compress for arrays
+  if (is_array($address)) {
+    $array = [];
+    foreach ($address as $entry) {
+      $array[] = ip_compress($entry, $force);
+    }
+    return $array;
+  }
+
   list($ip, $net) = explode('/', $address);
-  if (get_ip_version($ip) === 6)
-  {
+  if (get_ip_version($ip) === 6) {
     $address = Net_IPv6::compress($ip, $force);
-    if (is_numeric($net) && ($net >= 0) && ($net <= 128))
-    {
+    if (is_numeric($net) && ($net >= 0) && ($net <= 128)) {
       $address .= '/'.$net;
     }
   }
+
   return $address;
 }
 
 /**
  * Function for uncompress IPv6 address and keep as is IPv4
  *
- * @param string $address IPv4 or IPv6 address
+ * @param string|array $address IPv4 or IPv6 address
  * @param bool   $leading_zeros If true, the uncompressed address has a fixed length
  *
- * @return string Uncompressed address string
+ * @return string|array Uncompressed address string
  */
-function ip_uncompress($address, $leading_zeros = TRUE)
-{
+function ip_uncompress($address, $leading_zeros = TRUE) {
+
+  // Recursive uncompress for arrays
+  if (is_array($address)) {
+    $array = [];
+    foreach ($address as $entry) {
+      $array[] = ip_uncompress($entry, $leading_zeros);
+    }
+    return $array;
+  }
+
   list($ip, $net) = explode('/', $address);
-  if (get_ip_version($ip) === 6)
-  {
+  if (get_ip_version($ip) === 6) {
     $address = Net_IPv6::uncompress($ip, $leading_zeros);
-    if (is_numeric($net) && ($net >= 0) && ($net <= 128))
-    {
+    if (is_numeric($net) && ($net >= 0) && ($net <= 128)) {
       $address .= '/'.$net;
     }
   }
+
   return $address;
 }
 
@@ -437,24 +450,20 @@ function safe_ip_hostname_key(&$hostname, &$ip = NULL)
  * @return bool Returns TRUE if address is valid, FALSE if not valid.
  */
 // TESTME needs unit testing
-function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
-{
+function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL) {
 
-  if (str_contains_array($ipv4_address, '/'))
-  {
+  if (str_contains($ipv4_address, '/')) {
     list($ipv4_address, $ipv4_prefixlen) = explode('/', $ipv4_address);
   }
   $ip_full = $ipv4_address . '/' . $ipv4_prefixlen;
 
   // False if invalid IPv4 syntax
-  if (strlen($ipv4_prefixlen) &&
-      !preg_match('%^'.OBS_PATTERN_IPV4_NET.'$%', $ip_full))
-  {
+  if (strlen((string)$ipv4_prefixlen) &&
+      !preg_match('%^'.OBS_PATTERN_IPV4_NET.'$%', $ip_full)) {
     // Address with prefix
     return FALSE;
   }
-  elseif (!preg_match('%^'.OBS_PATTERN_IPV4.'$%i', $ipv4_address))
-  {
+  if (!preg_match('%^'.OBS_PATTERN_IPV4.'$%i', $ipv4_address)) {
     // Address without prefix
     return FALSE;
   }
@@ -469,12 +478,10 @@ function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
   // {
   //   $ignore_type[] = 'link-local';
   // }
-  if (in_array('broadcast', $GLOBALS['config']['ip-address']['ignore_type']))
-  {
+  if (in_array('broadcast', $GLOBALS['config']['ip-address']['ignore_type'])) {
     $ignore_type[] = 'broadcast';
   }
-  if (in_array($ipv4_type, $ignore_type))
-  {
+  if (in_array($ipv4_type, $ignore_type)) {
     print_debug("Address $ip_full marked as invalid by type [$ipv4_type].");
     return FALSE;
   }
@@ -492,22 +499,19 @@ function is_ipv4_valid($ipv4_address, $ipv4_prefixlen = NULL)
  * @return bool Returns TRUE if address is valid, FALSE if not valid.
  */
 // TESTME needs unit testing
-function is_ipv6_valid($ipv6_address, $ipv6_prefixlen = NULL)
-{
-  if (str_contains_array($ipv6_address, '/')) {
+function is_ipv6_valid($ipv6_address, $ipv6_prefixlen = NULL) {
+  if (str_contains($ipv6_address, '/')) {
     list($ipv6_address, $ipv6_prefixlen) = explode('/', $ipv6_address);
   }
   $ip_full = $ipv6_address . '/' . $ipv6_prefixlen;
 
   // False if invalid IPv6 syntax
-  if (strlen($ipv6_prefixlen) &&
-      !preg_match('%^'.OBS_PATTERN_IPV6_NET.'$%i', $ip_full))
-  {
+  if (strlen((string)$ipv6_prefixlen) &&
+      !preg_match('%^'.OBS_PATTERN_IPV6_NET.'$%i', $ip_full)) {
     // Address with prefix
     return FALSE;
   }
-  elseif (!preg_match('%^'.OBS_PATTERN_IPV6.'$%i', $ipv6_address))
-  {
+  if (!preg_match('%^'.OBS_PATTERN_IPV6.'$%i', $ipv6_address)) {
     // Address without prefix
     return FALSE;
   }
@@ -517,16 +521,13 @@ function is_ipv6_valid($ipv6_address, $ipv6_prefixlen = NULL)
   // False if link-local, unspecified
   $ignore_type = [ 'unspecified' ];
   // It this address types (link-local, broadcast) removed from config by user, allow to discover it too
-  if (in_array('link-local', $GLOBALS['config']['ip-address']['ignore_type']))
-  {
+  if (in_array('link-local', $GLOBALS['config']['ip-address']['ignore_type'])) {
     $ignore_type[] = 'link-local';
   }
-  if (in_array('broadcast', $GLOBALS['config']['ip-address']['ignore_type']))
-  {
+  if (in_array('broadcast', $GLOBALS['config']['ip-address']['ignore_type'])) {
     $ignore_type[] = 'broadcast';
   }
-  if (in_array($ipv6_type, $ignore_type))
-  {
+  if (in_array($ipv6_type, $ignore_type)) {
     print_debug("Address $ip_full marked as invalid by type [$ipv6_type].");
     return FALSE;
   }

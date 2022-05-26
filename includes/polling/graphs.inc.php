@@ -27,8 +27,8 @@ foreach (get_device_mibs_permitted($device) as $mib) {
   }
 }
 
-$check_vrfs = (empty($device['snmp_context']) && // Device not already with context
-               isset($config['os'][$device['os']]['snmp']['context']) && $config['os'][$device['os']]['snmp']['context'] && // Context permitted for os
+$check_vrfs = (safe_empty($device['snmp_context']) && // Device not already with context
+               isset($config['os'][$device['os']]['snmp']['virtual']) && $config['os'][$device['os']]['snmp']['virtual'] && // Context permitted for os
                $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts')));
 
 foreach ($table_defs as $mib => $mib_tables) {
@@ -57,9 +57,10 @@ foreach ($table_defs as $mib => $mib_tables) {
       // Keep original device array
       $device_original = $device;
 
-      foreach ($vrf_contexts as $vrf_name => $snmp_context) {
-        echo("[VRF $vrf_name] ");
-        $device['snmp_context'] = $snmp_context;
+      foreach ($vrf_contexts as $vrf_name => $snmp_virtual) {
+        echo("[Virtual Routing $vrf_name] ");
+        $device = snmp_virtual_device($device_original, $snmp_virtual);
+        //$device['snmp_context'] = $snmp_context;
         if ($graphs_ng) {
           echo("NEW GRAPHS polling ");
           collect_table_ng($device, $table_def, $graphs);

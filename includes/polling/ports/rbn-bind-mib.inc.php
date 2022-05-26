@@ -14,10 +14,9 @@
 /// but only informational fields (without stats)
 
 // Try Ports in VRF SNMP contexts
-if (empty($device['snmp_context']) && // Device not already with context
-    isset($config['os'][$device['os']]['snmp']['context']) && $config['os'][$device['os']]['snmp']['context'] && // Context permitted for os
-    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) // SNMP VRF context discovered for device
-{
+if (safe_empty($device['snmp_context']) && // Device not already with context
+    isset($config['os'][$device['os']]['snmp']['virtual']) && $config['os'][$device['os']]['snmp']['virtual'] && // Context permitted for os
+    $vrf_contexts = safe_json_decode(get_entity_attrib('device', $device, 'vrf_contexts'))) { // SNMP VRF context discovered for device
   // Keep original device array
   $device_original = $device;
   $vrf_ports = [];

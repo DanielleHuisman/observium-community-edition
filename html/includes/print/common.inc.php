@@ -92,7 +92,7 @@ function build_table_row($array, $options = [])
   $cols = 0;
   foreach ($array as $entry)
   {
-    $cols = max(count((array)$entry), $cols);
+    $cols = max(safe_count($entry), $cols);
   }
 
   // start table
@@ -185,7 +185,7 @@ function print_refresh($vars)
   $refresh_allowed = TRUE;
   foreach ($refresh_disabled as $var_test)
   {
-    $var_count = count($var_test);
+    $var_count = safe_count($var_test);
     foreach ($var_test as $key => $value)
     {
       if (isset($vars[$key]) && $vars[$key] == $value) { $var_count--; }
@@ -313,7 +313,7 @@ function get_label_group($params = [], $opt = [], $escape = TRUE) {
   }
   $html .= '>' . PHP_EOL;
 
-  $items_count = count($params);
+  //$items_count = count($params);
   $html_params = [];
   foreach ($params as $param_id => $param)
   {
@@ -358,7 +358,7 @@ function get_label_group($params = [], $opt = [], $escape = TRUE) {
   }
 
   // Return single label (without group), since label group for single item is incorrect
-  if (count($params) === 1) {
+  if (safe_count($params) === 1) {
     return array_shift($html_params);
   }
 
@@ -451,12 +451,24 @@ function get_markdown($markdown, $escape = TRUE, $extra = FALSE) {
   } else {
     $parsedown = new Parsedown();
   }
+  if (str_contains_array($markdown, [ "\n", "\r" ])) {
+    // Multiline texts must use text()
+    $html = $parsedown
+      ->setMarkupEscaped($escape) # escapes markup (HTML)
+      ->setBreaksEnabled(TRUE) # enables automatic line breaks
+      ->text($markdown);
+
+    return '<div style="min-width: 150px;">'.PHP_EOL.$html.PHP_EOL.'</div>';
+  }
+
+  // Single line (used for messages, eventlogs)
   $html = $parsedown
     ->setMarkupEscaped($escape) # escapes markup (HTML)
     ->setBreaksEnabled(TRUE) # enables automatic line breaks
     ->line($markdown);
+
   //print_vars($html);
-  return '<span style="min-width: 150px;">'.$html.'</span>';
+  return '<span style="min-width: 150px;">' . $html . '</span>';
 }
 
 /**

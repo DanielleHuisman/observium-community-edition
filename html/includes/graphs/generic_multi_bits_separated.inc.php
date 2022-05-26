@@ -16,7 +16,7 @@ include($config['html_dir']."/includes/graphs/common.inc.php");
 #$graph_return['valid_options'][] = "previous";
 #$graph_return['valid_options'][] = "total";
 #$graph_return['valid_options'][] = "trend";
-$graph_return['valid_options'][] = "line_graph";
+$graph_return['valid_options'] = [ "inverse", "line_graph" ];
 
 $i = 0;
 if ($width > "500")
@@ -75,7 +75,6 @@ foreach ($rrd_list as $rrd)
   $rrd_options .= " DEF:".$in.$i."_min=".$rrd_filename_escape.":".$ds_in.":MIN ";
   $rrd_options .= " DEF:".$out.$i."_min=".$rrd_filename_escape.":".$ds_out.":MIN ";
 
-
   $RRAs = array('ave' => '', 'min' => '_min', 'max' => '_max');
 
   foreach($RRAs AS $label => $rra) {
@@ -87,6 +86,17 @@ foreach ($rrd_list as $rrd)
 
   $rrd_multi['in_thing'][]  = $in.$i;
   $rrd_multi['out_thing'][] = $out.$i;
+
+  if ($vars['previous'])
+  {
+    $rrd_options .= " DEF:".$in.$i."X=".$rrd_filename_escape.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$out.$i."X=".$rrd_filename_escape.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " SHIFT:".$in.$i."X:$period";
+    $rrd_options .= " SHIFT:".$out.$i."X:$period";
+
+    $rrd_multi['in_thingX'][]  = "in".$i."X";
+    $rrd_multi['out_thingX'][] = "out".$i."X";
+  }
 
   $rrd_options .= " VDEF:totin".$i."=in".$i.",TOTAL";
   $rrd_options .= " VDEF:totout".$i."=out".$i.",TOTAL";
@@ -147,6 +157,20 @@ $rrd_options .= " CDEF:pout_tmp=doutbits,-1,* VDEF:dpout_tmp=pout_tmp,95,PERCENT
 $rrd_options .= " VDEF:totin=inoctets,TOTAL";
 $rrd_options .= " VDEF:totout=outoctets,TOTAL";
 
+if ($vars['previous'] == "yes")
+{
+
+  $rrd_options .= " CDEF:".$in."octetsX=" . rrd_aggregate_dses($rrd_multi['in_thingX']);;
+  $rrd_options .= " CDEF:".$out."octetsX=" . rrd_aggregate_dses($rrd_multi['in_thingX']);
+  $rrd_options .= " CDEF:doutoctetsX=outoctetsX,-1,*";
+  $rrd_options .= " CDEF:inbitsX=inoctetsX,8,*";
+  $rrd_options .= " CDEF:outbitsX=outoctetsX,8,*";
+  $rrd_options .= " CDEF:doutbitsX=doutoctetsX,8,*";
+  $rrd_options .= " VDEF:95thinX=inbitsX,95,PERCENT";
+  $rrd_options .= " VDEF:95thoutX=outbitsX,95,PERCENT";
+  $rrd_options .= " CDEF:poutX_tmp=doutbitsX,-1,* VDEF:dpoutX_tmp=poutX_tmp,95,PERCENT CDEF:dpoutX_tmp2=doutbitsX,doutbitsX,-,dpoutX_tmp,-1,*,+ VDEF:d95thoutX=dpoutX_tmp2,FIRST";
+}
+
 $rrd_options .= " 'COMMENT: \\n'";
 $rrd_options .= " 'COMMENT:Aggregate Totals\\n'";
 
@@ -170,12 +194,16 @@ if (!$nototal && $width > "500") {
 }
 $rrd_options .= " COMMENT:\\n";
 
-
-
 if ($custom_graph) { $rrd_options .= $custom_graph; }
 
 $rrd_options .= $rrd_optionsb;
 $rrd_options .= " HRULE:0#999999";
+
+if ($vars['previous'] == "yes")
+{
+  $rrd_options .= " AREA:inbitsX#99999966:";
+  $rrd_options .= " AREA:doutbitsX#99999966:";
+}
 
 // Clean
 unset($rrd_multi, $in_thing, $out_thing, $pluses, $stack);

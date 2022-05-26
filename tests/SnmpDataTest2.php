@@ -1,6 +1,6 @@
 <?php
 
-//define('OBS_DEBUG', 1);
+//define('OBS_DEBUG', 2);
 //define('OBS_QUIET', TRUE); // Disable any additional output from tests
 ini_set('opcache.enable', 0);
 
@@ -34,9 +34,9 @@ if (is_dir($snmpsimd_data))
   sleep(2); // Sleep before tests, because snmpsimd can get stuck
 }
 
-class IncludesSnmpTest2 extends \PHPUnit\Framework\TestCase
+class SnmpDataTest2 extends \PHPUnit\Framework\TestCase
 {
-  protected function setUp()
+  protected function setUp(): void
   {
     global $snmpsimd_ip, $snmpsimd_port, $snmpsimd_data;
 
@@ -138,6 +138,10 @@ class IncludesSnmpTest2 extends \PHPUnit\Framework\TestCase
     {
       $test = snmp_getnext_oid($device, $oid, $mib, NULL, $flags);
       //var_dump($test);
+      if (strpos($result, '::') !== FALSE) {
+        // snmpgetnext have different output from snmpget
+        list(, $result) = explode('::', $result, 2);
+      }
       $this->assertSame($result, $test);
     }
   }
@@ -154,7 +158,6 @@ class IncludesSnmpTest2 extends \PHPUnit\Framework\TestCase
     $sysdescr_ftos     .= "Series: S4810\r\n";
     $sysdescr_ftos     .= "Copyright (c) 1999-2015 by Dell Inc. All Rights Reserved.\r\n";
     $sysdescr_ftos     .= "Build Time: Thu Feb  4 06:57:34 2016";
-    // Note, here \n as line ends!
     $sysdescr_ftos_hex  = "\"44 65 6C 6C 20 4E 65 74 77 6F 72 6B 69 6E 67 20 ";
     $sysdescr_ftos_hex .= "4F 53 0D 0A 4F 70 65 72 61 74 69 6E 67 20 53 79 ";
     $sysdescr_ftos_hex .= "73 74 65 6D 20 56 65 72 73 69 6F 6E 3A 20 32 2E ";
@@ -167,9 +170,9 @@ class IncludesSnmpTest2 extends \PHPUnit\Framework\TestCase
     $sysdescr_ftos_hex .= "20 41 6C 6C 20 52 69 67 68 74 73 20 52 65 73 65 ";
     $sysdescr_ftos_hex .= "72 76 65 64 2E 0D 0A 42 75 69 6C 64 20 54 69 6D ";
     $sysdescr_ftos_hex .= "65 3A 20 54 68 75 20 46 65 62 20 20 34 20 30 36 ";
-    $sysdescr_ftos_hex .= "3A 35 37 3A 33 34 20 32 30 31 36 ";
-    $distro_ubuntu_hex  = "4C 69 6E 75 78 7C 34 2E 34 2E 30 2D 37 37 2D 67 \n";
-    $distro_ubuntu_hex .= "65 6E 65 72 69 63 7C 61 6D 64 36 34 7C 55 62 75 \n";
+    $sysdescr_ftos_hex .= "3A 35 37 3A 33 34 20 32 30 31 36 \"";
+    $distro_ubuntu_hex  = "4C 69 6E 75 78 7C 34 2E 34 2E 30 2D 37 37 2D 67 ";
+    $distro_ubuntu_hex .= "65 6E 65 72 69 63 7C 61 6D 64 36 34 7C 55 62 75 ";
     $distro_ubuntu_hex .= "6E 74 75 7C 31 36 2E 30 34 7C 6B 76 6D ";
     return array(
       // BGP4-MIB::bgpLocalAs.0 = Wrong Type (should be INTEGER): Gauge32: 20282

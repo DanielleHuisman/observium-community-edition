@@ -14,7 +14,21 @@
 
 $i = 0;
 
-foreach (dbFetchRows("SELECT * FROM `devices`") as $device) {
+$where = [];
+$args  = [];
+
+if(!safe_empty($vars['poller_id'])) {
+  $where[] = "`poller_id` = ?";
+  $args[]  = $vars['poller_id'];
+}
+
+$query = "SELECT * FROM `devices`";
+if(safe_count($where)) {
+  $query .= " WHERE ";
+  $query .= implode(" AND ", $where);
+}
+
+foreach (dbFetchRows($query, $args) as $device) {
   $devices[$device['device_id']] = $device;
 }
 
@@ -24,7 +38,7 @@ foreach ($devices as $device_id => $device) {
 
   $rrd_filename = get_rrd_path($device, 'perf-poller.rrd');
 
-  if (rrd_is_file($rrd_filename)) {
+  if (rrd_is_file($rrd_filename, TRUE)) {
 
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = str_pad($device['hostname'], 25) ." (".$device['os'].")";

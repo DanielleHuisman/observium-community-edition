@@ -3,30 +3,73 @@
 ####### Asterisk Telephony Server
 if [ -a /usr/sbin/asterisk ]
 then
+  ASTBIN=/usr/sbin/asterisk
+else
+  ASTBIN=$(which asterisk)
+fi
+
+if [ "$ASTBIN" != "" ]
+then
   echo '<<<app-asterisk>>>'
 
   astcmd () {
-      asterisk -rx "$1" | grep -v "Asterisk ending" | sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g'
+    #asterisk -rx "$1" | grep -v "Asterisk ending" | sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g'
+    $ASTBIN -rx "$1" | sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g'
   }
 
-  CORECHANNELS=$(astcmd 'core show channels' | tail -3)
-  ACTIVECHAN=$(echo $CORECHANNELS | grep -o '[0-9]* active channel' | cut -d' ' -f1)
-  ACTIVECALL=$(echo $CORECHANNELS | grep -o '[0-9]* active call' | cut -d' ' -f1)
+  #CORECHANNELS=$(astcmd 'core show channels' | tail -3)
+  CORECHANNELS=$($ASTBIN -rx 'core show channels' | tail -3)
+  ACTIVECHAN=$(echo "$CORECHANNELS" | grep -o '[0-9]* active channel' | cut -d' ' -f1)
+  ACTIVECALL=$(echo "$CORECHANNELS" | grep -o '[0-9]* active call' | cut -d' ' -f1)
   IAXCHANNELS=$(astcmd 'iax2 show channels' | tail -1 | cut -d' ' -f1)
   SIPCHANNELS=$(astcmd 'sip show channels' | tail -1 | cut -d' ' -f1)
-  SIPPEERS=`astcmd 'sip show peers' | tail -1`
-  SIPTOTALPEERS=$(echo $SIPPEERS | cut -d' ' -f1)
-  SIPONLINE=$(echo $SIPPEERS | grep -o '[0-9]* online' | head -1 | cut -d' ' -f1)
-  IAXPEERS=`astcmd 'iax2 show peers' | tail -1`
-  IAXTOTALPEERS=$(echo $IAXPEERS | cut -d' ' -f1)
-  IAXONLINE=$(echo $IAXPEERS | grep -o '[0-9]* online' | head -1 | cut -d' ' -f1)
+  SIPPEERS=$(astcmd 'sip show peers' | tail -1)
+  SIPTOTALPEERS=$(echo "$SIPPEERS" | cut -d' ' -f1)
+  SIPONLINE=$(echo "$SIPPEERS" | grep -o '[0-9]* online' | head -1 | cut -d' ' -f1)
+  IAXPEERS=$(astcmd 'iax2 show peers' | tail -1)
+  IAXTOTALPEERS=$(echo "$IAXPEERS" | cut -d' ' -f1)
+  IAXONLINE=$(echo "$IAXPEERS" | grep -o '[0-9]* online' | head -1 | cut -d' ' -f1)
+  PJSIPCHANNELS=$($ASTBIN -rx 'pjsip show channels' | grep -c "Channel: PJSIP")
+  PJSIPONLINE=$($ASTBIN -rx 'pjsip show endpoints' | grep 'Contact: ' | grep -c -v '<Aor')
+  PJSIPTOTAL=$($ASTBIN -rx 'pjsip show endpoints' | grep 'Endpoint: ' | grep -c -v '<Endpoint')
+
+  re='^[0-9]+$'
+  ASTSIPCHANNELS=0
+  ASTSIPTOTALPEERS=0
+  ASTSIPONLINE=0
+  if [[ $SIPCHANNELS =~ $re ]] ; then
+    ASTSIPCHANNELS=$(($ASTSIPCHANNELS + $SIPCHANNELS))
+  fi
+
+  if [[ $PJSIPCHANNELS =~ $re ]] ; then
+    ASTSIPCHANNELS=$(($ASTSIPCHANNELS + $PJSIPCHANNELS))
+  fi
+
+  if [[ $SIPTOTALPEERS =~ $re ]] ; then
+    ASTSIPTOTALPEERS=$(($ASTSIPTOTALPEERS + $SIPTOTALPEERS))
+  fi
+
+  if [[ $PJSIPTOTAL =~ $re ]] ; then
+    ASTSIPTOTALPEERS=$(($ASTSIPTOTALPEERS + $PJSIPTOTAL))
+  fi
+
+  if [[ $SIPONLINE =~ $re ]] ; then
+    ASTSIPONLINE=$(($ASTSIPONLINE + $SIPONLINE))
+  fi
+
+  if [[ $PJSIPONLINE =~ $re ]] ; then
+    ASTSIPONLINE=$(($ASTSIPONLINE + $PJSIPONLINE))
+  fi
 
   echo "activechan:$ACTIVECHAN"
   echo "activecall:$ACTIVECALL"
   echo "iaxchannels:$IAXCHANNELS"
-  echo "sipchannels:$SIPCHANNELS" 
-  echo "sippeers:$SIPTOTALPEERS"
-  echo "sippeersonline:$SIPONLINE"
+  #echo "sipchannels:$SIPCHANNELS"
+  #echo "sippeers:$SIPTOTALPEERS"
+  #echo "sippeersonline:$SIPONLINE"
+  echo "sipchannels:$ASTSIPCHANNELS"
+  echo "sippeers:$ASTSIPTOTALPEERS"
+  echo "sippeersonline:$ASTSIPONLINE"
   echo "iaxpeers:$IAXTOTALPEERS"
   echo "iaxpeersonline:$IAXONLINE"
 

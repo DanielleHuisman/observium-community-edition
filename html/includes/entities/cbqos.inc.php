@@ -99,23 +99,21 @@ function print_cbqos_table_header($vars)
   echo '<tbody>' . PHP_EOL;
 }
 
-function print_cbqos_table($vars)
-{
+function print_cbqos_table($vars) {
   global $config;
 
   $sql = build_cbqos_query($vars);
   $entries = dbFetchRows($sql);
 
-  if (count($entries)) {
+  if (!safe_empty($entries)) {
 
     echo generate_box_open();
 
     print_cbqos_table_header($vars);
 
-    foreach ($entries as $cbqos_id => $entry)
-    {
+    foreach ($entries as $cbqos_id => $entry) {
 
-      $perc_drop = round($entry['DropByte_rate'] / $entry['PrePolicyByte_rate'] * 100);
+      $perc_drop = float_div($entry['DropByte_rate'], $entry['PrePolicyByte_rate']) * 100;
 
       echo '<tr>';
       echo '<td class="state-marker"></td>';
@@ -129,13 +127,11 @@ function print_cbqos_table($vars)
       echo '<td></td>';
       echo '</tr>';
 
-      if ($vars['graphs'] == "yes")
-      {
+      if (get_var_true($vars['graphs'])) {
         $vars['graph'] = "graph";
       }
 
-      if ($vars['graph'])
-      {
+      if ($vars['graph']) {
         $graph_array = array();
         $graph_title = $entry['oid_descr'];
         $graph_array['type'] = "cbqos_".$vars['graph'];
@@ -157,10 +153,6 @@ function print_cbqos_table($vars)
 
   }
 
-
 }
-
-
-
 
 // EOF

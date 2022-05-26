@@ -1,18 +1,16 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-switch ($vars['sort_order'])
-{
+switch ($vars['sort_order']) {
   case 'desc':
     $sort_order = SORT_DESC;
     $sort_neg   = SORT_ASC;
@@ -25,8 +23,7 @@ switch ($vars['sort_order'])
     $sort_neg   = SORT_DESC;
 }
 
-switch ($vars['sort'])
-{
+switch ($vars['sort']) {
   case 'traffic':
     $ports = array_sort_by($ports, 'ifOctets_rate', $sort_neg, SORT_NUMERIC);
     break;

@@ -179,7 +179,7 @@ class HtmlIncludesPrintTest extends \PHPUnit\Framework\TestCase
 
 
     <div id="submit_div" class="controls">
-      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap"><i class="icon-lock" style="margin-right: 0px;"></i>&nbsp;&nbsp;Log in</button>
+      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap" value=""><i style="margin-right: 0px;" class="icon-lock"></i>&nbsp;&nbsp;Log in</button>
     </div>
 </form>
 
@@ -225,7 +225,7 @@ FORM;
 
 
     <div id="submit_div" class="controls">
-      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap"><i class="icon-lock" style="margin-right: 0px;"></i>&nbsp;&nbsp;Log in</button>
+      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap" value=""><i style="margin-right: 0px;" class="icon-lock"></i>&nbsp;&nbsp;Log in</button>
     </div>
 </form>
 
@@ -271,7 +271,7 @@ FORM;
 
 
     <div id="submit_div" class="controls">
-      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap"><i class="icon-lock" style="margin-right: 0px;"></i>&nbsp;&nbsp;Log in</button>
+      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap" value=""><i style="margin-right: 0px;" class="icon-lock"></i>&nbsp;&nbsp;Log in</button>
     </div>
 </form>
 
@@ -318,7 +318,7 @@ FORM;
   <div id="remember_div" class="control-group" style="margin-bottom: 5px;"> <!-- START row-2 -->
 
     <div id="remember_div" class="controls">
-    <input type="checkbox"  name="remember" id="remember"  value="1" />      <label for="remember" class="help-inline" style="margin-top: 4px;">Remember my login</label>
+    <input type="checkbox"  name="remember" id="remember"  value="1" />      <label for="remember" class="help-inline" style="margin-top: 4px;"><span style="min-width: 150px;">Remember my login</span></label>
     </div>
   </div> <!-- END row-2 -->
 
@@ -326,7 +326,7 @@ FORM;
 
 
     <div id="submit_div" class="controls">
-      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap"><i class="icon-lock" style="margin-right: 0px;"></i>&nbsp;&nbsp;Log in</button>
+      <button id="submit" name="submit" type="submit" class="btn btn-default btn-large text-nowrap" value=""><i style="margin-right: 0px;" class="icon-lock"></i>&nbsp;&nbsp;Log in</button>
     </div>
 </form>
 
@@ -334,6 +334,53 @@ FORM;
 
 FORM;
     $array[] = [$form, $html];
+
+    return $array;
+  }
+
+  /**
+   * @dataProvider providerGetMarkdown
+   * @group html
+   */
+  public function testGetMarkdown($text, $result, $extra = FALSE) {
+    $this->assertSame($result, get_markdown($text, TRUE, $extra));
+  }
+
+  public function providerGetMarkdown() {
+    $array = [];
+
+    // Simple
+    $array[] = [ 'Hello _Observium_!', '<span style="min-width: 150px;">Hello <em>Observium</em>!</span>' ];
+    $array[] = [ 'an autolink http://example.com',
+                 '<span style="min-width: 150px;">an autolink <a href="http://example.com">http://example.com</a></span>' ];
+    $array[] = [ 'inside of brackets [http://example.com], inside of braces {http://example.com},  inside of parentheses (http://example.com)',
+                 '<span style="min-width: 150px;">inside of brackets [<a href="http://example.com">http://example.com</a>], inside of braces {<a href="http://example.com">http://example.com</a>},  inside of parentheses (<a href="http://example.com">http://example.com</a>)</span>' ];
+    $array[] = [ 'trailing slash http://example.com/ and http://example.com/path/',
+                 '<span style="min-width: 150px;">trailing slash <a href="http://example.com/">http://example.com/</a> and <a href="http://example.com/path/">http://example.com/path/</a></span>' ];
+
+    // Extra
+    $array[] = [ 'Please read [FAQ](' . OBSERVIUM_DOCS_URL . '/faq/#snmpv3-strong-authentication-or-encryption){target=_blank}.',
+                 '<span style="min-width: 150px;">Please read <a href="' . OBSERVIUM_DOCS_URL . '/faq/#snmpv3-strong-authentication-or-encryption" target="_blank">FAQ</a>.</span>', TRUE ];
+
+    // Multiline
+    $text = <<<TEXT
+Welcome to the demo:
+
+1. Write Markdown text on the left
+2. Hit the __Parse__ button or `⌘ + Enter`
+3. See the result to on the right
+TEXT;
+    $html = <<<HTML
+<div style="min-width: 150px;">
+<p>Welcome to the demo:</p>
+<ol>
+<li>Write Markdown text on the left</li>
+<li>Hit the <strong>Parse</strong> button or <code>⌘ + Enter</code></li>
+<li>See the result to on the right</li>
+</ol>
+</div>
+HTML;
+    $array[] = [ $text, $html ];
 
     return $array;
   }

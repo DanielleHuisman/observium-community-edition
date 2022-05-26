@@ -71,8 +71,7 @@ $form['row'][0]['priority'] = array(
 dbSetVariable('MAX_EXECUTION_TIME', 5000); // Set 5 sec maximum query execution time
 $form_filter = dbFetchColumn('SELECT DISTINCT `program` FROM `syslog` WHERE 1 ' . $query_devices);
 dbSetVariable('MAX_EXECUTION_TIME', 0); // Reset maximum query execution time
-if (count($form_filter))
-{
+if (safe_count($form_filter)) {
   // Use full multiselect form
   $form_items['programs'] = generate_form_values('syslog', $form_filter, 'programs');
   $form['row'][0]['program'] = array(

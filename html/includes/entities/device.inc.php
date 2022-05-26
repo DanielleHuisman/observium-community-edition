@@ -145,12 +145,12 @@ function build_devices_sort($vars)
 }
 
 // DOCME needs phpdoc block
-function print_device_header($device, $args = array())
-{
+function print_device_header($device, $args = array()) {
   global $config;
 
   if (!is_array($device)) { print_error("Invalid device passed to print_device_header()!"); }
 
+  /* FIXME. Unused?
   if ($device['status'] == '0') {  $class = "div-alert"; } else {   $class = "div-normal"; }
   if ($device['ignore'] == '1')
   {
@@ -167,8 +167,14 @@ function print_device_header($device, $args = array())
   }
 
   $type = strtolower($device['os']);
+  */
+  $div_class = 'box box-solid';
+  if (!safe_empty($args['div-class'])) {
+    $div_class .= " ${args['div-class']}";
+  }
 
-  echo '<div class="box box-solid"><table class=" table table-hover table-condensed '.$args['class'].'" style="margin-bottom: 10px; min-height: 70px; border-radius: 2px;">';
+  echo '<div class="'.$div_class.'">
+  <table class=" table table-hover table-condensed '.$args['class'].'" style="margin-bottom: 10px; min-height: 70px; border-radius: 2px;">';
   echo '
               <tr class="'.$device['html_row_class'].' vertical-align">
                <td class="state-marker"></td>
@@ -178,26 +184,22 @@ function print_device_header($device, $args = array())
                ';
 
 
-  if (device_permitted($device) && !$args['no_graphs'])
-  {
+  if (device_permitted($device) && !$args['no_graphs']) {
 
     echo '<td>';
 
     // Only show graphs for device_permitted(), don't show device graphs to users who can only see a single entity.
 
-    if (isset($config['os'][$device['os']]['graphs']))
-    {
+    if (isset($config['os'][$device['os']]['graphs'])) {
       $graphs = $config['os'][$device['os']]['graphs'];
-    }
-    else if (isset($device['os_group']) && isset($config['os'][$device['os_group']]['graphs']))
-    {
+    } elseif (isset($device['os_group'], $config['os'][$device['os_group']]['graphs'])) {
       $graphs = $config['os'][$device['os_group']]['graphs'];
     } else {
       // Default group
       $graphs = $config['os_group']['default']['graphs'];
     }
 
-    $graph_array = array();
+    $graph_array = [];
     $graph_array['height'] = "100";
     $graph_array['width']  = "310";
     $graph_array['to']     = $config['time']['now'];
@@ -213,27 +215,21 @@ function print_device_header($device, $args = array())
 
     // Preprocess device graphs array
     $graphs_enabled = [];
-    foreach ($device['graphs'] as $graph)
-    {
+    foreach ($device['graphs'] as $graph) {
       $graphs_enabled[] = $graph['graph'];
     }
 
-    foreach ($graphs as $entry)
-    {
-      if ($entry && in_array(str_replace('device_', '', $entry), $graphs_enabled) !== FALSE)
-      {
+    foreach ($graphs as $entry) {
+      if ($entry && in_array(str_replace('device_', '', $entry), $graphs_enabled, TRUE)) {
         $graph_array['type'] = $entry;
 
-        preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>[a-z0-9A-Z-_]+)/', $entry, $graphtype);
-
-        if (isset($graphtype['type']) && isset($graphtype['subtype']))
-        {
+        if (preg_match(OBS_PATTERN_GRAPH_TYPE, $entry, $graphtype)) {
           $type = $graphtype['type'];
           $subtype = $graphtype['subtype'];
 
           $text = $config['graph_types'][$type][$subtype]['descr'];
         } else {
-          $text = nicecase($subtype); // Fallback to the type itself as a string, should not happen!
+          $text = nicecase($entry); // Fallback to the type itself as a string, should not happen!
         }
 
         echo '<div class="pull-right" style="padding: 2px; margin: 0;">';
@@ -273,10 +269,24 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
       'features'      => escape_html($device['features']),
       'os_text'       => $device['os_text'],
       'version'       => escape_html($device['version']),
-      'sysName'       => escape_html($device['sysName']),
+      //'sysName'       => escape_html($device['sysName']),
       'device_uptime' => deviceUptime($device, 'short'),
       'location'      => escape_html(truncate($device['location'], 40, ''))
   );
+
+  switch (strtolower($config['web_device_name'])) {
+    case 'sysname':
+    case 'purpose':
+    case 'descr':
+    case 'description':
+      $tags['sysName'] = escape_html($device['hostname']);
+      if (!safe_empty($device['sysName'])) {
+        $tags['sysName'] .= ' / ' . escape_html($device['sysName']);
+      }
+      break;
+    default:
+      $tags['sysName'] = escape_html($device['sysName']);
+  }
 
   switch ($vars['view'])
   {
@@ -354,7 +364,7 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
     <td class="state-marker"></td>
     <td class="vertical-align" style="width: 64px; text-align: center;">'.$tags['device_image'].'</td>
     <td class="vertical-align" style="width: 300px;"><span class="entity-title">' . $tags['device_link'] . '</span><br />'.$tags['location'].'</td>
-    <td><div class="pull-right" style="height: 100px; padding: 2px; margin: 0;">' . generate_graph_tag($graph_array) . '</div></td>
+    <td><div class="pull-right" style="height: 130px; padding: 2px; margin: 0;">' . generate_graph_tag($graph_array) . '</div></td>
   </tr>';
       }
       break;
@@ -476,14 +486,14 @@ function get_device_icon($device, $base_icon = FALSE, $dark = FALSE) {
   $device['os'] = strtolower($device['os']);
   $model = $config['os'][$device['os']]['model'];
 
-  if ($device['icon'] && is_file($config['html_dir'] . '/images/os/' . $device['icon'] . '.png')) {
+  if (!safe_empty($device['icon']) && is_file($config['html_dir'] . '/images/os/' . $device['icon'] . '.png')) {
     // Custom device icon from DB
     $icon  = $device['icon'];
   } elseif ($model && isset($config['model'][$model][$device['sysObjectID']]['icon']) &&
             is_file($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'] . '.png')) {
     // Per model icon
     $icon  = $config['model'][$model][$device['sysObjectID']]['icon'];
-  } elseif ($config['os'][$device['os']]['icon'] &&
+  } elseif (isset($config['os'][$device['os']]['icon']) &&
             is_file($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'] . '.png')) {
     // Icon defined in os definition
     $icon  = $config['os'][$device['os']]['icon'];
@@ -575,51 +585,45 @@ function generate_device_url($device, $vars = array())
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_device_popup_header($device, $vars = array())
-{
-  global $config;
+function generate_device_popup_header($device, $vars = []) {
 
   humanize_device($device);
 
-  $contents = generate_box_open() . '
+  $device_name = device_name($device);
+  if ($device['hostname'] !== $device_name) {
+    $sysName = $device['hostname'];
+    if (!safe_empty($device['sysName'])) {
+      $sysName .= ' / ' . $device['sysName'];
+    }
+  } else {
+    $sysName = $device['sysName'];
+  }
+
+  return generate_box_open() . '
 <table class="table table-striped table-rounded table-condensed">
   <tr class="' . $device['html_row_class'] . '" style="font-size: 10pt;">
     <td class="state-marker"></td>
     <td class="vertical-align" style="width: 64px; text-align: center;">' . get_device_icon($device) . '</td>
-    <td width="200px"><a href="#" class="' . device_link_class($device) . '" style="font-size: 15px; font-weight: bold;">' . escape_html($device['hostname']) . '</a><br />' . escape_html(truncate($device['location'], 64, '')) . '</td>
+    <td width="200px"><a href="'.generate_device_url($device).'" class="' . device_link_class($device) . '" style="font-size: 15px; font-weight: bold;">' .
+         escape_html(device_name($device)) . '</a><br />' . escape_html(truncate($device['location'], 64, '')) . '</td>
     <td>' . $device['os_text'] . ' ' . escape_html($device['version']) . ' <br /> ' .
           ($device['vendor'] ? escape_html($device['vendor']).' ' : '') . escape_html($device['hardware']) . '</td>
-    <td>' . deviceUptime($device, 'short') . '<br />' . escape_html($device['sysName']) . '</td>
+    <td>' . deviceUptime($device, 'short') . '<br />' . escape_html($sysName) . '</td>
   </tr>
 </table>
 ' . generate_box_close();
-
-  return $contents;
 }
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_device_popup($device, $vars = array(), $start = NULL, $end = NULL)
-{
+function generate_device_popup($device, $vars = []) {
   global $config;
 
-  if (!$start)
-  {
-    $start = $config['time']['day'];
-  }
-  if (!$end)
-  {
-    $end = $config['time']['now'];
-  }
+  $content = generate_device_popup_header($device, $vars);
 
-  $content = generate_device_popup_header($device, $vars = array());
-
-  if (isset($config['os'][$device['os']]['graphs']))
-  {
+  if (isset($config['os'][$device['os']]['graphs'])) {
     $graphs = $config['os'][$device['os']]['graphs'];
-  }
-  elseif (isset($device['os_group']) && isset($config['os'][$device['os_group']]['graphs']))
-  {
+  } elseif (isset($device['os_group'], $config['os'][$device['os_group']]['graphs'])) {
     $graphs = $config['os'][$device['os_group']]['graphs'];
   } else {
     // Default group
@@ -628,45 +632,34 @@ function generate_device_popup($device, $vars = array(), $start = NULL, $end = N
 
   // Preprocess device graphs array
   $graphs_enabled = [];
-  foreach ($device['graphs'] as $graph)
-  {
-    if($graph['enabled'] != '0')
-    {
+  foreach ($device['graphs'] as $graph) {
+    if ($graph['enabled'] != '0') {
       $graphs_enabled[] = $graph['graph'];
     }
   }
 
-  foreach ($graphs as $entry)
-  {
-    $graph = $entry;
+  foreach ($graphs as $entry) {
 
-    if ($graph && in_array(str_replace('device_', '', $graph), $graphs_enabled) !== FALSE)
-    {
+    if ($entry && in_array(str_replace('device_', '', $entry), $graphs_enabled, TRUE)) {
       // No text provided for the minigraph, fetch from array
-      preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>[a-z0-9A-Z-_]+)/', $graph, $graphtype);
-
-      if (isset($graphtype['type']) && isset($graphtype['subtype']))
-      {
+      if (preg_match(OBS_PATTERN_GRAPH_TYPE, $entry, $graphtype)) {
         $type = $graphtype['type'];
         $subtype = $graphtype['subtype'];
 
         $text = $config['graph_types'][$type][$subtype]['descr'];
-      }
-      else
-      {
-        $text = nicecase($subtype); // Fallback to the type itself as a string, should not happen!
+      } else {
+        $text = nicecase($entry); // Fallback to the type itself as a string, should not happen!
       }
 
       // FIXME -- function!
 
-
       $graph_array = array();
       $graph_array['height'] = "100";
       $graph_array['width']  = "290";
-      $graph_array['to']     = $config['time']['now'];
+      $graph_array['to']     = get_time();
       $graph_array['device'] = $device['device_id'];
-      $graph_array['type']   = $graph;
-      $graph_array['from']   = $config['time']['day'];
+      $graph_array['type']   = $entry;
+      $graph_array['from']   = get_time('day');
       $graph_array['legend'] = "no";
 
       $content .= '<div style="width: 730px; white-space: nowrap;">';
@@ -677,7 +670,7 @@ function generate_device_popup($device, $vars = array(), $start = NULL, $end = N
       */
       $content .= generate_graph_tag($graph_array);
 
-      $graph_array['from']   = $config['time']['week'];
+      $graph_array['from']   = get_time('week');
       $content .= generate_graph_tag($graph_array);
 
       $content .= '</div>';
@@ -691,43 +684,77 @@ function generate_device_popup($device, $vars = array(), $start = NULL, $end = N
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function generate_device_link($device, $text = NULL, $vars = array(), $escape = TRUE)
-{
-  if (is_array($device) && !($device['hostname'] && isset($device['status'])))
-  {
-    if (($device = device_by_id_cache($device['device_id'])) && is_null($text))
-    {
-      $text = $device['hostname'];
-    }
-  }
-  else if (is_numeric($device))
-  {
-    if (($device = device_by_id_cache($device)) && is_null($text))
-    {
-      $text = $device['hostname'];
-    }
-  }
-  if (!device_permitted($device['device_id']))
-  {
-    $text = ($escape ? escape_html($device['hostname']) : $device['hostname']);
+function generate_device_link($device, $text = NULL, $vars = array(), $escape = TRUE, $short = FALSE) {
 
-    return $text;
+  if (is_array($device) && !($device['hostname'] && isset($device['status']))) {
+    // partial device array, get full
+    $device = device_by_id_cache($device['device_id']);
+  } elseif (is_numeric($device)) {
+    $device = device_by_id_cache($device);
+  }
+
+  if (!$device) {
+    return escape_html($text);
+  }
+  if (!device_permitted($device['device_id'])) {
+    $text = device_name($device, $short);
+    return $escape ? escape_html($text) : $text;
   }
 
   $class = device_link_class($device);
-  if (!$text)
-  {
-    $text = $device['hostname'];
+
+  if (safe_empty($text)) {
+    $text = device_name($device, $short);
   }
 
   $url = generate_device_url($device, $vars);
 
-  if ($escape)
-  {
+  if ($escape) {
     $text = escape_html($text);
   }
 
-  return '<a href="' . $url . '" class="entity-popup ' . $class . '" data-eid="' . $device['device_id'] . '" data-etype="device">' . $text . '</a>';
+  return '<a href="' . $url . '" class="entity-popup ' . $class . ' text-nowrap" data-eid="' . $device['device_id'] . '" data-etype="device">' . $text . '</a>';
+}
+
+// Simple wrapper to generate_device_link() for common usage with only device_name
+function generate_device_link_short($device, $vars = [], $short = TRUE) {
+  // defaults - always short device name, escaped
+  return generate_device_link($device, NULL, $vars, TRUE, $short);
+}
+
+function device_name($device, $max_len = FALSE) {
+  global $config;
+
+  switch (strtolower($config['web_device_name'])) {
+    case 'sysname':
+      $name_field = 'sysName';
+      break;
+    case 'purpose':
+    case 'descr':
+    case 'description':
+      $name_field = 'purpose';
+      break;
+    default:
+      $name_field = 'hostname';
+  }
+
+  if ($max_len && !is_intnum($max_len)) {
+    $max_len = $config['short_hostname']['length'];
+  }
+
+  if ($name_field !== 'hostname' && !safe_empty($device[$name_field])) {
+    if ($name_field === 'sysName' && $max_len && $max_len > 3) {
+      // short sysname when is valid hostname (do not escape here)
+      return short_hostname($device[$name_field], $max_len, FALSE);
+    }
+    return $device[$name_field];
+  }
+
+  if ($max_len && $max_len > 3) {
+    // short hostname (do not escape here)
+    return short_hostname($device['hostname'], $max_len, FALSE);
+  }
+  return $device['hostname'];
 }
 
 function generate_device_form_values($form_filter = FALSE, $column = 'device_id', $options = array())

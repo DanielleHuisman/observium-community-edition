@@ -1,11 +1,9 @@
 ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 
-    IMPORTS
-	Integer32, Unsigned32 FROM SNMPv2-SMI
-	enterprises		FROM RFC1155-SMI     
-	TEXTUAL-CONVENTION FROM SNMPv2-TC
+    IMPORTS    
+	enterprises		FROM RFC1155-SMI                                
 	
-	MODULE-IDENTITY, OBJECT-TYPE
+	OBJECT-TYPE
 		FROM SNMPv2-SMI			-- RFC2578	
 	RowStatus, DateAndTime, TruthValue, StorageType, MacAddress
 		FROM SNMPv2-TC			-- RFC2579
@@ -25,6 +23,10 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 		FROM INET-ADDRESS-MIB		-- RFC2851
 	OperationResponseStatus
 		FROM DISMAN-PING-MIB
+	Counter, TimeTicks
+        FROM RFC1155-SMI
+    BridgeId, Timeout
+        FROM BRIDGE-MIB			
     IpAddress
         FROM SNMPv2-SMI
         
@@ -155,9 +157,11 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 
         RateLimitPortEntry ::=
            SEQUENCE {
-        	rateLimitPortState	EnabledStatus,
-		rateLimitPortIngRate	INTEGER,
-		rateLimitPortEgrRate	INTEGER
+        	rateLimitPortState        EnabledStatus,
+			rateLimitPortIngRate      INTEGER,
+			rateLimitPortEgrRate      INTEGER,
+			rateLimitPortStateIngress EnabledStatus,
+			rateLimitPortStateEgress  EnabledStatus
            }
 
         rateLimitPortState OBJECT-TYPE
@@ -183,6 +187,23 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
                       	"Egress rate in Kbit/s.  The range of FE port is between 64 and 100,000. For GE port, the range is between 64 and 1000,000."
         ::= { rateLimitPortEntry 3 }
+        
+        rateLimitPortStateIngress OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"Ingress rate limiting enabled/disabled on the port."
+        ::= { rateLimitPortEntry 5 }
+        
+        rateLimitPortStateEgress OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"Egress rate limiting enabled/disabled on the port."
+        ::= { rateLimitPortEntry 6 }
+
 
 -- brLimitSetup
 	brLimitSetup OBJECT IDENTIFIER ::= { es2108g 3 }
@@ -337,47 +358,8 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
                       	VLAN groups to pass through the switch."
         ::= { vlanTrunkPortEntry 1 }
 
---  radius8021xSetup
-	radius8021xSetup OBJECT IDENTIFIER ::= { es2108g 6 }
-
-        radiusLoginPrecedence OBJECT-TYPE
-        SYNTAX  INTEGER
-        ACCESS  read-write
-        STATUS  mandatory
-        DESCRIPTION
-                      	"1. Local Only
-			 2. Local then RADIUS
-			 3. RADIUS Only"
-        ::= { radius8021xSetup 1 }
-
---  radiusAnd8021xServer
-        
-        radiusAnd8021xServer OBJECT IDENTIFIER ::= { radius8021xSetup 2 }
-        
-        radiusIpAddr OBJECT-TYPE
-        SYNTAX  IpAddress
-        ACCESS  read-write
-        STATUS  mandatory
-        DESCRIPTION
-                      	"The IP address of the RADIUS server."
-        ::= { radiusAnd8021xServer 1 }
-
-        radiusUdpPort OBJECT-TYPE
-        SYNTAX  INTEGER
-        ACCESS  read-write
-        STATUS  mandatory
-        DESCRIPTION
-                      	"The UDP port of the RADIUS server."
-        ::= { radiusAnd8021xServer 2 }
-
-        radiusSharedSecret OBJECT-TYPE
-        SYNTAX  DisplayString
-        ACCESS  read-write
-        STATUS  mandatory
-        DESCRIPTION
-                      	"Shared secret used for RADIUS and network element authentication."
-        ::= { radiusAnd8021xServer 3 }
-                                
+--  dot1xSetup
+	dot1xSetup OBJECT IDENTIFIER ::= { es2108g 6 }                               
 --  portAuthState                               
         portAuthState OBJECT-TYPE
         SYNTAX  EnabledStatus
@@ -385,10 +367,10 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       	"802.1x port authentication enabled/disabled for the switch."
-        ::= { radius8021xSetup 3 }
+        ::= { dot1xSetup 3 }
                                 
                                 
--- 8021xPortAuthTable
+-- portAuthTable
 
         portAuthTable OBJECT-TYPE
         SYNTAX	SEQUENCE OF PortAuthEntry
@@ -396,7 +378,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                  	""
-        ::= { radius8021xSetup 4 }
+        ::= { dot1xSetup 4 }
         
 		portAuthEntry OBJECT-TYPE
         SYNTAX	PortAuthEntry
@@ -484,8 +466,11 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         SnmpTrapDestEntry ::=
            SEQUENCE {
         	snmpTrapDestIP	IpAddress,
-        	snmpTrapDestRowStatus RowStatus
-           }
+          	snmpTrapDestRowStatus RowStatus,
+        	snmpTrapDestPort	INTEGER,
+        	snmpTrapVersion	INTEGER,
+        	snmpTrapUserName	DisplayString
+        }
            
         snmpTrapDestIP OBJECT-TYPE
         SYNTAX  IpAddress
@@ -503,9 +488,207 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
                       	""
         ::= { snmpTrapDestEntry 2 }
 
+snmpTrapDestPort OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"The UDP port of the trap destination."
+        ::= { snmpTrapDestEntry 3 }
+        
+        snmpTrapVersion OBJECT-TYPE
+        SYNTAX  INTEGER {
+			v1(0),
+			v2c(1),
+			v3(2)
+		}
+        MAX-ACCESS read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"The SNMP protocol version to send traps."
+        ::= { snmpTrapDestEntry 4 }
 
---  dateTimeServerSetup
-	dateTimeServerSetup     	OBJECT IDENTIFIER ::= { es2108g 8 }
+        snmpTrapUserName OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"The user name for sending SNMPv3 traps."
+        ::= { snmpTrapDestEntry 5 }                        
+
+        snmpVersion OBJECT-TYPE
+	SYNTAX 	INTEGER {
+			v2c(0),
+			v3(1),
+			v3v2c(2)
+		}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+		"The SNMP version to be used. v3v2c means that the manager 
+		can get/set by SNMPv3 and can get by SNMPv2c."
+        ::= { snmpSetup 5 }
+
+-- snmpUserTable
+	
+	snmpUserTable OBJECT-TYPE
+    	SYNTAX SEQUENCE OF SnmpUserEntry
+    	MAX-ACCESS not-accessible
+    	STATUS current
+    	DESCRIPTION
+                "A table that contains SNMPv3 user information."
+    	::= { snmpSetup 6 }
+
+    	snmpUserEntry OBJECT-TYPE
+        SYNTAX SnmpUserEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+        	"An entry of snmpUserTable."
+        INDEX { snmpUserName }
+        ::= { snmpUserTable 1 }
+
+   	SnmpUserEntry ::=
+        	SEQUENCE {
+            		snmpUserName		DisplayString,
+            		snmpUserSecurityLevel	INTEGER,
+            		snmpUserAuthProtocol	INTEGER,
+            		snmpUserPrivProtocol	INTEGER
+    	   	} 
+
+	snmpUserName OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The user name."
+	::= { snmpUserEntry 1 }
+
+	snmpUserSecurityLevel OBJECT-TYPE
+	SYNTAX  INTEGER {
+			noAuthNoPriv(0),
+			authNoPriv(1),
+			authPriv(2)
+		}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The level of security at which SNMP messages can be sent or 
+		with which operations are being processed."
+	::= { snmpUserEntry 2 }	
+
+	snmpUserAuthProtocol OBJECT-TYPE
+	SYNTAX  INTEGER {
+			md5(0),
+			sha(1)
+		}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The type of authentication protocol to be used."
+	::= { snmpUserEntry 3 }
+
+	snmpUserPrivProtocol OBJECT-TYPE
+	SYNTAX 	INTEGER {
+			des(0),
+			aes(1)
+		}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The type of privacy protocol to be used."
+	::= { snmpUserEntry 4 }
+
+
+--  snmpTrapGroupTable
+        snmpTrapGroupTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF SnmpTrapGroupEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { snmpSetup 7 }
+
+	snmpTrapGroupEntry OBJECT-TYPE
+        SYNTAX	SnmpTrapGroupEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in snmpTrapGroupTable."
+        INDEX          	{ snmpTrapDestIP }
+        ::= { snmpTrapGroupTable 1 }
+
+        SnmpTrapGroupEntry ::=
+           SEQUENCE {
+        	snmpTrapSystemGroup	 BITS,
+        	snmpTrapInterfaceGroup	 BITS,
+        	snmpTrapAAAGroup  BITS,
+        	snmpTrapIPGroup	 BITS,
+        	snmpTrapSwitchGroup	 BITS
+           }
+
+        snmpTrapSystemGroup OBJECT-TYPE
+        	SYNTAX	BITS {
+		coldStart(0),
+		warmStart(1),
+		reset (5),
+		timeSync (6),
+		intrusionlock(7),
+		loopGuard(13)
+	}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { snmpTrapGroupEntry 1 }
+        
+        snmpTrapInterfaceGroup OBJECT-TYPE
+               	SYNTAX	BITS {
+		linkup(0),
+		linkdown(1),
+		autonegotiation(2)
+	}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { snmpTrapGroupEntry 2 }
+        
+        snmpTrapAAAGroup OBJECT-TYPE
+               	SYNTAX	BITS {
+		authentication(0),
+		accounting(1)
+	}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { snmpTrapGroupEntry 3 }        
+        
+        snmpTrapIPGroup OBJECT-TYPE
+               	SYNTAX	BITS {
+		ping(0),
+		traceroute(1)
+	}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { snmpTrapGroupEntry 4 }                
+        
+        snmpTrapSwitchGroup OBJECT-TYPE
+               	SYNTAX	BITS {
+		stp(0),
+		mactable(1),
+		rmon(2)
+	}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { snmpTrapGroupEntry 5 }
+
+--  dateTimeSetup
+	dateTimeSetup     	OBJECT IDENTIFIER ::= { es2108g 8 }
 
         dateTimeServerType OBJECT-TYPE
         SYNTAX  INTEGER {
@@ -518,7 +701,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The time service protocol."
-        ::= { dateTimeServerSetup 1 }
+        ::= { dateTimeSetup 1 }
         
         dateTimeServerIP OBJECT-TYPE
         SYNTAX  IpAddress
@@ -526,7 +709,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "IP address of time server."
-        ::= { dateTimeServerSetup 2 }
+        ::= { dateTimeSetup 2 }
 
         dateTimeZone OBJECT-TYPE
         SYNTAX  INTEGER
@@ -534,7 +717,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The time difference between UTC. Ex: +01"
-        ::= { dateTimeServerSetup 3 }
+        ::= { dateTimeSetup 3 }
 
         dateTimeNewDateYear OBJECT-TYPE
         SYNTAX  INTEGER
@@ -542,7 +725,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The new date in year."
-        ::= { dateTimeServerSetup 4 }
+        ::= { dateTimeSetup 4 }
 
         dateTimeNewDateMonth OBJECT-TYPE
         SYNTAX  INTEGER
@@ -550,7 +733,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The new date in month."
-        ::= { dateTimeServerSetup 5 }
+        ::= { dateTimeSetup 5 }
 
         dateTimeNewDateDay OBJECT-TYPE
         SYNTAX  INTEGER
@@ -558,7 +741,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The new date in day."
-        ::= { dateTimeServerSetup 6 }
+        ::= { dateTimeSetup 6 }
         
         dateTimeNewTimeHour OBJECT-TYPE
         SYNTAX  INTEGER
@@ -566,7 +749,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The new time in hour."
-        ::= { dateTimeServerSetup 7 }
+        ::= { dateTimeSetup 7 }
 
         dateTimeNewTimeMinute OBJECT-TYPE
         SYNTAX  INTEGER
@@ -574,7 +757,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The new time in minute."
-        ::= { dateTimeServerSetup 8 }
+        ::= { dateTimeSetup 8 }
 
         dateTimeNewTimeSecond OBJECT-TYPE
         SYNTAX  INTEGER
@@ -582,8 +765,137 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         STATUS  mandatory
         DESCRIPTION
                       "The new time in second."
-        ::= { dateTimeServerSetup 9 }
+        ::= { dateTimeSetup 9 }
+ 
+-- dateTimeDaylightSavingTimeSetup OBJECT-TYPE
+	dateTimeDaylightSavingTimeSetup     	OBJECT IDENTIFIER ::= { dateTimeSetup 10 }
+	
+        daylightSavingTimeState OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service enabled/disabled for the switch."
+        ::= { dateTimeDaylightSavingTimeSetup 1 }
 
+        daylightSavingTimeStartDateWeek OBJECT-TYPE
+        SYNTAX  INTEGER {
+         		first(1),
+         		second(2),
+         		third(3),
+         		fourth(4),
+         		last(5)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service start week."
+        ::= { dateTimeDaylightSavingTimeSetup 2 }
+
+        daylightSavingTimeStartDateDay OBJECT-TYPE
+        SYNTAX  INTEGER {
+         		sunday(0),
+         		monday(1),
+         		tuesday(2),
+         		wednesday(3),
+         		thursday(4),
+         		friday(5),
+         		saturday(6)         		
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service start day."
+        ::= { dateTimeDaylightSavingTimeSetup 3 }
+
+        daylightSavingTimeStartDateMonth OBJECT-TYPE
+        SYNTAX  INTEGER {
+         		january(1),
+         		february(2),
+         		march(3),
+         		april(4),
+         		may(5),
+         		june(6),
+         		july(7),
+         		august(8),
+         		september(9),
+         		october(10),
+         		november(11),
+         		december(12)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service start month."
+        ::= { dateTimeDaylightSavingTimeSetup 4 }
+
+        daylightSavingTimeStartDateHour OBJECT-TYPE
+        SYNTAX  INTEGER 
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service start time."
+        ::= { dateTimeDaylightSavingTimeSetup 5 }
+
+        daylightSavingTimeEndDateWeek OBJECT-TYPE
+        SYNTAX  INTEGER {
+         		first(1),
+         		second(2),
+         		third(3),
+         		fourth(4),
+         		last(5)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service end week."
+        ::= { dateTimeDaylightSavingTimeSetup 6 }
+
+        daylightSavingTimeEndDateDay OBJECT-TYPE
+        SYNTAX  INTEGER {
+         		sunday(0),
+         		monday(1),
+         		tuesday(2),
+         		wednesday(3),
+         		thursday(4),
+         		friday(5),
+         		saturday(6)         		
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service end day."
+        ::= { dateTimeDaylightSavingTimeSetup 7 }
+
+        daylightSavingTimeEndDateMonth OBJECT-TYPE
+        SYNTAX  INTEGER {
+         		january(1),
+         		february(2),
+         		march(3),
+         		april(4),
+         		may(5),
+         		june(6),
+         		july(7),
+         		august(8),
+         		september(9),
+         		october(10),
+         		november(11),
+         		december(12)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service end month."
+        ::= { dateTimeDaylightSavingTimeSetup 8 }
+
+        daylightSavingTimeEndDateHour OBJECT-TYPE
+        SYNTAX  INTEGER 
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Daylight saving time service end time."
+        ::= { dateTimeDaylightSavingTimeSetup 9 } 
+ 
 --  sysMgmt
 	sysMgmt     	OBJECT IDENTIFIER ::= { es2108g 9 }
 
@@ -624,7 +936,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 	sysMgmtDefaultConfig OBJECT-TYPE
         SYNTAX  INTEGER {
         		nothing(0),
-        		reset-to-default(1)
+        		reset_to_default(1)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -650,7 +962,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         vlanTypeSetup OBJECT-TYPE
         SYNTAX  INTEGER {
          		dot1Q(1),
-         		port-based(2)
+         		port_based(2)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -689,7 +1001,133 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
                       ""
         ::= { layer2Setup 5 }  
+
+        igmpFilteringStateSetup OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { layer2Setup 6 }
+        
+        unknownMulticastFrameForwarding OBJECT-TYPE
+        SYNTAX  INTEGER {
+         	flooding(1),
+         	drop(2)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { layer2Setup 7 }           
+        
+        multicastGrpHostTimeOut OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { layer2Setup 8 }
+        
+        multicastGrpLeaveTimeOut OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { layer2Setup 9 }
+        
+        igmpsnp8021pPriority OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      "Set the 802.1p priority of control messages for igmp-snooping(0~8, 8-No Change)"
+        ::= { layer2Setup 10 }
+
+		igmpsnpVlanMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+         	auto(1),
+         	fixed(2)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { layer2Setup 11 }                
+        
+        
+        stpMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+         	rstp(1),
+         	mstp(3)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { layer2Setup 12 }                               
+        
+               
+--  igmpsnpVlanTable
+        igmpsnpVlanTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF IgmpsnpVlanEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { layer2Setup 13 }
+        
+	igmpsnpVlanEntry OBJECT-TYPE
+        SYNTAX	IgmpsnpVlanEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in IgmpsnpVlanTable."
+        INDEX          	{ igmpsnpVid }
+        ::= { igmpsnpVlanTable 1 }
+
+        IgmpsnpVlanEntry ::=
+           SEQUENCE {
+			igmpsnpVid		INTEGER,
+        	igmpsnpVlanName	DisplayString,        	
+        	igmpsnpVlanRowStatus RowStatus
+           }
            
+   
+        igmpsnpVid OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpsnpVlanEntry 1 }        
+
+
+     igmpsnpVlanName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpsnpVlanEntry 2 }
+        
+                
+        igmpsnpVlanRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= {  igmpsnpVlanEntry 3 }
+         
+        igmpsnpQuerierMode OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { layer2Setup 14 }
+         
 --  ipSetup
 	ipSetup     	OBJECT IDENTIFIER ::= { es2108g 11 }
 
@@ -705,8 +1143,8 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 
         defaultMgmtIpType OBJECT-TYPE
         SYNTAX  INTEGER {
-        	dhcp-client(0),
-        	static-ip(1)
+        	dhcp_client(0),
+        	static_ip(1)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -912,8 +1350,8 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         mirrorIngActionState OBJECT-TYPE
         SYNTAX  INTEGER {
         	all(0),
-        	destination-mac(1),
-        	source-mac(2)
+        	destination_mac(1),
+        	source_mac(2)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -932,8 +1370,8 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         mirrorEgrActionState OBJECT-TYPE
         SYNTAX  INTEGER {
         	all(0),
-        	destination-mac(1),
-        	source-mac(2)
+        	destination_mac(1),
+        	source_mac(2)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -1254,8 +1692,8 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 
         queuingMethodType OBJECT-TYPE
         SYNTAX  INTEGER {
-        	strictly-priority(0),
-        	weighted-round-robin-scheduling(1)
+        	strictly_priority(0),
+        	weighted_round_robin_scheduling(1)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -1405,7 +1843,7 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         ACCESS	not-accessible
         STATUS	mandatory
         DESCRIPTION    	"An entry in arpTable."
-        INDEX          	{ arpIndex }
+        INDEX          	{ arpIpAddr, arpMacVid }
         ::= { arpTable 1 }
 
         ArpEntry ::=
@@ -1492,11 +1930,11 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
         portOpModePortSpeedDuplex OBJECT-TYPE
         SYNTAX  INTEGER {
         	auto(0),
-        	speed-10-half(1),
-        	speed-10-full(2),
-        	speed-100-half(3),
-        	speed-100-full(4),
-        	speed-1000-full(5)
+        	speed_10_half(1),
+        	speed_10_full(2),
+        	speed_100_half(3),
+        	speed_100_full(4),
+        	speed_1000_full(5)
         }
         ACCESS  read-write
         STATUS  mandatory
@@ -1525,8 +1963,8 @@ ZYXEL-ES2108G-MIB DEFINITIONS ::= BEGIN
 
         portOpModePortModuleType  OBJECT-TYPE
         SYNTAX  INTEGER {
-        	fast-ethernet-10-100(0),
-        	gigabit-ethernet-100-1000(1)
+        	fast_ethernet_10_100(0),
+        	gigabit_ethernet_100_1000(1)
         }
         ACCESS  read-only
         STATUS  mandatory
@@ -2432,6 +2870,2364 @@ eventClearedTrap NOTIFICATION-TYPE
            For more information see the eventTable specification"
          ::= { trapNotifications 2 }
     
-    
+--  multicastPortSetup
+	multicastPortSetup     	OBJECT IDENTIFIER ::= { es2108g 28 }
+	
+        multicastPortTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF MulticastPortEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { multicastPortSetup 1 }
+        
+	multicastPortEntry OBJECT-TYPE
+        SYNTAX	MulticastPortEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in multicastPortTable."
+        INDEX          	{ dot1dBasePort }
+        ::= { multicastPortTable 1 }
+
+        MulticastPortEntry ::=
+	SEQUENCE {
+        	multicastPortImmediateLeave		EnabledStatus,
+        	multicastPortMaxGroupLimited		EnabledStatus,
+        	multicastPortMaxOfGroup			INTEGER,
+        	multicastPortIgmpFilteringProfile	DisplayString,
+        	multicastPortQueryMode			INTEGER
+        }
+
+        multicastPortImmediateLeave OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastPortEntry 1 }
+
+        multicastPortMaxGroupLimited OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastPortEntry 2 }
+
+        multicastPortMaxOfGroup OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"0..255"
+        ::= { multicastPortEntry 3 }
+        
+        multicastPortIgmpFilteringProfile OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastPortEntry 4 }
+        
+        multicastPortQueryMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+        	auto_mode(1),
+        	fix_mode(2),
+			edge_mode(3)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"Specify query mode for each port"
+        ::= { multicastPortEntry 5 }
+
+-- multicastStatus
+	multicastStatus    	OBJECT IDENTIFIER ::= { es2108g 29 }
+
+        multicastStatusTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF MulticastStatusEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { multicastStatus 1 }
+        
+	multicastStatusEntry OBJECT-TYPE
+        SYNTAX	MulticastStatusEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in multicastStatusTable."
+        INDEX          	{ multicastStatusVlanID, multicastStatusPort, multicastStatusGroup }
+        ::= { multicastStatusTable 1 }
+
+        MulticastStatusEntry ::=
+	SEQUENCE {
+        	multicastStatusIndex    INTEGER,
+        	multicastStatusVlanID	INTEGER,
+        	multicastStatusPort	INTEGER,
+        	multicastStatusGroup	IpAddress
+         }
+
+        multicastStatusIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastStatusEntry 1 }
+
+        multicastStatusVlanID OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastStatusEntry 2 }
+
+        multicastStatusPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastStatusEntry 3 }
+
+        multicastStatusGroup OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastStatusEntry 4 }
+
+-- test igmpcount
+        igmpCountTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF IgmpCountEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	"A count table of igmp query/report/leave message."
+        ::= { multicastStatus 2 }
+
+	igmpCountEntry OBJECT-TYPE
+        SYNTAX	IgmpCountEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in igmpCountTable."
+        INDEX          	{ igmpCountIndex }
+        ::= { igmpCountTable 1 }
+
+        IgmpCountEntry ::=
+		SEQUENCE {
+        	igmpCountIndex    		INTEGER,
+        	igmpCountInQuery		INTEGER,
+        	igmpCountInReport		INTEGER,
+        	igmpCountInLeave		INTEGER,        	
+        	igmpCountInQueryDrop   	INTEGER,
+        	igmpCountInReportDrop   INTEGER,
+        	igmpCountInLeaveDrop   	INTEGER,
+        	igmpCountOutQuery   	INTEGER,
+        	igmpCountOutReport   	INTEGER,
+        	igmpCountOutLeave   	INTEGER
+        }
+
+        igmpCountIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION	"Index of IgmpCountEntry. 0 means total count in whole system"
+        ::= { igmpCountEntry 1 }
+
+        igmpCountInQuery OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 2 }
+
+        igmpCountInReport OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 3 }
+
+        igmpCountInLeave OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 4 }
+        
+        igmpCountInQueryDrop OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 5 }
+        
+        igmpCountInReportDrop OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 6 }        
+        
+        igmpCountInLeaveDrop OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 7 }                
+
+        igmpCountOutQuery OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 8 }                
+        
+        igmpCountOutReport OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 9 }          
+
+        igmpCountOutLeave OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpCountEntry 10 }     
+	
+-- multicastVlanStatusTable	
+       multicastVlanStatusTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF MulticastVlanStatusEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { multicastStatus 3 }
+
+	multicastVlanStatusEntry OBJECT-TYPE
+        SYNTAX	MulticastVlanStatusEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in multicastVlanStatusTable."
+        INDEX          	{ multicastVlanStatusVlanID }
+        ::= { multicastVlanStatusTable 1 }
+
+        MulticastVlanStatusEntry ::=
+	SEQUENCE {
+        	multicastVlanStatusVlanID    INTEGER,
+        	multicastVlanStatusType	INTEGER,
+        	multicastVlanQueryPort	PortList
+        	
+         }
+
+        multicastVlanStatusVlanID OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastVlanStatusEntry 1 }
+
+        multicastVlanStatusType OBJECT-TYPE
+        SYNTAX  INTEGER {
+   	dynamic(1),
+ 	mvr (2),
+	static(3)
+        
+        }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastVlanStatusEntry 2 }
+	
+        multicastVlanQueryPort OBJECT-TYPE
+        SYNTAX  PortList
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { multicastVlanStatusEntry 3 } 
+	
+--  igmpFilteringProfileSetup
+	igmpFilteringProfileSetup     	OBJECT IDENTIFIER ::= { es2108g 30 }
+	
+	igmpFilteringMaxNumberOfProfile OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpFilteringProfileSetup 1 }
+	
+        igmpFilteringProfileTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF IgmpFilteringProfileEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { igmpFilteringProfileSetup 2 }
+        
+	igmpFilteringProfileEntry OBJECT-TYPE
+        SYNTAX	IgmpFilteringProfileEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in igmpFilteringProfileTable."
+        INDEX          	{ igmpFilteringProfileName, igmpFilteringProfileStartAddress, igmpFilteringProfileEndAddress }
+        ::= { igmpFilteringProfileTable 1 }
+
+        IgmpFilteringProfileEntry ::=
+	SEQUENCE {
+        	igmpFilteringProfileName		DisplayString,
+        	igmpFilteringProfileStartAddress	IpAddress,
+        	igmpFilteringProfileEndAddress		IpAddress,
+        	igmpFilteringProfileRowStatus		RowStatus
+        }
+
+        igmpFilteringProfileName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpFilteringProfileEntry 1 }
+
+        igmpFilteringProfileStartAddress OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpFilteringProfileEntry 2 }
+
+        igmpFilteringProfileEndAddress OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpFilteringProfileEntry 3 }
+        
+        igmpFilteringProfileRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { igmpFilteringProfileEntry 4 }
+
+--  MVRSetup
+	mvrSetup     	OBJECT IDENTIFIER ::= { es2108g 31 }
+	
+	maxNumberOfMVR OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrSetup 1 }
+	
+        mvrTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF MvrEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { mvrSetup 2 }
+        
+	mvrEntry OBJECT-TYPE
+        SYNTAX	MvrEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in mvrTable."
+        INDEX          	{ mvrVlanID }
+        ::= { mvrTable 1 }
+
+        MvrEntry ::=
+	SEQUENCE {
+        	mvrVlanID	INTEGER,
+        	mvrName		DisplayString,
+        	mvrMode		INTEGER,
+        	mvrRowStatus	RowStatus,
+        	mvr8021pPriority	INTEGER
+        }
+
+        mvrVlanID OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	"1..4094"
+        ::= { mvrEntry 1 }
+
+        mvrName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrEntry 2 }
+
+        mvrMode OBJECT-TYPE
+        SYNTAX  INTEGER {
+        	dynamic(0),
+        	compatible(1)
+        	}
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrEntry 3 }
+        
+        mvrRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrEntry 4 }
+        
+        mvr8021pPriority OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"Set the 802.1p priority of control messages within MVR (0~7)"
+        ::= { mvrEntry 5 }
+
+        mvrPortTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF MvrPortEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { mvrSetup 3 }
+        
+	mvrPortEntry OBJECT-TYPE
+        SYNTAX	MvrPortEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in mvrPortTable."
+        INDEX          	{ mvrVlanID, dot1dBasePort }
+        ::= { mvrPortTable 1 }
+
+        MvrPortEntry ::=
+	SEQUENCE {
+        	mvrPortRole	INTEGER,
+        	mvrPortTagging	EnabledStatus
+        }
+
+        mvrPortRole OBJECT-TYPE
+        SYNTAX  INTEGER {
+        	none(1),
+        	source_port(2),
+        	receiver_port(3)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrPortEntry 1 }
+
+        mvrPortTagging OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrPortEntry 2 }
+
+	maxNumberOfMvrGroup OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrSetup 4 }
+	
+        mvrGroupTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF MvrGroupEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { mvrSetup 5 }
+        
+	mvrGroupEntry OBJECT-TYPE
+        SYNTAX	MvrGroupEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in mvrGroupTable."
+        INDEX          	{ mvrVlanID, mvrGroupName }
+        ::= { mvrGroupTable 1 }
+
+        MvrGroupEntry ::=
+	SEQUENCE {
+        	mvrGroupName		DisplayString,
+        	mvrGroupStartAddress	IpAddress,
+        	mvrGroupEndAddress	IpAddress,
+        	mvrGroupRowStatus	RowStatus
+        }
+
+        mvrGroupName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrGroupEntry 1 }
+
+        mvrGroupStartAddress OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrGroupEntry 2 }
+
+        mvrGroupEndAddress OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrGroupEntry 3 }
+        
+        mvrGroupRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { mvrGroupEntry 4 }    
+        
+--  sysLogSetup
+	sysLogSetup     	OBJECT IDENTIFIER ::= { es2108g 32 }
+	
+	sysLogState OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"sysLog enabled/disabled for the switch."
+        ::= { sysLogSetup 1 }
+            	
+--  sysLogTypeTable
+       	sysLogTypeTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF SysLogTypeEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { sysLogSetup 2 }
+        
+	sysLogTypeEntry OBJECT-TYPE
+        SYNTAX	SysLogTypeEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in sysLogTypeTable."
+        INDEX          	{ sysLogTypeIndex }
+        ::= { sysLogTypeTable 1 }
+
+        SysLogTypeEntry ::=
+           SEQUENCE {
+         	sysLogTypeIndex		INTEGER,
+        	sysLogTypeName		DisplayString,
+        	sysLogTypeState		EnabledStatus,
+        	sysLogTypeFacility	INTEGER
+           }
+       
+        sysLogTypeIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogTypeEntry 1 }
+
+        sysLogTypeName OBJECT-TYPE
+        SYNTAX  DisplayString 
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogTypeEntry 2 }
+
+        sysLogTypeState OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogTypeEntry 3 }
+
+   	sysLogTypeFacility OBJECT-TYPE
+        SYNTAX  INTEGER {
+        	local_user0(0),
+        	local_user1(1),
+        	local_user2(2),
+        	local_user3(3),
+        	local_user4(4),
+        	local_user5(5),
+        	local_user6(6),
+        	local_user7(7)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogTypeEntry 4 }
+
+--  sysLogServerTable
+       	sysLogServerTable	OBJECT-TYPE
+        SYNTAX	SEQUENCE OF SysLogServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { sysLogSetup 3 }
+        
+	sysLogServerEntry OBJECT-TYPE
+        SYNTAX	SysLogServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in sysLogServerTable."
+        INDEX          	{ sysLogServerAddress }
+        ::= { sysLogServerTable 1 }
+
+        SysLogServerEntry ::=
+           SEQUENCE {
+         	sysLogServerAddress		IpAddress,
+        	sysLogServerLogLevel	INTEGER,
+        	sysLogServerRowStatus	RowStatus
+           }
+       
+        sysLogServerAddress OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogServerEntry 1 }
+
+        sysLogServerLogLevel OBJECT-TYPE
+        SYNTAX  INTEGER {
+        	level0(0),
+        	level0-1(1),
+        	level0-2(2),
+        	level0-3(3),
+        	level0-4(4),
+        	level0-5(5),
+        	level0-6(6),
+        	level0-7(7)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogServerEntry 2 }
+
+        sysLogServerRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { sysLogServerEntry 3 } 
+        
+--  dhcpSetup
+	dhcpSetup     	OBJECT IDENTIFIER ::= {  es2108g 33 }
+
+        globalDhcpRelay OBJECT IDENTIFIER ::= { dhcpSetup 1 }
+        
+        globalDhcpRelayEnable OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { globalDhcpRelay 1 }
+
+        globalDhcpRelayOption82Enable OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { globalDhcpRelay 2 }
+
+        globalDhcpRelayInfoEnable OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { globalDhcpRelay 3 }
+
+        globalDhcpRelayInfoData OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { globalDhcpRelay 4 }
+
+--  globalDhcpRelayRemoteServer
+
+        maxNumberOfGlobalDhcpRelayRemoteServer OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { globalDhcpRelay 5 }
+
+-- globalDhcpRelayRemoteServerTable
+        globalDhcpRelayRemoteServerTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF GlobalDhcpRelayRemoteServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { globalDhcpRelay 6 }
+        
+	globalDhcpRelayRemoteServerEntry OBJECT-TYPE
+        SYNTAX	GlobalDhcpRelayRemoteServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in globalDhcpRelayRemoteServerTable."
+        INDEX          	{ globalDhcpRelayRemoteServerIp }
+        ::= { globalDhcpRelayRemoteServerTable 1 }
+
+        GlobalDhcpRelayRemoteServerEntry ::=
+           SEQUENCE {
+        	globalDhcpRelayRemoteServerIp		IpAddress,
+        	globalDhcpRelayRemoteServerRowStatus	RowStatus
+           }
+
+        globalDhcpRelayRemoteServerIp OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { globalDhcpRelayRemoteServerEntry 1 }
+
+        globalDhcpRelayRemoteServerRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { globalDhcpRelayRemoteServerEntry 2 }      
+        
+--
+	dhcpRelay OBJECT IDENTIFIER ::= { dhcpSetup 3 }
+
+   dhcpRelayInfoData OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { dhcpRelay 1 }
+
+	 maxNumberOfDhcpRelay OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	"The maximum number of DHCP relay entries that can be created. 
+                      	A value of 0 for this object implies that there exists settings for 
+                      	global DHCP relay."
+        ::= { dhcpRelay 2 }
+        
+     maxNumberOfDhcpRelayRemoteServer OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { dhcpRelay 3 }
+       
+-- dhcpRelayRemoteServerTable
+        dhcpRelayRemoteServerTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF DhcpRelayRemoteServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { dhcpRelay 4 }
+        
+	dhcpRelayRemoteServerEntry OBJECT-TYPE
+        SYNTAX	DhcpRelayRemoteServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in dhcpRelayRemoteServerTable."
+        INDEX          	{  dhcpRelayVid, dhcpRelayRemoteServerIp }
+        ::= { dhcpRelayRemoteServerTable 1 }
+
+        DhcpRelayRemoteServerEntry ::=
+           SEQUENCE {  
+            	dhcpRelayVid		          INTEGER,
+           	dhcpRelayRemoteServerIp		IpAddress,
+        		dhcpRelayRemoteServerRowStatus	RowStatus
+           }     
+           
+        dhcpRelayVid OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { dhcpRelayRemoteServerEntry 1 }   
+        
+        dhcpRelayRemoteServerIp OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { dhcpRelayRemoteServerEntry 2 }
+
+        dhcpRelayRemoteServerRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { dhcpRelayRemoteServerEntry 3 }
+          	
+-- dhcpRelayTable   
+        
+        dhcpRelayTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF DhcpRelayEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { dhcpRelay 5 }  	
+
+
+	dhcpRelayEntry OBJECT-TYPE
+        SYNTAX	DhcpRelayEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in dhcpRelayTable."
+        INDEX          	{ dhcpRelayVid }
+        ::= { dhcpRelayTable 1 }
+
+        DhcpRelayEntry ::=
+           SEQUENCE {
+        	dhcpRelayOption82Enable   EnabledStatus,
+        	dhcpRelayInfoEnable       EnabledStatus
+           }
+
+        dhcpRelayOption82Enable OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { dhcpRelayEntry 1 }
+
+        dhcpRelayInfoEnable OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { dhcpRelayEntry 2 }          
+        
+--  radiusServerSetup
+	radiusServerSetup     	OBJECT IDENTIFIER ::= { es2108g 34 }
+
+        radiusAuthServerSetup OBJECT IDENTIFIER ::= { radiusServerSetup 1 }
+        
+        radiusAuthServerMode OBJECT-TYPE
+        SYNTAX  INTEGER{
+        		index-priority(1),
+		round-robin(2),
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { radiusAuthServerSetup 1 }
+
+        radiusAuthServerTimeout OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { radiusAuthServerSetup 2 }
+
+-- radiusAuthServerTable
+        radiusAuthServerTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF RadiusAuthServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { radiusAuthServerSetup 3 }
+        
+	radiusAuthServerEntry OBJECT-TYPE
+        SYNTAX	RadiusAuthServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in radiusAuthServerTable."
+        INDEX          	{ radiusAuthServerIndex }
+        ::= { radiusAuthServerTable 1 }
+
+        RadiusAuthServerEntry ::=
+           SEQUENCE {
+        	radiusAuthServerIndex		INTEGER,
+        	radiusAuthServerIpAddr		IpAddress,
+        	radiusAuthServerUdpPort		INTEGER,
+        	radiusAuthServerSharedSecret	DisplayString
+           }
+
+        radiusAuthServerIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { radiusAuthServerEntry 1 }
+
+        radiusAuthServerIpAddr OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { radiusAuthServerEntry 2 }
+
+        radiusAuthServerUdpPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { radiusAuthServerEntry 3 }
+
+        radiusAuthServerSharedSecret OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { radiusAuthServerEntry 4 }
+
+        radiusAcctServerSetup OBJECT IDENTIFIER ::= { radiusServerSetup 2 }
+
+        radiusAcctServerTimeout OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { radiusAcctServerSetup 1 }
+
+-- radiusAcctServerTable
+        radiusAcctServerTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF RadiusAcctServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { radiusAcctServerSetup 2 }
+        
+	radiusAcctServerEntry OBJECT-TYPE
+        SYNTAX	RadiusAcctServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in radiusAcctServerTable."
+        INDEX          	{ radiusAcctServerIndex }
+        ::= { radiusAcctServerTable 1 }
+
+        RadiusAcctServerEntry ::=
+           SEQUENCE {
+        	radiusAcctServerIndex		INTEGER,
+        	radiusAcctServerIpAddr		IpAddress,
+        	radiusAcctServerUdpPort		INTEGER,
+        	radiusAcctServerSharedSecret	DisplayString
+           }
+
+        radiusAcctServerIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { radiusAcctServerEntry 1 }
+
+        radiusAcctServerIpAddr OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { radiusAcctServerEntry 2 }
+
+        radiusAcctServerUdpPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { radiusAcctServerEntry 3 }
+
+        radiusAcctServerSharedSecret OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { radiusAcctServerEntry 4 }
+        
+--  tacacsServerSetup
+	tacacsServerSetup     	OBJECT IDENTIFIER ::= { es2108g 35 }
+
+        tacacsAuthServerSetup OBJECT IDENTIFIER ::= { tacacsServerSetup 1 }
+        
+        tacacsAuthServerMode OBJECT-TYPE
+        SYNTAX  INTEGER{
+        		index-priority(1),
+		round-robin(2),
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { tacacsAuthServerSetup 1 }
+
+        tacacsAuthServerTimeout OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { tacacsAuthServerSetup 2 }
+
+-- tacacsAuthServerTable
+        tacacsAuthServerTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF TacacsAuthServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { tacacsAuthServerSetup 3 }
+        
+	tacacsAuthServerEntry OBJECT-TYPE
+        SYNTAX	TacacsAuthServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in tacacsAuthServerTable."
+        INDEX          	{ tacacsAuthServerIndex }
+        ::= { tacacsAuthServerTable 1 }
+
+        TacacsAuthServerEntry ::=
+           SEQUENCE {
+        	tacacsAuthServerIndex		INTEGER,
+        	tacacsAuthServerIpAddr		IpAddress,
+        	tacacsAuthServerTcpPort		INTEGER,
+        	tacacsAuthServerSharedSecret	DisplayString
+           }
+
+        tacacsAuthServerIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { tacacsAuthServerEntry 1 }
+
+        tacacsAuthServerIpAddr OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { tacacsAuthServerEntry 2 }
+
+        tacacsAuthServerTcpPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { tacacsAuthServerEntry 3 }
+
+        tacacsAuthServerSharedSecret OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { tacacsAuthServerEntry 4 }
+
+        tacacsAcctServerSetup OBJECT IDENTIFIER ::= { tacacsServerSetup 2 }
+
+        tacacsAcctServerTimeout OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { tacacsAcctServerSetup 1 }
+
+-- tacacsAcctServerTable
+        tacacsAcctServerTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF TacacsAcctServerEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { tacacsAcctServerSetup 2 }
+        
+	tacacsAcctServerEntry OBJECT-TYPE
+        SYNTAX	TacacsAcctServerEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in tacacsAcctServerTable."
+        INDEX          	{ tacacsAcctServerIndex }
+        ::= { tacacsAcctServerTable 1 }
+
+        TacacsAcctServerEntry ::=
+           SEQUENCE {
+        	tacacsAcctServerIndex		INTEGER,
+        	tacacsAcctServerIpAddr		IpAddress,
+        	tacacsAcctServerTcpPort		INTEGER,
+        	tacacsAcctServerSharedSecret	DisplayString
+           }
+
+        tacacsAcctServerIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { tacacsAcctServerEntry 1 }
+
+        tacacsAcctServerIpAddr OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { tacacsAcctServerEntry 2 }
+
+        tacacsAcctServerTcpPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { tacacsAcctServerEntry 3 }
+
+        tacacsAcctServerSharedSecret OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { tacacsAcctServerEntry 4 }
+
+--  aaaSetup
+	aaaSetup     	OBJECT IDENTIFIER ::= { es2108g 36 }
+
+        authenticationSetup OBJECT IDENTIFIER ::= { aaaSetup 1 }
+
+-- authenticationTypeTable
+        authenticationTypeTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF AuthenticationTypeEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { authenticationSetup 1 }
+        
+	authenticationTypeEntry OBJECT-TYPE
+        SYNTAX	AuthenticationTypeEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in authenticationTypeTable."
+        INDEX          	{ authenticationTypeName }
+        ::= { authenticationTypeTable 1 }
+
+        AuthenticationTypeEntry ::=
+           SEQUENCE {
+        	authenticationTypeName	DisplayString,
+        	authenticationTypeMethodList	OCTET STRING
+           }
+
+        authenticationTypeName OBJECT-TYPE
+        SYNTAX  DisplayString
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { authenticationTypeEntry 1 }
+
+        authenticationTypeMethodList OBJECT-TYPE
+        SYNTAX  OCTET STRING
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                     	""
+        ::= { authenticationTypeEntry 2 }
+
+    accountingSetup      	OBJECT IDENTIFIER ::= { aaaSetup 2 }      
+	accountingUpdatePeriod OBJECT-TYPE
+	SYNTAX  Integer32
+	ACCESS  read-write
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingSetup 1 }		
+	
+-- accountingTypeTable
+        accountingTypeTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF AccountingTypeEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { accountingSetup 2 }
+        
+	accountingTypeEntry OBJECT-TYPE
+        SYNTAX	AccountingTypeEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in accountingTypeTable."
+        INDEX          	{ accountingTypeName }
+        ::= { accountingTypeTable 1 }
+
+        AccountingTypeEntry ::=
+           SEQUENCE {
+         	accountingTypeName		DisplayString,
+         	accountingTypeActive		EnabledStatus,	         	
+         	accountingTypeBroadcast		EnabledStatus,	         	
+         	accountingTypeMode		INTEGER,
+         	accountingTypeMethod		INTEGER,
+         	accountingTypePrivilege		INTEGER        	
+           }
+
+	accountingTypeName OBJECT-TYPE
+	SYNTAX  DisplayString
+	ACCESS  read-only
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingTypeEntry 1 }
+
+	accountingTypeActive OBJECT-TYPE
+	SYNTAX  EnabledStatus
+	ACCESS  read-write
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingTypeEntry 2 }
+
+	accountingTypeBroadcast OBJECT-TYPE
+	SYNTAX  EnabledStatus
+	ACCESS  read-write
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingTypeEntry 3 }
+
+	accountingTypeMode OBJECT-TYPE
+	SYNTAX  INTEGER{
+		not-available(255),
+        		start-stop(1),
+		stop-only(2)		
+	}
+	ACCESS  read-write
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingTypeEntry 4 }
+
+	accountingTypeMethod OBJECT-TYPE
+	SYNTAX  INTEGER{		
+        		radius(1),
+		tacacs(2)		
+	}
+	ACCESS  read-write
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingTypeEntry 5 }
+
+	accountingTypePrivilege OBJECT-TYPE
+	SYNTAX  INTEGER{	
+		not-available(255),
+		privilege-0(0),
+		privilege-1(1),
+		privilege-2(2),
+		privilege-3(3),
+		privilege-4(4),
+		privilege-5(5),
+		privilege-6(6),
+		privilege-7(7),
+		privilege-8(8),
+		privilege-9(9),
+		privilege-10(10),
+		privilege-11(11),
+		privilege-12(12),
+		privilege-13(13),
+		privilege-14(14)        		
+	}
+	ACCESS  read-write
+	STATUS  mandatory
+	DESCRIPTION
+                      	""
+	::= { accountingTypeEntry 6 }
+
+---------------------------------------------------
+--
+--  ip source guard
+--
+---------------------------------------------------
+
+	ipsg OBJECT IDENTIFIER ::= { es2108g 101 }
+	
+	    ipsgTable  OBJECT-TYPE
+	    SYNTAX	SEQUENCE OF IpsgEntry 
+	    ACCESS  not-accessible
+	    STATUS  mandatory
+	    DESCRIPTION
+	             	""
+	    ::= { ipsg 1 }	
+
+	ipsgEntry  OBJECT-TYPE
+        SYNTAX	IpsgEntry 
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	""
+        INDEX          	{ ipsgEntryMac, ipsgEntryVid }
+        ::= { ipsgTable 1 }
+
+        IpsgEntry ::=
+           SEQUENCE {
+            ipsgEntryMac		MacAddress,
+        	ipsgEntryVid		INTEGER,
+        	ipsgEntryIp			IpAddress,
+        	ipsgEntryLease		INTEGER,
+        	ipsgEntryType		INTEGER,
+        	ipsgEntryPort		INTEGER,
+        	ipsgEntryState		RowStatus
+           }
+
+        ipsgEntryMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { ipsgEntry 1 }
+
+        ipsgEntryVid OBJECT-TYPE
+        SYNTAX  INTEGER (1.. 4094)
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { ipsgEntry 2 }
+
+        ipsgEntryIp OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { ipsgEntry 3 }
+
+        ipsgEntryLease OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	"second"
+        ::= { ipsgEntry 4 }
+
+        ipsgEntryType OBJECT-TYPE
+        SYNTAX  INTEGER { static(1), dhcp(2) }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { ipsgEntry 5 }
+
+        ipsgEntryPort OBJECT-TYPE
+        SYNTAX  INTEGER 
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	"0 means any port"
+        ::= { ipsgEntry 6 }
+
+        ipsgEntryState OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { ipsgEntry 7 } 
+
+
+---------------------------------------------------
+--
+--  arpInspect
+--
+---------------------------------------------------
+
+	arpInspect     	OBJECT IDENTIFIER ::= { es2108g 102 }
+
+	arpInspectSetup  OBJECT IDENTIFIER ::= { arpInspect 1 }
+
+        arpInspectState OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectSetup 1 }
+
+        arpInspectFilterAgingTime OBJECT-TYPE
+        SYNTAX  INTEGER (0..2147483647)
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectSetup 2 }
+
+	arpInspectLog  OBJECT IDENTIFIER ::= { arpInspectSetup 3 }
+	
+        arpInspectLogEntries OBJECT-TYPE
+        SYNTAX  INTEGER	(0..1024)
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectLog 1 }
+
+        arpInspectLogRate OBJECT-TYPE
+        SYNTAX  INTEGER (0..1024)
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectLog 2 }
+        
+        arpInspectLogInterval OBJECT-TYPE
+        SYNTAX  INTEGER (0..2147483647)
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectLog 3 }                	
+
+	arpInspectVlanTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF ArpInspectVlanEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { arpInspectSetup 4 }
+        
+	arpInspectVlanEntry OBJECT-TYPE
+        SYNTAX	ArpInspectVlanEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	""
+        INDEX          	{ arpInspectVlanVid }
+        ::= { arpInspectVlanTable 1 }
+
+        ArpInspectVlanEntry ::=
+           SEQUENCE {
+        	arpInspectVlanVid	INTEGER,
+        	arpInspectVlanLog	INTEGER,
+			arpInspectVlanStatus	INTEGER       	
+           }
+
+        arpInspectVlanVid OBJECT-TYPE
+        SYNTAX  INTEGER (1..4094)
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectVlanEntry 1 }
+
+        arpInspectVlanLog OBJECT-TYPE
+        SYNTAX  INTEGER {
+        		all (1),
+        		none (2),
+        		permit (3),
+        		deny (4)
+        }
+        		
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectVlanEntry 2 }
+
+        arpInspectVlanStatus OBJECT-TYPE
+        SYNTAX  INTEGER {
+        		enabled(1),
+        		disabled(2)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectVlanEntry 3 }
+
+	arpInspectPortTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF ArpInspectPortEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { arpInspectSetup 5 }
+        
+	arpInspectPortEntry OBJECT-TYPE
+        SYNTAX	ArpInspectPortEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	""
+        INDEX          	{ arpInspectPortIndex }
+        ::= { arpInspectPortTable 1 }
+
+        ArpInspectPortEntry ::=
+           SEQUENCE {
+        	arpInspectPortIndex	INTEGER,
+        	arpInspectPortTrust	INTEGER
+           }
+
+        arpInspectPortIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectPortEntry 1 }
+
+        arpInspectPortTrust OBJECT-TYPE
+        SYNTAX  INTEGER {
+        		trusted(1),
+        		untrusted(2)
+        }
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectPortEntry 2 }
+
+	arpInspectStatus  OBJECT IDENTIFIER ::= { arpInspect 2 }
+
+        arpInspectFilterClear OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectStatus 1 }
+
+        arpInspectLogClear OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      ""
+        ::= { arpInspectStatus 2 }
+
+	arpInspectFilterTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF ArpInspectFilterEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { arpInspectStatus 3 }
+        
+	arpInspectFilterEntry OBJECT-TYPE
+        SYNTAX	ArpInspectFilterEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	""
+        INDEX          	{ arpInspectFilterMac, arpInspectFilterVid }
+        ::= { arpInspectFilterTable 1 }
+
+        ArpInspectFilterEntry ::=
+           SEQUENCE {
+        	arpInspectFilterMac	MacAddress,
+        	arpInspectFilterVid	INTEGER,
+			arpInspectFilterPort	INTEGER,       	
+			arpInspectFilterExpiry	INTEGER,
+			arpInspectFilterReason	INTEGER,
+			arpInspectFilterRowStatus RowStatus
+           }
+
+        arpInspectFilterMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectFilterEntry 1 }
+
+        arpInspectFilterVid OBJECT-TYPE
+        SYNTAX  INTEGER (1..4094)
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectFilterEntry 2 }
+
+        arpInspectFilterPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectFilterEntry 3 }
+
+        arpInspectFilterExpiry OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectFilterEntry 4 }	
+
+        arpInspectFilterReason OBJECT-TYPE
+        SYNTAX  INTEGER {
+        		macVid(1),
+        		port(2),
+        		ip(3)
+        }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectFilterEntry 5 }		
+        
+       arpInspectFilterRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        ACCESS  read-create
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectFilterEntry 6 }	
+
+	arpInspectLogTable OBJECT-TYPE
+        SYNTAX	SEQUENCE OF ArpInspectLogEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { arpInspectStatus 4 }
+        
+	arpInspectLogEntry OBJECT-TYPE
+        SYNTAX	ArpInspectLogEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	""
+        INDEX          	{ arpInspectLogMac, arpInspectLogVid, arpInspectLogPort, arpInspectLogIp }
+        ::= { arpInspectLogTable 1 }
+
+        ArpInspectLogEntry ::=
+           SEQUENCE {
+        	arpInspectLogMac	MacAddress,
+        	arpInspectLogVid	INTEGER,
+			arpInspectLogPort	INTEGER,       	
+			arpInspectLogIp	IpAddress,
+			arpInspectLogNumPkt	INTEGER,
+			arpInspectLogReason	INTEGER,
+			arpInspectLogTime	DateAndTime
+           }
+
+        arpInspectLogMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 1 }
+
+        arpInspectLogVid OBJECT-TYPE
+        SYNTAX  INTEGER (1..4094)
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 2 }
+
+        arpInspectLogPort OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 3 }
+
+        arpInspectLogIp OBJECT-TYPE
+        SYNTAX  IpAddress
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 4 }	
+
+        arpInspectLogNumPkt OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 5 }		
+
+        arpInspectLogReason OBJECT-TYPE
+        SYNTAX  INTEGER {
+        		deny (1),
+        		denyStatic (2),
+        		denyDHCP (3),
+        		permitStatic (4),
+        		permitDHCP (5)
+        }
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 6 }		
+        
+        arpInspectLogTime OBJECT-TYPE
+        SYNTAX  DateAndTime
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { arpInspectLogEntry 7 }		
+        
+
+
+---------------------------------------------------
+--
+--  loopGuardSetup
+--
+---------------------------------------------------
+
+	loopGuardSetup     	OBJECT IDENTIFIER ::= { es2108g 104 }
+                               
+        loopGuardState OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { loopGuardSetup 1 }
+
+                                               
+-- loopGuardPortTable
+
+	loopGuardPortTable OBJECT-TYPE
+		SYNTAX	SEQUENCE OF LoopGuardPortEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                 	""
+        ::= { loopGuardSetup 2 }
+        
+	loopGuardPortEntry OBJECT-TYPE
+        SYNTAX	LoopGuardPortEntry
+        ACCESS	not-accessible
+        STATUS	mandatory
+        DESCRIPTION    	"An entry in loopGuardPortTable."
+        INDEX          	{ dot1dBasePort }
+        ::= { loopGuardPortTable 1 }
+
+		LoopGuardPortEntry ::=
+		SEQUENCE {
+			loopGuardPortState	EnabledStatus
+		}
+
+        loopGuardPortState OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        ACCESS  read-write
+        STATUS  mandatory
+        DESCRIPTION
+                      	""
+        ::= { loopGuardPortEntry 1 }
+
+-- MSTP  
+--****************************************************************
+-- TEXTUAL-CONVENTIONs
+--****************************************************************
+		MstiOrCistInstanceIndex ::= TEXTUAL-CONVENTION
+      		STATUS       mandatory
+    		DESCRIPTION
+	            "This textual convention is an extension of the
+	            MstiInstanceIndex convention.  This extension permits the
+	            additional value of zero, which means Common and Internal
+	            Spanning Tree (CIST)."
+            SYNTAX      Integer32 (0..16) 
+            
+        mstp            OBJECT IDENTIFIER ::= { es2108g 107 }    
+-- mstpGen group reflects configurations/statuses
+-- the Bridge as a unit  
+	    mstpGen			OBJECT IDENTIFIER ::= { mstp 1}  
+	    
+        mstpGenState		OBJECT-TYPE
+        SYNTAX    EnabledStatus
+        ACCESS    read-write
+        STATUS    mandatory
+        DESCRIPTION
+        "Enabled/disabled on the mrstp bridge."
+        ::= { mstpGen 1 }
+        
+        mstpGenCfgIdName    OBJECT-TYPE
+        SYNTAX    DisplayString
+        ACCESS    read-write
+        STATUS    mandatory 
+        DESCRIPTION 
+        "The configuration name that identifies the MST
+         region and is used as one of the inputs in the 
+         computation of the MST Configuration Identifier." 
+        REFERENCE
+            "12.12.3.4.2.b)"
+        ::= { mstpGen 2 }
+        
+        mstpGenCfgIdRevLevel OBJECT-TYPE
+        SYNTAX    Integer32
+        ACCESS    read-write
+        STATUS    mandatory 
+        DESCRIPTION 
+        "This object identifies the MST revision that
+         identifies the MST region and is used as one
+         of the inputs in the computation of the MST 
+         configuration Identifier."
+        REFERENCE
+            "12.12.3.4.2.c)"
+        ::= { mstpGen 3 }
+	    
+	    
+	   mstpGenCfgIdCfgDigest  OBJECT-TYPE
+            SYNTAX    OCTET STRING(SIZE(16))
+            ACCESS    read-only
+            STATUS    mandatory
+            DESCRIPTION
+              "Configuration Digest."
+            REFERENCE
+               "12.12.3.3.3.a.4"
+            ::= { mstpGen 4 }
+	    
+	    mstpGenHelloTime  OBJECT-TYPE
+	        SYNTAX    Timeout (100..1000)
+            ACCESS    read-write
+            STATUS    mandatory 
+            DESCRIPTION
+            ""                  
+            ::= { mstpGen 5 }
+       
+        mstpGenMaxAge    OBJECT-TYPE
+            SYNTAX  Timeout (600..4000)
+            ACCESS  read-write
+            STATUS  mandatory 
+            DESCRIPTION
+            "" 
+            ::= { mstpGen 6 }
+         
+        mstpGenForwardDelay   OBJECT-TYPE 
+            SYNTAX  Timeout (400..3000)
+            ACCESS  read-write
+            STATUS  mandatory
+            DESCRIPTION
+            ""
+            ::= {mstpGen 7}
+        
+        mstpGenMaxHops  OBJECT-TYPE
+            SYNTAX      Integer32 (4..30)
+            MAX-ACCESS  read-write
+            STATUS      mandatory
+            DESCRIPTION
+               "13.22.f)"
+            ::= { mstpGen 8 }
+	    
+	mstpGenCistRootPathCost  OBJECT-TYPE
+            SYNTAX      Integer32
+            MAX-ACCESS  read-only
+            STATUS      mandatory
+            DESCRIPTION
+	    "."
+            ::= { mstpGen 9 }
+	    
+	mstpGenCistRootBrid  OBJECT-TYPE
+            SYNTAX      OCTET STRING(SIZE(32))
+            MAX-ACCESS  read-only
+            STATUS      mandatory
+            DESCRIPTION
+            "."
+            ::= { mstpGen 10 }
+-- MSTP MAP TABLE
+        mstMapTable        OBJECT-TYPE
+            SYNTAX      SEQUENCE OF MstMapEntry
+            ACCESS  not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+               "This table contains one entry for each instance of MSTP."
+            ::= { mstp 20 }	
+         
+        mstMapEntry        OBJECT-TYPE
+            SYNTAX      MstMapEntry
+            ACCESS  not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+               "A conceptual row containing the status of the MSTP instance."
+            INDEX  { mstMapIndex }
+            ::= { mstMapTable 1 }
+        
+        MstMapEntry ::= SEQUENCE {
+                   mstMapIndex             MstiOrCistInstanceIndex,
+                   mstMapVlans1k           OCTET STRING,
+                   mstMapVlans2k           OCTET STRING,
+                   mstMapVlans3k           OCTET STRING,
+                   mstMapVlans4k           OCTET STRING,
+                   mstMapRowStatus         RowStatus
+        }
+        
+        mstMapIndex    OBJECT-TYPE
+            SYNTAX      MstiOrCistInstanceIndex
+            MAX-ACCESS  not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+            "Uniquely identifies an instance. The entry of this table with index 0
+            presents always, represents CIST. When SET operation "
+            ::= { mstMapEntry 1 }  
+        
+        mstMapVlans1k      OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE (0..128))
+            ACCESS  read-write
+            STATUS      mandatory
+            DESCRIPTION
+           "A string of octets containing one bit per VLAN. The
+            first octet corresponds to VLANs with VlanIndex values
+            1 through 8; the second octet to VLANs 9 through
+            16 etc.  The most significant bit of each octet
+            corresponds to the lowest VlanIndex value in that octet.
+
+            For each VLAN that is mapped to this MSTP instance,
+            the bit corresponding to that VLAN is set to '1'.
+            Empty (zero) most significant octes are not mandatory."
+            ::= { mstMapEntry 2 } 
+        
+        mstMapVlans2k      OBJECT-TYPE
+            SYNTAX  OCTET STRING (SIZE (0..128))
+            ACCESS  read-write
+            STATUS  mandatory
+            DESCRIPTION
+            "A string of octets containing one bit per VLAN for
+             VLANS with VlanIndex values 1024 through 2047. The
+             first octet corresponds to VLANs with VlanIndex values
+             1024 through 1031; the second octet to VLANs 1032
+             through 1039 etc.  The most significant bit of each
+             octet corresponds to the lowest VlanIndex value in that
+             octet.
+             
+             For each VLAN that is mapped to this MSTP instance,
+             the bit corresponding to that VLAN is set to '1'.
+
+             Empty (zero) most significant octes are not mandatory."
+             ::= { mstMapEntry 3 }
+        
+        mstMapVlans3k      OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE (0..128))
+            ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+            "A string of octets containing one bit per VLAN for
+             VLANS with VlanIndex values 2048 through 3071. The
+             first octet corresponds to VLANs with VlanIndex values
+             of 2048 through 2055; the second octet to VLANs 2056
+             through 2063 etc.  The most significant bit of each
+             octet corresponds to the lowest VlanIndex value in that
+             octet.
+
+             For each VLAN that is mapped to this MSTP instance,
+             the bit corresponding to that VLAN is set to '1'.
+
+             Empty (zero) most significant octes are not mandatory."
+             ::= { mstMapEntry 4 }
+        
+        mstMapVlans4k      OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE (0..128))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+            "A string of octets containing one bit per VLAN for
+             VLANS with VlanIndex values 3072 through 4095. The
+             first octet corresponds to VLANs with VlanIndex values
+             3072 through 3079; the second octet to VLANs 3080
+             through 3087 etc.  The most significant bit of each
+             octet corresponds to the lowest VlanIndex value in that
+             octet.
+        
+             For each VLAN that is mapped to this MSTP instance,
+             the bit corresponding to that VLAN is set to '1'.
+           
+             Empty (zero) most significant octes are not mandatory."
+             ::= { mstMapEntry 5 }   
+        
+        mstMapRowStatus    OBJECT-TYPE
+            SYNTAX  RowStatus
+            ACCESS  read-create
+            STATUS  mandatory
+            DESCRIPTION 
+            ""
+        ::= {  mstMapEntry 6 }
+    	
+-- MSTP Vlan Table, map vlan to msti
+        mstVlanTable       OBJECT-TYPE
+            SYNTAX      SEQUENCE OF MstVlanEntry
+            ACCESS  not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+            "This table contains one entry for each VlanId."
+            ::= { mstp 30 } 
+        
+        mstVlanEntry  OBJECT-TYPE
+            SYNTAX      MstVlanEntry
+            ACCESS      not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+                "Information regarding the instance to which each Vlan is mapped."
+            INDEX  { mstVlanIndex }
+            ::= { mstVlanTable 1 }
+           
+        MstVlanEntry ::= SEQUENCE {
+              mstVlanIndex         INTEGER,
+              mstVlanMstIndex      MstiOrCistInstanceIndex
+        }
+        
+        
+        mstVlanIndex     OBJECT-TYPE
+            SYNTAX        INTEGER(1..4094)
+            ACCESS        not-accessible
+            STATUS        mandatory
+            DESCRIPTION
+                "The VlanId for which this entry contains the instance mapped."
+            ::= { mstVlanEntry 1 } 
+         
+        mstVlanMstIndex    OBJECT-TYPE
+             SYNTAX      MstiOrCistInstanceIndex
+             ACCESS  read-only
+             STATUS      mandatory
+             DESCRIPTION
+                 "An integer with values ranging from 0 to 64 that identify a 
+                      the CIST/MSTI instance to which this VLAN is mapped" 
+             ::= { mstVlanEntry 2 }   
+-- MSTP Port Table, information for all instance of a port
+        mstpPortTable      OBJECT-TYPE
+            SYNTAX      SEQUENCE OF MstpPortEntry
+            ACCESS  not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+                "A table that contains generic information about
+                every port that is associated with this bridge."
+            ::= { mstp 40 }
+        
+        mstpPortEntry      OBJECT-TYPE
+            SYNTAX  MstpPortEntry
+            ACCESS  not-accessible
+            STATUS  mandatory
+            DESCRIPTION
+            "A list of information for each port of the
+            bridge."
+            INDEX  { mstpPortIndex }
+            ::= { mstpPortTable 1 }
+        
+        MstpPortEntry ::= SEQUENCE {
+             mstpPortIndex                    INTEGER,
+             mstpPortOperEdgePort             TruthValue,
+             mstpPortOperPointToPointMAC      TruthValue
+        }
+        
+        mstpPortIndex	OBJECT-TYPE
+            SYNTAX    INTEGER (1..65535)
+            ACCESS  not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+            "A unique value, greater than zero, for each Port.
+            The value for each interface sub-layer
+            must remain constant at least from one re-initialization
+            of the entity's network management system to the next re-
+            initialization."
+            ::= { mstpPortEntry 1 }
+        
+        mstpPortOperEdgePort    OBJECT-TYPE
+            SYNTAX    TruthValue
+            ACCESS    read-only
+            STATUS    mandatory 
+            DESCRIPTION
+            ""
+            REFERENCE   ""
+            ::= { mstpPortEntry 2 }
+        
+        mstpPortOperPointToPointMAC    OBJECT-TYPE
+            SYNTAX    TruthValue
+            ACCESS    read-only
+            STATUS    mandatory
+            DESCRIPTION
+            ""
+            REFERENCE    ""
+            ::= {mstpPortEntry 3} 
+-- MSTP Xst Table, Cist/Mst status/setting
+        mstpXstTable  OBJECT-TYPE
+              SYNTAX      SEQUENCE OF MstpXstEntry
+              ACCESS  not-accessible
+              STATUS      mandatory
+              DESCRIPTION
+                "."
+              ::= { mstp 50 }
+
+        mstpXstEntry OBJECT-TYPE
+              SYNTAX      MstpXstEntry
+              ACCESS  not-accessible
+              STATUS      mandatory
+              DESCRIPTION
+                "."
+              INDEX { mstpXstId }
+              ::= { mstpXstTable 1 }  
+        
+       MstpXstEntry ::= SEQUENCE {
+	           mstpXstId                      MstiOrCistInstanceIndex,
+	           mstpXstBridgePriority          Integer32,
+	           mstpXstBridgeId                BridgeId,
+	           mstpXstInternalRootCost        Integer32,
+	           mstpXstRootPort                INTEGER,
+	           mstpXstTimeSinceTopologyChange TimeTicks,
+	           mstpXstTopologyChangesCount    Counter32
+       }
+       
+       mstpXstId   OBJECT-TYPE
+           SYNTAX      MstiOrCistInstanceIndex
+           ACCESS      read-only
+           STATUS      mandatory
+           DESCRIPTION
+             "0 means CIST."
+           ::= { mstpXstEntry 1 }
+       
+       mstpXstBridgePriority   OBJECT-TYPE
+           SYNTAX      Integer32 (0..61440)
+           ACCESS  read-write
+           STATUS      mandatory
+           DESCRIPTION
+              "Bridge priority, in steps of 4096."
+           DEFVAL       { 32768 }
+           ::= { mstpXstEntry 2 } 
+       
+       mstpXstBridgeId   OBJECT-TYPE
+           SYNTAX      BridgeId
+           ACCESS      read-only
+           STATUS      mandatory
+           DESCRIPTION
+             "."
+           ::= { mstpXstEntry 3 }   
+        
+        
+       mstpXstInternalRootCost     OBJECT-TYPE
+           SYNTAX      Integer32
+           ACCESS      read-only
+           STATUS      mandatory
+           DESCRIPTION
+             "."
+           ::= { mstpXstEntry 4 }
+
+       mstpXstRootPort      OBJECT-TYPE
+           SYNTAX      INTEGER 
+           ACCESS      read-only
+           STATUS      mandatory
+           DESCRIPTION
+           "."
+           ::= { mstpXstEntry 5 }
+       
+       mstpXstTimeSinceTopologyChange  OBJECT-TYPE
+           SYNTAX      TimeTicks
+           ACCESS      read-only
+           STATUS      mandatory
+           DESCRIPTION
+             "."
+           ::= { mstpXstEntry 6 }
+
+       mstpXstTopologyChangesCount     OBJECT-TYPE
+           SYNTAX      Counter32
+           ACCESS      read-only
+           STATUS      mandatory
+           DESCRIPTION
+             "."
+           ::= { mstpXstEntry 7 }  
+-- MSTP Xst Port Table, Cist/Mst Port status/setting
+       mstpXstPortTable    OBJECT-TYPE
+           SYNTAX  SEQUENCE OF MstpXstPortEntry
+           ACCESS  not-accessible
+           STATUS  mandatory
+           DESCRIPTION
+             "."
+           ::= { mstp 60 }
+       
+       mstpXstPortEntry    OBJECT-TYPE
+           SYNTAX  MstpXstPortEntry
+           ACCESS  not-accessible
+           STATUS  mandatory
+           DESCRIPTION
+             "."
+           REFERENCE
+             "."
+           INDEX  { mstpXstPortXstId, mstpXstPortIndex }
+           ::= { mstpXstPortTable 1 }
+       
+        
+        MstpXstPortEntry ::=
+        SEQUENCE {
+         	mstpXstPortXstId                 MstiOrCistInstanceIndex,
+          	mstpXstPortIndex                 INTEGER,
+          	mstpXstPortEnable                EnabledStatus, 
+          	mstpXstPortPriority              Integer32,
+          	mstpXstPortPathCost              INTEGER,   
+          	mstpXstPortState				 INTEGER,
+          	mstpXstPortDesignatedRoot        BridgeId,
+          	mstpXstPortDesignatedCost        Integer32,
+          	mstpXstPortDesignatedBridge      BridgeId,
+          	mstpXstPortDesignatedPort        INTEGER
+        }
+        
+        mstpXstPortXstId     OBJECT-TYPE
+            SYNTAX      MstiOrCistInstanceIndex
+            ACCESS      not-accessible
+            STATUS      mandatory
+            DESCRIPTION
+              "0 means CIST."
+            ::= { mstpXstPortEntry 1 }
+
+        mstpXstPortIndex     OBJECT-TYPE
+            SYNTAX      INTEGER(1..65535)
+            ACCESS      read-only
+            STATUS      mandatory
+            DESCRIPTION
+              "The value of mstpPortIndex of the Port
+              in mstpPortTable."
+            ::= { mstpXstPortEntry 2 }
+        
+        
+        mstpXstPortEnable     OBJECT-TYPE
+            SYNTAX      EnabledStatus
+            ACCESS      read-write
+            STATUS      mandatory
+            DESCRIPTION
+              "."
+            ::= { mstpXstPortEntry 3 }
+         
+         mstpXstPortPriority              OBJECT-TYPE 
+             SYNTAX      Integer32 (0..255)
+             ACCESS      read-write
+             STATUS      mandatory
+             DESCRIPTION
+               "Port priority, in steps of 16."
+             DEFVAL       { 128 }
+             ::= { mstpXstPortEntry 4 }
+        
+         mstpXstPortPathCost              OBJECT-TYPE 
+             SYNTAX      INTEGER (1..65535)
+             ACCESS      read-write
+             STATUS      mandatory
+             DESCRIPTION
+               "."
+             ::= { mstpXstPortEntry 5 }
+
+         mstpXstPortState                 OBJECT-TYPE 
+             SYNTAX      INTEGER {
+               disabled(0),
+               discarding(1),
+               learning(2),
+               forwarding(3),
+               unknown(4)
+             }
+             ACCESS      read-only
+             STATUS      mandatory
+             DESCRIPTION
+               "."
+             ::= { mstpXstPortEntry 6 }
+         
+         mstpXstPortDesignatedRoot        OBJECT-TYPE 
+              SYNTAX      BridgeId
+              ACCESS      read-only
+              STATUS      mandatory
+              DESCRIPTION
+              "."
+              ::= { mstpXstPortEntry 7 }
+         
+         mstpXstPortDesignatedCost        OBJECT-TYPE
+             SYNTAX      Integer32
+             ACCESS      read-only
+             STATUS      mandatory
+             DESCRIPTION
+             "."
+             ::= { mstpXstPortEntry 8 }
+         
+         mstpXstPortDesignatedBridge      OBJECT-TYPE
+             SYNTAX      BridgeId
+             ACCESS      read-only
+             STATUS      mandatory
+             DESCRIPTION
+             "."
+             ::= { mstpXstPortEntry 9 }
+        
+         mstpXstPortDesignatedPort      OBJECT-TYPE
+             SYNTAX      INTEGER
+             ACCESS      read-only
+             STATUS      mandatory
+             DESCRIPTION
+             "."
+             ::= { mstpXstPortEntry 10 }  
+--MSTP Traps 
+ 	     mstpNotifications     	OBJECT IDENTIFIER ::= { mstp 70 }              
+	
+	     newRoot NOTIFICATION-TYPE
+         OBJECTS {
+                mstpXstId
+         }
+         STATUS  current
+         DESCRIPTION
+          ""
+         ::= { mstpNotifications 1 }
+      
+         topologyChange NOTIFICATION-TYPE
+         OBJECTS {
+                mstpXstId
+         }
+         STATUS  current
+         DESCRIPTION
+          ""
+         ::= { mstpNotifications 2 }        
+
 END
 

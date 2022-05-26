@@ -437,14 +437,13 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
 
   $alert_tests = dbFetchRows('SELECT * FROM `alert_tests` ORDER BY `entity_type`, `alert_name`');
 
-  if (safe_count($alert_tests))
-  {
-    foreach ($alert_tests as $alert_test)
-    {
-      if (!isset($assoc_exists[$alert_test['alert_test_id']]))
-      {
-        $form_items['alert_checker_id'][$alert_test['alert_test_id']] = array('name' => escape_html($alert_test['alert_name']),
-                                                                              'icon' => $config['entities'][$alert_test['entity_type']]['icon']);
+  if (safe_count($alert_tests)) {
+    foreach ($alert_tests as $alert_test) {
+      if (!isset($assoc_exists[$alert_test['alert_test_id']])) {
+        $form_items['alert_checker_id'][$alert_test['alert_test_id']] = [
+          'name' => $alert_test['alert_name'],
+          'icon' => $config['entities'][$alert_test['entity_type']]['icon']
+        ];
       }
     }
 
@@ -560,15 +559,14 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
 
   $alert_tests = dbFetchRows('SELECT * FROM `syslog_rules` ORDER BY `la_severity`, `la_name`');
 
-  if (safe_count($alert_tests))
-  {
-    foreach ($alert_tests as $alert_test)
-    {
-      if (!isset($assoc_exists[$alert_test['la_id']]))
-      {
-        $form_items['la_id'][$alert_test['la_id']] = array('name'    => escape_html($alert_test['la_name']),
-                                                           'subtext' => escape_html($alert_test['la_rule']),
-                                                           'icon'    => $config['icon']['syslog-alerts']);
+  if (safe_count($alert_tests)) {
+    foreach ($alert_tests as $alert_test) {
+      if (!isset($assoc_exists[$alert_test['la_id']])) {
+        $form_items['la_id'][$alert_test['la_id']] = [
+          'name'    => $alert_test['la_name'],
+          'subtext' => $alert_test['la_rule'],
+          'icon'    => $config['icon']['syslog-alerts']
+        ];
       }
     }
 
@@ -603,9 +601,7 @@ if ($contact = get_contact_by_id($vars['contact_id'])) {
     $box_close['footer_nopadding'] = TRUE;
     unset($form, $form_items);
 
-  } else {
-    // print_warning('No unassociated syslog rules.');
-  }
+  } //else { print_warning('No unassociated syslog rules.'); }
 
   echo generate_box_close($box_close);
 

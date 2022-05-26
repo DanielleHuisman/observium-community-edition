@@ -55,7 +55,7 @@ elseif (!isset($datas[$vars['metric']]))
   // By default display processor
   $vars['metric'] = "processor";
 }
-if (!$vars['view'])   { $vars['view']   = "detail"; }
+//if (!$vars['view'])   { $vars['view']   = "detail"; }
 
 $link_array = array('page' => 'health');
 
@@ -81,13 +81,30 @@ foreach ($datas as $type => $options)
 $navbar['options']['graphs']['icon']  = $config['icon']['graphs'];
 $navbar['options']['graphs']['right'] = TRUE;
 
-if ($vars['view'] == "graphs")
-{
-  $navbar['options']['graphs']['class'] = 'active';
-  $navbar['options']['graphs']['url']   = generate_url($vars, array('view' => "detail"));
+
+if ($vars['metric'] == "storage"){
+
+    foreach(['perc' => 'Percentage', 'bytes' => 'Bytes'] AS $graph_type => $text)
+    {
+        $navbar['options']['graphs']['suboptions'][$graph_type]['text'] = $text;
+        if($vars['graph'] == $graph_type) { $navbar['options']['graphs']['text'] = '('.$text.')'; }
+        $navbar['options']['graphs']['suboptions'][$graph_type]['url'] = generate_url($vars, ['graph' => $graph_type]);
+    }
+
+    if(isset($vars['graph'])) {
+        $navbar['options']['graphs']['suboptions']['none']['url'] = generate_url($vars, ['graph' => NULL]);
+        $navbar['options']['graphs']['suboptions']['none']['text'] = "None";
+    }
+
 } else {
-  $navbar['options']['graphs']['url']   = generate_url($vars, array('view' => "graphs"));
+    if ($vars['view'] == "graphs") {
+        $navbar['options']['graphs']['class'] = 'active';
+        $navbar['options']['graphs']['url'] = generate_url($vars, array('view' => "detail"));
+    } else {
+        $navbar['options']['graphs']['url'] = generate_url($vars, array('view' => "graphs"));
+    }
 }
+
 
 print_navbar($navbar);
 

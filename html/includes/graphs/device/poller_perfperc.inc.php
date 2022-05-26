@@ -25,13 +25,14 @@ $rrd_options .= " DEF:tot=".$total_rrd.":val:AVERAGE";
 
 foreach($device['state']['poller_mod_perf'] as $mod => $perf) {
 
+  $this_rrd = get_rrd_path($device, 'perf-pollermodule-'.$mod.'.rrd');
+  if (!rrd_is_file($this_rrd, TRUE)) { continue; }
+
   $colours = 'mixed';
 
   if (!isset($config['graph_colours'][$colours][$colour_iter])) { $colour_iter = 0; }
   $colour = $config['graph_colours'][$colours][$colour_iter];
   $colour_iter++;
-
-  $this_rrd = get_rrd_path($device, 'perf-pollermodule-'.$mod.'.rrd');
 
   $descr = rrdtool_escape($mod, '15');
 

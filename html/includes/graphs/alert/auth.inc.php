@@ -27,7 +27,7 @@ if (is_numeric($vars['id']) && $alert = get_alert_entry_by_id($vars['id']))
 
     $auth   = TRUE;
 
-    $rrd_filename = get_rrd_path($device, "alert-".$alert['alert_table_id']);
+    $rrd_filename = get_rrd_path($device, "alert-".$alert['alert_test_id']."-".$alert['entity_type']."-".$alert['entity_id'].".rrd");
 
   }
 } else {

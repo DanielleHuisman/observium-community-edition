@@ -9,7 +9,7 @@ use const PHP_EOL;
 
 final class CliHighlighter implements Highlighter
 {
-    public const HIGHLIGHT_FUNCTIONS = 'functions';
+    const HIGHLIGHT_FUNCTIONS = 'functions';
 
     /** @var array<string, string> */
     private $escapeSequences;
@@ -47,7 +47,7 @@ final class CliHighlighter implements Highlighter
         return $prefix . $value . "\x1b[0m";
     }
 
-    private function prefix(int $type) : ?string
+    private function prefix(int $type)
     {
         if (! isset(self::TOKEN_TYPE_TO_HIGHLIGHT[$type])) {
             return null;

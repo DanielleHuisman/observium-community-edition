@@ -3,7 +3,7 @@
 #
 #
 # Parsedown Extra Plugin
-# https://github.com/tovic/parsedown-extra-plugin
+# https://github.com/taufik-nurrohman/parsedown-extra-plugin
 #
 # (c) Emanuil Rusev
 # http://erusev.com
@@ -18,10 +18,7 @@
 
 class ParsedownExtraPlugin extends ParsedownExtra {
 
-    const version = '1.3.2';
-
-
-    # config
+    const version = '1.3.7';
 
     public $abbreviationData = array();
 
@@ -63,7 +60,7 @@ class ParsedownExtraPlugin extends ParsedownExtra {
 
     public $headerText = null;
 
-    public $imageAttributes = array();
+    public $imageAttributes = array('rel' => null, 'target' => null);
 
     public $imageAttributesOnParent = false;
 
@@ -76,9 +73,6 @@ class ParsedownExtraPlugin extends ParsedownExtra {
     public $tableColumnAttributes = array();
 
     public $voidElementSuffix = ' />';
-
-    # config
-
 
     protected $regexAttribute = '(?:[#.][-\w:\\\]+[ ]*|[-\w:\\\]+(?:=(?:["\'][^\n]*?["\']|[^\s]+)?)?[ ]*)';
 
@@ -159,16 +153,22 @@ class ParsedownExtraPlugin extends ParsedownExtra {
             // `~~~ {.php #foo}` → `<pre><code id="foo" class="php">`
             $Results = [];
             foreach ($Classes as $Class) {
-                if ($Class === "" || $Class === str_replace('%s', "", $this->blockCodeClassFormat)) {
+                if ($Class === "" || $Class === strtr($this->blockCodeClassFormat, array('%s' => ""))) {
                     continue;
                 }
                 if ($Class[0] === '.') {
                     $Results[] = substr($Class, 1);
+                } else if (preg_match('/^' . strtr(preg_quote($this->blockCodeClassFormat), array('%s' => '\S+')) . '$/', $Class)) {
+                    $Results[] = $Class; // Do nothing!
                 } else {
                     $Results[] = sprintf($this->blockCodeClassFormat, $Class);
                 }
             }
-            $Block['element']['element']['attributes']['class'] = implode(' ', array_unique($Results));
+            if ($Results = array_unique($Results)) {
+                $Block['element']['element']['attributes']['class'] = implode(' ', $Results);
+            } else {
+                unset($Block['element']['element']['attributes']['class']);
+            }
         }
         return $Block;
     }
@@ -320,6 +320,9 @@ class ParsedownExtraPlugin extends ParsedownExtra {
             $Args = array(is_numeric($Name) ? (float) $Name : $Name, $Count);
             $this->doSetAttributes($Element0, $this->footnoteBackReferenceAttributes, $Args);
             foreach ($Element0['elements'] as $Index1 => &$Element1) {
+                if (!isset($Element1['elements'])) {
+                    continue;
+                }
                 $Count = 0;
                 foreach ($Element1['elements'] as $Index2 => &$Element2) {
                     if (!isset($Element2['name']) || $Element2['name'] !== 'a') {

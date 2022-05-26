@@ -20,8 +20,7 @@ define('OBS_DB_MYSQLND', function_exists('mysqli_get_client_stats'));
  *
  * @return string $info
  */
-function dbClientInfo()
-{
+function dbClientInfo() {
   return mysqli_get_client_info();
 }
 
@@ -30,9 +29,8 @@ function dbClientInfo()
  *
  * @return string $info
  */
-function dbHostInfo()
-{
-  return mysqli_get_host_info($GLOBALS[OBS_DB_LINK]);
+function dbHostInfo() {
+  return isset($GLOBALS[OBS_DB_LINK]) ? mysqli_get_host_info($GLOBALS[OBS_DB_LINK]) : '';
 }
 
 /**
@@ -46,27 +44,21 @@ function dbHostInfo()
  *
  * @return object $connection
  */
-function dbOpen($host, $user, $password, $database, $charset = 'utf8')
-{
+function dbOpen($host, $user, $password, $database, $charset = 'utf8') {
   // Check host params
   $host_array = explode(':', $host);
-  if (count($host_array) > 1)
-  {
-    if ($host_array[0] === 'p')
-    {
+  if (count($host_array) > 1) {
+    if ($host_array[0] === 'p') {
       // p:example.com
       // p:::1
       array_shift($host_array);
       $host = implode(':', $host_array);
       $GLOBALS['config']['db_persistent'] = TRUE;
-    }
-    elseif (count($host_array) === 2)
-    {
+    } elseif (count($host_array) === 2) {
       // This is for compatibility with old style host option (from mysql extension)
       // IPv6 host not possible here
       $host = $host_array[0];
-      if (is_numeric($host_array[1]))
-      {
+      if (is_numeric($host_array[1])) {
         // example.com:3306
         $port   = $host_array[1];
       } else {
@@ -84,7 +76,7 @@ function dbOpen($host, $user, $password, $database, $charset = 'utf8')
   }
 
   // Server socket
-  if (isset($GLOBALS['config']['db_socket']) && strlen($GLOBALS['config']['db_socket'])) {
+  if (isset($GLOBALS['config']['db_socket']) && !safe_empty($GLOBALS['config']['db_socket'])) {
     $socket = $GLOBALS['config']['db_socket'];
   } elseif (!isset($socket)) {
     $socket = ini_get("mysqli.default_socket");
@@ -100,24 +92,20 @@ function dbOpen($host, $user, $password, $database, $charset = 'utf8')
   $time_start = utime();
   $GLOBALS['db_stats']['connect'] = 1;
   $connection = mysqli_init();
-  if ($connection === (object)$connection)
-  {
+  if ($connection === (object)$connection) {
     $client_flags = 0;
     // Optionally compress connection
-    if ($GLOBALS['config']['db_compress'] && defined('MYSQLI_CLIENT_COMPRESS'))
-    {
+    if ($GLOBALS['config']['db_compress'] && defined('MYSQLI_CLIENT_COMPRESS')) {
       $client_flags |= MYSQLI_CLIENT_COMPRESS;
     }
 
     // Optionally enable SSL
-    if ($GLOBALS['config']['db_ssl'])
-    {
+    if ($GLOBALS['config']['db_ssl']) {
       $client_flags |= MYSQLI_CLIENT_SSL;
 
       if (!empty($GLOBALS['config']['db_ssl_key']) || !empty($GLOBALS['config']['db_ssl_cert']) ||
           !empty($GLOBALS['config']['db_ssl_ca'])  || !empty($GLOBALS['config']['db_ssl_ca_path']) ||
-          !empty($GLOBALS['config']['db_ssl_ciphers']))
-      {
+          !empty($GLOBALS['config']['db_ssl_ciphers'])) {
         $db_ssl_key     = $GLOBALS['config']['db_ssl_key']     ? $GLOBALS['config']['db_ssl_key'] : '';
         $db_ssl_cert    = $GLOBALS['config']['db_ssl_cert']    ? $GLOBALS['config']['db_ssl_cert'] : '';
         $db_ssl_ca      = $GLOBALS['config']['db_ssl_ca']      ? $GLOBALS['config']['db_ssl_ca'] : '';
@@ -128,8 +116,7 @@ function dbOpen($host, $user, $password, $database, $charset = 'utf8')
 
       // Disables SSL certificate validation on mysqlnd for MySQL 5.6 or later
       // https://bugs.php.net/bug.php?id=68344
-      if (!$GLOBALS['config']['db_ssl_verify'])
-      {
+      if (!$GLOBALS['config']['db_ssl_verify']) {
         $client_flags |= MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT;
 
         mysqli_options($connection, MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, $GLOBALS['config']['db_ssl_verify']);
@@ -150,6 +137,10 @@ function dbOpen($host, $user, $password, $database, $charset = 'utf8')
     // Report if no index or bad index was used in a query
     //mysqli_report(MYSQLI_REPORT_INDEX);
 
+    // Set default ignore errors on php8.1
+    // https://php.watch/versions/8.1/mysqli-error-mode
+    mysqli_report(MYSQLI_REPORT_OFF);
+
     if (!mysqli_real_connect($connection, $host, $user, $password, $database, (int)$port, $socket, $client_flags)) {
       $error_num = @mysqli_connect_errno();
       if (defined('OBS_DEBUG') && OBS_DEBUG) {
@@ -169,8 +160,7 @@ function dbOpen($host, $user, $password, $database, $charset = 'utf8')
     $GLOBALS['db_stats']['connect_sec'] = $time_end - $time_start;
     //print_vars($GLOBALS['db_stats']['connect_sec']);
 
-    if ($charset)
-    {
+    if ($charset) {
       mysqli_set_charset($connection, $charset);
       /*
       if (version_compare(PHP_VERSION, '5.3.6', '<') && $charset == 'utf8')
@@ -188,16 +178,14 @@ function dbOpen($host, $user, $password, $database, $charset = 'utf8')
 /**
  * Closes a previously opened database connection
  *
- * @param object $connection Link to resource with mysql connection, default last used connection
+ * @param mysqli $connection Link to resource with mysql connection, default last used connection
  *
  * @return bool Returns TRUE on success or FALSE on failure.
  */
-function dbClose($connection = NULL)
-{
+function dbClose($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to function mysqli_close() without link identifier."); }
@@ -210,16 +198,14 @@ function dbClose($connection = NULL)
 /**
  * Returns the text of the error message from last MySQL operation
  *
- * @param object $connection Link to resource with mysql connection, default last used connection
+ * @param mysqli $connection Link to resource with mysql connection, default last used connection
  *
  * @return string $return
  */
-function dbError($connection = NULL)
-{
+function dbError($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     //if (!OBS_DB_SKIP) { print_error("Call to function mysqli_error() without link identifier."); }
@@ -232,16 +218,14 @@ function dbError($connection = NULL)
 /**
  * Returns the numerical value of the error message from last MySQL operation
  *
- * @param object $connection Link to resource with mysql connection, default last used connection
+ * @param mysqli $connection Link to resource with mysql connection, default last used connection
  *
- * @return string $return
+ * @return int $return
  */
-function dbErrorNo($connection = NULL)
-{
+function dbErrorNo($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     //if (!OBS_DB_SKIP) { print_error("Call to function mysqli_errno() without link identifier."); }
@@ -251,12 +235,10 @@ function dbErrorNo($connection = NULL)
   return mysqli_errno($connection);
 }
 
-function dbWarnings($connection = NULL)
-{
+function dbWarnings($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     return;
@@ -273,24 +255,20 @@ function dbWarnings($connection = NULL)
   return $warning;
 }
 
-function dbPing($connection = NULL)
-{
+function dbPing($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   }
 
   return mysqli_ping($connection);
 }
 
-function dbAffectedRows($connection = NULL)
-{
+function dbAffectedRows($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to function mysqli_affected_rows() without link identifier."); }
@@ -300,12 +278,10 @@ function dbAffectedRows($connection = NULL)
   return mysqli_affected_rows($connection);
 }
 
-function dbCallQuery($fullSql, $connection = NULL)
-{
+function dbCallQuery($fullSql, $connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to function mysqli_query() without link identifier."); }
@@ -320,16 +296,14 @@ function dbCallQuery($fullSql, $connection = NULL)
  * Returns escaped string
  *
  * @param string $string Input string for escape in mysql query
- * @param object $connection Link to resource with mysql connection, default last used connection
+ * @param mysqli $connection Link to resource with mysql connection, default last used connection
  *
  * @return string
  */
-function dbEscape($string, $connection = NULL)
-{
+function dbEscape($string, $connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to function mysqli_real_escape_string() without link identifier."); }
@@ -337,8 +311,7 @@ function dbEscape($string, $connection = NULL)
   }
 
   $return = mysqli_real_escape_string($connection, $string);
-  if (!isset($return[0]) && isset($string[0]))
-  {
+  if (!isset($return[0]) && isset($string[0])) {
     // If character set empty, use escape alternative
     // FIXME. I really not know why, but in unittests $connection object is lost!
     print_debug("Mysql connection lost, in dbEscape() used escape alternative!");
@@ -352,24 +325,21 @@ function dbEscape($string, $connection = NULL)
 /**
  * Returns the auto generated id used in the last query
  *
- * @param object $connection Link to resource with mysql connection, default last used connection
+ * @param mysqli $connection Link to resource with mysql connection, default last used connection
  *
  * @return string
  */
-function dbLastID($connection = NULL)
-{
+function dbLastID($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to function mysqli_insert_id() without link identifier."); }
     return;
   }
 
-  if ($id = mysqli_insert_id($connection))
-  {
+  if ($id = mysqli_insert_id($connection)) {
     //print_debug("DEBUG ID by function");
     //var_dump($id);
     return $id;
@@ -386,21 +356,17 @@ function dbLastID($connection = NULL)
  * Fetches all of the rows (associatively) from the last performed query.
  * Most other retrieval functions build off this
  * */
-function dbFetchRows($sql, $parameters = array(), $print_query = FALSE)
-{
+function dbFetchRows($sql, $parameters = [], $print_query = FALSE) {
   $time_start = utime();
   $result = dbQuery($sql, $parameters, $print_query);
 
-  $rows = array();
-  if ($result instanceof mysqli_result)
-  {
-    if (OBS_DB_MYSQLND)
-    {
+  $rows = [];
+  if ($result instanceof mysqli_result) {
+    if (OBS_DB_MYSQLND) {
       // MySQL Native Driver
       $rows = mysqli_fetch_all($result, MYSQLI_ASSOC);
     } else {
-      while ($row = mysqli_fetch_assoc($result))
-      {
+      while ($row = mysqli_fetch_assoc($result)) {
         $rows[] = $row;
       }
     }
@@ -420,12 +386,10 @@ function dbFetchRows($sql, $parameters = array(), $print_query = FALSE)
  * Like fetch(), accepts any number of arguments
  * The first argument is an sprintf-ready query stringTypes
  * */
-function dbFetchRow($sql = NULL, $parameters = array(), $print_query = FALSE)
-{
+function dbFetchRow($sql = NULL, $parameters = array(), $print_query = FALSE) {
   $time_start = utime();
   $result = dbQuery($sql, $parameters, $print_query);
-  if ($result)
-  {
+  if ($result) {
     $row = mysqli_fetch_assoc($result);
     mysqli_free_result($result);
     $time_end = utime();
@@ -434,21 +398,18 @@ function dbFetchRow($sql = NULL, $parameters = array(), $print_query = FALSE)
     $GLOBALS['db_stats']['fetchrow']++;
 
     return $row;
-  } else {
-    return NULL;
   }
+  return [];
 }
 
 /*
  * Fetches the first call from the first row returned by the query
  * */
-function dbFetchCell($sql, $parameters = array(), $print_query = FALSE)
-{
+function dbFetchCell($sql, $parameters = array(), $print_query = FALSE) {
   $time_start = utime();
   //$row = dbFetchRow($sql, $parameters);
   $result = dbQuery($sql, $parameters, $print_query);
-  if ($result)
-  {
+  if ($result) {
     $row = mysqli_fetch_assoc($result);
     mysqli_free_result($result);
     $time_end = utime();
@@ -456,21 +417,18 @@ function dbFetchCell($sql, $parameters = array(), $print_query = FALSE)
     $GLOBALS['db_stats']['fetchcell_sec'] += $time_end - $time_start;
     $GLOBALS['db_stats']['fetchcell']++;
 
-    if (is_array($row))
-    {
+    if (is_array($row)) {
       return array_shift($row); // shift first field off first row
     }
   }
 
-  return NULL;
+  return NULL; // or ''?
 }
 
-function dbBeginTransaction($connection = NULL)
-{
+function dbBeginTransaction($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to begin db transaction without link identifier."); }
@@ -480,12 +438,10 @@ function dbBeginTransaction($connection = NULL)
   mysqli_autocommit($connection, FALSE); // Set autocommit to off
 }
 
-function dbCommitTransaction($connection = NULL)
-{
+function dbCommitTransaction($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to commmit db transaction without link identifier."); }
@@ -496,12 +452,10 @@ function dbCommitTransaction($connection = NULL)
   mysqli_autocommit($connection, TRUE); // Restore autocommit to on
 }
 
-function dbRollbackTransaction($connection = NULL)
-{
+function dbRollbackTransaction($connection = NULL) {
   // Observium uses $observium_link global variable name for db link
   if     ($connection === (object)$connection) {}
-  elseif ($GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK])
-  {
+  elseif (isset($GLOBALS[OBS_DB_LINK]) && $GLOBALS[OBS_DB_LINK] === (object)$GLOBALS[OBS_DB_LINK]) {
     $connection = $GLOBALS[OBS_DB_LINK];
   } else {
     if (!OBS_DB_SKIP) { print_error("Call to rollback db transaction without link identifier."); }

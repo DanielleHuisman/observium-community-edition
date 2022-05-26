@@ -6,12 +6,11 @@
  *
  * @package    observium
  * @subpackage db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-if (!defined('OBS_DEBUG'))
-{
+if (!defined('OBS_DEBUG')) {
   // Direct call not allowed.
   echo("WARNING. Direct call to this script is no longer supported, please use './discovery.php -u' from main observium directory.\n");
   exit(2);
@@ -19,8 +18,7 @@ if (!defined('OBS_DEBUG'))
 
 // One time alert about deprecated (eol) mysql version
 get_versions();
-if ($GLOBALS['cache']['versions']['mysql_old'])
-{
+if ($GLOBALS['cache']['versions']['mysql_old']) {
   $mysql_name    = $GLOBALS['cache']['versions']['mysql_name'];
   $mysql_version = $GLOBALS['cache']['versions']['mysql_version'];
   print_message("
@@ -65,10 +63,8 @@ $db_rev = get_db_version();
 $schema_insert = ($db_rev == 0 && !dbQuery('SELECT 1 FROM `devices` LIMIT 1;'));
 
 // Try to use mysql cmd for insert initial db schema
-if ($schema_insert && is_file($config['install_dir'] . '/update/db_schema_mysql.sql'))
-{
-  if (is_executable('/usr/bin/mysql'))
-  {
+if ($schema_insert && is_file($config['install_dir'] . '/update/db_schema_mysql.sql')) {
+  if (is_executable('/usr/bin/mysql')) {
     // Default path
     $mysql_cmd = '/usr/bin/mysql';
   } else {
@@ -76,8 +72,7 @@ if ($schema_insert && is_file($config['install_dir'] . '/update/db_schema_mysql.
     $mysql_cmd = external_exec('which mysql');
   }
 
-  if (is_executable($mysql_cmd))
-  {
+  if (is_executable($mysql_cmd)) {
     // If mysql executable exist (or find) use insert initial schema
     $cmd = $mysql_cmd .
             ' -u' . escapeshellarg($config['db_user']) .
@@ -94,13 +89,11 @@ if ($schema_insert && is_file($config['install_dir'] . '/update/db_schema_mysql.
     $db_rev = get_db_version();
     $schema_insert = ($db_rev == 0 && !dbQuery('SELECT 1 FROM `devices` LIMIT 1;'));
 
-    if ($mysql_status)
-    {
+    if ($mysql_status) {
       echo(' done.' . PHP_EOL);
     } else {
       echo(' FALSE.' . PHP_EOL);
-      if (!$schema_insert)
-      {
+      if (!$schema_insert) {
         print_error("Error during installation initial schema, but tables exist. Run update again."); // Not should happen NEVER
         exit(2);
       }
@@ -108,12 +101,10 @@ if ($schema_insert && is_file($config['install_dir'] . '/update/db_schema_mysql.
   }
 }
 
-if ($db_rev > 272) // observium_processes added in db version 272
-{
+if ($db_rev > 272) { // observium_processes added in db version 272
   // Check if discovery -u already running
   $pid_info = check_process_run(-1);
-  if ($pid_info)
-  {
+  if ($pid_info) {
     // Process ID exist in DB
     print_message("%rAnother ".$pid_info['process_name']." process (PID: ".$pid_info['PID'].", UID: ".$pid_info['UID'].", STARTED: ".$pid_info['STARTED'].") already running for update.%n", 'color');
 
@@ -129,8 +120,7 @@ if ($db_rev > 272) // observium_processes added in db version 272
 // Note, undocumented ability for force update from db schema (not more than 50)
 $update_force = isset($options['U']) && is_numeric($options['U']) &&
                 $db_rev >= $options['U'] && ($db_rev - $options['U']) <= 50;
-if ($update_force)
-{
+if ($update_force) {
   print_debug("Forced update from DB schema ".$options['U']);
   $db_rev = (int)$options['U'] - 1;
 }
@@ -142,12 +132,9 @@ $sql_regexp = "/^\d{3,4}\.sql$/";
 $php_regexp = "/^\d{3,4}\.php$/";
 
 $filelist = [];
-if ($handle = opendir($config['install_dir'] . '/update'))
-{
-  while (FALSE !== ($file = readdir($handle)))
-  {
-    if (filetype($config['install_dir'] . '/update/' . $file) === 'file' && (preg_match($sql_regexp, $file) || preg_match($php_regexp, $file)))
-    {
+if ($handle = opendir($config['install_dir'] . '/update')) {
+  while (FALSE !== ($file = readdir($handle))) {
+    if (filetype($config['install_dir'] . '/update/' . $file) === 'file' && (preg_match($sql_regexp, $file) || preg_match($php_regexp, $file))) {
       $filelist[] = $file;
     }
   }
@@ -157,31 +144,25 @@ if ($handle = opendir($config['install_dir'] . '/update'))
 sort($filelist);
 //print_vars($filelist);
 
-foreach ($filelist as $file)
-{
+foreach ($filelist as $file) {
   $filepath = $config['install_dir'] . '/update/' . $file;
   list($filename, $extension) = explode('.', $file, 2);
-  if ($filename > $db_rev)
-  {
-    if (!$updating)
-    {
+  if ($filename > $db_rev) {
+    if (!$updating) {
       echo('-- Updating database/file schema' . PHP_EOL);
     }
 
     $error_ignore = $update_force; // Stop update if errors not ignored
 
-    if ($extension === "php")
-    {
+    if ($extension === "php") {
       $log_msg = sprintf("%03d",$db_rev) . " -> " . sprintf("%03d", $filename) . " # (php) ";
       echo($log_msg);
 
       $start = time();
-      if (include_wrapper($filepath))
-      {
+      if (include_wrapper($filepath)) {
         // File included OK, update dbSchema
         $schema_status = set_db_version($filename, $schema_insert);
-        if ($schema_insert && $schema_status !== FALSE)
-        {
+        if ($schema_insert && $schema_status !== FALSE) {
           // dbSchema inserted, now only update
           $schema_insert = FALSE;
         }
@@ -199,37 +180,27 @@ foreach ($filelist as $file)
         }
         exit(1);
       }
-    }
-    elseif ($extension === "sql")
-    {
+    } elseif ($extension === "sql") {
       $log_msg = sprintf("%03d", $db_rev) . " -> " . sprintf("%03d", $filename) . " # (db) ";
       echo($log_msg);
 
       $err   = 0;
       $start = time();
 
-      if ($fd = @fopen($filepath, 'r'))
-      {
+      if ($fd = @fopen($filepath, 'r')) {
         $data = fread($fd,4096);
-        while (!feof($fd))
-        {
+        while (!feof($fd)) {
           $data .= fread($fd, 4096);
         }
         fclose($fd);
 
-        foreach (explode("\n", $data) as $line)
-        {
-          if (trim($line))
-          {
+        foreach (explode("\n", $data) as $line) {
+          if (trim($line)) {
             // Skip comments
-            if (str_starts($line, [ '#', '-', '/' ]))
-            {
-              if (str_contains_array($line, [ 'ERROR_IGNORE', 'IGNORE_ERROR' ]))
-              {
+            if (str_starts($line, [ '#', '-', '/' ])) {
+              if (str_contains_array($line, [ 'ERROR_IGNORE', 'IGNORE_ERROR' ])) {
                 $error_ignore = TRUE;
-              }
-              elseif (str_contains_array($line, 'NOTE'))
-              {
+              } elseif (str_contains($line, 'NOTE')) {
                 list(, $note) = explode('NOTE', $line, 2);
                 echo('('.trim($note).')');
               }
@@ -239,12 +210,10 @@ foreach ($filelist as $file)
             print_debug($line);
 
             $update = dbQuery($line);
-            if (!$update)
-            {
+            if (!$update) {
               $error_no  = dbErrorNo();
               $error_msg = "($error_no) " . dbError();
-              if ($error_no >= 2000 || in_array($error_no, array(3, 1114))) // additional critical errors list
-              {
+              if ($error_no >= 2000 || in_array($error_no, [ 3, 1114 ])) { // additional critical errors list
                 // Critical errors, stop update
                 log_event("Observium schema not updated: " . $log_msg . ".", NULL, NULL, NULL, 3);
                 echo(" stopped. Critical error: " . $error_msg . PHP_EOL);
@@ -254,17 +223,16 @@ foreach ($filelist as $file)
                 logfile('update-errors.log', "Error: " . $error_msg);
                 del_process_info(-1); // Remove process info
                 exit(1);
-              } else {
-                if ($error_ignore)
-                {
-                  echo('.');
-                } else {
-                  echo('F');
-                }
-                $err++;
-                $errors[] = array('query' => $line, 'error' => $error_msg);
-                print_debug($error_msg);
               }
+
+              if ($error_ignore) {
+                echo('.');
+              } else {
+                echo('F');
+              }
+              $err++;
+              $errors[] = [ 'query' => $line, 'error' => $error_msg ];
+              print_debug($error_msg);
             } else {
               echo('.');
             }
@@ -273,17 +241,13 @@ foreach ($filelist as $file)
         }
 
         $update_time = format_uptime(time() - $start);
-        if ($db_rev < 1)
-        {
+        if ($db_rev < 1) {
           if ($filename >= 184) {
             log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
           }
           echo(" Done ($update_time)." . PHP_EOL);
-        }
-        elseif ($err)
-        {
-          if ($error_ignore)
-          {
+        } elseif ($err) {
+          if ($error_ignore) {
             if ($filename >= 184) {
               log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
             }
@@ -295,8 +259,7 @@ foreach ($filelist as $file)
             echo(" Done ($update_time, $err errors)." . PHP_EOL);
           }
           logfile('update-errors.log', "====== Schema update " . sprintf("%03d", $db_rev) . " -> " . sprintf("%03d", $filename) . " ==============");
-          foreach ($errors as $error)
-          {
+          foreach ($errors as $error) {
             logfile('update-errors.log', "Query: " . $error['query']);
             logfile('update-errors.log', "Error: " . $error['error']);
           }
@@ -310,8 +273,7 @@ foreach ($filelist as $file)
 
         // SQL update done, update dbSchema
         $schema_status = set_db_version($filename, $schema_insert);
-        if ($schema_insert && $schema_status !== FALSE)
-        {
+        if ($schema_insert && $schema_status !== FALSE) {
           // dbSchema inserted, now only update
           $schema_insert = FALSE;
         }
@@ -339,8 +301,7 @@ foreach ($filelist as $file)
   }
 }
 
-if ($updating)
-{
+if ($updating) {
 //  $GLOBALS['cache']['db_version'] = $db_rev; // Cache new db version
 //  if ($schema_insert)
 //  {

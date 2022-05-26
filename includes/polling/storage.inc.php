@@ -92,7 +92,7 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $storage)
   print_debug_vars($storage);
 
   if (is_numeric($storage['used']) && $storage['size']) {
-    $percent = round($storage['used'] / $storage['size'] * 100, 2);
+    $percent = round(float_div($storage['used'], $storage['size']) * 100, 2);
   } else {
     $percent = 0;
   }

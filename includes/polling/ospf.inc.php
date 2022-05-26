@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -249,12 +249,14 @@ if (is_array($ospf_ports_db))
     {
       $ospf_port_poll = $ospf_ports_poll[$ospf_port_db['ospf_port_id']];
 
-      if ($ospf_port_poll['ospfAddressLessIf'])
-      {
+      if ($ospf_port_poll['ospfAddressLessIf']) {
         $ospf_port_poll['port_id'] = @dbFetchCell('SELECT `port_id` FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?', array($device['device_id'], $ospf_port_poll['ospfAddressLessIf']));
       } else {
         //$ospf_port_poll['port_id'] = @dbFetchCell('SELECT A.`port_id` FROM ipv4_addresses AS A, ports AS I WHERE A.ipv4_address = ? AND I.port_id = A.port_id AND I.device_id = ?', array($ospf_port_poll['ospfIfIpAddress'], $device['device_id']));
-        $ospf_port_poll['port_id'] = current(get_entity_ids_ip_by_network('port', $ospf_port_poll['ospfIfIpAddress'], generate_query_values($device['device_id'], 'device_id')));
+        $ids = get_entity_ids_ip_by_network('port', $ospf_port_poll['ospfIfIpAddress'], generate_query_values($device['device_id'], 'device_id'));
+        if (safe_count($ids)) {
+          $ospf_port_poll['port_id'] = current($ids);
+        }
       }
 
       foreach ($ospf_port_oids as $oid)
@@ -340,10 +342,14 @@ if (is_array($ospf_nbrs_db))
       $ospf_nbr_poll = $ospf_nbrs_poll[$ospf_nbr_db['ospf_nbr_id']];
 
       //$ospf_nbr_poll['port_id'] = @dbFetchCell('SELECT A.`port_id` FROM `ipv4_addresses` AS A, `ospf_nbrs` AS I WHERE A.`ipv4_address` = ? AND I.`port_id` = A.`port_id` AND I.`device_id` = ?', array($ospf_nbr_poll['ospfNbrIpAddr'], $device['device_id']));
-      $ospf_nbr_poll['port_id'] = current(get_entity_ids_ip_by_network('port', $ospf_nbr_poll['ospfNbrIpAddr'], generate_query_values($device['device_id'], 'device_id')));
+      $ids = get_entity_ids_ip_by_network('port', $ospf_nbr_poll['ospfNbrIpAddr'], generate_query_values($device['device_id'], 'device_id'));
+      if (safe_count($ids)) {
+        $ospf_nbr_poll['port_id'] = current($ids);
+      } else {
+        $ospf_nbr_poll['port_id'] = NULL;
+      }
 
-      if ($ospf_nbr_db['port_id'] != $ospf_nbr_poll['port_id'])
-      {
+      if ($ospf_nbr_db['port_id'] != $ospf_nbr_poll['port_id']) {
         if ($ospf_nbr_poll['port_id']) {
           $ospf_nbr_update = array('port_id' => $ospf_nbr_poll['port_id']);
         } else {

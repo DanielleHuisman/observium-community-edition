@@ -32,6 +32,8 @@ if ($device['os'] === 'poweralert') {
   $scale_battery = 1;
 }
 
+$invalid_values = [ '4294967295', '2147483647' ];
+
 /* SNR ERD-4
 UPS-MIB::upsIdentManufacturer.0 = STRING: APC
 UPS-MIB::upsIdentModel.0 = STRING: Smart-UPS
@@ -147,6 +149,61 @@ UPS-MIB::upsConfigAudibleStatus.0 = INTEGER: 0
 UPS-MIB::upsConfigLowVoltageTransferPoint.0 = INTEGER: 0 RMS Volts
 UPS-MIB::upsConfigHighVoltageTransferPoint.0 = INTEGER: 0 RMS Volts
  */
+
+/* Huawei UPS
+UPS-MIB::upsIdentManufacturer.0 = STRING: HUAWEI
+UPS-MIB::upsIdentModel.0 = STRING: UPS2000 6kVA
+UPS-MIB::upsIdentUPSSoftwareVersion.0 = STRING: V100R001C00SPC610
+UPS-MIB::upsIdentAgentSoftwareVersion.0 = STRING: V100R002C02B150
+UPS-MIB::upsIdentName.0 = STRING: ups2000
+UPS-MIB::upsIdentAttachedDevices.0 = STRING: None
+UPS-MIB::upsBatteryStatus.0 = Wrong Type (should be INTEGER): Gauge32: 2
+UPS-MIB::upsSecondsOnBattery.0 = Wrong Type (should be INTEGER): Gauge32: 0
+UPS-MIB::upsEstimatedMinutesRemaining.0 = Wrong Type (should be INTEGER): Gauge32: 4294967295
+UPS-MIB::upsEstimatedChargeRemaining.0 = Wrong Type (should be INTEGER): Gauge32: 73
+UPS-MIB::upsBatteryVoltage.0 = Wrong Type (should be INTEGER): Gauge32: 2708
+UPS-MIB::upsBatteryCurrent.0 = INTEGER: 6 0.1 Amp DC
+UPS-MIB::upsBatteryTemperature.0 = INTEGER: 2147483647 degrees Centigrade
+UPS-MIB::upsInputLineBads.0 = Wrong Type (should be Counter32): INTEGER: 0
+UPS-MIB::upsInputNumLines.0 = Wrong Type (should be INTEGER): Gauge32: 1
+UPS-MIB::upsInputLineIndex.1 = INTEGER: 1
+UPS-MIB::upsInputFrequency.1 = INTEGER: 500 0.1 Hertz
+UPS-MIB::upsInputVoltage.1 = INTEGER: 227 RMS Volts
+UPS-MIB::upsOutputSource.0 = INTEGER: normal(3)
+UPS-MIB::upsOutputFrequency.0 = Wrong Type (should be INTEGER): Gauge32: 500
+UPS-MIB::upsOutputNumLines.0 = Wrong Type (should be INTEGER): Gauge32: 1
+UPS-MIB::upsOutputLineIndex.1 = INTEGER: 1
+UPS-MIB::upsOutputVoltage.1 = INTEGER: 220 RMS Volts
+UPS-MIB::upsOutputCurrent.1 = INTEGER: 0 0.1 RMS Amp
+UPS-MIB::upsOutputPower.1 = INTEGER: 0 Watts
+UPS-MIB::upsOutputPercentLoad.1 = INTEGER: 0 percent
+UPS-MIB::upsBypassFrequency.0 = Wrong Type (should be INTEGER): Gauge32: 500
+UPS-MIB::upsBypassNumLines.0 = Wrong Type (should be INTEGER): Gauge32: 1
+UPS-MIB::upsBypassLineIndex.1 = INTEGER: 1
+UPS-MIB::upsBypassVoltage.1 = INTEGER: 227 RMS Volts
+UPS-MIB::upsAlarmsPresent.0 = Gauge32: 0
+UPS-MIB::upsTestId.0 = Wrong Type (should be OBJECT IDENTIFIER): INTEGER: 0
+UPS-MIB::upsTestSpinLock.0 = INTEGER: 0
+UPS-MIB::upsTestResultsSummary.0 = INTEGER: 0
+UPS-MIB::upsTestResultsDetail.0 = Wrong Type (should be OCTET STRING): INTEGER: 0
+UPS-MIB::upsTestStartTime.0 = Wrong Type (should be Timeticks): INTEGER: 0
+UPS-MIB::upsTestElapsedTime.0 = INTEGER: 0
+UPS-MIB::upsShutdownType.0 = INTEGER: 0
+UPS-MIB::upsShutdownAfterDelay.0 = INTEGER: 0 seconds
+UPS-MIB::upsStartupAfterDelay.0 = INTEGER: 0 seconds
+UPS-MIB::upsRebootWithDuration.0 = INTEGER: 0 seconds
+UPS-MIB::upsAutoRestart.0 = INTEGER: 0
+UPS-MIB::upsConfigInputVoltage.0 = INTEGER: 0 RMS Volts
+UPS-MIB::upsConfigInputFreq.0 = INTEGER: 0 0.1 Hertz
+UPS-MIB::upsConfigOutputVoltage.0 = INTEGER: 0 RMS Volts
+UPS-MIB::upsConfigOutputFreq.0 = INTEGER: 0 0.1 Hertz
+UPS-MIB::upsConfigOutputVA.0 = INTEGER: 0 Volt-Amps
+UPS-MIB::upsConfigOutputPower.0 = INTEGER: 0 Watts
+UPS-MIB::upsConfigLowBattTime.0 = INTEGER: 0 minutes
+UPS-MIB::upsConfigAudibleStatus.0 = INTEGER: 0
+UPS-MIB::upsConfigLowVoltageTransferPoint.0 = INTEGER: 0 RMS Volts
+UPS-MIB::upsConfigHighVoltageTransferPoint.0 = INTEGER: 0 RMS Volts
+ */
 $descr_extra = '';
 if ($device['type'] !== 'power' &&
     $descr_extra = snmp_get_oid($device, 'upsIdentModel.0', 'UPS-MIB')) {
@@ -220,22 +277,32 @@ if (safe_count($ups_array)) {
       $oid   = ".1.3.6.1.2.1.33.1.3.3.1.3.$index";
       //discover_sensor('voltage', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, 1, $entry[$oid_name]);
       $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
+      if ($limit = snmp_cache_oid($device, "upsConfigInputVoltage.0", "UPS-MIB")) {
+        $options['limit_high'] = sensor_limit_high('voltage', $limit);
+        $options['limit_low']  = sensor_limit_low('voltage', $limit);
+      }
       discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
     }
 
     ## Input frequency
     $oid_name = 'upsInputFrequency';
-    if (isset($entry[$oid_name]) && $entry[$oid_name] > 0) {
+    if (isset($entry[$oid_name]) && $entry[$oid_name] > 0 &&
+        !discovery_check_if_type_exist([ 'frequency->HUAWEI-UPS-MIB-hwUpsInputFrequency' ], 'sensor')) {
       $scale_frequency = strlen($entry[$oid_name]) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
       $oid   = ".1.3.6.1.2.1.33.1.3.3.1.2.$index";
       //discover_sensor('frequency', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, $scale, $entry[$oid_name]);
       $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
+      if ($limit = snmp_cache_oid($device, "upsConfigInputFreq.0", "UPS-MIB")) {
+        $options['limit_high'] = sensor_limit_high('frequency', $limit * $scale_frequency);
+        $options['limit_low']  = sensor_limit_low('frequency', $limit * $scale_frequency);
+      }
       discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid, $index, NULL, $descr, $scale_frequency, $entry[$oid_name], $options);
     }
 
     ## Input current
     $oid_name = 'upsInputCurrent';
-    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0 &&
+        !discovery_check_if_type_exist([ 'current->HUAWEI-UPS-MIB-hwUpsInputCurrentA' ], 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.3.3.1.4.$index";
       //discover_sensor('current', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, $scale_current, $entry[$oid_name]);
       $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
@@ -305,12 +372,17 @@ if (safe_count($ups_array)) {
       $oid   = ".1.3.6.1.2.1.33.1.4.4.1.2.$index";
       //discover_sensor('voltage', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsOutputVoltage']);
       $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
+      if ($limit = snmp_cache_oid($device, "upsConfigOutputVoltage.0", "UPS-MIB")) {
+        $options['limit_high'] = sensor_limit_high('voltage', $limit);
+        $options['limit_low']  = sensor_limit_low('voltage', $limit);
+      }
       discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
     }
 
     ## Output current
     $oid_name = 'upsOutputCurrent';
-    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0) {
+    if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0 &&
+        !discovery_check_if_type_exist([ 'current->HUAWEI-UPS-MIB-hwUpsOutputCurrentA' ], 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.4.4.1.3.$index";
       //discover_sensor('current', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, $scale_current, $entry['upsOutputCurrent']);
       $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
@@ -408,7 +480,7 @@ if (safe_count($ups_array)) {
 
 /* Battery */
 echo("upsBattery ");
-$ups_array = snmpwalk_cache_oid($device, "upsBattery", array(), "UPS-MIB");
+$ups_array = snmpwalk_cache_oid($device, "upsBattery", [], "UPS-MIB");
 if (isset($ups_array[0])) {
   $index = 0;
   $entry = $ups_array[0];
@@ -444,13 +516,17 @@ if (isset($ups_array[0])) {
   }
 
   $oid_name = 'upsEstimatedMinutesRemaining';
-  if (isset($entry[$oid_name])) {
+  if (isset($entry[$oid_name]) && !in_array($entry[$oid_name], $invalid_values) &&
+      !discovery_check_if_type_exist([ 'runtime->HUAWEI-UPS-MIB-hwUpsBatteryBackupTime' ], 'sensor') &&
+      !($entry[$oid_name] == 0 && isset($entry['upsEstimatedChargeRemaining']) && $entry['upsEstimatedChargeRemaining'] > 10)) {
+
     $descr  = "Battery Runtime Remaining" . $descr_extra;
     $oid    = ".1.3.6.1.2.1.33.1.2.3.0";
-    $options = [ 'limit_low' => snmp_get_oid($device, "upsConfigLowBattTime.0", "UPS-MIB") ];
-
+    $options = [ 'rename_rrd' => 'mge-upsEstimatedMinutesRemaining.0' ];
+    if ($limit = snmp_get_oid($device, "upsConfigLowBattTime.0", "UPS-MIB")) {
+      $options['limit_low']  = $limit;
+    }
     //discover_sensor('runtime', $device, $oid, "upsEstimatedMinutesRemaining.0", 'mge', $descr . $descr_extra, 1, $value, $limits);
-    $options['rename_rrd'] = 'mge-upsEstimatedMinutesRemaining.0';
     discover_sensor_ng($device, 'runtime', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
   }
 
@@ -488,19 +564,25 @@ if (snmp_status()) {
 ## Output Frequency
 echo("upsOutputFrequency ");
 $value = snmp_get_oid($device, 'upsOutputFrequency.0', $mib);
-if (is_numeric($value)) {
+if (is_numeric($value) &&
+    !discovery_check_if_type_exist([ 'frequency->HUAWEI-UPS-MIB-hwUpsOutputFrequency' ], 'sensor')) {
   $scale_frequency = strlen($value) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
   $descr = "Output" . $descr_extra;
   $oid   = ".1.3.6.1.2.1.33.1.4.2.0";
   //discover_sensor('frequency', $device, $oid, "upsOutputFrequency", 'ups-mib', "Output".$descr_extra, $scale, $value);
   $options = [ 'rename_rrd' => 'ups-mib-upsOutputFrequency' ];
+  if ($limit = snmp_get_oid($device, "upsConfigOutputFreq.0", "UPS-MIB")) {
+    $options['limit_high'] = sensor_limit_high('frequency', $limit * $scale_frequency);
+    $options['limit_low']  = sensor_limit_low('frequency', $limit * $scale_frequency);
+  }
   discover_sensor_ng($device, 'frequency', $mib, "upsOutputFrequency", $oid, 0, NULL, $descr, $scale_frequency, $value, $options);
 }
 
 ## Bypass Frequency
 echo("upsBypassFrequency ");
 $value = snmp_get_oid($device, 'upsBypassFrequency.0', $mib);
-if (is_numeric($value)) {
+if (is_numeric($value) &&
+    !discovery_check_if_type_exist([ 'frequency->HUAWEI-UPS-MIB-hwUpsBypassInputFrequency' ], 'sensor')) {
   $scale_frequency = strlen($value) === 2 ? 1 : $scale; // 50 (incorrect) vs 500
   $descr = "Bypass" . $descr_extra;
   $oid   = ".1.3.6.1.2.1.33.1.5.1.0";

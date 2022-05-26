@@ -76,25 +76,25 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
   {
     return array(
       // by $device['os']
-      array(array('os' => 'screenos'), TRUE, 'juniper-old'),
+      array(array('os' => 'screenos', 'icon' => '', 'sysObjectID' => ''), TRUE, 'juniper-old'),
       // by $device['os'] and icon definition
-      array(array('os' => 'ios'), TRUE, 'cisco'),
+      array(array('os' => 'ios', 'icon' => '', 'sysObjectID' => ''), TRUE, 'cisco'),
       // by $device['os'] and vendor definition
-      array(array('os' => 'cyclades'), TRUE, 'emerson'),
+      array(array('os' => 'cyclades', 'icon' => '', 'sysObjectID' => ''), TRUE, 'emerson'),
       // by $device['os'] and vendor defined icon
-      array(array('os' => 'summitd-wl'), TRUE, 'summitd'),
+      array(array('os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => ''), TRUE, 'summitd'),
       // by $device['os'] and vendor defined icon
-      array(array('os' => 'summitd-wl', 'vendor' => 'Summit Development'), TRUE, 'summitd'),
+      array(array('os' => 'summitd-wl', 'icon' => '', 'sysObjectID' => '', 'vendor' => 'Summit Development'), TRUE, 'summitd'),
       // by $device['os'] and vendor definition (with non alpha chars)
       //array(array('os' => 'ccplus'), TRUE, 'c_c_power'),
       // by $device['os'] and distro name in array
-      array(array('os' => 'linux', 'distro' => 'RedHat'), TRUE, 'redhat'),
+      array(array('os' => 'linux', 'icon' => '', 'sysObjectID' => '', 'distro' => 'RedHat'), TRUE, 'redhat'),
       // by $device['os'] and icon in array
-      array(array('os' => 'ios', 'icon' => 'cisco-old'), TRUE, 'cisco-old'),
+      array(array('os' => 'ios', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
       // by all, who win?
-      array(array('os' => 'cyclades', 'distro' => 'RedHat', 'icon' => 'cisco-old'), TRUE, 'cisco-old'),
+      array(array('os' => 'cyclades', 'distro' => 'RedHat', 'icon' => 'cisco-old', 'sysObjectID' => ''), TRUE, 'cisco-old'),
       // unknown
-      array(array('os' => 'yohoho'), TRUE, 'generic'),
+      array(array('os' => 'yohoho', 'icon' => '', 'sysObjectID' => ''), TRUE, 'generic'),
       // empty
       array(array(), TRUE, 'generic'),
       

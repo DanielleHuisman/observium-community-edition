@@ -1,0 +1,1089 @@
+-- *****************************************************************
+-- FS-CLUSTER-MIB.mib:  FS CLUSTER MIB file
+--
+-- july 2012, sunxiaofeng
+--
+-- Copyright (c) 2012 by FS.COM Inc..
+-- All rights reserved.
+-- *****************************************************************
+
+FS-CLUSTER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Unsigned32
+        FROM SNMPv2-SMI
+    MacAddress,
+    TimeStamp,
+    DisplayString,
+    RowStatus
+        FROM SNMPv2-TC
+    IpAddress
+        FROM SNMPv2-SMI
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP
+        FROM SNMPv2-CONF
+    EnabledStatus
+        FROM P-BRIDGE-MIB
+    fsMgmt
+        FROM FS-SMI;
+
+fsClusterMIB MODULE-IDENTITY
+    LAST-UPDATED "201207010000Z"
+    ORGANIZATION "FS.COM Inc.."
+    CONTACT-INFO
+            "
+            Tel: 400-865-2852
+
+            E-mail: https://www.fs.com/live_chat_service_mail.html"
+    DESCRIPTION
+            "The MIB module for the management of a group of
+            devices called a 'cluster'.  A cluster comprises:
+
+            1. A manager device, which is a device that can provide
+               a single point of management (including SNMP, Web
+               Console and CLI/Telnet Console) for the devices
+               in the cluster;
+
+            2. Zero or more expansion devicees, or called the
+               cluster members throughout the context of this MIB,
+               which are devices that can be managed via a manager
+               device.  The manager device is also considered as a
+               cluster member.  Thus it has an entry in the MIB tables
+               defined below for cluster members.
+
+            Only the manager device IP address, passwords, and SNMP
+            community strings need to be configured in order to
+            provide management access to members of the cluster.
+
+            The Entity MIB is not cross-referenced from this MIB.
+
+            To determine if a particular device can be a manager device
+            or a member device please refer to the device's
+            user's guide."
+    REVISION  "201207010000Z"
+    DESCRIPTION
+            "Initial version of this mib."
+    ::= { fsMgmt 31 }
+
+fsClusterMIBObjects OBJECT IDENTIFIER ::= { fsClusterMIB 1 }
+
+-- MIB contains 7 groups
+
+fsClusterName OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..31))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "The name of the cluster.  Cluster command switch
+             functionality is only enabled if this object is
+             a string. a NULL string will create the cluster named 'cluster',
+             This object and fsClusterStatus in this MIB are
+             the only objects that will be instantiated if the
+             command switch functionality is not enabled.         
+             This object in candidate switch is read-write, 
+             and in candidate switch will return null
+             string when retrive. But in member switch this object is
+             read-only ."
+    DEFVAL        { "" }
+    ::= { fsClusterMIBObjects 1 }
+
+fsClusterStatus OBJECT-TYPE
+    SYNTAX    EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS      current
+    DESCRIPTION
+            "if the role of device is manage device, the value set disable
+             the manage device will delete the cluster,this command 
+            can only be used on manage device delete cluster."
+    DEFVAL { 1 }
+   ::= { fsClusterMIBObjects 2 }
+   
+fsClusterCmdMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of the manager device of the
+             cluster, ie. the CPU MAC address.
+             This object is not-accessible for candidate device."
+    ::= { fsClusterMIBObjects 3 }
+
+fsClusterCmdName OBJECT-TYPE
+    SYNTAX        DisplayString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The name of the manager device of the cluster.
+            This object is not-accessible for candidate device."
+    ::= { fsClusterMIBObjects 4 }
+
+fsClusterVlan OBJECT-TYPE
+    SYNTAX      INTEGER(0..4094)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "For the vlan created by a cluster. After this value is altered, 
+            the previous cluster will be deleted and a new cluster will be created 
+            according to the newly value of vlan, when the value is set 0 ,the vlan
+            will be get a idle vlan between 2049 and 3000"
+    ::= { fsClusterMIBObjects 5}
+
+fsClusterHopsLimit OBJECT-TYPE
+    SYNTAX        INTEGER(1..16)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "The hop counts between the farthest device and the manage device 
+            in the topology discovery, namely, the scope of topology discovery. 
+            Devices within this scope can be discovered by the manage device."
+    DEFVAL        { 5}
+    ::= { fsClusterMIBObjects 6}
+
+fsClusterTimerTopo OBJECT-TYPE
+    SYNTAX        INTEGER(10..300)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Set the timer time for cluster topology collect. This value ranges 
+            from 10 to 300 (60 by default), and the unit is second."
+    DEFVAL        { 60}
+    ::= { fsClusterMIBObjects 7}
+
+fsClusterTimerHello OBJECT-TYPE
+    SYNTAX        INTEGER(10..300)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Set handshaking time administrator device and member device,This value ranges 
+            from 10 to 300 (30 by default), and the unit is second."
+    DEFVAL        { 30}
+    ::= { fsClusterMIBObjects 8 }
+
+fsClusterTimerHold OBJECT-TYPE
+    SYNTAX        INTEGER(10..300)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Set holdtime of administrator device in the cluster,This value ranges 
+            from 10 to 300 (90 by default), and the unit is second."
+    DEFVAL        { 90}
+    ::= { fsClusterMIBObjects 9}
+
+fsClusterTftpServer OBJECT-TYPE
+    SYNTAX        IpAddress
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Set the shared TFTP server of the cluster. When the public network IP addresses
+            are not set on member devices, use the TFTP agent service of the management device
+            to upload or download files from the designated TFTP server."
+    ::= { fsClusterMIBObjects 10 }
+
+fsClusterNumberOfMembers OBJECT-TYPE
+    SYNTAX        INTEGER(0..240)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The number of cluster member devices,The manager device is considered as a cluster
+             member also. "
+    DEFVAL        { 0}
+    ::= { fsClusterMIBObjects 11 }
+
+
+fsClusterMaxNumberOfMembers OBJECT-TYPE
+    SYNTAX        INTEGER(0..240)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The maximum number of cluster member devices allowed in the
+             cluster.  The manager device is considered as a cluster
+             member also. "
+    DEFVAL        { 0}
+    ::= { fsClusterMIBObjects 12 }
+
+fsClusterDevMaxCapicity OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The maximum number of cluster dev allowed in the
+             cluster. the max number of cluster members is 512"
+    DEFVAL        { 0}
+    ::= { fsClusterMIBObjects 13 }
+
+fsClusterAutoAdd OBJECT-TYPE
+    SYNTAX        INTEGER {
+                            disable-with-def(0),
+                            enable(1),
+                            disabled-with-static(2),
+                            disabled-with-del(3)
+                          }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Description the add Members method of Cluster.Set the value 1 to enable auto-add functionality.
+            Set the value 0 or 3 to delete all auto-add Members by Cluster.
+            The value 2 indicates that Cluster will change all Members to static."
+    DEFVAL   { 1 }
+    ::= { fsClusterMIBObjects 14}
+
+fsClusterExplore OBJECT-TYPE
+    SYNTAX       EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Collect topology information manually. This command improves 
+            the convergence of the cluster topology. And this command 
+            can only be used on manage device."
+    DEFVAL { 2 }
+    ::= { fsClusterMIBObjects 15 }
+  
+fsClusterSpecifyAdmin       OBJECT IDENTIFIER ::= { fsClusterMIBObjects 16}
+
+fsClusterSpecifyAdminAddress OBJECT-TYPE
+    SYNTAX       MacAddress
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Specify the mac address of the cluster that the manage device ,
+            And this command can only be used on member devices of the cluster 
+            or the candidate devices of the cluster."
+    ::= { fsClusterSpecifyAdmin 1 }
+
+fsClusterSpecifyAdminName OBJECT-TYPE
+    SYNTAX       DisplayString (SIZE (0..31))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "Specify the name of the manage device of the cluster,
+            And this command can only be used on member devices of the cluster 
+            or the candidate devices of the cluster."
+    ::= { fsClusterSpecifyAdmin 2 }
+
+-- The Cluster device info
+fsClusterDeviceInfo                          OBJECT IDENTIFIER ::= { fsClusterMIBObjects 17}
+
+fsClusterDeviceEnable OBJECT-TYPE
+    SYNTAX    EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS      current
+    DESCRIPTION
+            "Wether the device can be added to a cluster, if this device
+            is already in a cluster, will be delete from cluster(if in the
+            cluster) and will never be added to any cluster."
+    DEFVAL { 1 }
+   ::= { fsClusterDeviceInfo 1 }
+
+fsClusterDeviceRole OBJECT-TYPE
+    SYNTAX       INTEGER {
+                           candidateDevice(1),
+                           managerDevice(2),
+                           memberDevice(3)
+                          }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The role of the device.  A device can become a member
+             device only when it is added to the cluster at the manager
+             device.  For devices that do not belong to any cluster,
+             the fsStatusClusterMode is set to 'candidateDevice'."
+     DEFVAL { 1 }
+    ::= { fsClusterDeviceInfo 2 }
+
+fsClusterDeviceIP OBJECT-TYPE
+    SYNTAX       IpAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The ip address of the device that specified by the manage device of the cluster"
+    ::= { fsClusterDeviceInfo 3 }
+
+fsClusterDeviceSn OBJECT-TYPE
+    SYNTAX       INTEGER(1..240)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "the uniquely identifies of the device of the cluster."
+    ::= { fsClusterDeviceInfo 4 }
+    
+    
+    -- The Cluster Ip Pool table   
+fsClusterIpPoolTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterIpPoolEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The table is used config the cluster ip address pool."
+    ::= { fsClusterMIBObjects 18 } 
+    
+fsClusterIpPoolEntry OBJECT-TYPE
+    SYNTAX      FSClusterIpPoolEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Entry items"
+    INDEX { fsClusterIpPool, fsClusterIpMask }
+    ::= { fsClusterIpPoolTable 1 } 
+    
+FSClusterIpPoolEntry ::=
+      SEQUENCE {
+               fsClusterIpPool                   IpAddress,
+               fsClusterIpMask                     IpAddress,
+               fsClusterIpPoolRowStatus         RowStatus
+      } 
+      
+fsClusterIpPool OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "As the management ip-pool configured by Cluster is altered, the cluster will be deleted. 
+             A new cluster will be created according to the newly ip-pool. the management ip-pool must be private address of enterprises£¨10.0.0.0-10.255.255.255£»172.16.0.0-172.37.255.255£»192.168.0.0-192.168.255.255£©"
+    ::= { fsClusterIpPoolEntry 1 }  
+    
+fsClusterIpMask OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "For the IP address mask created by a cluster. After this value is altered, 
+            the previous cluster will be deleted and a new cluster will be created 
+            according to the newly created cluster IP mask."
+    ::= { fsClusterIpPoolEntry 2 } 
+    
+fsClusterIpPoolRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The row status of this table."
+    ::= { fsClusterIpPoolEntry 3 } 
+
+--   The Cluster Member Add Table
+
+fsClusterMemberAddTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterMemberAddEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The table of manage the member device of the cluster or assign uniquely identifies
+            of the clsuter to any device"
+    ::= { fsClusterMIBObjects 19 }
+
+fsClusterMemberAddEntry OBJECT-TYPE
+    SYNTAX      FSClusterMemberAddEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            " The table of member add configuration identified by its 
+            mac address and the member id."
+    INDEX { fsClusterMemberAddSn }
+    ::= { fsClusterMemberAddTable 1 }
+
+FSClusterMemberAddEntry ::=
+      SEQUENCE {
+                fsClusterMemberAddSn                     INTEGER,
+                fsClusterMemberAddMacAddress               MacAddress,              
+                fsClusterMemberAddRowStatus              RowStatus
+      }
+
+fsClusterMemberAddSn OBJECT-TYPE
+    SYNTAX      INTEGER(0..240)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "An arbitrary value which uniquely identifies the
+             cluster member device number. when the value set 0,
+             the value of number will be specify a idle number beween 2 and 240,
+             when the value set 1,the value is invalid."
+    ::= { fsClusterMemberAddEntry 1 }
+fsClusterMemberAddMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "The MAC address of the member device."
+    ::= { fsClusterMemberAddEntry 2 }
+
+fsClusterMemberAddRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The row status of this table."
+    ::= { fsClusterMemberAddEntry 3 }
+
+--    The Cluster Member Table
+
+fsClusterMemberTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one row per cluster member,
+            including the manager device."
+    ::= { fsClusterMIBObjects 20}
+
+fsClusterMemberEntry OBJECT-TYPE
+    SYNTAX      FSClusterMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry containing cluster management information
+            applicable to a particular cluster member. If the
+            entry contain the manager device, this entry cannot
+            be modified."
+    INDEX { fsClusterMemberSn, fsClusterMemberUpMAC, fsClusterMemberLcIfx, fsClusterMemberUpIfx}
+    ::= { fsClusterMemberTable 1 }
+
+FSClusterMemberEntry ::=
+      SEQUENCE {
+                fsClusterMemberSn                       Unsigned32,
+                fsClusterMemberUpMAC                    MacAddress,
+                fsClusterMemberLcIfx                    Unsigned32,
+                fsClusterMemberUpIfx                    Unsigned32,
+                fsClusterMemberLcPort                   DisplayString,
+                fsClusterMemberUpPort                   DisplayString,
+                fsClusterMemberMacAddress               MacAddress,
+                fsClusterMemberName                     DisplayString,
+                fsClusterMemberIp                       IpAddress,
+                fsClusterMemberHops                     Unsigned32,
+                fsClusterMemberState                    DisplayString,      
+                fsClusterMemberUpSn                     Unsigned32,              
+                fsClusterMemberLastTopoUpdateTime       Unsigned32,
+                fsClusterMemberLastUdpUpdateTime        Unsigned32,
+                fsClusterMemberNoRecvTopoRspCount       Unsigned32,
+                fsClusterMemberNoRecvUdpRspCount        Unsigned32,
+                fsClusterMemberReload                   EnabledStatus
+      }
+
+fsClusterMemberSn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "An arbitrary value which uniquely identifies the
+             cluster member device number. It ranges from 0 to
+             fsStatusMaxNumberOfMembers - 1. incluing the manager
+             device."
+    ::= { fsClusterMemberEntry 1 }
+    
+fsClusterMemberUpMAC OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The mac address of the uplink device of the cluster."
+    ::= { fsClusterMemberEntry 2 }
+    
+fsClusterMemberLcIfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The interface index of port of the member device of the cluster."
+    ::= { fsClusterMemberEntry 3 }
+    
+fsClusterMemberUpIfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The interface index of port of the uplink device of the cluster."
+    ::= { fsClusterMemberEntry 4 }
+    
+fsClusterMemberLcPort OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The port member of the member device of the cluster."
+    ::= { fsClusterMemberEntry 5 }
+
+fsClusterMemberUpPort OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The port member of the uplink device of the cluster."
+    ::= { fsClusterMemberEntry 6 }
+    
+fsClusterMemberMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of the member device."
+    ::= { fsClusterMemberEntry 7 }
+
+fsClusterMemberName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The name of the device."
+    ::= { fsClusterMemberEntry 8 }
+
+fsClusterMemberIp OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The private IP address of the member device of the cluster "
+    ::= { fsClusterMemberEntry 9 }
+
+fsClusterMemberHops OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The hop counts between the device and the management device 
+            in the topology discovery."
+    ::= { fsClusterMemberEntry 10 }
+
+fsClusterMemberState OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The status of cluster management connectivity between
+            the manage device and a cluster member. Cluster management
+            connectivity is determined by the exchange of cluster
+            management messages between the manage device and a
+            cluster member. A member that has failed to exchange
+            cluster management messages with the manage device is
+            deemed to be inactive. Otherwise, it is deemed to be active."
+    ::= { fsClusterMemberEntry 11 }
+
+fsClusterMemberUpSn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The uniquely identifies of the uplink device of the member device,
+             if the uplink device of the member device is null,
+             the fsClusterMemberUpSn vlaue is 0."
+    ::= { fsClusterMemberEntry 12 }
+
+fsClusterMemberLastTopoUpdateTime OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The last time of the device for cluster topology collect."
+    ::= { fsClusterMemberEntry 13 }
+
+fsClusterMemberLastUdpUpdateTime OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The last update time of the member device of the cluster."
+    ::= { fsClusterMemberEntry 14 }
+
+fsClusterMemberNoRecvTopoRspCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The count that no receive the response of the topology collect of the member device."
+    ::= { fsClusterMemberEntry 15 }
+
+fsClusterMemberNoRecvUdpRspCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The count that no receive the response package of the hello time of the member device."
+    ::= { fsClusterMemberEntry 16 }
+    
+fsClusterMemberReload OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "when the value is set enable,the member device will reboot."
+    ::= { fsClusterMemberEntry 17 }
+--      The Cluster Candidate Table
+
+fsClusterCandidateTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterCandidateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one row per cluster candidate,
+             A cluster candidate is a device that is currently
+             eligible to be added to the cluster of a manager
+             device.  A device is eligible if it satisfies the
+             following conditions:
+             1. It supports the cluster management protocol.
+
+
+             The entries in this table and the entries in
+             fsMemberTable are mutually exclusive at all
+             times.  That is, any device that is a cluster
+             member never shows up in the fsCandidateTable
+             or is never a candidate at the same time .  Also, any
+             candidate that shows up in fsCandidateTable should not
+             appear in fsMemberTable."
+    ::= { fsClusterMIBObjects 21 }
+
+fsClusterCandidateEntry       OBJECT-TYPE
+    SYNTAX      FSClusterCandidateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry pertaining to a single candidate device."
+    INDEX { fsClusterCandidateMacAddress, fsClusterCandidateUpMAC, fsClusterCandidateLcIfx, fsClusterCandidateUpIfx}
+    ::= { fsClusterCandidateTable 1 }
+
+FSClusterCandidateEntry ::= SEQUENCE {
+        fsClusterCandidateMacAddress            MacAddress,
+        fsClusterCandidateUpMAC                 MacAddress,
+        fsClusterCandidateLcIfx                 Unsigned32,
+        fsClusterCandidateUpIfx                 Unsigned32, 
+        fsClusterCandidateLcPort                DisplayString,
+        fsClusterCandidateUpPort                DisplayString,
+        fsClusterCandidateUpSn                  Unsigned32,    
+        fsClusterCandidateHops                  Unsigned32,
+        fsClusterCandidateState                 DisplayString
+}
+
+fsClusterCandidateMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of a device qualified to
+             to be a cluster member of the manager device
+             cluster."
+    ::= { fsClusterCandidateEntry 1 }
+    
+fsClusterCandidateUpMAC OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The mac address of the uplink device of the candidate device."
+    ::= { fsClusterCandidateEntry 2 }
+    
+fsClusterCandidateLcIfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The interface index of port of the candidate device of the cluster."
+    ::= { fsClusterCandidateEntry 3 }
+    
+fsClusterCandidateUpIfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The interface index of port of the uplink device of the candidate device."
+    ::= { fsClusterCandidateEntry 4 }    
+
+fsClusterCandidateLcPort OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The port number of the candidate device of the cluster."
+    ::= { fsClusterCandidateEntry 5 }
+
+fsClusterCandidateUpPort OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The port number of the uplink device of the candidate device."
+    ::= { fsClusterCandidateEntry 6 }
+    
+fsClusterCandidateUpSn OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The port number of the uplink device of the candidate device."
+    ::= { fsClusterCandidateEntry 7 }   
+    
+fsClusterCandidateHops OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The hop counts between the candidate device and the management device 
+            in the topology discovery."
+    ::= { fsClusterCandidateEntry 8 }
+    
+fsClusterCandidateState OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The status of cluster management connectivity between
+            the manage device and a cluster candidate. Cluster management
+            connectivity is determined by the exchange of cluster
+            management messages between the manage device and a
+            cluster candidate member. A candidate member that has failed to exchange
+            cluster management messages with the manage device is
+            deemed to be inactive. Otherwise, it is deemed to be active."
+    ::= { fsClusterCandidateEntry 9 }
+    
+--    The Cluster blacklist Table
+
+fsClusterBlacklistTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterBlacklistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one row per cluster blacklist,
+            the device is not permitted to join in any cluster
+            in the black list table"
+    ::= { fsClusterMIBObjects 22}
+
+fsClusterBlacklistEntry       OBJECT-TYPE
+    SYNTAX      FSClusterBlacklistEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry pertaining to a single device in blacklist table."
+    INDEX { fsClusterBlacklistMacAddress }
+    ::= { fsClusterBlacklistTable 1 }
+
+FSClusterBlacklistEntry ::= SEQUENCE {
+      fsClusterBlacklistMacAddress                MacAddress,
+      fsClusterBlackListRowStatus                 RowStatus
+}
+
+fsClusterBlacklistMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of a device which is
+            in blacklist table ."
+    ::= { fsClusterBlacklistEntry 1 }
+
+fsClusterBlackListRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of the table."
+    ::= { fsClusterBlacklistEntry 2 }
+
+--     The Cluster Password Auth Pool Table
+
+fsClusterPasswordAuth                    OBJECT IDENTIFIER ::= { fsClusterMIBObjects 23}
+
+fsClusterPasswordAuthPoolTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterPasswordAuthPoolEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table shows current configurations for the password pool of the cluster."
+    ::= { fsClusterPasswordAuth 1 }
+
+fsClusterPasswordAuthPoolEntry       OBJECT-TYPE
+    SYNTAX      FSClusterPasswordAuthPoolEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Entry items"
+    INDEX { fsClusterPasswordSn }
+    ::= { fsClusterPasswordAuthPoolTable 1 }
+
+FSClusterPasswordAuthPoolEntry ::= SEQUENCE {
+      fsClusterPasswordSn                    INTEGER,
+      fsClusterPassword                      DisplayString,
+      fsClusterPasswordAuthRowStatus        RowStatus
+}
+
+fsClusterPasswordSn OBJECT-TYPE
+    SYNTAX      INTEGER(1..16)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The uniquely identifies of the password pool of the cluster."
+    ::= { fsClusterPasswordAuthPoolEntry 1 }
+
+fsClusterPassword OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..126))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "The password of the password pool."
+    ::= { fsClusterPasswordAuthPoolEntry 2 }
+
+fsClusterPasswordAuthRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of the table."
+    ::= { fsClusterPasswordAuthPoolEntry 3}
+
+--  The Cluster device auth password Tables
+
+fsClusterDeviceAuthPasswordTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FSClusterDeviceAuthPasswordEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table shows current configurations for the password of the cluster devices."
+    ::= { fsClusterPasswordAuth 2 }
+
+fsClusterDeviceAuthPasswordEntry       OBJECT-TYPE
+    SYNTAX      FSClusterDeviceAuthPasswordEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Entry items"
+    INDEX { fsClusterDeviceMacAddress }
+    ::= { fsClusterDeviceAuthPasswordTable 1 }
+
+FSClusterDeviceAuthPasswordEntry ::= SEQUENCE {
+      fsClusterDeviceMacAddress                MacAddress,
+      fsClusterDevicePassword                DisplayString ,
+      fsClusterDevicePasswordRowStatus        RowStatus
+}
+
+fsClusterDeviceMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The mac address of the device."
+    ::= { fsClusterDeviceAuthPasswordEntry 1 }
+
+fsClusterDevicePassword OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..126))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            " The auth password of the device."
+    ::= { fsClusterDeviceAuthPasswordEntry 2 }
+
+fsClusterDevicePasswordRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of the table."
+    ::= { fsClusterDeviceAuthPasswordEntry 3}
+
+-- traps definition
+
+fsClusterTraps OBJECT IDENTIFIER ::= { fsClusterMIB 2 }
+
+fsClusterMemberStateChangeTrap    NOTIFICATION-TYPE
+                OBJECTS { fsClusterMemberSn,fsClusterMemberState}
+                STATUS  current
+                DESCRIPTION
+                    "While the state of member device changed, then this trap will be sent.
+                    The fsClusterMemberState node is as follow, 1 indicates Ready status, 
+                    2 indicates Active status, 3 indicates Connect status, 
+                    and 4 indicates Disconnect status. The node value is as follow."
+            ::= { fsClusterTraps 1}
+
+fsClusterMemberFailureTrap    NOTIFICATION-TYPE
+                OBJECTS {fsClusterCandidateMacAddress}
+                STATUS  current
+                DESCRIPTION
+                    "When a device add cluster failure, send a snmp trap to the network
+                    management. then this trap will be sent."
+            ::= { fsClusterTraps 2}
+
+
+fsClusterDevMaximumAllowedTrap    NOTIFICATION-TYPE
+                STATUS  current
+                DESCRIPTION
+                    "The number of cluster devices including candidates and members reaches the maximum allowed,
+                    then this trap will be sent."
+            ::= { fsClusterTraps 3}
+            
+fsClusterMemberMaximumAllowedTrap    NOTIFICATION-TYPE
+                STATUS  current
+                DESCRIPTION
+                    "The number of cluster member including members reaches the maximum allowed,
+                    then this trap will be sent."
+            ::= { fsClusterTraps 4}
+
+-- Conformance Information
+
+fsClusterMIBConformance OBJECT IDENTIFIER ::= { fsClusterMIB 3 }
+fsClusterMIBCompliances OBJECT IDENTIFIER
+            ::= { fsClusterMIBConformance 1 }
+fsClusterMIBGroups      OBJECT IDENTIFIER
+            ::= { fsClusterMIBConformance 2 }
+
+-- Compliance statements
+
+fsClusterCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for the CLUSTER MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS { fsClusterStatusGroup,
+                        fsClusterMemberStatusGroup,
+                        fsClusterMemberGroup,
+                        fsClusterCandidateGroup,
+                        fsClusterMemberAddGroup,
+                        fsClusterBlackListGroup,
+                        uijieClusterPasswordAuthPoolGroup,
+                        fsDeviceAuthPasswordGroup,
+                        fsClusterCandidateStatusGroup
+                       }
+    ::= { fsClusterMIBCompliances 1 }
+
+-- MIB groupings
+
+fsClusterStatusGroup  OBJECT-GROUP
+    OBJECTS {
+             fsClusterName,
+             fsClusterCmdMacAddress,
+             fsClusterIpPool,
+             fsClusterIpMask,
+             fsClusterVlan,
+             fsClusterHopsLimit,
+             fsClusterHopsLimit,
+             fsClusterTimerTopo,
+             fsClusterTimerHello,
+             fsClusterTimerHold,
+             fsClusterTftpServer,
+             fsClusterNumberOfMembers,
+             fsClusterMaxNumberOfMembers,
+             fsClusterDevMaxCapicity
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the status of the cluster."
+    ::= { fsClusterMIBGroups 1 }
+
+fsClusterMemberStatusGroup OBJECT-GROUP
+    OBJECTS {
+            fsClusterName,
+            fsClusterDeviceEnable,
+            fsClusterDeviceRole,
+            fsClusterDeviceIP,
+            fsClusterDeviceSn
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the status of the cluster member.  These objects are accessible
+             on the cluster members and the manager device."
+    ::= { fsClusterMIBGroups 2 }
+
+fsClusterCandidateStatusGroup OBJECT-GROUP
+    OBJECTS {
+             fsClusterName,
+             fsClusterDeviceRole,
+             fsClusterDeviceEnable
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the status of single devices which are not in any cluster.
+             These objects are accessible on any single device."
+    ::= { fsClusterMIBGroups 3 }
+
+fsClusterMemberGroup    OBJECT-GROUP
+    OBJECTS {
+                fsClusterMemberSn,
+                fsClusterMemberMacAddress,
+                fsClusterMemberLcIfx ,
+                fsClusterMemberUpIfx ,
+                fsClusterMemberLcPort,
+                fsClusterMemberUpPort,
+                fsClusterMemberName,
+                fsClusterMemberIp,
+                fsClusterMemberHops,
+                fsClusterMemberState,                
+                fsClusterMemberUpSn,
+                fsClusterMemberUpMAC,                
+                fsClusterMemberLastTopoUpdateTime,
+                fsClusterMemberLastUdpUpdateTime,
+                fsClusterMemberNoRecvTopoRspCount,
+                fsClusterMemberNoRecvUdpRspCount,
+                fsClusterMemberReload
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the members of a cluster."
+    ::= { fsClusterMIBGroups 4 }
+
+fsClusterCandidateGroup    OBJECT-GROUP
+    OBJECTS {
+                fsClusterCandidateMacAddress,
+                fsClusterCandidateUpMAC,
+                fsClusterCandidateLcIfx,
+                fsClusterCandidateUpIfx, 
+                fsClusterCandidateLcPort,
+                fsClusterCandidateUpPort,
+                fsClusterCandidateHops,               
+                fsClusterCandidateUpSn,                   
+                fsClusterCandidateState                  
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             cluster candidates.  These objects are accessible
+             on the manager device only."
+    ::= { fsClusterMIBGroups 5 }
+
+fsClusterMemberAddGroup    OBJECT-GROUP
+    OBJECTS {
+             fsClusterMemberAddMacAddress,
+             fsClusterMemberAddSn,
+             fsClusterMemberAddRowStatus
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             cluster Member add operate.  These objects are accessible
+             on the manager device only."
+    ::= { fsClusterMIBGroups 6 }
+
+fsClusterBlackListGroup    OBJECT-GROUP
+    OBJECTS {
+             fsClusterBlacklistMacAddress
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             cluster blackList.  These objects are accessible
+             on the manager device only."
+    ::= { fsClusterMIBGroups 7 }
+
+fsClusterPasswordAuthPoolGroup    OBJECT-GROUP
+    OBJECTS {
+             fsClusterPasswordSn,
+             fsClusterPassword
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             cluster auth password pool.  These objects are accessible
+             on the manager device only."
+    ::= { fsClusterMIBGroups 8 }
+
+fsClsuterDeviceAuthPasswordGroup    OBJECT-GROUP
+    OBJECTS {
+             fsClusterDeviceMacAddress,
+             fsClusterDevicePassword
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             cluster device auth Password.  These objects are accessible
+             on the manager device only."
+    ::= { fsClusterMIBGroups 9 }
+
+END

@@ -1,0 +1,645 @@
+-- *****************************************************************
+-- FS-QINQ-MIB.mib:  FS QINQ MIB file
+--
+-- September 2010, miaoshifu
+--
+-- Copyright (c) 2010 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-QINQ-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32
+                FROM SNMPv2-SMI
+        VlanId
+                FROM Q-BRIDGE-MIB
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        IfIndex
+                FROM FS-TC        
+        EnabledStatus
+        	FROM P-BRIDGE-MIB
+        TEXTUAL-CONVENTION
+                FROM SNMPv2-TC        
+        fsMgmt
+                FROM FS-SMI;
+
+fsQinQMIB MODULE-IDENTITY
+        LAST-UPDATED "200909090000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs vlan mibs."
+        REVISION      "200909090000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 53}
+
+fsQINQMIBObjects OBJECT IDENTIFIER ::= { fsQinQMIB 1 }
+
+VlanList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Each octet within this value specifies a set of eight
+        vlans, with the first octet specifying vlans 1 through
+        8, the second octet specifying vlans 9 through 16, etc.
+        Within each octet, the most significant bit represents
+        the lowest numbered vlan, and the least significant bit
+        represents the highest numbered vlan.  Thus, each vlan
+        of the bridge is represented by a single bit within the
+        value of this object.  If that bit has a value of '1',
+        then that vlan is included in the set of vlans; the vlan
+        is not included if its bit has a value of '0'."
+    SYNTAX      OCTET STRING
+
+
+-- ---------------------------------------------------------- --
+-- A table for configuring 802.1q tunnel port.
+-- ---------------------------------------------------------- -- 
+fsQinQPortConfigTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSQinQPortConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table for configuring 802.1q tunnel port mode, native 
+            vlan and allowed vlan"
+        ::= { fsQINQMIBObjects 1 }
+    
+fsQinQPortConfigEntry OBJECT-TYPE
+        SYNTAX FSQinQPortConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            " "
+        INDEX { fsQinQPortConfigIndex}
+        ::= { fsQinQPortConfigTable 1 }
+    
+FSQinQPortConfigEntry ::=
+        SEQUENCE {
+        fsQinQPortConfigIndex IfIndex,
+        fsQinQPortConfigMode INTEGER,
+        fsQinQPortNativeVlan   VlanId,
+        fsQinQPortAllowedUntagVlanList VlanList,
+        fsQinQPortAllowedTagVlanList VlanList
+        }
+        
+fsQinQPortConfigIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "port index."
+        ::= { fsQinQPortConfigEntry 1 }
+              
+fsQinQPortConfigMode OBJECT-TYPE
+        SYNTAX INTEGER {
+            other(1),          -- the mode of interface is not 802.1q tunnel
+            dot1q-tunnel(2)    -- the mode of interface is 802.1q tunnel port
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Port mode, indicates that port is an 
+             other(1), dot1q-tunnel(2)."
+        ::= { fsQinQPortConfigEntry 2 }
+
+fsQinQPortNativeVlan OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The value indicate the VID of the native vlan of that this port .
+             This field is effective for only dot1q_tunnel port."
+        ::= { fsQinQPortConfigEntry 3 }
+
+fsQinQPortAllowedUntagVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The set of vlans that should transmit egress packets 
+             for this VLAN as untagged. 
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'. This field
+             is effective for only 802.1q tunnel port."
+        ::= { fsQinQPortConfigEntry 4 }
+
+fsQinQPortAllowedTagVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The set of vlans that should transmit egress packets 
+             for this VLAN as tagged. 
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'. This field
+             is effective for only 802.1q tunnel."
+        ::= { fsQinQPortConfigEntry 5 }
+
+
+-- ---------------------------------------------------------- --
+-- configuring global Service TPID value.
+-- ---------------------------------------------------------- -- 
+    fsQinQServiceTPIDValue  OBJECT-TYPE
+        SYNTAX      Integer32 (1..65535)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Ethernet protocol type configured for service VLAN tags
+            globally.  The ethernet protocol type is also the TPID(Tag
+            Protocol Identity) field of a VLAN tag described in 802.1q
+            document.  This value can be also configured for an
+            individual interface.  The node that configure this
+            value for a single interface is fsQinQIfServiceTPIDValue,
+            who has no association with fsQinQServiceTPIDValue.
+            That meas, a switch can only support one of them. only
+            support interface configuration or only support global
+            configuration.
+            The default Service TPID value is 0x8100."
+        ::= { fsQINQMIBObjects 2 }
+
+-- ---------------------------------------------------------- --
+-- A table for configuring Service TPID value for interfaces.
+-- ---------------------------------------------------------- -- 
+fsQinQIfServiceTPIDConfigTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSQinQIfServiceTPIDConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "An entry for configuring Service TPID functions for
+            interfaces."
+        ::= { fsQINQMIBObjects 3 }
+    
+fsQinQIfServiceTPIDConfigEntry OBJECT-TYPE
+        SYNTAX FSQinQIfServiceTPIDConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "An entry for configuring Service TPID function for
+            interfaces."
+        INDEX { fsQinQIfServiceTPIDConfigIfIndex}
+        ::= { fsQinQIfServiceTPIDConfigTable 1 }
+    
+FSQinQIfServiceTPIDConfigEntry ::=
+        SEQUENCE {
+        fsQinQIfServiceTPIDConfigIfIndex IfIndex,
+        fsQinQIfServiceTPIDValue   Integer32
+        }    
+    
+fsQinQIfServiceTPIDConfigIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "port index."
+        ::= { fsQinQIfServiceTPIDConfigEntry 1 }  
+
+fsQinQIfServiceTPIDValue    OBJECT-TYPE
+        SYNTAX      Integer32 (1..65535)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Service TPID value configured for an interface.
+            The default Service TPID value is 0x8100."
+        ::= { fsQinQIfServiceTPIDConfigEntry 2 }
+
+-- ---------------------------------------------------------- --
+-- A table for configuring priority copy for interfaces.
+-- ---------------------------------------------------------- -- 
+fsQinQPriorityCopyTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FSQinQPriorityCopyEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring priority field in 802.1Q-in-Q
+            outer VLAN tag for interfaces. This feature copy the
+            priority of an inner VLAN tag to the priority of an 
+            outer VLAN tag."
+        ::= { fsQINQMIBObjects  4  }
+
+fsQinQPriorityCopyEntry OBJECT-TYPE
+        SYNTAX  FSQinQPriorityCopyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring priority copy function for
+            interfaces."
+        INDEX   { fsQinQPriorityCopyIfIndex }		
+        ::= { fsQinQPriorityCopyTable 1}
+
+FSQinQPriorityCopyEntry ::=
+        SEQUENCE {
+		            fsQinQPriorityCopyIfIndex  IfIndex,
+		            fsQinQPriorityCopyPortStatus   EnabledStatus 
+		    }
+
+fsQinQPriorityCopyIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { fsQinQPriorityCopyEntry 1 }
+
+fsQinQPriorityCopyPortStatus OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+             "The value enabled(1) indicates that priority copy should 
+             be enabled on this interface. When disabled(2), priority 
+             copy is disabled on this interface."
+        ::= { fsQinQPriorityCopyEntry 2 }   
+
+-- ---------------------------------------------------------- --
+-- A table for configuring priority remark for interfaces.
+-- ---------------------------------------------------------- -- 
+
+fsQinQPriorityRemarkTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FSQinQPriorityRemarkEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring priority field in 802.1Q-in-Q
+            outer VLAN tag for interfaces. This feature uses the
+            priority of an inner VLAN tag to remark the priority
+            of an outer VLAN tag."
+        ::= { fsQINQMIBObjects  5  }
+
+fsQinQPriorityRemarkEntry OBJECT-TYPE
+        SYNTAX  FSQinQPriorityRemarkEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring priority remark function for
+            interfaces."
+        INDEX   { fsQinQPriorityRemarkIfIndex, 
+                  fsQinQPriorityValue
+                }		
+        ::= { fsQinQPriorityRemarkTable 1}
+
+FSQinQPriorityRemarkEntry ::=
+        SEQUENCE {
+		        	fsQinQPriorityRemarkIfIndex  IfIndex,
+            		fsQinQPriorityValue Integer32,
+            		fsQinQPriorityRemarkValue Integer32
+		    }
+
+fsQinQPriorityRemarkIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { fsQinQPriorityRemarkEntry 1 }
+
+fsQinQPriorityValue  OBJECT-TYPE
+        SYNTAX      Integer32 (0..7)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The priority value in inner VLAN tag. Since the priority
+            range is from 0 to 7, yet the index range is from 1 to 8.
+            Thus, the actual priority value equals to the value that
+            subtracts 1 from corresponding index value."
+        ::= { fsQinQPriorityRemarkEntry 2 }
+
+fsQinQPriorityRemarkValue  OBJECT-TYPE
+        SYNTAX      Integer32 (0..7)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The new priority value used to fill outer tag."
+        ::= { fsQinQPriorityRemarkEntry 3 }
+
+-- ------------------------------------------------------------------ --
+-- A table for configuring selective QINQ based on VLAN for interfaces.
+-- ------------------------------------------------------------------ -- 
+fsselectiveQinQBasedOnVlanTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FSselectiveQinQBasedOnVlanEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring vlan field in 802.1Q-in-Q outer 
+            VLAN tag for interfaces. This feature adds an outer VLAN 
+            tag based on inbound VLAN IDs, modifies outer VLAN tag 
+            based on inner VLAN IDs, modifies outer VLAN tag based on
+            outer VLAN IDs, modifies outer VLAN tag based on outer VLAN
+            ID and inner VLAN IDs."
+        ::= { fsQINQMIBObjects  6  }
+
+fsselectiveQinQBasedOnVlanEntry OBJECT-TYPE
+        SYNTAX  FSselectiveQinQBasedOnVlanEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring vlan field in 802.1Q-in-Q
+            outer VLAN tag based on VLAN for interfaces."
+        INDEX   { fsselectiveQinQBasedOnVlanIfIndex, 
+        		  fsselectiveQinQBasedOnVlanType,
+                  fsselectiveQinQBasedOnVlanOuterVlanID,
+				  fsselectiveQinQBasedOnVlanOldOuterVlanID  }		
+        ::= { fsselectiveQinQBasedOnVlanTable 1}
+
+FSselectiveQinQBasedOnVlanEntry ::=
+        SEQUENCE {
+		        	fsselectiveQinQBasedOnVlanIfIndex  IfIndex,
+		        	fsselectiveQinQBasedOnVlanType     INTEGER,
+            		fsselectiveQinQBasedOnVlanOuterVlanID Integer32,
+            		fsselectiveQinQBasedOnVlanOldOuterVlanID Integer32,
+            		fsselectiveQinQBasedOnVlanVlanList VlanList
+		    }
+
+fsselectiveQinQBasedOnVlanIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { fsselectiveQinQBasedOnVlanEntry 1 }
+
+fsselectiveQinQBasedOnVlanType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            addOuterTag(1),       				
+            -- add an outer VLAN tag based on VLAN.
+            modifyOuterTagBaseInnerTag(2),    	
+            -- modify the outer VLAN tag based on inner VLAN IDs.
+            modifyOuterTagBaseOuterTag(3),     	
+            -- modify the inner VLAN tag based on outer VLAN IDs.
+            modifyOuterTagBaseInnerAndOuterTag(4) 
+            -- modify the inner VLAN tag based on old outer VLAN ID and inner VLAN IDs.   
+            }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "802.1Q-in-Q strategy type."
+    ::= { fsselectiveQinQBasedOnVlanEntry 2 }
+
+fsselectiveQinQBasedOnVlanOuterVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The outer VLAN ID."
+        ::= { fsselectiveQinQBasedOnVlanEntry 3 }
+
+fsselectiveQinQBasedOnVlanOldOuterVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The old outer VLAN ID of original 802.1Q packets.
+            This field is only effective for mofifying outer 
+            VLAN tag based on old outer VLAN ID and inner VLAN
+            IDs."
+        ::= { fsselectiveQinQBasedOnVlanEntry 4 }
+
+fsselectiveQinQBasedOnVlanVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The inbound VLAN IDs which need 802.1Q-in-Q processing. 
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'. This field
+             is effective for only 802.1q tunnel port."
+        ::= { fsselectiveQinQBasedOnVlanEntry 5 }
+
+
+-- ------------------------------------------------------------------ --
+-- A table for configuring selective QINQ based on ACL for interfaces.
+-- ------------------------------------------------------------------ -- 
+fsselectiveQinQBasedOnAclTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FSselectiveQinQBasedOnAclEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring vlan field in 802.1Q-in-Q VLAN tag
+            for interfaces. This feature adds an outer VLAN tag based on 
+            ACL, modifies the outer VLAN tag based on ACL or modifies the
+            inner VLAN tag based on ACL."
+        ::= { fsQINQMIBObjects  7  }
+
+fsselectiveQinQBasedOnAclEntry OBJECT-TYPE
+        SYNTAX  FSselectiveQinQBasedOnAclEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring vlan field in 802.1Q-in-Q
+            VLAN tag for interfaces."
+        INDEX   { fsselectiveQinQBasedOnAclIfIndex, 
+                  fsselectiveQinQBasedOnAclType,
+                  fsselectiveQinQBasedOnAclAclID}		
+        ::= { fsselectiveQinQBasedOnAclTable 1}
+
+FSselectiveQinQBasedOnAclEntry ::=
+        SEQUENCE {
+		        	fsselectiveQinQBasedOnAclIfIndex  IfIndex,
+		        	fsselectiveQinQBasedOnAclType   INTEGER,
+		        	fsselectiveQinQBasedOnAclAclID  Integer32,
+            		fsselectiveQinQBasedOnAclVlanID Integer32
+		    }
+
+fsselectiveQinQBasedOnAclIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { fsselectiveQinQBasedOnAclEntry 1 }
+
+
+fsselectiveQinQBasedOnAclType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            addOuterTag(1),       -- add an outer VLAN tag based on ACL
+            modifyOuterTag(2),    -- modify the outer VLAN tag based on ACL
+            modifyInnerTag(3)     -- modify the inner VLAN tag based on ACL            
+        }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "802.1Q-in-Q strategy type."
+    ::= { fsselectiveQinQBasedOnAclEntry 2 }
+
+fsselectiveQinQBasedOnAclAclID  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The ACL index."
+        ::= { fsselectiveQinQBasedOnAclEntry 3 }
+
+fsselectiveQinQBasedOnAclVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The VLAN ID."
+        ::= { fsselectiveQinQBasedOnAclEntry 4 }
+
+-- ------------------------------------------------------------------ --
+-- A table for configuring vlan mapping for interfaces.
+-- ------------------------------------------------------------------ -- 
+fsQinQVlanMappingTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF FSQinQVlanMappingEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring 802.1Q-in-Q vlan mapping for interfaces."
+        ::= { fsQINQMIBObjects  8  }
+
+fsQinQVlanMappingEntry OBJECT-TYPE
+        SYNTAX  FSQinQVlanMappingEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring vlan mapping for interfaces."
+        INDEX   { fsQinQVlanMappingIfIndex, 
+                  fsQinQVlanMappingType, 
+		  fsQinQVlanMappingNewVlanID  }		
+        ::= { fsQinQVlanMappingTable 1}
+
+FSQinQVlanMappingEntry ::=
+        SEQUENCE {
+		        	fsQinQVlanMappingIfIndex  	IfIndex,
+		        	fsQinQVlanMappingType 		INTEGER,
+            		fsQinQVlanMappingNewVlanID 	Integer32,
+            		fsQinQVlanMappingOldVlanList VlanList,
+		        	fsQinQVlanMappingOldVlanID  Integer32
+		    }
+
+fsQinQVlanMappingIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { fsQinQVlanMappingEntry 1 }
+
+fsQinQVlanMappingType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            vlanMappingIn(1),       				
+            -- ingress vlan mapping strategy.
+            vlanMappingOut(2)    	
+            -- egress vlan mapping strategy. 
+            }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "vlan mapping strategy type."
+        ::= { fsQinQVlanMappingEntry 2 }
+
+fsQinQVlanMappingNewVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The new VLAN ID of original ingress or egress 802.1Q packets."
+        ::= { fsQinQVlanMappingEntry 3 }
+
+fsQinQVlanMappingOldVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The old VLAN IDs of original ingress 802.1Q packets.
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'.
+             This field is effective for ingress vlan mapping strategy."
+        ::= { fsQinQVlanMappingEntry 4 }
+
+fsQinQVlanMappingOldVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The old VLAN ID of original egress 802.1Q packets.
+	     This field is effective for egress vlan mapping strategy."
+        ::= { fsQinQVlanMappingEntry 5 }
+
+
+fsQinQMIBConformance OBJECT IDENTIFIER ::= { fsQinQMIB 2 }
+fsQinQMIBCompliances OBJECT IDENTIFIER ::= { fsQinQMIBConformance 1 }
+fsQinQMIBGroups      OBJECT IDENTIFIER ::= { fsQinQMIBConformance 2 }
+
+
+-- compliance statements
+
+fsQinQMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS QINQ MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { 
+                      fsQinQMIBGroup  
+                 }
+         ::= { fsQinQMIBCompliances 1 }
+         
+fsQinQMIBGroup OBJECT-GROUP
+        OBJECTS {
+              fsQinQPortConfigMode,
+              fsQinQPortNativeVlan,
+              fsQinQPortAllowedUntagVlanList,
+              fsQinQPortAllowedTagVlanList,
+              fsQinQServiceTPIDValue,
+              fsQinQIfServiceTPIDValue,
+		          fsQinQPriorityCopyPortStatus,
+            	fsQinQPriorityValue,
+            	fsQinQPriorityRemarkValue,
+		        	fsselectiveQinQBasedOnVlanType,
+            	fsselectiveQinQBasedOnVlanOuterVlanID,
+            	fsselectiveQinQBasedOnVlanOldOuterVlanID,
+            	fsselectiveQinQBasedOnVlanVlanList,
+		        	fsselectiveQinQBasedOnAclType,
+		        	fsselectiveQinQBasedOnAclAclID,
+            	fsselectiveQinQBasedOnAclVlanID,
+            	fsQinQVlanMappingNewVlanID   
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qinq managment."
+        ::= { fsQinQMIBGroups 1 }
+END

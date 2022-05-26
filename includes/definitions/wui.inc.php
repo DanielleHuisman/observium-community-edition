@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -38,10 +38,11 @@ define('OBS_COLOUR_WARN_B',         '#ffcccc'); //$warn_colour_b   = "#ffcccc";
 /* After this line keep only WUI specific definitions, not required in cli! */
 //if (is_cli()) { return; }
 
-// List of allowed (un-escaped) tags in escape_html(): <tag>..</tag>
+// List of allowed (un-escaped) tags in escape_html(): <tag>..</tag>, <br/>
 $config['escape_html']['tags']            = []; // prevent change by config
 $config['escape_html']['tags'][]          = 'sup';
 $config['escape_html']['tags'][]          = 'sub';
+$config['escape_html']['tags'][]          = 'br';
 
 // List of allowed (un-escaped) entities in escape_html(): &entity;
 $config['escape_html']['entities']        = []; // prevent change by config
@@ -62,11 +63,13 @@ $config['escape_html']['entities'][]      = '#8203';  // &#x200B; U+200B ZERO WI
 
 $config['pages']['gridstack']['no_panel'] = TRUE;
 $config['pages']['dashboard']['no_panel'] = TRUE;
+$config['pages']['map']['no_panel']       = TRUE;
 
 // Refresh pages definitions
 $config['wui']['refresh_times']       = array(0, 60, 120, 300, 900, 1800); // Allowed refresh times in seconds
 // $vars array combination where auto-refresh page disabled by default
 $config['wui']['refresh_disabled'][]  = array('page' => 'dashboard');
+$config['wui']['refresh_disabled'][]  = array('page' => 'map');
 $config['wui']['refresh_disabled'][]  = array('page' => 'add_alert_check');
 $config['wui']['refresh_disabled'][]  = array('page' => 'alert_check');
 $config['wui']['refresh_disabled'][]  = array('page' => 'alert_regenerate');
@@ -98,11 +101,11 @@ $config['wui']['refresh_disabled'][]  = array('page' => 'preferences');
 $config['wui']['refresh_disabled'][]  = array('page' => 'logout');
 $config['wui']['refresh_disabled'][]  = array('page' => 'customoids');
 $config['wui']['refresh_disabled'][]  = array('page' => 'log');
+$config['wui']['refresh_disabled'][]  = array('page' => 'pollers');
 
 // Search modules used by the ajax search, in order.
-$config['wui']['search_modules'] = [ 'groups', 'devices', 'ports', 'slas', 'sensors', 'status', 'neighbours',
-                                     'accesspoints', 'ip-addresses', 'inventory', 'loadbalancers',
-                                    ];
+$config['wui']['search_modules'] = [ 'groups', 'devices', 'accesspoints', 'ports', 'slas', 'sensors', 'status', 'neighbours',
+                                     'ip-addresses', 'inventory', 'loadbalancers' ];
 
 // Default groups list (on status page and default panel)
 //$config['wui']['groups_list'] = array('device', 'port', 'processor', 'mempool', 'sensor', 'bgp_peer');
@@ -187,7 +190,7 @@ $config['icon']['syslog-rule-add']   = $config['icon']['plus'];
 $config['icon']['eventlog']          = "sprite-eventlog";
 
 $config['icon']['pollerlog']         = "sprite-performance";
-
+$config['icon']['pollers']           = "sprite-module";
 $config['icon']['processes']         = "sprite-processes";
 
 $config['icon']['netmap']            = "sprite-netmap";
@@ -349,6 +352,7 @@ $config['icon']['mibs']              = "sprite-map-2";
 $config['icon']['notes']             = "sprite-note";
 
 // Font icons
+$config['icon']['info-sign']         = "icon-info-sign";
 $config['icon']['edit']              = "icon-cog";
 $config['icon']['delete']            = "icon-trash";
 $config['icon']['add']               = "icon-plus-sign";
@@ -359,7 +363,7 @@ $config['icon']['arrow-down']        = "icon-circle-arrow-down";
 $config['icon']['arrow-right']       = "icon-circle-arrow-right";
 $config['icon']['arrow-left']        = "icon-circle-arrow-left";
 
-$config['icons'] = ['sprite-device', 'sprite-network', 'sprite-virtual-machine'];
+$config['icons'] = [ 'sprite-device', 'sprite-network', 'sprite-virtual-machine' ];
 
 
 

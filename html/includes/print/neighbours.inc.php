@@ -289,7 +289,7 @@ function get_neighbours_array($vars)
   }
 
   // Query neighbours count
-  $array['count'] = count($array['entries']);
+  $array['count'] = safe_count($array['entries']);
   if ($array['pagination'])
   {
     $array['pagination_html'] = pagination($vars, $array['count']);

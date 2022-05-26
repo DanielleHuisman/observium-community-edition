@@ -10,23 +10,55 @@
  *
  */
 
-if (!isset($cache_discovery['host-resources-mib']))
-{
-  $cache_discovery['host-resources-mib'] = snmpwalk_cache_oid($device, "hrStorageEntry", array(), "HOST-RESOURCES-MIB:HOST-RESOURCES-TYPES");
-}
+$hrStorage = snmp_cache_table($device, "hrStorageEntry", [], "HOST-RESOURCES-MIB:HOST-RESOURCES-TYPES");
 
 //$debug_stats = array('total' => 0, 'used' => 0);
-if (safe_count($cache_discovery['host-resources-mib'])) {
-  foreach ($cache_discovery['host-resources-mib'] as $index => $entry)
-  {
+if (!safe_empty($hrStorage)) {
+
+  if ($device['os'] === "arista_eos" && $hrStorage[1]['hrStorageDescr'] === 'RAM') {
+    // Arista EOS derp hack for correct free memory
+    // https://eos.arista.com/memory-utilization-on-eos-devices/
+
+    // hrStorageType.1 = hrStorageRam
+    // hrStorageType.2 = hrStorageRam
+    // hrStorageType.3 = hrStorageRam
+    // hrStorageType.100 = hrStorageRam
+    // hrStorageDescr.1 = RAM
+    // hrStorageDescr.2 = RAM (Buffers)
+    // hrStorageDescr.3 = RAM (Cache)
+    // hrStorageDescr.100 = RAM (Unavailable)
+    // hrStorageAllocationUnits.1 = 1024
+    // hrStorageAllocationUnits.2 = 1024
+    // hrStorageAllocationUnits.3 = 1024
+    // hrStorageAllocationUnits.100 = 1024
+    // hrStorageSize.1 = 8152456
+    // hrStorageSize.2 = 8152456
+    // hrStorageSize.3 = 8152456
+    // hrStorageSize.100 = 8152456
+    // hrStorageUsed.1 = 7376060
+    // hrStorageUsed.2 = 288472
+    // hrStorageUsed.3 = 2984372
+    // hrStorageUsed.100 = 1811664
+    $hrStorage[1]['hrStorageUsed'] = snmp_dewrap32bit($hrStorage[1]['hrStorageUsed']);
+    foreach ($hrStorage as $idx => $entry) {
+      if ($idx != '1' && $entry['hrStorageType'] === 'hrStorageRam' &&
+          str_starts($entry['hrStorageDescr'], 'RAM') && !str_contains($entry['hrStorageDescr'], 'Unavailable')) {
+        // Use only Buffers and Cache
+        $hrStorage[1]['hrStorageUsed'] -= snmp_dewrap32bit($entry['hrStorageUsed']);
+        unset($hrStorage[$idx]);
+      }
+    }
+    unset($idx);
+  }
+
+  foreach ($hrStorage as $index => $entry) {
     $descr  = $entry['hrStorageDescr'];
     $units  = $entry['hrStorageAllocationUnits'];
     $total  = snmp_dewrap32bit($entry['hrStorageSize']);
     $used   = snmp_dewrap32bit($entry['hrStorageUsed']);
     $deny   = TRUE;
 
-    switch($entry['hrStorageType'])
-    {
+    switch($entry['hrStorageType']) {
       case 'hrStorageVirtualMemory':
       case 'hrStorageRam':
       case 'hrStorageOther':
@@ -46,12 +78,12 @@ if (safe_count($cache_discovery['host-resources-mib'])) {
     }
 
 
-    if ($device['os'] === "routeros" && $descr === "main memory") { $deny = FALSE; }
-    elseif ($device['os'] === "mcd") {
+    if ($device['os'] === "routeros" && $descr === "main memory") {
+      $deny = FALSE;
+    } elseif ($device['os'] === "mcd") {
       // Yes, hardcoded logic for mcd, because they do not use standard
       // See: http://jira.observium.org/browse/OBSERVIUM-1269
-      if ($index === 1)
-      {
+      if ($index === 1) {
         // hrStorageType.1 = hrStorageRam
         // hrStorageDescr.1 = System Free Memory
         // hrStorageAllocationUnits.1 = 1
@@ -64,20 +96,23 @@ if (safe_count($cache_discovery['host-resources-mib'])) {
         discover_mempool($valid['mempool'], $device, $index, "host-resources-mcd", $descr, $units, $total, $used);
       }
       $deny = TRUE;
+      continue;
     }
 
-    if (strstr($descr, "MALLOC") || strstr($descr, "UMA")) { $deny = TRUE;  }   // Ignore FreeBSD INSANITY
-    if (strstr($descr, "procfs") || strstr($descr, "/proc")) { $deny = TRUE;  } // Ignore ProcFS
-    if ($descr == "Cached memory" || $descr == "Shared memory" || $descr == "Physical memory") { $deny = TRUE;  }   // Ignore worthless data on Unix hosts
+    if ($deny ||
+        str_contains_array($descr, [ "MALLOC", "UMA" ])   || // Ignore FreeBSD INSANITY
+        str_contains_array($descr, [ "procfs", "/proc" ]) || // Ignore ProcFS
+        in_array($descr, [ "Cached memory", "Shared memory", "Physical memory" ], TRUE)) { // Ignore worthless data on Unix hosts
+      continue;
+    }
 
-    if (!$deny && is_numeric($entry['hrStorageSize']) && $total)
-    {
+    if (is_numeric($entry['hrStorageSize']) && $total) {
       discover_mempool($valid['mempool'], $device, $index, $mib, $descr, $units, $total, $used);
       //$debug_stats['total'] += $total;
       //$debug_stats['used']  += $used;
     }
   }
 }
-unset ($index, $descr, $total, $used, $units, $deny);
+unset($index, $descr, $total, $used, $units, $deny);
 
 // EOF

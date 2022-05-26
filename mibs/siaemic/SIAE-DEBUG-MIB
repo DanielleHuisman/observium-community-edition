@@ -1,0 +1,479 @@
+-- ----------------------------------------------------------------------------
+--
+--  SIAE MICROELETTRONICA s.p.a.
+--                 
+--  Via Michelangelo Buonarroti, 21
+--  20093 - Cologno Monzese
+--  Milano 
+--  ITALY
+--
+-- ----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+
+SIAE-DEBUG-MIB
+        DEFINITIONS ::= BEGIN
+
+        IMPORTS
+             MODULE-IDENTITY, NOTIFICATION-TYPE, OBJECT-TYPE,
+             Integer32
+        FROM SNMPv2-SMI
+             DisplayString
+        FROM SNMPv2-TC
+             siaeMib
+        FROM SIAE-TREE-MIB
+             AlarmStatus, AlarmSeverityCode, alarmTrap
+        FROM SIAE-ALARM-MIB
+             equipIpSnmpAgentAddress
+        FROM SIAE-EQUIP-MIB;
+
+    debug MODULE-IDENTITY
+        LAST-UPDATED "201503230000Z"
+        ORGANIZATION "SIAE MICROELETTRONICA spa"
+        CONTACT-INFO
+
+            "SIAE MICROELETTONICA s.p.a.
+             Via Michelangelo Buonarroti, 21
+             20093 - Cologno Monzese
+             Milano - ITALY
+             Phone :  +39-02-27325-1
+             E-mail: help@siaemic.com
+            "
+        DESCRIPTION
+            "Maintenance of software releases loaded on SIAE equiment.
+            "
+        REVISION "201503230000Z"
+        DESCRIPTION
+            "Removed alarmTrapNumber from uploadDownloadFTPStatusTrap
+             and IMPORTS.
+            "
+        REVISION "201402030000Z"
+        DESCRIPTION
+            "Improved description of debugMibVersion
+            "
+        REVISION "201304160000Z"
+        DESCRIPTION 
+            "Initial version 01.00.00
+            "
+    ::= { siaeMib 41 }
+
+
+----------------------------------------------------------------------------------
+--  object identifier inside the module
+----------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------
+-- debug GROUP
+----------------------------------------------------------------------------------
+--
+-- Debug group defines all the object required to debug a new board:
+--   Memory Read/write
+--   FPGA registers Read/write
+--  debug is a new group inserted as a new mib leaf of a specific equipment mib:
+--    debug     OBJECT IDENTIFIER ::= {x 41}
+--
+----------------------------------------------------------------------------------
+
+------ Beginning --------------------------------------------------------------
+
+    debugMibVersion  OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Numerical version of this module.
+             The string version of this MIB have the following format:
+                XX.YY.ZZ
+             so, for example, the value 1 should be interpreted as 00.00.01
+             and the value 10001 should be interpreted as 01.00.01."
+        DEFVAL {1}
+    ::= {debug 1}
+
+--
+-------  Device Table
+-------  It is used to define the number and the type of device (FPGA, Gate Array)
+-------  presents on the board.
+-------  Begin of deviceTable
+--
+    deviceTable  OBJECT-TYPE
+        SYNTAX      SEQUENCE OF     DeviceEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Table with device (FPGA, Gate array...) records."
+    ::= {debug 2}
+
+    deviceEntry  OBJECT-TYPE
+        SYNTAX      DeviceEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Device records."
+        INDEX {deviceId}
+    ::= {deviceTable 1}
+
+    DeviceEntry  ::=
+        SEQUENCE {
+            deviceId                  Integer32,
+            deviceType                INTEGER,
+            deviceLabel               DisplayString,
+            deviceStartAddressBase    OCTET STRING,
+            deviceStartAddressOffset  OCTET STRING,
+            deviceEndAddressBase      OCTET STRING,
+            deviceEndAddressOffset    OCTET STRING
+        }
+
+    deviceId  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Device identifier is used as the index for the device table."
+    ::= {deviceEntry 1}
+
+     deviceType  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             serial    (1),
+                             parallel  (2),
+                             delete    (3)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Device type.
+             Writing this object for a not existing deviceId (serial or parallel option)
+             creates  a new device record.
+             'delete' option deletes the existing device record."
+    ::= {deviceEntry 2}
+
+    deviceLabel  OBJECT-TYPE
+        SYNTAX      DisplayString    (SIZE(0..15))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "ASCII string used by the operator to identify the device.
+             The default value is DEVICE-deviceId."
+    ::= {deviceEntry 3}
+
+    deviceStartAddressBase  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With deviceStartAddressOffset it defines the device registry start address."
+    ::= {deviceEntry 4}
+
+    deviceStartAddressOffset  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With deviceStartAddressBase it defines the device registry start address."
+    ::= {deviceEntry 5}
+
+    deviceEndAddressBase  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With deviceEndAddressOffset it defines the device registry end address."
+    ::= {deviceEntry 6}
+
+    deviceEndAddressOffset  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With deviceEndAddressBase it defines the device registry end address."
+    ::= {deviceEntry 7}
+--
+-------  End of deviceTable
+
+-------  Begin of memoryTable
+--
+    memoryTable  OBJECT-TYPE
+        SYNTAX      SEQUENCE OF     MemoryEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Table with memoryEntry records."
+    ::={debug 3}
+
+    memoryEntry  OBJECT-TYPE
+        SYNTAX      MemoryEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "MemoryEntry record."
+        INDEX {memoryIdNumber}
+    ::= {memoryTable 1}
+
+    MemoryEntry  ::=
+        SEQUENCE {
+            memoryIdNumber              Integer32,
+            memoryAddressBase           OCTET STRING,
+            memoryAddressOffset         OCTET STRING,
+            memoryValue                 Integer32,
+            memoryDumpEnable            INTEGER,
+            memoryDumpSize              Integer32,
+            memoryDump                  OCTET STRING,
+            triggerMemoryAddressBase    OCTET STRING,
+            triggerMemoryAddressOffset  OCTET STRING,
+            triggerMemoryValue          Integer32,
+            triggerMemoryMask           Integer32,
+            triggerEnable               INTEGER,
+            triggerAlarm                AlarmStatus
+        }
+
+    memoryIdNumber  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Memory Id is used as the index for the memory table
+             Three records are automatically created at Sw start-up."
+    ::= {memoryEntry 1}
+
+    memoryAddressBase  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With memoryAddressOffset it defines the memory address."
+    ::= {memoryEntry 2}
+
+    memoryAddressOffset  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With memoryAddressBase it defines the memory address."
+    ::= {memoryEntry 3}
+
+    memoryValue  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Value (one byte) to be written at memoryAddrees."
+        DEFVAL {0}
+    ::= {memoryEntry 4}
+
+    memoryDumpEnable  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             disable             (1),
+                             enable              (2),
+                             enableuntiltrigger  (3)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to enable periodically memory dump. The 'enable-until-trigger' parameter
+             changes in 'disable'parameter after the trigger."
+        DEFVAL {disable}
+    ::= {memoryEntry 5}
+
+  memoryDumpSize  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It rappresent the number of bytes (max 256) to put im memoryDump parameter."
+        DEFVAL {50}
+    ::= {memoryEntry 6}
+
+    memoryDump  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(32768))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "It rappresents the memory area  to read. The dump area begins from memoryAddress
+             and it's long memoryDumpSize bytes. The dump don't exceed the lenght of FPGA.
+             The object is refresched when memoryAddressOffset or memoryValue are SET.
+             The object is periodically (every 200ms) refresched when memoryDumpEnable is enable."
+    ::= {memoryEntry 7}
+
+    triggerMemoryAddressBase  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With memoryAddressOffset it defines the memory  address to be checked
+             for trigger."
+    ::= {memoryEntry 8}
+
+    triggerMemoryAddressOffset  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With memoryAddressBase it defines the memory address to be checked
+             for trigger."
+    ::= {memoryEntry 9}
+
+    triggerMemoryValue  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Memory value (one byte) to be checked  for trigger."
+        DEFVAL {0}
+    ::= {memoryEntry 10}
+
+    triggerMemoryMask  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Memory Mask (one byte) to select the bits to be checked (0xFF means all bits)."
+        DEFVAL {255}
+    ::= {memoryEntry 11}
+
+    triggerEnable  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             disable  (1),
+                             enable   (2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "It is used to enable the trigger. Writing this object reset the trigger Alarms."
+        DEFVAL {disable}
+    ::= {memoryEntry 12}
+
+    triggerAlarm  OBJECT-TYPE
+        SYNTAX      AlarmStatus
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "It reports to the trigger condition "
+    ::= {memoryEntry 13}
+--
+-------  End of memoryTable
+
+    triggerAlarmSeverityCode  OBJECT-TYPE
+        SYNTAX      AlarmSeverityCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Defines the severity associated to trigger Alarm
+             and enables/disables the trap generation on status change event."
+        DEFVAL {warningTrapEnable}
+    ::= {debug 4}
+
+--
+-------  The following objects are used  to allow the configuration file upload and download
+--
+
+    uploadMemoryAddressBaseStart  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With UploadMemoryAddressOffsetStart it defines the memory start address for the upload."
+    ::= {debug 5}
+
+    uploadMemoryAddressOffsetStart  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With UploadMemoryAddressBaseStart it defines the memory start address for the upload."
+    ::= {debug 6}
+
+    uploadMemoryAddressBaseEnd  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With UploadMemoryAddressOffsetEnd it defines the memory end address for the upload."
+    ::= {debug 7}
+
+    uploadMemoryAddressOffsetEnd  OBJECT-TYPE
+        SYNTAX      OCTET STRING    (SIZE(2))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "With UploadMemoryAddressBaseend it defines the memory end address for the upload."
+    ::= {debug 8}
+
+    uploadDownloadActionRequest  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             upload    (1),
+                             download  (2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object is used to upload/download the configuration file."
+    ::= {debug 9}
+
+    uploadDownloadFTPfile  OBJECT-TYPE
+        SYNTAX      DisplayString    (SIZE(0..255))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Path and file name of the file to be uploaded or downloaded."
+    ::= {debug 10}
+
+    uploadDownloadFTPStatus  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             transferring  (1),
+                             completed     (2),
+                             interrupted   (3),
+                             empty         (4)
+                            }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Status of upload/download operation."
+        DEFVAL {completed}
+    ::= {debug 11}
+
+    uploadDownloadFTPStatusTrapNotification  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             trapDisable        (1),
+                             trapEnable         (2),
+                             trapEnableWithACK  (34)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Enables/disables the trap generation on FTP tranfer operation."
+        DEFVAL {trapEnable}
+    ::= {debug 12}
+
+    debugEnable  OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             disable  (1),
+                             enable   (2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Debug enable."
+        DEFVAL {disable}
+    ::= {debug 13}
+
+-----------------------
+--
+--  The debug Group generates the following TRAPs:
+--
+-----------------------
+
+    uploadDownloadFTPStatusTrap  NOTIFICATION-TYPE
+        OBJECTS  {equipIpSnmpAgentAddress, uploadDownloadFTPStatus}
+        STATUS current
+        DESCRIPTION
+            "This event is generated by ALFOHD-NE when the status of FTP transfer is changed.
+             The data passed with the event are:
+                1) equipIpSnmpAgentAddress
+                2) UploadDownloadFTPStatus"
+    ::= {alarmTrap 4103}
+
+------ End group -----------------------------------------------------------------
+
+END
+
+
+
+

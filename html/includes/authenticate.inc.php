@@ -284,7 +284,7 @@ if (isset($_SESSION['username'])) {
   if ($_SESSION['authenticated'])
   {
     @session_start();
-    if (!is_numeric($_SESSION['userlevel']) || !is_numeric($_SESSION['user_id']))
+    if (!is_numeric($_SESSION['userlevel']) || !is_numeric($_SESSION['user_id']) || $_SESSION['user_id'] == -1)
     {
       $_SESSION['userlevel'] = auth_user_level($_SESSION['username']);
       $_SESSION['user_id']   = auth_user_id($_SESSION['username']);
@@ -394,6 +394,11 @@ if (isset($_SESSION['username'])) {
     }
     exit();
   }
+}
+
+// Load user defined configs
+if ($_SESSION['authenticated'] && $_SESSION['user_id']) {
+  load_user_config($config, $_SESSION['user_id']);
 }
 
 ///r($_SESSION);

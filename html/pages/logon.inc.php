@@ -14,7 +14,7 @@
 <div class="row" style="margin-top: 50px;">
   <div class="col-sm-12 col-md-10 col-md-offset-1 col-lg-8 col-lg-offset-2 col-xl-6 col-xl-offset-3">
     <div class="box box-solid" <?php if (TRUE) { echo 'style="background-image: url(\'images/login-hamster-large.png\');  background-position: left 10px top -65px; background-repeat: no-repeat;"'; } ?> >
-     <div class="login-box" <?php if (isset($config['web']['logo'])) { echo 'style="background-image: url(../images/'.escape_html($config['web']['logo']).');"'; }  ?> >
+     <div class="login-box" <?php if (isset($config['web']['logo'])) { echo 'style="background: url(../images/'.escape_html($config['web']['logo']).') no-repeat; background-size: auto 30px; background-position: right 10px bottom 10px;"'; }  ?> >
       <div class="row">
         <div class="col-xs-4 col-sm-4 col-md-4">
         </div>

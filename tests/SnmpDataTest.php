@@ -4,7 +4,7 @@
 define('OBS_QUIET', TRUE); // Disable any additional output from tests
 ini_set('opcache.enable', 0);
 
-include(dirname(__FILE__) . '/../includes/sql-config.inc.php');
+include(__DIR__ . '/../includes/sql-config.inc.php');
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');
@@ -25,11 +25,10 @@ include(dirname(__FILE__) . '/../includes/sql-config.inc.php');
  */
 
 // SNMPsim tests
-$snmpsimd_ip   = isset($config['tests']['snmpsim_ip']) ? $config['tests']['snmpsim_ip'] : '127.0.0.1';
-$snmpsimd_port = isset($config['tests']['snmpsim_port']) ? $config['tests']['snmpsim_port'] : 16111;
+$snmpsimd_ip   = $config['tests']['snmpsim_ip'] ?: '127.0.0.1';
+$snmpsimd_port = $config['tests']['snmpsim_port'] ?: 16111;
 $snmpsimd_data = $config['tests']['snmpsim_dir'] . '/os';
-if (is_dir($snmpsimd_data))
-{
+if (is_dir($snmpsimd_data)) {
   snmpsimd_init($snmpsimd_data);
   sleep(2); // Sleep before tests, because snmpsimd can get stuck
 }
@@ -64,9 +63,9 @@ foreach (dbFetchRows("SELECT * FROM `devices`") as $entry)
 exit;
 */
 
-class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
+class SnmpDataTest extends \PHPUnit\Framework\TestCase
 {
-  protected function setUp()
+  protected function setUp(): void
   {
     global $snmpsimd_ip, $snmpsimd_port, $snmpsimd_data;
 
@@ -115,7 +114,7 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
     {
       while (false !== ($file = readdir($handle)))
       {
-        if (filetype($snmpsimd_data . '/' . $file) == 'file' && preg_match('/^(?<community>(?<os>[\S]+?)(?:\-\d+)?)\.snmprec$/', $file, $matches))
+        if (filetype($snmpsimd_data . '/' . $file) === 'file' && preg_match('/^(?<community>(?<os>[\S]+?)(?:\-\d+)?)\.snmprec$/', $file, $matches))
         {
           //if (!str_starts($matches['os'], 'zyxel')) { continue; }
           $results[] = array($matches['os'], $matches['community']);
@@ -182,7 +181,7 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       array(    'exinda-os-1',       'linux'),
       array(       'ge-ups-1',       'linux'),
       array(     'tplinkap-2',       'linux'),
-      array(       'tplink-4',       'linux'),
+      array(       'tplink-1',       'linux'),
       array(   'ciscosb-wl-1',       'linux'),
       array(   'ciscosb-rv-1',       'linux'),
       array(  'cisco-acano-1',       'linux'),

@@ -774,7 +774,7 @@ final class Tokenizer
      *
      * @return Token An associative array containing the type and value of the token.
      */
-    private function createNextToken(string $string, ?Token $previous = null) : Token
+    private function createNextToken(string $string, Token $previous = null) : Token
     {
         $matches = [];
         // Whitespace

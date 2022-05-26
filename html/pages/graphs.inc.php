@@ -23,43 +23,37 @@ unset($vars['page']);
   $thumb_width=113;
 //}
 
-$timestamp_pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
-if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from']))
-{
+if (isset($vars['timestamp_from']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_from'])) {
   $vars['from'] = strtotime($vars['timestamp_from']);
   unset($vars['timestamp_from']);
 }
-if (isset($vars['timestamp_to'])   && preg_match($timestamp_pattern, $vars['timestamp_to']))
-{
+if (isset($vars['timestamp_to'])   && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_to'])) {
   $vars['to'] = strtotime($vars['timestamp_to']);
   unset($vars['timestamp_to']);
 }
 
 // Validate rrdtool compatible time string and set to now/day if it's not valid
-if (preg_match('/^(\-?\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['to']))   { $to   = $vars['to'];   } // else { $to     = $config['time']['now']; }
-if (preg_match('/^(\-?\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['from'])) { $from = $vars['from']; } // else { $from   = $config['time']['day']; }
+if (preg_match(OBS_PATTERN_RRDTIME, $vars['to']))   { $to   = $vars['to'];   } // else { $to     = $config['time']['now']; }
+if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) { $from = $vars['from']; } // else { $from   = $config['time']['day']; }
 
-preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>.+)/', $vars['type'], $graphtype);
+preg_match(OBS_PATTERN_GRAPH_TYPE, $vars['type'], $graphtype);
 
-if (OBS_DEBUG) { print_vars($graphtype); }
+print_debug_vars($graphtype, 1);
 
 $type = $graphtype['type'];
 $subtype = $graphtype['subtype'];
 
-if (is_numeric($vars['device']))
-{
+if (is_numeric($vars['device'])) {
   $device = device_by_id_cache($vars['device']);
 } elseif (!empty($vars['device'])) {
   $device = device_by_name($vars['device']);
 }
 
-if (is_file($config['html_dir']."/includes/graphs/".$type."/auth.inc.php"))
-{
+if (is_file($config['html_dir']."/includes/graphs/".$type."/auth.inc.php")) {
   include($config['html_dir']."/includes/graphs/".$type."/auth.inc.php");
 }
 
-if (!$auth)
-{
+if (!$auth) {
   print_error_permission();
   return;
 }
@@ -74,13 +68,16 @@ if (!$auth)
   //}
 
   // Print the device header
-  if (isset($device) && is_array($device))
-  {
-    print_device_header($device);
+  if (isset($device) && is_array($device)) {
+    $args = [];
+    if ($type === 'device') {
+      // device have own panel, hide on xl
+      $args['div-class'] = 'hidden-xl';
+    }
+    print_device_header($device, $args);
   }
 
-  if (isset($config['graph_types'][$type][$subtype]['descr']))
-  {
+  if (isset($config['graph_types'][$type][$subtype]['descr'])) {
     $title .= " :: ".$config['graph_types'][$type][$subtype]['descr'];
   } else {
     $title .= " :: ".nicecase($subtype);
@@ -284,8 +281,8 @@ if (!$auth)
                 'submit_by_key' => TRUE,
                 'url'           => 'graphs'.generate_url($form_vars));
 
-  if (is_numeric($vars['from']) && $vars['from'] < 0) { $text_from = time() + $vars['from']; } else { $text_from = date('Y-m-d H:i:s', $vars['from']); }
-  if ($vars['to'] === 'now' || $vars['to'] === "NOW") { $text_to = time() + $vars['to']; } else { $text_to = date('Y-m-d H:i:s', $vars['to']); }
+  if (is_numeric($vars['from']) && $vars['from'] < 0) { $text_from = time() + $vars['from']; } elseif(is_numeric($vars['from'])) { $text_from = date('Y-m-d H:i:s', $vars['from']); }
+if (is_numeric($vars['to']) && $vars['to'] < 0) { $text_to = time() + $vars['to']; } elseif ($vars['to'] === 'now' || $vars['to'] === "NOW") { $text_to = time(); } elseif(is_numeric($vars['to'])) { $text_to = date('Y-m-d H:i:s', $vars['to']); }
 
   if (isset($vars['period']) && (!isset($vars['from']) || !isset($vars['to']))) {
       $text_to = date('Y-m-d H:i:s', time());
@@ -377,10 +374,14 @@ $navbar['options']['previous'] =  array('text' => 'Graph Previous');
 if (in_array('trend', $graph_return['valid_options'])) {
   $navbar['options']['trend']    =  array('text' => 'Graph Trend');
 }
-$navbar['options']['max']      =  array('text' => 'Graph Maximum');
+//$navbar['options']['max']      =  array('text' => 'Graph Maximum');
 
 if (in_array('inverse', $graph_return['valid_options'])) {
    $navbar['options']['inverse']    =  array('text' => 'Invert Graph');
+}
+
+if (in_array('line_graph', $graph_return['valid_options'])) {
+  $navbar['options']['line_graph']    =  array('text' => 'Line Graph');
 }
 
 

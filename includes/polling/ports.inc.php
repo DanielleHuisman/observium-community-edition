@@ -12,8 +12,8 @@
 
 // Include description parser (usually ifAlias) if config option set
 $custom_port_parser = FALSE;
-if (isset($config['port_descr_parser']) && $config['port_descr_parser'] != FALSE && is_file($config['install_dir'] . "/" . $config['port_descr_parser']))
-{
+if (isset($config['port_descr_parser']) && $config['port_descr_parser'] != FALSE &&
+    is_file($config['install_dir'] . "/" . $config['port_descr_parser'])) {
   include_once($config['install_dir'] . "/" . $config['port_descr_parser']);
 
   if (function_exists('custom_port_parser'))
@@ -27,7 +27,7 @@ if (isset($config['port_descr_parser']) && $config['port_descr_parser'] != FALSE
 }
 
 // Cache ports table from DB
-$ports = array();
+$ports = [];
 
 // FIXME -- this stuff is a little messy, looping the array to make an array just seems wrong. :>
 //       -- i can make it a function, so that you don't know what it's doing.
@@ -38,10 +38,8 @@ $query  = 'SELECT * FROM `ports` WHERE `device_id` = ?';
 $ports_db = dbFetchRows($query, array($device['device_id']));
 $ports_attribs = get_device_entities_attribs($device['device_id'], 'port'); // Get all attribs
 //print_vars($ports_attribs);
-foreach ($ports_db as $port)
-{
-  if (isset($ports_attribs['port'][$port['port_id']]))
-  {
+foreach ($ports_db as $port) {
+  if (isset($ports_attribs['port'][$port['port_id']])) {
     $port = array_merge($port, $ports_attribs['port'][$port['port_id']]);
   }
   $ports[$port['ifIndex']] = $port;
@@ -49,56 +47,52 @@ foreach ($ports_db as $port)
 $ports_ignored_count_db = (int)get_entity_attrib('device', $device, 'ports_ignored_count'); // Cache last ports ignored count
 
 // Ports module options
-$ports_modules = array(); // Ports sub-modules enabled/disabled
-foreach (array_keys($config) as $ports_module)
-{
+$ports_modules = []; // Ports sub-modules enabled/disabled
+foreach (array_keys($config) as $ports_module) {
   if (!str_starts($ports_module, 'enable_ports_')) { continue; } // Filter only enable_ports_* config entries
   $ports_module = str_replace('enable_ports_', '', $ports_module);
 
   //$ports_modules[$ports_module] = isset($attribs['enable_ports_' . $ports_module]) ? (bool)$attribs['enable_ports_' . $ports_module] : $config['enable_ports_' . $ports_module];
   $ports_modules[$ports_module] = is_module_enabled($device, 'ports_'.$ports_module);
 }
-// Additionally force enable separate walk feature for some device oses, but only if ports total count >10
+// Additionally, force enable separate walk feature for some device oses, but only if ports total count >10
 $ports_module = 'separate_walk';
 // Model definition can override os definition
-$model_separate_walk = isset($model['ports_'.$ports_module]) ? $model['ports_'.$ports_module] : $config['os'][$device['os']]['ports_'.$ports_module];
-if (!$ports_modules[$ports_module] && $model_separate_walk)
-{
+$model_separate_walk = isset($model['ports_'.$ports_module]) && $model['ports_'.$ports_module];
+if (!$ports_modules[$ports_module] && $model_separate_walk) {
   if (isset($attribs['enable_ports_' . $ports_module]) && !$attribs['enable_ports_' . $ports_module]) {} // forcing disabled in device config
-  else
-  {
+  else {
     $ports_total_count = $ports_ignored_count_db + dbFetchCell('SELECT COUNT(*) FROM `ports` WHERE `device_id` = ? AND `deleted` = 0', array($device['device_id']));
     $ports_modules[$ports_module] = $ports_total_count > 10;
-    if (OBS_DEBUG && $ports_modules[$ports_module])
-    {
+    if (OBS_DEBUG && $ports_modules[$ports_module]) {
       print_debug('Forced ports separate walk feature!');
     }
   }
 }
-//print_vars($ports_modules);
+print_debug_vars($ports_modules);
 
-$table_rows = array();
+$table_rows = [];
 
 // Build SNMP Cache Array
 
 // IF-MIB OIDs that go into the ports table
 
-$data_oids_ifEntry = array(
+$data_oids_ifEntry = [
   // ifEntry
   'ifDescr', 'ifType', 'ifMtu', 'ifSpeed', 'ifPhysAddress',
   'ifAdminStatus', 'ifOperStatus', 'ifLastChange',
-);
-$data_oids_ifXEntry = array(
+];
+$data_oids_ifXEntry = [
   // ifXEntry
   'ifName', 'ifAlias', 'ifHighSpeed', 'ifPromiscuousMode', 'ifConnectorPresent',
-);
+];
 $data_oids = array_merge($data_oids_ifEntry,
                          $data_oids_ifXEntry,
-                         array('ifDuplex', 'ifTrunk', 'ifVlan')); // Add additional oids
+                         [ 'ifDuplex', 'ifTrunk', 'ifVlan' ]); // Add additional oids
 
 // IF-MIB statistics OIDs that go into RRD
 
-$stat_oids_ifEntry = array(
+$stat_oids_ifEntry = [
   // ifEntry
   'ifInOctets',        'ifOutOctets',
   'ifInUcastPkts',     'ifOutUcastPkts',
@@ -106,9 +100,9 @@ $stat_oids_ifEntry = array(
   'ifInDiscards',      'ifOutDiscards',
   'ifInErrors',        'ifOutErrors',
   'ifInUnknownProtos',
-);
+];
 
-$stat_oids_ifXEntry = array(
+$stat_oids_ifXEntry = [
   // ifXEntry
   'ifInMulticastPkts', 'ifOutMulticastPkts',
   'ifInBroadcastPkts', 'ifOutBroadcastPkts',
@@ -117,32 +111,31 @@ $stat_oids_ifXEntry = array(
   'ifHCInUcastPkts',     'ifHCOutUcastPkts',
   'ifHCInMulticastPkts', 'ifHCOutMulticastPkts',
   'ifHCInBroadcastPkts', 'ifHCOutBroadcastPkts',
-);
+];
 
 // This oids definitions used only for Upstream/Downstream interface types
-$upstream_oids = array(
+$upstream_oids = [
   // ifEntry
   'ifInOctets', 'ifInUcastPkts', 'ifInNUcastPkts', 'ifInDiscards', 'ifInErrors',
   // ifXEntry
   'ifInMulticastPkts', 'ifInBroadcastPkts', 'ifHCInOctets', 'ifHCInUcastPkts', 'ifHCInMulticastPkts', 'ifHCInBroadcastPkts',
-);
-$downstream_oids = array(
+];
+$downstream_oids = [
   // ifEntry
   'ifOutOctets', 'ifOutUcastPkts', 'ifOutNUcastPkts', 'ifOutDiscards', 'ifOutErrors',
   // ifXEntry
   'ifOutMulticastPkts', 'ifOutBroadcastPkts', 'ifHCOutOctets', 'ifHCOutUcastPkts', 'ifHCOutMulticastPkts', 'ifHCOutBroadcastPkts',
-);
+];
 
-// Remove HC oids from stat arrays for SNMP v1
-if ($device['snmp_version'] === 'v1')
-{
-  $hc_oids = array(
+// Remove HC oids from stat arrays for SNMP v1 or 64bit module disabled
+if ($device['snmp_version'] === 'v1' || !$ports_modules['64bit']) {
+  $hc_oids = [
     // HC counters
     'ifHCInOctets',        'ifHCOutOctets',
     'ifHCInUcastPkts',     'ifHCOutUcastPkts',
     'ifHCInMulticastPkts', 'ifHCOutMulticastPkts',
     'ifHCInBroadcastPkts', 'ifHCOutBroadcastPkts',
-  );
+  ];
   $stat_oids_ifXEntry = array_diff($stat_oids_ifXEntry, $hc_oids);
   $upstream_oids      = array_diff($upstream_oids,      $hc_oids);
   $downstream_oids    = array_diff($downstream_oids,    $hc_oids);
@@ -172,10 +165,20 @@ if (is_device_mib($device, "IF-MIB")) {
 
   if (!$ports_modules['separate_walk']) {
     print_debug("Used full table ifEntry/ifXEntry snmpwalk.");
-    $ifmib_oids = ['ifEntry', 'ifXEntry'];
+    $ifmib_oids = [ 'ifEntry', 'ifXEntry' ];
     foreach ($ifmib_oids as $oid) {
       $has_name = 'has_' . $oid;
       echo("$oid ");
+
+      // End walk before Oid have effect only for nobulk!
+      if ($oid === 'ifEntry') {
+        // stop walk after ifOutErrors (next ifOutQLen)
+        snmpwalk_oid_end('ifOutQLen');
+      } else {
+        // stop walk after ifAlias (next ifCounterDiscontinuityTime)
+        snmpwalk_oid_end('ifCounterDiscontinuityTime');
+      }
+
       $port_stats = snmpwalk_cache_oid($device, $oid, $port_stats, "IF-MIB");
       $$has_name = snmp_status() || snmp_error_code() === OBS_SNMP_ERROR_REQUEST_NOT_COMPLETED; // $has_ifEntry, $has_ifXEntry
       //print_vars($$has_name);
@@ -498,12 +501,12 @@ foreach ($ports as $port) {
     }
 
     // If we're not using SNMPv1, assume there are 64-bit values and overwrite the 32-bit OIDs.
-    if ($device['snmp_version'] !== 'v1') {
+    if ($device['snmp_version'] !== 'v1' && $ports_modules['64bit']) {
       $hc_prefix = 'HC';
       $port_has_64bit = is_numeric($this_port['if'.$hc_prefix.'InOctets']) && is_numeric($this_port['if'.$hc_prefix.'OutOctets']);
 
       // We've never tested for 64bit. Lets do it now. Lots of devices seem to not support 64bit counters for all ports.
-      if ($port['port_64bit'] == NULL) {
+      if (safe_empty($port['port_64bit'])) {
         // We have 64-bit traffic counters. Lets set port_64bit
         if ($port_has_64bit) {
           $port['port_64bit'] = 1;
@@ -516,7 +519,7 @@ foreach ($ports as $port) {
         // Port changed to 64-bit
         $port['port_64bit'] = 1;
         $port['update']['port_64bit'] = 1;
-        log_event('Interface changed: [HC] -> Counter64 (may cause disposable spike)', $device, 'port', $port);
+        log_event('Interface changed: [HC] 64bit counters enabled (may cause disposable spike)', $device, 'port', $port);
       }
 
       $port_has_mcbc = is_numeric($this_port['ifInBroadcastPkts']) && is_numeric($this_port['ifOutBroadcastPkts']) &&
@@ -559,6 +562,14 @@ foreach ($ports as $port) {
         $this_port['ifInNUcastPkts']  = int_add($this_port['ifInBroadcastPkts'],  $this_port['ifInMulticastPkts']);
         $this_port['ifOutNUcastPkts'] = int_add($this_port['ifOutBroadcastPkts'], $this_port['ifOutMulticastPkts']);
       }
+    } elseif ($port['port_64bit']) {
+      $port['port_64bit'] = 0;
+      $port['update']['port_64bit'] = 0;
+      if ($port['port_mcbc']) {
+        $port['port_mcbc'] = 0;
+        $port['update']['port_mcbc'] = 0;
+      }
+      log_event('Interface changed: [HC] 64bit counters disabled (may cause disposable spike)', $device, 'port', $port);
     }
 
     // rewrite the ifPhysAddress

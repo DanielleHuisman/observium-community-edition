@@ -308,7 +308,10 @@ function generate_status_row($status, $vars) {
   // FIXME -- Generify this. It's not just for sensors.
   if ($vars['page'] === "device" && $vars['tab'] !== "overview")
   {
-    $row .= '        <td>' .  (strlen($status['status_mib']) ? '<a href="https://mibs.observium.org/mib/'.$status['status_mib'].'/" target="_blank">' .nicecase($status['status_mib']) .'</a>' : '') . ( ( strlen($status['status_mib']) && strlen($status['status_object'])) ? '::' : '') .(strlen($status['status_mib']) ? '<a href="https://mibs.observium.org/mib/'.$status['status_mib'].'/#'.$status['status_object'].'" target="_blank">' .$status['status_object'] .'</a>' : ''). '.'.$status['status_index'].'</td>' . PHP_EOL;
+    $row .= '        <td>' . (!safe_empty($status['status_mib']) ? '<a href="'.OBSERVIUM_MIBS_URL.'/'.$status['status_mib'].'/" target="_blank">' .nicecase($status['status_mib']) .'</a>' : '') .
+            ( ( !safe_empty($status['status_mib']) && !safe_empty($status['status_object'])) ? '::' : '') .
+            (!safe_empty($status['status_mib']) ? '<a href="'.OBSERVIUM_MIBS_URL.'/'.$status['status_mib'].'/#'.$status['status_object'].'" target="_blank">' . $status['status_object'] .'</a>' : '') .
+            '.'.$status['status_index'].'</td>' . PHP_EOL;
     $table_cols++;
   }
 

@@ -16,7 +16,7 @@ declare(strict_types=1);
 
 namespace Phpfastcache\Drivers\Couchdb;
 
-use Doctrine\CouchDB\{CouchDBClient, CouchDBException};
+use Doctrine\CouchDB\{CouchDBClient, CouchDBException, HTTP\HTTPException};
 use Phpfastcache\Cluster\AggregatablePoolInterface;
 use Phpfastcache\Core\Pool\{DriverBaseTrait, ExtendedCacheItemPoolInterface};
 use Phpfastcache\Entities\DriverStatistic;
@@ -66,7 +66,7 @@ HELP;
         $info = $this->instance->getDatabaseInfo();
 
         return (new DriverStatistic())
-            ->setSize($info['sizes']['active'])
+            ->setSize($info['sizes']['active'] ?? 0)
             ->setRawData($info)
             ->setData(implode(', ', array_keys($this->itemInstances)))
             ->setInfo('Couchdb version ' . $this->instance->getVersion() . "\n For more information see RawData.");
@@ -94,7 +94,7 @@ HELP;
         }
         $url .= $clientConfig->getHost();
         $url .= ":{$clientConfig->getPort()}";
-        $url .= $clientConfig->getPath();
+        $url .= '/' . \urlencode($this->getDatabaseName());
 
         $this->instance = CouchDBClient::create(
             [
@@ -122,9 +122,16 @@ HELP;
      */
     protected function createDatabase()
     {
-        if (!in_array($this->instance->getDatabase(), $this->instance->getAllDatabases(), true)) {
-            $this->instance->createDatabase($this->instance->getDatabase());
+        try{
+            $this->instance->getDatabaseInfo($this->getDatabaseName());
+        } catch(HTTPException $e){
+            $this->instance->createDatabase($this->getDatabaseName());
         }
+    }
+
+    protected function getCouchDbItemKey(CacheItemInterface $item)
+    {
+        return 'pfc_' . $item->getEncodedKey();
     }
 
     /**
@@ -135,17 +142,17 @@ HELP;
     protected function driverRead(CacheItemInterface $item)
     {
         try {
-            $response = $this->instance->findDocument($item->getEncodedKey());
+            $response = $this->instance->findDocument($this->getCouchDbItemKey($item));
         } catch (CouchDBException $e) {
             throw new PhpfastcacheDriverException('Got error while trying to get a document: ' . $e->getMessage(), 0, $e);
         }
 
-        if ($response->status === 404 || empty($response->body['data'])) {
+        if ($response->status === 404 || empty($response->body[ExtendedCacheItemPoolInterface::DRIVER_DATA_WRAPPER_INDEX])) {
             return null;
         }
 
         if ($response->status === 200) {
-            return $this->decode($response->body['data']);
+            return $this->decode($response->body);
         }
 
         throw new PhpfastcacheDriverException('Got unexpected HTTP status: ' . $response->status);
@@ -165,9 +172,9 @@ HELP;
         if ($item instanceof Item) {
             try {
                 $this->instance->putDocument(
-                    ['data' => $this->encode($this->driverPreWrap($item))],
-                    $item->getEncodedKey(),
-                    $this->getLatestDocumentRevision($item->getEncodedKey())
+                    $this->encodeDocument($this->driverPreWrap($item)),
+                    $this->getCouchDbItemKey($item),
+                    $this->getLatestDocumentRevision($this->getCouchDbItemKey($item))
                 );
             } catch (CouchDBException $e) {
                 throw new PhpfastcacheDriverException('Got error while trying to upsert a document: ' . $e->getMessage(), 0, $e);
@@ -183,7 +190,7 @@ HELP;
      */
     protected function getLatestDocumentRevision($docId)
     {
-        $path = '/' . $this->getDatabaseName() . '/' . urlencode($docId);
+        $path = '/' . \urlencode($this->getDatabaseName()) . '/' . urlencode($docId);
 
         $response = $this->instance->getHttpClient()->request(
             'HEAD',
@@ -217,7 +224,7 @@ HELP;
          */
         if ($item instanceof Item) {
             try {
-                $this->instance->deleteDocument($item->getEncodedKey(), $this->getLatestDocumentRevision($item->getEncodedKey()));
+                $this->instance->deleteDocument($this->getCouchDbItemKey($item), $this->getLatestDocumentRevision($this->getCouchDbItemKey($item)));
             } catch (CouchDBException $e) {
                 throw new PhpfastcacheDriverException('Got error while trying to delete a document: ' . $e->getMessage(), 0, $e);
             }
@@ -241,5 +248,51 @@ HELP;
         }
 
         return true;
+    }
+
+    /**
+     * @param array $data
+     * @return array
+     */
+    protected function encodeDocument(array $data): array
+    {
+        $data[ExtendedCacheItemPoolInterface::DRIVER_DATA_WRAPPER_INDEX] = $this->encode($data[ExtendedCacheItemPoolInterface::DRIVER_DATA_WRAPPER_INDEX]);
+
+        return $data;
+    }
+
+    /**
+     * Specific document decoder for Couchdb
+     * since we dont store encoded version
+     * for performance purposes
+     *
+     * @param $value
+     * @return mixed
+     * @throws \Exception
+     */
+    protected function decode($value)
+    {
+        $value[ExtendedCacheItemPoolInterface::DRIVER_DATA_WRAPPER_INDEX] = \unserialize($value[ExtendedCacheItemPoolInterface::DRIVER_DATA_WRAPPER_INDEX], ['allowed_classes' => true]);
+
+        $value[ExtendedCacheItemPoolInterface::DRIVER_EDATE_WRAPPER_INDEX] = new \DateTime(
+            $value[ExtendedCacheItemPoolInterface::DRIVER_EDATE_WRAPPER_INDEX]['date'],
+            new \DateTimeZone($value[ExtendedCacheItemPoolInterface::DRIVER_EDATE_WRAPPER_INDEX]['timezone'])
+        );
+
+        if(isset($value[ExtendedCacheItemPoolInterface::DRIVER_CDATE_WRAPPER_INDEX])){
+            $value[ExtendedCacheItemPoolInterface::DRIVER_CDATE_WRAPPER_INDEX] = new \DateTime(
+                $value[ExtendedCacheItemPoolInterface::DRIVER_CDATE_WRAPPER_INDEX]['date'],
+                new \DateTimeZone($value[ExtendedCacheItemPoolInterface::DRIVER_CDATE_WRAPPER_INDEX]['timezone'])
+            );
+        }
+
+        if(isset($value[ExtendedCacheItemPoolInterface::DRIVER_MDATE_WRAPPER_INDEX])){
+            $value[ExtendedCacheItemPoolInterface::DRIVER_MDATE_WRAPPER_INDEX] = new \DateTime(
+                $value[ExtendedCacheItemPoolInterface::DRIVER_MDATE_WRAPPER_INDEX]['date'],
+                new \DateTimeZone($value[ExtendedCacheItemPoolInterface::DRIVER_MDATE_WRAPPER_INDEX]['timezone'])
+            );
+        }
+
+        return $value;
     }
 }

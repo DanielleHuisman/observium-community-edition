@@ -11,8 +11,7 @@
  */
 
 $wmi_found = FALSE;
-if (isset($wmi['disk']['logical']) && count($wmi['disk']['logical']))
-{
+if (isset($wmi['disk']['logical']) && safe_count($wmi['disk']['logical'])) {
   echo(" Storage WMI: ");
 
   //print_debug_vars($storage);
@@ -25,8 +24,7 @@ if (isset($wmi['disk']['logical']) && count($wmi['disk']['logical']))
    * VolumeName => ""
    * VolumeSerialNumber => "D0122308"
    */
-  foreach ($wmi['disk']['logical'] as $disk)
-  {
+  foreach ($wmi['disk']['logical'] as $disk) {
     //$storage_name = $disk['DeviceID'] . "\\\\ Label:" . $disk['VolumeName'] . "  Serial Number " . ltrim(strtolower($disk['VolumeSerialNumber']), '0');
     $disk_name   = $disk['DeviceID'] . '\\\\';
     $disk_label  = 'Label:' . $disk['VolumeName'];
@@ -34,8 +32,7 @@ if (isset($wmi['disk']['logical']) && count($wmi['disk']['logical']))
     $wmi_found   = str_starts($storage['storage_descr'], $disk_name) &&
                    str_contains_array($storage['storage_descr'], $disk_label) &&
                    str_ends($storage['storage_descr'], $disk_serial);
-    if ($wmi_found)
-    {
+    if ($wmi_found) {
       // Found
       //$storage['units'] = 1;
       $storage['free']  = $disk['FreeSpace'];
@@ -46,15 +43,11 @@ if (isset($wmi['disk']['logical']) && count($wmi['disk']['logical']))
   }
 }
 
-if (!$wmi_found)
-{
-  if (!is_array($cache_storage['host-resources-mib']))
-  {
-    $cache_storage['host-resources-mib'] = snmpwalk_cache_oid($device, "hrStorageEntry", NULL, "HOST-RESOURCES-MIB:HOST-RESOURCES-TYPES");
-    if (OBS_DEBUG && count($cache_storage['host-resources-mib'])) { print_vars($cache_storage['host-resources-mib']); }
-  }
+if (!$wmi_found) {
 
-  $entry = $cache_storage['host-resources-mib'][$storage['storage_index']];
+  $hrStorage = snmp_cache_table($device, "hrStorageEntry", [], "HOST-RESOURCES-MIB:HOST-RESOURCES-TYPES");
+
+  $entry = $hrStorage[$storage['storage_index']];
 
   $storage['units'] = $entry['hrStorageAllocationUnits'];
   $storage['used']  = snmp_dewrap32bit($entry['hrStorageUsed']) * $storage['units'];

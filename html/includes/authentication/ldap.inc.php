@@ -14,8 +14,7 @@
 check_extension_exists('ldap', 'LDAP selected as authentication module, but PHP does not have LDAP support! Please load the PHP LDAP module.', TRUE);
 
 // Set LDAP debugging level to 7 (dumped to Apache daemon error log) (not virtualhost error log!)
-if (OBS_DEBUG > 1) // Currently OBS_DEBUG > 1 for WUI is not supported ;)
-{
+if (defined('OBS_DEBUG') && OBS_DEBUG > 1) { // Currently, OBS_DEBUG > 1 for WUI is not supported ;)
   // Disabled by default, VERY chatty.
   ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
 }
@@ -42,12 +41,10 @@ if (!is_array($config['auth_ldap_server']))
  *
  * @return boolean
  */
-function ldap_search_user($ldap_group, $userdn, $depth = -1)
-{
+function ldap_search_user($ldap_group, $userdn, $depth = -1) {
   global $ds, $config;
 
-  if ($config['auth_ldap_groupreverse'])
-  {
+  if ($config['auth_ldap_groupreverse']) {
     $compare = ldap_internal_compare($ds, $userdn, $config['auth_ldap_attr']['memberOf'], $ldap_group);
   } else {
     $compare = ldap_internal_compare($ds, $ldap_group, $config['auth_ldap_groupmemberattr'], $userdn);
@@ -57,8 +54,7 @@ function ldap_search_user($ldap_group, $userdn, $depth = -1)
     return TRUE; // Member found, return TRUE
   }
 
-  if (!$config['auth_ldap_groupreverse'] && $config['auth_ldap_recursive'] && ($depth < $config['auth_ldap_recursive_maxdepth']))
-  {
+  if (!$config['auth_ldap_groupreverse'] && $config['auth_ldap_recursive'] && ($depth < $config['auth_ldap_recursive_maxdepth'])) {
     $depth++;
 
     //$filter = "(&(objectClass=group)(memberOf=". $ldap_group ."))";
@@ -153,51 +149,44 @@ function ldap_init()
  * @param string $password User password to check
  * @return int Authentication success (0 = fail, 1 = success) FIXME bool
  */
-function ldap_authenticate($username, $password)
-{
+function ldap_authenticate($username, $password) {
   global $config, $ds;
 
   ldap_init();
-  if ($username && $ds)
-  {
+  if ($username && $ds) {
     if (ldap_bind_dn($username, $password)) { return 0; }
 
     $binduser = ldap_internal_dn_from_username($username);
 
-    if ($binduser)
-    {
+    if ($binduser) {
       print_debug("LDAP[Authenticate][User: $username][Bind user: $binduser]");
 
       // Auth via Apache + LDAP fallback -> automatically authenticated, fall through to group permission check
-      if ($config['auth']['remote_user'] || ldap_bind($ds, $binduser, $password))
-      {
+      if ($config['auth']['remote_user'] || ldap_bind($ds, $binduser, $password)) {
         if (!$config['auth_ldap_group']) {
           // No groups defined, auth is sufficient
           return 1;
-        } else {
-          $userdn = ($config['auth_ldap_groupmembertype'] === 'fulldn' ? $binduser : $username);
+        }
+        $userdn = ($config['auth_ldap_groupmembertype'] === 'fulldn' ? $binduser : $username);
 
-          foreach ($config['auth_ldap_group'] as $ldap_group)
-          {
-            if ($config['auth_ldap_groupreverse'])
-            {
-              print_debug("LDAP[Authenticate][Comparing: " . $userdn . "][".$config['auth_ldap_attr']['memberOf']."=$ldap_group]");
-            } else {
-              print_debug("LDAP[Authenticate][Comparing: " . $ldap_group . "][".$config['auth_ldap_groupmemberattr']."=$userdn]");
-            }
-            $compare = ldap_search_user($ldap_group, $userdn);
+        foreach ($config['auth_ldap_group'] as $ldap_group) {
+          if ($config['auth_ldap_groupreverse']) {
+            print_debug("LDAP[Authenticate][Comparing: " . $userdn . "][".$config['auth_ldap_attr']['memberOf']."=$ldap_group]");
+          } else {
+            print_debug("LDAP[Authenticate][Comparing: " . $ldap_group . "][".$config['auth_ldap_groupmemberattr']."=$userdn]");
+          }
+          $compare = ldap_search_user($ldap_group, $userdn);
 
-            if ($compare === -1)
-            {
-              print_debug("LDAP[Authenticate][Compare LDAP error: " . ldap_error($ds) . "]");
-              continue;
-            } elseif ($compare === FALSE) {
-              print_debug("LDAP[Authenticate][Processing group: $ldap_group][Not matched]");
-            } else {
-              // $compare === TRUE
-              print_debug("LDAP[Authenticate][Processing group: $ldap_group][Matched]");
-              return 1;
-            }
+          if ($compare === -1) {
+            print_debug("LDAP[Authenticate][Compare LDAP error: " . ldap_error($ds) . "]");
+            continue;
+          }
+          if ($compare === FALSE) {
+            print_debug("LDAP[Authenticate][Processing group: $ldap_group][Not matched]");
+          } else {
+            // $compare === TRUE
+            print_debug("LDAP[Authenticate][Processing group: $ldap_group][Matched]");
+            return 1;
           }
         }
 
@@ -315,12 +304,10 @@ function ldap_auth_user_exists($username)
  * @param string $username Username to retrieve the auth level for
  * @return int User's auth level
  */
-function ldap_auth_user_level($username)
-{
+function ldap_auth_user_level($username) {
   global $config, $ds, $cache;
 
-  if (!isset($cache['ldap']['level'][$username]))
-  {
+  if (!isset($cache['ldap']['level'][$username])) {
     $userlevel = 0;
 
     ldap_init();
@@ -341,20 +328,18 @@ function ldap_auth_user_level($username)
     //
     // Yay for arbitrary escapes. Don't know how to handle; this is most likely (hopefully) AD specific.
     // So, we foreach our locally known groups instead.
-    foreach ($config['auth_ldap_groups'] as $ldap_group => $ldap_group_info)
-    {
-      if (strpos($ldap_group,'=') === FALSE)
-      {
+    foreach ($config['auth_ldap_groups'] as $ldap_group => $ldap_group_info) {
+      if (!str_contains($ldap_group, '=')) {
         print_debug("WARNING: You specified LDAP group '$ldap_group' without full DN syntax. Appending group base, this becomes 'CN=" . $ldap_group . ',' . $config['auth_ldap_groupbase'] . "'. If this is correct, you're in luck! If it's not, please check your configuration.");
         $ldap_group = 'CN=' . $ldap_group . ',' . $config['auth_ldap_groupbase'];
       }
       $compare = ldap_search_user($ldap_group, $userdn);
 
-      if ($compare === -1)
-      {
+      if ($compare === -1) {
         print_debug("LDAP[UserLevel][Compare LDAP error: " . ldap_error($ds) . "]");
         continue;
-      } elseif ($compare === FALSE) {
+      }
+      if ($compare === FALSE) {
         print_debug("LDAP[UserLevel][Processing group: $ldap_group][Not matched]");
       } else {
         // $compare === TRUE
@@ -482,15 +467,12 @@ function ldap_auth_user_info($username)
  *
  * @return array Rows of user data
  */
-function ldap_auth_user_list($username = NULL)
-{
+function ldap_auth_user_list($username = NULL) {
   global $config, $ds;
 
   // Use caching for reduce queries to LDAP
-  if (isset($GLOBALS['cache']['ldap']['userlist']))
-  {
-    if (($config['time']['now'] - $GLOBALS['cache']['ldap']['userlist']['unixtime']) <= 300) // Cache valid for 5 min
-    {
+  if (isset($GLOBALS['cache']['ldap']['userlist'])) {
+    if (($config['time']['now'] - $GLOBALS['cache']['ldap']['userlist']['unixtime']) <= 300) { // Cache valid for 5 min
       //print_message('cached');
       return $GLOBALS['cache']['ldap']['userlist']['entries'];
     }
@@ -503,20 +485,18 @@ function ldap_auth_user_list($username = NULL)
   //$filter = '(objectClass=' . $config['auth_ldap_objectclass'] . ')';
   $filter_params   = array();
   $filter_params[] = ldap_filter_create('objectClass', $config['auth_ldap_objectclass']);
-  if (!empty($username))
-  {
+  if (!empty($username)) {
     // Filter users by username
     $filter_params[] = ldap_filter_create($config['auth_ldap_attr']['uid'], $username);
   }
 
-  if (count($config['auth_ldap_group']) == 1)
-  {
+  $ldap_group_count = safe_count($config['auth_ldap_group']);
+  if ($ldap_group_count === 1) {
     //$filter = '(&'.$filter.'(memberof='.$config['auth_ldap_group'][0].'))';
     $filter_params[] = ldap_filter_create($config['auth_ldap_attr']['memberOf'], $config['auth_ldap_group'][0]);
-  } else if (count($config['auth_ldap_group']) > 1) {
+  } elseif ($ldap_group_count > 1) {
     $group_params = array();
-    foreach($config['auth_ldap_group'] as $group)
-    {
+    foreach($config['auth_ldap_group'] as $group) {
       //$group_filter .= '(memberof='.$group.')';
       $group_params[] = ldap_filter_create($config['auth_ldap_attr']['memberOf'], $group);
     }
@@ -527,13 +507,14 @@ function ldap_auth_user_list($username = NULL)
   }
   $filter = ldap_filter_combine($filter_params);
   // Limit fetched attributes, for reduce network transfer size
-  $attributes = array(strtolower($config['auth_ldap_attr']['uid']),
-                      strtolower($config['auth_ldap_attr']['cn']),
-                      strtolower($config['auth_ldap_attr']['uidNumber']),
-                      'description',
-                      'mail',
-                      'dn',
-                     );
+  $attributes = [
+    strtolower($config['auth_ldap_attr']['uid']),
+    strtolower($config['auth_ldap_attr']['cn']),
+    strtolower($config['auth_ldap_attr']['uidNumber']),
+    'description',
+    'mail',
+    'dn',
+  ];
 
   print_debug("LDAP[UserList][Filter][$filter][" . trim($config['auth_ldap_suffix'], ', ') . "]");
 
@@ -542,9 +523,8 @@ function ldap_auth_user_list($username = NULL)
   ldap_internal_user_entries($entries, $userlist);
   unset($entries);
 
-  $GLOBALS['cache']['ldap']['userlist'] = array('unixtime'       => $config['time']['now'],
-                                                'entries'        => $userlist
-                                               );
+  $GLOBALS['cache']['ldap']['userlist'] = [ 'unixtime' => $config['time']['now'],
+                                            'entries'  => $userlist ];
   return $userlist;
 }
 
@@ -554,22 +534,18 @@ function ldap_auth_user_list($username = NULL)
  * @param	array	$entries LDAP entries by ldap_get_entries()
  * @param	array	$userlist	Users list
  */
-function ldap_internal_user_entries($entries, &$userlist)
-{
+function ldap_internal_user_entries($entries, &$userlist) {
   global $config, $ds;
 
-  if (!is_array($userlist))
-  {
-    $userlist = array();
+  if (!is_array($userlist)) {
+    $userlist = [];
   }
 
-  if ($entries['count'])
-  {
+  if ($entries['count']) {
     unset($entries['count']);
     //print_vars($entries);
 
-    foreach ($entries as $i => $entry)
-    {
+    foreach ($entries as $i => $entry) {
       $username    = $entry[strtolower($config['auth_ldap_attr']['uid'])][0];
       $realname    = $entry[strtolower($config['auth_ldap_attr']['cn'])][0];
       $user_id     = ldap_internal_auth_user_id($entry);
@@ -577,45 +553,38 @@ function ldap_internal_user_entries($entries, &$userlist)
       $description = $entry['description'][0];
 
       $userdn = (strtolower($config['auth_ldap_groupmembertype']) === 'fulldn' ? $entry['dn'] : $username);
-      if ($config['auth_ldap_groupreverse'])
-      {
-        print_debug("LDAP[UserList][Compare: $userdn][".$config['auth_ldap_attr']['memberOf']."][" . implode('|',$config['auth_ldap_group']) . "]");
+      if ($config['auth_ldap_groupreverse']) {
+        print_debug("LDAP[UserList][Compare: $userdn][".$config['auth_ldap_attr']['memberOf']."][" . implode('|', (array)$config['auth_ldap_group']) . "]");
       } else {
-        print_debug("LDAP[UserList][Compare: " . implode('|',$config['auth_ldap_group']) . "][".$config['auth_ldap_groupmemberattr']."][$userdn]");
+        print_debug("LDAP[UserList][Compare: " . implode('|', (array)$config['auth_ldap_group']) . "][".$config['auth_ldap_groupmemberattr']."][$userdn]");
       }
 
       //if (!is_numeric($user_id)) { print_vars($entry); continue; }
 
-      foreach ($config['auth_ldap_group'] as $ldap_group)
-      {
-        $authorized = 0;
+      $authorized = FALSE;
+      foreach ($config['auth_ldap_group'] as $ldap_group) {
 
         $compare = ldap_search_user($ldap_group, $userdn);
         //print_warning("$username, $realname, ");
         //print_vars($compare);
 
-        if ($compare === -1)
-        {
+        if ($compare === -1) {
           print_debug("LDAP[UserList][Compare LDAP error: " . ldap_error($ds) . "]");
           continue;
         }
-        else if ($compare === FALSE)
-        {
+        if ($compare === FALSE) {
           print_debug("LDAP[UserList][Processing group: $ldap_group][Not matched]");
-
         } else {
-
-          // $$compare === TRUE
+          // $compare === TRUE
           print_debug("LDAP[UserList][Authorized: $userdn for group $ldap_group]");
-          $authorized = 1;
+          $authorized = TRUE;
           break;
         }
       }
 
-      if (!isset($config['auth_ldap_group']) || $authorized)
-      {
+      if (!isset($config['auth_ldap_group']) || $authorized) {
         $user_level = ldap_auth_user_level($username);
-        $userlist[] = array('username' => $username, 'realname' => $realname, 'user_id' => $user_id, 'level' => $user_level, 'email' => $email, 'descr' => $description);
+        $userlist[] = [ 'username' => $username, 'realname' => $realname, 'user_id' => $user_id, 'level' => $user_level, 'email' => $email, 'descr' => $description ];
       }
     }
     //print_vars($userlist);

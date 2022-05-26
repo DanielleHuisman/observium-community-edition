@@ -31,6 +31,16 @@ foreach ($cache['routing'] as $type => $value)
     $navbar['options'][$type]['text'] = nicecase($type).' ('.$value['count'].')';
   }
 }
+
+if(isset($vars['protocol']) && $vars['protocol'] == "ospf") {
+    $navbar['options_right']['show_disabled']['text'] = 'Show Disabled';
+  if(isset($vars['show_disabled']) && ($vars['show_disabled'])) {
+      $navbar['options_right']['show_disabled']['url'] = generate_url($vars, ['show_disabled' => NULL]);
+  } else {
+      $navbar['options_right']['show_disabled']['url'] = generate_url($vars, ['show_disabled' => 1]);
+  }
+}
+
 print_navbar($navbar);
 unset($navbar);
 

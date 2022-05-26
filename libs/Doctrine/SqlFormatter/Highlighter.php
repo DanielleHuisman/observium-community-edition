@@ -6,7 +6,7 @@ namespace Doctrine\SqlFormatter;
 
 interface Highlighter
 {
-    public const TOKEN_TYPE_TO_HIGHLIGHT = [
+    const TOKEN_TYPE_TO_HIGHLIGHT = [
         Token::TOKEN_TYPE_BOUNDARY => self::HIGHLIGHT_BOUNDARY,
         Token::TOKEN_TYPE_WORD => self::HIGHLIGHT_WORD,
         Token::TOKEN_TYPE_BACKTICK_QUOTE => self::HIGHLIGHT_BACKTICK_QUOTE,
@@ -20,15 +20,15 @@ interface Highlighter
         Token::TOKEN_TYPE_BLOCK_COMMENT => self::HIGHLIGHT_COMMENT,
     ];
 
-    public const HIGHLIGHT_BOUNDARY       = 'boundary';
-    public const HIGHLIGHT_WORD           = 'word';
-    public const HIGHLIGHT_BACKTICK_QUOTE = 'backtickQuote';
-    public const HIGHLIGHT_QUOTE          = 'quote';
-    public const HIGHLIGHT_RESERVED       = 'reserved';
-    public const HIGHLIGHT_NUMBER         = 'number';
-    public const HIGHLIGHT_VARIABLE       = 'variable';
-    public const HIGHLIGHT_COMMENT        = 'comment';
-    public const HIGHLIGHT_ERROR          = 'error';
+    const HIGHLIGHT_BOUNDARY       = 'boundary';
+    const HIGHLIGHT_WORD           = 'word';
+    const HIGHLIGHT_BACKTICK_QUOTE = 'backtickQuote';
+    const HIGHLIGHT_QUOTE          = 'quote';
+    const HIGHLIGHT_RESERVED       = 'reserved';
+    const HIGHLIGHT_NUMBER         = 'number';
+    const HIGHLIGHT_VARIABLE       = 'variable';
+    const HIGHLIGHT_COMMENT        = 'comment';
+    const HIGHLIGHT_ERROR          = 'error';
 
     /**
      * Highlights a token depending on its type.

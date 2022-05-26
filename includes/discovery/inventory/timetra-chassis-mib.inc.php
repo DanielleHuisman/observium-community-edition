@@ -12,8 +12,7 @@
 
 $oids = snmp_cache_table($device, 'tmnxHwTable', NULL, 'TIMETRA-CHASSIS-MIB');
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
   list($chassis, $system_index) = explode('.', $index);
 
   $inventory[$system_index] = array(
@@ -28,8 +27,7 @@ foreach ($oids as $index => $entry)
     'entPhysicalParentRelPos' => $entry['tmnxHwParentRelPos'],
     'entPhysicalMfgName'      => $entry['tmnxHwMfgString'] // 'Alcatel-Lucent'
   );
-  if ($entry['tmnxHwContainedIn'] === '0' && $entry['tmnxHwParentRelPos'] == '-1')
-  {
+  if ($entry['tmnxHwContainedIn'] === '0' && $entry['tmnxHwParentRelPos'] === '-1') {
     $inventory[$system_index]['entPhysicalName'] .= ' '.$chassis;
   }
 

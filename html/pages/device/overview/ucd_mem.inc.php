@@ -26,19 +26,19 @@ if (isset($device_state['ucd_mem']['mem_used']))
   $mem_used = $mem_used_total - ($device_state['ucd_mem']['mem_cached'] + $device_state['ucd_mem']['mem_buffer']);
 }
 
-$used_perc = round(($mem_used / $device_state['ucd_mem']['mem_total']) * 100);
-$used_perc_total = round(($mem_used_total / $device_state['ucd_mem']['mem_total']) * 100);
-$cach_perc = round(($device_state['ucd_mem']['mem_cached'] / $device_state['ucd_mem']['mem_total']) * 100);
-$buff_perc = round(($device_state['ucd_mem']['mem_buffer'] / $device_state['ucd_mem']['mem_total']) * 100);
-$avai_perc = round(($device_state['ucd_mem']['mem_avail'] / $device_state['ucd_mem']['mem_total']) * 100);
+$used_perc = round(float_div($mem_used, $device_state['ucd_mem']['mem_total']) * 100);
+$used_perc_total = round(float_div($mem_used_total, $device_state['ucd_mem']['mem_total']) * 100);
+$cach_perc = round(float_div($device_state['ucd_mem']['mem_cached'], $device_state['ucd_mem']['mem_total']) * 100);
+$buff_perc = round(float_div($device_state['ucd_mem']['mem_buffer'], $device_state['ucd_mem']['mem_total']) * 100);
+$avai_perc = round(float_div($device_state['ucd_mem']['mem_avail'], $device_state['ucd_mem']['mem_total']) * 100);
 
 $graph_array = array();
 $graph_array['height'] = "100";
 $graph_array['width']  = "509";
-$graph_array['to']     = $config['time']['now'];
+$graph_array['to']     = get_time();
 $graph_array['device'] = $device['device_id'];
 $graph_array['type']   = 'device_ucd_memory';
-$graph_array['from']   = $config['time']['day'];
+$graph_array['from']   = get_time('day');
 $graph_array['legend'] = "no";
 $graph = generate_graph_tag($graph_array);
 
@@ -63,7 +63,7 @@ $percentage_bar['bars'][1] = array('percent' => $buff_perc, 'colour' => '#cc0000
 $percentage_bar['bars'][2] = array('percent' => $cach_perc, 'colour' => '#f0e0a0', 'text' => '');
 
 $swap_used = $device_state['ucd_mem']['swap_total'] - $device_state['ucd_mem']['swap_avail'];
-$swap_perc = $device_state['ucd_mem']['swap_total'] != 0 ? round(($swap_used / $device_state['ucd_mem']['swap_total']) * 100) : 0;
+$swap_perc = round(float_div($swap_used, $device_state['ucd_mem']['swap_total']) * 100);
 $swap_free_perc = 100 - $swap_perc;
 
 ?>
@@ -103,7 +103,7 @@ $swap_free_perc = 100 - $swap_perc;
 /**
 
 $swap_used = $device_state['ucd_mem']['swap_total'] - $device_state['ucd_mem']['swap_avail'];
-$swap_perc = round(($swap_used / $device_state['ucd_mem']['swap_total']) * 100);
+$swap_perc = round(float_div($swap_used, $device_state['ucd_mem']['swap_total']) * 100);
 $swap_free_perc = 100 - $swap_perc;
 
 $background = get_percentage_colours('40');

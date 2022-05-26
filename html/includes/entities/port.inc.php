@@ -132,8 +132,7 @@ function build_ports_where_array($vars) {
  *
  * @return string Table containing port header for popups
  */
-function generate_port_popup_header($port)
-{
+function generate_port_popup_header($port) {
   // Push through processing function to set attributes
   humanize_port($port);
 
@@ -142,7 +141,9 @@ function generate_port_popup_header($port)
      <tr class="' . $port['row_class'] . '" style="font-size: 10pt;">
        <td class="state-marker"></td>
        <td style="width: 10px;"></td>
-       <td style="width: 250px;"><a href="#" class="' . $port['html_class'] . '" style="font-size: 15px; font-weight: bold;">' . escape_html($port['port_label']) . '</a><br />' . escape_html($port['ifAlias']) . '</td>
+       <td style="width: 250px;"><a href="'.generate_entity_url('port', $port).'" class="' . $port['html_class'] .
+               '" style="font-size: 15px; font-weight: bold;">' . escape_html($port['port_label']) . '</a><br />' .
+               escape_html($port['ifAlias']) . '</td>
        <td style="width: 100px;">' . $port['human_speed'] . '<br />' . $port['ifMtu'] . '</td>
        <td>' . $port['human_type'] . '<br />' . $port['human_mac'] . '</td>
      </tr>
@@ -398,7 +399,7 @@ function generate_port_row($port, $vars = array())
     {
       $table_cols++; // Increment table columns by one to make sure graph line draws correctly
 
-      $string .= '    <td style="width: 200px;"><span class="entity">' . generate_device_link($device, short_hostname($device['hostname'], "20")) . '</span><br />
+      $string .= '    <td style="width: 200px;"><span class="entity">' . generate_device_link_short($device, [], 20) . '</span><br />
                 <span class="em">' . escape_html(truncate($port['location'], 32, "")) . '</span></td>';
     }
 
@@ -434,7 +435,7 @@ function generate_port_row($port, $vars = array())
     {
       $table_cols++; // Increment table columns by one to make sure graph line draws correctly
 
-      $string .= '    <td width="200"><span class="entity">' . generate_device_link($device, short_hostname($device['hostname'], "20")) . '</span><br />
+      $string .= '    <td width="200"><span class="entity">' . generate_device_link_short($device, [], 20) . '</span><br />
                 <span class="em">' . escape_html(truncate($port['location'], 32, "")) . '</span></td>';
     }
 
@@ -714,7 +715,7 @@ function generate_port_row($port, $vars = array())
         }
 
         // for port_label_short - generate_port_link($link_if, NULL,  NULL, TRUE, TRUE)
-        $string .= '<b>' . generate_port_link_short($link_if) . ' on ' . generate_device_link($link_dev, short_hostname($link_dev['hostname'])) . '</b>';
+        $string .= '<b>' . generate_port_link_short($link_if) . ' on ' . generate_device_link_short($link_dev) . '</b>';
 
         if (isset($int_links_phys[$int_link]) && !is_numeric($int_links_phys[$int_link]))
         {
@@ -756,7 +757,7 @@ function generate_port_row($port, $vars = array())
         if (is_array($pw_peer_int))
         {
           humanize_port($pw_peer_int);
-          $string .= $br.'<i class="'.$config['icon']['cross-connect'].'"></i> <strong>' . generate_port_link_short($pw_peer_int) .' on '. generate_device_link($pw_peer_dev, short_hostname($pw_peer_dev['hostname'])) . '</strong>';
+          $string .= $br.'<i class="'.$config['icon']['cross-connect'].'"></i> <strong>' . generate_port_link_short($pw_peer_int) .' on '. generate_device_link_short($pw_peer_dev) . '</strong>';
         } else {
           $string .= $br.'<i class="'.$config['icon']['cross-connect'].'"></i> <strong> VC ' . $pseudowire['pwID'] .' on '. $pseudowire['peer_addr'] . '</strong>';
         }
@@ -876,10 +877,6 @@ function print_port_minigraph($port, $graph_type = 'port_bits', $period = 'day')
   $graph_array['legend'] = "no";
   $graph_array['graph_only'] = "yes";
 
-  //r(generate_port_link($port, generate_graph_tag($graph_array)));
-  echo("<div style='display: block; padding: 3px; margin: 3px; min-width: 200px; max-width:200px; min-height:115px; max-height:115px; text-align: center; float: left; background-color: #e9e9e9;'>
-    <div style='font-weight: bold;'>".escape_html($port['port_label_short'])."</div>");
-
   $graph_array_zoom = $graph_array;
   $graph_array_zoom['height'] = "175";
   $graph_array_zoom['width']  = "600";
@@ -890,11 +887,18 @@ function print_port_minigraph($port, $graph_type = 'port_bits', $period = 'day')
   unset($link_array['height'], $link_array['width']);
   $link = generate_url($link_array);
 
-  echo(overlib_link($link, generate_graph_tag($graph_array), generate_graph_tag($graph_array_zoom), NULL));
-  //echo(generate_port_link($port, generate_graph_tag($graph_array)));
+  echo '
+  <div class="box box-solid" style="float: left; margin-left: 10px; margin-bottom: 10px;  width:302px; min-width: 302px; max-width:302px; min-height:158px; max-height:158;">
+    <div class="box-header with-border">
+      <a href="device/device=682/"><h3 class="box-title">'.escape_html($port['port_label_short']).'</h3></a>
+    </div>
+  <div class="box-body no-padding">
+  '.overlib_link($link, generate_graph_tag($graph_array), generate_graph_tag($graph_array_zoom), NULL).'
+  </div>
+  <div class="box-footer" style="padding: 0px 10px"><span style="font-size: 0.7em">'.short_port_descr($port['ifAlias']).'</span></div>
+  
+</div>';
 
-  echo("<div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
-    </div>");
 }
 
 // EOF

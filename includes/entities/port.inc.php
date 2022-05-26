@@ -205,12 +205,20 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE) 
 
       break; // Exit do-while
     } elseif ($device['os'] === 'arista_eos' &&
-              $sensor_port['entPhysicalClass'] === 'container' && strlen($sensor_port['entPhysicalAlias'])) {
+              $sensor_port['entPhysicalClass'] === 'container' && !safe_empty($sensor_port['entPhysicalAlias'])) {
       // Arista not have entAliasMappingIdentifier, but used entPhysicalAlias as ifDescr
       $port_id = get_port_id_by_ifDescr($device['device_id'], $sensor_port['entPhysicalAlias']);
       if (is_numeric($port_id)) {
         // Hola, port really found
         $port    = get_port_by_id($port_id);
+        $ifIndex = $port['ifIndex'];
+        print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+        return $port; // Exit do-while
+      }
+      if ($port_id = get_port_id_by_ifDescr($device['device_id'], $sensor_port['entPhysicalAlias'] . '/1')) {
+        // Multi-lane Tranceivers
+        $port    = get_port_by_id($port_id);
+        $port['sensor_multilane'] = TRUE;
         $ifIndex = $port['ifIndex'];
         print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
         return $port; // Exit do-while
@@ -289,8 +297,10 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE) 
         return $port;
       }
 
-    } elseif ($sensor_port['entPhysicalClass'] === 'sensor' && $sensor_port['entPhysicalContainedIn'] == 0 &&
-              str_contains_array($sensor_port['entPhysicalName'], [ 'TenGigE', 'TwentyFiveGigE', 'FortyGigE', 'HundredGigE', 'Ethernet' ])) {
+    } elseif ((($sensor_port['entPhysicalClass'] === 'sensor' && $sensor_port['entPhysicalContainedIn'] == 0) ||
+               ($sensor_port['entPhysicalClass'] === 'module' && $sensor_port['entPhysicalIsFRU'] === 'true')) &&
+              str_starts($sensor_port['entPhysicalName'], [ 'TenGigE', 'TwentyFiveGigE', 'FortyGigE', 'HundredGigE', 'Ethernet' ])) {
+      $sensor_index = $sensor_port['entPhysicalContainedIn']; // Next ifIndex
       // entPhysicalName contain correct ifDescr, ie:
       // NCS platform: FortyGigE0/0/0/20
       // NXOS 6.x platform: "Ethernet1/1(volt)
@@ -309,12 +319,12 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE) 
 
       // See: http://jira.observium.org/browse/OBS-2295
       // IOS-XE and IOS-XR can store in module index both: sensors and port
-      $sensor_transceiver = $sensor_port['entPhysicalClass'] == 'sensor' &&
+      $sensor_transceiver = $sensor_port['entPhysicalClass'] === 'sensor' &&
                             str_icontains_array($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'] . $sensor_port['entPhysicalVendorType'], [ 'transceiver', '-PORT-' ]);
       // This is multi-lane optical transceiver, ie 100G, 40G, multiple sensors for each port
-      $sensor_multilane   = $sensor_port['entPhysicalClass'] == 'container' &&
+      $sensor_multilane   = $sensor_port['entPhysicalClass'] === 'container' &&
                             (in_array($sensor_port['entPhysicalVendorType'], [ 'cevContainer40GigBasePort', 'cevContainerCXP', 'cevContainerCPAK' ]) || // Known Cisco specific containers
-                             str_contains_array($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'], array( 'Optical')));                       // Pluggable Optical Module Container
+                             str_contains_array($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'], [ 'Optical' ]));                    // Pluggable Optical Module Container
       if ($sensor_transceiver) {
         $tmp_index = dbFetchCell('SELECT `entPhysicalIndex` FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalClass` = ? AND `deleted` IS NULL', array($device['device_id'], $sensor_index, 'port'));
         if (is_numeric($tmp_index) && $tmp_index > 0) {
@@ -354,8 +364,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE) 
 // Get port array by ID (using cache)
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function get_port_by_id_cache($port_id)
-{
+function get_port_by_id_cache($port_id) {
   return get_entity_by_id_cache('port', $port_id);
 }
 
@@ -384,38 +393,47 @@ function get_port_by_id($port_id)
 // Get port array by ifIndex (using cache)
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function get_port_by_index_cache($device, $ifIndex, $deleted = 0)
-{
+function get_port_by_index_cache($device, $ifIndex, $deleted = 0) {
   global $cache;
 
-  if (is_array($device) && isset($device['device_id']))
-  {
+  if (is_array($device) && isset($device['device_id'])) {
     $device_id = $device['device_id'];
-  }
-  elseif (is_numeric($device))
-  {
+  } elseif (is_numeric($device)) {
     $device_id = $device;
   }
-  if (!isset($device_id) || !is_numeric($ifIndex))
-  {
+  if (!isset($device_id) || !is_intnum($ifIndex)) {
     print_error("Invalid arguments passed into function get_port_by_index_cache(). Please report to developers.");
+    return FALSE;
   }
 
-  if (isset($cache['port_index'][$device_id][$ifIndex]) && is_numeric($cache['port_index'][$device_id][$ifIndex]))
-  {
+  if (OBS_PROCESS_NAME === 'poller' && !isset($cache['port_index'][$device_id]) && !$deleted) {
+    // Pre-cache all ports in poller for speedup db queries
+    foreach (dbFetchRows('SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` = ?', [ $device_id, 0 ]) as $entity) {
+      if (is_numeric($entity['port_id'])) {
+        // Cache ifIndex to port ID translations
+        $cache['port_index'][$device_id][$entity['ifIndex']] = $entity['port_id'];
+
+        // Same caching as in get_entity_by_id_cache()
+        humanize_port($entity);
+        entity_rewrite('port', $entity);
+        $cache['port'][$entity['port_id']] = $entity;
+      }
+    }
+  }
+
+  if (isset($cache['port_index'][$device_id][$ifIndex]) && is_numeric($cache['port_index'][$device_id][$ifIndex])) {
     $id = $cache['port_index'][$device_id][$ifIndex];
   } else {
     $deleted = $deleted ? 1 : 0; // Just convert boolean to 0 or 1
 
-    $id = dbFetchCell("SELECT `port_id` FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ? AND `deleted` = ? LIMIT 1", array($device_id, $ifIndex, $deleted));
-    if (!$deleted && is_numeric($id))
-    {
+    $id = dbFetchCell("SELECT `port_id` FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ? AND `deleted` = ? LIMIT 1", [ $device_id, $ifIndex, $deleted ]);
+    if (!$deleted && is_numeric($id)) {
       // Cache port IDs (except deleted)
       $cache['port_index'][$device_id][$ifIndex] = $id;
     }
   }
 
-  $port = get_port_by_id_cache($id);
+  $port = get_entity_by_id_cache('port', $id);
   if (is_array($port)) { return $port; }
 
   return FALSE;

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -25,52 +25,42 @@ $vars = get_vars();
 
 $vars['page'] = "popup";
 
-switch ($vars['entity_type'])
-{
+switch ($vars['entity_type']) {
   case "port":
-    if (is_numeric($vars['entity_id']) && (port_permitted($vars['entity_id'])))
-    {
+    if (is_numeric($vars['entity_id']) && (port_permitted($vars['entity_id']))) {
       $port = get_port_by_id($vars['entity_id']);
       echo generate_port_popup($port);
     } else {
       print_warning("You are not permitted to view this port.");
     }
-    exit;
     break;
 
   case "device":
-    if (is_numeric($vars['entity_id']) && device_permitted($vars['entity_id']))
-    {
+    if (is_numeric($vars['entity_id']) && device_permitted($vars['entity_id'])) {
       $device = device_by_id_cache($vars['entity_id']);
-      echo generate_device_popup($device, $vars, $start, $end);
+      echo generate_device_popup($device, $vars);
     } else {
       print_warning("You are not permitted to view this device.");
     }
-    exit;
     break;
 
   case "group":
-    if (is_numeric($vars['entity_id']) && $_SESSION['userlevel'] >= 5)
-    {
+    if (is_numeric($vars['entity_id']) && $_SESSION['userlevel'] >= 5) {
       $group = get_group_by_id($vars['entity_id']);
       echo generate_group_popup_header($group, array());
     } else {
       print_warning("You are not permitted to view this group.");
     }
-    exit;
     break;
 
   // FIXME : mac is not an observium entity. This should go elsewhere!
   case "mac":
-    //if (Net_MAC::check($vars['entity_id']))
-    if (preg_match('/^' . OBS_PATTERN_MAC . '$/i', $vars['entity_id']))
-    {
+    if (preg_match('/^' . OBS_PATTERN_MAC . '$/i', $vars['entity_id'])) {
       $mac = format_mac($vars['entity_id']);
       // Other way by using Pear::Net_MAC, see here: http://pear.php.net/manual/en/package.networking.net-mac.importvendors.php
-      $url = 'http://api.macvendors.com/' . urlencode($mac);
+      $url = 'https://api.macvendors.com/' . urlencode($mac);
       $response = get_http_request($url);
-      if ($response)
-      {
+      if ($response) {
         echo 'MAC vendor: ' . $response;
       } else {
         echo 'Not Found';
@@ -78,19 +68,16 @@ switch ($vars['entity_type'])
     } else {
       echo 'Not correct MAC address';
     }
-    exit;
     break;
 
   case "ip":
     list($ip) = explode('/', $vars['entity_id']);
-    $ip_version = get_ip_version($ip);
-    if ($ip_version)
-    {
+
+    if ($ip_version = get_ip_version($ip)) {
       $cache_key = 'response_' . $vars['entity_type'] . '_' . $ip;
       $cache_entry = get_cache_session($cache_key);
       //r($cache_entry);
-      if (ishit_cache_session())
-      {
+      if (ishit_cache_session()) {
         //echo '<h2>CACHED!</h2>';
         echo $cache_entry;
         exit;
@@ -98,47 +85,36 @@ switch ($vars['entity_type'])
 
       $response = '';
       $reverse_dns = gethostbyaddr6($ip);
-      if ($reverse_dns)
-      {
+      if ($reverse_dns) {
         $response .= '<h4>' . $reverse_dns . '</h4><hr />' . PHP_EOL;
       }
 
       // WHOIS
-      if (is_executable($config['whois']) && !isset($config['http_proxy']))
-      {
+      if (!isset($config['http_proxy']) && is_executable($config['whois'])) {
         // Use direct whois cmd query (preferred)
         // NOTE, for now not tested and not supported for KRNIC, ie: 202.30.50.0, 2001:02B8:00A2::
         $cmd = $config['whois'] . ' ' . $ip;
         $whois = external_exec($cmd);
 
         $multi_whois = explode('# start', $whois); // Some time whois return multiple (ie: whois 8.8.8.8), than use last
-        if (count($multi_whois) > 1)
-        {
+        if (safe_count($multi_whois) > 1) {
           $whois = array_pop($multi_whois);
         }
 
         $org = 0;
-        foreach (explode("\n", $whois) as $line)
-        {
-          if (preg_match('/^(\w[\w\s\-\/]+):.*$/', $line, $matches))
-          {
-            if (in_array($matches[1], array('Ref', 'source', 'nic-hdl-br')))
-            {
-              if ($org === 1)
-              {
+        foreach (explode("\n", $whois) as $line) {
+          if (preg_match('/^(\w[\w\s\-\/]+):.*$/', $line, $matches)) {
+            if (in_array($matches[1], [ 'Ref', 'source', 'nic-hdl-br' ])) {
+              if ($org === 1) {
                 $response .= PHP_EOL;
                 $org++;
                 continue;
-              } else {
-                break;
               }
+              break;
             }
-            elseif (in_array($matches[1], array('Organization', 'org', 'mnt-irt')))
-            {
+            if (in_array($matches[1], array('Organization', 'org', 'mnt-irt'))) {
               $org++; // has org info
-            }
-            elseif ($matches[1] == 'Comment')
-            {
+            } elseif ($matches[1] === 'Comment') {
               continue; // skip comments
             }
             $response .= $line . PHP_EOL;
@@ -149,53 +125,39 @@ switch ($vars['entity_type'])
         $whois_url  = 'https://stat.ripe.net/data/whois/data.json?';
         $whois_url .= 'sourceapp=' . urlencode(OBSERVIUM_PRODUCT . '-' . get_unique_id());
         $whois_url .= '&resource='  . urlencode($ip);
-        $request = get_http_request($whois_url);
-        if ($request)
-        {
-          $request = json_decode($request, TRUE); // Convert to array
-          if ($request['status'] == 'ok' && count($request['data']['records']))
-          {
+
+        if ($request = get_http_request($whois_url)) {
+          $request = safe_json_decode($request); // Convert to array
+          if ($request['status'] === 'ok' && safe_count($request['data']['records'])) {
             $whois_parts = array();
-            foreach ($request['data']['records'] as $i => $parts)
-            {
+            foreach ($request['data']['records'] as $i => $parts) {
               $key = $parts[0]['key'];
 
-              if (in_array($key, array('NetRange', 'inetnum', 'inet6num')))
-              {
+              if (in_array($key, [ 'NetRange', 'inetnum', 'inet6num' ])) {
                 $org = 0;
 
                 $whois_parts[0] = '';
-                foreach ($parts as $part)
-                {
-                  if (in_array($part['key'], array('Ref', 'source', 'nic-hdl-br')))
-                  {
+                foreach ($parts as $part) {
+                  if (in_array($part['key'], [ 'Ref', 'source', 'nic-hdl-br' ])) {
                     break;
                   }
-                  elseif (in_array($part['key'], array('Organization', 'org', 'mnt-irt')))
-                  {
+                  if (in_array($part['key'], [ 'Organization', 'org', 'mnt-irt' ])) {
                     $org = 1; // has org info
                     $org_name = $part['value'];
-                  }
-                  elseif ($part['key'] == 'Comment')
-                  {
+                  } elseif ($part['key'] === 'Comment') {
                     continue; // skip comments
                   }
                   $whois_parts[0] .= sprintf('%-16s %s' . PHP_EOL, $part['key'] . ':', $part['value']);
                 }
 
-              }
-              elseif ($org === 1 && $key == 'OrgName' && strpos($org_name, $parts[0]['value']) === 0)
-              {
+              } elseif ($org === 1 && $key === 'OrgName' && strpos($org_name, $parts[0]['value']) === 0) {
 
                 $whois_parts[1] = '';
-                foreach ($parts as $part)
-                {
-                  if (in_array($part['key'], array('Ref', 'source', 'nic-hdl-br')))
-                  {
+                foreach ($parts as $part) {
+                  if (in_array($part['key'], [ 'Ref', 'source', 'nic-hdl-br' ])) {
                     break;
                   }
-                  elseif ($part['key'] == 'Comment')
-                  {
+                  if ($part['key'] === 'Comment') {
                     continue; // skip comments
                   }
                   $whois_parts[1] .= sprintf('%-16s %s' . PHP_EOL, $part['key'] . ':', $part['value']);
@@ -211,8 +173,7 @@ switch ($vars['entity_type'])
         }
       }
 
-      if ($response)
-      {
+      if ($response) {
         $cache_entry = '<pre class="small">' . $response . '</pre>';
         // @session_start();
         // $_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip] = '<pre class="small">' . $response . '</pre>';
@@ -226,7 +187,6 @@ switch ($vars['entity_type'])
     } else {
       echo 'Not correct IP address';
     }
-    exit;
     break;
 
   case 'autodiscovery':
@@ -236,14 +196,12 @@ switch ($vars['entity_type'])
     // }
     //r($vars);
     if (is_numeric($vars['entity_id']) &&
-        $_SESSION['userlevel'] > 7)
-    {
+        $_SESSION['userlevel'] > 7) {
 
       $cache_key = 'response_' . $vars['entity_type'] . '_' . $vars['entity_id'];
       $cache_entry = get_cache_session($cache_key);
       //r($cache_entry);
-      if (ishit_cache_session())
-      {
+      if (ishit_cache_session()) {
         //echo '<h2>CACHED!</h2>';
         echo $cache_entry;
         exit;
@@ -255,8 +213,7 @@ switch ($vars['entity_type'])
 
       //r($entry);
       // 'ok','no_xdp','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
-      switch ($entry['last_reason'])
-      {
+      switch ($entry['last_reason']) {
         case 'ok':
           $last_reason = "Remote host $hostname ($ip) successfully added to db.";
           break;
@@ -307,23 +264,18 @@ switch ($vars['entity_type'])
     } else {
       print_warning("You are not permitted to view this entry.");
     }
-    exit;
     break;
 
   default:
-    if (isset($config['entities'][$vars['entity_type']]))
-    {
+    if (isset($config['entities'][$vars['entity_type']])) {
       $entity_ids = array();
-      foreach (explode(',', $vars['entity_id']) as $id)
-      {
+      foreach (explode(',', $vars['entity_id']) as $id) {
         // Filter permitted IDs
-        if (is_numeric($id) && (is_entity_permitted($id, $vars['entity_type'])))
-        {
+        if (is_numeric($id) && (is_entity_permitted($id, $vars['entity_type']))) {
           $entity_ids[] = $id;
         }
       }
-      if (count($entity_ids))
-      {
+      if (count($entity_ids)) {
         echo generate_entity_popup_multi($entity_ids, $vars);
       //}
       //elseif (is_numeric($vars['entity_id']) && (is_entity_permitted($vars['entity_id'], $vars['entity_type'])))
@@ -336,8 +288,8 @@ switch ($vars['entity_type'])
     } else {
       print_error("Unknown entity type.");
     }
-    exit;
     break;
 }
+exit;
 
 // EOF

@@ -1,0 +1,543 @@
+-- *****************************************************************
+-- FS-SNMP-AGENT-MIB.mib:  FS Snmp Agent MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-SNMP-AGENT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        IpAddress
+                FROM SNMPv2-SMI
+        DisplayString,
+        RowStatus,
+        TAddress,
+        TEXTUAL-CONVENTION
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        FSTrapType       
+                FROM FS-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB
+        InetAddressType,
+        InetAddress
+                FROM INET-ADDRESS-MIB
+        fsMgmt
+                FROM FS-SMI;
+
+fsSnmpAgentMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs SNMP agent mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 5}
+
+fsSnmpAgentMIBObjects OBJECT IDENTIFIER ::= { fsSnmpAgentMIB 1 }
+
+fsSnmpCommunityObjects OBJECT IDENTIFIER ::= { fsSnmpAgentMIBObjects 1 }
+
+fsSnmpTrapObjects OBJECT IDENTIFIER ::= { fsSnmpAgentMIBObjects 2 }
+
+fsSnmpUdpPortObjects OBJECT IDENTIFIER ::= { fsSnmpAgentMIBObjects 3 }
+
+fsSnmpNetObjects OBJECT IDENTIFIER ::= {fsSnmpAgentMIBObjects 4}
+
+Community ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "community string for the implementation, maximum length of 
+        community strings limited to 32 octets."
+    SYNTAX DisplayString (SIZE (1..32))
+
+--
+--  snmp community
+--
+fsCommunityMaxNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of Max of communities which the SNMP Agent support."
+        ::= { fsSnmpCommunityObjects 1 }
+
+fsCommunityTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSCommunityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of SNMP Community configurations."
+        ::= { fsSnmpCommunityObjects 2 }
+        
+fsCommunityEntry OBJECT-TYPE
+        SYNTAX FSCommunityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Obtain information of SNMP Community configuration."
+        INDEX { fsCommunityName }
+        ::= { fsCommunityTable 1 }
+        
+FSCommunityEntry ::= 
+        SEQUENCE {
+           fsCommunityName  Community,
+           fsCommunityWritable INTEGER,
+           fsCommunityUserIpAddr IpAddress,
+           fsCommunityEnableIpAddrAuthen EnabledStatus,
+           fsCommunityStatus RowStatus
+        }
+        
+fsCommunityName OBJECT-TYPE
+        SYNTAX Community
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Community used by this entry.This value is unique for every entry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { fsCommunityEntry 1 }
+    
+fsCommunityWritable OBJECT-TYPE
+        SYNTAX INTEGER {
+               readonly(1),
+               readwrite(2)
+        }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Authority of this community"
+        DEFVAL{ readonly }
+        ::= { fsCommunityEntry 2 }
+        
+fsCommunityUserIpAddr OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "IP address use for the authentication of a user, if the associated object
+             fsCommunityEnableIpAddrAuthen status is enable(1), the all messages
+             send to the agent will be authened by community and this IP address. messages
+             that can't pass the authentication will be discarded."
+        ::= { fsCommunityEntry 3 }
+        
+fsCommunityEnableIpAddrAuthen OBJECT-TYPE
+        SYNTAX EnabledStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "this object offer the means to enable of disable the IP authentications of 
+            SNMP message."
+        ::= { fsCommunityEntry 4 }
+            
+fsCommunityStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status of this entry. and the means in this enviraments can
+            reffer to the text-convention definition of the RowStatus."
+        ::= { fsCommunityEntry 5 }
+
+fsReadCommunityName OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "SNMP read community string."
+        ::= { fsSnmpCommunityObjects 3 }
+
+fsWriteCommunityName OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "SNMP write community string."
+        ::= { fsSnmpCommunityObjects 4 }
+
+--
+--trap destination table
+--
+ 
+fsTrapDstMaxNumber OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of destination address table entries."
+        ::= { fsSnmpTrapObjects 1 }
+                        
+fsTrapDstTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSTrapDstEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "table of destination hosts that the trap will be sent to."
+        ::= { fsSnmpTrapObjects 2 }
+    
+fsTrapDstEntry OBJECT-TYPE
+        SYNTAX FSTrapDstEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of hosts."
+        INDEX { fsTrapDstAddr }
+        ::= { fsTrapDstTable 1 }
+    
+FSTrapDstEntry ::= 
+        SEQUENCE {
+           fsTrapDstAddr IpAddress,
+           fsTrapDstCommunity Community,
+           fsTrapDstSendTrapClass INTEGER,
+           fsTrapDstEntryStatus RowStatus
+        }
+        
+fsTrapDstAddr OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "the destination address of a host the trap will be sent to."
+        ::= { fsTrapDstEntry 1 }
+                
+fsTrapDstCommunity OBJECT-TYPE
+        SYNTAX Community
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "the destination host's SNMP Client wish to receive the community in
+            the trap send by agent."
+        DEFVAL { "public" }
+        ::= { fsTrapDstEntry 2 }
+
+fsTrapDstSendTrapClass OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    snmpv1-Trap(1), 
+                    snmpv2c-Trap(2),
+                    snmpv3-trap(3)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "Indicates that the SNMP entity will send which kind of trap 
+            SNMPv1-Trap and SNMPv2-Trap"
+    DEFVAL { snmpv1-Trap }
+    ::= { fsTrapDstEntry 3 }
+        
+fsTrapDstEntryStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status of this entry. and the means in this enviraments can
+            reffer to the text-convention definition of the RowStatus."
+        ::= { fsTrapDstEntry 4 }
+
+
+fsTrapActionTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSTrapActionEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table of the trap's action."
+        ::= { fsSnmpTrapObjects 3 }
+
+fsTrapActionEntry OBJECT-TYPE
+        SYNTAX FSTrapActionEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "List of of the trap's action."
+        INDEX { fsTrapType }
+        ::= { fsTrapActionTable 1 }
+    
+FSTrapActionEntry ::=
+        SEQUENCE {
+           fsTrapType FSTrapType,
+           fsTrapAction INTEGER
+        }
+        
+fsTrapType OBJECT-TYPE
+        SYNTAX FSTrapType 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Trap type identifier, every kind of trap which the system support
+             will has one entry in this table."
+        ::= { fsTrapActionEntry 1 }
+        
+fsTrapAction OBJECT-TYPE
+        SYNTAX INTEGER {
+            none(1),       -- do nothing
+            sendtrap(2)    -- send trap
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This value decide how to deal with when this type trap has happened."
+        ::= { fsTrapActionEntry 2 }
+
+
+fsTrapControlTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSTrapControlEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table of the trap's control."
+        ::= { fsSnmpTrapObjects 4 }
+
+fsTrapControlEntry OBJECT-TYPE
+        SYNTAX FSTrapControlEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "List of of the trap's action."
+        INDEX { fsTrapName }
+        ::= { fsTrapControlTable 1 }
+
+FSTrapControlEntry ::=
+        SEQUENCE {
+           fsTrapName         DisplayString,
+           fsTrapDescr        DisplayString,
+           fsTrapOnOff        INTEGER
+        }
+
+fsTrapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE(1..64)) 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Trap name identifier, represent by standard trap oid, 
+             each kind of trap which the system support will has one entry in this table."
+        ::= { fsTrapControlEntry 1 }
+
+fsTrapDescr OBJECT-TYPE
+        SYNTAX DisplayString(SIZE(1..255)) 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The description of the trap."
+        ::= { fsTrapControlEntry 2 }
+
+fsTrapOnOff OBJECT-TYPE
+        SYNTAX INTEGER {
+            off(0),     
+            on(1)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This value decide how to deal with when this type trap has happened.
+             off(0)  forbid send this trap
+             on(1)   allow send this trap 
+            "
+        ::= { fsTrapControlEntry 3 }
+
+
+--
+--trap destination information table
+--
+
+fsTrapDesTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF FSTrapDesEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Table of trap destination hosts information that the trap will be sent to."
+    ::= { fsSnmpTrapObjects 5 }
+
+fsTrapDesEntry OBJECT-TYPE
+    SYNTAX FSTrapDesEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "List of trap destination hosts."
+    INDEX { 
+        fsTrapDesIndex
+    }
+    ::= { fsTrapDesTable 1 }
+
+FSTrapDesEntry ::= 
+    SEQUENCE {
+        fsTrapDesIndex         Integer32,
+        fsTrapDesIPAddress     TAddress,
+        fsTrapDesCommunity     Community,
+        fsTrapDesVersion       INTEGER,
+        fsTrapDesStatus        RowStatus
+    }
+
+fsTrapDesIndex OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only           
+    STATUS current               
+    DESCRIPTION
+        "Index of Trap host information"
+    ::= { fsTrapDesEntry 1 }
+
+fsTrapDesIPAddress OBJECT-TYPE
+    SYNTAX TAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Taddress of Trap hosts."               
+    ::= { fsTrapDesEntry 2 }
+
+fsTrapDesCommunity OBJECT-TYPE
+    SYNTAX Community
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The destination host's SNMP Client wish to receive the community in the trap send by agent."
+    ::= { fsTrapDesEntry 3 }
+
+fsTrapDesVersion OBJECT-TYPE
+    SYNTAX INTEGER {
+        snmpv1-Trap(1), 
+        snmpv2c-Trap(2),
+        snmpv3-trap(3)
+    }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Indicates that the SNMP entity will send which kind of trap: SNMPv1-Trap, SNMPv2-Trap, SNMPv3-Trap"
+    ::= { fsTrapDesEntry 4 }
+
+fsTrapDesStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Entry status of this entry. and the means in this enviraments can
+         reffer to the text-convention definition of the RowStatus."
+    ::= { fsTrapDesEntry 5 }
+
+
+--
+-- snmp udp-port information
+--
+
+fsSNMPGetSetPort OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Udp-port of snmp get or set operation."
+        ::= { fsSnmpUdpPortObjects 1 }
+
+fsSNMPTrapPort OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Udp-port of snmp trap operation."
+        ::= { fsSnmpUdpPortObjects 2 }
+
+
+--
+-- snmp net-id information
+--
+
+fsSysNetID OBJECT-TYPE
+       SYNTAX DisplayString
+       MAX-ACCESS read-write
+       STATUS    current
+       DESCRIPTION
+           "The system netID tells this network element's information 
+            which maybe include province ID,local ID,network element type,network element ID,etc."
+       ::= { fsSnmpNetObjects 1 }
+
+fsSnmpAgentMIBConformance OBJECT IDENTIFIER ::= { fsSnmpAgentMIB 2 }
+fsSnmpAgentMIBCompliances OBJECT IDENTIFIER ::= { fsSnmpAgentMIBConformance 1 }
+fsSnmpAgentMIBGroups      OBJECT IDENTIFIER ::= { fsSnmpAgentMIBConformance 2 }
+
+
+-- compliance statements
+
+fsSnmpAgentMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS SnmpAgent MIB"
+        MODULE  -- this module
+        MANDATORY-GROUPS { 
+           fsCommunityMIBGroup,
+           fsSnmpTrapMIBGroup,
+           fsSnmpUdpPortMIBGroup
+        }
+        ::= { fsSnmpAgentMIBCompliances 1 }
+
+-- units of conformance
+
+fsCommunityMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsCommunityMaxNum,
+           fsCommunityName,
+           fsCommunityWritable,
+           fsCommunityUserIpAddr,
+           fsCommunityEnableIpAddrAuthen,
+           fsCommunityStatus,
+           fsReadCommunityName,
+           fsWriteCommunityName
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing community management to a
+                FS agent."
+        ::= { fsSnmpAgentMIBGroups 1 }         
+
+fsSnmpTrapMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsTrapDstSendTrapClass,
+           fsTrapDstMaxNumber,
+           fsTrapDstAddr,
+           fsTrapDstCommunity,
+           fsTrapDstEntryStatus,
+           fsTrapType,
+           fsTrapAction,
+           fsTrapName,
+           fsTrapDescr,
+           fsTrapOnOff,
+           fsTrapDesIndex,
+           fsTrapDesIPAddress,
+           fsTrapDesCommunity,
+           fsTrapDesVersion,
+           fsTrapDesStatus,
+           fsSysNetID
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing trap information to a
+                FS agent."
+        ::= { fsSnmpAgentMIBGroups 2 }                 
+
+fsSnmpUdpPortMIBGroup OBJECT-GROUP
+        OBJECTS {
+           fsSNMPGetSetPort,
+           fsSNMPTrapPort
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing udp-port information to a
+                FS agent."
+        ::= { fsSnmpAgentMIBGroups 3 }  
+
+END

@@ -1,0 +1,583 @@
+-- ******************************************************************
+-- FS-URPF-MIB.mib
+--
+-- This module is used for monitoring the state of Unicast Reverse
+-- Path Forwarding (URPF) checking.
+--
+-- April 2009, huangcb
+--
+-- Copyright (c) 2009 by FS.COM Inc..
+-- All rights reserved.
+-- ******************************************************************
+--
+
+FS-URPF-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Gauge32,
+    Integer32,
+    Counter32,
+    Unsigned32,
+    NOTIFICATION-TYPE      
+        FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, 
+    NOTIFICATION-GROUP,
+    OBJECT-GROUP           
+        FROM SNMPv2-CONF
+    TruthValue             
+        FROM SNMPv2-TC
+    SnmpAdminString        
+        FROM SNMP-FRAMEWORK-MIB
+    ifIndex                
+        FROM IF-MIB
+    fsMgmt             
+        FROM FS-SMI;
+
+fsUrpfMIB MODULE-IDENTITY
+    LAST-UPDATED "200904090000z"
+    ORGANIZATION "FS.COM Inc.."
+    CONTACT-INFO
+        " 
+        Tel: 400-865-2852 
+
+        E-mail: https://www.fs.com/live_chat_service_mail.html"
+    DESCRIPTION
+        "Unicast Reverse Path Forwarding (URPF) is a function 
+         that checks the validity of the source address of IP 
+         packets received on an interface. This in an attempt 
+         to prevent Denial of Service attacks based on IP address 
+         spoofing.
+
+        URPF checks validity of a source address by determining
+        whether the packet would be successfully routed as a
+        destination address.
+
+        Based on configuration, the check made can be for existence
+        of any route for the address, or more strictly for a route
+        out the interface on which the packet was received by the 
+        device. When a violating packet is detected, it can be dropped.
+
+        This MIB allows detection of spoofing events."
+    REVISION        "200904090000z" 
+    DESCRIPTION
+        "Initial version of this MIB module."    
+    ::= { fsMgmt 46 }
+
+--
+-- URPF MIB
+--
+
+fsUrpfMIBObjects     OBJECT IDENTIFIER ::= { fsUrpfMIB 0 }
+fsUrpfMIBNotifs      OBJECT IDENTIFIER ::= { fsUrpfMIB 1 }
+fsUrpfMIBConformance OBJECT IDENTIFIER ::= { fsUrpfMIB 2 }
+
+--
+-- URPF MIB Objects
+--
+fsUrpfScalar          OBJECT IDENTIFIER ::= { fsUrpfMIBObjects 1 }
+fsUrpfStatistics      OBJECT IDENTIFIER ::= { fsUrpfMIBObjects 2 }
+fsUrpfInterfaceConfig OBJECT IDENTIFIER ::= { fsUrpfMIBObjects 3 }
+--
+-- fsUrpfScalar
+--
+fsUrpfComputeInterval OBJECT-TYPE
+    SYNTAX     Integer32 (30..300)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The time between rate computations. This global value 
+         applies for the computation of all URPF rates, global
+         and per-interface.
+
+         When the value of fsUrpfComputeInterval is changed,
+         the interval in-progress proceeds as though the value
+         had not changed. The change will apply to the length
+         of subsequent intervals.
+
+         The fsUrpfComputeInterval must be less than or equal 
+         to the fsUrpfDropRateWindow.
+         
+         Relation CLI: ip verify urpf drop-rate compute interval seconds."
+    DEFVAL { 30 }
+    ::= { fsUrpfScalar 1 }
+    
+fsUrpfDropRateWindow OBJECT-TYPE
+    SYNTAX     Integer32 (150..1500)
+    UNITS      "seconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The window of time in the recent past over which the drop
+         count used in the drop rate computation is collected. 
+         This global value applies for the computation of all URPF 
+         rates, global and per-interface. 
+
+         Once the period over which computations have been 
+         performed exceeds fsUrpfDropRateWindow, every time a 
+         computation is performed, the window slides up to end 
+         at the current time and start at fsUrpfDropRateWindow 
+         seconds before. 
+         
+         Since the agent must save the drop count values
+         for each compute interval in order to slide the window,
+         the number of counts saved is the quotient of
+         fsUrpfDropRateWindow divided by fsUrpfComputeInterval."
+    DEFVAL { 150 }
+    ::= { fsUrpfScalar 2 }
+
+
+fsUrpfDropNotifyHoldDownTime OBJECT-TYPE
+    SYNTAX     Integer32(30..300)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The minimum time between issuance of 
+         fsUrpfIfDropRateNotify notifications for a 
+         particular interface and packet forwarding type.
+
+         Notifications are generated for each interface and
+         packet forwarding type that exceeds the drop-rate. 
+         When a Notify is sent because the drop-rate is 
+         exceeded for a particular interface and forwarding
+         type, the time specified by this object is used to 
+         specify the minimum time that must elapse before 
+         another Notify can be sent for that interface and
+         forwarding type. The time is specified globally but 
+         used individually.
+         
+         Relation CLI: ip verify urpf drop-rate notify hold-down seconds."
+    DEFVAL { 300 }
+    ::= { fsUrpfScalar 3 }
+
+--
+-- fsUrpfStatistics
+--
+
+fsUrpfTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FSUrpfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains summary information for the
+         managed device on URPF dropping."
+    ::= { fsUrpfStatistics 1 }
+
+fsUrpfEntry OBJECT-TYPE
+    SYNTAX     FSUrpfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "If the managed device supports URPF dropping,
+         a row exists for each IP version type (v4 and v6).
+         A row contains summary information on URPF
+         dropping over the entire managed device." 
+    INDEX  { fsUrpfIpVersion }
+    ::= { fsUrpfTable 1 }
+
+FSUrpfEntry ::= SEQUENCE {
+        fsUrpfIpVersion               INTEGER,
+        fsUrpfDrops                   Counter32,
+        fsUrpfDropRate                Gauge32
+    }
+
+fsUrpfIpVersion OBJECT-TYPE
+    SYNTAX     INTEGER {ipv4(1), ipv6(2)}
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Specifies the version of IP forwarding on an interface
+        to which the table row URPF counts, rates, and
+        configuration apply."
+    ::= { fsUrpfEntry 1 }
+
+fsUrpfDrops OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "packets"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Sum of dropped IP version fsUrpfIpVersion packets failing 
+         a URPF check. This value is the sum of drops of packets 
+         received on all interfaces of the managed device."
+    ::= { fsUrpfEntry 2 }
+
+fsUrpfDropRate OBJECT-TYPE
+    SYNTAX     Gauge32
+    UNITS      "packets per second"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The rate of packet drops of IP version fsUrpfIpVersion 
+         packets due to URPF for the managed device. The 
+         per-interface drop rate notification is issued on rates 
+         exceeding a limit (rising rate). This dropping may 
+         indicate an security attack on the network. To determine 
+         whether the attack/event is over, the NMS must 
+         consult the managed device. This object can be polled to 
+         determine the recent drop rate for the managed device
+         as a whole, in addition to querying particular interface 
+         objects.
+
+         This object is the average rate of dropping over the most 
+         recent window of time. The rate is computed by dividing 
+         the number of packets dropped over a window by the window 
+         time in seconds. The window time is specified by 
+         fsUrpfDropRateWindow. Each time the drop rate is computed, 
+         and at system startup, a snapshot is taken of the latest 
+         value of fsUrpfDrops. Subtracting from this the snapshot 
+         of fsUrpfDrops at the start of the current window of time 
+         gives the number of packets dropped.  
+         
+         The drop rate is 
+         computed every fsUrpfComputeInterval seconds. As an 
+         example, let fsUrpfDropRateWindow be 300 seconds,
+         and fsUrpfComputeInterval 30 seconds. Every 30 seconds,
+         the drop count five minutes previous is subtracted
+         from the current drop count, and the result is divided
+         by 300 to arrive at the drop rate.
+         
+         At device start-up, until the device has been up more than
+         fsUrpfDropRateWindow, when drop rate is computed,
+         the value of fsUrpfDrops is divided by the time the
+         device has been up.
+         After the device has been up for fsUrpfDropRateWindow,
+         when drop rate is computed, the number of packet drops counted 
+         from interval start time to the computation time is divided 
+         by fsUrpfDropRateWindow.
+         
+         Changes to fsUrpfDropRateWindow are not reflected in this
+         object until the next computation time.
+
+         The rate from the  most recent computation is the value 
+         fetched until the subsequent computation is performed."
+    ::= { fsUrpfEntry 3 }
+
+fsUrpfIfMonTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FSUrpfIfMonEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains information on URPF dropping on
+         an interface."
+    ::= { fsUrpfStatistics 2 }
+                
+fsUrpfIfMonEntry OBJECT-TYPE
+    SYNTAX     FSUrpfIfMonEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "If IPv4 packet forwarding is configured on an interface,
+         and is configured to perform URPF checking, a row appears
+         in this table with indices [ifIndex][ipv4]. If IPv4
+         packet forwarding is deconfigured, or URPF checking
+         is deconfigured, the row disappears.
+
+         If IPv6 packet forwarding is configured on an interface,
+         and is configured to perform URPF checking, a row appears
+         in the table with indices [ifIndex][ipv6].  If IPv6
+         packet forwarding is deconfigured, or URPF checking
+         is deconfigured, the row disappears."
+    INDEX  { ifIndex, fsUrpfIfIpVersion }
+    ::= { fsUrpfIfMonTable 1 }
+
+FSUrpfIfMonEntry ::= SEQUENCE { 
+        fsUrpfIfIpVersion             INTEGER,
+        fsUrpfIfDrops                 Counter32,
+        fsUrpfIfDropRate              Gauge32
+    }
+
+fsUrpfIfIpVersion OBJECT-TYPE
+    SYNTAX     INTEGER {ipv4(1), ipv6(2)}
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Specifies the version of IP forwarding on an interface 
+        to which the table row URPF counts, rates, and 
+        configuration apply."
+    ::= { fsUrpfIfMonEntry 1}
+
+fsUrpfIfDrops OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "packets"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The number of IP packets of version fsUrpfIfIpVersion
+         failing the URPF check and dropped by the managed device
+         on a particular interface."
+    ::= { fsUrpfIfMonEntry 2 }
+
+fsUrpfIfDropRate OBJECT-TYPE
+    SYNTAX     Gauge32
+    UNITS      "packets/second"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The rate of packet drops of IP version fsUrpfIfIpVersion
+         packets due to URPF on the interface.
+
+         This object is the average rate of dropping over the most 
+         recent interval of time.The rate is computed by dividing
+         the number of packets dropped over an interval by the 
+         interval time in seconds. Each time the drop rate
+         is computed, and at system startup, a snapshot is taken
+         of the latest value of fsUrpfIfDrops. Subtracting from this
+         the snapshot of fsUrpfIfDrops at the start of the current
+         interval of time gives the number of packets dropped.
+         The drop rate is computed every fsUrpfComputeInterval
+         seconds.
+
+         When drop rate is computed, if time since the creation of 
+         a row in fsUrpfIfMonTable is less than 
+         fsUrpfDropRateWindow, the value of fsUrpfIfDrops is 
+         divided by the time since row was created.
+
+         After the row has been in existence for 
+         fsUrpfDropRateWindow, when drop rate is computed, the 
+         number of packet drops counted on the interface from 
+         interval start time to the computation time is divided 
+         by fsUrpfDropRateWindow.
+
+         Changes to fsUrpfDropRateWindow are not reflected in this
+         object until the next computation time.
+
+         The rate from the  most recent computation is the value 
+         fetched until the subsequent computation is performed."
+    ::= { fsUrpfIfMonEntry 3 }
+
+--
+-- fsUrpfInterfaceConfig
+--
+
+fsUrpfIfConfTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FSUrpfIfConfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains statistics information on URPF on
+         an interface."
+    ::= { fsUrpfInterfaceConfig 1 }
+
+fsUrpfIfConfEntry OBJECT-TYPE
+    SYNTAX     FSUrpfIfConfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A row exists in this table if a row exists
+         in fsUrpfIfMonTable."
+    AUGMENTS { fsUrpfIfMonEntry }
+    ::= { fsUrpfIfConfTable 1 }
+
+FSUrpfIfConfEntry ::= SEQUENCE {
+        fsUrpfIfCheckStrict             INTEGER,
+        fsUrpfIfDropRateNotifyEnable    TruthValue,
+        fsUrpfIfNotifyDropRateThreshold Unsigned32,
+        fsUrpfIfNotifyDrHoldDownReset   TruthValue,
+        fsUrpfIfWhichRouteTableID       INTEGER,
+        fsUrpfIfVrfName                 SnmpAdminString
+    }
+
+fsUrpfIfCheckStrict OBJECT-TYPE
+    SYNTAX INTEGER {
+              none(0),
+              strict(1),
+              loose(2)
+            }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Interface configuration indicating the strictness of 
+         the reachability check performed 
+         on the interface.
+         - none: not enable urpf check in this interface.
+         - strict: check that source addr is reachable via 
+                   the interface it came in on.
+         - loose : check that source addr is reachable via 
+		   some interface on the device."
+    ::= { fsUrpfIfConfEntry 1 }
+
+fsUrpfIfDropRateNotifyEnable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "This object specifies whether the system produces the 
+         fsUrpfIfDropRateNotify notification as a result of URPF 
+         dropping of version fsUrpfIfIpVersion IP packets on this 
+         interface. A false value prevents such notifications from 
+         being generated by this system.
+         
+         Relation CLI: ip verify urpf drop-rate notify."
+    DEFVAL { false }
+    ::= { fsUrpfIfConfEntry 2 }
+
+fsUrpfIfNotifyDropRateThreshold OBJECT-TYPE
+    SYNTAX     Unsigned32
+    UNITS      "packets/second"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "When the calculated rate of URPF packet drops 
+         (fsUrpfIfDropRate) meets or exceeds the value 
+         specified by this object, a fsUrpfIfDropRateNotify 
+         notification is sent if fsUrpfIfDropRateNotifyEnable 
+         is set to true, and no such notification for the
+         IP version has been sent for this interface for the 
+         hold-down period.
+
+         Note that due to the calculation used for drop rate, 
+         if there are less than n drop events in an n-second
+         period the notification will not be generated. To allow
+         for the detection of a small number of drop events, the
+         value 0 (zero) is used to indicate that if any drop events
+         occur during the interval, a notification is generated.
+         
+         Relation CLI: ip verify urpf drop-rate notify hold-down seconds."
+    DEFVAL { 1000 }
+    ::= { fsUrpfIfConfEntry 3 }
+
+fsUrpfIfNotifyDrHoldDownReset OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "Setting this object to true causes the five-minute 
+         hold-down timer for emitting URPF drop rate 
+         notifications for IP version fsUrpfIfIpVersion on 
+         the interface to be short-circuited.  If a notification 
+         is due and would be emitted for the interface if the 
+         five-minutes elapsed, setting this object will cause 
+         the notification to be sent.
+
+         This is a trigger, and doesn't hold information. It is
+         set and an action is performed. Therefore a get for 
+         this object always returns false.
+         
+         Relation CLI: clear ip urpf interface."
+    DEFVAL { false }
+    ::= { fsUrpfIfConfEntry 4 }
+
+fsUrpfIfWhichRouteTableID OBJECT-TYPE
+    SYNTAX INTEGER {
+              default(1),
+              vrf(2)
+            }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Interface configuration indicating the routing table 
+         consulted for the reachability check:
+         - default: the non-private routing table for of the 
+                    managed system.
+         - vrf   : a particular VPN routing table."
+    ::= { fsUrpfIfConfEntry 5 }
+
+fsUrpfIfVrfName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "If the value of fsUrpfIfWhichRouteTableID is 'vrf',
+         the name of the VRF Table. Otherwise a zero-length
+         string."
+    ::= { fsUrpfIfConfEntry 6 }
+
+--
+-- URPF MIB Notifications
+--
+
+fsUrpfIfDropRateNotify NOTIFICATION-TYPE
+    OBJECTS     {
+                fsUrpfIfDropRate
+                }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when 
+         fsUrpfIfDropRateNotifyEnable is set to true and
+         the calculated URPF drop rate (fsUrpfIfDropRate) 
+         exceeds the notification threshold drop rate 
+         (fsUrpfIfNotifyDropRateThreshold). Note the 
+         exceptional value of 0 for threshold allows notification 
+         generation if any drop events occur in an interval.
+ 
+         After generating this notification, another such
+         notification will not be sent out for a minimum of five 
+         minutes (note the exception to this provided by 
+         fsUrpfIfNotifyDrHoldDownReset).
+
+         The object value present in the notification is the 
+         the drop rate that exceeded the threshold."
+    ::= { fsUrpfMIBNotifs 1 }
+
+--
+-- URPF MIB Conformance
+--
+fsUrpfMIBCompliances OBJECT IDENTIFIER ::= 
+                                   { fsUrpfMIBConformance 1 }
+fsUrpfMIBGroups  OBJECT IDENTIFIER ::= 
+                                   { fsUrpfMIBConformance 2 }
+                
+
+fsUrpfMIBCompliance MODULE-COMPLIANCE
+    STATUS     current
+    DESCRIPTION
+        "An SNMP entity can implement this module to
+        provide URPF problem diagnosis information."
+
+    MODULE  -- this module
+
+    MANDATORY-GROUPS { fsUrpfMIBMainObjectGroup,
+                       fsUrpfMIBNotifyGroup }
+
+    GROUP           fsUrpfMIBVrfObjectGroup 
+    DESCRIPTION
+        "This group is mandatory for all implementations
+         that need to index URPF statistics by VRF interfaces."
+
+    ::= { fsUrpfMIBCompliances 1 }
+                
+fsUrpfMIBMainObjectGroup OBJECT-GROUP
+    OBJECTS  {
+        fsUrpfComputeInterval,
+        fsUrpfDropRateWindow,
+        fsUrpfDropNotifyHoldDownTime,
+        fsUrpfDrops,
+        fsUrpfDropRate,
+        fsUrpfIfDrops,
+        fsUrpfIfDropRate,
+        fsUrpfIfCheckStrict,
+        fsUrpfIfDropRateNotifyEnable,
+        fsUrpfIfNotifyDropRateThreshold,
+        fsUrpfIfNotifyDrHoldDownReset
+    }
+    STATUS     current
+    DESCRIPTION
+        "The collection of common counter objects, those 
+         needed by other objects, and the common interface 
+         table."
+    ::= { fsUrpfMIBGroups 1 }
+
+fsUrpfMIBVrfObjectGroup OBJECT-GROUP
+    OBJECTS  {
+        fsUrpfIfWhichRouteTableID,
+        fsUrpfIfVrfName
+    }
+    STATUS     current
+    DESCRIPTION
+        "The collection of objects needed to index by  
+         VRF."
+    ::= { fsUrpfMIBGroups 2 }
+
+fsUrpfMIBNotifyGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { fsUrpfIfDropRateNotify }
+    STATUS     current
+    DESCRIPTION
+        "The collection of objects which are used to specify 
+         notifications for URPF."
+    ::= { fsUrpfMIBGroups 3 }
+
+END

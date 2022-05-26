@@ -36,8 +36,7 @@ foreach ($ports as $port) {
 
   if ($_SESSION['widescreen'])
   {
-    if ($_SESSION['big_graphs'])
-    {
+    if ($config['graphs']['size'] === 'big') {
       $width_div = 585;
       $width = 507;
       $height = 149;
@@ -49,8 +48,7 @@ foreach ($ports as $port) {
       $height_div = 180;
     }
   } else {
-    if ($_SESSION['big_graphs'])
-    {
+    if ($config['graphs']['size'] === 'big') {
       $width_div = 611;
       $width = 528;
       $height = 159;

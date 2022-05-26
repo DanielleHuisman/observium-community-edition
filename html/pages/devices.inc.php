@@ -348,14 +348,12 @@ foreach ($navbar['options'] as $option => $array)
 
 // Set graph period stuff
 if ($vars['format'] === 'graphs') {
-  $timestamp_pattern = '/^(\d{4})-(\d{2})-(\d{2}) ([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/';
-  if (isset($vars['timestamp_from']) && preg_match($timestamp_pattern, $vars['timestamp_from']))
-  {
+
+  if (isset($vars['timestamp_from']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_from'])) {
     $vars['from'] = strtotime($vars['timestamp_from']);
     unset($vars['timestamp_from']);
   }
-  if (isset($vars['timestamp_to'])   && preg_match($timestamp_pattern, $vars['timestamp_to']))
-  {
+  if (isset($vars['timestamp_to'])   && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_to'])) {
     $vars['to'] = strtotime($vars['timestamp_to']);
     unset($vars['timestamp_to']);
   }

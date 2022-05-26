@@ -6,22 +6,28 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-// FIXME. airos != unifi. required device for tests
-$data = snmpwalk_cache_oid($device, "dot11manufacturerProductName", array(), "IEEE802dot11-MIB");
-if ($data)
-{
-  $data = snmpwalk_cache_oid($device, "dot11manufacturerProductVersion", $data, "IEEE802dot11-MIB");
+// IEEE802dot11-MIB::dot11MACAddress[5] = STRING: 74:83:c2:e8:2a:60
+// IEEE802dot11-MIB::dot11manufacturerName[5] = STRING: Ubiquiti Networks, Inc.
+// IEEE802dot11-MIB::dot11manufacturerProductName[5] = STRING: PowerBeam M5
+// IEEE802dot11-MIB::dot11manufacturerProductVersion[5] = STRING: XW.ar934x.v6.1.9.32918.190108.1737
 
-  $data = current($data);
-  $hardware = $data['dot11manufacturerProductName'];
-  // 5.5.10-u2.28005.150723.1358
-  // 8.7.0.42152.200203.1256
-  list(,$version) = preg_split('/\.v/', $data['dot11manufacturerProductVersion']);
-  $version = implode('.', array_slice(explode('.', $version), 0, 4)); // Leave only first 4 numbers: 8.7.0.42152.200203.1256 -> 8.7.0.42152
+if ($hw = snmp_getnext_oid($device, 'dot11manufacturerProductName', 'IEEE802dot11-MIB')) {
+  $hardware = $hw;
+
+  if ($ver = snmp_getnext_oid($device, 'dot11manufacturerProductVersion', 'IEEE802dot11-MIB')) {
+    list(,$version) = explode(".v", $ver, 2);
+    $version = implode('.', array_slice(explode('.', $version), 0, 4)); // Leave only first 4 numbers: 8.7.0.42152.200203.1256 -> 8.7.0.42152
+  }
+
+  if (safe_empty($serial) && ($mac = snmp_getnext_oid($device, 'dot11MACAddress', 'IEEE802dot11-MIB')) &&
+      is_valid_param($mac, 'serial')) {
+    // Not real hardware serial, but use mac as serial
+    $serial = str_replace(':', '', $mac);
+  }
 }
 
 // EOF

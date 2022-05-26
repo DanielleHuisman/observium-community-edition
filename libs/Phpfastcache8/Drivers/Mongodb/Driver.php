@@ -17,7 +17,6 @@ declare(strict_types=1);
 
 namespace Phpfastcache\Drivers\Mongodb;
 
-use DateTime;
 use LogicException;
 use MongoClient;
 use MongoDB\{BSON\Binary, BSON\UTCDateTime, Client, Collection, Database, DeleteResult, Driver\Command, Driver\Exception\Exception as MongoDBException, Driver\Manager};
@@ -75,7 +74,7 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
     public function getStats(): DriverStatistic
     {
         $serverStats = $this->instance->getManager()->executeCommand(
-            'phpFastCache',
+            $this->getConfig()->getDatabaseName(),
             new Command(
                 [
                     'serverStatus' => 1,
@@ -87,10 +86,10 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
         )->toArray()[0];
 
         $collectionStats = $this->instance->getManager()->executeCommand(
-            'phpFastCache',
+            $this->getConfig()->getDatabaseName(),
             new Command(
                 [
-                    'collStats' => (isset($this->getConfig()['collectionName']) ? $this->getConfig()['collectionName'] : 'Cache'),
+                    'collStats' => $this->getConfig()->getCollectionName(),
                     'verbose' => true,
                 ]
             )
@@ -146,25 +145,19 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
      */
     protected function driverRead(CacheItemInterface $item)
     {
-        $document = $this->getCollection()->findOne(['_id' => $item->getEncodedKey()]);
+        $document = $this->getCollection()->findOne(['_id' => $this->getMongoDbItemKey($item)]);
 
         if ($document) {
             $return = [
                 self::DRIVER_DATA_WRAPPER_INDEX => $this->decode($document[self::DRIVER_DATA_WRAPPER_INDEX]->getData()),
-                self::DRIVER_TAGS_WRAPPER_INDEX => $this->decode($document[self::DRIVER_TAGS_WRAPPER_INDEX]->getData()),
-                self::DRIVER_EDATE_WRAPPER_INDEX => (new DateTime())->setTimestamp($document[self::DRIVER_EDATE_WRAPPER_INDEX]->toDateTime()->getTimestamp()),
+                self::DRIVER_TAGS_WRAPPER_INDEX => $document[self::DRIVER_TAGS_WRAPPER_INDEX]->jsonSerialize(),
+                self::DRIVER_EDATE_WRAPPER_INDEX => $document[self::DRIVER_EDATE_WRAPPER_INDEX]->toDateTime(),
             ];
 
             if (!empty($this->getConfig()->isItemDetailedDate())) {
                 $return += [
-                    self::DRIVER_MDATE_WRAPPER_INDEX => (new DateTime())->setTimestamp(
-                        $document[self::DRIVER_MDATE_WRAPPER_INDEX]->toDateTime()
-                            ->getTimestamp()
-                    ),
-                    self::DRIVER_CDATE_WRAPPER_INDEX => (new DateTime())->setTimestamp(
-                        $document[self::DRIVER_CDATE_WRAPPER_INDEX]->toDateTime()
-                            ->getTimestamp()
-                    ),
+                    self::DRIVER_MDATE_WRAPPER_INDEX => $document[self::DRIVER_MDATE_WRAPPER_INDEX]->toDateTime(),
+                    self::DRIVER_CDATE_WRAPPER_INDEX => $document[self::DRIVER_CDATE_WRAPPER_INDEX]->toDateTime(),
                 ];
             }
 
@@ -196,32 +189,27 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
         if ($item instanceof Item) {
             try {
                 $set = [
+                    self::DRIVER_KEY_WRAPPER_INDEX => $item->getKey(),
                     self::DRIVER_DATA_WRAPPER_INDEX => new Binary($this->encode($item->get()), Binary::TYPE_GENERIC),
-                    self::DRIVER_TAGS_WRAPPER_INDEX => new Binary($this->encode($item->getTags()), Binary::TYPE_GENERIC),
-                    self::DRIVER_EDATE_WRAPPER_INDEX => ($item->getTtl() > 0 ? new UTCDateTime((time() + $item->getTtl()) * 1000) : new UTCDateTime(time() * 1000)),
+                    self::DRIVER_TAGS_WRAPPER_INDEX => $item->getTags(),
+                    self::DRIVER_EDATE_WRAPPER_INDEX => new UTCDateTime($item->getExpirationDate()),
                 ];
 
                 if (!empty($this->getConfig()->isItemDetailedDate())) {
                     $set += [
-                        self::DRIVER_MDATE_WRAPPER_INDEX => ($item->getModificationDate() ? new UTCDateTime(
-                            ($item->getModificationDate()
-                                ->getTimestamp()) * 1000
-                        ) : new UTCDateTime(time() * 1000)),
-                        self::DRIVER_CDATE_WRAPPER_INDEX => ($item->getCreationDate() ? new UTCDateTime(
-                            ($item->getCreationDate()
-                                ->getTimestamp()) * 1000
-                        ) : new UTCDateTime(time() * 1000)),
+                        self::DRIVER_MDATE_WRAPPER_INDEX =>  new UTCDateTime($item->getModificationDate()),
+                        self::DRIVER_CDATE_WRAPPER_INDEX =>  new UTCDateTime($item->getCreationDate()),
                     ];
                 }
                 $result = (array)$this->getCollection()->updateOne(
-                    ['_id' => $item->getEncodedKey()],
+                    ['_id' => $this->getMongoDbItemKey($item)],
                     [
                         '$set' => $set,
                     ],
                     ['upsert' => true, 'multiple' => false]
                 );
             } catch (MongoDBException $e) {
-                throw new PhpfastcacheDriverException('Got an exception while trying to write data to MongoDB server', 0, $e);
+                throw new PhpfastcacheDriverException('Got an exception while trying to write data to MongoDB server: ' . $e->getMessage(), 0, $e);
             }
 
             return isset($result['ok']) ? $result['ok'] == 1 : true;
@@ -244,7 +232,7 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
             /**
              * @var DeleteResult $deletionResult
              */
-            $deletionResult = $this->getCollection()->deleteOne(['_id' => $item->getEncodedKey()]);
+            $deletionResult = $this->getCollection()->deleteOne(['_id' =>  $this->getMongoDbItemKey($item)]);
 
             return $deletionResult->isAcknowledged();
         }
@@ -257,7 +245,11 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
      */
     protected function driverClear(): bool
     {
-        return $this->collection->deleteMany([])->isAcknowledged();
+        try {
+           return $this->collection->deleteMany([])->isAcknowledged();
+        } catch (MongoDBException $e) {
+            throw new PhpfastcacheDriverException('Got error while trying to empty the collection: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     /**
@@ -281,6 +273,16 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
 
         if (!$this->collectionExists($collectionName)) {
             $this->database->createCollection($collectionName);
+            $this->database->selectCollection($collectionName)
+                ->createIndex(
+                    [self::DRIVER_KEY_WRAPPER_INDEX => 1],
+                    ['unique' => true, 'name' => 'unique_key_index']
+                );
+            $this->database->selectCollection($collectionName)
+                ->createIndex(
+                    [self::DRIVER_EDATE_WRAPPER_INDEX => 1],
+                    ['expireAfterSeconds' => 0,  'name' => 'auto_expire_index']
+                );
         }
 
         $this->collection = $this->database->selectCollection($collectionName);
@@ -294,8 +296,9 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
      * @param string $databaseName
      * @return string The connection URI.
      */
-    protected function buildConnectionURI($databaseName = ''): string
+    protected function buildConnectionURI(string $databaseName): string
     {
+        $databaseName = \urlencode($databaseName);
         $servers = $this->getConfig()->getServers();
         $options = $this->getConfig()->getOptions();
 
@@ -330,6 +333,11 @@ class Driver implements ExtendedCacheItemPoolInterface, AggregatablePoolInterfac
                 count($options) > 0 ? '?' . http_build_query($options) : '',
             ]
         );
+    }
+
+    protected function getMongoDbItemKey(CacheItemInterface $item)
+    {
+        return 'pfc_' . $item->getEncodedKey();
     }
 
     /********************

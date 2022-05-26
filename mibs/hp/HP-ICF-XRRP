@@ -17,7 +17,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         ;
 
     hpicfXrrpMIB MODULE-IDENTITY 
-        LAST-UPDATED "200508050000Z" -- Aug 5, 2005 
+        LAST-UPDATED "202106100000Z" -- June 10, 2021 
         ORGANIZATION "HP Networking"
         CONTACT-INFO "Hewlett-Packard Company
                       8000 Foothills Blvd.
@@ -26,6 +26,10 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
                       Objects for the XRRP router - the device running HP 
                       proprietory version of the Virtual Router Redundancy
                       Protocol (VRRP)."
+        REVISION     "202106100000Z" -- June 10, 2021
+        DESCRIPTION  "Added hpicfXrrpStatsRcMainRouterTime and
+                      hpicfXrrpStatsRcBecomeMain objects."
+
         REVISION     "200508050000Z" -- Aug 5, 2005
         DESCRIPTION  "Added import objects."
 
@@ -122,7 +126,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
     hpicfXrrpTrapCntl OBJECT-TYPE
         SYNTAX       BITS {
                          stateChange(0),
-                         masterState(1),
+                         mainState(1),
                          authFailure(2)
                      }
         MAX-ACCESS   read-write
@@ -135,10 +139,10 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
                         This bit controls whether the notification trap is
                         allowed to be send when virtual router changes the state.
 
-                      - masterState(1)
+                      - mainState(1)
                         This bit controls whether the notification trap is
                         allowed to be send when virtual router transitions 
-                        to the Master state.
+                        to the Main state.
 
                       - authFailure(2)
                         This bit controls whether the notification trap is
@@ -210,7 +214,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         SYNTAX       INTEGER {
                          initialize(1),
                          backup(2),
-                         master(3),
+                         main(3),
                          vlandown(4)
                      }
         MAX-ACCESS   read-only
@@ -223,11 +227,11 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
                         (XRRP instance) is waiting for a startup event.
 
                       - `backup', which indicates that virtual router (XRRP 
-                        instance) is monitoring the availability of the Master.
+                        instance) is monitoring the availability of the Main router.
 
-                      - `master', which indicates that the given virtual router
+                      - `main', which indicates that the given virtual router
                         (XRRP instance) is forwarding packets for the IP 
-                        addresses associated with it, i.e. is in the Master 
+                        addresses associated with it, i.e. is in the Main 
                         state.
 
                       - 'vlandown', which indicates that the VLAN associated 
@@ -272,7 +276,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         MAX-ACCESS  read-create
         STATUS      current
         DESCRIPTION "This parameter defines the advertisement interval in 
-                     seconds for XRRP packets sent out by the Master of the 
+                     seconds for XRRP packets sent out by the Main router of the 
                      XRRP instance."
         DEFVAL { 5 }
         ::= { hpicfXrrpInstanceEntry 6 }
@@ -551,7 +555,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         STATUS       current
         DESCRIPTION  "This value contains the number of XRRP packets received 
                       with the priority set to 0 on the virtual router (i.e. 
-                      the current master is giving up control)."
+                      the current main router is giving up control)."
         ::= { hpicfXrrpStatsInstanceEntry 4 }
 
     hpicfXrrpStatsInstancePriorityZeroPktsXmtd OBJECT-TYPE
@@ -635,7 +639,9 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
             hpicfXrrpStatsRcBecomeMaster         Counter32,
             hpicfXrrpStatsRcMasterTime           TimeStamp,
             hpicfXrrpStatsRcUnknownVlanId        Counter32,
-            hpicfXrrpStatsRcCreateTime           LastCreateTime
+            hpicfXrrpStatsRcCreateTime           LastCreateTime,
+            hpicfXrrpStatsRcMainRouterTime       TimeStamp,
+            hpicfXrrpStatsRcBecomeMain           Counter32
         } 
 
     hpicfXrrpStatsRcRouterId OBJECT-TYPE
@@ -649,7 +655,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         SYNTAX       INTEGER {
                          initialize(1),
                          backup(2),
-                         master(3),
+                         main(3),
                          failback(4)
                      }
         MAX-ACCESS   read-only
@@ -724,6 +730,21 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
                       cycles between polls and thus detect discontinuity 
                       in the above statistics counters."
         ::= { hpicfXrrpStatsRcEntry 10 }
+
+    hpicfXrrpStatsRcMainRouterTime OBJECT-TYPE
+        SYNTAX      TimeStamp 
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Duration as main router (in seconds)."
+        ::= { hpicfXrrpStatsRcEntry 11 }
+
+    hpicfXrrpStatsRcBecomeMain OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The total number of times that this router has become
+                     a main router."
+        ::= { hpicfXrrpStatsRcEntry 12 }
 
 -- **********************************************************************
 --   XRRP Notifications Trap Definitions
@@ -800,7 +821,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         ::= { hpicfXrrpMIBCompliances 1 }
 
     hpicfXrrpMIBCompliance1 MODULE-COMPLIANCE
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "The core compliance statement for XRRP implementation."
         MODULE -- this module
             MANDATORY-GROUPS  { hpicfXrrpOperGroup1,
@@ -809,7 +830,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         ::= { hpicfXrrpMIBCompliances 2 }
 
     hpicfXrrpMIBCompliance2 MODULE-COMPLIANCE
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "The core compliance statement for XRRP implementation."
         MODULE -- this module
             MANDATORY-GROUPS  { hpicfXrrpOperGroup1,
@@ -826,6 +847,34 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
                  notifications."
 
         ::= { hpicfXrrpMIBCompliances 3 }
+
+    hpicfXrrpMIBCompliance3 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION "The core compliance statement for XRRP implementation."
+        MODULE -- this module
+            MANDATORY-GROUPS  { hpicfXrrpOperGroup1,
+                                hpicfXrrpStatsGroup1 }
+
+        ::= { hpicfXrrpMIBCompliances 4 }
+
+    hpicfXrrpMIBCompliance4 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION "The core compliance statement for XRRP implementation."
+        MODULE -- this module
+            MANDATORY-GROUPS  { hpicfXrrpOperGroup1,
+                                hpicfXrrpOperGroup2,
+                                hpicfXrrpStatsGroup1 }
+
+            GROUP               hpicfXrrpNotificationGroup
+            DESCRIPTION
+                "The XRRP MIB Notification Group."
+
+            GROUP              hpicfXrrpTrapGroup
+            DESCRIPTION
+                "Conformance group for objects contained in XRRP 
+                 notifications."
+
+        ::= { hpicfXrrpMIBCompliances 5 }
 
     hpicfXrrpOperGroup OBJECT-GROUP
         OBJECTS     {
@@ -883,7 +932,7 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
                         hpicfXrrpStatsRcUnknownVlanId,
                         hpicfXrrpStatsRcCreateTime
                     }
-        STATUS      current
+        STATUS      deprecated
         DESCRIPTION "Conformance group for XRRP statistics."
         ::= { hpicfXrrpMIBGroups 2 }
 
@@ -956,4 +1005,43 @@ HP-ICF-XRRP DEFINITIONS ::= BEGIN
         DESCRIPTION "Conformance group for XRRP operations."
         ::= { hpicfXrrpMIBGroups 6 }
 
+    hpicfXrrpStatsGroup1 OBJECT-GROUP
+        OBJECTS     { 
+                        hpicfXrrpStatsXrrpMacAddress,
+                        hpicfXrrpStatsMacAndMask,
+                        hpicfXrrpStatsPktsRcvd,
+                        hpicfXrrpStatsNotDomainPktsReject,
+                        hpicfXrrpStatsCheckSumPktsReject,
+                        hpicfXrrpStatsBadValuePktsReject,
+                        hpicfXrrpStatsCorruptedPktsReject,
+                        hpicfXrrpStatsVersionErrorPktsReject,
+                        hpicfXrrpStatsBcastArpsXmtd,
+                        hpicfXrrpStatsUpTime,
+                        hpicfXrrpStatsProtocolCreateTime,
+
+                        hpicfXrrpStatsInstancePktsRcvd,
+                        hpicfXrrpStatsInstancePktsXmtd,
+                        hpicfXrrpStatsInstanceVersionErrPkts,
+                        hpicfXrrpStatsInstancePriorityZeroPktsRcvd,
+                        hpicfXrrpStatsInstancePriorityZeroPktsXmtd,
+                        hpicfXrrpStatsInstanceMismatchedIpPkts,
+                        hpicfXrrpStatsInstanceAuthFailPktsReject,
+                        hpicfXrrpStatsInstanceIntervalMismatchPkts,
+                        hpicfXrrpStatsInstanceCreateTime,
+
+                        hpicfXrrpStatsRcOperState,
+                        hpicfXrrpStatsRcType1PktsRcvd,
+                        hpicfXrrpStatsRcType1PktsXmtd,
+                        hpicfXrrpStatsRcType2PktsRcvd,
+                        hpicfXrrpStatsRcType2PktsXmtd,
+                        hpicfXrrpStatsRcBecomeMaster,
+                        hpicfXrrpStatsRcMasterTime,
+                        hpicfXrrpStatsRcUnknownVlanId,
+                        hpicfXrrpStatsRcCreateTime,
+                        hpicfXrrpStatsRcBecomeMain,
+                        hpicfXrrpStatsRcMainRouterTime
+                    }
+        STATUS      current
+        DESCRIPTION "Conformance group for XRRP statistics."
+        ::= { hpicfXrrpMIBGroups 7 }
 END

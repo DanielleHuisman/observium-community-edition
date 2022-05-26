@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -16,15 +15,13 @@ $i = 0;
 $query = "SELECT * FROM `devices`";
 $devices = dbFetchRows($query, $sql_param);
 
-foreach ($devices AS $device)
-{
+foreach ($devices as $device) {
   $rrd_filename = get_rrd_path($device, "perf-poller.rrd");
 
-  if (device_permitted($device) && rrd_is_file($rrd_filename))
-  {
+  if (device_permitted($device) && rrd_is_file($rrd_filename, TRUE)) {
 
     $rrd_list[$i]['filename'] = $rrd_filename;
-    $rrd_list[$i]['descr'] = str_pad($device['hostname'],25) ." (".$device['os'].")";
+    $rrd_list[$i]['descr'] = str_pad($device['hostname'], 25) ." (".$device['os'].")";
     $rrd_list[$i]['ds'] = "val";
     $i++;
   }
@@ -45,4 +42,4 @@ $nototal = 1;
 
 include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
 
-?>
+// EOF

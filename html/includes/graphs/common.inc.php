@@ -10,14 +10,15 @@
  *
  */
 
-// Validate rrdtool compatible time string and set to now/day if it's not valid
-if (preg_match('/^(\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['to']))   { $to   = $vars['to'];   }// else { $to     = $config['time']['now']; }
-if (preg_match('/^(\d+|[\-\+]\d+[dwmysh]|now)$/i', $vars['from'])) { $from = $vars['from']; }// else { $from   = $config['time']['day']; }
-
-if (isset($vars['period']) && is_numeric($vars['period'])) {
-  $to = time();
-  $from = time() - $vars['period'];
-}
+/**
+ * @var array $config
+ * @var array $vars
+ * @var string $rrd_options
+ * @var string $graph_title
+ * @var boolean $scale_rigid
+ * @var boolean $step
+ * @var boolean $kibi
+ */
 
 if (isset($vars['width'])) {
    $width = $vars['width'];
@@ -91,7 +92,7 @@ if (isset($vars['style']) && $vars['style']) {
 // Autoscale
 if (!isset($scale_min) && !isset($scale_max)) {
    if ($graph_style === 'mrtg' && !isset($log_y)) { // Don't use this if we're doing logarithmic scale, else it breaks.
-      $rrd_options .= ' --lower-limit 0 --alt-autoscale-max';
+      $rrd_options .= ' --alt-autoscale-max';
    } else {
       $rrd_options .= ' --alt-autoscale';
    }
@@ -125,7 +126,8 @@ if (isset($vars['max']) && get_var_true($vars['max'])) {
    $graph_max = TRUE;
 }
 
-if ($config['graphs']['always_draw_max'] !== 1) {
+if (!$config['graphs']['always_draw_max']) {
+  // @adama please fix sensors graphs when always_draw_max FALSE (default) :P
    if (is_numeric($from)) {
       if ($to - $from <= 172800) {
          $graph_max = 0;

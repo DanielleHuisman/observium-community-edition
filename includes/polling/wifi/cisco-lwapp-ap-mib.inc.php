@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -30,70 +29,42 @@
  *
  */
 
- echo('CISCO-LWAPP-AP-MIB' . PHP_EOL);
+if (safe_empty($aps_db)) {
+  // APs not discovered
+  return;
+}
 
- //Thin AP Get Uptimes
- print_cli_data("Collecting", "CISCO-LWAPP-AP-MIB Access Points Uptimes", 3);
+//echo('CISCO-LWAPP-AP-MIB' . PHP_EOL);
 
- $table_rows = array();
- $table_headers = array('%WAP MacAddress%n', '%WAP Uptime%n', '%WAP Controller Uptime%n', '%WAP Controller Latency%n');
+//Thin AP Get Uptimes
+print_cli_data("Collecting", "CISCO-LWAPP-AP-MIB Access Points Uptimes", 3);
 
- $ap_db = dbFetchRows('SELECT * FROM `wifi_aps` WHERE `device_id` = ?', array($device['device_id']));
- foreach ($ap_db as $aps)
- {
- 	$aps_db[$aps['ap_index']] = $aps;
-	$aps_exist[$aps['ap_index']] = $aps['wifi_ap_id'];
- }
+// AccessPoints Attributes
+$lwapps = snmpwalk_cache_oid($device, 'cLApUpTime',                [], 'CISCO-LWAPP-AP-MIB', NULL, OBS_SNMP_ALL_TABLE);  //ap_uptime
+$lwapps = snmpwalk_cache_oid($device, 'cLLwappUpTime',     	  $lwapps, 'CISCO-LWAPP-AP-MIB', NULL, OBS_SNMP_ALL_TABLE);  //ap_control_uptime
+$lwapps = snmpwalk_cache_oid($device, 'cLLwappJoinTakenTime', $lwapps, 'CISCO-LWAPP-AP-MIB', NULL, OBS_SNMP_ALL_TABLE);  //ap_control_latency
 
- // AccessPoints Attributes
- $lwapps = snmpwalk_cache_oid($device, 'cLApUpTime',    	array(), 'CISCO-LWAPP-AP-MIB', NULL, OBS_SNMP_ALL_TABLE);  //ap_uptime
- $lwapps = snmpwalk_cache_oid($device, 'cLLwappUpTime',     	$lwapps, 'CISCO-LWAPP-AP-MIB', NULL, OBS_SNMP_ALL_TABLE);  //ap_control_uptime
- $lwapps = snmpwalk_cache_oid($device, 'cLLwappJoinTakenTime',	$lwapps, 'CISCO-LWAPP-AP-MIB', NULL, OBS_SNMP_ALL_TABLE);  //ap_control_latency
+//print_vars($lwapps);
 
- //print_vars($lwapps);
+foreach ($lwapps as $ap_index => $aps) {
+	$index = format_mac(mac_zeropad($ap_index));
 
- foreach ($lwapps as $index => $aps)
- {
-	$mac_padded = mac_zeropad($index);
-	$mac_index = format_mac($mac_padded);
+  print_debug_vars($aps);
 
-	if (OBS_DEBUG) { print_r($aps); }
+	if (is_array($aps_poll[$index])) {
+    //echo("AP Index exists: $index\n");
+    $uptime = uptime_to_seconds($aps['cLApUpTime']);
+    $control_uptime = uptime_to_seconds($aps['cLLwappUpTime']);
+    $control_latency = uptime_to_seconds($aps['cLLwappJoinTakenTime']);
 
-	$uptime = uptime_to_seconds($aps['cLApUpTime']);
-	$uptime_show = format_uptime($uptime, "long");
+    $aps_poll[$index]['ap_uptime']          = $uptime;
+    $aps_poll[$index]['ap_control_uptime']  = $control_uptime;
+    $aps_poll[$index]['ap_control_latency'] = $control_latency;
+  } else {
+    print_warning("New AP Index: $index - Need to wait for AIRESPACE-WIRELESS-MIB to add it in the DB");
+  }
+}
 
-	$control_uptime = uptime_to_seconds($aps['cLLwappUpTime']);
-        $control_uptime_show = format_uptime($control_uptime, "long");
-
-	$control_latency = uptime_to_seconds($aps['cLLwappJoinTakenTime']);
-        $control_latency_show = format_uptime($control_latency, "long");
-
-	if (is_array($aps_db[$mac_index]))
-	{
-		//echo("AP Index exists: $index\n");
-		dbUpdate(array('ap_uptime'          => $uptime,
-                   'ap_control_uptime'  => $control_uptime,
-			             'ap_control_latency' => $control_latency,
-		               ),'wifi_aps', '`device_id` = ? AND `ap_index` = ?',
-			  	   array($device['device_id'], $mac_index));
-		}else {
-			echo("New AP Index: $mac_index - Need to wait for AIRESPACE-WIRELESS-MIB to add it in the DB\n");
-		}
-
-		$table_row = array();
-		$table_row[] = $mac_index;
-		$table_row[] = $uptime_show;
-		$table_row[] = $control_uptime_show;
-		$table_row[] = $control_latency_show;
-		$table_rows[] = $table_row;
-		unset($table_row);
- }
-
- print_cli_table($table_rows, $table_headers);
- unset($table_rows, $table_headers);
-
- if (OBS_DEBUG) { print_r($aps_exist); }
-
- unset($ap_db, $aps_db, $aps_exist, $mac_index, $wifi_ap_id, $aps, $lwapps, $uptime, $uptime_show, $control_uptime, $control_uptime_show, $control_latency, $control_latency_show, $index, $mac_padded);
+unset($lwapps, $ap_index, $index, $aps);
 
 // EOF

@@ -18,8 +18,7 @@
  * @return string Full rrd file path
  */
 // TESTME needs unit testing
-function get_rrd_path($device, $filename)
-{
+function get_rrd_path($device, $filename) {
   global $config;
 
   $rrd_dir = trim($config['rrd_dir']) . '/';
@@ -61,21 +60,24 @@ function get_rrd_path($device, $filename)
  * @param array $device
  * @param string $old_rrd Base filename for old rrd file
  * @param string $new_rrd Base filename for new rrd file
- * @param boolean $overwrite Force overwrite new rrd file if already exist
+ * @param bool $overwrite Force overwrite new rrd file if already exist
  * @return bool TRUE if renamed
  */
-function rename_rrd($device, $old_rrd, $new_rrd, $overwrite = FALSE)
-{
+function rename_rrd($device, $old_rrd, $new_rrd, $overwrite = FALSE) {
   $old_rrd = get_rrd_path($device, $old_rrd);
   $new_rrd = get_rrd_path($device, $new_rrd);
   print_debug_vars($old_rrd);
   print_debug_vars($new_rrd);
-  if (is_file($old_rrd))
-  {
-    if (!$overwrite && is_file($new_rrd))
-    {
+
+  if (rrd_is_file($old_rrd, TRUE)) {
+    if (!$overwrite && rrd_is_file($new_rrd, TRUE)) {
       // If not forced overwrite file, return false
       print_debug("RRD already exist new file: '$new_rrd'");
+      $renamed = FALSE;
+    } elseif (OBS_RRD_NOLOCAL) {
+      // Currently external rrd(cached) not support rename (also dump/restore), see:
+      // https://github.com/oetiker/rrdtool-1.x/issues/1141
+      // https://github.com/oetiker/rrdtool-1.x/issues/1142
       $renamed = FALSE;
     } else {
       $renamed = rename($old_rrd, $new_rrd);
@@ -84,65 +86,11 @@ function rename_rrd($device, $old_rrd, $new_rrd, $overwrite = FALSE)
     print_debug("RRD old file not found: '$old_rrd'");
     $renamed = FALSE;
   }
-  if ($renamed)
-  {
+  if ($renamed) {
     print_debug("RRD moved: '$old_rrd' -> '$new_rrd'");
   }
 
   return $renamed;
-}
-
-/**
- * Rename rrd file for device (same as in rename_rrd()),
- * but rrd filename detected by common entity params
- *
- * @param array $device
- * @param string $entity Entity type (sensor, status, etc..)
- * @param array $old Old entity params, based on discovery entity
- * @param array $new New entity params, based on discovery entity
- * @param boolean $overwrite Force overwrite new rrd file if already exist
- * @return bool TRUE if renamed
- */
-function rename_rrd_entity($device, $entity, $old, $new, $overwrite = FALSE)
-{
-  switch ($entity)
-  {
-    case 'sensor':
-      $old_sensor = array('poller_type'  => $old['poller_type'],
-                          'sensor_descr' => $old['descr'],
-                          'sensor_class' => $old['class'],
-                          'sensor_type'  => $old['type'],
-                          'sensor_index' => $old['index']);
-      $new_sensor = array('poller_type'  => $new['poller_type'],
-                          'sensor_descr' => $new['descr'],
-                          'sensor_class' => $new['class'],
-                          'sensor_type'  => $new['type'],
-                          'sensor_index' => $new['index']);
-
-      $old_rrd = get_sensor_rrd($device, $old_sensor);
-      $new_rrd = get_sensor_rrd($device, $new_sensor);
-      break;
-    case 'status':
-      $old_status = array('poller_type'  => $old['poller_type'],
-                          'status_descr' => $old['descr'],
-                          'status_type'  => $old['type'],
-                          'status_index' => $old['index']);
-      $new_status = array('poller_type'  => $new['poller_type'],
-                          'status_descr' => $new['descr'],
-                          'status_type'  => $new['type'],
-                          'status_index' => $new['index']);
-
-      $old_rrd = get_status_rrd($device, $old_status);
-      $new_rrd = get_status_rrd($device, $new_status);
-      break;
-    default:
-      print_debug("skipped unknown entity for rename rrd");
-      return FALSE;
-  }
-
-  $old_rrd = safename($old_rrd);
-
-  return rename_rrd($device, $old_rrd, $new_rrd, $overwrite);
 }
 
 /**
@@ -154,8 +102,7 @@ function rename_rrd_entity($device, $entity, $old, $new, $overwrite = FALSE)
  * @param &rrd_pipes
  */
 // TESTME needs unit testing
-function rrdtool_pipe_open(&$rrd_process, &$rrd_pipes)
-{
+function rrdtool_pipe_open(&$rrd_process, &$rrd_pipes) {
   global $config;
 
   $command = $config['rrdtool'] . ' -'; // Waits for input via standard input (STDIN)
@@ -180,22 +127,20 @@ function rrdtool_pipe_open(&$rrd_process, &$rrd_pipes)
     // 0 => writeable handle connected to child stdin
     // 1 => readable handle connected to child stdout
     // 2 => readable handle connected to child stderr
-    if (OBS_DEBUG > 1)
-    {
+    if (OBS_DEBUG > 1) {
       print_message('RRD PIPE OPEN[%gTRUE%n]', 'console');
     }
 
     return TRUE;
-  } else {
-    if (isset($config['rrd']['debug']) && $config['rrd']['debug']) {
-      logfile('rrd.log', "RRD pipe process not opened '$command'.");
-    }
-    if (OBS_DEBUG > 1)
-    {
-      print_message('RRD PIPE OPEN[%rFALSE%n]', 'console');
-    }
-    return FALSE;
   }
+
+  if (isset($config['rrd']['debug']) && $config['rrd']['debug']) {
+    logfile('rrd.log', "RRD pipe process not opened '$command'.");
+  }
+  if (OBS_DEBUG > 1) {
+    print_message('RRD PIPE OPEN[%rFALSE%n]', 'console');
+  }
+  return FALSE;
 }
 
 /**
@@ -378,15 +323,14 @@ function rrdtool($command, $filename, $options)
     return NULL;
   }
 
-  if (in_array($command, [ 'fetch', 'last', 'lastupdate', 'tune', 'xport', 'info' ])) {
+  if (in_array($command, [ 'fetch', 'last', 'lastupdate', 'tune', 'xport', 'dump', 'restore', 'info' ])) {
     // This commands require exact STDOUT, skip use pipes
-    $command = $config['rrdtool'] . ' ' . $cmd;
-    $stdout = external_exec($command, 500); // Limit exec time to 500ms
+    //$command = $config['rrdtool'] . ' ' . $cmd;
+    $stdout = external_exec($config['rrdtool'] . ' ' . $cmd, 500); // Limit exec time to 500ms
     $runtime = $GLOBALS['exec_status']['runtime'];
     $GLOBALS['rrd_status'] = $GLOBALS['exec_status']['exitcode'] === 0;
     // Check rrdtool's output for the command.
-    if (!$GLOBALS['rrd_status'] && isset($config['rrd']['debug']) && $config['rrd']['debug'])
-    {
+    if (!$GLOBALS['rrd_status'] && isset($config['rrd']['debug']) && $config['rrd']['debug']) {
       logfile('rrd.log', "RRD ".$GLOBALS['exec_status']['stderr'].", CMD: $cmd");
     }
   } else {
@@ -457,8 +401,7 @@ function rrdtool($command, $filename, $options)
  * @param string ds
  * @param string options
  */
-function rrdtool_create($device, $filename, $ds, $options = '')
-{
+function rrdtool_create($device, $filename, $ds, $options = '') {
   global $config;
 
   if ($filename[0] === '/') {
@@ -472,11 +415,15 @@ function rrdtool_create($device, $filename, $ds, $options = '')
     print_message("[%rRRD Disabled - create $fsfilename%n]", 'color');
     return NULL;
   }
-  if (OBS_RRD_NOLOCAL) {
-    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
+
+  if (OBS_RRD_NOLOCAL && !$config['cache']['enable']) {
+    // do not check remote without caching
   } elseif (rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename already exists - no need to create.");
     return FALSE; // Bail out if the file exists already
+  }
+  if (OBS_RRD_NOLOCAL) {
+    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
   }
 
   if (!$options) {
@@ -543,8 +490,7 @@ function rrdtool_generate_filename($def, $index) {
  * @return string
  */
 // TESTME needs unit testing
-function rrdtool_create_ng($device, $type, $index = NULL, $options = [])
-{
+function rrdtool_create_ng($device, $type, $index = NULL, $options = []) {
   global $config;
 
   if (!is_array($type)) { // We were passed a string
@@ -566,11 +512,15 @@ function rrdtool_create_ng($device, $type, $index = NULL, $options = [])
     print_message("[%rRRD Disabled - create $fsfilename%n]", 'color');
     return NULL;
   }
-  if (OBS_RRD_NOLOCAL) {
-    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
+
+  if (OBS_RRD_NOLOCAL && !$config['cache']['enable']) {
+    // do not check remote without caching
   } elseif (rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename already exists - no need to create.");
     return FALSE; // Bail out if the file exists already
+  }
+  if (OBS_RRD_NOLOCAL) {
+    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
   }
 
   // Set RRA option
@@ -743,8 +693,7 @@ function rrdtool_update($device, $filename, $options)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rrdtool_fetch($filename, $options)
-{
+function rrdtool_fetch($filename, $options) {
   return rrdtool('fetch', $filename, $options);
 }
 
@@ -756,8 +705,7 @@ function rrdtool_fetch($filename, $options)
  * @param string $options Mostly not required
  * @return string UNIX timestamp
  */
-function rrdtool_last($filename, $options = '')
-{
+function rrdtool_last($filename, $options = '') {
   return rrdtool('last', $filename, $options);
 }
 
@@ -777,8 +725,8 @@ function rrdtool_lastupdate($filename, $options = '') {
  * Checks if an RRD database at $filename for $device exists
  * Checks via rrdcached if configured, else via is_exists
  *
- * @param array  device
- * @param string filename
+ * @param array  $device
+ * @param string $filename
  **/
 function rrd_exists($device, $filename) {
 
@@ -786,33 +734,66 @@ function rrd_exists($device, $filename) {
 
   $fsfilename = get_rrd_path($device, $filename);
 
-  if (OBS_RRD_NOLOCAL) {
-    // NOTE. RRD last on remote daemon reduce polling times
-    rrdtool_last($fsfilename);
-
-    //ERROR: realpath(hostname/status.rrd): No such file or directory
-    return strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
-    //return $GLOBALS['rrd_status'];
-  }
-
-  return is_file($fsfilename);
+  // Return cached variant of rrdfile is exist
+  return rrd_is_file($fsfilename, TRUE);
 }
 
-/* Simple pass is_file() on local system and TRUE on REMOTE rrdcached */
+/**
+ * Pass is_file() on local system
+ * and rrdtool last on REMOTE rrdcached
+ * or pass TRUE if $remote_validate == FALSE
+ *
+ * @param string $filename RRD filename
+ * @param bool   $remote_validate Validate if RRD file exist with remote rrdcached
+ * @return bool
+ */
 function rrd_is_file($filename, $remote_validate = FALSE) {
 
   if (OBS_RRD_NOLOCAL) {
     // NOTE. RRD last on remote daemon reduce polling times
     if ($remote_validate) {
-      // FIXME. Caching for valid files?
-      $unixtime = rrdtool_last($filename);
-      if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
-        // Correct unixtime without errors
-        return TRUE;
+      if (!$GLOBALS['config']['rrd']['cache']) {
+        // Extra way for skip use phpFastCache in polling
+        // WARNING. Don't use this until you know what you are doing
+        print_debug("Remote RRDcacheD caching disabled for rrd_is_file('$filename', TRUE) call.");
+        $unixtime = rrdtool_last($filename);
+        if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
+          // Correct unixtime without errors
+          return TRUE;
+        }
+
+        //ERROR: realpath(hostname/status.rrd): No such file or directory
+        return strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
+        //return $GLOBALS['rrd_status'];
       }
-      //ERROR: realpath(hostname/status.rrd): No such file or directory
-      return strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
-      //return $GLOBALS['rrd_status'];
+
+      $cache_key = 'rrd_is_file-' . str_replace($GLOBALS['config']['rrd_dir'].'/', '', $filename);
+      $cache_item = get_cache_item($cache_key);
+      if (!ishit_cache_item($cache_item)) {
+        $unixtime = rrdtool_last($filename);
+        if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
+          // Correct unixtime without errors
+          $exist = TRUE;
+        } else {
+
+          //ERROR: realpath(hostname/status.rrd): No such file or directory
+          $exist = strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
+          //return $GLOBALS['rrd_status'];
+        }
+
+        // Store $cache in fast caching
+        set_cache_item($cache_item, $exist ? 1 : 0, [ 'ttl' => 3600 ]); // set valid for 1 hour
+        //print_debug_vars(get_cache_items('__cli'));
+        return $exist;
+      }
+
+      // Cached item
+      $exist = get_cache_data($cache_item);
+      if (OBS_DEBUG || (defined('OBS_CACHE_DEBUG') && OBS_CACHE_DEBUG)) {
+        print_message("RRD file '%W$filename%n' exist cached [".($exist ? '%gTRUE%n' : '%yFALSE%n')."].", 'console');
+        //print_vars($exist);
+      }
+      return (bool)$exist;
     }
 
     // Probably for polling
@@ -871,8 +852,7 @@ function rrdtool_file_valid($file) {
  *
  * @return bool|string|string[]|null
  */
-function rrdtool_export_ng($device, $filename, $options = '', $start = NULL, $end = NULL, $rows = NULL)
-{
+function rrdtool_export_ng($device, $filename, $options = '', $start = NULL, $end = NULL, $rows = NULL) {
   $fsfilename = get_rrd_path($device, $filename);
 
   // https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#AT-STYLE_TIME_SPECIFICATION
@@ -886,43 +866,38 @@ function rrdtool_export_ng($device, $filename, $options = '', $start = NULL, $en
   // start+6hours or s+6h -- 6 hours after start time (may be used as end time specification).
   // 931200300 -- 18:45 (UTC), July 5th, 1999 (yes, seconds since 1970 are valid as well).
   // 19970703 12:45 -- 12:45 July 3th, 1997 (my favorite, and it has even got an ISO number (8601)).
-  if (strlen($start))
-  {
+  if (strlen($start)) {
     $options .= ' -s '.escapeshellarg($start);
   }
-  if (strlen($end))
-  {
+  if (strlen($end)) {
     $options .= ' -e '.escapeshellarg($end);
   }
 
-  if (strlen($rows))
-  {
+  if (strlen($rows)) {
     $options .= ' -m '.escapeshellarg($rows);
   }
 
   return rrdtool_export($fsfilename, $options);
 }
 
-function rrdtool_export($filename, $options = '')
-{
+function rrdtool_export($filename, $options = '') {
   global $config;
 
   $return = FALSE;
-  if ($config['norrd'])
-  {
+  if ($config['norrd']) {
     print_message('[%gRRD Disabled%n] ');
     return $return;
   }
 
   // rrdtool tune rename DS supported since v1.4
   $version = get_versions();
-  if (version_compare($version['rrdtool_version'], '1.4.6', '<'))
-  {
+  if (version_compare($version['rrdtool_version'], '1.4.6', '<')) {
     print_error('[%gRRD too old. JSON supported since 1.4.6%n] ');
     return $return;
   }
 
   //$fsfilename = get_rrd_path($device, $filename);
+  print_vars($filename);
   return rrdtool('xport', $filename, "--json -t ".$options);
 }
 
@@ -947,9 +922,10 @@ function rrdtool_rename_ds($device, $filename, $oldname, $newname)
   }
 
   // rrdtool tune rename DS supported since v1.4
+  // really not, see:
+  // https://github.com/oetiker/rrdtool-1.x/pull/1139
   $version = get_versions();
-  if (version_compare($version['rrdtool_version'], '1.4', '>='))
-  {
+  if (version_compare($version['rrdtool_version'], '1.4', '>=')) {
     $fsfilename = get_rrd_path($device, $filename);
     print_debug("RRD DS renamed, file $fsfilename: '$oldname' -> '$newname'");
     return rrdtool('tune', $filename, "--data-source-rename $oldname:$newname");
@@ -1056,9 +1032,8 @@ function rrdtool_update_ds($device, $type, $index = NULL, $options = []) {
     print_message("[%rRRD Disabled - update rra $fsfilename%n]", 'color');
     return NULL;
   }
-  if (OBS_RRD_NOLOCAL) {
-    print_debug("RRA update $fsfilename passed to remote rrdcached with --no-overwrite.");
-  } elseif (!rrd_exists($device, $filename)) {
+
+  if (!rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename not exist - no need to update.");
     return FALSE; // Bail out if the file exists already
   }

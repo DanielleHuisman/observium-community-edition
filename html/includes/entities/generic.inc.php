@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage functions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -41,19 +41,16 @@ function print_f5_lb_virtual_table_header($vars)
   echo('<tbody>' . PHP_EOL);
 }
 
-function get_customoid_by_id($oid_id)
-{
+function get_customoid_by_id($oid_id) {
 
-  if (is_numeric($oid_id))
-  {
+  if (is_numeric($oid_id)) {
     $oid = dbFetchRow('SELECT * FROM `oids` WHERE `oid_id` = ?', array($oid_id));
   }
-  if (count($oid))
-  {
+  if (safe_count($oid)) {
     return $oid;
-  } else {
-    return FALSE;
   }
+
+  return FALSE;
 
 } // end function get_customoid_by_id()
 
@@ -379,7 +376,7 @@ function build_entity_measured_where($entity_type, $vars)
           {
             case 'port':
             case 'printersupply':
-              $measure_sql  = generate_query_values($measured_type, $column_measured_type, NULL, FALSE);
+              $measure_sql  = generate_query_values($measured_type, $column_measured_type, NULL, OBS_DB_NO_LEADING_AND);
               $measure_sql .= generate_query_values($entities,      $column_measured_id);
               break;
           }
@@ -390,10 +387,9 @@ function build_entity_measured_where($entity_type, $vars)
         // UP / DOWN / STUTDOWN / NONE states
         //$value = (array)$value;
         // Select all without measured entities
-        if (in_array('none', $value))
-        {
-          $measure_array[] = generate_query_values(1, $column_measured_id, 'NULL', FALSE);
-          $value = array_diff($value, ['none']);
+        if (in_array('none', $value)) {
+          $measure_array[] = generate_query_values(1, $column_measured_id, 'NULL', OBS_DB_NO_LEADING_AND);
+          $value = array_diff($value, [ 'none' ]);
         }
         if (count($value))
         {
@@ -414,7 +410,7 @@ function build_entity_measured_where($entity_type, $vars)
                 $entities = dbFetchColumn($entity_sql);
                 //$entities = dbFetchColumn($entity_sql, NULL, TRUE);
                 //r($entities);
-                $measure_sql  = generate_query_values($measured_type, $column_measured_type, NULL, FALSE);
+                $measure_sql  = generate_query_values($measured_type, $column_measured_type, NULL, OBS_DB_NO_LEADING_AND);
                 $measure_sql .= generate_query_values($entities,      $column_measured_id);
                 break;
               case 'printersupply':

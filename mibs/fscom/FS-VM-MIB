@@ -1,0 +1,783 @@
+-- *****************************************************************
+-- FS-VMSUP-MIB.mib:  FS VirtualMachine MIB file
+--
+-- January 2011, Liupu
+--
+-- Copyright (c) 2012 by FS.COM Inc..
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+FS-VM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Unsigned32,
+        IpAddress
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        DateAndTime,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        IfIndex,
+        ConfigStatus
+                FROM FS-TC
+        VlanId
+                FROM Q-BRIDGE-MIB
+        fsMgmt
+                FROM FS-SMI;
+
+fsVMMIB MODULE-IDENTITY
+        LAST-UPDATED "201208220000Z"
+        ORGANIZATION "FS.COM Inc.."
+        CONTACT-INFO
+                " 
+                Tel: 400-865-2852 
+
+                E-mail: https://www.fs.com/live_chat_service_mail.html"
+        DESCRIPTION
+                "This module defines fs VM support mibs."
+        REVISION      "201208220000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { fsMgmt 96}
+
+
+-- VirtualMachine Information
+
+fsVMMIBObjects OBJECT IDENTIFIER ::= { fsVMMIB 1 }
+
+-- -----------------------------------------------------------------------
+-- Scalar of configuring VM support.
+-- -----------------------------------------------------------------------
+fsVMFuncVMSupport OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Indicates whether the VM support is currently running 
+                in the specified switch.
+                
+                Set this object to valid(1) and the VM support will be disabled.
+                Set this object to invalid(2) and the VM support will be enabled." 
+        ::= { fsVMMIBObjects 1 }
+
+fsVMTrapCfgNotifyStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Status of the VM notification, 
+                set its value to invalid(2) and VM notification will be turned off.
+                set its value to valid(1) and VM notification will be turned on."
+        ::= { fsVMMIBObjects 2 }
+        
+fsVMTrapCfgHistorySize OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Value of VM notification history, and this value ranges from 1 to 200."
+        ::= { fsVMMIBObjects 3 }
+        
+fsVMRateMin OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Minimum Kbps (KBits per second) for rate limit."
+        ::= { fsVMMIBObjects 12 }
+        
+fsVMRateMax OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Maximum Kbps (KBits per second) for rate limit."
+        ::= { fsVMMIBObjects 13 }
+        
+fsVMBurstMin OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Minimum Kbyte for rate burst. 
+                Burst Size: The maximum number of byte to allow in a burst."
+        ::= { fsVMMIBObjects 14 }
+
+fsVMBurstMax OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Maximum Kbyte for rate burst. 
+                Burst Size: The maximum number of byte to allow in a burst."
+        ::= { fsVMMIBObjects 15 }
+        
+-- -----------------------------------------------------------------------
+-- A table for configuring VM information.
+-- -----------------------------------------------------------------------
+fsVMInfoTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of VM information request entries."
+        ::= { fsVMMIBObjects 4 }
+    
+fsVMInfoEntry OBJECT-TYPE
+        SYNTAX FSVMInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains VM information in switch."  
+        INDEX { fsVMInfoVMMac, fsVMInfoVMGroup }
+        ::= { fsVMInfoTable 1 }
+        
+FSVMInfoEntry ::=
+        SEQUENCE {
+                fsVMInfoVMMac       MacAddress,
+                fsVMInfoVMGroup     Integer32,
+                fsVMInfoRowStatus   RowStatus
+        } 
+
+fsVMInfoVMMac OBJECT-TYPE
+        SYNTAX MacAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Mac address of VM is registered."
+        ::= { fsVMInfoEntry 1 }
+
+fsVMInfoVMGroup OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+               "VM Group number to which the VM is associated."
+        ::= { fsVMInfoEntry 2 }
+
+fsVMInfoRowStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+                "Status of the Virtual Machine information table.
+                
+                Set this object to ROW_DESTORY, delete VM from VM Group.
+                Set this object to ROW_ACTIVE, add VM to VM Group."
+        ::= { fsVMInfoEntry 3 }
+
+-- -----------------------------------------------------------------------
+-- A table for configuring VM Group.
+-- -----------------------------------------------------------------------
+fsVMGroupInfoTable  OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMGroupInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "A table of VM Group information request entries."
+        ::= { fsVMMIBObjects 5 }
+    
+fsVMGroupInfoEntry OBJECT-TYPE
+        SYNTAX FSVMGroupInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry VM group information in switch."
+        INDEX { fsVMGroupInfoGroupName }
+        ::= { fsVMGroupInfoTable 1 }
+
+FSVMGroupInfoEntry ::=
+        SEQUENCE {
+                fsVMGroupInfoGroupName      Integer32,
+                fsVMGroupInfoProfileCfg     ConfigStatus,
+                fsVMGroupInfoProfileName    DisplayString,
+                fsVMGroupInfoRowStatus      RowStatus
+        }
+
+fsVMGroupInfoGroupName OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Group number to which the VM Group is associated."
+        ::= { fsVMGroupInfoEntry 1 }
+
+fsVMGroupInfoProfileCfg OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Configuration of the VM Group Profile.
+                
+                Set this object to unrelated(2) remove the profile from VM Group, 
+                Set this object to related(1) relate the profile to VM Group"
+        ::= { fsVMGroupInfoEntry  2 }
+
+fsVMGroupInfoProfileName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (0..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Name of the network config file on the VM . 
+                If the profile file is not created and the VM dose not need any ACL, QOS config, 
+                this field is null."
+        ::= { fsVMGroupInfoEntry  3 }
+
+fsVMGroupInfoRowStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+                "Status of the Virtual Machine Group information table.
+                
+                Set this object to ROW_DESTORY, delete the VM Group.
+                Set this object to ROW_ACTIVE, create the VM Group and 
+                associate with this profile"
+        ::= { fsVMGroupInfoEntry 4 }
+
+-- -----------------------------------------------------------------------
+-- A table for configuring VM Profile.
+-- -----------------------------------------------------------------------
+fsVMProfileTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMProfileEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table of VM network profile information."
+        ::= { fsVMMIBObjects 6 }
+
+fsVMProfileEntry OBJECT-TYPE
+        SYNTAX FSVMProfileEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry the VM network profile information in switch."  
+        INDEX { fsVMProfileName }
+        ::= { fsVMProfileTable 1 }
+        
+FSVMProfileEntry ::= 
+        SEQUENCE {
+                fsVMProfileName           DisplayString,
+                fsVMProfileAclIn          DisplayString,
+                fsVMProfileAclOut         DisplayString,
+                fsVMProfileTxRate         Unsigned32,
+                fsVMProfileTxBurst        Integer32,
+                fsVMProfileRxRate         Unsigned32,
+                fsVMProfileRxBurst        Integer32,
+                fsVMProfileRowStatus      RowStatus,
+                fsVMProfileQosTrustMode   INTEGER,
+                fsVMProfileQosDefCos      INTEGER,
+                fsVMProfileQosRxPolicyMap DisplayString
+        }
+
+fsVMProfileName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (0..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+               "the name of the VM profile contains a set of properties 
+                that will be configured on the Switch and VirtualSwitch."
+        ::= { fsVMProfileEntry  1 }
+
+fsVMProfileAclIn OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..100))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Access list name of this entry , and the direction is in.This value 
+                is unique for every entry. When this string is used as an index, Value 
+                of a sub-identifier equals ASCII value of corresponding character(first 
+                sub-identifier corresponds first character of string). The number of 
+                sub-identifiers of this string must be 100, If length of string is less 
+                than 100, the sub-identifier(0x0) will be filled in tail."
+        ::= { fsVMProfileEntry  2 }
+
+fsVMProfileAclOut OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..100))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Access list name of this entry , and the direction is out.This value 
+                is unique for every entry. When this string is used as an index, Value 
+                of a sub-identifier equals ASCII value of corresponding character(first 
+                sub-identifier corresponds first character of string). The number of 
+                sub-identifiers of this string must be 100, If length of string is less 
+                than 100, the sub-identifier(0x0) will be filled in tail."
+        ::= { fsVMProfileEntry  3 }
+
+fsVMProfileTxRate OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Tx Rate value of VM flow output from port."
+        ::= { fsVMProfileEntry 4 }
+
+fsVMProfileTxBurst OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Output limit of burst traffic in units of byte.
+                 0 indicates that burst traffic will be not limited."
+        ::= { fsVMProfileEntry 5 }
+
+fsVMProfileRxRate OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Rx Rate value of VM flow input limit from port."
+        ::= { fsVMProfileEntry 6 }
+
+fsVMProfileRxBurst OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Input limit of burst traffic in units of byte.
+                 0 indicates that burst traffic will be not limited."
+        ::= { fsVMProfileEntry 7 }
+
+fsVMProfileRowStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+                "Status of the Virtual Machine Profile information table.
+                
+                Set this object to ROW_DESTORY, delete the profile. 
+                Set this object to ROW_ACTIVE, create the profile."
+        ::= { fsVMProfileEntry 8 }
+
+fsVMProfileQosTrustMode OBJECT-TYPE
+        SYNTAX INTEGER {
+               not-trust(0),
+               trust-cos(1),
+               trust-dscp(2),
+               trust-ip-precedence(3)
+        } 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "QoS trust mode  for VMs."
+        ::= { fsVMProfileEntry 9 }
+
+fsVMProfileQosDefCos OBJECT-TYPE
+        SYNTAX INTEGER {
+                invalid(8)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "The default ingress User Priority for VMs.
+		        This cos value is in the range (0..7) ,
+                Set this value with invalid(8), defualt cos will delete."
+        ::= { fsVMProfileEntry 10 }
+
+fsVMProfileQosRxPolicyMap OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+               "Police map name of ServerPort ingress match about VM."
+        ::= { fsVMProfileEntry  11 }
+
+-- -----------------------------------------------------------------------
+-- A table for configuring VM location.
+-- -----------------------------------------------------------------------
+fsVMLocInfoTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMLocInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of VM location information."
+        ::= { fsVMMIBObjects 7 }
+fsVMLocInfoEntry OBJECT-TYPE
+        SYNTAX FSVMLocInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry the VM location informations in switch."  
+        INDEX { fsVMLocInfoVMMac, fsVMLocInfoPort }
+        ::= { fsVMLocInfoTable 1 }
+        
+FSVMLocInfoEntry ::= 
+        SEQUENCE {
+                fsVMLocInfoVMMac        MacAddress,
+                fsVMLocInfoPort         IfIndex,
+                fsVMLocInfoType         Unsigned32,
+                fsVMLocInfoRowStatus    RowStatus
+        } 
+
+fsVMLocInfoVMMac OBJECT-TYPE
+        SYNTAX MacAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Mac address of VM which is discovered in server port."
+        ::= { fsVMLocInfoEntry 1 }
+        
+fsVMLocInfoPort OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "The port index where the VM is discovered in switch."
+        ::= { fsVMLocInfoEntry 2 }
+
+fsVMLocInfoType OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "The type of VM location. This object is read-only.
+                 get its value is VM_LOC_CONF(0) and the VM is configurated.
+                 get its value is VM_LOC_DIS(1) and the VM is discovered."
+        ::= { fsVMLocInfoEntry 3 }
+        
+fsVMLocInfoRowStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+                "Status of the Virtual Machine location information table.
+                 Set this object to ROW_DESTORY, delete the location of VM.
+                 Set this object to ROW_ACTIVE, add the location of VM."
+        ::= { fsVMLocInfoEntry 4 }
+
+-- -----------------------------------------------------------------------
+-- A table for configuring VM support ServerPort and ReflectPort.
+-- -----------------------------------------------------------------------
+fsVMPortInfoTable  OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMPortInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of server port information."
+        ::= { fsVMMIBObjects 8 }
+
+fsVMPortInfoEntry OBJECT-TYPE
+        SYNTAX FSVMPortInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry the server port informations in switch."  
+        INDEX { fsVMPortInfoPort }
+        ::= { fsVMPortInfoTable 1 }
+        
+FSVMPortInfoEntry ::= 
+        SEQUENCE {
+                fsVMPortInfoPort            IfIndex,
+                fsVMPortInfoStatus          ConfigStatus,
+                fsVMPortInfoReflectStatus   ConfigStatus
+        }
+
+fsVMPortInfoPort OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "Server port index on which VM is discovered."
+        ::= { fsVMPortInfoEntry 1 }
+
+fsVMPortInfoStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Status of this port to ServerPort function, 
+                set its value to invalid(2) and this port VM support will be disabled. 
+                set its value to valid(1) and this port VM support will be enabled."
+        ::= { fsVMPortInfoEntry 2 }
+
+fsVMPortInfoReflectStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+                "Status of this port reflectrelay function, 
+                set its value to invalid(2) and this port without reflectrelay function.
+                set its value to valid(1) and this port reflectrelay function enable."
+        ::= { fsVMPortInfoEntry 3 }
+
+-- -----------------------------------------------------------------------
+-- A table for VM support SNMP trap interface configuration.
+-- -----------------------------------------------------------------------
+fsVMPortTrapCfgTable  OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMPortTrapCfgEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "Configuration the port of VM notification."
+        ::= { fsVMMIBObjects 9 }
+
+fsVMPortTrapCfgEntry OBJECT-TYPE
+        SYNTAX FSVMPortTrapCfgEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry the Configuration of VM notification of interface."  
+        INDEX { fsVMPortTrapCfgPort }
+        ::= { fsVMPortTrapCfgTable 1 }
+        
+FSVMPortTrapCfgEntry ::= 
+        SEQUENCE {
+                fsVMPortTrapCfgPort         IfIndex,
+                fsVMPortTrapCfgNotifyStatus ConfigStatus
+        }
+
+fsVMPortTrapCfgPort OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The port index which VM notification will be sent in switch."
+        ::= { fsVMPortTrapCfgEntry 1 }
+
+fsVMPortTrapCfgNotifyStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Status of this port VM notification, 
+            set its value to invalid(2) and VM notification will be disabled on this port.
+            set its value to valid(1) and VM notification will be enabled on this port."
+        ::= { fsVMPortTrapCfgEntry 2 }
+
+-- -----------------------------------------------------------------------
+-- A table for VM support trap information.
+-- -----------------------------------------------------------------------
+fsVMInfoChgTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMInfoChgEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of VM notification."
+        ::= { fsVMMIBObjects 10 }
+    
+fsVMInfoChgEntry OBJECT-TYPE
+        SYNTAX FSVMInfoChgEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry the VM notification information in switch."  
+        INDEX { fsVMInfoChgVMMac, fsVMInfoChgVlan }
+        ::= { fsVMInfoChgTable 1 }
+        
+FSVMInfoChgEntry ::= 
+        SEQUENCE {
+                fsVMInfoChgVMMac    MacAddress,
+                fsVMInfoChgVlan     VlanId,
+                fsVMInfoChgPort     IfIndex,
+                fsVMInfoChgAction   DisplayString,
+                fsVMInfoChgDate     DateAndTime
+        } 
+        
+fsVMInfoChgVMMac OBJECT-TYPE
+        SYNTAX MacAddress
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+                "The VM mac address is discovered in switch."
+        ::= { fsVMInfoChgEntry 1 }
+        
+fsVMInfoChgVlan OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+                "Vlan ID where the VM is discovered in switch."
+        ::= { fsVMInfoChgEntry 2 }
+        
+fsVMInfoChgPort OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+                "The port index where the VM is discovered in switch."
+        ::= { fsVMInfoChgEntry 3 }
+        
+fsVMInfoChgAction OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (0..32))
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+                "The action of VM discover or delete, 
+                set its value to invalid and indicates the VM is deleted.
+                set its value to valid and indicates the VM is discovered."
+        ::= { fsVMInfoChgEntry 4 }
+        
+fsVMInfoChgDate OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+                "The date and time when this VM is discovered or deleted."
+        ::= { fsVMInfoChgEntry 5 }
+
+-- -----------------------------------------------------------------------
+-- A table for configuring VM OUI.
+-- -----------------------------------------------------------------------
+fsVMOuiInfoTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FSVMOuiInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of VM OUI information."
+        ::= { fsVMMIBObjects 11 }
+
+fsVMOuiInfoEntry OBJECT-TYPE
+        SYNTAX FSVMOuiInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry the VM OUI information in switch."  
+        INDEX { fsVMOuiInfoOui }
+        ::= { fsVMOuiInfoTable 1 }
+        
+FSVMOuiInfoEntry ::= 
+        SEQUENCE {
+                fsVMOuiInfoOui          MacAddress,
+                fsVMOuiInfoRowStatus    RowStatus
+        } 
+
+fsVMOuiInfoOui OBJECT-TYPE
+        SYNTAX MacAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+                "OUI of VM which is VM will be discovered in server port,
+                Only three bytes available in front and the last three bytes 
+                should be set to 0x00, such as 0x00 0x50 0x56 0x00 0x00 0x00."
+        ::= { fsVMOuiInfoEntry 1 }
+
+fsVMOuiInfoRowStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+                "Status of the VM OUI information table.
+                 Set this object to ROW_DESTORY, delete the VM OUI.
+                 Set this object to ROW_ACTIVE, add the VM OUI"
+        ::= { fsVMOuiInfoEntry 2 }
+-- -----------------------------------------------------------------------
+-- Notification of VM support.
+-- -----------------------------------------------------------------------
+fsVMMIBTraps OBJECT IDENTIFIER ::= { fsVMMIB 2 }
+
+fsVMsupMIBTrap NOTIFICATION-TYPE
+    OBJECTS { 
+            fsVMInfoChgVMMac,
+            fsVMInfoChgVlan,
+            fsVMInfoChgPort, 
+            fsVMInfoChgAction,
+            fsVMInfoChgDate
+    } 
+    STATUS  current
+    DESCRIPTION
+            "This notification is generated when a VM is discovered or deleted. 
+            If this VM is discovered and without VM location information this 
+            notification will be sent. If this VM is deleted and activated by MAC 
+            notification, this notification will be sent." 
+    ::= { fsVMMIBTraps 1 } 
+
+-- conformance information
+
+fsVMMIBConformance OBJECT IDENTIFIER ::= { fsVMMIB 3 }
+fsVMMIBCompliances OBJECT IDENTIFIER ::= { fsVMMIBConformance 1 }
+fsVMMIBGroups      OBJECT IDENTIFIER ::= { fsVMMIBConformance 2 }
+
+
+-- compliance statements
+
+fsVMMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the FS VM MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { fsVMMIBGroup }
+        ::= { fsVMMIBCompliances 1 }
+
+
+-- units of conformance
+
+fsVMMIBGroup OBJECT-GROUP
+        OBJECTS {
+                -- Scalar
+                fsVMFuncVMSupport,
+                fsVMTrapCfgNotifyStatus,
+                fsVMTrapCfgHistorySize,
+                fsVMRateMin,
+                fsVMRateMax,
+                fsVMBurstMin,
+                fsVMBurstMax,
+                
+                -- VM information table
+                fsVMInfoVMMac,
+                fsVMInfoVMGroup,
+                fsVMInfoRowStatus,
+                
+                -- VM group information table
+                fsVMGroupInfoGroupName,
+                fsVMGroupInfoProfileCfg,
+                fsVMGroupInfoProfileName,
+                fsVMGroupInfoRowStatus,
+                
+                -- VM profile information table
+                fsVMProfileName,
+                fsVMProfileAclIn,
+                fsVMProfileAclOut,
+                fsVMProfileTxRate,
+                fsVMProfileTxBurst,
+                fsVMProfileRxRate,
+                fsVMProfileRxBurst,
+                fsVMProfileRowStatus,
+                fsVMProfileQosTrustMode,
+                fsVMProfileQosDefCos,
+                fsVMProfileQosRxPolicyMap,
+                
+                -- VM location information table
+                fsVMLocInfoVMMac,
+                fsVMLocInfoPort,
+                fsVMLocInfoType,
+                fsVMLocInfoRowStatus,
+                
+                -- VM ServerPort and ReflectPort configuration
+                fsVMPortInfoPort,
+                fsVMPortInfoStatus,
+                fsVMPortInfoReflectStatus,
+                
+                -- VM trap port configuration
+                fsVMPortTrapCfgPort,
+                fsVMPortTrapCfgNotifyStatus,
+                
+                -- VM support trap information
+                fsVMInfoChgVMMac,
+                fsVMInfoChgVlan,
+                fsVMInfoChgPort,
+                fsVMInfoChgAction,
+                fsVMInfoChgDate,
+                
+                -- VM OUI information table
+                fsVMOuiInfoOui,
+                fsVMOuiInfoRowStatus
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing VM (echo) ability to a
+                FS agent."
+        ::= { fsVMMIBGroups 1 }     
+        
+END

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -19,7 +19,7 @@ foreach (dbFetchRows("SELECT * FROM `ports` AS I, `devices` AS D WHERE `port_des
   {
     $rrd_list[] = [ 'filename'  => $rrd_filename,
                     'descr'     => $port['hostname'] ."-". $port['ifDescr'],
-                    'descr_in'  => short_hostname($port['hostname']),
+                    'descr_in'  => device_name($port, TRUE),
                     'descr_out' => short_ifname($port['ifDescr'], NULL, FALSE) ]; // Options sets for skip htmlentities
   }
 }

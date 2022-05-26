@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -70,8 +70,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
         <?php
 
         $roles = dbFetchRows("SELECT * FROM `roles_users` LEFT JOIN `roles` USING (`role_id`) WHERE `user_id` = ? AND `auth_mechanism` = ?", [ $user_data['user_id'], $config['auth_mechanism'] ]);
-        if (is_array($roles) && count($roles))
-        {
+        if (!safe_empty($roles)) {
             ?>
 
     <div class="box box-solid">
@@ -82,8 +81,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
             <table class="table table-striped table-condensed">
               <?php
 
-              foreach($roles as $role)
-              {
+              foreach($roles as $role) {
                   echo '<tr><td><b>'.$role['role_name'].'</td><td>'.$role['role_descr'].'</td></tr>';
 
                   //print_vars($role);
@@ -104,7 +102,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
       </div> <!-- userinfo end -->
 
 
-  <div class="col-lg-6">
+  <div class="col-md-6">
 <?php
 
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Access Keys'));
@@ -116,12 +114,9 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
       <td>RSS/Atom access key</td>
 <?php
   // Warn about lack of encrypt modules unless told not to.
-  if (!OBS_ENCRYPT)
-  {
+  if (!OBS_ENCRYPT) {
     echo('<td colspan="2"><span class="text text-danger">To use RSS/Atom feeds the PHP mcrypt or sodium (php >= 7.2) extension is required.</span></td>');
-  }
-  else if (!check_extension_exists('SimpleXML'))
-  {
+  } elseif (!check_extension_exists('SimpleXML')) {
     echo('<td colspan="2"><span class="text text-danger">To use RSS/Atom feeds the PHP SimpleXML module is required.</span></td>');
   } else {
     echo("      <td>RSS/Atom access key created $atom_key_updated.</td>");
@@ -174,7 +169,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
 
   </div>
 
-  <div class="col-lg-6 pull-right">
+  <div class="col-md-6 col-sm-12 col-xs-12 pull-right">
 
 <?php
 
@@ -183,17 +178,14 @@ echo('<p class="text-center text-uppercase text-'.$user_data['text_class'].' bg-
 echo generate_box_close();
 
 // Show entity permissions only for Normal users
-if ($user_data['permission_access'] && !$user_data['permission_read'])
-{
+if ($user_data['permission_access'] && !$user_data['permission_read']) {
   // Cache user permissions
-  foreach (dbFetchRows("SELECT * FROM `entity_permissions` WHERE `user_id` = ? AND `auth_mechanism` = ?", [ $user_data['user_id'], $config['auth_mechanism'] ]) as $entity)
-  {
+  foreach (dbFetchRows("SELECT * FROM `entity_permissions` WHERE `user_id` = ? AND `auth_mechanism` = ?", [ $user_data['user_id'], $config['auth_mechanism'] ]) as $entity) {
     $user_permissions[$entity['entity_type']][$entity['entity_id']] = TRUE;
   }
 
   // Start bill Permissions
-  if (isset($config['enable_billing']) && $config['enable_billing'] && count($user_permissions['bill']))
-  {
+  if (isset($config['enable_billing']) && $config['enable_billing'] && !safe_empty($user_permissions['bill'])) {
     // Display info about user bill permissions, only if user has is
     echo generate_box_open(array('header-border' => TRUE, 'title' => 'Bill Permissions'));
     //if (count($user_permissions['bill']))
@@ -221,16 +213,13 @@ if ($user_data['permission_access'] && !$user_data['permission_read'])
   // End bill permissions
 
   // Start group permissions
-  if (OBSERVIUM_EDITION != 'community')
-  {
+  if (OBSERVIUM_EDITION !== 'community') {
     echo generate_box_open(array('header-border' => TRUE, 'title' => 'Group Permissions'));
 
-    if (count($user_permissions['group']))
-    {
+    if (!safe_empty($user_permissions['group'])) {
       echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-      foreach ($user_permissions['group'] as $group_id => $status)
-      {
+      foreach ($user_permissions['group'] as $group_id => $status) {
         $group = get_group_by_id($group_id);
 
         echo('<tr><td style="width: 1px;"></td>
@@ -251,12 +240,10 @@ if ($user_data['permission_access'] && !$user_data['permission_read'])
   // Start device permissions
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Device Permissions'));
 
-  if (count($user_permissions['device']))
-  {
+  if (!safe_empty($user_permissions['device'])) {
     echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-    foreach ($user_permissions['device'] as $device_id => $status)
-    {
+    foreach ($user_permissions['device'] as $device_id => $status) {
       $device = device_by_id_cache($device_id);
 
       echo('<tr><td style="width: 1px;"></td>
@@ -276,12 +263,10 @@ if ($user_data['permission_access'] && !$user_data['permission_read'])
 
   // Start port permissions
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Port Permissions'));
-  if (count($user_permissions['port']))
-  {
+  if (!safe_empty($user_permissions['port'])) {
     echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
-    foreach (array_keys($user_permissions['port']) as $entity_id)
-    {
+    foreach (array_keys($user_permissions['port']) as $entity_id) {
       $port   = get_port_by_id($entity_id);
       $device = device_by_id_cache($port['device_id']);
 
@@ -303,8 +288,7 @@ if ($user_data['permission_access'] && !$user_data['permission_read'])
 
   // Start sensor permissions
   echo generate_box_open(array('header-border' => TRUE, 'title' => 'Sensor Permissions'));
-  if (count($user_permissions['sensor']))
-  {
+  if (!safe_empty($user_permissions['sensor'])) {
     echo('<table class="'.OBS_CLASS_TABLE.'">' . PHP_EOL);
 
     foreach (array_keys($user_permissions['sensor']) as $entity_id)
@@ -338,7 +322,9 @@ if ($user_data['permission_access'] && !$user_data['permission_read'])
 
 <?php
 
-
-if(isset($config['debug_user_perms']) && $config['debug_user_perms'] == TRUE) { r($_SESSION); r($permissions); }
+if (isset($config['debug_user_perms']) && $config['debug_user_perms']) {
+  r($_SESSION);
+  r($permissions);
+}
 
 // EOF

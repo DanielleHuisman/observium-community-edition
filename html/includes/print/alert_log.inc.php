@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
  *
  */
 
@@ -119,7 +118,7 @@ function print_alert_log($vars)
                              'device'  => $entry['device_id'],
                              'tab'     => 'logs',
                              'section' => 'alertlog');
-        $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
+        $string .= '    <td class="entity">' . generate_device_link_short($dev, $device_vars) . '</td>' . PHP_EOL;
       }
       if ($list['alert_test_id']) { $string .= '     <td class="entity"><a href="'. generate_url(array('page' => 'alert_check', 'alert_test_id' => $alert_rule['alert_test_id'])). '">'. escape_html($alert_rule['alert_name']). '</a></td>'; }
 
@@ -272,7 +271,7 @@ function get_alert_log($vars)
     $array['count'] = dbFetchCell($query_count, $param);
     $array['pagination_html'] = pagination($vars, $array['count']);
   } else {
-    $array['count'] = count($array['entries']);
+    $array['count'] = safe_count($array['entries']);
   }
 
   // Query for last timestamp

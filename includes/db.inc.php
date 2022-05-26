@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -219,6 +219,7 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
 
   if ($debug > 0 || $GLOBALS['config']['profile_sql']) {
     $time_start = microtime(true);
+    $debug_msg = '';
   }
 
   $result = dbCallQuery($fullSql); // sets $this->result
@@ -234,18 +235,15 @@ function dbQuery($sql, $parameters = array(), $print_query = FALSE)
   }
 
   if ($debug > 0) {
-    if ($result === FALSE && (error_reporting() & 1))
-    {
+    if ($result === FALSE && (error_reporting() & 1)) {
       $error_msg = 'Error in query: (' . dbError() . ') ' . dbErrorNo();
       $debug_msg .= PHP_EOL . 'SQL ERROR[%r'.$error_msg.'%n]';
     }
-    if ($warnings = dbWarnings())
-    {
+    if ($warnings = dbWarnings()) {
       $debug_msg .= PHP_EOL . "SQL WARNINGS[\n %m" . implode("%n\n %m", $warnings) . "%n\n]";
     }
 
-    if (is_cli())
-    {
+    if (is_cli()) {
       if ($debug > 1) {
         $rows = dbAffectedRows();
         $debug_msg = 'ROWS['.($rows < 1 ? '%r' : '%g').$rows.'%n]'.PHP_EOL.$debug_msg;
@@ -361,20 +359,30 @@ function dbInsert($data, $table, $print_query = FALSE)
   return $id;
 }
 
+function dbInsertRowMulti($row, $table, $id_key = NULL) {
+  global $cache_db;
+
+  if (is_string($id_key) && isset($row[$id_key])) {
+    print_error("Incorrect insert db table '$table' entry passed (not should be have ID '$id_key'cell).");
+    print_debug_vars($row);
+  } else {
+    // no validations here
+    $cache_db[$table]['insert'][] = $row;
+  }
+}
+
 /**
  * Passed an array and a table name, it attempts to insert the data into the table.
  * Check for boolean false to determine whether insert failed
  */
-function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
-{
+function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE) {
   global $fullSql;
 
   // the following block swaps the parameters if they were given in the wrong order.
   // it allows the method to work for those that would rather it (or expect it to)
   // follow closer with SQL convention:
   // insert into the TABLE this DATA
-  if (is_string($data) && is_array($table))
-  {
+  if (is_string($data) && is_array($table)) {
     $tmp = $data;
     $data = $table;
     $table = $tmp;
@@ -384,28 +392,24 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
 
   // Detect if data is multiarray
   $first_data = reset($data);
-  if (!is_array($first_data))
-  {
+  if (!is_array($first_data)) {
     $first_data = $data;
-    $data = array($data);
+    $data = [ $data ];
   }
 
   // Columns, if not passed use keys from first element
-  if (empty($columns))
-  {
+  if (empty($columns)) {
     $columns = array_keys($first_data);
   }
 
-  $values = array();
+  $values = [];
   // Multiarray data
-  foreach ($data as $entry)
-  {
+  foreach ($data as $entry) {
     $entry = dbPrepareData($entry); // Escape data
 
     // Keep same columns order as in first entry
-    $entries = array();
-    foreach ($columns as $column)
-    {
+    $entries = [];
+    foreach ($columns as $column) {
       $entries[$column] = $entry[$column];
     }
 
@@ -417,8 +421,7 @@ function dbInsertMulti($data, $table, $columns = NULL, $print_query = FALSE)
   $time_start = microtime(true);
   //dbBeginTransaction();
   $result = dbQuery($sql, NULL, $print_query);
-  if ($result)
-  {
+  if ($result) {
     // This should return true if insert succeeded, but no ID was generated
     $id = dbLastID();
     //dbCommitTransaction();
@@ -485,6 +488,18 @@ function dbUpdate($data, $table, $where = NULL, $parameters = array(), $print_qu
   return $return;
 }
 
+function dbUpdateRowMulti($row, $table, $id_key = NULL) {
+  global $cache_db;
+
+  if (is_string($id_key) && isset($row[$id_key])) {
+    // id_key used for validation that entry already exist
+    $cache_db[$table]['update'][$row[$id_key]] = $row;
+  } else {
+    // no validations here
+    $cache_db[$table]['update'][] = $row;
+  }
+}
+
 /**
  * Passed an array and a table name, it attempts to update the data in the table.
  * Check for boolean false to determine whether update failed
@@ -492,16 +507,14 @@ function dbUpdate($data, $table, $where = NULL, $parameters = array(), $print_qu
  * For key really better use only ID field!
  * https://stackoverflow.com/questions/25674737/mysql-update-multiple-rows-with-different-values-in-one-query/25674827
  */
-function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
-{
+function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE) {
   global $fullSql;
 
   // the following block swaps the parameters if they were given in the wrong order.
   // it allows the method to work for those that would rather it (or expect it to)
   // follow closer with SQL convention:
   // insert into the TABLE this DATA
-  if (is_string($data) && is_array($table))
-  {
+  if (is_string($data) && is_array($table)) {
     $tmp = $data;
     $data = $table;
     $table = $tmp;
@@ -511,16 +524,14 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
 
   // Detect if data is multiarray
   $first_data = reset($data);
-  if (!is_array($first_data))
-  {
+  if (!is_array($first_data)) {
     $first_data = $data;
-    $data = array($data);
+    $data = [ $data ];
   }
 
   // Columns, if not passed use keys from first element
   $all_columns = array_keys($first_data); // All columns data and UNIQUE indexes
-  if (!empty($columns))
-  {
+  if (!empty($columns)) {
     // Update only passed columns from param
     $update_columns = $columns;
   } else {
@@ -530,21 +541,19 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
   }
 
   // Columns which will updated
-  foreach ($update_columns as $key)
-  {
+  $update_keys = [];
+  foreach ($update_columns as $key) {
     $update_keys[] = '`'.$key.'`=VALUES(`'.$key.'`)';
   }
 
-  $values = array();
+  $values = [];
   // Multiarray data
-  foreach ($data as $entry)
-  {
+  foreach ($data as $entry) {
     $entry = dbPrepareData($entry); // Escape data
 
     // Keep same columns order as in first entry
-    $entries = array();
-    foreach ($all_columns as $column)
-    {
+    $entries = [];
+    foreach ($all_columns as $column) {
       $entries[$column] = $entry[$column];
     }
 
@@ -558,8 +567,7 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
  
   $time_start = microtime(true);
   //dbBeginTransaction();
-  if (dbQuery($sql, NULL, $print_query))
-  {
+  if (dbQuery($sql, NULL, $print_query)) {
     $return = dbAffectedRows(); // This value should be divided into two for innodb
   } else {
     $return = FALSE;
@@ -570,6 +578,30 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
   $GLOBALS['db_stats']['update']++;
 
   return $return;
+}
+
+function dbProcessMulti($table, $print_query = FALSE) {
+  global $cache_db;
+
+  print_debug_vars($cache_db);
+  $clean = FALSE;
+
+  // Multi insert
+  if (isset($cache_db[$table]['insert'])) {
+    dbInsertMulti($cache_db[$table]['insert'], $table, NULL, $print_query);
+
+    $clean = TRUE;
+  }
+
+  // Multi update
+  if (isset($cache_db[$table]['update'])) {
+    dbUpdateMulti($cache_db[$table]['update'], $table, NULL, $print_query);
+
+    $clean = TRUE;
+  }
+
+  // Clean
+  if ($clean) { unset($cache_db[$table]); }
 }
 
 function dbExist($table, $where = NULL, $parameters = array(), $print_query = FALSE)
@@ -756,10 +788,11 @@ function dbPlaceHolders($values)
  * @param mixed  $value       Values
  * @param string $column      Table column name
  * @param string $condition   Compare condition, known: =, !=, NOT, NULL, NOT NULL, LIKE (and variants %LIKE%, %LIKE, LIKE%)
- * @param bool   $leading_and Add leading AND to result query
+ * @param bool|int $flags     OBS_DB_NO_LEADING_AND - Do not add leading AND to result query,
+ *                            OBS_DB_IFNULL - add IFNULL(column, '')
  * @return string             Generated query
  */
-function generate_query_values($value, $column, $condition = NULL, $leading_and = TRUE) {
+function generate_query_values($value, $column, $condition = NULL, $flags = 0) {
   //if (!is_array($value)) { $value = explode(',', $value); }
   if (!is_array($value)) { $value = array((string)$value); }
   $column = '`' . str_replace(array('`', '.'), array('', '`.`'), $column) . '`'; // I.column -> `I`.`column`
@@ -769,6 +802,16 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
     $condition = str_replace(array('NOT', '!=', ' '), '', $condition);
   } else {
     $negative  = FALSE;
+  }
+
+  // Flags
+  if (is_bool($flags)) {
+    // Compat with old param style
+    $leading_and = $flags;
+    $ifnull = FALSE;
+  } else {
+    $leading_and = !is_flag_set(OBS_DB_NO_LEADING_AND, $flags);
+    $ifnull = is_flag_set(OBS_DB_IFNULL, $flags);
   }
 
   $search  = array('%', '_');
@@ -825,7 +868,7 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
       $where = '';
       $add_null = FALSE;
       foreach ($value as $v) {
-        if ($v == OBS_VAR_UNSET || $v === '') {
+        if ($v === OBS_VAR_UNSET || $v === '') {
           $add_null = TRUE; // Add check NULL values at end
           $values[] = "''";
         } else {
@@ -834,25 +877,27 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
       }
       $count = count($values);
       if ($count === 1) {
-        $where .= $column . ($negative ? ' != ' : ' = ') . $values[0];
+        $where .= ($add_null || $ifnull) ? "IFNULL($column, '')" : $column;
+        $where .= ($negative ? ' != ' : ' = ') . $values[0];
       } elseif ($count) {
         $values = array_unique($values); // Removes duplicate values
-        $where .= $column . ($negative ? ' NOT IN (' : ' IN (') . implode(',', $values) . ')';
+        $where .= ($add_null || $ifnull) ? "IFNULL($column, '')" : $column;
+        $where .= ($negative ? ' NOT IN (' : ' IN (') . implode(',', $values) . ')';
       } else {
         // Empty values
         $where = $negative ? '1' : '0';
       }
-      if ($add_null) {
-        // Add search for empty values
-        if ($negative) {
-          $where .= " AND $column IS NOT NULL";
-        } else {
-          $where .= " OR $column IS NULL";
-        }
-        $where = " AND ($where)";
-      } else {
+      // if ($add_null) {
+      //   // Add search for empty values
+      //   if ($negative) {
+      //     $where .= " AND $column IS NOT NULL";
+      //   } else {
+      //     $where .= " OR $column IS NULL";
+      //   }
+      //   $where = " AND ($where)";
+      // } else {
         $where = " AND " . $where;
-      }
+      // }
       break;
   }
   if (!$leading_and) { $where = preg_replace('/^(\ )+AND/', '', $where); }

@@ -372,7 +372,10 @@ function generate_sensor_row($sensor, $vars)
 
   // FIXME -- Generify this. It's not just for sensors.
   if ($vars['page'] === "device" && $vars['tab'] !== "overview") {
-    $row .= '        <td>' .  (strlen($sensor['sensor_mib']) ? '<a href="https://mibs.observium.org/mib/'.$sensor['sensor_mib'].'/" target="_blank">' .nicecase($sensor['sensor_mib']) .'</a>' : '') . ( ( strlen($sensor['sensor_mib']) && strlen($sensor['sensor_object'])) ? '::' : '') .(strlen($sensor['sensor_mib']) ? '<a href="https://mibs.observium.org/mib/'.$sensor['sensor_mib'].'/#'.$sensor['sensor_object'].'" target="_blank">' .$sensor['sensor_object'] .'</a>' : ''). '.'.$sensor['sensor_index'].'</td>' . PHP_EOL;
+    $row .= '        <td>' . (!safe_empty($sensor['sensor_mib']) ? '<a href="'.OBSERVIUM_MIBS_URL.'/'.$sensor['sensor_mib'].'/" target="_blank">' .nicecase($sensor['sensor_mib']) .'</a>' : '') .
+            ( ( !safe_empty($sensor['sensor_mib']) && !safe_empty($sensor['sensor_object'])) ? '::' : '') .
+            (!safe_empty($sensor['sensor_mib']) ? '<a href="'.OBSERVIUM_MIBS_URL.'/'.$sensor['sensor_mib'].'/#'.$sensor['sensor_object'].'" target="_blank">' .$sensor['sensor_object'] .'</a>' : '') .
+            '.'.$sensor['sensor_index'].'</td>' . PHP_EOL;
     $table_cols++;
   }
 

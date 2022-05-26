@@ -10,8 +10,7 @@
  *
  */
 
-if ($_SESSION['userlevel'] <= 7)
-{
+if ($_SESSION['userlevel'] <= 7) {
   print_error_permission();
   return;
 }
@@ -22,26 +21,25 @@ $cache_times_db = dbFetchRows("SELECT `device_id`,`hostname`,`device_state` FROM
 
 $modules = array();
 
-foreach($config['poller_modules'] as $module => $state) { $modules[$module]['state'] = $state; }
+foreach($config['poller_modules'] as $module => $state) {
+  $modules[$module]['state'] = $state;
+}
 
-foreach($cache_times_db as $cache_time)
-{
+$total_time = 0;
+foreach($cache_times_db as $cache_time) {
   $cache_time['device_state'] = safe_unserialize($cache_time['device_state']);
   $cache_times[$cache_time['device_id']] = $cache_time;
 
-  foreach($cache_time['device_state']['poller_mod_perf'] AS $module => $time)
-  {
+  foreach($cache_time['device_state']['poller_mod_perf'] as $module => $time) {
     $modules[$module]['time'] += $time;
     $total_time += $time;
   }
 }
 
-foreach($modules as $module => $data)
-{
+foreach($modules as $module => $data) {
 
-  if(isset($data['time']))
-  {
-    $modules[$module]['perc'] =  round(($data['time'] / $total_time)*100,2);
+  if (isset($data['time'])) {
+    $modules[$module]['perc'] = round(float_div($data['time'], $total_time) * 100, 2);
   } else {
     $modules[$module]['perc'] = 0;
   }

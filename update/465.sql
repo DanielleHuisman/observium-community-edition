@@ -1,0 +1,3 @@
+ALTER TABLE `vlans_fdb` CHANGE `mac_address` `mac_address` VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL, CHANGE `fdb_status` `fdb_status` VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL;
+ALTER TABLE `vlans_fdb` ADD `fdb_port` VARCHAR(32) NULL DEFAULT NULL AFTER `fdb_status`, ADD `fdb_last_change` INT UNSIGNED NULL DEFAULT NULL AFTER `fdb_port`, ADD `deleted` TINYINT NOT NULL DEFAULT '0' AFTER `fdb_last_change`;
+ALTER TABLE `vlans_fdb` DROP INDEX `fdb_cache`, ADD INDEX `fdb_cache` (`device_id`, `vlan_id`, `mac_address`, `port_id`, `deleted`) USING BTREE;

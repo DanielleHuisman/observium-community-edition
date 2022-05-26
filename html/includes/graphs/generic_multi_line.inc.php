@@ -27,8 +27,7 @@ if ($width > 600) {
 }
 
 // Drop total from view if requested not to show
-if ($args['nototal'] || $nototal)
-{
+if ($args['nototal'] || $nototal) {
   if (($key = array_search('tot', $data_show)) !== FALSE)
   {
     unset($data_show[$key]);
@@ -77,8 +76,7 @@ if ($legend != 'no')
 $colour_iter = 0;
 $i = 0;
 
-foreach ($rrd_list as $rrd)
-{
+foreach ($rrd_list as $rrd) {
 
   $i++;
 
@@ -100,8 +98,7 @@ foreach ($rrd_list as $rrd)
 
   $rrd_options .= " DEF:".$id."=$filename:$ds:AVERAGE";
 
-  if ($simple_rrd)
-  {
+  if ($simple_rrd) {
     $rrd_options .= " CDEF:".$id."min=".$id." ";
     $rrd_options .= " CDEF:".$id."max=".$id." ";
   } else {
@@ -112,15 +109,14 @@ foreach ($rrd_list as $rrd)
   if ($rrd['invert'])
   {
     $rrd_options .= " CDEF:".$id."i=".$id.",-1,*";
-    $rrd_optionsb .= " LINE1.25:".$id."i#".$colour.":'$descr'";
     if (!empty($rrd['areacolour'])) { $rrd_optionsb .= " AREA:".$id."i#" . $rrd['areacolour']; }
+    $rrd_optionsb .= " LINE1.25:".$id."i#".$colour.":'$descr'";
   } else {
-    $rrd_optionsb .= " LINE1.25:".$id."#".$colour.":'$descr'";
     if (!empty($rrd['areacolour'])) { $rrd_optionsb .= " AREA:".$id."#" . $rrd['areacolour']; }
+    $rrd_optionsb .= " LINE1.25:".$id."#".$colour.":'$descr'";
   }
 
-  if ($vars['trend'])
-  {
+  if ($vars['trend']) {
     $rrd_options .= " CDEF:".$id."smooth=".$id.",1800,TREND";
     $rrd_options .= " CDEF:".$id."predict=586400,-7,1800,".$id.",PREDICT";
     $rrd_options .= " LINE1:".$id."predict#".$colour."::dashes=3";
