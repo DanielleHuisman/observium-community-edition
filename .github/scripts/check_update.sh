@@ -2,7 +2,7 @@
 set -e
 
 LATEST_OBSERVIUM_VERSION=$(
-    wget https://observium.org/observium-community-latest.tar.gz -O - -q \
+    wget https://www.observium.org/observium-community-latest.tar.gz -O - -q \
     | tar -xzf - --occurrence=1 --to-stdout observium/VERSION \
     | sed 's|Observium CE ||'
 )

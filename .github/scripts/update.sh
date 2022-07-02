@@ -8,7 +8,7 @@ echo "Going to update Observium from $LATEST_GIT_VERSION to $LATEST_OBSERVIUM_VE
 mkdir -p .new
 
 echo "Extracting Observium archive..."
-wget https://observium.org/observium-community-latest.tar.gz -O - -q \
+wget https://www.observium.org/observium-community-latest.tar.gz -O - -q \
     | tar -xzf - -C .new
 
 echo "Copying files..."
