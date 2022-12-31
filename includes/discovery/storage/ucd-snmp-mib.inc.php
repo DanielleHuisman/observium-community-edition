@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,12 +6,12 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 // NOTE. Here only walking, because needed additional checks by HOST-RESOURCES-MIB (see host-resources-mib.inc.php in current directory)
 
-$cache_discovery['ucd-snmp-mib'] = snmpwalk_cache_oid($device, 'dskEntry', array(), 'UCD-SNMP-MIB');
+$cache_discovery['ucd-snmp-mib'] = snmpwalk_cache_oid($device, 'dskEntry', [], 'UCD-SNMP-MIB');
 
 // EOF

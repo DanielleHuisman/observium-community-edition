@@ -46,7 +46,7 @@ if (!$config['enable_vrfs']) {
   // Clean removed VRFs
   print_debug_vars($valid['vrf']);
   $where = '`device_id` = ?';
-  $where .= generate_query_values(array_keys((array)$valid['vrf']), 'vrf_name', '!=');
+  $where .= generate_query_values_and(array_keys((array)$valid['vrf']), 'vrf_name', '!=');
   if ($count = dbFetchCell("SELECT COUNT(*) FROM `vrfs` WHERE $where", [ $device['device_id'] ])) {
     $GLOBALS['module_stats'][$module]['deleted'] = $count;
     dbDelete('vrfs', $where, [ $device['device_id'] ]);
@@ -60,7 +60,7 @@ if (!$config['enable_vrfs']) {
   }
   print_debug_vars($vrf_ports);
   $where = '`device_id` = ? AND `ifVrf` IS NOT NULL';
-  $where .= generate_query_values($vrf_ports, 'port_id', '!=');
+  $where .= generate_query_values_and($vrf_ports, 'port_id', '!=');
   if ($count = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE $where", [ $device['device_id'] ])) {
     //$GLOBALS['module_stats'][$module]['deleted'] = $count;
     dbUpdate([ 'ifVrf' => [ 'NULL' ] ], 'ports', $where, [ $device['device_id'] ]);

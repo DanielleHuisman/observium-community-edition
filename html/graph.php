@@ -15,9 +15,9 @@
 // Define this is graph
 define('OBS_GRAPH', TRUE);
 
-include_once("../includes/sql-config.inc.php");
+$start = microtime(TRUE); // Needs common.php
 
-$start = utime(); // Needs common.php
+include_once("../includes/sql-config.inc.php");
 
 include($config['html_dir'] . "/includes/functions.inc.php");
 
@@ -44,7 +44,7 @@ $vars = get_vars('GET', $auth);
 
 include($config['html_dir'] . "/includes/graphs/graph.inc.php");
 
-$runtime = utime() - $start;
+$runtime = microtime(TRUE) - $start;
 
 print_debug("Runtime ".$runtime." secs");
 

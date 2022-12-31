@@ -1,0 +1,1149 @@
+IBM-PDU-MIB DEFINITIONS ::= BEGIN
+
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE     FROM SNMPv2-SMI
+    enterprises, Integer32, Unsigned32                  FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION, DisplayString                   FROM SNMPv2-TC;
+
+
+ibmPowerDistributionUnitMIB MODULE-IDENTITY
+    LAST-UPDATED "201205310000Z"
+    ORGANIZATION "International Business Machines"
+    CONTACT-INFO "International Business Machines
+                  1 New Orchard Road
+                  Armonk, New York 10504-1722
+                  United States
+                  E-mail: ews@us.ibm.com"
+	DESCRIPTION  "The MIB module representing a power disribution
+                  unit supported by a single SNMP agent"
+    REVISION     "201205310000Z"
+    DESCRIPTION  "1. Additions of fields ibmPduReboot, ibmPduOutletGlobalDelayTimer, 
+				  and ibmPduOutletIndividualDelayTimer for IBM/Netezza.
+				                                                         
+                  Licensed Materials - Property of IBM               
+                  Copyright IBM Corp. 2012"
+	
+	REVISION	 "201201180000Z"
+	DESCRIPTION  "The IBM Power Distribution Unit MIB definitions for 
+                enabling power monitoring and management of an IBM
+                  Power Unit.                                         
+                                                        
+                  Licensed Materials - Property of IBM               
+                  Copyright IBM Corp. 2009"
+    ::= { ibmProd 223 }
+
+ibm              OBJECT IDENTIFIER ::= { enterprises 2 }
+ibmProd          OBJECT IDENTIFIER ::= { ibm 6 }
+
+ibmPduMetadata          OBJECT IDENTIFIER ::= { ibmPowerDistributionUnitMIB 7 }
+ibmPduDevice            OBJECT IDENTIFIER ::= { ibmPowerDistributionUnitMIB 8 }
+ibmPduOutlets           OBJECT IDENTIFIER ::= { ibmPduDevice 2 }
+ibmPduPower             OBJECT IDENTIFIER ::= { ibmPduDevice 3 }
+ibmPduEnvironment       OBJECT IDENTIFIER ::= { ibmPduDevice 4 }
+ibmPduExternalMonitors  OBJECT IDENTIFIER ::= { ibmPowerDistributionUnitMIB 9 }
+ibmPduTraps             OBJECT IDENTIFIER ::= { ibmPowerDistributionUnitMIB 0 }
+ibmPduTrapData          OBJECT IDENTIFIER ::= { ibmPduTraps 1 }
+ibmPduTrapDataObjects   OBJECT IDENTIFIER ::= { ibmPduTrapData 1 }
+ibmPduConformance       OBJECT IDENTIFIER ::= { ibmPowerDistributionUnitMIB 2 }
+ibmPduCompliances       OBJECT IDENTIFIER ::= { ibmPduConformance 1 }  
+ibmPduGroups            OBJECT IDENTIFIER ::= { ibmPduConformance 2 }
+ibmPduLocation          OBJECT IDENTIFIER ::= { ibmPduMetadata 1 }
+ibmPduImage             OBJECT IDENTIFIER ::= { ibmPduMetadata 2 }
+
+
+-- ////////////////////////////////////////////////////////
+-- //////////////// TEXTUAL-CONVENTIONs ///////////////////
+-- ////////////////////////////////////////////////////////
+
+IbmPduPowerBuf  ::= TEXTUAL-CONVENTION
+                STATUS       current
+                DESCRIPTION  "Buffer that contains the power records. This buffer
+                              contains ibmPduBufferEntries (default 120) average
+                              power samples, in Watts, at 4 bytes each sample, in
+                              little-endian format."
+				SYNTAX		 OCTET STRING(SIZE(480))
+				
+				
+IbmPduEnvBuf	::= TEXTUAL-CONVENTION
+				STATUS		 current
+				DESCRIPTION  "Buffer that contains temperature or humidity records.
+                              This buffer contains ibmPduBufferEntries (default 120)
+                              average point-in-time samples at 2 bytes each in
+                              little-endian format."
+                SYNTAX       OCTET STRING(SIZE(240))
+                
+
+IbmPduMilliAmps ::= TEXTUAL-CONVENTION
+                STATUS        current
+                DESCRIPTION   "Used for floating point amperage values since SNMP
+                               does not support floating point numbers."
+				SYNTAX Unsigned32
+				
+IbmPduMilliVolt ::= TEXTUAL-CONVENTION
+                STATUS        voltage
+                DESCRIPTION   "Used for floating point voltage values since SNMP
+                               does not support floating point numbers."
+				SYNTAX Unsigned32
+				
+			  
+-- ////////////////////////////////////////////////////////
+-- ///////////////////// ibmDevice ATTRs /////////////////////
+-- ////////////////////////////////////////////////////////
+
+ibmPduBufferTagValue	OBJECT-TYPE
+					SYNTAX		  Unsigned32
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Used for the update interval of power and environmental
+                                             registers.  The buffer tag is incremented every sample
+                                             of data that is captured in the buffer."
+                    ::= { ibmPowerDistributionUnitMIB 3 }
+                
+                
+ibmPduSampleRate   OBJECT-TYPE
+                SYNTAX        Unsigned32
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Sample rate in seconds for each entry in the sampled buffer.
+                               The default is 30."
+				::= { ibmPowerDistributionUnitMIB 4 }
+
+
+ibmPduBufferVersion 	OBJECT-TYPE
+					SYNTAX		  DisplayString(SIZE(0..7))
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Version of the snapshot buffer."
+					::= { ibmPowerDistributionUnitMIB 5 }
+
+
+ibmPduBufferEntries 	OBJECT-TYPE
+					SYNTAX		  Unsigned32
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Number of entries contained in each data buffer.
+                                             The default is 120."
+                    ::= { ibmPowerDistributionUnitMIB 6 }
+
+                
+ibmPduSoftwareVersion   OBJECT-TYPE
+                    SYNTAX        DisplayString(SIZE (0..63))
+                    MAX-ACCESS    read-only
+                    STATUS        current
+                    DESCRIPTION   "Version of the software loaded on the PDU."
+                    ::= { ibmPduMetadata 3 }
+                
+
+ibmPduMachineType  OBJECT-TYPE
+                SYNTAX        DisplayString(SIZE (0..4))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Machine type of the PDU."
+                ::= { ibmPduMetadata 4 }
+
+                
+ibmPduModelNumber  OBJECT-TYPE
+                SYNTAX        DisplayString(SIZE (0..15))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Model number of the PDU."
+                ::= { ibmPduMetadata 5 }
+                
+ibmPduPartNumber  OBJECT-TYPE
+                SYNTAX        DisplayString(SIZE (0..10))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Part number of the PDU."
+                ::= { ibmPduMetadata 6 }
+                
+                
+ibmPduName      OBJECT-TYPE
+                SYNTAX        DisplayString(SIZE (0..63))
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION   "Name of the device."
+                ::= { ibmPduMetadata 7 }
+               
+               
+ibmPduManufacturer OBJECT-TYPE
+                SYNTAX        DisplayString (SIZE (0..63))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "The name of manufacturer."
+                ::= { ibmPduMetadata 8 }
+
+
+ibmPduSerialNumber OBJECT-TYPE
+                SYNTAX        DisplayString (SIZE (0..6))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Serial number of the device."
+                ::= { ibmPduMetadata 9 }
+                
+                
+ibmPduDescription  OBJECT-TYPE
+                SYNTAX        DisplayString (SIZE (0..255))
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION   "Description of the device."
+                ::= { ibmPduMetadata 10 }
+    
+
+ibmPduUrl          OBJECT-TYPE
+                SYNTAX        DisplayString(SIZE(0..127))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "URL of the web interface to the ibmDevice if available."
+                ::= { ibmPduMetadata 11 }
+                
+ibmPduReboot       OBJECT-TYPE
+                SYNTAX        Unsigned32
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION   "Set 1 to reboot PDU."
+                ::= { ibmPduMetadata 12 }
+                
+ibmPduDateTime      OBJECT-TYPE
+                SYNTAX        DateAndTime
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION   "Set or get PDU Date and Time."
+                ::= { ibmPduMetadata 13 }
+                
+-- ////////////////////////////////////////////////////////
+-- ////////////////////// ibmLocation ////////////////////////
+-- ////////////////////////////////////////////////////////
+ibmPduTelephoneNumber OBJECT-TYPE
+                   SYNTAX        DisplayString (SIZE (0..31))
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Telephone number of building and site
+                                  where the device is located."
+				   ::= { ibmPduLocation 1 }
+				   
+				   
+ibmPduCountryRegion 	 OBJECT-TYPE
+				   SYNTAX		 DisplayString (SIZE (0..31))
+				   MAX-ACCESS	 read-write
+				   STATUS		 current
+				   DESCRIPTION	 "Country or region where the device
+                                  is located."
+                   ::= { ibmPduLocation 2 }
+
+
+ibmPduStreetAddress   OBJECT-TYPE
+                   SYNTAX        DisplayString (SIZE (0..31))
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Street address of building where the
+                                  device is located."
+				   ::= { ibmPduLocation 3 }
+
+
+ibmPduCity			  OBJECT-TYPE
+				   SYNTAX		 DisplayString (SIZE (0..31))
+				   MAX-ACCESS	 read-write
+				   STATUS		 current
+				   DESCRIPTION	 "City where the device is located."
+				   ::= { ibmPduLocation 4 }
+
+				   
+ibmPduStateProvince   OBJECT-TYPE
+				   SYNTAX		 DisplayString (SIZE (0..15))
+				   MAX-ACCESS	 read-write
+				   STATUS		 current
+				   DESCRIPTION	 "State or province where the device
+                                  is located."
+                   ::= { ibmPduLocation 5 }
+
+
+ibmPduPostalCode      OBJECT-TYPE
+                   SYNTAX        DisplayString (SIZE (0..15))
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Postal code where the device is
+                                  located."
+				   ::= { ibmPduLocation 6 }
+				   
+				   
+ibmPduBuilding		  OBJECT-TYPE
+				   SYNTAX		 DisplayString (SIZE (0..15))
+				   MAX-ACCESS	 read-write
+				   STATUS		 current
+				   DESCRIPTION	 "Building name where the device is
+                                  located."
+                   ::= { ibmPduLocation 7 }
+
+
+ibmPduFloor           OBJECT-TYPE
+                   SYNTAX        DisplayString (SIZE (0..7))
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Floor number or designation where
+                                  the device is located."
+				   ::= { ibmPduLocation 8 }
+
+				   
+ibmPduRoomNumber	  OBJECT-TYPE
+				   SYNTAX		 DisplayString (SIZE (0..7))
+				   MAX-ACCESS	 read-write
+				   STATUS		 current
+				   DESCRIPTION	 "Room number where the device is
+                                  located."
+                   ::= { ibmPduLocation 9 }
+
+                   
+ibmPduRow             OBJECT-TYPE
+                   SYNTAX        DisplayString (SIZE (0..7))
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Row number where the device is
+                                  located."
+				   ::= { ibmPduLocation 10 }
+
+
+ibmPduAisle 		  OBJECT-TYPE
+				   SYNTAX		 DisplayString (SIZE (0..7))
+				   MAX-ACCESS	 read-write
+				   STATUS		 current
+				   DESCRIPTION	 "Aisle number where the device is
+                                  located."
+                   ::= { ibmPduLocation 11 }
+
+                   
+ibmPduDisplaceHeight  OBJECT-TYPE
+                   SYNTAX        Unsigned32
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Displaced height in Centimeters."
+                   ::= { ibmPduLocation 12 }
+
+                   
+ibmPduAltitude        OBJECT-TYPE
+                   SYNTAX        Unsigned32
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Altitude in Meters."
+                   ::= { ibmPduLocation 13 }
+
+
+ibmPduOtherInfo       OBJECT-TYPE
+                   SYNTAX        DisplayString (SIZE (0..63))
+                   MAX-ACCESS    read-write
+                   STATUS        current
+                   DESCRIPTION   "Additional ibmLocation information."
+                   ::= { ibmPduLocation 14 }
+
+
+-- ////////////////////////////////////////////////////////
+-- ///////////////////// IMAGE ATTRS //////////////////////
+-- ////////////////////////////////////////////////////////
+ibmPduLogo         OBJECT-TYPE
+                SYNTAX        OCTET STRING(SIZE(65535))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Device logo or image."
+                ::= { ibmPduImage 1 }
+
+
+ibmPduDeviceFront  OBJECT-TYPE
+                SYNTAX        OCTET STRING(SIZE(65535))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Image of the front of the device."
+                ::= { ibmPduImage 2 }
+
+
+ibmPduDeviceRear      OBJECT-TYPE
+                SYNTAX        OCTET STRING(SIZE(65535))
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "Image of the back of the device."
+                ::= { ibmPduImage 3 }
+                
+
+-- ////////////////////////////////////////////////////////
+-- ///////////////////// ibmDevice POWER /////////////////////
+-- ////////////////////////////////////////////////////////
+
+ibmPduPhaseCount   OBJECT-TYPE
+                SYNTAX        INTEGER {
+                              single(1),
+                              three(3)
+                              }
+                MAX-ACCESS    read-only
+                STATUS        current
+                DESCRIPTION   "The number of input power phases for the PDU."
+                ::= { ibmPduPower 1 }
+                
+
+ibmPduPhaseTable   OBJECT-TYPE
+                SYNTAX        SEQUENCE OF IbmPduPowerPhaseStruct
+                MAX-ACCESS    not-accessible
+                STATUS        current
+                DESCRIPTION   "A list of power phase entries.  The number of
+                               entries is given by phaseNumber."
+				::= { ibmPduPower 2 }
+
+
+ibmPduPhaseTableEntry	 OBJECT-TYPE
+					  SYNTAX		IbmPduPowerPhaseStruct
+					  MAX-ACCESS	not-accessible
+					  STATUS		current
+					  DESCRIPTION	"A value contained within the PowerPhaseStruct."
+					  INDEX 		{ ibmPduPhaseNumber }
+					  ::= { ibmPduPhaseTable 1 }
+
+
+
+IbmPduPowerPhaseStruct ::= SEQUENCE { ibmPduPhaseNumber 			   Unsigned32,
+									  ibmPduPhaseAvgPower			   IbmPduPowerBuf,
+									  ibmPduPhaseMaxPower			   IbmPduPowerBuf,
+									  ibmPduPhaseLastPowerReading	   Unsigned32 }
+
+
+ibmPduPhaseNumber  OBJECT-TYPE
+				SYNTAX		  Unsigned32(1..3)
+				MAX-ACCESS	  not-accessible
+				STATUS		  current
+				DESCRIPTION   "The power phase number."
+				::= { ibmPduPhaseTableEntry 1 }
+				
+
+ibmPduPhaseAvgPower 	OBJECT-TYPE
+					SYNTAX		  IbmPduPowerBuf
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Buffer containing average power values.  Refer to
+                                   description of IbmPduPowerBuf for information about
+                                   buffer format."
+					::= { ibmPduPhaseTableEntry 2 }
+				 
+				 
+ibmPduPhaseMaxPower 	OBJECT-TYPE
+					SYNTAX		  IbmPduPowerBuf
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Buffer containing max power values.  Refer to                                   
+                                   description of IbmPduPowerBuf for information about
+                                   buffer format."
+					::= { ibmPduPhaseTableEntry 3 }
+				 
+				 
+ibmPduPhaseLastPowerReading    OBJECT-TYPE
+						SYNTAX		  Unsigned32
+						MAX-ACCESS	  read-only
+						STATUS		  current
+						DESCRIPTION   "The value of the most recent power reading for this
+                                       phase, in Watts."
+						::= { ibmPduPhaseTableEntry 4 }
+
+				
+-- ////////////////////////////////////////////////////////
+-- ///////////////////// ENVIRONMENT //////////////////////
+-- ////////////////////////////////////////////////////////
+ibmPduThermalBuffer 	OBJECT-TYPE
+					SYNTAX		  IbmPduEnvBuf
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Buffer that contains the thermal records.  Refer to
+                                   description of IbmPduEnvBuf for information about
+                                   buffer format."
+					::= { ibmPduEnvironment 1 }
+			   
+
+ibmPduHumidityBuffer	OBJECT-TYPE
+					SYNTAX		  IbmPduEnvBuf
+					MAX-ACCESS	  read-only
+					STATUS		  current
+					DESCRIPTION   "Buffer that contains the humdity records.  Refer to
+                                   description of IbmPduEnvBuf for information about
+                                   buffer format."
+					::= { ibmPduEnvironment 2 }
+			   
+
+ibmPduThermalThresholdWarning  OBJECT-TYPE
+						SYNTAX		   Unsigned32
+						MAX-ACCESS	   read-write
+						STATUS		   current
+						DESCRIPTION    "The value of the warning threshold for
+                                        the given temperature returned in Celsius."
+						::= { ibmPduEnvironment 3 }
+										  
+										  
+ibmPduThermalThresholdCritical OBJECT-TYPE
+						SYNTAX		   Unsigned32
+						MAX-ACCESS	   read-write
+						STATUS		   current
+						DESCRIPTION    "The value of the critical threshold for
+                                        the given temperature returned in Celsius."
+						::= { ibmPduEnvironment 4 }
+
+
+ibmPduHumidityThresholdWarning OBJECT-TYPE
+						SYNTAX		   Unsigned32(0..100)
+						MAX-ACCESS	   read-write
+						STATUS		   current
+						DESCRIPTION    "The value of the warning threshold for
+                                        the given humidity returned as a percent."
+						::= { ibmPduEnvironment 5 }
+
+
+ibmPduHumidityThresholdCritical OBJECT-TYPE
+						SYNTAX		   Unsigned32(0..100)
+						MAX-ACCESS	   read-write
+						STATUS		   current
+						DESCRIPTION    "The value of the critical threshold for
+                                        the given humidity returned as a percent."
+						::= { ibmPduEnvironment 6 }
+
+
+ibmPduThermalLastReading		OBJECT-TYPE
+						SYNTAX		  Unsigned32
+						MAX-ACCESS	  read-only
+						STATUS		  current
+						DESCRIPTION   "The value of the most recent temperature reading for
+                                       the internal temperature sensor, in degrees Celsius."
+						::= { ibmPduEnvironment 7 }
+
+ibmPduHumidityLastReading		OBJECT-TYPE
+						SYNTAX		  Unsigned32
+						MAX-ACCESS	  read-only
+						STATUS		  current
+						DESCRIPTION   "The value of the most recent humidity reading for
+                                       the internal humidity sensor, as a percentage."
+						::= { ibmPduEnvironment 8 }
+
+-- ////////////////////////////////////////////////////////
+-- //////////////////////// OUTLETS ///////////////////////
+-- ////////////////////////////////////////////////////////
+
+ibmPduOutletCount  OBJECT-TYPE
+				SYNTAX		  Integer32
+				MAX-ACCESS	  read-only
+				STATUS		  current
+				DESCRIPTION   "The number of outlets (regardless of their current state) present on this PDU."
+				::= { ibmPduOutlets 1 }
+
+
+ibmPduOutletTable  OBJECT-TYPE
+				SYNTAX		  SEQUENCE OF IbmPduOutletStruct
+				MAX-ACCESS	  not-accessible
+				STATUS		  current
+				DESCRIPTION   "A list of outlet entries.  The number of entries is given by the value of
+                               outletCount."
+                ::= { ibmPduOutlets 2 }
+ 
+ibmPduOutletGlobalDelayTimer    OBJECT-TYPE
+                SYNTAX        Integer32
+                MAX-ACCESS    read-write
+                STATUS        current
+                DESCRIPTION   "Global delay timer for all outlets. Range: 0 sec ~ 3600 sec. Default value:0 sec. To combine with Individual Delay timer to control outlet state/behavior as rack power on/restore"
+                ::= { ibmPduOutlets 3 }
+                
+
+
+ibmPduOutletEntry   OBJECT-TYPE
+                 SYNTAX        IbmPduOutletStruct
+                 MAX-ACCESS    not-accessible
+                 STATUS        current
+                 DESCRIPTION   "A value contained within the OutletStruct."
+                 INDEX         { ibmPduOutletNumber }
+                 ::= { ibmPduOutletTable 1 }
+
+
+IbmPduOutletStruct ::= SEQUENCE {   ibmPduOutletNumber                   Integer32,
+                        ibmPduOutletName                     DisplayString,
+                        ibmPduOutletType                     INTEGER,
+                        ibmPduOutletDescription              DisplayString,
+                        ibmPduOutletAvgPower                 IbmPduPowerBuf,
+                        ibmPduOutletMaxPower                 IbmPduPowerBuf,
+                        ibmPduOutletPowerFactor              Unsigned32,
+                        ibmPduOutletVoltage                  IbmPduMilliVolt,        
+                        ibmPduOutletCurrent                  IbmPduMilliAmps,
+                        ibmPduOutletMaxCapacity              IbmPduMilliAmps,
+                        ibmPduOutletCurrentThresholdWarning  IbmPduMilliAmps,
+                        ibmPduOutletCurrentThresholdCritical IbmPduMilliAmps,
+                        ibmPduOutletState                    INTEGER,
+                        ibmPduOutletGroupIndex               Unsigned32,
+                        ibmPduOutletLastPowerReading         Unsigned32,
+                        ibmPduOutletIndividualDelayTimer     Unsigned32}
+                            
+
+ibmPduOutletNumber   OBJECT-TYPE
+                  SYNTAX        Integer32(0..255)
+                  MAX-ACCESS    not-accessible
+                  STATUS        current
+                  DESCRIPTION   "The unique index of the given outlet."
+                  ::= { ibmPduOutletEntry 1 }
+         
+         
+ibmPduOutletName     OBJECT-TYPE
+                  SYNTAX        DisplayString(SIZE (0..64))
+                  MAX-ACCESS    read-write
+                  STATUS        current
+                  DESCRIPTION   "Text describing the name or designation of the given outlet."
+                  ::= { ibmPduOutletEntry 2 }
+
+
+ibmPduOutletType     OBJECT-TYPE
+                  SYNTAX        INTEGER { c13(0),
+                                          c19(1)
+                                        }
+                  MAX-ACCESS    read-only
+                  STATUS        current
+                  DESCRIPTION   "Type of the outlet."
+                  ::= { ibmPduOutletEntry 3 }
+
+
+ibmPduOutletDescription OBJECT-TYPE
+                              SYNTAX        DisplayString(SIZE (0..63))
+                              MAX-ACCESS    read-write
+                              STATUS        current
+                              DESCRIPTION   "Description of the outlet."
+                              ::= { ibmPduOutletEntry 4 }
+
+
+ibmPduOutletAvgPower OBJECT-TYPE
+                  SYNTAX        IbmPduPowerBuf
+                  MAX-ACCESS    read-only
+                  STATUS        current
+                  DESCRIPTION   "Buffer containing average power values.  Refer to
+                                 description of IbmPduPowerBuf for information about
+                                 buffer format."
+				  ::= { ibmPduOutletEntry 5 }
+		 
+		 
+ibmPduOutletMaxPower OBJECT-TYPE
+				  SYNTAX		IbmPduPowerBuf
+				  MAX-ACCESS	read-only
+				  STATUS		current
+				  DESCRIPTION	"Buffer containing max power values.  Refer to
+                                 description of IbmPduPowerBuf for information about
+                                 buffer format."
+                  ::= { ibmPduOutletEntry 6 }
+                  
+ibmPduOutletPowerFactor  OBJECT-TYPE
+                  SYNTAX        Unsigned32
+                  MAX-ACCESS    read-only
+                  STATUS        current
+                  DESCRIPTION   "The value of the Power Factor of the given outlet."
+				  ::= { ibmPduOutletEntry 7 }            
+      
+
+ibmPduOutletVoltage  OBJECT-TYPE
+                  SYNTAX        IbmPduMilliVolt
+                  MAX-ACCESS    read-only
+                  STATUS        current
+                  DESCRIPTION   "The value of the Voltage of the given outlet
+                                 returned in MilliVolt."
+				  ::= { ibmPduOutletEntry 8 }            
+         
+         
+ibmPduOutletCurrent  OBJECT-TYPE
+                  SYNTAX        IbmPduMilliAmps
+                  MAX-ACCESS    read-only
+                  STATUS        current
+                  DESCRIPTION   "The value of the Current of the given outlet
+                                 returned in Milliamps."
+				  ::= { ibmPduOutletEntry 9 }
+				  
+				  
+ibmPduOutletMaxCapacity    OBJECT-TYPE
+								 SYNTAX 	   IbmPduMilliAmps
+								 MAX-ACCESS    read-only
+								 STATUS 	   current
+								 DESCRIPTION   "The maximum capacity of the current
+                                                outlet in Milliamps."
+                                 ::= { ibmPduOutletEntry 10 }
+
+
+ibmPduOutletCurrentThresholdWarning OBJECT-TYPE
+                                 SYNTAX        IbmPduMilliAmps
+                                 MAX-ACCESS    read-write
+                                 STATUS        current
+                                 DESCRIPTION   "The value of the warning threshold
+                                                for the given outlet returned in Milliamps."
+								 ::= { ibmPduOutletEntry 11 }
+
+
+ibmPduOutletCurrentThresholdCritical	OBJECT-TYPE
+												SYNTAX		  IbmPduMilliAmps
+												MAX-ACCESS	  read-write
+												STATUS		  current
+												DESCRIPTION   "The value of the critical threshold
+                                                           for the given outlet returned in Milliamps."
+												::= { ibmPduOutletEntry 12 }
+				 
+
+ibmPduOutletState				 OBJECT-TYPE
+								 SYNTAX 	   INTEGER { error(-1),
+														 off(0),
+														 on(1),
+														 cycling(2),
+														 delaySwitch10(3),
+														 delaySwitch30(4),
+														 delaySwitch60(5)
+													   }
+								 MAX-ACCESS    read-write
+								 STATUS 	   current
+								 DESCRIPTION   "The value of the operational state for the given outlet.
+                                                This can also be used to set (change) the outlet state."
+                                 ::= { ibmPduOutletEntry 13 }
+                                 
+
+ibmPduOutletGroupIndex              OBJECT-TYPE
+                                 SYNTAX        Unsigned32
+                                 MAX-ACCESS    read-only
+                                 STATUS        current
+                                 DESCRIPTION   "The index of the outlet group in which the outlet resides.
+                                                If there are no outlet groups present, the default is 0."
+								 ::= { ibmPduOutletEntry 14 }
+
+ibmPduOutletLastPowerReading		OBJECT-TYPE
+								 SYNTAX 	   Unsigned32
+								 MAX-ACCESS    read-only
+								 STATUS 	   current
+								 DESCRIPTION   "The value of the most recent power reading for this
+                                                outlet, in Watts."
+                                 ::= { ibmPduOutletEntry 15 }
+                                 
+ibmPduOutletIndividualDelayTimer   OBJECT-TYPE
+                                 SYNTAX        Unsigned32
+                                 MAX-ACCESS    read-write
+                                 STATUS        current
+                                 DESCRIPTION   "The delay timer for each outlet as AC power restored. Range: 0 sec ~ 3600 sec. Default Value: 0 sec. To combine with Global Delay timer to control outlet state/behavior as rack power or or restore"
+                                 ::= { ibmPduOutletEntry 16 }
+                                 
+-- ////////////////////////////////////////////////////////
+-- ////////////////// EXTERNAL MONITORS ///////////////////
+-- ////////////////////////////////////////////////////////
+
+ibmPduExtMonitorCount    OBJECT-TYPE
+                      SYNTAX        Integer32
+                      MAX-ACCESS    read-only
+                      STATUS        current
+                      DESCRIPTION   "The number of external monitors (regardless of
+                                     their current state) present on this PDU."
+					  ::= { ibmPduExternalMonitors 1 }
+
+
+ibmPduExtMonitorTable	 OBJECT-TYPE
+					  SYNTAX		SEQUENCE OF IbmPduExternalMonitorStruct
+					  MAX-ACCESS	not-accessible
+					  STATUS		current
+					  DESCRIPTION	"A list of external monitors. The number of
+                                     entries is given by the value of externalMonitorCount."
+                      ::= { ibmPduExternalMonitors 2 }
+
+
+ibmPduExtMonitorEntry    OBJECT-TYPE
+                      SYNTAX        IbmPduExternalMonitorStruct
+                      MAX-ACCESS    not-accessible
+                      STATUS        current
+                      DESCRIPTION   "A value contained within the ExternalMonitorStruct."
+                      INDEX         { ibmPduExtMonitorNumber }
+                      ::= { ibmPduExtMonitorTable 1 }
+
+
+IbmPduExternalMonitorStruct ::= SEQUENCE { ibmPduExtMonitorNumber                   Integer32,
+                                           ibmPduExtThermalBuffer                   IbmPduEnvBuf,
+                                           ibmPduExtHumidityBuffer                  IbmPduEnvBuf,
+                                           ibmPduExtThermalThresholdWarning         Unsigned32,
+                                           ibmPduExtThermalThresholdCritical        Unsigned32,
+                                           ibmPduExtHumidityThresholdWarning        Unsigned32,
+                                           ibmPduExtHumidityThresholdCritical       Unsigned32,
+                                           ibmPduExtThermalLastReading              Unsigned32,
+                                           ibmPduExtHumidityLastReading             Unsigned32
+                                         }
+
+
+ibmPduExtMonitorNumber   OBJECT-TYPE
+                      SYNTAX        Integer32(0..255)
+                      MAX-ACCESS    not-accessible
+                      STATUS        current
+                      DESCRIPTION   "The unique index of the given external monitor."
+                      ::= { ibmPduExtMonitorEntry 1 }
+
+
+ibmPduExtThermalBuffer   OBJECT-TYPE
+                      SYNTAX        IbmPduEnvBuf
+                      MAX-ACCESS    read-only
+                      STATUS        current
+                      DESCRIPTION   "Buffer that contains the thermal records.  Refer to
+                                     description of IbmPduEnvBuf for information about
+                                     buffer format."
+					  ::= { ibmPduExtMonitorEntry 2 }
+
+
+ibmPduExtHumidityBuffer  OBJECT-TYPE
+					  SYNTAX		IbmPduEnvBuf
+					  MAX-ACCESS	read-only
+					  STATUS		current
+					  DESCRIPTION	"Buffer that contains the humdity records.  Refer to
+                                     description of IbmPduEnvBuf for information about
+                                     buffer format."
+                      ::= { ibmPduExtMonitorEntry 3 }
+
+
+ibmPduExtThermalThresholdWarning OBJECT-TYPE
+                              SYNTAX         Unsigned32
+                              MAX-ACCESS     read-write
+                              STATUS         current
+                              DESCRIPTION    "The value of the warning threshold for
+                                              the given temperature returned in Celsius."
+							  ::= { ibmPduExtMonitorEntry 4 }
+										  
+										  
+ibmPduExtThermalThresholdCritical  OBJECT-TYPE
+								SYNTAX		   Unsigned32
+								MAX-ACCESS	   read-write
+								STATUS		   current
+								DESCRIPTION    "The value of the critical threshold for
+                                                                the given temperature returned in Celsius."
+                                ::= { ibmPduExtMonitorEntry 5 }
+
+
+ibmPduExtHumidityThresholdWarning  OBJECT-TYPE
+                                SYNTAX         Unsigned32(0..100)
+                                MAX-ACCESS     read-write
+                                STATUS         current
+                                DESCRIPTION    "The value of the warning threshold for
+                                                                the given humidity returned as a percent."
+								::= { ibmPduExtMonitorEntry 6 }
+
+
+ibmPduExtHumidityThresholdCritical	OBJECT-TYPE
+							  SYNTAX		 Unsigned32(0..100)
+							  MAX-ACCESS	 read-write
+							  STATUS		 current
+							  DESCRIPTION	 "The value of the critical threshold for
+                                              the given humidity returned as a percent."
+                              ::= { ibmPduExtMonitorEntry 7 }
+
+
+ibmPduExtThermalLastReading   OBJECT-TYPE
+                                    SYNTAX        Unsigned32
+                                    MAX-ACCESS    read-only
+                                    STATUS        current
+                                    DESCRIPTION   "The value of the most recent temperature reading for
+                                                   the external temperature sensor, in degrees Celsius.
+                                                   If no external temperature sensor is connected, a
+                                                   value of -1 should be returned."
+									::= { ibmPduExtMonitorEntry 8 }
+
+ibmPduExtHumidityLastReading   OBJECT-TYPE
+									SYNTAX		  Unsigned32
+									MAX-ACCESS	  read-only
+									STATUS		  current
+									DESCRIPTION   "The value of the most recent humidity reading for
+                                                   the external humidity sensor, as a percentage.  If no
+                                                   external humidity sensor is connected, a value of -1
+                                                   should be returned."
+                                    ::= { ibmPduExtMonitorEntry 9 }
+
+-- ////////////////////////////////////////////////////////                            
+-- ////////////////////// Traps ///////////////////////////
+-- ////////////////////////////////////////////////////////
+ibmPduObjectIndex    OBJECT-TYPE
+                     SYNTAX        Unsigned32(0..255)
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "Index in the table of an outlet or external meter"
+                     ::= { ibmPduTrapDataObjects 1 }
+
+
+ibmPduObjectType     OBJECT-TYPE
+                     SYNTAX        INTEGER { pdu(0),
+                                             outlet(1),
+                                             extMeter(2)
+                                           }
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "The type of object represented in the trap."
+                     ::= { ibmPduTrapDataObjects 2 }
+                     
+
+ibmPduObjectID       OBJECT-TYPE
+                     SYNTAX        DisplayString
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "Unique ID or name of the object represented in the trap."
+                     ::= { ibmPduTrapDataObjects 3 }
+
+                     
+ibmPduSeverity       OBJECT-TYPE
+                     SYNTAX        INTEGER { informational(0),
+                                             warning(1),
+                                             critical(2)
+                                           }
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "Severity of the trap."
+                     ::= { ibmPduTrapDataObjects 4 }
+                     
+                     
+ibmPduTrapDescription OBJECT-TYPE
+                     SYNTAX        DisplayString
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "Textual description of the trap."
+                     ::= { ibmPduTrapDataObjects 5 }
+
+
+ibmPduState          OBJECT-TYPE
+                     SYNTAX        INTEGER { powerOff(0),
+                                             powerOn(1),
+                                             reboot(2),
+                                             delayedOn(3),
+                                             delayedOff(4)
+                                           }
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "State change for management of an outlet."
+                     ::= { ibmPduTrapDataObjects 6 }
+                     
+ibmPduVoltageWarning OBJECT-TYPE
+                     SYNTAX        INTEGER { voltageNormal(0),
+                                             voltageOutOfRange(1)
+                                           }
+                     MAX-ACCESS    accessible-for-notify
+                     STATUS        current
+                     DESCRIPTION   "Voltage Warning."
+                     ::= { ibmPduTrapDataObjects 7 }
+
+
+ibmPduCurrentThreshold  NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectIndex,
+                                      ibmPduObjectType,
+                                      ibmPduObjectID,
+                                      ibmPduSeverity,
+                                      ibmPduTrapDescription
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "Threshold for Current events set by the user."
+                     ::= { ibmPduTraps 1 }
+            
+            
+ibmPduThermalThreshold  NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectIndex,
+                                      ibmPduObjectType,
+                                      ibmPduObjectID,
+                                      ibmPduSeverity,
+                                      ibmPduTrapDescription
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "Threshold for thermal events set by the user."
+                     ::= { ibmPduTraps 2 }
+            
+            
+ibmPduHumidityThreshold NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectIndex,
+                                      ibmPduObjectType,
+                                      ibmPduObjectID,
+                                      ibmPduSeverity,
+                                      ibmPduTrapDescription
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "Threshold for humidity events set by the user."
+                     ::= { ibmPduTraps 3 }
+                  
+                  
+ibmPduOutletStateChange NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectIndex,
+                                      ibmPduObjectID,
+                                      ibmPduState,
+                                      ibmPduTrapDescription
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "Outlet state has changed."
+                     ::= { ibmPduTraps 4 }
+                     
+                     
+ibmPduFirmwareChanged   NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectID,
+                                      ibmPduTrapDescription
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "PDU firmware has been updated."
+                     ::= { ibmPduTraps 5 }
+                     
+
+ibmPduDeviceStateChange NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectID,
+                                      ibmPduState,
+                                      ibmPduTrapDescription
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "Device state has changed."
+                     ::= { ibmPduTraps 6 }
+
+ibmPduACVoltageWarning NOTIFICATION-TYPE
+                     OBJECTS        { ibmPduObjectID,
+                                      ibmPduVoltageWarning
+                                    }
+                     STATUS         current
+                     DESCRIPTION    "AC Voltage +/- 15% Normal."
+                     ::= { ibmPduTraps 7 }
+                              
+-- ////////////////////////////////////////////////////////                            
+-- /////////////////// Compliances ////////////////////////
+-- ////////////////////////////////////////////////////////
+
+ibmPduDeviceGroup     OBJECT-GROUP
+                OBJECTS { ibmPduBufferTagValue,
+                          ibmPduSampleRate,
+                          ibmPduBufferVersion,
+                          ibmPduBufferEntries,
+                          ibmPduSoftwareVersion,
+                          ibmPduMachineType,
+                          ibmPduModelNumber,
+                          ibmPduPartNumber,
+                          ibmPduName,
+                          ibmPduManufacturer,
+                          ibmPduSerialNumber,
+                          ibmPduDescription,
+                          ibmPduUrl,
+                          ibmPduReboot,
+                          ibmPduPhaseCount,
+                          ibmPduPhaseAvgPower,
+                          ibmPduPhaseMaxPower,
+                          ibmPduPhaseLastPowerReading,
+                          ibmPduThermalBuffer,
+                          ibmPduHumidityBuffer,
+                          ibmPduThermalThresholdWarning,
+                          ibmPduThermalThresholdCritical,
+                          ibmPduHumidityThresholdWarning,
+                          ibmPduHumidityThresholdCritical,
+                          ibmPduThermalLastReading,
+                          ibmPduHumidityLastReading
+                        }
+                STATUS        current
+                DESCRIPTION   "A group of objects containing base information about
+                               the overall PDU."
+				::= { ibmPduGroups 1 }
+
+
+ibmPduImageGroup   OBJECT-GROUP
+				OBJECTS { ibmPduLogo,
+						  ibmPduDeviceFront,
+						  ibmPduDeviceRear
+						}
+				STATUS		  current
+				DESCRIPTION   "A group of objects containing image information
+                               of the PDU."
+                ::= { ibmPduGroups 2 }
+
+
+ibmPduLocationGroup   OBJECT-GROUP
+                OBJECTS { ibmPduTelephoneNumber,
+                          ibmPduCountryRegion,
+                          ibmPduStreetAddress,
+                          ibmPduCity,
+                          ibmPduStateProvince,
+                          ibmPduPostalCode,
+                          ibmPduBuilding,
+                          ibmPduFloor,
+                          ibmPduRoomNumber,
+                          ibmPduRow,
+                          ibmPduAisle,
+                          ibmPduDisplaceHeight,
+                          ibmPduAltitude,
+                          ibmPduOtherInfo
+                        }
+                STATUS        current
+                DESCRIPTION   "A group of objects containing ibmLocation information
+                               of the PDU."
+				::= { ibmPduGroups 3 }
+
+
+ibmPduOutletGroup  OBJECT-GROUP
+				OBJECTS { ibmPduOutletCount,
+						  ibmPduOutletName,
+						  ibmPduOutletType,
+						  ibmPduOutletDescription,
+						  ibmPduOutletAvgPower,
+						  ibmPduOutletMaxPower,
+						  ibmPduOutletCurrent,
+						  ibmPduOutletMaxCapacity,
+						  ibmPduOutletCurrentThresholdWarning,
+						  ibmPduOutletCurrentThresholdCritical,
+						  ibmPduOutletState,
+						  ibmPduOutletGroupIndex,
+						  ibmPduOutletLastPowerReading,
+						  ibmPduOutletIndividualDelayTimer,
+						  ibmPduOutletGlobalDelayTimer
+						}
+				STATUS		  current
+				DESCRIPTION   "A group of objects containing information about
+                               the outlets in a PDU."
+                ::= { ibmPduGroups 4 }
+
+
+ibmPduExtMonitorGroup   OBJECT-GROUP
+                    OBJECTS { ibmPduExtMonitorCount,
+                                        ibmPduExtThermalBuffer,
+                                        ibmPduExtHumidityBuffer,
+                                        ibmPduExtThermalThresholdWarning,
+                                        ibmPduExtThermalThresholdCritical,
+                                        ibmPduExtHumidityThresholdWarning,
+                                        ibmPduOutletCurrentThresholdCritical,
+                                        ibmPduExtHumidityThresholdCritical,
+                                        ibmPduExtThermalLastReading,
+                                        ibmPduExtHumidityLastReading
+                                      }
+                    STATUS        current
+                    DESCRIPTION   "A group of objects containing information about
+                                             external thermal and humidity monitors connected
+                                             to the PDU."
+					::= { ibmPduGroups 5 }
+				
+				
+ibmPduTrapDataGroup 	OBJECT-GROUP
+					OBJECTS { ibmPduObjectIndex,
+							  ibmPduObjectType,
+							  ibmPduObjectID,
+							  ibmPduSeverity,
+							  ibmPduState,
+							  ibmPduTrapDescription,
+							  ibmPduVoltageWarning
+							}
+					STATUS		  current
+					DESCRIPTION   "A group of object containing data for traps."
+					::= { ibmPduGroups 6 }
+
+
+ibmPduTrapGroup    NOTIFICATION-GROUP
+				NOTIFICATIONS { ibmPduCurrentThreshold,
+								ibmPduThermalThreshold,
+								ibmPduHumidityThreshold,
+								ibmPduOutletStateChange,
+								ibmPduFirmwareChanged,
+								ibmPduDeviceStateChange,
+								ibmPduACVoltageWarning
+							  }
+				STATUS		  current
+				DESCRIPTION   "A group of objects containing information about
+                               traps of the PDU, its outlets, and external meters."
+                ::= { ibmPduGroups 7 }
+                
+
+ibmPduCompliance   MODULE-COMPLIANCE
+                STATUS        current
+                DESCRIPTION   "The requirements for conformance to the PDU-MIB."
+                MODULE -- this module
+
+                MANDATORY-GROUPS {
+                    ibmPduDeviceGroup,
+                    ibmPduLocationGroup,
+                    ibmPduImageGroup,
+                    ibmPduOutletGroup,
+                    ibmPduExtMonitorGroup,
+                    ibmPduTrapDataGroup,
+                    ibmPduTrapGroup
+                }   
+                ::= { ibmPduCompliances 8 }
+
+END

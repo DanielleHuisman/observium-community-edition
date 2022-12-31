@@ -70,9 +70,6 @@ define('OBS_PERMIT_EDIT',          8); // Can edit
 define('OBS_PERMIT_ADMIN',        16); // Can add/remove
 define('OBS_PERMIT_ALL', OBS_PERMIT_ACCESS | OBS_PERMIT_READ | OBS_PERMIT_SECURE | OBS_PERMIT_EDIT | OBS_PERMIT_ADMIN); // Permit all
 
-const OBS_DB_NO_LEADING_AND = 1; // Do not add leading AND to result query (default add)
-const OBS_DB_IFNULL         = 2; // Add IFNULL() for column compare
-
 // Configuration view levels
 define('OBS_CONFIG_BASIC',          1); // 0001: Basic view, 0001
 define('OBS_CONFIG_ADVANCED',       3); // 0011: Advanced view, includes basic
@@ -147,6 +144,7 @@ const OBS_PATTERN_ALPHA = '/^[\w\.\-]+$/';
 const OBS_PATTERN_NOPRINT = '/[^\p{L}\p{N}\p{P}\p{S} ]/u'; // Non-printable UTF8 chars
 const OBS_PATTERN_NOLATIN = '/[^\p{Common}\p{Latin}]/u';   // Non Latin (UTF8?) chars
 const OBS_PATTERN_VAR_NAME = '/^\w[\w\s\.\-+]*(\[[\w\.\-+]*\])*$/';
+const OBS_PATTERN_REGEXP = '/^\s*(?<delimiter>[//!#@%+])(?<pattern>.+)(\1)(?<modifiers>[imsxu])?\s*$/s'; // Detect string is common pattern
 
 // Json flags
 define('OBS_JSON_BIGINT_AS_STRING', PHP_VERSION_ID >= 50400 && PHP_INT_SIZE > 4 && !(defined('JSON_C_VERSION'))); // Check if BIGINT supported
@@ -204,9 +202,10 @@ const OBS_MIN_PHP_VERSION = '5.6.26'; // PHP (15 Sep 2016, https://www.php.net/r
 //define('OBS_MIN_PYTHON2_VERSION', '2.7.12'); // Python 2 (26 June 2016, https://www.python.org/doc/versions/)
 const OBS_MIN_PYTHON2_VERSION = '2.7.5';  // last in RHEL/CentOS 7 (and Ubuntu LTS 14.04)
 const OBS_MIN_PYTHON3_VERSION = '3.5.2';  // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
-const OBS_MIN_MYSQL_VERSION   = '5.6.5';  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
-//define('OBS_MIN_MARIADB_VERSION', '10.0');   // MySQL 5.6 mostly equals with MariaDB 10.0: https://mariadb.com/kb/en/timestamp/
-const OBS_MIN_MARIADB_VERSION = '5.5.68'; // 5.5.68 last in RHEL/CentOS 7 and 5.5.63 in Ubuntu LTS 14.04
+//const OBS_MIN_MYSQL_VERSION   = '5.6.5';  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
+const OBS_MIN_MYSQL_VERSION   = '5.7.0';  // JSON data type was added in 5.7
+//const OBS_MIN_MARIADB_VERSION = '5.5.68'; // 5.5.68 last in RHEL/CentOS 7 and 5.5.63 in Ubuntu LTS 14.04
+const OBS_MIN_MARIADB_VERSION = '10.2.7'; // JSON data type was added in 10.2.7: https://mariadb.com/kb/en/json-data-type/
 const OBS_MIN_RRD_VERSION     = '1.4.8';  // last in RHEL/CentOS 7
 //define('OBS_MIN_RRD_VERSION',     '1.5.5');  // RRDTool (10 Nov 2015, https://github.com/oetiker/rrdtool-1.x/tags)
 
@@ -337,8 +336,8 @@ else                                  { $config['cache_dir']    = rtrim($config[
 // Load random_compat (for PHP 5.x)
 require_once("random_compat/random.php");
 
-// Load hash-compat (for < PHP 5.6)
-require_once("hash-compat/hash_equals.php");
+// CLEANME. Load hash-compat (for < PHP 5.6)
+//require_once("hash-compat/hash_equals.php");
 
 // Collect php errors mostly for catch php8 errors
 if ($config['php_debug'] && !defined('__PHPUNIT_PHAR__')) {
@@ -389,6 +388,8 @@ $definition_files = [
   'apps',         // Apps system definitions
 ];
 
+//echo "definitions was last modified: " . date ("F d Y H:i:s.", filemtime('/opt/observium/includes/definitions/')) . "\n";
+
 foreach ($definition_files as $file) {
   $file = $config['install_dir'].'/includes/definitions/'.$file.'.inc.php';
   if (is_file($file)) {
@@ -398,132 +399,147 @@ foreach ($definition_files as $file) {
 
 unset($definition_files, $file); // Clean
 
-// Alert Graphs
-## FIXME - this is ugly
-## Merge it in to entities, since that's what it is!
-
-$config['alert_graphs']['port']['ifInOctets_rate']       = array('type' => 'port_bits', 'id' => '@port_id');
-$config['alert_graphs']['port']['ifOutOctets_rate']      = array('type' => 'port_bits', 'id' => '@port_id');
-$config['alert_graphs']['port']['ifInOctets_perc']       = array('type' => 'port_percent', 'id' => '@port_id');
-$config['alert_graphs']['port']['ifOutOctets_perc']      = array('type' => 'port_percent', 'id' => '@port_id');
-$config['alert_graphs']['mempool']['mempool_perc']       = array('type' => 'mempool_usage', 'id' => '@mempool_id');
-$config['alert_graphs']['sensor']['sensor_value']        = array('type' => 'sensor_graph', 'id' => '@sensor_id');
-$config['alert_graphs']['sensor']['sensor_event']        = array('type' => 'sensor_graph', 'id' => '@sensor_id');
-$config['alert_graphs']['status']['status_event']        = array('type' => 'status_graph', 'id' => '@status_id');
-$config['alert_graphs']['status']['status_state']        = array('type' => 'status_graph', 'id' => '@status_id');
-
-$config['alert_graphs']['processor']['processor_usage']  = array('type' => 'processor_usage', 'id' => '@processor_id');
-$config['alert_graphs']['storage']['storage_perc']  = array('type' => 'storage_usage', 'id' => '@storage_id');
-
 // IP types
 // https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
-$config['ip_types']['unspecified']    = array('networks' => array('0.0.0.0', '::/128'),
-                                              'name'     => 'Unspecified', 'subtext' => 'Example: ::/128, 0.0.0.0',
-                                              'label-class' => 'error',
-                                              'descr'    => 'This address may only be used as a source address by an initialising host before it has learned its own address. Example: ::/128, 0.0.0.0');
-$config['ip_types']['loopback']       = array('networks' => array('127.0.0.0/8', '::1/128'),
-                                              'name'     => 'Loopback', 'subtext' => 'Example: ::1/128, 127.0.0.1',
-                                              'label-class' => 'info',
-                                              'descr'    => 'This address is used when a host talks to itself. Example: ::1/128, 127.0.0.1');
-$config['ip_types']['private']        = array('networks' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'),
-                                              'name'     => 'Private Local Addresses', 'subtext' => 'Example: fdf8:f53b:82e4::53, 192.168.0.1',
-                                              'label-class' => 'warning',
-                                              'descr'    => 'These addresses are reserved for local use in home and enterprise environments and are not public address space. Example: fdf8:f53b:82e4::53, 192.168.0.1');
-$config['ip_types']['multicast']      = array('networks' => array('224.0.0.0/4', 'ff00::/8'),
-                                              'name'     => 'Multicast', 'subtext' => 'Example: ff01:0:0:0:0:0:0:2, 224.0.0.1',
-                                              'label-class' => 'inverse',
-                                              'descr'    => 'These addresses are used to identify multicast groups. Example: ff01:0:0:0:0:0:0:2, 224.0.0.1');
-$config['ip_types']['link-local']     = array('networks' => array('169.254.0.0/16', 'fe80::/10'),
-                                              'name'     => 'Link-Local Addresses', 'subtext' => 'Example: fe80::200:5aee:feaa:20a2, 169.254.3.1',
-                                              'label-class' => 'suppressed',
-                                              'descr'    => 'These addresses are used on a single link or a non-routed common access network, such as an Ethernet LAN. Example: fe80::200:5aee:feaa:20a2, 169.254.3.1');
-$config['ip_types']['ipv4mapped']     = array('networks' => array('::ffff/96'),
-                                              'name'     => 'IPv6 IPv4-Mapped', 'subtext' => 'Example: ::ffff:192.0.2.47',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'These addresses are used to embed IPv4 addresses in an IPv6 address. Example: 64:ff9b::192.0.2.33');
-$config['ip_types']['ipv4embedded']   = array('networks' => array('64:ff9b::/96'),
-                                              'name'     => 'IPv6 IPv4-Embedded', 'subtext' => 'Example: ::ffff:192.0.2.47',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'IPv4-converted IPv6 addresses and IPv4-translatable IPv6 addresses. Example: 64:ff9b::192.0.2.33');
-$config['ip_types']['6to4']           = array('networks' => array('192.88.99.0/24', '2002::/16'),
-                                              'name'     => 'IPv6 6to4', 'subtext' => 'Example: 2002:cb0a:3cdd:1::1, 192.88.99.1',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'A 6to4 gateway adds its IPv4 address to this 2002::/16, creating a unique /48 prefix. Example: 2002:cb0a:3cdd:1::1, 192.88.99.1');
-$config['ip_types']['documentation']  = array('networks' => array('192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '2001:db8::/32'),
-                                              'name'     => 'Documentation', 'subtext' => 'Example: 2001:db8:8:4::2, 203.0.113.1',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'These addresses are used in examples and documentation. Example: 2001:db8:8:4::2, 203.0.113.1');
-$config['ip_types']['teredo']         = array('networks' => array('2001:0000::/32'),
-                                              'name'     => 'IPv6 Teredo', 'subtext' => 'Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'This is a mapped address allowing IPv6 tunneling through IPv4 NATs. The address is formed using the Teredo prefix, the servers unique IPv4 address, flags describing the type of NAT, the obfuscated client port and the client IPv4 address, which is probably a private address. Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2');
-$config['ip_types']['benchmark']      = array('networks' => array('198.18.0.0/15', '2001:0002::/48'),
-                                              'name'     => 'Benchmarking', 'subtext' => 'Example: 2001:0002:6c::430, 198.18.0.1',
-                                              'label-class' => 'error',
-                                              'descr'    => 'These addresses are reserved for use in documentation. Example: 2001:0002:6c::430, 198.18.0.1');
-$config['ip_types']['orchid']         = array('networks' => array('2001:0010::/28', '2001:0020::/28'),
-                                              'name'     => 'IPv6 Orchid', 'subtext' => 'Example: 2001:10:240:ab::a',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'These addresses are used for a fixed-term experiment. Example: 2001:10:240:ab::a');
-$config['ip_types']['reserved']       = array(//'networks' => array(),
-                                              'name'     => 'Reserved', 'subtext' => 'Address in reserved address space',
-                                              'label-class' => 'error',
-                                              'descr'    => 'Reserved address space');
-$config['ip_types']['broadcast']      = array(//'networks' => array(),
-                                              'name'     => 'IPv4 Broadcast', 'subtext' => 'Example: 255.255.255.255',
-                                              'label-class' => 'disabled',
-                                              'descr'    => 'IPv4 broadcast address. Example: 255.255.255.255');
-$config['ip_types']['anycast']        = array(//'networks' => array(),
-                                              'name'     => 'Anycast',
-                                              'label-class' => 'primary',
-                                              'descr'    => 'Anycast is a network addressing and routing methodology in which a single destination address has multiple routing paths to two or more endpoint destinations.');
+$config['ip_types']['unspecified'] = [
+  'networks' => [ '0.0.0.0', '::/128' ],
+  'name'     => 'Unspecified', 'subtext' => 'Example: ::/128, 0.0.0.0',
+  'label-class' => 'error',
+  'descr'    => 'This address may only be used as a source address by an initialising host before it has learned its own address. Example: ::/128, 0.0.0.0'
+];
+$config['ip_types']['loopback'] = [
+  'networks' => [ '127.0.0.0/8', '::1/128' ],
+  'name'     => 'Loopback', 'subtext' => 'Example: ::1/128, 127.0.0.1',
+  'label-class' => 'info',
+  'descr'    => 'This address is used when a host talks to itself. Example: ::1/128, 127.0.0.1'
+];
+$config['ip_types']['private'] = [
+  'networks' => [ '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7' ],
+  'name'     => 'Private Local Addresses', 'subtext' => 'Example: fdf8:f53b:82e4::53, 192.168.0.1',
+  'label-class' => 'warning',
+  'descr'    => 'These addresses are reserved for local use in home and enterprise environments and are not public address space. Example: fdf8:f53b:82e4::53, 192.168.0.1'
+];
+$config['ip_types']['multicast'] = [
+  'networks' => [ '224.0.0.0/4', 'ff00::/8' ],
+  'name'     => 'Multicast', 'subtext' => 'Example: ff01:0:0:0:0:0:0:2, 224.0.0.1',
+  'label-class' => 'inverse',
+  'descr'    => 'These addresses are used to identify multicast groups. Example: ff01:0:0:0:0:0:0:2, 224.0.0.1'
+];
+$config['ip_types']['link-local'] = [
+  'networks' => [ '169.254.0.0/16', 'fe80::/10' ],
+  'name'     => 'Link-Local Addresses', 'subtext' => 'Example: fe80::200:5aee:feaa:20a2, 169.254.3.1',
+  'label-class' => 'suppressed',
+  'descr'    => 'These addresses are used on a single link or a non-routed common access network, such as an Ethernet LAN. Example: fe80::200:5aee:feaa:20a2, 169.254.3.1'
+];
+$config['ip_types']['ipv4mapped'] = [
+  'networks' => [ '::ffff/96' ],
+  'name'     => 'IPv6 IPv4-Mapped', 'subtext' => 'Example: ::ffff:192.0.2.47',
+  'label-class' => 'primary',
+  'descr'    => 'These addresses are used to embed IPv4 addresses in an IPv6 address. Example: 64:ff9b::192.0.2.33'
+];
+$config['ip_types']['ipv4embedded'] = [
+  'networks' => [ '64:ff9b::/96' ],
+  'name'     => 'IPv6 IPv4-Embedded', 'subtext' => 'Example: ::ffff:192.0.2.47',
+  'label-class' => 'primary',
+  'descr'    => 'IPv4-converted IPv6 addresses and IPv4-translatable IPv6 addresses. Example: 64:ff9b::192.0.2.33'
+];
+$config['ip_types']['6to4'] = [
+  'networks' => [ '192.88.99.0/24', '2002::/16' ],
+  'name'     => 'IPv6 6to4', 'subtext' => 'Example: 2002:cb0a:3cdd:1::1, 192.88.99.1',
+  'label-class' => 'primary',
+  'descr'    => 'A 6to4 gateway adds its IPv4 address to this 2002::/16, creating a unique /48 prefix. Example: 2002:cb0a:3cdd:1::1, 192.88.99.1'
+];
+$config['ip_types']['documentation'] = [
+  'networks' => [ '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '2001:db8::/32' ],
+  'name'     => 'Documentation', 'subtext' => 'Example: 2001:db8:8:4::2, 203.0.113.1',
+  'label-class' => 'primary',
+  'descr'    => 'These addresses are used in examples and documentation. Example: 2001:db8:8:4::2, 203.0.113.1'
+];
+$config['ip_types']['teredo'] = [
+  'networks' => [ '2001:0000::/32' ],
+  'name'     => 'IPv6 Teredo', 'subtext' => 'Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2',
+  'label-class' => 'primary',
+  'descr'    => 'This is a mapped address allowing IPv6 tunneling through IPv4 NATs. The address is formed using the Teredo prefix, the servers unique IPv4 address, flags describing the type of NAT, the obfuscated client port and the client IPv4 address, which is probably a private address. Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2'
+];
+$config['ip_types']['benchmark'] = [
+  'networks' => [ '198.18.0.0/15', '2001:0002::/48' ],
+  'name'     => 'Benchmarking', 'subtext' => 'Example: 2001:0002:6c::430, 198.18.0.1',
+  'label-class' => 'error',
+  'descr'    => 'These addresses are reserved for use in documentation. Example: 2001:0002:6c::430, 198.18.0.1'
+];
+$config['ip_types']['orchid'] = [
+  'networks' => [ '2001:0010::/28', '2001:0020::/28' ],
+  'name'     => 'IPv6 Orchid', 'subtext' => 'Example: 2001:10:240:ab::a',
+  'label-class' => 'primary',
+  'descr'    => 'These addresses are used for a fixed-term experiment. Example: 2001:10:240:ab::a'
+];
+$config['ip_types']['reserved'] = [
+  //'networks' => [],
+  'name'     => 'Reserved', 'subtext' => 'Address in reserved address space',
+  'label-class' => 'error',
+  'descr'    => 'Reserved address space'
+];
+$config['ip_types']['broadcast'] = [
+  //'networks' => [],
+  'name'     => 'IPv4 Broadcast', 'subtext' => 'Example: 255.255.255.255',
+  'label-class' => 'disabled',
+  'descr'    => 'IPv4 broadcast address. Example: 255.255.255.255'
+];
+$config['ip_types']['anycast'] = [
+  //'networks' => [],
+  'name'     => 'Anycast',
+  'label-class' => 'primary',
+  'descr'    => 'Anycast is a network addressing and routing methodology in which a single destination address has multiple routing paths to two or more endpoint destinations.'
+];
 // Keep this at last!
-$config['ip_types']['unicast']        = array('networks' => array('2000::/3'), // 'networks' => array('0.0.0.0/0', '2000::/3'),'
-                                              'name'     => 'Global Unicast', 'subtext' => 'Example: 2a02:408:7722::, 80.94.60.2', 'disabled' => 1,
-                                              'label-class' => 'success',
-                                              'descr'    => 'Global Unicast addresses. Example: 2a02:408:7722::, 80.94.60.2');
+$config['ip_types']['unicast'] = [
+  'networks' => [ '2000::/3' ], // 'networks' => [ '0.0.0.0/0', '2000::/3' ],'
+  'name'     => 'Global Unicast', 'subtext' => 'Example: 2a02:408:7722::, 80.94.60.2', 'disabled' => 1,
+  'label-class' => 'success',
+  'descr'    => 'Global Unicast addresses. Example: 2a02:408:7722::, 80.94.60.2'
+];
 
 // Syslog colour and name translation
 
-$config['syslog']['priorities'][0] = array('name' => 'emergency',     'color' => '#D94640', 'label-class' => 'inverse',    'row-class' => 'error',      'emoji' => 'red_circle');
-$config['syslog']['priorities'][1] = array('name' => 'alert',         'color' => '#D94640', 'label-class' => 'delayed',    'row-class' => 'error',      'emoji' => 'red_circle');
-$config['syslog']['priorities'][2] = array('name' => 'critical',      'color' => '#D94640', 'label-class' => 'error',      'row-class' => 'error',      'emoji' => 'red_circle');
-$config['syslog']['priorities'][3] = array('name' => 'error',         'color' => '#E88126', 'label-class' => 'error',      'row-class' => 'error',      'emoji' => 'red_circle');
-$config['syslog']['priorities'][4] = array('name' => 'warning',       'color' => '#F2CA3F', 'label-class' => 'warning',    'row-class' => 'warning',    'emoji' => 'large_yellow_circle');
-$config['syslog']['priorities'][5] = array('name' => 'notification',  'color' => '#107373', 'label-class' => 'success',    'row-class' => 'recovery',   'emoji' => 'large_orange_circle'); // large_green_circle
-$config['syslog']['priorities'][6] = array('name' => 'informational', 'color' => '#499CA6', 'label-class' => 'primary',    'row-class' => '',           'emoji' => 'large_blue_circle'); //'row-class' => 'info');
-$config['syslog']['priorities'][7] = array('name' => 'debugging',     'color' => '#5AA637', 'label-class' => 'suppressed', 'row-class' => 'suppressed', 'emoji' => 'large_purple_circle');
+$config['syslog']['priorities'][0] = [ 'name' => 'emergency',     'color' => '#D94640', 'label-class' => 'inverse',    'row-class' => 'error',      'emoji' => 'red_circle' ];
+$config['syslog']['priorities'][1] = [ 'name' => 'alert',         'color' => '#D94640', 'label-class' => 'delayed',    'row-class' => 'error',      'emoji' => 'red_circle' ];
+$config['syslog']['priorities'][2] = [ 'name' => 'critical',      'color' => '#D94640', 'label-class' => 'error',      'row-class' => 'error',      'emoji' => 'red_circle' ];
+$config['syslog']['priorities'][3] = [ 'name' => 'error',         'color' => '#E88126', 'label-class' => 'error',      'row-class' => 'error',      'emoji' => 'red_circle' ];
+$config['syslog']['priorities'][4] = [ 'name' => 'warning',       'color' => '#F2CA3F', 'label-class' => 'warning',    'row-class' => 'warning',    'emoji' => 'large_yellow_circle' ];
+$config['syslog']['priorities'][5] = [ 'name' => 'notification',  'color' => '#107373', 'label-class' => 'success',    'row-class' => 'recovery',   'emoji' => 'large_orange_circle' ]; // large_green_circle
+$config['syslog']['priorities'][6] = [ 'name' => 'informational', 'color' => '#499CA6', 'label-class' => 'primary',    'row-class' => '',           'emoji' => 'large_blue_circle' ]; //'row-class' => 'info');
+$config['syslog']['priorities'][7] = [ 'name' => 'debugging',     'color' => '#5AA637', 'label-class' => 'suppressed', 'row-class' => 'suppressed', 'emoji' => 'large_purple_circle' ];
 
 for ($i = 8; $i < 16; $i++)
 {
-  $config['syslog']['priorities'][$i] = array('name' => 'other',        'color' => '#D2D8F9', 'label-class' => 'disabled',   'row-class' => 'disabled', 'emoji' => 'large_orange_circle');
+  $config['syslog']['priorities'][$i] = [ 'name' => 'other',        'color' => '#D2D8F9', 'label-class' => 'disabled',   'row-class' => 'disabled', 'emoji' => 'large_orange_circle' ];
 }
 
 // https://tools.ietf.org/html/draft-ietf-netmod-syslog-model-14
-$config['syslog']['facilities'][0]  = array('name' => 'kern',     'descr' => 'kernel messages');
-$config['syslog']['facilities'][1]  = array('name' => 'user',     'descr' => 'user-level messages');
-$config['syslog']['facilities'][2]  = array('name' => 'mail',     'descr' => 'mail system');
-$config['syslog']['facilities'][3]  = array('name' => 'daemon',   'descr' => 'system daemons');
-$config['syslog']['facilities'][4]  = array('name' => 'auth',     'descr' => 'security/authorization messages');
-$config['syslog']['facilities'][5]  = array('name' => 'syslog',   'descr' => 'messages generated internally by syslogd');
-$config['syslog']['facilities'][6]  = array('name' => 'lpr',      'descr' => 'line printer subsystem');
-$config['syslog']['facilities'][7]  = array('name' => 'news',     'descr' => 'network news subsystem');
-$config['syslog']['facilities'][8]  = array('name' => 'uucp',     'descr' => 'UUCP subsystem');
-$config['syslog']['facilities'][9]  = array('name' => 'cron',     'descr' => 'clock daemon');
-$config['syslog']['facilities'][10] = array('name' => 'authpriv', 'descr' => 'security/authorization messages');
-$config['syslog']['facilities'][11] = array('name' => 'ftp',      'descr' => 'FTP daemon');
-$config['syslog']['facilities'][12] = array('name' => 'ntp',      'descr' => 'NTP subsystem');
-$config['syslog']['facilities'][13] = array('name' => 'audit',    'descr' => 'log audit');
-$config['syslog']['facilities'][14] = array('name' => 'console',  'descr' => 'log alert');
-$config['syslog']['facilities'][15] = array('name' => 'cron2',    'descr' => 'clock daemon');
-$config['syslog']['facilities'][16] = array('name' => 'local0',   'descr' => 'local use 0 (local0)');
-$config['syslog']['facilities'][17] = array('name' => 'local1',   'descr' => 'local use 1 (local1)');
-$config['syslog']['facilities'][18] = array('name' => 'local2',   'descr' => 'local use 2 (local2)');
-$config['syslog']['facilities'][19] = array('name' => 'local3',   'descr' => 'local use 3 (local3)');
-$config['syslog']['facilities'][20] = array('name' => 'local4',   'descr' => 'local use 4 (local4)');
-$config['syslog']['facilities'][21] = array('name' => 'local5',   'descr' => 'local use 5 (local5)');
-$config['syslog']['facilities'][22] = array('name' => 'local6',   'descr' => 'local use 6 (local6)');
-$config['syslog']['facilities'][23] = array('name' => 'local7',   'descr' => 'local use 7 (local7)');
+$config['syslog']['facilities'][0]  = [ 'name' => 'kern',     'descr' => 'kernel messages' ];
+$config['syslog']['facilities'][1]  = [ 'name' => 'user',     'descr' => 'user-level messages' ];
+$config['syslog']['facilities'][2]  = [ 'name' => 'mail',     'descr' => 'mail system' ];
+$config['syslog']['facilities'][3]  = [ 'name' => 'daemon',   'descr' => 'system daemons' ];
+$config['syslog']['facilities'][4]  = [ 'name' => 'auth',     'descr' => 'security/authorization messages' ];
+$config['syslog']['facilities'][5]  = [ 'name' => 'syslog',   'descr' => 'messages generated internally by syslogd' ];
+$config['syslog']['facilities'][6]  = [ 'name' => 'lpr',      'descr' => 'line printer subsystem' ];
+$config['syslog']['facilities'][7]  = [ 'name' => 'news',     'descr' => 'network news subsystem' ];
+$config['syslog']['facilities'][8]  = [ 'name' => 'uucp',     'descr' => 'UUCP subsystem' ];
+$config['syslog']['facilities'][9]  = [ 'name' => 'cron',     'descr' => 'clock daemon' ];
+$config['syslog']['facilities'][10] = [ 'name' => 'authpriv', 'descr' => 'security/authorization messages' ];
+$config['syslog']['facilities'][11] = [ 'name' => 'ftp',      'descr' => 'FTP daemon' ];
+$config['syslog']['facilities'][12] = [ 'name' => 'ntp',      'descr' => 'NTP subsystem' ];
+$config['syslog']['facilities'][13] = [ 'name' => 'audit',    'descr' => 'log audit' ];
+$config['syslog']['facilities'][14] = [ 'name' => 'console',  'descr' => 'log alert' ];
+$config['syslog']['facilities'][15] = [ 'name' => 'cron2',    'descr' => 'clock daemon' ];
+$config['syslog']['facilities'][16] = [ 'name' => 'local0',   'descr' => 'local use 0 (local0)' ];
+$config['syslog']['facilities'][17] = [ 'name' => 'local1',   'descr' => 'local use 1 (local1)' ];
+$config['syslog']['facilities'][18] = [ 'name' => 'local2',   'descr' => 'local use 2 (local2)' ];
+$config['syslog']['facilities'][19] = [ 'name' => 'local3',   'descr' => 'local use 3 (local3)' ];
+$config['syslog']['facilities'][20] = [ 'name' => 'local4',   'descr' => 'local use 4 (local4)' ];
+$config['syslog']['facilities'][21] = [ 'name' => 'local5',   'descr' => 'local use 5 (local5)' ];
+$config['syslog']['facilities'][22] = [ 'name' => 'local6',   'descr' => 'local use 6 (local6)' ];
+$config['syslog']['facilities'][23] = [ 'name' => 'local7',   'descr' => 'local use 7 (local7)' ];
 
 // Alert severities (emoji used _only_ as notification icon)
 // Recover emoji is white_check_mark
@@ -532,7 +548,7 @@ $config['alert']['severity']['warn'] = [ 'name' => 'Warning',       'color' => '
 //$config['alert']['severity']['info'] = [ 'name' => 'Informational', 'color' => '#499CA6', 'label-class' => 'primary', 'row-class' => 'info',    'icon' => $config['icon']['informational'], 'emoji' => 'information_source' ];
 
 // Possible transports for net-snmp, used for enumeration in several functions
-$config['snmp']['transports'] = array('udp', 'udp6', 'tcp', 'tcp6');
+$config['snmp']['transports'] = [ 'udp', 'udp6', 'tcp', 'tcp6' ];
 
 // 'count' is min total errors count, after which autodisable this MIB/oid pair
 // 'rate' is min total rate (per poll), after which autodisable this MIB/oid pair
@@ -645,10 +661,10 @@ $config['snmp']['errorcodes'][1000] = [
   'name'   => 'OBS_SNMP_ERROR_FAILED_RESPONSE',
   'msg'    => ''
 ];
-//$config['snmp']['errorcodes'][1001] = array('reason' => 'Authentication failure',   // Snmp auth errors
+//$config['snmp']['errorcodes'][1001] = ['reason' => 'Authentication failure',   // Snmp auth errors
 //                                            'count'  => 25,                         // errors in every poll run, disable after ~ 1.5 hour
 //                                            'rate'   => 0.9,
-//                                            'msg'    => '');
+//                                            'msg'    => ''];
 $config['snmp']['errorcodes'][1002] = [
   'reason' => 'Request timeout',          // Cmd exit by timeout
   'count'  => 25,                         // errors in every poll run, disable after ~ 1.5 hour
@@ -699,17 +715,17 @@ unset($errorname, $errorcode, $tmp);
 
 // IPMI user levels (used in GUI, first entry = default if unset)
 
-$config['ipmi']['userlevels']['USER']          = array('text' => 'User');
-$config['ipmi']['userlevels']['OPERATOR']      = array('text' => 'Operator');
-$config['ipmi']['userlevels']['ADMINISTRATOR'] = array('text' => 'Administrator');
-$config['ipmi']['userlevels']['CALLBACK']      = array('text' => 'Callback');
+$config['ipmi']['userlevels']['USER']          = [ 'text' => 'User' ];
+$config['ipmi']['userlevels']['OPERATOR']      = [ 'text' => 'Operator' ];
+$config['ipmi']['userlevels']['ADMINISTRATOR'] = [ 'text' => 'Administrator' ];
+$config['ipmi']['userlevels']['CALLBACK']      = [ 'text' => 'Callback' ];
 
 // IPMI interfaces (used in GUI, first entry = default if unset)
 
-$config['ipmi']['interfaces']['lan']     = array('text' => 'IPMI v1.5 LAN Interface');
-$config['ipmi']['interfaces']['lanplus'] = array('text' => 'IPMI v2.0 RMCP+ LAN Interface');
-$config['ipmi']['interfaces']['imb']     = array('text' => 'Intel IMB Interface');
-$config['ipmi']['interfaces']['open']    = array('text' => 'Linux OpenIPMI Interface');
+$config['ipmi']['interfaces']['lan']     = [ 'text' => 'IPMI v1.5 LAN Interface' ];
+$config['ipmi']['interfaces']['lanplus'] = [ 'text' => 'IPMI v2.0 RMCP+ LAN Interface' ];
+$config['ipmi']['interfaces']['imb']     = [ 'text' => 'Intel IMB Interface' ];
+$config['ipmi']['interfaces']['open']    = [ 'text' => 'Linux OpenIPMI Interface' ];
 
 // CLEANME. RANCID OS map (for config generation script)
 /* MOVED to os definitions as $config['os'][$os]['rancid']
@@ -811,52 +827,70 @@ if (OBS_DB_SKIP !== TRUE) {
 
 // Base user levels
 
-$config['user_level']     = array(); // Init this array, for do not allow override over config.inc.php!
-$config['user_level'][0]  = array('permission' => 0,
-                                  'name'       => 'Disabled',
-                                  'subtext'    => 'This user disabled',
-                                  'notes'      => 'User complete can\'t login and use any services. Use it to block access for specific users, but not delete from DB.',
-                                  'row_class'  => 'disabled',
-                                  'icon'       => $config['icon']['user-delete']);
-$config['user_level'][1]  = array('permission' => OBS_PERMIT_ACCESS,
-                                  'name'       => 'Normal User',
-                                  'subtext'    => 'This user has read access to individual entities',
-                                  'notes'      => 'User can\'t see or edit anything by default. Can only see devices and entities specifically permitted.',
-                                  'row_class'  => 'default',
-                                  'icon'       => $config['icon']['users']);
-$config['user_level'][5]  = array('permission' => OBS_PERMIT_ACCESS | OBS_PERMIT_READ,
-                                  'name'       => 'Global Read',
-                                  'subtext'    => 'This user has global read access',
-                                  'notes'      => 'User can see all devices and entities with some security and configuration data masked, such as passwords.',
-                                  'row_class'  => 'suppressed',
-                                  'icon'       => $config['icon']['user-self']);
-$config['user_level'][7]  = array('permission' => OBS_PERMIT_ACCESS | OBS_PERMIT_READ | OBS_PERMIT_SECURE,
-                                  'name'       => 'Global Secure Read',
-                                  'subtext'    => 'This user has global read access with secured info',
-                                  'notes'      => 'User can see all devices and entities without any information being masked, including device configuration (supplied by e.g. RANCID).',
-                                  'row_class'  => 'warning',
-                                  'icon'       => $config['icon']['user-self']);
-$config['user_level'][8]  = array('permission' => OBS_PERMIT_ACCESS | OBS_PERMIT_READ | OBS_PERMIT_SECURE | OBS_PERMIT_EDIT,
-                                  'name'       => 'Global Secure Read / Limited Write',
-                                  'subtext'    => 'This user has secure global read access with scheduled maintenence read/write.',
-                                  'notes'      => 'User can see all devices and entities without any information being masked, including device configuration (supplied by e.g. RANCID). User can also add, edit and remove scheduled maintenance, group, contacts.',
-                                  'row_class'  => 'warning',
-                                  'icon'       => $config['icon']['user-self']);
-$config['user_level'][10] = array('permission' => OBS_PERMIT_ALL,
-                                  'name'       => 'Administrator',
-                                  'subtext'    => 'This user has full administrative access',
-                                  'notes'      => 'User can see and edit all devices and entities. This includes adding and removing devices, bills and users.',
-                                  'row_class'  => 'success',
-                                  'icon'       => $config['icon']['user-log']);
+$config['user_level']     = []; // Init this array, for do not allow override over config.inc.php!
+$config['user_level'][0]  = [
+  'permission' => 0, // CLEANME, remove this entry when converted to roles
+  'roles'      => [],
+  'name'       => 'Disabled',
+  'subtext'    => 'This user disabled',
+  'notes'      => 'User complete can\'t login and use any services. Use it to block access for specific users, but not delete from DB.',
+  'row_class'  => 'disabled',
+  'icon'       => $config['icon']['user-delete']
+];
+$config['user_level'][1]  = [
+  'permission' => OBS_PERMIT_ACCESS, // CLEANME, remove this entry when converted to roles
+  'roles'      => [ 'LOGIN' ],
+  'name'       => 'Normal User',
+  'subtext'    => 'This user has read access to individual entities',
+  'notes'      => 'User can\'t see or edit anything by default. Can only see devices and entities specifically permitted.',
+  'row_class'  => 'default',
+  'icon'       => $config['icon']['users']
+];
+$config['user_level'][5]  = [
+  'permission' => OBS_PERMIT_ACCESS | OBS_PERMIT_READ, // CLEANME, remove this entry when converted to roles
+  'roles'      => [ 'GLOBAL_READ' ],
+  'name'       => 'Global Read',
+  'subtext'    => 'This user has global read access',
+  'notes'      => 'User can see all devices and entities with some security and configuration data masked, such as passwords.',
+  'row_class'  => 'suppressed',
+  'icon'       => $config['icon']['user-self']
+];
+$config['user_level'][7]  = [
+  'permission' => OBS_PERMIT_ACCESS | OBS_PERMIT_READ | OBS_PERMIT_SECURE, // CLEANME, remove this entry when converted to roles
+  'roles'      => [ 'SECURE_READ' ],
+  'name'       => 'Global Secure Read',
+  'subtext'    => 'This user has global read access with secured info',
+  'notes'      => 'User can see all devices and entities without any information being masked, including device configuration (supplied by e.g. RANCID).',
+  'row_class'  => 'warning',
+  'icon'       => $config['icon']['user-self']
+];
+$config['user_level'][8]  = [
+  'permission' => OBS_PERMIT_ACCESS | OBS_PERMIT_READ | OBS_PERMIT_SECURE | OBS_PERMIT_EDIT, // CLEANME, remove this entry when converted to roles
+  'roles'      => [ 'EDIT' ],
+  'name'       => 'Global Secure Read / Limited Write',
+  'subtext'    => 'This user has secure global read access with scheduled maintenence read/write.',
+  'notes'      => 'User can see all devices and entities without any information being masked, including device configuration (supplied by e.g. RANCID). User can also add, edit and remove scheduled maintenance, group, contacts.',
+  'row_class'  => 'warning',
+  'icon'       => $config['icon']['user-self']
+];
+$config['user_level'][10] = [
+  'permission' => OBS_PERMIT_ALL, // CLEANME, remove this entry when converted to roles
+  'roles'      => [ 'ADMIN' ],
+  'name'       => 'Administrator',
+  'subtext'    => 'This user has full administrative access',
+  'notes'      => 'User can see and edit all devices and entities. This includes adding and removing devices, bills and users.',
+  'row_class'  => 'success',
+  'icon'       => $config['icon']['user-log']
+];
 
-$config['remote_access']['ssh']    = array('name' => "SSH",    'port' => '22',   'icon' => 'oicon-application-terminal');
-$config['remote_access']['telnet'] = array('name' => "Telnet", 'port' => '23',   'icon' => 'oicon-application-list');
-$config['remote_access']['scp']    = array('name' => "SFTP",   'port' => '22',   'icon' => 'oicon-disk-black');
-$config['remote_access']['ftp']    = array('name' => "FTP",    'port' => '21',   'icon' => 'oicon-disk');
-$config['remote_access']['http']   = array('name' => "HTTP",   'port' => '80',   'icon' => 'oicon-application-icon-large');
-$config['remote_access']['https']  = array('name' => "HTTPS",  'port' => '443',  'icon' => 'oicon-shield');
-$config['remote_access']['rdp']    = array('name' => "RDP",    'port' => '3389', 'icon' => 'oicon-connect');
-$config['remote_access']['vnc']    = array('name' => "VNC",    'port' => '5901', 'icon' => 'oicon-computer');
+$config['remote_access']['ssh']    = [ 'name' => "SSH",    'port' => '22',   'icon' => 'oicon-application-terminal' ];
+$config['remote_access']['telnet'] = [ 'name' => "Telnet", 'port' => '23',   'icon' => 'oicon-application-list' ];
+$config['remote_access']['scp']    = [ 'name' => "SFTP",   'port' => '22',   'icon' => 'oicon-disk-black' ];
+$config['remote_access']['ftp']    = [ 'name' => "FTP",    'port' => '21',   'icon' => 'oicon-disk' ];
+$config['remote_access']['http']   = [ 'name' => "HTTP",   'port' => '80',   'icon' => 'oicon-application-icon-large' ];
+$config['remote_access']['https']  = [ 'name' => "HTTPS",  'port' => '443',  'icon' => 'oicon-shield' ];
+$config['remote_access']['rdp']    = [ 'name' => "RDP",    'port' => '3389', 'icon' => 'oicon-connect' ];
+$config['remote_access']['vnc']    = [ 'name' => "VNC",    'port' => '5901', 'icon' => 'oicon-computer' ];
 
 // Set some times needed by loads of scripts (it's dynamic, so we do it here!)
 $config['time']['now']        = time();
@@ -880,34 +914,34 @@ $config['time']['threeyear']  = $config['time']['now'] - 94608000; //time() - (3
 // Obsolete config variables
 // Note, for multiarray config options use conversion with '->'
 // example: $config['email']['default'] --> 'email->default'
-$config['obsolete_config'] = array(); // NOT CONFIGURABLE, init
-$config['obsolete_config'][] = array('old' => 'warn->ifdown',        'new' => 'frontpage->device_status->ports');
-$config['obsolete_config'][] = array('old' => 'alerts->email->enable',       'new' => 'email->enable',       'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'alerts->email->default',      'new' => 'email->default',      'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'alerts->email->default_only', 'new' => 'email->default_only', 'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'alerts->email->graphs',       'new' => 'email->graphs',       'info' => 'changed since r6976');
-$config['obsolete_config'][] = array('old' => 'email_backend',       'new' => 'email->backend',       'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_from',          'new' => 'email->from',          'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_sendmail_path', 'new' => 'email->sendmail_path', 'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_host',     'new' => 'email->smtp_host',     'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_port',     'new' => 'email->smtp_port',     'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_timeout',  'new' => 'email->smtp_timeout',  'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_secure',   'new' => 'email->smtp_secure',   'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_auth',     'new' => 'email->smtp_auth',     'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_username', 'new' => 'email->smtp_username', 'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'email_smtp_password', 'new' => 'email->smtp_password', 'info' => 'changed since r5787');
-$config['obsolete_config'][] = array('old' => 'discovery_modules->cisco-pw', 'new' => 'discovery_modules->pseudowires', 'info' => 'changed since r6205');
-$config['obsolete_config'][] = array('old' => 'discovery_modules->discovery-protocols', 'new' => 'discovery_modules->neighbours', 'info' => 'changed since r6744');
-$config['obsolete_config'][] = array('old' => 'search_modules',      'new' => 'wui->search_modules', 'info' => 'changed since r7463');
-$config['obsolete_config'][] = array('old' => 'discovery_modules->ipv4-addresses', 'new' => 'discovery_modules->ip-addresses', 'info' => 'changed since r7565');
-$config['obsolete_config'][] = array('old' => 'discovery_modules->ipv6-addresses', 'new' => 'discovery_modules->ip-addresses', 'info' => 'changed since r7565');
-$config['obsolete_config'][] = array('old' => 'location_map',        'new' => 'location->map',       'info' => 'changed since r8021');
-$config['obsolete_config'][] = array('old' => 'geocoding->api_key',  'new' => 'geo_api->google->key', 'info' => 'DEPRECATED since 19.8.10000');
-$config['obsolete_config'][] = array('old' => 'snmp->snmp_sysorid',  'new' => 'discovery_modules->mibs', 'info' => 'Migrated to separate module since 19.10.10091');
+$config['obsolete_config'] = []; // NOT CONFIGURABLE, init
+$config['obsolete_config'][] = [ 'old' => 'warn->ifdown',        'new' => 'frontpage->device_status->ports' ];
+$config['obsolete_config'][] = [ 'old' => 'alerts->email->enable',       'new' => 'email->enable',       'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'alerts->email->default',      'new' => 'email->default',      'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'alerts->email->default_only', 'new' => 'email->default_only', 'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'alerts->email->graphs',       'new' => 'email->graphs',       'info' => 'changed since r6976' ];
+$config['obsolete_config'][] = [ 'old' => 'email_backend',       'new' => 'email->backend',       'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_from',          'new' => 'email->from',          'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_sendmail_path', 'new' => 'email->sendmail_path', 'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_host',     'new' => 'email->smtp_host',     'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_port',     'new' => 'email->smtp_port',     'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_timeout',  'new' => 'email->smtp_timeout',  'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_secure',   'new' => 'email->smtp_secure',   'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_auth',     'new' => 'email->smtp_auth',     'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_username', 'new' => 'email->smtp_username', 'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'email_smtp_password', 'new' => 'email->smtp_password', 'info' => 'changed since r5787' ];
+$config['obsolete_config'][] = [ 'old' => 'discovery_modules->cisco-pw', 'new' => 'discovery_modules->pseudowires', 'info' => 'changed since r6205' ];
+$config['obsolete_config'][] = [ 'old' => 'discovery_modules->discovery-protocols', 'new' => 'discovery_modules->neighbours', 'info' => 'changed since r6744' ];
+$config['obsolete_config'][] = [ 'old' => 'search_modules',      'new' => 'wui->search_modules', 'info' => 'changed since r7463' ];
+$config['obsolete_config'][] = [ 'old' => 'discovery_modules->ipv4-addresses', 'new' => 'discovery_modules->ip-addresses', 'info' => 'changed since r7565' ];
+$config['obsolete_config'][] = [ 'old' => 'discovery_modules->ipv6-addresses', 'new' => 'discovery_modules->ip-addresses', 'info' => 'changed since r7565' ];
+$config['obsolete_config'][] = [ 'old' => 'location_map',        'new' => 'location->map',       'info' => 'changed since r8021' ];
+$config['obsolete_config'][] = [ 'old' => 'geocoding->api_key',  'new' => 'geo_api->google->key', 'info' => 'DEPRECATED since 19.8.10000' ];
+$config['obsolete_config'][] = [ 'old' => 'snmp->snmp_sysorid',  'new' => 'discovery_modules->mibs', 'info' => 'Migrated to separate module since 19.10.10091' ];
 
-$config['obsolete_config'][] = array('old' => 'bad_xdp',             'new' => 'xdp->ignore_hostname',       'info' => 'changed since 20.6.10520');
-$config['obsolete_config'][] = array('old' => 'bad_xdp_regexp',      'new' => 'xdp->ignore_hostname_regex', 'info' => 'changed since 20.6.10520');
-$config['obsolete_config'][] = array('old' => 'bad_xdp_platform',    'new' => 'xdp->ignore_platform',       'info' => 'changed since 20.6.10520');
+$config['obsolete_config'][] = [ 'old' => 'bad_xdp',             'new' => 'xdp->ignore_hostname',       'info' => 'changed since 20.6.10520' ];
+$config['obsolete_config'][] = [ 'old' => 'bad_xdp_regexp',      'new' => 'xdp->ignore_hostname_regex', 'info' => 'changed since 20.6.10520' ];
+$config['obsolete_config'][] = [ 'old' => 'bad_xdp_platform',    'new' => 'xdp->ignore_platform',       'info' => 'changed since 20.6.10520' ];
 
 $config['obsolete_config'][] = [ 'old' => 'discovery_modules->cisco-vrf', 'new' => 'discovery_modules->vrf', 'info' => 'changed since 20.10.10792' ];
 
@@ -925,6 +959,6 @@ $config['hide_config'] = [
 
 // Here whitelist of base definitions keys which can be overridden by config.php file
 // Note, this required only for override already exist definitions, for additions not required
-$config['definitions_whitelist'] = array('os', 'mibs', 'device_types', 'rancid', 'geo_api', 'search_modules', 'rewrites', 'nicecase', 'wui');
+$config['definitions_whitelist'] = [ 'os', 'mibs', 'device_types', 'rancid', 'geo_api', 'search_modules', 'rewrites', 'nicecase', 'wui' ];
 
 // End of includes/definitions.inc.php

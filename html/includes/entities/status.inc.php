@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -74,26 +74,26 @@ function generate_status_query($vars, $query_count = FALSE) {
       case "group":
       case "group_id":
         $values = get_group_entities($value, 'status');
-        $sql .= generate_query_values($values, 'status.status_id');
+        $sql .= generate_query_values_and($values, 'status.status_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'status.device_id');
+        $sql .= generate_query_values_and($values, 'status.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'status.device_id');
+        $sql .= generate_query_values_and($value, 'status.device_id');
         break;
       case "id":
       case 'status_id':
-        $sql .= generate_query_values($value, 'status.status_id');
+        $sql .= generate_query_values_and($value, 'status.status_id');
         break;
       case "entity_id":
-        $sql .= generate_query_values($value, 'measured_entity');
+        $sql .= generate_query_values_and($value, 'measured_entity');
         break;
       case "entity_type":
-        $sql .= generate_query_values($value, 'measured_class');
+        $sql .= generate_query_values_and($value, 'measured_class');
         break;
       case 'entity_state':
       case "measured_state":
@@ -101,23 +101,23 @@ function generate_status_query($vars, $query_count = FALSE) {
         break;
       case "class":
       case 'entPhysicalClass':
-        $sql .= generate_query_values($value, 'entPhysicalClass');
+        $sql .= generate_query_values_and($value, 'entPhysicalClass');
         break;
       case "event":
       case "status_event":
-        $sql .= generate_query_values($value, 'status_event');
+        $sql .= generate_query_values_and($value, 'status_event');
         break;
       case "status":
       case "status_name":
-        $sql .= generate_query_values($value, 'status_name');
+        $sql .= generate_query_values_and($value, 'status_name');
         break;
       case "descr":
       case "status_descr":
-        $sql .= generate_query_values($value, 'status_descr', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'status_descr', '%LIKE%');
         break;
       case 'type':
       case "status_type":
-        $sql .= generate_query_values($value, 'status_type', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'status_type', '%LIKE%');
         break;
     }
   }
@@ -323,7 +323,7 @@ function generate_status_row($status, $vars) {
   $row .= '<td style="width: 90px; text-align: right;">' . generate_entity_link('status', $status, $mini_graph, NULL, FALSE) . '</td>';
   if ($vars['tab'] !== "overview")
   {
-    $row .= '<td style="white-space: nowrap">' . generate_tooltip_link('', format_uptime((get_time() - $status['status_last_change']), 'short-2') . ' ago', format_unixtime($status['status_last_change'])) . '</td>
+    $row .= '<td style="white-space: nowrap">' . generate_tooltip_time($status['status_last_change'], 'ago') . '</td>
         <td style="text-align: right;"><strong>' . generate_tooltip_link('', $status['status_event'], $status['event_descr'], $status['event_class']) . '</strong></td>';
     $table_cols++;
     $table_cols++;

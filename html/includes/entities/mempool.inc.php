@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -32,20 +32,20 @@ function build_mempool_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'mempools.mempool_id');
+        $sql .= generate_query_values_and($values, 'mempools.mempool_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'mempools.device_id');
+        $sql .= generate_query_values_and($values, 'mempools.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'mempools.device_id');
+        $sql .= generate_query_values_and($value, 'mempools.device_id');
         break;
       case "descr":
       case "mempool_descr";
-        $sql .= generate_query_values($value, 'mempool_descr', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'mempool_descr', '%LIKE%');
         break;
     }
   }

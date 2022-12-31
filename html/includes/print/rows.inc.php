@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -26,39 +26,54 @@ function generate_box_open($args = []) {
   if (isset($args['title'])) {
     $return .= '  <div class="box-header' . ($args['header-border'] ? ' with-border' : '') . '">'.PHP_EOL;
     if (isset($args['url']))  { $return .= '<a href="'.$args['url'].'">'; }
-    if (isset($args['icon'])) { $return .= '<i class="'.$args['icon'].'"></i>'; }
+    if (isset($args['icon'])) { $return .= get_icon($args['icon']); }
     $return .= '<' . (isset($args['title-element']) ? $args['title-element'] : 'h3').' class="box-title"';
     $return .= isset($args['title-style']) ? ' style="'.$args['title-style'].'"' : '';
     $return .= '>';
-    $return .= $args['title'].'</' . (isset($args['title-element']) ? $args['title-element'] : 'h3').'>'.PHP_EOL;
+    $return .= escape_html($args['title']).'</' . (isset($args['title-element']) ? $args['title-element'] : 'h3').'>'.PHP_EOL;
     if (isset($args['url'])) { $return .= '</a>'; }
 
     if (isset($args['header-controls']) && is_array($args['header-controls']['controls'])) {
       $return .= '    <div class="box-tools pull-right">';
 
       foreach($args['header-controls']['controls'] as $control) {
-        if (isset($control['anchor']) && $control['anchor'] == TRUE) {
+        $anchor = (isset($control['anchor']) && $control['anchor']) ||
+                  (isset($control['config']) && !empty($control['config']));
+        if ($anchor) {
           $return .= ' <a role="button"';
         } else {
           $return .= '<button type="button"';
         }
         if (isset($control['url']) && $control['url'] !== '#' && !empty($control['url'])) {
-          $return .= ' href="'.$control['url'].'"';
+          $return .= ' href="' . $control['url'] . '"';
+        } elseif (isset($control['config']) && !empty($control['config'])) {
+          // Check/get config option
+          $return .= ' href="#"'; // set config url
+          if (empty($control['data']) && isset($control['value'])) {
+            $control['data'] = [ 'onclick' => "ajax_settings('".$control['config']."', '".$control['value']."');" ];
+          }
         } else {
           //$return .= ' onclick="return false;"';
         }
 
+        // Additional class
         $return .= ' class="btn btn-box-tool';
-        if (isset($control['class'])) { $return .= ' '.$control['class']; }
+        if (isset($control['class'])) {
+          $return .= ' ' . escape_html($control['class']);
+        }
         $return .= '"';
 
-        if (isset($control['data'])) { $return .= ' '.$control['data']; }
+        // Additional params (raw string or array with params
+        if (isset($control['data'])) {
+          $params = is_array($control['data']) ? generate_html_attribs($control['data']) : $control['data'];
+          $return .= ' '.$params;
+        }
         $return .= '>';
 
-        if (isset($control['icon'])) { $return .= '<i class="'.$control['icon'].'"></i> '; }
+        if (isset($control['icon'])) { $return .= get_icon($control['icon']).' '; }
         if (isset($control['text'])) { $return .= $control['text']; }
 
-        if (isset($control['anchor']) && $control['anchor'] == TRUE) {
+        if ($anchor) {
           $return .= '</a>';
         } else {
           $return .= '</button>';
@@ -455,7 +470,7 @@ SCRIPT;
       foreach ($content as $key => $value) {
         echo('<div id="'.$htmlname.'_clone_row" class="control-group text-nowrap" style="margin: 10px 0 10px 0;">'.PHP_EOL);
         $item = [
-          'id'       => "${htmlname}[key][]",
+          'id'       => "{$htmlname}[key][]",
           'name'     => 'Key',
           //'width'    => '500px',
           'class'    => 'input-large',
@@ -470,7 +485,7 @@ SCRIPT;
         }
         echo(generate_form_element($item));
         $item = [
-          'id'       => "${htmlname}[value][]",
+          'id'       => "{$htmlname}[value][]",
           'name'     => 'Value',
           //'width'    => '500px',
           'class'    => 'input-xlarge',
@@ -509,9 +524,9 @@ SCRIPT;
       // https://metallurgical.github.io/jquery-metal-clone/
       register_html_resource('js', 'jquery.metalClone.js'); // jquery.metalClone.min.js
       register_html_resource('css', 'metalClone.css');
-      $clone_target = "${htmlname}_clone_row";
-      $clone_button = "${htmlname}[add]";
-      $clone_remove = "${htmlname}[remove]";
+      $clone_target = "{$htmlname}_clone_row";
+      $clone_button = "{$htmlname}[add]";
+      $clone_remove = "{$htmlname}[remove]";
       $remove_text = ''; //'Remove';
       if ($readonly || (bool)$locked) {
         $clone_disabled = 'disabled: \'1\',';
@@ -531,26 +546,26 @@ SCRIPT;
     //console.log(element);
     var regex = /(metalElement\d{0,})/g;
     var eclass = element.attr('class');
-    var others = \$('[id=${clone_target}]').not(element);
+    var others = \$('[id={$clone_target}]').not(element);
     $.each(others, function () {
       \$(this).addClass(eclass);
       
       // Add button icon
-      //console.log(\$(this).find('#${clone_button}'));
-      \$(this).find('[id=\"${clone_button}\"]').prepend(' ').prepend(\$('<i/>', { class: '${icon_add}' }));
+      //console.log(\$(this).find('#{$clone_button}'));
+      \$(this).find('[id=\"{$clone_button}\"]').prepend(' ').prepend(\$('<i/>', { class: '{$icon_add}' }));
       
       // Remove button
       \$(this).append(\$('<button/>', {
-        id: '${clone_remove}',
+        id: '{$clone_remove}',
         type: 'button',
-        ${clone_disabled}
+        {$clone_disabled}
         class: eclass.match(regex) + 'BtnRemove metal-btn-remove btn btn-danger',
-        text: ' ${remove_text}',
+        text: ' {$remove_text}',
         'data-metal-ref': '.' + element.attr('class').match(regex)
       }));
       
       // Remove button icon
-      \$(this).find('.metal-btn-remove').prepend(\$('<i/>', { class: '${icon_remove}' }));
+      \$(this).find('.metal-btn-remove').prepend(\$('<i/>', { class: '{$icon_remove}' }));
     });
   }";
 

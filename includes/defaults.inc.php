@@ -63,7 +63,7 @@ $config['db_ssl_verify']    = TRUE;        // disables SSL certificate validatio
 #$config['db_ssl_ca_path']   = '';          // path to ca files
 #$config['db_ssl_ciphers']   = '';          // allowed ciphers to use for ssl connection
 
-$config['db']['debug']      = TRUE;        // If TRUE store errors in DB queries into logs/db.log
+$config['db']['debug']       = FALSE;       // If TRUE store errors in DB queries into logs/db.log
 
 #$config['db_host']          = 'localhost'; // DB hostname (default: localhost)
 #$config['db_user']          = 'USERNAME';
@@ -225,6 +225,7 @@ $config['graphs']['ports_scale_force']    = 1;         // Force scale also if re
 $config['graphs']['ports_scale_default']  = "auto";    // Possible values: auto, speed, scales from $config['graphs']['ports_scale_list']
 $config['graphs']['ports_scale_list']     = [ '100Gbit', '50Gbit', '40Gbit', '25Gbit', '10Gbit', '5Gbit', '2.5Gbit', '1Gbit', '100Mbit', '10Mbit' ];
 $config['graphs']['stacked_processors']   = TRUE;
+$config['graphs']['dynamic_labels']       = TRUE;      // Draw different color markers for labels (instead square marker).
 $config['graphs']['always_draw_max']      = FALSE;     // Allow suppression of MAX region for aesthetic reasons on graphs < 1 week long
 
 $config['int_customers']           = 1;  // Enable Customer Port Parsing
@@ -233,7 +234,7 @@ $config['int_transit']             = 1;  // Enable Transit Types
 $config['int_peering']             = 1;  // Enable Peering Types
 $config['int_core']                = 1;  // Enable Core Port Types
 $config['int_l2tp']                = 0;  // Enable L2TP Port Types
-$config['int_groups']              = array();  // Custom Interface Types
+$config['int_groups']              = []; // Custom Interface Types
 
 $config['show_locations']          = 1;  // Enable Locations on menu
 $config['ports_page_default']      = "details"; // eg "details" or "basic"
@@ -253,7 +254,7 @@ $config['snmp']['community'][0] = "public"; // Communities to try during adding 
 
 // SNMPv3 default settings
 // The array can be expanded to give another set of parameters
-$config['snmp']['v3'] = array();
+$config['snmp']['v3'] = [];
 // $config['snmp']['v3'][0]['authlevel']  = "noAuthNoPriv"; // noAuthNoPriv | authNoPriv | authPriv
 // $config['snmp']['v3'][0]['authname']   = "observium";    // User Name (required even for noAuthNoPriv)
 // $config['snmp']['v3'][0]['authpass']   = "";             // Auth Passphrase
@@ -261,13 +262,17 @@ $config['snmp']['v3'] = array();
 // $config['snmp']['v3'][0]['cryptopass'] = "";             // Privacy (Encryption) Passphrase
 // $config['snmp']['v3'][0]['cryptoalgo'] = "AES";          // DES | AES | AES-192 | AES-192-C | AES-256 | AES-256-C
 
+// SNMP virtual contexts ignore
+$config['snmp']['virtual_ignore'][] = '/^vpls_\S+$/';        // IOS XR incorrect snmp contexts, ie: cContextMappingVrfName."vpls_XXXX11192" = XXXX11192
+$config['snmp']['virtual_ignore'][] = '/^vlan\-(\d{1,4})$/'; // Common Cisco vlan contexts
+
 // Autodiscovery Settings
 
 $config['autodiscovery']['xdp']            = TRUE;   // Autodiscover hosts via discovery protocols (CDP, LLDP, FDP, AMAP and other)
 $config['autodiscovery']['ospf']           = TRUE;   // Autodiscover hosts via OSPF
 $config['autodiscovery']['bgp']            = TRUE;   // Autodiscover hosts via iBGP
-$config['autodiscovery']['bgp_as_private'] = FALSE;  //Autodiscovery hosts via eBGP a Private AS (64512 - 65535)
-$config['autodiscovery']['bgp_as_whitelist'] = array(); // Array of ASNs we will try to auto-discover hosts for. (eg for confederations).
+$config['autodiscovery']['bgp_as_private'] = FALSE;  // Autodiscovery hosts via eBGP a Private AS (64512 - 65535)
+$config['autodiscovery']['bgp_as_whitelist'] = [];   // Array of ASNs we will try to auto-discover hosts for. (eg for confederations).
 $config['autodiscovery']['snmp_scan']      = TRUE;   // Autodiscover hosts via SNMP scanning - currently not implemented. (FIXME)
 $config['autodiscovery']['libvirt']        = TRUE;   // Autodiscover hosts found via libvirt
 $config['autodiscovery']['vmware']         = TRUE;   // Autodiscover hosts found via vmware
@@ -308,7 +313,7 @@ $config['smsbox']['from']     = '';                     // Phone number of sende
 
 // Alerting Settings
 
-$config['alerts']['bgp']['whitelist']      = NULL;      // Populate as an array() with ASNs to alert on.
+$config['alerts']['bgp']['whitelist']      = NULL;      // Populate as an array with ASNs to alert on.
 
 $config['alerts']['interval']              = 86400;     // How frequently to re-send a notification for a continuing alert condition
                                                         // In seconds. Default is 1 day.
@@ -320,7 +325,10 @@ $config['alerts']['disable']['all']        = FALSE;     // Disable all notificat
 #$config['poller-wrapper']['threads']       = 0;         // The number of poller threads that should run simultaneously. Default: CPU count x 2
 $config['poller-wrapper']['max_running']   = 4;         // The number of maximum allowed simultaneously running wrapper processes. This prevents race and too high LA on server
 $config['poller-wrapper']['max_la']        = 10;        // Maximum allowed server Load Average for run wrapper processes. This prevents race and too high LA on server
+$config['poller-wrapper']['poller_timeout']    = 3600;  // Hard poller Timeout (seconds) for run poller per each device (note: poller will stopped working as undone by timeout)
+$config['poller-wrapper']['discovery_timeout'] = 10800; // Hard discovery Timeout (seconds) for run poller per each device
 $config['poller-wrapper']['alerter']       = TRUE;      // Execute alerter.php after poller.php
+$config['poller-wrapper']['notifications'] = TRUE;      // Execute notifications inside alerter.php (when FALSE, need to add separate notifications cron)
 $config['poller-wrapper']['stats']         = TRUE;      // Enable poller wrapper statistics in RRD (can be seen at page http://your_observium/pollerlog/)
 
 $config['uptime_warning']                  = "86400";   // Time in seconds to display a "Device Rebooted" Alert. 0 to disable warnings.
@@ -496,14 +504,14 @@ $config['frontpage']['map']['alertmarkersize']          = 32;           // Set t
 // Device status settings
 // Show the status messages you want
 $config['frontpage']['device_status']['max']['interval'] = 24;     // Maximal interval for which to display devices status (in hours)
-$config['frontpage']['device_status']['max']['count'] = 200;       // Maximal count for which to display devices status (in items)
-$config['frontpage']['device_status']['devices']   = true;         // Show the down devices
-$config['frontpage']['device_status']['ports']     = true;         // Show the down ports
-$config['frontpage']['device_status']['neighbours'] = true;        // Show the down inter-device neighbours (with CDP/LLDP linked devices)
-$config['frontpage']['device_status']['errors']    = true;         // Show the ports with interface errors
-$config['frontpage']['device_status']['services']  = false;        // Show the down services
-$config['frontpage']['device_status']['bgp']       = true;         // Show the bgp status
-$config['frontpage']['device_status']['uptime']    = true;         // Show the uptime status
+$config['frontpage']['device_status']['max']['count']    = 200;    // Maximal count for which to display devices status (in items)
+$config['frontpage']['device_status']['devices']         = true;   // Show the down devices
+$config['frontpage']['device_status']['ports']           = true;   // Show the down ports
+$config['frontpage']['device_status']['neighbours']      = true;   // Show the down inter-device neighbours (with CDP/LLDP linked devices)
+$config['frontpage']['device_status']['errors']          = true;   // Show the ports with interface errors
+$config['frontpage']['device_status']['services']        = false;  // Show the down services
+$config['frontpage']['device_status']['bgp']             = true;   // Show the bgp status
+$config['frontpage']['device_status']['uptime']          = true;   // Show the uptime status
 
 // Custom traffic graphs
 $config['frontpage']['custom_traffic']['ids']      = "";           // COMMA SEPARATED PORT ID FOR EXAMPLE: "1,2,3,4,5"
@@ -622,6 +630,7 @@ $config['devices']['ignore_sysname'][]        = 'zywall';
 $config['sensors']['port']['power_to_dbm']    = FALSE; // Convert power Port DOM sensors to dBm
 $config['sensors']['port']['ignore_shutdown'] = TRUE;  // Set ignore sensor state instead alert for entities in shutdown state (admin down)
 $config['sensors']['limits_events']           = FALSE; // Store sensors limit changes in eventlog
+$config['sensors']['web_measured_compact']    = FALSE; // Show sensors for measured entities in compact view style
 
 // Ignores & Allows
 // Has to be lowercase
@@ -656,6 +665,7 @@ $config['bad_if_regexp'][] = "/^sl[0-9]/i";
 $config['bad_if_regexp'][] = "/^<(none|invalid)>$/i";              // calix: <none>, <invalid>
 $config['bad_if_regexp'][] = "/^<(invalid|ethportany):[\d-]+>$/i"; // calix: <INVALID:0-0-0-1-0-0-0-4-91-219>, <EthPortAny:0-0-0-0-0-0-0-0-0-0>
 $config['bad_if_regexp'][] = "/^(ZTPCONFIG|TopoNode|SYSLOG)=/i";   // iqnos: ZTPCONFIG=ZTPCFG, TopoNode=1.1.1.1, SYSLOG=SYSLOG-1
+$config['bad_if_regexp'][] = "/^\s*CPU Interface for Unit/";       // Dell NOS: CPU Interface for Unit: 0 Slot: 3 Port: 1
 
 // Ignore ports based on ifType. Case-sensitive.
 // FIXME. Rename to $config['ports']['ignore_type']
@@ -680,9 +690,9 @@ $config['bad_iftype'][] = "usb";        // Ignore USB pseudo interface (BSD)
 
 // Ignore ports based on ifAlias
 // FIXME. Rename to $config['ports']['ignore_alias_regexp']
-$config['bad_ifalias_regexp'] = array();
+$config['bad_ifalias_regexp'] = [];
 
-$config['ports']['ignore_errors_iftype'] = ['ieee80211'];
+$config['ports']['ignore_errors_iftype'] = [ 'ieee80211' ];
 
 // Neighbour discovery/autodiscovery options
 // Ignore discover remote devices via discovery protocols (CDP, LLDP, FDP, AMAP and other)
@@ -833,7 +843,7 @@ $config['irc_ssl'] = FALSE;
 // Authentication
 
 $config['allow_unauth_graphs']      = 0;       // Allow graphs to be viewed by anyone
-$config['allow_unauth_graphs_cidr'] = array(); // Allow graphs to be viewed without authorisation from certain IP ranges
+$config['allow_unauth_graphs_cidr'] = [];      // Allow graphs to be viewed without authorisation from certain IP ranges
 $config['auth_mechanism']           = "mysql"; // Available mechanisms: mysql (default), ldap, radius, http-auth
 
 $config['auth']['remote_user'] = FALSE;        // Trust Apache server to authenticate user, READ DOCUMENTATION FIRST!!
@@ -967,7 +977,7 @@ $config['wmi']['modules']['storage']      = 1;
 $config['wmi']['modules']['winservices']  = 1;
 $config['wmi']['modules']['exchange']     = 0;
 $config['wmi']['modules']['mssql']        = 0;
-$config['wmi']['service_permit'] = array();
+$config['wmi']['service_permit']          = [];
 
 // Hardcoded ASN descriptions
 $config['astext'][65332] = "Cymru FullBogon Feed";

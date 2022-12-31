@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,23 +6,23 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-/// SEARCH ACCESSPOINTS
-$results = dbFetchRows("SELECT * FROM `groups`
+/// Search Groups
+$results = dbFetchRows('SELECT * FROM `groups`
                         WHERE `group_name` LIKE ? OR `group_descr` LIKE ?
-                        ORDER BY `group_name` LIMIT $query_limit", array($query_param, $query_param));
+                        ORDER BY `group_name` LIMIT ' . $query_limit, array($query_param, $query_param));
 
-if (safe_count($results)) {
+$group_search_results = [];
+
+if (!safe_empty($results)) {
+  $max_len = 35;
   foreach ($results as $result) {
-    $name = $result['group_name'];
-    if (strlen($name) > 35) {
-      $name = substr($name, 0, 35) . "...";
-    }
+    $name = truncate($result['group_name'], $max_len);
 
-    $entity_type           = $config['entities'][$result['entity_type']];
+    $entity_type = $config['entities'][$result['entity_type']];
 
     /// FIXME: always blue
     $tab_colour = '#194B7F'; // FIXME: This colour pulled from functions.inc.php humanize_device, maybe set it centrally in definitions?

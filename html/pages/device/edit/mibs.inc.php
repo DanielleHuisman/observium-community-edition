@@ -225,8 +225,7 @@ foreach ($snmp_errors as $mib => $entries)
     }
     $text_class = (count(explode(' ', $error_db['oid'])) > 3 ? '' : 'text-nowrap');
     echo('<tr width="100%" class="'.$error_class2.'"><td style="width: 50%;" class="'.$text_class.'"><strong><i class="glyphicon glyphicon-exclamation-sign"></i>&nbsp;'.$error_db['oid'].'</strong></td>' . PHP_EOL);
-    $timediff = $GLOBALS['config']['time']['now'] - $error_db['updated'];
-    echo('<td style="width: 100px; white-space: nowrap; text-align: right;">'.generate_tooltip_link('', format_uptime($timediff, "short-3").' ago', format_unixtime($error_db['updated'])).'</td>' . PHP_EOL);
+    echo('<td style="width: 100px; white-space: nowrap; text-align: right;">'.generate_tooltip_time($error_db['updated'], 'ago').'</td>' . PHP_EOL);
     echo('<td style="width: 80px; white-space: nowrap;"><span class="text-'.$error_class.'">'.$error_codes[$error_db['error_code']]['reason'].'</span></td>' . PHP_EOL);
     echo('<td style="width: 40px; text-align: right;"><span class="label">'.$error_db['error_count'].'</span></td>' . PHP_EOL);
     echo('<td style="width: 80px; text-align: right;"><span class="label">'.round($error_db['error_rate'], 2).'/poll</span></td>' . PHP_EOL);

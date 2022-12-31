@@ -169,8 +169,14 @@ function print_dash_mod ($mod)
       echo '  <div class="box box-solid" style="overflow: hidden; height: auto; max-height: 100%">';
       echo '    <div class="box-header" style="cursor: hand;"><h3 class="box-title"><a href="/syslog/">Syslog</a></h3></div>';
       echo '    <div class="box-content" style="overflow: hidden; overflow-x:scroll;">';
-      print_syslogs(array('short' => TRUE, 'pagesize' => ($height - 36) / 26,
-                          'priority' => $config['frontpage']['syslog']['priority']));
+
+      $syslog_vars = $mod['vars'];
+
+      $syslog_vars = array_merge($syslog_vars, ['short' => TRUE, 'pagesize' => ($height - 36) / 26,
+                      'priority' => $config['frontpage']['syslog']['priority']]);
+
+      print_syslogs($syslog_vars);
+
       echo '  </div>';
       echo '</div>';
       break;
@@ -372,7 +378,7 @@ function print_dash_graph($mod, $width, $height) {
   if ($graph_array['width'] > 350)
   {
     $graph_array['height'] -= 6;
-  } // RRD graphs > 350px are 6 px wider because of larger legend font
+  } // RRD graphs > 350px are 6 px taller because of larger legend font
 
   $title_div = 'top:0px; left: 0px; padding: 4px; border-top-left-radius: 4px; border: 1px solid #e5e5e5; border-left: none; border-top: none; background-color: rgba(255, 255,255, 0.75); ';
   $title_div = 'widget-title';
@@ -411,7 +417,10 @@ function print_dash_graph($mod, $width, $height) {
   //$graph_array['format'] = 'png';
 
   //$graph_array['img_id'] = generate_random_string(5);
-  $graph_array['legend'] = 'no';
+  //$graph_array['legend'] = 'no';
+
+  $graph_array['rigid_height'] = 'yes'; // Force height of graph to be same as height of graph_type.
+
   $graph_array['class'] = 'image-refresh';
 
   $graph = generate_graph_tag($graph_array, TRUE);
@@ -419,6 +428,7 @@ function print_dash_graph($mod, $width, $height) {
   $link_array = $graph_array;
   $link_array['page'] = "graphs";
   unset($link_array['graph_only']);
+  unset($link_array['rigid_height']);
   unset($link_array['height'], $link_array['width']);
   $link = generate_url($link_array);
 

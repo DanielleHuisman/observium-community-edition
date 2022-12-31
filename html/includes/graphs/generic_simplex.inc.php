@@ -25,14 +25,15 @@ $graph_return['valid_options'][] = "trend";
 
 include($config['html_dir']."/includes/graphs/common.inc.php");
 
-$unit_text = str_pad(truncate($unit_text,18,''),18);
-$line_text = str_pad(truncate($line_text,12,''),12);
+// Fix length before escaping for layout purposes
+$unit_text = rrdtool_escape(str_pad(truncate($unit_text,17,''),17));
+$line_text = rrdtool_escape(str_pad(truncate($line_text,11,''),11));
 
 if (isset($unit_integer) && $unit_integer)
 {
-  $ds_format = '"%6.0lf "'; //NOTE. max value 999999
+  $ds_format = '"%6.0lf"'; //NOTE. max value 999999
 } else {
-  $ds_format = '"%6.2lf%s"';
+  $ds_format = '"%5.1lf%s"';
 }
 
 if ($multiplier)
@@ -98,13 +99,13 @@ if ($vars['previous'] == "yes")
     if ($graph_max) {
         $rrd_options .= " CDEF:" . $ds . "_minmax=" . $ds . "_max," . $ds . "_min,-";
         $rrd_options .= " AREA:" . $ds . "_min#ffffff00";
-        $rrd_options .= " AREA:" . $ds . "_minmax#" . $colour_line . "60:STACK";
+        $rrd_options .= " AREA:" . $ds . "_minmax#" . $colour_line . "30:STACK";
     } else {
         $rrd_options .= " AREA:".$ds."#".$colour_area.":";
     }
 //}
 
-$rrd_options .= " COMMENT:'".$unit_text."Now       Avg       Max       ";
+$rrd_options .= " COMMENT:'".$unit_text."Now     Avg      Min     Max";
 
 if ($percentile)
 {
@@ -119,7 +120,7 @@ $rrd_options .= " GPRINT:".$ds.":AVERAGE:".$ds_format;
 
 //  if ($print_min || TRUE)
 //  {
-//    $rrd_options .= " GPRINT:".$ds."_min:MIN:%6.2lf%s";
+    $rrd_options .= " GPRINT:".$ds."_min:MIN:".$ds_format;
 //  }
 
 $rrd_options .= " GPRINT:".$ds."_max:MAX:".$ds_format;

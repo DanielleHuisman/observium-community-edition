@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -51,15 +50,15 @@ function print_addresses($vars)
       {
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'A.device_id');
-          $where_netscaler .= generate_query_values($value, 'N.device_id');
+          $where .= generate_query_values_and($value, 'A.device_id');
+          $where_netscaler .= generate_query_values_and($value, 'N.device_id');
           break;
         case 'interface':
-          $where .= generate_query_values($value, 'I.ifDescr', 'LIKE%');
+          $where .= generate_query_values_and($value, 'I.ifDescr', 'LIKE%');
           $join_ports = TRUE;
           break;
         case 'type':
-          $where .= generate_query_values($value, 'A.ip_type');
+          $where .= generate_query_values_and($value, 'A.ip_type');
           break;
         case 'network':
           if (!is_array($value))
@@ -69,7 +68,7 @@ function print_addresses($vars)
           if ($ids = get_entity_ids_ip_by_network($address_type, $value))
           {
             // Full network with prefix
-            $where .= generate_query_values($ids, 'A.ip_address_id');
+            $where .= generate_query_values_and($ids, 'A.ip_address_id');
           } else {
             // Part of network string
             $where .= ' AND 0'; // Nothing!
@@ -87,16 +86,16 @@ function print_addresses($vars)
           }
           if ($ids = get_entity_ids_ip_by_network($address_type, $addr)) {
             // Full network with prefix
-            $where .= generate_query_values($ids, 'A.ip_address_id');
+            $where .= generate_query_values_and($ids, 'A.ip_address_id');
           } else {
             $where .= ' AND 0'; // Nothing!
           }
           /// FIXME. Netscaller hack
           if (count($addr) && get_ip_version($addr[0])) {
             // Netscaller for valid IP address
-            $where_netscaler .= generate_query_values($addr, 'N.vsvr_ip');
+            $where_netscaler .= generate_query_values_and($addr, 'N.vsvr_ip');
           } else {
-            $where_netscaler .= generate_query_values($addr, 'N.vsvr_ip', '%LIKE%');
+            $where_netscaler .= generate_query_values_and($addr, 'N.vsvr_ip', '%LIKE%');
           }
           break;
       }

@@ -34,7 +34,7 @@ $where_array = build_ports_where_array($vars);
 
 $where = ' WHERE 1 ';
 if (!$config['web_show_disabled'] && safe_count($cache['devices']['disabled']) > 0) {
-  $where_array[] = generate_query_values($cache['devices']['disabled'], 'ports.device_id', '!=');
+  $where_array[] = generate_query_values_and($cache['devices']['disabled'], 'ports.device_id', '!=');
 }
 $where .= implode('', $where_array);
 //r($where_array);

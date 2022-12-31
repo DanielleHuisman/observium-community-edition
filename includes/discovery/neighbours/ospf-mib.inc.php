@@ -6,12 +6,11 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-if (!$config['autodiscovery']['ospf'])
-{
+if (!$config['autodiscovery']['ospf']) {
   print_debug("Autodiscovery for OSPF disabled.");
   return;
 }
@@ -45,23 +44,20 @@ if (!$config['autodiscovery']['ospf'])
 // OSPF-MIB::ospfNbmaNbrStatus[103.52.56.4][0] = INTEGER: active(1)
 
 $ospf_array = snmpwalk_cache_twopart_oid($device, 'ospfNbmaNbrStatus', [], 'OSPF-MIB', NULL, OBS_SNMP_ALL_TABLE);
-if (snmp_status())
-{
+if (snmp_status()) {
   $ospf_array = snmpwalk_cache_twopart_oid($device, 'ospfNbrRtrId', $ospf_array, 'OSPF-MIB', NULL, OBS_SNMP_ALL_TABLE);
   print_debug_vars($ospf_array);
 
-  foreach ($ospf_array as $ip => $entry)
-  {
+  foreach ($ospf_array as $ip => $entry) {
     if ($ip === '0.0.0.0') { continue; }
-    foreach ($entry as $if => $ospf)
-    {
+
+    foreach ($entry as $if => $ospf) {
       if ($ospf['ospfNbmaNbrStatus'] !== 'active' || $ospf['ospfNbrRtrId'] === '0.0.0.0') { continue; }
 
       // Try find remote device and check if already cached
       $remote_device_id = get_autodiscovery_device_id($device, $ospf['ospfNbrRtrId']);
-      if (is_null($remote_device_id) &&               // NULL - never cached in other rounds
-          check_autodiscovery($ospf['ospfNbrRtrId'])) // Check all previous autodiscovery rounds
-      {
+      if (is_null($remote_device_id) &&                 // NULL - never cached in other rounds
+          check_autodiscovery($ospf['ospfNbrRtrId'])) { // Check all previous autodiscovery rounds
         // Neighbour never checked, try autodiscovery
         $remote_device_id = autodiscovery_device($ospf['ospfNbrRtrId'], NULL, 'OSPF', NULL, $device);
       }

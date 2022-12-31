@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -156,32 +155,39 @@ $outlets      = snmpwalk_cache_twopart_oid($device, 'outletCurrentTable', $outle
 // Power statistics currently not collected.
 //$outlets      = snmpwalk_cache_twopart_oid($device, 'outletCurrentTable', $outlets, 'EATON-EPDU-MIB');
 
-foreach ($outlets AS $unit_id => $unit_data)
-{
-  foreach ($unit_data AS $outlet_id => $outlet)
-  {
+foreach ($outlets as $unit_id => $unit_data) {
+  foreach ($unit_data as $outlet_id => $entry) {
+    
     $outlet_index = $unit_id.".".$outlet_id;
-    $outlet_descr = "Unit $unit_id ".$outlet['outletName'] . " (".$outlet['outletType'].")";
-    $outlet_capacity = $outlet['outletCurrentCapacity'] * 0.001;
+    $outlet_descr = "Unit $unit_id ".$entry['outletName'] . " (".$entry['outletType'].")";
+    $outlet_capacity = $entry['outletCurrentCapacity'] * 0.001;
 
-    $current_value = $outlet['outletCurrent'];
-    $percent_value = $outlet['outletCurrentPercentLoad'];
-    $status_value  = $outlet['outletCurrentThStatus'];
-    $crest_value = $outlet['outletCurrentCrestFactor'];
+    $current_value = $entry['outletCurrent'];
+    $percent_value = $entry['outletCurrentPercentLoad'];
+    $status_value  = $entry['outletCurrentThStatus'];
+    $crest_value   = $entry['outletCurrentCrestFactor'];
 
     $current_oid = '.1.3.6.1.4.1.534.6.6.7.6.4.1.3.'.$outlet_index;
     $percent_oid = '.1.3.6.1.4.1.534.6.6.7.6.4.1.10.'.$outlet_index;
     $status_oid  = '.1.3.6.1.4.1.534.6.6.7.6.4.1.4.'.$outlet_index;
-    $crest_oid = '.1.3.6.1.4.1.534.6.6.7.6.4.1.9.'.$outlet_index;
+    $crest_oid   = '.1.3.6.1.4.1.534.6.6.7.6.4.1.9.'.$outlet_index;
 
-    discover_status($device, $status_oid, "outletCurrentThStatus.".$outlet_index, 'outletCurrentThStatus', $outlet_descr, $status_value, array('entPhysicalClass' => 'outlet'));
+    discover_status($device, $status_oid, "outletCurrentThStatus.".$outlet_index, 'outletCurrentThStatus', $outlet_descr, $status_value, [ 'entPhysicalClass' => 'outlet' ]);
 
-    $limits = array('limit_low' => $entry['outletCurrentThLowerCritical']*0.001, 'limit_low_warn' => $entry['outletCurrentThLowerWarning']*0.001,
-                    'limit_high' => $entry['outletCurrentThUpperCritical']*0.001, 'limit_high_warn' => $entry['outletCurrentThUpperWarning']*0.001);
+    $limits = [
+      'limit_low'       => $entry['outletCurrentThLowerCritical'] * 0.001,
+      'limit_low_warn'  => $entry['outletCurrentThLowerWarning'] * 0.001,
+      'limit_high'      => $entry['outletCurrentThUpperCritical'] * 0.001,
+      'limit_high_warn' => $entry['outletCurrentThUpperWarning'] * 0.001
+    ];
 
     discover_sensor('current', $device, $current_oid, "outletCurrent.$outlet_index", 'eaton-epdu-mib', $outlet_descr, 0.001, $current_value, $limits);
-    discover_sensor('load', $device, $percent_oid, "outletCurrentPercentLoad.$outlet_index", 'eaton-epdu-mib', $outlet_descr, 1, $percent_value);
-    discover_sensor('crestfactor', $device, $crest_oid, "outletCurrentCrestFactor.$outlet_index", 'eaton-epdu-mib', $outlet_descr, 1, $crest_value);
+    if ($percent_value >= 0) {
+      discover_sensor('load', $device, $percent_oid, "outletCurrentPercentLoad.$outlet_index", 'eaton-epdu-mib', $outlet_descr, 1, $percent_value);
+    }
+    if ($crest_value > 0) {
+      discover_sensor('crestfactor', $device, $crest_oid, "outletCurrentCrestFactor.$outlet_index", 'eaton-epdu-mib', $outlet_descr, 0.001, $crest_value);
+    }
   }
 }
 

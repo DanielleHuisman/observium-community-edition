@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -312,13 +312,12 @@ function navbar_location_menu($array) {
 }
 
 // DOCME needs phpdoc block
-function navbar_submenu($entry, $level = 1)
-{
+function navbar_submenu($entry, $level = 1) {
 
-  if(isset($entry['text'])) { $entry['title'] = $entry['text']; }
+  if (isset($entry['text'])) { $entry['title'] = $entry['text']; }
 
   // autoscroll set by navbar-narrow + dropdown-menu, but override max-height
-  echo(str_pad('',($level-1)*2) . '                <li class="dropdown-submenu">' . generate_menu_link($entry['url'], '<i class="' . $entry['icon'] . '"></i>&nbsp;' . $entry['title'], $entry['count'], 'label', NULL, $entry['alert_count']) . PHP_EOL);
+  echo(str_pad('',($level-1)*2) . '                <li class="dropdown-submenu">' . generate_menu_link($entry['url'], '<i class="' . $entry['icon'] . '"></i>&nbsp;' . escape_html($entry['title']), $entry['count'], 'label', NULL, $entry['alert_count']) . PHP_EOL);
   echo(str_pad('',($level-1)*2) . '                  <ul role="menu" class="dropdown-menu" style="max-height: 85vh;">' . PHP_EOL);
 
   foreach ($entry['entries'] as $subentry) {
@@ -369,14 +368,20 @@ function navbar_entry($entry, $level = 1) {
     }
 
     if (isset($entry['title'])) {
-      $entry_text .= $entry['title'];
+      $entry_text .= escape_html($entry['title']);
     } elseif (isset($entry['text'])) {
-      $entry_text .= $entry['text'];
+      $entry_text .= escape_html($entry['text']);
+    }
+
+    if (isset($entry['class'])) {
+       $entry_class = ' class="'.$entry['class'].'"';
+    } else {
+       $entry_class = '';
     }
 
     $entry['text'] = $entry_text;
 
-    echo(str_pad('',($level-1)*2) . '                <li>' . generate_menu_link_new($entry) . '</li>' . PHP_EOL);
+    echo(str_pad('',($level-1)*2) . '                <li '.$entry_class.'>' . generate_menu_link_new($entry) . '</li>' . PHP_EOL);
   }
 }
 

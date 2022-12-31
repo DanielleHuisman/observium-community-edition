@@ -12,8 +12,9 @@
 
 $prt_supplies = snmpwalk_cache_oid($device, 'prtMarkerSuppliesTable', array(), 'Printer-MIB', NULL, OBS_SNMP_ALL_UTF8);
 $prt_colorant = snmpwalk_cache_twopart_oid($device, 'prtMarkerColorantTable', array(), 'Printer-MIB', NULL, OBS_SNMP_ALL_UTF8);
-//print_vars($prt_supplies);
-//print_vars($prt_colorant);
+
+print_debug_vars($prt_supplies);
+print_debug_vars($prt_colorant);
 
 // Count toner/ink, if Toner not has colorant table or name non informative (ie: TK-340) set to black for single toner
 $toner_count = 0;

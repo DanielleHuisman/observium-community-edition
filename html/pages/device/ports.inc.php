@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -223,7 +223,7 @@ if ($vars['view'] === 'minigraphs') {
   }
 
   //$where = ' IN ('.implode(',', array_keys($port_cache)).')';
-  //$where = generate_query_values(array_keys($port_cache), 'port_id');
+  //$where = generate_query_values_and(array_keys($port_cache), 'port_id');
   //$where = generate_query_permitted(array('ports', 'devices'));
   foreach ($ext_tables as $table) {
     // Here stored port_id!

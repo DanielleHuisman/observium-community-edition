@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage syslog
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -50,6 +50,7 @@ function get_cache($host, $value) {
           foreach ($GLOBALS['config']['syslog']['host_map_regexp'] as $pattern => $to) {
             $new_host = preg_replace($pattern, $to, $host);
             if (!$new_host || $new_host === $host) { continue; } // skip same of false
+            $dev_new = FALSE;
             if (is_intnum($new_host)) {
               $dev_new = dbFetchCell('SELECT `device_id` FROM `devices` WHERE `device_id` = ?', [ $new_host ]);
             } elseif (is_valid_hostname($new_host) || get_ip_version($new_host)) {
@@ -58,6 +59,7 @@ function get_cache($host, $value) {
 
             // If syslog host map correct, return device id or try onward
             if ($dev_new) {
+              //print_cli("'$host' -> '$new_host' ($dev_new)");
               $dev_cache[$host]['device_id'] = $dev_new;
               return $dev_cache[$host]['device_id'];
             }
@@ -269,6 +271,10 @@ function process_syslog($line, $update)
               ];
               //unset($message_tags['ENTITY_GRAPHS_ARRAY']);
               $notification['message_tags'] = safe_json_encode($message_tags);
+
+              /// DEVEL
+              //file_put_contents('/tmp/alert_'.$la_id.'_SYSLOG_'.time().'.json', safe_json_encode($notification, JSON_PRETTY_PRINT));
+
               $notification_id = dbInsert($notification, 'notifications_queue');
             } // End foreach($contacts)
           } // End if($notified)
@@ -351,7 +357,7 @@ function syslog_generate_tags($entry, $rule) {
     'DEVICE_DESCRIPTION'  => $device['purpose'],
     'DEVICE_ID'           => $device['device_id'],
     'DEVICE_URL'          => generate_device_url($device),
-    'DEVICE_LINK'         => generate_device_link($device, NULL, array('tab' => 'alerts', 'entity_type' => 'syslog')),
+    'DEVICE_LINK'         => generate_device_link($device, NULL, array('tab' => 'logs', 'section' => 'logalert', 'la_id' => $la_id)),
     'DEVICE_HARDWARE'     => $device['hardware'],
     'DEVICE_OS'           => $device['os_text'] . ' ' . $device['version'] . ($device['features'] ? ' (' . $device['features'] . ')' : ''),
     'DEVICE_TYPE'         => $device['type'],

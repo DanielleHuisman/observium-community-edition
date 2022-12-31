@@ -77,13 +77,14 @@ for ($i = 1; $i <= 4; $i++) {
   discover_status($device, $oid, 'relay'.$i.'State.0', 'teracom-relay-state', $descr, $value, array('entPhysicalClass' => 'other'));
 }
 
-// Status FIXME definition-based
+/* Status FIXME definition-based
 $value = snmp_get_oid($device, 'hardwareErr.0', $mib);
 if (!safe_empty($value)) {
   $descr = 'Status';
   $oid   = '.1.3.6.1.4.1.38783.1.3.8.0';
   discover_status($device, $oid, 'hardwareErr.0', 'teracom-alarm-state', $descr, $value, array('entPhysicalClass' => 'other'));
 }
+*/
 
 unset($data, $oid, $descr, $limits, $value);
 

@@ -50,18 +50,19 @@ echo generate_box_open();
 echo '<table class="' . OBS_CLASS_TABLE_STRIPED . ' table-hover">' . PHP_EOL;
 
 $cols = array(
-                     array(NULL, 'class="state-marker"'),
-                     array(NULL, 'style="width: 1px;"'),                   
-  'device'        => array('Device', 'style="width: 200px;"'),
-  'port'          => array('Port', 'style="width: 350px;"'),    
-  'traffic'       => array('Traffic', 'style="width: 100px;"'),
-  'traffic_perc'  => array('Traffic %', 'style="width: 90px;"'),
-  'packets'       => array('Packets', 'style="width: 90px;"'),
-  'speed'         => array('Speed', 'style="width: 90px;"'),    
-  'mac'           => array('MAC Address', 'style="width: 150px;"')
+  'state-marker'  => '',
+                     [ NULL, 'style'  => "width: 1px;" ],
+  'device'        => [ 'device' => 'Device', 'style' => "min-width: 150px;" ],
+                     [ 'port'   => 'Port Name', 'descr' => 'Description', 'errors' => 'Errors', 'style' => "min-width: 250px;" ],
+                     [ 'traffic' => ['Bits', 'subfields' => ['traffic_in' => 'In', 'traffic_out' => 'Out']], 'style' => "width: 100px;" ],
+                     [ 'traffic_perc' => ['%', 'subfields' => ['traffic_perc_in' => 'In', 'traffic_perc_out' => 'Out']], 'style' => "width: 110px;" ],
+                     [ 'packets' => ['Pkts', 'subfields' => ['packets_in' => 'In', 'packets_out' => 'Out']], 'style' => "width: 90px;" ],
+                     [ 'speed' => 'Speed', 'mtu' => 'MTU', 'style' => "width: 90px;" ],
+                     [ 'media' => 'Media', 'mac' => 'MAC', 'style' =>"width: 150px;" ]
 );
 
-echo get_table_header($cols, $vars);
+//echo get_table_header_old($cols, $vars);
+echo generate_table_header($cols, $vars);
 echo '<tbody>' . PHP_EOL;
 
 $ports_disabled = 0; $ports_down = 0; $ports_up = 0; $ports_total = 0;

@@ -62,6 +62,12 @@ if (is_numeric($vars['id']) && ($auth || port_permitted($vars['id'])))
   $title_array[] = array('text' => escape_html($port['port_label']) . (strlen($port['ifAlias']) ? " (".escape_html($port['ifAlias']).")" : ''), 'url' => generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'port', 'port' => $port['port_id'])));
 
   $graph_title = device_name($device, TRUE) . " :: " . $port['port_label_short'];
+
+  // check if the port has an alias available and add it to the title
+  if(!empty($port['ifAlias'])) {
+    $graph_title = $graph_title . " :: " . $port['ifAlias'];
+  }
+
   $rrd_filename = get_port_rrdfilename($port, NULL, TRUE);
 
   if ($vars['type'] == 'port_bits')

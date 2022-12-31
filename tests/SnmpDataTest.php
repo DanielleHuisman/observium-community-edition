@@ -197,6 +197,7 @@ class SnmpDataTest extends \PHPUnit\Framework\TestCase
       array(   'eltex-gpon-1',       'linux'),
       array(       'ge-ups-1',       'linux'),
       array(         'qnap-1',       'linux'),
+      array(         'qnap-2',       'linux'),
       array(          'srm-1',       'linux'),
       array(          'dsm-1',       'linux'),
       array(         'gaia-1',       'linux'),

@@ -6,10 +6,9 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
-
 
 /// CONTACTS ACTIONS
 
@@ -60,7 +59,7 @@ if (!$readonly)
         $exist_contacts = dbFetchColumn('SELECT `contact_id` FROM `alert_contacts_assoc` WHERE `aca_type` = ? AND `alert_checker_id` = ?', array('alert', $vars['alert_test_id']));
         //print_vars($exist_contacts);
         $sql = "SELECT `contact_id` FROM `alert_contacts` WHERE `contact_disabled` = 0 AND `contact_method` != 'syscontact'" .
-               generate_query_values($exist_contacts, 'contact_id', '!='); // exclude exist contacts
+               generate_query_values_and($exist_contacts, 'contact_id', '!='); // exclude exist contacts
         //print_vars($sql);
         foreach (dbFetchColumn($sql) as $contact_id)
         {

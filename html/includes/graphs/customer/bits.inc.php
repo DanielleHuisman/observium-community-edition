@@ -20,7 +20,7 @@ foreach (dbFetchRows("SELECT * FROM `ports` AS I, `devices` AS D WHERE `port_des
     $rrd_list[] = [ 'filename'  => $rrd_filename,
                     'descr'     => $port['hostname'] ."-". $port['ifDescr'],
                     'descr_in'  => device_name($port, TRUE),
-                    'descr_out' => short_ifname($port['ifDescr'], NULL, FALSE) ]; // Options sets for skip htmlentities
+                    'descr_out' => short_ifname($port['port_label'], NULL, FALSE) ]; // Options sets for skip htmlentities
   }
 }
 

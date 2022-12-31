@@ -42,6 +42,7 @@ $setting = 'timestamp_format';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Datetime';
 $config_variable[$setting]['name']       = "Time format";
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 //$config_variable[$setting]['type']       = 'string';
 $config_variable[$setting]['type']       = 'enum'; // Normally this setting is just string, but we limit it with a pre-defined list
 $params = [
@@ -55,12 +56,10 @@ $params = [
   'd.m.Y H:i:s'     => [ 'name' => 'EU' ],
   'd.m.Y H:i:s T'   => [ 'name' => 'EU with TZ' ],
   ];
-foreach ($params as $key => $param)
-{
+foreach ($params as $key => $param) {
   $params[$key]['name'] .= ' ('.date($key).')';
 }
-if (!isset($params[$config['timestamp_format']]))
-{
+if (!isset($params[$config['timestamp_format']])) {
   $params[$config['timestamp_format']] = [ 'name' => 'Current ('.date($config['timestamp_format']).')' ];
 }
 $config_variable[$setting]['params']     = $params; // 'icon' => 'icon-refresh'));
@@ -74,6 +73,20 @@ $config_variable[$setting]['name']       = "Date format";
 $config_variable[$setting]['type']       = 'string';
 $config_variable[$setting]['shortdesc']  = 'Default time format ('.date($config['date_format']).')';
 */
+
+$setting = 'rrdcached';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RRD / RRDcacheD';
+$config_variable[$setting]['name']       = "RRDcacheD host or socket";
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Address of local (unix://xxx) or remote (IP:PORT) rrdcached host.';
+
+$setting = 'rrd_override';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RRD / RRDcacheD';
+$config_variable[$setting]['name']       = 'RRD override';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = ' Allow adding of devices if RRD directory already exists.';
 
 $setting = 'db|debug';
 $config_variable[$setting]['section']    = $section;
@@ -131,406 +144,77 @@ $config_variable[$setting]['name']       = 'Web UI debug Unprivileged';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = '[WARNING] Allow showing debug information to unprivileged (userlevel < 7) users in Web UI. This may leak configuration data to unauthorized users.';
 
-/// WEB UI //////////////////////////////////////////////////////////
-
-$section = 'wui';
-$config_sections[$section]['text'] = 'Web UI';
-
-$setting = 'web_url';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'External Web URL';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'URL used in links generated for emails, notifications and other external media.';
-
-$setting = 'page_title_prefix';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Page Title prefix';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Prefix used in the HTML page title.';
-
-$setting = 'page_title_suffix';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Page Title suffix';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['view']       = OBS_CONFIG_ADVANCED;
-$config_variable[$setting]['shortdesc']  = 'Suffix used in the HTML page title.';
-
-$setting = 'page_title_separator';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Page Title split character';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['view']       = OBS_CONFIG_ADVANCED;
-$config_variable[$setting]['shortdesc']  = 'Character to split the different page title levels on.';
-
-$setting = 'web|logo';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Custom header logo';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = "Replace Observium's header logo with a custom logo placed in html/images/. Observium logo will move to the bottom bar. Images must be exactly 162x30px.";
-
-
-$setting = 'page_refresh';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Refresh pages';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum'; // Normally this setting is just int, but we limit it with a pre-defined list
-$config_variable[$setting]['params']     = [
-  0    => [ 'name' =>   'Manually', 'icon' => 'icon-ban-circle' ],
-  60   => [ 'name' =>   '1 minute', 'icon' => 'icon-refresh' ],
-  120  => [ 'name' =>  '2 minutes', 'icon' => 'icon-refresh' ],
-  300  => [ 'name' =>  '5 minutes', 'icon' => 'icon-refresh' ],
-  900  => [ 'name' => '15 minutes', 'icon' => 'icon-refresh' ],
-  1800 => [ 'name' => '30 minutes', 'icon' => 'icon-refresh' ]
-];
-$config_variable[$setting]['shortdesc']  = "Defines an autorefresh for pages in the web interface. If it's unset pages won't auto refresh.";
-
-$setting = "web_always_paginate";
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Always show pagination for lists';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Forces the UI to always generation pagination sections above and below lists. Useful to show total counts or to set pagination below 100 where required.';
-
-$setting = "web_pagesize";
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Default pagination size';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum|10|20|50|100|500|1000|10000|50000';
-$config_variable[$setting]['shortdesc']  = 'The default number of items per page used by the web UI when paginating large tables. Default is 100.';
-
-$setting = 'web_mouseover';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Mouseover popups';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enable mouseover popups with extra information and graphs.';
-
-$setting = 'web_mouseover_mobile';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Mouseover popups on Mobile phones/tablets';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Allow display of mouseover popups on Mobile devices.';
-
-$setting = 'web_show_disabled';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Show disabled devices';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Whether to show disabled devices on major pages or not. (To hide disabled devices and their ports/alerts/etc, set this to FALSE).';
-
-$setting = 'web_device_name';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Default name to display device';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['hostname']    = [ 'name' => 'Hostname (default)' ];
-$config_variable[$setting]['params']['sysName']     = [ 'name' => 'sysName' ];
-$config_variable[$setting]['params']['description'] = [ 'name' => 'Description' ];
-$config_variable[$setting]['shortdesc']  = 'Default name to display device name. Allowed: hostname (default), sysName, description. When sysname or description empty, fallback as hostname.';
-
-$setting = 'web_enable_showtech';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = "Enable 'show tech' option";
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = "Enable 'show tech' menu option. Currently only for device pages.";
-
-$setting = 'show_overview_tab';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = "Enable 'Overview' tab";
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = "Enable 'Overview' tab on device pages.";
-
-$setting = 'web_theme_default';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Appearance';
-$config_variable[$setting]['name']       = 'Default Theme';
-$config_variable[$setting]['edition']    = 'pro';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['light']    = array('name' => 'Light (default)', 'icon' => 'sprite-sun');
-$config_variable[$setting]['params']['dark']     = array('name' => 'Dark',            'icon' => 'sprite-moon');
-$config_variable[$setting]['params']['darkblue'] = array('name' => 'Dark Blue',       'icon' => 'sprite-moon');
-$config_variable[$setting]['params']['system']   = array('name' => 'Auto System (by MacOS/Windows settings)', 'icon' => 'sprite-globe-light'); /// FIXME icon
-//$config_variable[$setting]['params']['time']     = array('name' => 'Auto (day/night)');
-$config_variable[$setting]['shortdesc']  = 'Set default theme.';
-
-$setting = 'cache|enable';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Caching';
-$config_variable[$setting]['name']       = 'Enable/disable caching';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster page generation, on very large installs. Not recommended for smaller installs.';
-
-$setting = 'cache|enable_cli';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Caching';
-$config_variable[$setting]['name']       = 'Enable/disable caching in CLI';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster Polling/Discovery operations with distributed installs. Not recommended for small installs.';
-
-$setting = 'cache|ttl';
-$config_variable[$setting]['section']     = $section;
-$config_variable[$setting]['subsection']  = 'Caching';
-$config_variable[$setting]['name']        = 'Default time to live for cache';
-$config_variable[$setting]['type']        = 'enum';
-$config_variable[$setting]['params'][60]  = array('name' => '1 min');
-$config_variable[$setting]['params'][180] = array('name' => '3 min');
-$config_variable[$setting]['params'][300] = array('name' => '5 min (default)');
-$config_variable[$setting]['params'][600] = array('name' => '10 min');
-$config_variable[$setting]['params'][900] = array('name' => '15 min');
-$config_variable[$setting]['shortdesc']   = 'Time in seconds to cache some data from the database.';
-
-$setting = 'cache|driver';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Caching';
-$config_variable[$setting]['name']       = 'Cache driver';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['auto']    = array('name' => 'Auto detect');
-$config_variable[$setting]['params']['zendshm'] = array('name' => 'Zend Memory Cache');
-$config_variable[$setting]['params']['apcu']    = array('name' => 'APCu');
-$config_variable[$setting]['params']['sqlite']  = array('name' => 'Sqlite');
-$config_variable[$setting]['params']['files']   = array('name' => 'Files');
-$config_variable[$setting]['shortdesc']  = "Cache driver used for caching data. Auto detection will choose whichever is available.";
-
-$setting = 'front_page';
-$config_variable[$setting]['section']     = $section;
-$config_variable[$setting]['subsection']  = 'Frontpage';
-$config_variable[$setting]['name']        = 'Front page to display';
-$config_variable[$setting]['type']        = 'enum';
-$config_variable[$setting]['params_call'] = 'config_get_front_page_files'; // Call to this function for possible options
-$config_variable[$setting]['shortdesc']   = 'PHP file to use as Observium front page';
-
-$setting = 'frontpage|order';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage';
-$config_variable[$setting]['name']       = 'Frontpage Modules (DEPRECATED)';
-$config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['params']['map']                 = array('name' => 'Map');
-$config_variable[$setting]['params']['alert_table']         = array('name' => 'Alert Table');
-$config_variable[$setting]['params']['status_summary']      = array('name' => 'Status Summary');
-$config_variable[$setting]['params']['status_donuts']       = array('name' => 'Status Summary (as donuts)');
-$config_variable[$setting]['params']['device_status']       = array('name' => 'Status Table');
-$config_variable[$setting]['params']['device_status_boxes'] = array('name' => 'Status Boxes');
-$config_variable[$setting]['params']['overall_traffic']     = array('name' => 'Overall Traffic');
-$config_variable[$setting]['params']['custom_traffic']      = array('name' => 'Custom Traffic');
-$config_variable[$setting]['params']['portpercent']         = array('name' => 'Overall Ports Percent');
-$config_variable[$setting]['params']['minigraphs']          = array('name' => 'Mini Graphs');
-$config_variable[$setting]['params']['syslog']              = array('name' => 'Syslog');
-$config_variable[$setting]['params']['eventlog']            = array('name' => 'Eventlog');
-$config_variable[$setting]['params']['splitlog']            = array('name' => 'Syslog & Eventlog');
-$config_variable[$setting]['shortdesc']  = 'List of modules to show on the front page. Keep required order. Options: map, alert_table, status_summary, status_donuts, device_status, device_status_boxes, overall_traffic, custom_traffic, portpercent, minigraphs, syslog, eventlog, splitlog';
-
-$setting = 'frontpage|eventlog|severity';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage';
-$config_variable[$setting]['name']       = 'Eventlog severities';
-$config_variable[$setting]['type']       = 'enum-array';
-$config_variable[$setting]['params']     = array_slice($config['syslog']['priorities'], 0, 8);
-$config_variable[$setting]['value_call'] = 'priority_string_to_numeric'; // Call to this function for current values
-$config_variable[$setting]['shortdesc']  = 'Show eventlog entries only with this severities';
-
-$setting = 'frontpage|syslog|items';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage';
-$config_variable[$setting]['name']       = 'Syslog items';
-$config_variable[$setting]['type']       = 'enum|5|10|15|25|50'; // Normally this setting is just int, but we limit it with a pre-defined list
-$config_variable[$setting]['shortdesc']  = 'Only show the last XX items of the syslog view';
-
-$setting = 'frontpage|syslog|priority';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage';
-$config_variable[$setting]['name']       = 'Syslog priorities';
-$config_variable[$setting]['type']       = 'enum-array';
-$config_variable[$setting]['params']     = array_slice($config['syslog']['priorities'], 0, 8);
-$config_variable[$setting]['value_call'] = 'priority_string_to_numeric'; // Call to this function for current values
-$config_variable[$setting]['shortdesc']  = 'Show syslog entries only with this priorities';
-
-$setting = 'frontpage|map|api';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage Map';
-$config_variable[$setting]['name']       = 'Map API';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['leaflet']     = array('name' => 'Leaflet');
-//$config_variable[$setting]['params']['google-mc'] = array('name' => 'Google',  'subtext' => 'REQUIRED to use Maps API KEY', 'desc' => 'Request a KEY <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>');
-//$config_variable[$setting]['params']['google']    = array('name' => 'Google (old)',  'subtext' => 'REQUIRED to use Maps API KEY', 'desc' => 'Request a KEY <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>');
-$config_variable[$setting]['shortdesc']  = 'Map provider on the front page';
-
-$setting = 'frontpage|map|tiles';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage Map';
-$config_variable[$setting]['name']       = 'Map Tiles (except Google)';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['carto-base-light']   = array('name' => 'Carto Basemap Light');
-$config_variable[$setting]['params']['carto-base-dark']    = array('name' => 'Carto Basemap Dark');
-$config_variable[$setting]['params']['carto-base-auto']    = array('name' => 'Carto Basemap Auto Light/Dark');
-$config_variable[$setting]['params']['esri-worldgraycanvas']    = array('name' => 'ESRI World Gray Canvas');
-$config_variable[$setting]['params']['opentopomap'] = array('name' => 'OpenTopoMap');
-$config_variable[$setting]['params']['wikimedia'] = array('name' => 'Wikimedia');
-$config_variable[$setting]['params']['nasa-night'] = array('name' => 'NASA (Night)');
-//$config_variable[$setting]['params']['osm-mapnik'] = array('name' => 'OpenStreetMap Mapnik');
-$config_variable[$setting]['shortdesc']  = 'Map tiles used when building the map on the front page.';
-
-$setting = 'frontpage|map|height';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage Map';
-$config_variable[$setting]['name']       = 'Map Height';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Height in pixels for the map on the front page';
-
-$setting = 'frontpage|map|okmarkersize';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage Map';
-$config_variable[$setting]['name']       = 'OK Marker Size';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Marker size in pixels for the map on the front page';
-
-$setting = 'frontpage|map|alertmarkersize';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Frontpage Map';
-$config_variable[$setting]['name']       = 'Alert Marker Size';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Alert marker size in pixels for the map on the front page';
-
-$setting = 'short_hostname|length';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Cosmetics';
-$config_variable[$setting]['name']       = 'Short Hostname Length';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Maximum length in characters of "shortened" hostnames used in UI tables.';
-
-
-$setting = 'rrdgraph_real_95th';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Display 95% percentile';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enable or disable display the 95% based on the highest value for ports (aka real 95%).';
-
-$setting = 'graphs|style';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Graph style';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['default'] = [ 'name' => 'Default' ];
-$config_variable[$setting]['params']['mrtg']    = [ 'name' => 'MRTG' ];
-$config_variable[$setting]['shortdesc']  = 'Use alternative graph style. NOTE: MRTG style currently works only for port bits graphs.';
-
-$setting = 'graphs|size';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Graph size';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum';
-//$config_variable[$setting]['params']['small']  = [ 'name' => 'Small' ];
-$config_variable[$setting]['params']['normal'] = [ 'name' => 'Normal' ];
-$config_variable[$setting]['params']['big']    = [ 'name' => 'Large' ];
-$config_variable[$setting]['shortdesc']  = 'Common graphs view size on most pages (not at all).';
-
-$setting = 'graphs|stacked_processors';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Enable Stacked Processor Graphs';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enable the use of stacked processor graphs for OS types with "processor_stacked" enabled.';
-
-$setting = 'graphs|ports_scale_default';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Ports graph default scale';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['auto']  = [ 'name' => 'Autoscale' ];
-$config_variable[$setting]['params']['speed'] = [ 'name' => 'Interface Speed' ];
-foreach ($config['graphs']['ports_scale_list'] as $entry) {
-  $speed = (int)unit_string_to_numeric($entry, 1000);
-  $config_variable[$setting]['params'][$entry] = formatRates($speed, 4, 4);
-}
-$config_variable[$setting]['shortdesc']  = 'Use this value as default scale for port graphs.';
-
-$setting = 'graphs|ports_scale_force';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Force graph scale';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Force scale also if real data more than selected scale.';
-
-
-$setting = 'graphs|always_draw_max';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Always draw "Max" area on graphs';
-$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Always draw the Max RRA on graphs. By default this is suppressed for graphs of one week or shorter.';
-
-
 /// POLLING /////////////////////////////////////////////////////////
 
 $section = 'polling';
-$config_sections[$section]['text'] = 'Polling';
+$config_sections[$section]['text'] = 'Polling/Cli';
 
 $setting = 'poller-wrapper|threads';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Wrapper';
+$config_variable[$setting]['subsection'] = 'Poller Wrapper';
 $config_variable[$setting]['name']       = 'Threads count';
 $config_variable[$setting]['type']       = 'int';
 $config_variable[$setting]['shortdesc']  = 'The number of poller threads that should run simultaneously. Default: CPU count x 2';
 
 $setting = 'poller-wrapper|max_running';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Wrapper';
+$config_variable[$setting]['subsection'] = 'Poller Wrapper';
 $config_variable[$setting]['name']       = 'Maximum allowed wrapper processes';
 $config_variable[$setting]['type']       = 'enum|2|3|4|6|8|10';
 $config_variable[$setting]['shortdesc']  = "The number of maximum allowed simultaneously running wrapper processes, used together with \$config['poller-wrapper']['max_la']. This prevents locking issues and too high Load Average on server. WARNING, don't set this number too high.";
 
 $setting = 'poller-wrapper|max_la';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Wrapper';
+$config_variable[$setting]['subsection'] = 'Poller Wrapper';
 $config_variable[$setting]['name']       = 'Maximum allowed Load Average';
 $config_variable[$setting]['type']       = 'float';
 $config_variable[$setting]['shortdesc']  = "Maximum allowed server Load Average to start wrapper processes, used together with \$config['poller-wrapper']['max_running']. This prevents locking issues and and too high Load Average on server. ";
 
+$setting = 'poller-wrapper|poller_timeout';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Poller Wrapper';
+$config_variable[$setting]['name']       = 'Poller Device Timeout';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Hard poller timeout for each device (in seconds, minimum 90s). Prevents endless running for device poller process.';
+
 $setting = 'poller-wrapper|alerter';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Wrapper';
+$config_variable[$setting]['subsection'] = 'Poller Wrapper';
 $config_variable[$setting]['name']       = 'Run alerter in poller wrapper';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Execute alerter.php after poller.php from the poller wrapper.';
 
 $setting = 'poller-wrapper|stats';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Wrapper';
+$config_variable[$setting]['subsection'] = 'Poller Wrapper';
 $config_variable[$setting]['name']       = 'Enable poller wrapper statistics';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable poller wrapper statistics in RRD (can be seen at ' . $config['web_url'] . 'pollerlog/).';
 
+$setting = 'cache|enable_cli';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Caching';
+$config_variable[$setting]['name']       = 'Enable/disable CLI caching';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster Polling/Discovery operations with distributed installs. Not recommended for small installs.';
+
+$setting = 'rrd|cache';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Caching';
+$config_variable[$setting]['name']       = 'Enable/disable RRDcacheD caching';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable additional caching for is rrd file exist for remote RRDcacheD. CLI caching must be enabled too.';
+
 $setting = 'poller_modules|system';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Modules';
+$config_variable[$setting]['subsection'] = 'Poller Modules';
 $config_variable[$setting]['name']       = 'system';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['locked']     = TRUE; // Always locked, just display
 
 $setting = 'poller_modules|os';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Modules';
+$config_variable[$setting]['subsection'] = 'Poller Modules';
 $config_variable[$setting]['name']       = 'os';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['locked']     = TRUE; // Always locked, just display
@@ -539,7 +223,7 @@ foreach ($config['poller_modules'] as $key => $value) {
   $setting = 'poller_modules|'.$key;
   if (isset($config_variable[$setting])) { continue; }
   $config_variable[$setting]['section']    = $section;
-  $config_variable[$setting]['subsection'] = 'Modules';
+  $config_variable[$setting]['subsection'] = 'Poller Modules';
   $config_variable[$setting]['name']       = $key;
   $config_variable[$setting]['type']       = 'bool';
 }
@@ -601,450 +285,17 @@ $config_variable[$setting]['shortdesc']  = 'Prefer 64bit (HC) counters when avai
 //$config_variable[$setting]['shortdesc']  = 'NOT ENABLED, do not use this globally! Walk separate IF-MIB tables instead global ifEntry, ifXEntry.';
 // FIXME when we have a toggle to not display it ever, make sure it's in the array for docs generation etc.
 
-/// Entities
-
-$section = 'entities';
-$config_sections[$section]['text'] = 'Entities';
-
-$setting = 'devices|serverscheck|temp_f';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'ServersCheck';
-$config_variable[$setting]['name']       = 'ServersCheck Fahrenheit units';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Specifies that any ServersCheck devices will return temperature sensors in Fahrenheit.';
-
-$setting = 'sensors|port|ignore_shutdown';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Ports';
-$config_variable[$setting]['name']       = 'Ignore alert state for Administrative Down ports';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'When measured port Shutdown ignore sensor alerts.';
-
-$setting = 'sensors|port|power_to_dbm';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Ports';
-$config_variable[$setting]['name']       = 'Convert Port DOM power sensors to dBm';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'When device provide port DOM power sensors in Watts, set to TRUE for convert it to dBm sensors. NOTE: power DOM sensors in Watts will removed.';
-
-$setting = 'sensors|limits_events';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sensors';
-$config_variable[$setting]['name']       = 'Log sensors limit changes in eventlog';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Log sensors limit changes in eventlog.';
-
-$setting = 'ipmi_unit|discrete';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Statuses';
-$config_variable[$setting]['name']       = 'Enable polling IPMI "discrete" sensors';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enable experimental support for IPMI discrete sensors. NOTE: very unstable, many false positive alerts.';
-
-/// ALERTING /////////////////////////////////////////////////////////
-
-$section = 'alerting';
-$config_sections[$section]['text'] = 'Alerting';
-
-$setting = 'alerts|interval';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Notification';
-$config_variable[$setting]['name']       = 'Alert notification re-send interval';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params'][0]      = array('name' => 'Disable re-send');
-$config_variable[$setting]['params'][21600]  = array('name' => '6 hours');
-$config_variable[$setting]['params'][43200]  = array('name' => '12 hours');
-$config_variable[$setting]['params'][86400]  = array('name' => '1 day');
-$config_variable[$setting]['params'][172800] = array('name' => '2 days');
-$config_variable[$setting]['params'][604800] = array('name' => '1 week');
-$config_variable[$setting]['shortdesc']  = 'How frequently to re-send a notification for a continuing alert condition. Default is 1 day.';
-
-$setting = 'alerts|disable|all';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Notification';
-$config_variable[$setting]['name']       = 'Disable All Notifications';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Disables alert notification generation for all notification transport types.';
-
-$setting = 'alerts|suppress';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Notification';
-$config_variable[$setting]['name']       = 'Suppress All Alerts';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Causes all failed alerts to be placed in the suppressed state.';
-
-$setting = 'email|enable';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport';
-$config_variable[$setting]['name']       = 'Enable Email transport';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Disables or enables email transport globally.';
-
-$setting = 'email|backend';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport';
-$config_variable[$setting]['name']       = 'Mail backend';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']     = [
-  'mail'      => [ 'name' => "PHP's built-in" ],
-  'sendmail'  => [ 'name' => 'Sendmail' ],
-  'mx'        => [ 'name' => 'SMTP by MX records' ],
-  'smtp'      => [ 'name' => 'SMTP' ]
-];
-$config_variable[$setting]['shortdesc']  = 'Mail backends. Sendmail and SMTP required additional configurations.';
-
-$setting = 'email|from';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport';
-$config_variable[$setting]['name']       = 'Email From: address';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Email address used in the from: Field. Default is observium@<localhost>';
-
-$setting = 'email|graphs';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport';
-$config_variable[$setting]['name']       = 'Graphs in mail';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Allow graphs in mail body.';
-
-// FIXME. Probably need remove too. Show only if not empty
-if (!empty($config['email']['default'])) {
-  $setting                                 = 'email|default';
-  $config_variable[$setting]['section']    = $section;
-  $config_variable[$setting]['subsection'] = 'Email Transport';
-  $config_variable[$setting]['name']       = 'Default Notification Email';
-  $config_variable[$setting]['type']       = 'string';
-  $config_variable[$setting]['shortdesc']  = 'Email address to send notifications to as default. Only used when no contact matches the alert.';
-}
-
-// FIXME. Do not use this. Will remove later. Show only if changed
-if ($config['email']['default_only']) {
-  $setting                                 = 'email|default_only';
-  $config_variable[$setting]['section']    = $section;
-  $config_variable[$setting]['subsection'] = 'Email Transport';
-  $config_variable[$setting]['name']       = 'Default Email Only';
-  $config_variable[$setting]['type']       = 'bool';
-  $config_variable[$setting]['shortdesc']  = "When no contact matches, use only the default notification email. Don't use the device's sysContact.";
-}
-
-$setting                                 = 'email|default_syscontact';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport';
-$config_variable[$setting]['name']       = 'Default Device sysContact';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = "Always sent alerts by Device sysContact.";
-
-$setting = 'email|sendmail_path';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (Sendmail)';
-$config_variable[$setting]['name']       = 'Sendmail Path';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'The location of the sendmail program.';
-
-$setting = 'email|smtp_host';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SMTP hostname';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Outgoing SMTP server name.';
-
-$setting = 'email|smtp_port';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SMTP server port';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the SMTP server.';
-
-$setting = 'email|smtp_timeout';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SMTP connection timeout';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'SMTP server connection timeout in seconds.';
-
-$setting = 'email|smtp_secure';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SNMP connection encryption';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']     = [
-  ''    => [ 'name' => 'No encryption' ],
-  'tls' => [ 'name' => 'TLS' ],
-  'ssl' => [ 'name' => 'SSL' ]
-];
-$config_variable[$setting]['shortdesc']  = 'Use SMTP connection encryption (TLS, SSL, or none).';
-
-$setting = 'email|smtp_auth';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SMTP authentication';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Whether or not to use SMTP authentication.';
-
-$setting = 'email|smtp_username';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SMTP username';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'SMTP authentication username.';
-
-$setting = 'email|smtp_password';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
-$config_variable[$setting]['name']       = 'SMTP password';
-$config_variable[$setting]['type']       = 'password';
-$config_variable[$setting]['shortdesc']  = 'SMTP authentication password.';
-
-/// AUTHENTICATION ///////////////////////////////////////////////////
-
-$section = 'authentication';
-$config_sections[$section]['text'] = 'Authentication';
-
-$setting = 'auth_mechanism';
-$config_variable[$setting]['section']     = $section;
-$config_variable[$setting]['subsection']  = 'General';
-$config_variable[$setting]['name']        = 'Authentication module to use';
-$config_variable[$setting]['type']        = 'enum';
-$config_variable[$setting]['params_call'] = 'config_get_auth_modules'; // Call to this function for possible options
-$config_variable[$setting]['shortdesc']   = 'Specific settings for the individual authentication modules can be found below.';
-
-$setting = 'auth|remote_user';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'General';
-$config_variable[$setting]['name']       = 'Trust Apache REMOTE_USER';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Disables built-in authentication and delegates this to Apache, for auth modules that support this. Make sure to read the documentation and handle with care!';
-
-$setting = 'login_message';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Login';
-$config_variable[$setting]['name']       = 'Login message';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'Define the login message shown on the login page.';
-
-$setting = 'login_remember_me';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Login';
-$config_variable[$setting]['name']       = 'Remember me';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enable or disable the remember me feature.';
-
-$setting = 'web_session_lifetime';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sessions';
-$config_variable[$setting]['name']       = 'Session lifetime';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']     = array(0      => array('name' => 'Until browser restart'),
-                                                 //60     => array('name' => '1 minute'),
-                                                 //600    => array('name' => '10 minutes'),
-                                                 1800   => array('name' => '30 minutes'),
-                                                 3600   => array('name' => '1 hour'),
-                                                 10800  => array('name' => '3 hours'),
-                                                 86400  => array('name' => '1 day'),
-                                                 604800 => array('name' => '1 week'));
-$config_variable[$setting]['shortdesc']  = 'Default user sessions lifetime in seconds (0 means until browser restart). This lifetime is used for sessions without "remember me" checkbox.';
-
-$setting = 'web_session_ip';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sessions';
-$config_variable[$setting]['name']       = 'Session bind to IP';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Bind user sessions to their IP address.';
-
-$setting = 'web_session_ipv6_prefix';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sessions';
-$config_variable[$setting]['name']       = 'Session IPv6 Prefix';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params'][128] = [ 'name' => '/128 (default)' ];
-$config_variable[$setting]['params'][127] = [ 'name' => '/127' ];
-$config_variable[$setting]['params'][126] = [ 'name' => '/126' ];
-$config_variable[$setting]['params'][124] = [ 'name' => '/124' ];
-$config_variable[$setting]['params'][120] = [ 'name' => '/120' ];
-$config_variable[$setting]['params'][112] = [ 'name' => '/112' ];
-$config_variable[$setting]['params'][104] = [ 'name' => '/104' ];
-$config_variable[$setting]['params'][96]  = [ 'name' => '/96' ];
-$config_variable[$setting]['params'][80]  = [ 'name' => '/80' ];
-$config_variable[$setting]['params'][64]  = [ 'name' => '/64' ];
-$config_variable[$setting]['params'][48]  = [ 'name' => '/48' ];
-if (!isset($config_variable[$setting]['params'][$config['web_session_ipv6_prefix']]))
-{
-  // When configured in config.php
-  $config['web_session_ipv6_prefix'] = ltrim($config['web_session_ipv6_prefix'], '/');
-  $config_variable[$setting]['params'][$config['web_session_ipv6_prefix']]  = [ 'name' => '/'.$config['web_session_ipv6_prefix'].' (current)' ];
-}
-$config_variable[$setting]['shortdesc']  = 'Bind user session to prefix limited IPv6 address. Minimum /128 (single address) and maximum is /1 (just about any address)';
-
-$setting = 'web_session_ip_by_header';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sessions';
-$config_variable[$setting]['name']       = 'Use configured Remote Address HTTP header';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'DANGEROUS. Allow to use alternative Remote Address HTTP header for Session identification. Use at own risk, since address in HTTP header(s) can be spoofed.';
-
-$setting = 'web_remote_addr_header';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sessions';
-$config_variable[$setting]['name']       = 'Remote Address HTTP header for Web session logging';
-$config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['default']           = [ 'name' => 'Auto Detect' ];
-$config_variable[$setting]['params']['CF-Connecting-IP']  = [ 'name' => 'CF-Connecting-IP (Cloudflare Proxy)' ];
-$config_variable[$setting]['params']['X-Real-IP']         = [ 'name' => 'X-Real-IP (Nginx HTTP Proxy)' ];
-$config_variable[$setting]['params']['Client-IP']         = [ 'name' => 'Client-IP (NetScaler Load Balancer)' ];
-$config_variable[$setting]['params']['X-Forwarded-For']   = [ 'name' => 'X-Forwarded-For (HTTP Proxy or Load Balancer)' ];
-$config_variable[$setting]['shortdesc']  = 'This HTTP header will automatically log in the specified user without extra authentication. NOTE: Additionally it can used as Session Identification address (NOT BY default, see above).';
-
-$setting = 'web_session_cidr';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Sessions';
-$config_variable[$setting]['name']       = 'Allow user authorization from specific IP ranges';
-$config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['example']    = '10.0.0.0/8';
-$config_variable[$setting]['shortdesc']  = 'Allow users to log in from specific IP ranges only. Leave empty for access from any IP address.';
-
-$setting = 'allow_unauth_graphs';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Allow graphs to be viewed by anyone';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Disables authentication for all graphs. This should be used with caution and should be left disabled when using the CIDR option!';
-
-$setting = 'allow_unauth_graphs_cidr';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Graphs';
-$config_variable[$setting]['name']       = 'Allow graphs to be viewed by anyone from specific IP ranges';
-$config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['example']    = '10.0.0.0/8';
-$config_variable[$setting]['shortdesc']  = 'Allow unauthenticated users to view graphs from specific IP ranges only.';
-
-$setting = 'auth_ldap_server';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'LDAP servers';
-$config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['shortdesc']  = 'List of LDAP servers to authenticate against, in order. Note this is meant as redundancy, and not as a way to specify multiple LDAP realms. Failover to the next server will happen when it is unreachable, not when authentication fails.';
-
-$setting = 'auth_ldap_port';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'LDAP server port';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the LDAP servers.';
-
-$setting = 'auth_ldap_version';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'LDAP version used';
-$config_variable[$setting]['type']       = 'enum|2|3';
-$config_variable[$setting]['shortdesc']  = 'LDAP version used to connect to the LDAP server.';
-
-$setting = 'auth_ldap_starttls';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'Use STARTTLS';
-$config_variable[$setting]['type']       = 'enum|no|optional|require';
-$config_variable[$setting]['shortdesc']  = 'Use STARTTLS for LDAP security: No, Optional (Try but not require), Require (Abort connection when failing).';
-
-$setting = 'auth_ldap_referrals';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'Follow LDAP referrals';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Follow referrals received from LDAP server.';
-
-$setting = 'auth_ldap_recursive';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'Recursive group lookup';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Do recursive group lookup for group memberships.';
-
-$setting = 'auth_ldap_recursive_maxdepth';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'LDAP';
-$config_variable[$setting]['name']       = 'Recursive group lookup maximum depth';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Maximum depth of group membership lookups.';
-
-$setting = 'auth_radius_server';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS servers';
-$config_variable[$setting]['type']       = 'enum-freeinput';
-$config_variable[$setting]['shortdesc']  = 'List of RADIUS servers to authenticate against, in order.';
-
-$setting = 'auth_radius_id';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS NAS Identifier';
-$config_variable[$setting]['type']       = 'string';
-$config_variable[$setting]['shortdesc']  = 'NAS-Identifier (32) attribute string. When ID empty, local server hostname is used.';
-
-$setting = 'auth_radius_port';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS server port';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the RADIUS servers.';
-
-$setting = 'auth_radius_secret';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS authentication secret';
-$config_variable[$setting]['type']       = 'password';
-$config_variable[$setting]['shortdesc']  = 'Authentication secret to be used to connect to the RADIUS server.';
-
-$setting = 'auth_radius_method';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS authentication method';
-$config_variable[$setting]['type']       = 'enum|PAP|CHAP|MSCHAPv1|MSCHAPv2';
-$config_variable[$setting]['shortdesc']  = 'Authentication method to use: PAP (default, unencrypted), CHAP (Windows RADIUS server not supported), MSCHAPv1, MSCHAPv2';
-
-$setting = 'auth_radius_timeout';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS connection timeout';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Connection timeout in seconds.';
-
-$setting = 'auth_radius_retries';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'RADIUS';
-$config_variable[$setting]['name']       = 'RADIUS connection retries';
-$config_variable[$setting]['type']       = 'int';
-$config_variable[$setting]['shortdesc']  = 'Number of times to try to connect to the RADIUS server.';
-
 /// DISCOVERY ////////////////////////////////////////////////////
 
 $section = 'discovery';
 $config_sections[$section]['text'] = 'Discovery';
 
-// Modules
-
-$setting = 'discovery_modules|os';
+$setting = 'poller-wrapper|discovery_timeout';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Modules';
-$config_variable[$setting]['name']       = 'os';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['locked']     = TRUE; // Always locked, just display
-
-$setting = 'discovery_modules|mibs';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Modules';
-$config_variable[$setting]['name']       = 'mibs';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['locked']     = TRUE; // Always locked, just display
-
-foreach ($config['discovery_modules'] as $key => $value)
-{
-  $setting = 'discovery_modules|'.$key;
-  if (isset($config_variable[$setting])) { continue; }
-  $config_variable[$setting]['section']    = $section;
-  $config_variable[$setting]['subsection'] = 'Modules';
-  $config_variable[$setting]['name']       = $key;
-  $config_variable[$setting]['type']       = 'bool';
-}
+$config_variable[$setting]['subsection'] = 'Wrapper';
+$config_variable[$setting]['name']       = 'Discovery Device Timeout';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Hard discovery timeout for each device (in seconds, minimum 90s). Prevents endless running for device poller process.';
 
 // Ports
 
@@ -1378,18 +629,812 @@ $config_variable[$setting]['type']       = 'enum-freeinput';
 $config_variable[$setting]['example']    = '/^Cisco IP Phone/';
 $config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover any device whose reported platform matches a configured regular expression.';
 
-/// WMI
-
-$section = 'WMI';
-$config_sections[$section]['text'] = 'WMI';
-
 $setting = 'wmi|service_permit';
 $config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Device Autodiscovery Options';
+$config_variable[$setting]['subsection'] = 'WMI Autodiscovery Options';
 $config_variable[$setting]['name']       = 'WMI Services allowed to be Discovered';
 $config_variable[$setting]['type']       = 'enum-freeinput';
 $config_variable[$setting]['example']    = 'Dnscache';
 $config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover all WMI services. Only defined names will be discovered instead.';
+
+// Modules
+
+$setting = 'discovery_modules|os';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Modules';
+$config_variable[$setting]['name']       = 'os';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['locked']     = TRUE; // Always locked, just display
+
+$setting = 'discovery_modules|mibs';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Modules';
+$config_variable[$setting]['name']       = 'mibs';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['locked']     = TRUE; // Always locked, just display
+
+foreach ($config['discovery_modules'] as $key => $value) {
+  $setting = 'discovery_modules|'.$key;
+  if (isset($config_variable[$setting])) { continue; }
+  $config_variable[$setting]['section']    = $section;
+  $config_variable[$setting]['subsection'] = 'Modules';
+  $config_variable[$setting]['name']       = $key;
+  $config_variable[$setting]['type']       = 'bool';
+}
+
+/// WEB UI //////////////////////////////////////////////////////////
+
+$section = 'wui';
+$config_sections[$section]['text'] = 'Web UI';
+
+$setting = 'web_url';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'External Web URL';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'URL used in links generated for emails, notifications and other external media.';
+
+$setting = 'page_title_prefix';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Page Title prefix';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Prefix used in the HTML page title.';
+
+$setting = 'page_title_suffix';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Page Title suffix';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['view']       = OBS_CONFIG_ADVANCED;
+$config_variable[$setting]['shortdesc']  = 'Suffix used in the HTML page title.';
+
+$setting = 'page_title_separator';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Page Title split character';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['view']       = OBS_CONFIG_ADVANCED;
+$config_variable[$setting]['shortdesc']  = 'Character to split the different page title levels on.';
+
+$setting = 'web|logo';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Custom header logo';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = "Replace Observium's header logo with a custom logo placed in html/images/. Observium logo will move to the bottom bar. Images must be exactly 162x30px.";
+
+
+$setting = 'page_refresh';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Refresh pages';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum'; // Normally this setting is just int, but we limit it with a pre-defined list
+$config_variable[$setting]['params']     = [
+  0    => [ 'name' =>   'Manually', 'icon' => 'icon-ban-circle' ],
+  60   => [ 'name' =>   '1 minute', 'icon' => 'icon-refresh' ],
+  120  => [ 'name' =>  '2 minutes', 'icon' => 'icon-refresh' ],
+  300  => [ 'name' =>  '5 minutes', 'icon' => 'icon-refresh' ],
+  900  => [ 'name' => '15 minutes', 'icon' => 'icon-refresh' ],
+  1800 => [ 'name' => '30 minutes', 'icon' => 'icon-refresh' ]
+];
+$config_variable[$setting]['shortdesc']  = "Defines an autorefresh for pages in the web interface. If it's unset pages won't auto refresh.";
+
+$setting = "web_always_paginate";
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Always show pagination for lists';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Forces the UI to always generation pagination sections above and below lists. Useful to show total counts or to set pagination below 100 where required.';
+
+$setting = "web_pagesize";
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Default pagination size';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum|10|20|50|100|500|1000|10000|50000';
+$config_variable[$setting]['shortdesc']  = 'The default number of items per page used by the web UI when paginating large tables. Default is 100.';
+
+$setting = 'web_mouseover';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Mouseover popups';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable mouseover popups with extra information and graphs.';
+
+$setting = 'web_mouseover_mobile';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Mouseover popups on Mobile phones/tablets';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Allow display of mouseover popups on Mobile devices.';
+
+$setting = 'web_show_disabled';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Show disabled devices';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Whether to show disabled devices on major pages or not. (To hide disabled devices and their ports/alerts/etc, set this to FALSE).';
+
+$setting = 'web_device_name';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Default name to display device';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['hostname']    = [ 'name' => 'Hostname (default)' ];
+$config_variable[$setting]['params']['sysName']     = [ 'name' => 'sysName' ];
+$config_variable[$setting]['params']['description'] = [ 'name' => 'Description' ];
+$config_variable[$setting]['shortdesc']  = 'Default name to display device name. Allowed: hostname (default), sysName, description. When sysname or description empty, fallback as hostname.';
+
+$setting = 'web_enable_showtech';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = "Enable 'show tech' option";
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = "Enable 'show tech' menu option. Currently only for device pages.";
+
+$setting = 'show_overview_tab';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = "Enable 'Overview' tab";
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = "Enable 'Overview' tab on device pages.";
+
+$setting = 'web_theme_default';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Appearance';
+$config_variable[$setting]['name']       = 'Default Theme';
+$config_variable[$setting]['edition']    = 'pro';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['light']    = [ 'name' => 'Light (default)', 'icon' => 'sprite-sun' ];
+$config_variable[$setting]['params']['dark']     = [ 'name' => 'Dark',            'icon' => 'sprite-moon' ];
+$config_variable[$setting]['params']['darkblue'] = [ 'name' => 'Dark Blue',       'icon' => 'sprite-moon' ];
+$config_variable[$setting]['params']['system']   = [ 'name' => 'Auto System (by MacOS/Windows settings)', 'icon' => 'sprite-globe-light' ]; /// FIXME icon
+//$config_variable[$setting]['params']['time']     = [ 'name' => 'Auto (day/night)' ];
+$config_variable[$setting]['shortdesc']  = 'Set default theme.';
+
+$setting = 'cache|enable';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Caching';
+$config_variable[$setting]['name']       = 'Enable/disable Web UI caching';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster page generation, on very large installs. Not recommended for smaller installs.';
+
+$setting = 'cache|ttl';
+$config_variable[$setting]['section']     = $section;
+$config_variable[$setting]['subsection']  = 'Caching';
+$config_variable[$setting]['name']        = 'Default time to live for cache';
+$config_variable[$setting]['type']        = 'enum';
+$config_variable[$setting]['params'][60]  = [ 'name' => '1 min' ];
+$config_variable[$setting]['params'][180] = [ 'name' => '3 min' ];
+$config_variable[$setting]['params'][300] = [ 'name' => '5 min (default)' ];
+$config_variable[$setting]['params'][600] = [ 'name' => '10 min' ];
+$config_variable[$setting]['params'][900] = [ 'name' => '15 min' ];
+$config_variable[$setting]['shortdesc']   = 'Time in seconds to cache some data from the database.';
+
+$setting = 'cache|driver';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Caching';
+$config_variable[$setting]['name']       = 'Cache driver';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['auto']    = [ 'name' => 'Auto detect' ];
+$config_variable[$setting]['params']['zendshm'] = [ 'name' => 'Zend Memory Cache' ];
+$config_variable[$setting]['params']['apcu']    = [ 'name' => 'APCu' ];
+$config_variable[$setting]['params']['sqlite']  = [ 'name' => 'Sqlite' ];
+$config_variable[$setting]['params']['files']   = [ 'name' => 'Files' ];
+$config_variable[$setting]['shortdesc']  = "Cache driver used for caching data. Auto detection will choose whichever is available.";
+
+$setting = 'front_page';
+$config_variable[$setting]['section']     = $section;
+$config_variable[$setting]['subsection']  = 'Frontpage';
+$config_variable[$setting]['name']        = 'Front page to display';
+$config_variable[$setting]['type']        = 'enum';
+$config_variable[$setting]['params_call'] = 'config_get_front_page_files'; // Call to this function for possible options
+$config_variable[$setting]['shortdesc']   = 'PHP file to use as Observium front page';
+
+$setting = 'frontpage|order';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage';
+$config_variable[$setting]['name']       = 'Frontpage Modules (DEPRECATED)';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['params']['map']                 = [ 'name' => 'Map' ];
+$config_variable[$setting]['params']['alert_table']         = [ 'name' => 'Alert Table' ];
+$config_variable[$setting]['params']['status_summary']      = [ 'name' => 'Status Summary' ];
+$config_variable[$setting]['params']['status_donuts']       = [ 'name' => 'Status Summary (as donuts)' ];
+$config_variable[$setting]['params']['device_status']       = [ 'name' => 'Status Table' ];
+$config_variable[$setting]['params']['device_status_boxes'] = [ 'name' => 'Status Boxes' ];
+$config_variable[$setting]['params']['overall_traffic']     = [ 'name' => 'Overall Traffic' ];
+$config_variable[$setting]['params']['custom_traffic']      = [ 'name' => 'Custom Traffic' ];
+$config_variable[$setting]['params']['portpercent']         = [ 'name' => 'Overall Ports Percent' ];
+$config_variable[$setting]['params']['minigraphs']          = [ 'name' => 'Mini Graphs' ];
+$config_variable[$setting]['params']['syslog']              = [ 'name' => 'Syslog' ];
+$config_variable[$setting]['params']['eventlog']            = [ 'name' => 'Eventlog' ];
+$config_variable[$setting]['params']['splitlog']            = [ 'name' => 'Syslog & Eventlog' ];
+$config_variable[$setting]['shortdesc']  = 'List of modules to show on the front page. Keep required order. Options: map, alert_table, status_summary, status_donuts, device_status, device_status_boxes, overall_traffic, custom_traffic, portpercent, minigraphs, syslog, eventlog, splitlog';
+
+$setting = 'frontpage|eventlog|severity';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage';
+$config_variable[$setting]['name']       = 'Eventlog severities';
+$config_variable[$setting]['type']       = 'enum-array';
+$config_variable[$setting]['params']     = array_slice($config['syslog']['priorities'], 0, 8);
+$config_variable[$setting]['value_call'] = 'priority_string_to_numeric'; // Call to this function for current values
+$config_variable[$setting]['shortdesc']  = 'Show eventlog entries only with this severities';
+
+$setting = 'frontpage|syslog|items';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage';
+$config_variable[$setting]['name']       = 'Syslog items';
+$config_variable[$setting]['type']       = 'enum|5|10|15|25|50'; // Normally this setting is just int, but we limit it with a pre-defined list
+$config_variable[$setting]['shortdesc']  = 'Only show the last XX items of the syslog view';
+
+$setting = 'frontpage|syslog|priority';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage';
+$config_variable[$setting]['name']       = 'Syslog priorities';
+$config_variable[$setting]['type']       = 'enum-array';
+$config_variable[$setting]['params']     = array_slice($config['syslog']['priorities'], 0, 8);
+$config_variable[$setting]['value_call'] = 'priority_string_to_numeric'; // Call to this function for current values
+$config_variable[$setting]['shortdesc']  = 'Show syslog entries only with this priorities';
+
+$setting = 'frontpage|map|api';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage Map';
+$config_variable[$setting]['name']       = 'Map API';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['leaflet']     = [ 'name' => 'Leaflet' ];
+//$config_variable[$setting]['params']['google-mc'] = [ 'name' => 'Google',  'subtext' => 'REQUIRED to use Maps API KEY', 'desc' => 'Request a KEY <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>' ];
+//$config_variable[$setting]['params']['google']    = [ 'name' => 'Google (old)',  'subtext' => 'REQUIRED to use Maps API KEY', 'desc' => 'Request a KEY <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>' ];
+$config_variable[$setting]['shortdesc']  = 'Map provider on the front page';
+
+$setting = 'frontpage|map|tiles';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage Map';
+$config_variable[$setting]['name']       = 'Map Tiles (except Google)';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['carto-base-light']     = [ 'name' => 'Carto Basemap Light' ];
+$config_variable[$setting]['params']['carto-base-dark']      = [ 'name' => 'Carto Basemap Dark' ];
+$config_variable[$setting]['params']['carto-base-auto']      = [ 'name' => 'Carto Basemap Auto Light/Dark' ];
+$config_variable[$setting]['params']['esri-worldgraycanvas'] = [ 'name' => 'ESRI World Gray Canvas' ];
+$config_variable[$setting]['params']['opentopomap']          = [ 'name' => 'OpenTopoMap' ];
+$config_variable[$setting]['params']['wikimedia']            = [ 'name' => 'Wikimedia' ];
+$config_variable[$setting]['params']['nasa-night']           = [ 'name' => 'NASA (Night)' ];
+//$config_variable[$setting]['params']['osm-mapnik'] = [ 'name' => 'OpenStreetMap Mapnik' ];
+$config_variable[$setting]['shortdesc']  = 'Map tiles used when building the map on the front page.';
+
+$setting = 'frontpage|map|height';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage Map';
+$config_variable[$setting]['name']       = 'Map Height';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Height in pixels for the map on the front page';
+
+$setting = 'frontpage|map|okmarkersize';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage Map';
+$config_variable[$setting]['name']       = 'OK Marker Size';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Marker size in pixels for the map on the front page';
+
+$setting = 'frontpage|map|alertmarkersize';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Frontpage Map';
+$config_variable[$setting]['name']       = 'Alert Marker Size';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Alert marker size in pixels for the map on the front page';
+
+$setting = 'short_hostname|length';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Cosmetics';
+$config_variable[$setting]['name']       = 'Short Hostname Length';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Maximum length in characters of "shortened" hostnames used in UI tables.';
+
+
+$setting = 'rrdgraph_real_95th';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Display 95% percentile';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable or disable display the 95% based on the highest value for ports (aka real 95%).';
+
+$setting = 'graphs|style';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Graph style';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['default'] = [ 'name' => 'Default' ];
+$config_variable[$setting]['params']['mrtg']    = [ 'name' => 'MRTG' ];
+$config_variable[$setting]['shortdesc']  = 'Use alternative graph style. NOTE: MRTG style currently works only for port bits graphs.';
+
+$setting = 'graphs|size';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Graph size';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+//$config_variable[$setting]['params']['small']  = [ 'name' => 'Small' ];
+$config_variable[$setting]['params']['normal'] = [ 'name' => 'Normal' ];
+$config_variable[$setting]['params']['big']    = [ 'name' => 'Large' ];
+$config_variable[$setting]['shortdesc']  = 'Common graphs view size on most pages (not at all).';
+
+$setting = 'graphs|stacked_processors';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Enable Stacked Processor Graphs';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable the use of stacked processor graphs for OS types with "processor_stacked" enabled.';
+
+$setting = 'graphs|ports_scale_default';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Ports graph default scale';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['auto']  = [ 'name' => 'Autoscale' ];
+$config_variable[$setting]['params']['speed'] = [ 'name' => 'Interface Speed' ];
+foreach ($config['graphs']['ports_scale_list'] as $entry) {
+  $speed = (int)unit_string_to_numeric($entry, 1000);
+  $config_variable[$setting]['params'][$entry] = formatRates($speed, 4, 4);
+}
+$config_variable[$setting]['shortdesc']  = 'Use this value as default scale for port graphs.';
+
+$setting = 'graphs|ports_scale_force';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Force graph scale';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Force scale also if real data more than selected scale.';
+
+$setting = 'graphs|dynamic_labels';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Use Dynamic Labels';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Draw different color markers for labels (instead square marker).';
+
+$setting = 'graphs|always_draw_max';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Always draw "Max" area on graphs';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Always draw the Max RRA on graphs. By default this is suppressed for graphs of one week or shorter.';
+
+/// Entities
+
+$section = 'entities';
+$config_sections[$section]['text'] = 'Entities';
+
+$setting = 'devices|serverscheck|temp_f';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'ServersCheck';
+$config_variable[$setting]['name']       = 'ServersCheck Fahrenheit units';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Specifies that any ServersCheck devices will return temperature sensors in Fahrenheit.';
+
+$setting = 'sensors|port|ignore_shutdown';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Ports';
+$config_variable[$setting]['name']       = 'Ignore alert state for Administrative Down ports';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'When measured port Shutdown ignore sensor alerts.';
+
+$setting = 'sensors|port|power_to_dbm';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Ports';
+$config_variable[$setting]['name']       = 'Convert Port DOM power sensors to dBm';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'When device provide port DOM power sensors in Watts, set to TRUE for convert it to dBm sensors. NOTE: power DOM sensors in Watts will removed.';
+
+$setting = 'sensors|limits_events';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sensors';
+$config_variable[$setting]['name']       = 'Log sensors limit changes in eventlog';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Log sensors limit changes in eventlog.';
+
+$setting = 'sensors|web_measured_compact';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sensors';
+$config_variable[$setting]['name']       = 'Compact sensors view for measured entities';
+$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Show sensors for measured entities in compact view style';
+
+$setting = 'ipmi_unit|discrete';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Statuses';
+$config_variable[$setting]['name']       = 'Enable polling IPMI "discrete" sensors';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable experimental support for IPMI discrete sensors. NOTE: very unstable, many false positive alerts.';
+
+/// ALERTING /////////////////////////////////////////////////////////
+
+$section = 'alerting';
+$config_sections[$section]['text'] = 'Alerting';
+
+$setting = 'alerts|interval';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Alert notification re-send interval';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params'][0]      = [ 'name' => 'Disable re-send' ];
+$config_variable[$setting]['params'][21600]  = [ 'name' => '6 hours' ];
+$config_variable[$setting]['params'][43200]  = [ 'name' => '12 hours' ];
+$config_variable[$setting]['params'][86400]  = [ 'name' => '1 day' ];
+$config_variable[$setting]['params'][172800] = [ 'name' => '2 days' ];
+$config_variable[$setting]['params'][604800] = [ 'name' => '1 week' ];
+$config_variable[$setting]['shortdesc']  = 'How frequently to re-send a notification for a continuing alert condition. Default is 1 day.';
+
+$setting = 'alerts|disable|all';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Disable All Notifications';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Disables alert notification generation for all notification transport types.';
+
+$setting = 'alerts|suppress';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Notification';
+$config_variable[$setting]['name']       = 'Suppress All Alerts';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Causes all failed alerts to be placed in the suppressed state.';
+
+$setting = 'email|enable';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport';
+$config_variable[$setting]['name']       = 'Enable Email transport';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Disables or enables email transport globally.';
+
+$setting = 'email|backend';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport';
+$config_variable[$setting]['name']       = 'Mail backend';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']     = [
+  'mail'      => [ 'name' => "PHP's built-in" ],
+  'sendmail'  => [ 'name' => 'Sendmail' ],
+  'mx'        => [ 'name' => 'SMTP by MX records' ],
+  'smtp'      => [ 'name' => 'SMTP' ]
+];
+$config_variable[$setting]['shortdesc']  = 'Mail backends. Sendmail and SMTP required additional configurations.';
+
+$setting = 'email|from';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport';
+$config_variable[$setting]['name']       = 'Email From: address';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Email address used in the from: Field. Default is observium@<localhost>';
+
+$setting = 'email|graphs';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport';
+$config_variable[$setting]['name']       = 'Graphs in mail';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Allow graphs in mail body.';
+
+// Don't remove. This is useful if people just want everything to go to a single address. Without touching contacts.
+//if (!empty($config['email']['default'])) {
+  $setting                                 = 'email|default';
+  $config_variable[$setting]['section']    = $section;
+  $config_variable[$setting]['subsection'] = 'Email Transport';
+  $config_variable[$setting]['name']       = 'Default Notification Email';
+  $config_variable[$setting]['type']       = 'string';
+  $config_variable[$setting]['shortdesc']  = 'Email address to send notifications to as default. Only used when no contact matches the alert.';
+//}
+
+// FIXME. Do not use this. Will remove later. Show only if changed
+// This should probably be removed and set as default behaviour when email|default is configured. Almost no one wants sysContact, and no one wants sysContact *and* default
+
+//if ($config['email']['default_only']) {
+  $setting                                 = 'email|default_only';
+  $config_variable[$setting]['section']    = $section;
+  $config_variable[$setting]['subsection'] = 'Email Transport';
+  $config_variable[$setting]['name']       = 'Default Email Only';
+  $config_variable[$setting]['type']       = 'bool';
+  $config_variable[$setting]['shortdesc']  = "When no contact matches, use only the default notification email. Don't use the device's sysContact.";
+//}
+
+$setting                                 = 'email|default_syscontact';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport';
+$config_variable[$setting]['name']       = 'Default Device sysContact';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = "Always sent alerts by Device sysContact.";
+
+$setting = 'email|sendmail_path';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (Sendmail)';
+$config_variable[$setting]['name']       = 'Sendmail Path';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'The location of the sendmail program.';
+
+$setting = 'email|smtp_host';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SMTP hostname';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Outgoing SMTP server name.';
+
+$setting = 'email|smtp_port';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SMTP server port';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the SMTP server.';
+
+$setting = 'email|smtp_timeout';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SMTP connection timeout';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'SMTP server connection timeout in seconds.';
+
+$setting = 'email|smtp_secure';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SNMP connection encryption';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']     = [
+  ''    => [ 'name' => 'No encryption' ],
+  'tls' => [ 'name' => 'TLS' ],
+  'ssl' => [ 'name' => 'SSL' ]
+];
+$config_variable[$setting]['shortdesc']  = 'Use SMTP connection encryption (TLS, SSL, or none).';
+
+$setting = 'email|smtp_auth';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SMTP authentication';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Whether or not to use SMTP authentication.';
+
+$setting = 'email|smtp_username';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SMTP username';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'SMTP authentication username.';
+
+$setting = 'email|smtp_password';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Email Transport (SMTP)';
+$config_variable[$setting]['name']       = 'SMTP password';
+$config_variable[$setting]['type']       = 'password';
+$config_variable[$setting]['shortdesc']  = 'SMTP authentication password.';
+
+/// AUTHENTICATION ///////////////////////////////////////////////////
+
+$section = 'authentication';
+$config_sections[$section]['text'] = 'Authentication';
+
+$setting = 'auth_mechanism';
+$config_variable[$setting]['section']     = $section;
+$config_variable[$setting]['subsection']  = 'General';
+$config_variable[$setting]['name']        = 'Authentication module to use';
+$config_variable[$setting]['type']        = 'enum';
+$config_variable[$setting]['params_call'] = 'config_get_auth_modules'; // Call to this function for possible options
+$config_variable[$setting]['shortdesc']   = 'Specific settings for the individual authentication modules can be found below.';
+
+$setting = 'auth|remote_user';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Trust Apache REMOTE_USER';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Disables built-in authentication and delegates this to Apache, for auth modules that support this. Make sure to read the documentation and handle with care!';
+
+$setting = 'login_message';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Login';
+$config_variable[$setting]['name']       = 'Login message';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Define the login message shown on the login page.';
+
+$setting = 'login_remember_me';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Login';
+$config_variable[$setting]['name']       = 'Remember me';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable or disable the remember me feature.';
+
+$setting = 'web_session_lifetime';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sessions';
+$config_variable[$setting]['name']       = 'Session lifetime';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']     = [
+  0      => [ 'name' => 'Until browser restart' ],
+  //60     => [ 'name' => '1 minute' ],
+  //600    => [ 'name' => '10 minutes' ],
+  1800   => [ 'name' => '30 minutes' ],
+  3600   => [ 'name' => '1 hour' ],
+  10800  => [ 'name' => '3 hours' ],
+  86400  => [ 'name' => '1 day' ],
+  604800 => [ 'name' => '1 week' ]
+];
+$config_variable[$setting]['shortdesc']  = 'Default user sessions lifetime in seconds (0 means until browser restart). This lifetime is used for sessions without "remember me" checkbox.';
+
+$setting = 'web_session_ip';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sessions';
+$config_variable[$setting]['name']       = 'Session bind to IP';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Bind user sessions to their IP address.';
+
+$setting = 'web_session_ipv6_prefix';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sessions';
+$config_variable[$setting]['name']       = 'Session IPv6 Prefix';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params'][128] = [ 'name' => '/128 (default)' ];
+$config_variable[$setting]['params'][127] = [ 'name' => '/127' ];
+$config_variable[$setting]['params'][126] = [ 'name' => '/126' ];
+$config_variable[$setting]['params'][124] = [ 'name' => '/124' ];
+$config_variable[$setting]['params'][120] = [ 'name' => '/120' ];
+$config_variable[$setting]['params'][112] = [ 'name' => '/112' ];
+$config_variable[$setting]['params'][104] = [ 'name' => '/104' ];
+$config_variable[$setting]['params'][96]  = [ 'name' => '/96' ];
+$config_variable[$setting]['params'][80]  = [ 'name' => '/80' ];
+$config_variable[$setting]['params'][64]  = [ 'name' => '/64' ];
+$config_variable[$setting]['params'][48]  = [ 'name' => '/48' ];
+if (!isset($config_variable[$setting]['params'][$config['web_session_ipv6_prefix']])) {
+  // When configured in config.php
+  $config['web_session_ipv6_prefix'] = ltrim($config['web_session_ipv6_prefix'], '/');
+  $config_variable[$setting]['params'][$config['web_session_ipv6_prefix']]  = [ 'name' => '/'.$config['web_session_ipv6_prefix'].' (current)' ];
+}
+$config_variable[$setting]['shortdesc']  = 'Bind user session to prefix limited IPv6 address. Minimum /128 (single address) and maximum is /1 (just about any address)';
+
+$setting = 'web_session_ip_by_header';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sessions';
+$config_variable[$setting]['name']       = 'Use configured Remote Address HTTP header';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'DANGEROUS. Allow to use alternative Remote Address HTTP header for Session identification. Use at own risk, since address in HTTP header(s) can be spoofed.';
+
+$setting = 'web_remote_addr_header';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sessions';
+$config_variable[$setting]['name']       = 'Remote Address HTTP header for Web session logging';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['default']           = [ 'name' => 'Auto Detect' ];
+$config_variable[$setting]['params']['CF-Connecting-IP']  = [ 'name' => 'CF-Connecting-IP (Cloudflare Proxy)' ];
+$config_variable[$setting]['params']['X-Real-IP']         = [ 'name' => 'X-Real-IP (Nginx HTTP Proxy)' ];
+$config_variable[$setting]['params']['Client-IP']         = [ 'name' => 'Client-IP (NetScaler Load Balancer)' ];
+$config_variable[$setting]['params']['X-Forwarded-For']   = [ 'name' => 'X-Forwarded-For (HTTP Proxy or Load Balancer)' ];
+$config_variable[$setting]['shortdesc']  = 'This HTTP header will automatically log in the specified user without extra authentication. NOTE: Additionally it can used as Session Identification address (NOT BY default, see above).';
+
+$setting = 'web_session_cidr';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Sessions';
+$config_variable[$setting]['name']       = 'Allow user authorization from specific IP ranges';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['example']    = '10.0.0.0/8';
+$config_variable[$setting]['shortdesc']  = 'Allow users to log in from specific IP ranges only. Leave empty for access from any IP address.';
+
+$setting = 'allow_unauth_graphs';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Allow graphs to be viewed by anyone';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Disables authentication for all graphs. This should be used with caution and should be left disabled when using the CIDR option!';
+
+$setting = 'allow_unauth_graphs_cidr';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Graphs';
+$config_variable[$setting]['name']       = 'Allow graphs to be viewed by anyone from specific IP ranges';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['example']    = '10.0.0.0/8';
+$config_variable[$setting]['shortdesc']  = 'Allow unauthenticated users to view graphs from specific IP ranges only.';
+
+$setting = 'auth_ldap_server';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'LDAP servers';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['shortdesc']  = 'List of LDAP servers to authenticate against, in order. Note this is meant as redundancy, and not as a way to specify multiple LDAP realms. Failover to the next server will happen when it is unreachable, not when authentication fails.';
+
+$setting = 'auth_ldap_port';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'LDAP server port';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the LDAP servers.';
+
+$setting = 'auth_ldap_version';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'LDAP version used';
+$config_variable[$setting]['type']       = 'enum|2|3';
+$config_variable[$setting]['shortdesc']  = 'LDAP version used to connect to the LDAP server.';
+
+$setting = 'auth_ldap_starttls';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'Use STARTTLS';
+$config_variable[$setting]['type']       = 'enum|no|optional|require';
+$config_variable[$setting]['shortdesc']  = 'Use STARTTLS for LDAP security: No, Optional (Try but not require), Require (Abort connection when failing).';
+
+$setting = 'auth_ldap_referrals';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'Follow LDAP referrals';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Follow referrals received from LDAP server.';
+
+$setting = 'auth_ldap_recursive';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'Recursive group lookup';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Do recursive group lookup for group memberships.';
+
+$setting = 'auth_ldap_recursive_maxdepth';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'LDAP';
+$config_variable[$setting]['name']       = 'Recursive group lookup maximum depth';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Maximum depth of group membership lookups.';
+
+$setting = 'auth_radius_server';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS servers';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['shortdesc']  = 'List of RADIUS servers to authenticate against, in order.';
+
+$setting = 'auth_radius_id';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS NAS Identifier';
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'NAS-Identifier (32) attribute string. When ID empty, local server hostname is used.';
+
+$setting = 'auth_radius_port';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS server port';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Port to be used to connect to the RADIUS servers.';
+
+$setting = 'auth_radius_secret';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS authentication secret';
+$config_variable[$setting]['type']       = 'password';
+$config_variable[$setting]['shortdesc']  = 'Authentication secret to be used to connect to the RADIUS server.';
+
+$setting = 'auth_radius_method';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS authentication method';
+$config_variable[$setting]['type']       = 'enum|PAP|CHAP|MSCHAPv1|MSCHAPv2';
+$config_variable[$setting]['shortdesc']  = 'Authentication method to use: PAP (default, unencrypted), CHAP (Windows RADIUS server not supported), MSCHAPv1, MSCHAPv2';
+
+$setting = 'auth_radius_timeout';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS connection timeout';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Connection timeout in seconds.';
+
+$setting = 'auth_radius_retries';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'RADIUS';
+$config_variable[$setting]['name']       = 'RADIUS connection retries';
+$config_variable[$setting]['type']       = 'int';
+$config_variable[$setting]['shortdesc']  = 'Number of times to try to connect to the RADIUS server.';
 
 /// Network ///////////////////////////////////////////////////////////////////
 
@@ -1475,7 +1520,7 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'HTTP';
 $config_variable[$setting]['name']       = 'HTTP(S) Proxy use Full URI';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'When set to TRUE, the entire URI will be used when constructing the request. (i.e. GET http://www.example.com/path/to/file.html HTTP/1.0). While this is a non-standard request format, some proxy servers require it.';
+$config_variable[$setting]['shortdesc']  = 'When set to TRUE, the entire URI will be used when constructing the request. (i.e. GET https://www.example.com/path/to/file.html HTTP/1.0). While this is a non-standard request format, some proxy servers require it.';
 
 $setting = 'proxy_user'; // FIXME should be renamed to proxy|username
 $config_variable[$setting]['section']    = $section;
@@ -1538,14 +1583,14 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Geocoding';
 $config_variable[$setting]['name']       = 'Geolocation API';
 $config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['geocodefarm']   = array('name' => 'Geocode.Farm', 'allowed'  => 'geo_api|geocodefarm|key', 'subtext' => 'Free users have 250 req/day and 4 req/sec limit (IP based). Possible to configure API key.', 'desc' => 'Request a KEY <a href="https://geocode.farm/" target="_blank">here</a>');
-$config_variable[$setting]['params']['arcgis']        = array('name' => 'ArcGIS',        'subtext' => 'Free users have 25000 req/day limit.', 'desc' => 'Please see geocode quality <a href="https://developers.arcgis.com/rest/geocode/api-reference/geocode-coverage.htm" target="_blank">here</a>');
-$config_variable[$setting]['params']['openstreetmap'] = array('name' => 'OpenStreetMap', 'subtext' => 'Rate limit 150 req/day.', 'desc' => 'See the usage limits <a href="http://wiki.openstreetmap.org/wiki/Nominatim_usage_policy" target="_blank">here</a>');
-$config_variable[$setting]['params']['google']        = array('name' => 'Google',   'required' => 'geo_api|google|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>');
-$config_variable[$setting]['params']['yandex']        = array('name' => 'Yandex',   'allowed'  => 'geo_api|yandex|key', 'subtext' => 'Free users have 25000 req/day limit. Possible to configure API key.', 'desc' => 'Request a key <a href="https://tech.yandex.ru/maps/commercial/doc/concepts/how-to-buy-docpage" target="_blank">here</a>');
-$config_variable[$setting]['params']['mapquest']      = array('name' => 'MapQuest', 'required' => 'geo_api|mapquest|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://developer.mapquest.com/user/register" target="_blank">here</a>');
-$config_variable[$setting]['params']['opencage']      = array('name' => 'OpenCage', 'required' => 'geo_api|opencage|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://opencagedata.com/users/sign_up" target="_blank">here</a>');
-$config_variable[$setting]['params']['locationiq']    = array('name' => 'LocationIQ', 'required' => 'geo_api|locationiq|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://locationiq.com/register" target="_blank">here</a>');
+$config_variable[$setting]['params']['geocodefarm']   = [ 'name' => 'Geocode.Farm', 'allowed'  => 'geo_api|geocodefarm|key', 'subtext' => 'Free users have 250 req/day and 4 req/sec limit (IP based). Possible to configure API key.', 'desc' => 'Request a KEY <a href="https://geocode.farm/" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['arcgis']        = [ 'name' => 'ArcGIS',        'subtext' => 'Free users have 25000 req/day limit.', 'desc' => 'Please see geocode quality <a href="https://developers.arcgis.com/rest/geocode/api-reference/geocode-coverage.htm" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['openstreetmap'] = [ 'name' => 'OpenStreetMap', 'subtext' => 'Rate limit 150 req/day.', 'desc' => 'See the usage limits <a href="https://wiki.openstreetmap.org/wiki/Nominatim_usage_policy" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['google']        = [ 'name' => 'Google',   'required' => 'geo_api|google|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['yandex']        = [ 'name' => 'Yandex',   'allowed'  => 'geo_api|yandex|key', 'subtext' => 'Free users have 25000 req/day limit. Possible to configure API key.', 'desc' => 'Request a key <a href="https://tech.yandex.ru/maps/commercial/doc/concepts/how-to-buy-docpage" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['mapquest']      = [ 'name' => 'MapQuest', 'required' => 'geo_api|mapquest|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://developer.mapquest.com/user/register" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['opencage']      = [ 'name' => 'OpenCage', 'required' => 'geo_api|opencage|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://opencagedata.com/users/sign_up" target="_blank">here</a>' ];
+$config_variable[$setting]['params']['locationiq']    = [ 'name' => 'LocationIQ', 'required' => 'geo_api|locationiq|key', 'subtext' => 'API key REQUIRED.', 'desc' => 'Request a key <a href="https://locationiq.com/register" target="_blank">here</a>' ];
 $config_variable[$setting]['shortdesc']  = 'Which API to use to resolve your addresses into coordinates. If locations turn up unknown, try switching to another API.';
 
 $setting = 'geocoding|api_key';
@@ -1602,7 +1647,7 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Geocoding';
 $config_variable[$setting]['name']       = 'Use DNS LOC records for geolocation';
 $config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Try to use DNS LOC records for detect device coordinates. See http://en.wikipedia.org/wiki/LOC_record and http://dnsloc.net/'; // FIXME actually link this
+$config_variable[$setting]['shortdesc']  = 'Try to use DNS LOC records for detect device coordinates. See https://en.wikipedia.org/wiki/LOC_record and https://dnsloc.net/'; // FIXME actually link this
 
 $setting = 'geocoding|default|lat';
 $config_variable[$setting]['section']    = $section;
@@ -1746,15 +1791,19 @@ $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RANCID';
 $config_variable[$setting]['name']       = 'RANCID version used';
 $config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']['2']   = array('name' => '2.0+');
-$config_variable[$setting]['params']['3']   = array('name' => '3.0+');
-$config_variable[$setting]['params']['3.2'] = array('name' => '3.2+');
-$config_variable[$setting]['params']['3.3'] = array('name' => '3.3+');
-$config_variable[$setting]['params']['3.4'] = array('name' => '3.4+');
-$config_variable[$setting]['params']['3.5'] = array('name' => '3.5+');
-$config_variable[$setting]['params']['3.7'] = array('name' => '3.7+');
-$config_variable[$setting]['params']['3.8'] = array('name' => '3.8+');
-$config_variable[$setting]['params']['3.9'] = array('name' => '3.9+');
+$config_variable[$setting]['params']['2']    = [ 'name' => '2.0+' ];
+$config_variable[$setting]['params']['3']    = [ 'name' => '3.0+' ];
+$config_variable[$setting]['params']['3.2']  = [ 'name' => '3.2+' ];
+$config_variable[$setting]['params']['3.3']  = [ 'name' => '3.3+' ];
+$config_variable[$setting]['params']['3.4']  = [ 'name' => '3.4+' ];
+$config_variable[$setting]['params']['3.5']  = [ 'name' => '3.5+' ];
+$config_variable[$setting]['params']['3.7']  = [ 'name' => '3.7+' ];
+$config_variable[$setting]['params']['3.8']  = [ 'name' => '3.8+' ];
+$config_variable[$setting]['params']['3.9']  = [ 'name' => '3.9+' ];
+$config_variable[$setting]['params']['3.10'] = [ 'name' => '3.10+' ];
+$config_variable[$setting]['params']['3.11'] = [ 'name' => '3.11+' ];
+$config_variable[$setting]['params']['3.12'] = [ 'name' => '3.12+' ];
+$config_variable[$setting]['params']['3.13'] = [ 'name' => '3.13+' ];
 $config_variable[$setting]['shortdesc']  = 'Depending on the RANCID version, a different delimiter is used in the RANCID configuration files (: vs ;).';
 
 $setting = 'rancid_revisions';
@@ -1902,6 +1951,7 @@ $config_sections[$section]['text'] = 'API';
 $setting = 'api|enable';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
+//$config_variable[$setting]['useredit']   = TRUE; // Allow set by user prefs
 $config_variable[$setting]['name']       = 'Enable API';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable or disable the API.';
@@ -2040,7 +2090,10 @@ $config_variable[$setting]['edition']    = 'pro';
 $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Billing base';
 $config_variable[$setting]['type']       = 'enum';
-$config_variable[$setting]['params']     = array(1000 => array('name' => 1000, 'subtext' => '1kB = 1000B'), 1024 => array('subtext' => '1kB = 1024B'));
+$config_variable[$setting]['params']     = [
+  1000 => [ 'name' => '1000', 'subtext' => '1kB = 1000B' ],
+  1024 => [ 'name' => '1024', 'subtext' => '1kB = 1024B' ]
+];
 $config_variable[$setting]['shortdesc']  = 'Set the base to divider bytes to kB, MB, GB, ... 1000 or 1024';
 
 /// HOUSEKEEPING /////////////////////////////////////////////////////

@@ -1,42 +1,40 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
+/// FIXME. Unused anymore?
+
 // Global write permissions required.
-if ($_SESSION['userlevel'] < 10)
-{
+if ($_SESSION['userlevel'] < 10) {
   print_error_permission();
   return;
 }
 
 include($config['html_dir']."/includes/alerting-navbar.inc.php");
 
-  // Regenerate alerts
+// Regenerate alerts
 
-  echo generate_box_open();
+echo generate_box_open();
 
 
 $checkers = cache_alert_rules();
 $assocs   = cache_alert_assoc();
 
-foreach($assocs as $assoc)
-{
-   $checkers[$assoc['alert_test_id']]['assocs'][] = $assoc;
+foreach($assocs as $assoc) {
+  $checkers[$assoc['alert_test_id']]['assocs'][] = $assoc;
 }
 
-foreach($checkers as $alert)
-{
+foreach ($checkers as $alert) {
 
-   echo '<h3>Updating Alert <b>' . $alert['alert_name'] . '</b></h3>';
+   echo '<h3>Updating Alert <b>' . escape_html($alert['alert_name']) . '</b></h3>';
    echo '<br />';
 
    //r($alert);

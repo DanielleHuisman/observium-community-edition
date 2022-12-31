@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -37,7 +36,7 @@ $pws = snmpwalk_cache_oid($device, "cpwVcMplsLocalLdpID", $pws, "CISCO-IETF-PW-M
 $pws = snmpwalk_cache_oid($device, "cpwVcMplsPeerLdpID",  $pws, "CISCO-IETF-PW-MPLS-MIB");
 //echo("PWS_WALK: ".count($pws)."\n"); var_dump($pws);
 
-  $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
+  $peer_where = generate_query_values_and($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
   foreach ($pws as $pw_id => $pw)
   {
     $peer_addr         = hex2ip($pw['cpwVcPeerAddr']);
@@ -96,7 +95,7 @@ $pws = snmpwalk_cache_oid($device, "cpwVcMplsPeerLdpID",  $pws, "CISCO-IETF-PW-M
       // cpwVcName.3221225473 = STRING: 82.209.169.153,3055
       // cpwVcMplsLocalLdpID.3221225473 = STRING: 82.209.169.129:0
       list($local_addr) = explode(':', $pw['cpwVcMplsLocalLdpID']);
-      $local_where = generate_query_values($device['device_id'], 'device_id'); // Filter by self IPs
+      $local_where = generate_query_values_and($device['device_id'], 'device_id'); // Filter by self IPs
       if ($ids = get_entity_ids_ip_by_network('port', $local_addr, $local_where))
       {
         $if_id = $ids[0];

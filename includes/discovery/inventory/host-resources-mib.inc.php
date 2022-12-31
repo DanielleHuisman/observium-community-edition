@@ -33,21 +33,23 @@ if (is_array($hrDevices)) {
       print_debug_vars($hrDevice, 1);
       continue;
     }
+    if (!is_numeric($hrDevice['hrDeviceErrors'])) {
+      $hrDevice['hrDeviceErrors'] = 0;
+    }
 
     //if (dbFetchCell("SELECT COUNT(*) FROM `hrDevice` WHERE device_id = ? AND hrDeviceIndex = ?",array($device['device_id'], $hrDevice['hrDeviceIndex'])))
-    if (dbExist('hrDevice', '`device_id` = ? AND `hrDeviceIndex` = ?', array($device['device_id'], $hrDevice['hrDeviceIndex'])))
-    {
-      if (($hrDevice['hrDeviceType'] === "hrDeviceProcessor") && empty($hrDevice['hrDeviceDescr']))
-      {
+    if (dbExist('hrDevice', '`device_id` = ? AND `hrDeviceIndex` = ?', array($device['device_id'], $hrDevice['hrDeviceIndex']))) {
+      if (($hrDevice['hrDeviceType'] === "hrDeviceProcessor") && empty($hrDevice['hrDeviceDescr'])) {
         $hrDevice['hrDeviceDescr'] = "Processor";
       }
-      $update_array = array('hrDeviceType'   => $hrDevice['hrDeviceType'],
-                            'hrDeviceDescr'  => $hrDevice['hrDeviceDescr'],
-                            'hrDeviceStatus' => $hrDevice['hrDeviceStatus'],
-                            'hrDeviceErrors' => $hrDevice['hrDeviceErrors']);
+      $update_array = [
+        'hrDeviceType'   => $hrDevice['hrDeviceType'],
+        'hrDeviceDescr'  => $hrDevice['hrDeviceDescr'],
+        'hrDeviceStatus' => $hrDevice['hrDeviceStatus'],
+        'hrDeviceErrors' => $hrDevice['hrDeviceErrors']
+      ];
 
-      if ($hrDevice['hrDeviceType'] === "hrDeviceProcessor")
-      {
+      if ($hrDevice['hrDeviceType'] === "hrDeviceProcessor") {
         $update_array['hrProcessorLoad'] = $hrDevice['hrProcessorLoad'];
       } else {
         $update_array['hrProcessorLoad'] = array('NULL');

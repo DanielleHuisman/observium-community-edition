@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -43,7 +43,7 @@ if (isset($vars['format']) && array_key_exists($vars['format'], $config['graph_f
 
 $graphfile = $config['temp_dir'] . "/"  . strgen() . "." . $extension;
 
-if (OBS_DEBUG) { print_vars($graphtype); }
+if (OBS_DEBUG) { print_vars($vars); print_vars($graphtype); }
 
 if (isset($graphtype['type']) && isset($graphtype['subtype'])) {
   $type = $graphtype['type'];
@@ -76,22 +76,26 @@ if (preg_match(OBS_PATTERN_RRDTIME, $vars['to']))   { $to   = $vars['to'];   }//
 if (preg_match(OBS_PATTERN_RRDTIME, $vars['from'])) { $from = $vars['from']; }// else { $from   = $config['time']['day']; }
 
 if (isset($vars['period']) && is_numeric($vars['period'])) {
-  $to     = time();
-  $from   = time() - $vars['period'];
+  $to     = get_time();
+  $from   = get_time() - $vars['period'];
   $period = $vars['period'];
-} elseif(preg_match('/[\-]*\d+[s|w|m|d|y|h]/', $vars['from'])) {
+} elseif (preg_match('/[\-]*\d+[s|w|m|d|y|h]/', $vars['from'])) {
   // It seems we have AT-style/timespec. Just pass it through (some features will break because we can't calculate period)
   $from = $vars['from'];
-  if(preg_match('/[\-]*\d+[s|w|m|d|y|h]/', $vars['to'])) { $to = $vars['to']; } else { $to = 'NOW'; }
+  if (preg_match('/[\-]*\d+[s|w|m|d|y|h]/', $vars['to'])) {
+    $to = $vars['to'];
+  } else {
+    $to = 'now';
+  }
 } else {
-  $from = (isset($vars['from'])) ? $vars['from'] : time() - 86400;
-  $to   = (isset($vars['to'])) ? $vars['to'] : time();
+  $from = (isset($vars['from']) && is_numeric($vars['from'])) ? $vars['from'] : get_time() - 86400;
+  $to   = (isset($vars['to']) && is_numeric($vars['to'])) ? $vars['to'] : time();
   if ($from < 0) { $from = $to + $from; }
   $period = $to - $from;
 }
 
 // Set prev_from & prev_to if we have a period
-if(isset($period)) {
+if (isset($period)) {
   $prev_from = $from - $period;
   $prev_to   = $from;
 }
@@ -100,41 +104,62 @@ $graph_include = FALSE;
 $definition_include = FALSE;
 //print_message("Graph type: $type, subtype: $subtype");
 
-if (is_file($config['html_dir'] . "/includes/graphs/$type/$subtype.inc.php"))
-{
+if (is_file($config['html_dir'] . "/includes/graphs/$type/$subtype.inc.php")) {
   $graph_include = $config['html_dir'] . "/includes/graphs/$type/$subtype.inc.php";
-}
-elseif (is_array($config['graph_types'][$type][$subtype]['ds']))
-{
+} elseif (is_array($config['graph_types'][$type][$subtype]['ds'])) {
   // Init tags array
   $tags = [];
 
   // Additional include with define some graph variables like $unit_text, $graph_title
   // Currently only for indexed definitions
   if ($config['graph_types'][$type][$subtype]['index'] &&
-      is_file($config['html_dir'] . "/includes/graphs/$type/definition.inc.php"))
-  {
+      is_file($config['html_dir'] . "/includes/graphs/$type/definition.inc.php")) {
     $definition_include = $config['html_dir'] . "/includes/graphs/$type/definition.inc.php";
   }
   $graph_include = $config['html_dir'] . "/includes/graphs/generic_definition.inc.php";
-}
-elseif (is_file($config['html_dir'] . "/includes/graphs/$type/graph.inc.php"))
-{
+} elseif (is_file($config['html_dir'] . "/includes/graphs/$type/graph.inc.php")) {
   $graph_include = $config['html_dir'] . "/includes/graphs/$type/graph.inc.php";
 }
 
-if ($graph_include)
-{
+if ($graph_include) {
   include($config['html_dir'] . "/includes/graphs/$type/auth.inc.php");
 
-  if (isset($auth) && $auth)
-  {
-    if ($definition_include)
-    {
+  if (isset($auth) && $auth) {
+    if ($definition_include) {
       include_once($definition_include);
     }
-
     include($graph_include);
+
+    // Requested a rigid height graph, probably for the dashboard.
+    // If we don't know the legend height, turn off legend.
+    // If we know the height and it won't fit, turn it off.
+
+    if ( !(isset($vars['legend']) && $vars['legend'] == 'no') &&
+          (isset($vars['rigid_height']) && $vars['rigid_height'] == 'yes') ) {
+      $line_height = ($width > 350 ? 14 : 12); // Set line height based on font size chosen by width
+      if (!isset($graph_return['legend_lines'])) { // Don't know legend length
+        print_debug('no legend height');
+        $vars['legend'] = 'no';
+      }
+      else if (($graph_return['legend_lines'] * $line_height) > ($height - 100)) { // Legend too long
+        print_debug('legend too tall: ' . $graph_return['legend_lines'] * $line_height);
+        $vars['legend'] = 'no';
+      }
+      else { // Legend fits
+        $height = $height - ($graph_return['legend_lines'] * $line_height);
+      }
+    }
+
+    $rrd_options .= ' --start ' . rrdtool_escape($from) .
+      ' --end ' . rrdtool_escape($to) .
+      ' --width ' . rrdtool_escape($width) .
+      ' --height ' . rrdtool_escape($height) . ' ';
+
+    if ($vars['legend'] === 'no') {
+      $rrd_options .= ' -g';
+      $legend      = 'no';
+    }
+
   }
 } elseif(!isset($vars['command_only'])) {
   graph_error('no '. $type.'_'.$subtype.''); // Graph Template Missing

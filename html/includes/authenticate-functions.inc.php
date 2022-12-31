@@ -262,4 +262,12 @@ function auth_user_info($username)
   }
 }
 
+// Create placeholder user for users logged in via non-MySQL mechanisms to enable user list
+function create_mysql_user($username, $userid, $level = '1', $type = 'mysql')
+{
+  if(isset($username) && isset($userid) && is_numeric($userid)) {
+    dbInsert(array('username' => $username, 'user_id' => $userid, 'level' => $level, 'type' => $type), 'users');
+  }
+}
+
 // EOF

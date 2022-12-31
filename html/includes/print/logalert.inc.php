@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -113,17 +113,17 @@ function get_logalert_log($vars)
       switch ($var)
       {
         case 'la_id':
-          $where .= generate_query_values($value, 'la_id');
+          $where .= generate_query_values_and($value, 'la_id');
           break;
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'program':
-          $where .= generate_query_values($value, 'program', '%LIKE%');
+          $where .= generate_query_values_and($value, 'program', '%LIKE%');
           break;
         case 'message':
-          $where .= generate_query_values($value, 'message', '%LIKE%');
+          $where .= generate_query_values_and($value, 'message', '%LIKE%');
           break;
         case 'timestamp_from':
           $where .= ' AND `timestamp` >= ?';

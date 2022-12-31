@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -56,6 +56,11 @@ if (($vars['submit'] === 'save' || $vars['action'] === 'save') && request_token_
     // $set_attribs = array(); // set obs_attribs
     //print_warning($param);
     //r($entry);
+
+    //r([ $param, $entry]);
+
+    // fixme: unreadable: unroll via array of variable names
+
     $$param = $entry;
   }
 
@@ -64,7 +69,7 @@ if (($vars['submit'] === 'save' || $vars['action'] === 'save') && request_token_
   // Set fields that were submitted with custom value
   if (safe_count($sets)) {
 
-    $query = 'SELECT * FROM `config` WHERE ' . generate_query_values(array_keys($sets), 'config_key', NULL, FALSE);
+    $query = 'SELECT * FROM `config` WHERE ' . generate_query_values_ng(array_keys($sets), 'config_key');
     // Fetch current rows in config file so we know which one to UPDATE and which one to INSERT
     $in_db = [];
     foreach (dbFetchRows($query) as $row) {
@@ -90,7 +95,9 @@ if (($vars['submit'] === 'save' || $vars['action'] === 'save') && request_token_
 
   // Delete fields that were reset to default
   if (safe_count($deletes)) {
-    dbDelete('config', generate_query_values($deletes, 'config_key', NULL, FALSE));
+    dbDelete('config', generate_query_values_ng($deletes, 'config_key'));
+    //r(generate_query_values_ng($deletes, 'config_key'));
+    //r(dbError());
     $updates++;
   }
 

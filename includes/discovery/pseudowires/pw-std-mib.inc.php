@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -33,7 +32,7 @@ $pws = snmpwalk_cache_oid($device, "pwMplsLocalLdpID", $pws, "PW-MPLS-STD-MIB");
 $pws = snmpwalk_cache_oid($device, "pwMplsPeerLdpID",  $pws, "PW-MPLS-STD-MIB");
 //echo("PWS_WALK: ".count($pws)."\n"); var_dump($pws);
 
-  $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
+  $peer_where = generate_query_values_and($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
   foreach ($pws as $pw_id => $pw)
   {
     $peer_addr_type = $pw['pwPeerAddrType'];
@@ -84,7 +83,7 @@ $pws = snmpwalk_cache_oid($device, "pwMplsPeerLdpID",  $pws, "PW-MPLS-STD-MIB");
     $pw['pwDescr']          = rtrim($pw['pwDescr'], ". \t\n\r\0\x0B");
     $pw['pwRemoteIfString'] = rtrim($pw['pwRemoteIfString'], ". \t\n\r\0\x0B");
 
-    $if_id = dbFetchCell('SELECT `port_id` FROM `ports` WHERE `ifDescr` = ? AND `device_id` = ? LIMIT 1;', array($pw['pwName'], $device['device_id']));
+    $if_id = dbFetchCell('SELECT `port_id` FROM `ports` WHERE (`ifDescr` = ? OR `ifName` = ?) AND `device_id` = ? LIMIT 1;', array($pw['pwName'], $pw['pwName'], $device['device_id']));
     if (!is_numeric($if_id) && strpos($pw['pwName'], '_'))
     {
       // IOS-XR some time use '_' instead '/'. http://jira.observium.org/browse/OBSERVIUM-246
@@ -99,7 +98,7 @@ $pws = snmpwalk_cache_oid($device, "pwMplsPeerLdpID",  $pws, "PW-MPLS-STD-MIB");
       // pwName.3221225473 = STRING: 82.209.169.153,3055
       // pwMplsLocalLdpID.3221225473 = STRING: 82.209.169.129:0
       list($local_addr) = explode(':', $pw['pwMplsLocalLdpID']);
-      $local_where = generate_query_values($device['device_id'], 'device_id'); // Filter by self IPs
+      $local_where = generate_query_values_and($device['device_id'], 'device_id'); // Filter by self IPs
       if ($ids = get_entity_ids_ip_by_network('port', $local_addr, $local_where))
       {
         $if_id = $ids[0];

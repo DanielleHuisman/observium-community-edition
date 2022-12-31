@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -173,7 +173,7 @@ if ($_SESSION['userlevel'] < 5) {
 
         $mac_list = array_column($macs, 'mac_address');
         $sql = "SELECT * FROM ports, devices WHERE 1 ";
-        $sql .= generate_query_values($mac_list, 'ifPhysAddress');
+        $sql .= generate_query_values_and($mac_list, 'ifPhysAddress');
         $sql .= " AND ports.device_id = devices.device_id";
 
         $ports = [];

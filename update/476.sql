@@ -1,0 +1,1 @@
+ALTER TABLE `ports` MODIFY `ifIndex` VARCHAR(16);

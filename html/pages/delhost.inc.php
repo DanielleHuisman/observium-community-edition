@@ -6,19 +6,20 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-// Global write permissions required.
+/* Global write permissions required.
 if ($_SESSION['userlevel'] < 10) {
   print_error_permission();
   return;
 }
+*/
 
 register_html_title("Delete devices");
 
-if (is_intnum($vars['id'])) {
+if (is_intnum($vars['id']) && is_entity_write_permitted($vars['id'], 'device')) {
   $device = device_by_id_cache($vars['id']);
 
   if ($device && get_var_true($vars['confirm'], 'confirm')) {
@@ -60,7 +61,7 @@ if (is_intnum($vars['id'])) {
       print_form($form);
       unset($form);
   }
-} else {
+} elseif ($_SESSION['userlevel'] > 9) {
 
   $form_items['devices'] = generate_form_values('device', NULL, NULL, array('disabled' => TRUE));
 
@@ -100,6 +101,8 @@ if (is_intnum($vars['id'])) {
 
   print_form($form);
   unset($form, $form_items);
+} else {
+  print_error_permission();
 }
 
 // EOF

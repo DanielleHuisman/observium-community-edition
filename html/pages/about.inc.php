@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -21,7 +21,7 @@ print_versions();
 $ua = detect_browser();
 //r($ua);
 register_html_resource('js', 'moment.min.js');
-$tz = get_timezone();
+$tz = get_timezone(TRUE); // Refresh timezone, for get system TZ
 //r($tz);
 ?>
   <div class="box box-solid">
@@ -33,7 +33,7 @@ $tz = get_timezone();
               <tbody>
               <tr><td><b>User-Agent</b></td><td><?php echo $ua['user_agent']; ?></td></tr>
               <tr><td><b>Browser</b></td><td><?php echo $ua['browser_full'] . ' (' . $ua['platform'] . ')'; ?></td></tr>
-              <tr><td><b>Screen Resolution</b></td><td><?php echo $ua['screen_resolution']; ?></td></tr>
+              <tr><td><b>Screen&nbsp;Resolution</b></td><td><?php echo $ua['screen_resolution']; ?></td></tr>
               <tr><td><b>Timezone</b></td><td><?php echo $tz['system'] . ' (System), ' . $tz['php'] . ' (PHP), ' . $tz['mysql'] . ' (DB), '; ?><script>document.write(moment().format('Z') + ' (User)');</script></td></tr>
               </tbody>
           </table>
@@ -82,14 +82,12 @@ $tz = get_timezone();
 
 <?php
 
-if (!$_SESSION['user_limited'])
-{
+if (!$_SESSION['user_limited']) {
 
   $cache_item = get_cache_item('stats');
 
-  if (!ishit_cache_item($cache_item))
-  {
-    $stats = array();
+  if (!ishit_cache_item($cache_item)) {
+    $stats = [];
     $stats['devices']            = dbFetchCell('SELECT COUNT(*) FROM `devices`');
     $stats['ports']              = dbFetchCell('SELECT COUNT(*) FROM `ports`');
     $stats['syslog']             = dbFetchCell('SELECT COUNT(*) FROM `syslog`');
@@ -123,7 +121,7 @@ if (!$_SESSION['user_limited'])
     $stats['db']                 = get_db_size();
     $stats['rrd']                = get_dir_size($config['rrd_dir']);
 
-    set_cache_item($cache_item, $stats, array('ttl' => 900)); // 15 min
+    set_cache_item($cache_item, $stats, [ 'ttl' => 900 ]); // 15 min
   } else {
     $stats = get_cache_data($cache_item);
   }

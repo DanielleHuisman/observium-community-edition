@@ -341,10 +341,10 @@ $("#contact_method").change(function() {
     } else {
       $script .= PHP_EOL . "  } else if (select === '" . $transport . "') {" . PHP_EOL;
     }
-    $script .= "    \$('div[id^=\"contact_${transport}_\"]').show();" . PHP_EOL . "   ";
+    $script .= "    \$('div[id^=\"contact_{$transport}_\"]').show();" . PHP_EOL . "   ";
     foreach (array_keys($config['transports']) as $ltransport) {
       if ($transport != $ltransport) {
-        $script .= " \$('div[id^=\"contact_${ltransport}_\"]').hide();";
+        $script .= " \$('div[id^=\"contact_{$ltransport}_\"]').hide();";
       }
     }
 

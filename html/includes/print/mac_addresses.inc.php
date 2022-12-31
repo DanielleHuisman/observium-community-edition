@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -39,14 +38,14 @@ function print_mac_addresses($vars)
       {
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'interface':
-          $where .= generate_query_values($value, 'ifDescr', 'LIKE');
+          $where .= generate_query_values_and($value, 'ifDescr', 'LIKE');
           break;
         case 'address':
-          $value = str_replace(array(':', ' ', '-', '.', '0x'), '', $value);
-          $where .= generate_query_values($value, 'ifPhysAddress', '%LIKE%');
+          $value = str_replace([ ':', ' ', '-', '.', '0x' ], '', $value);
+          $where .= generate_query_values_and($value, 'ifPhysAddress', '%LIKE%');
           break;
       }
     }

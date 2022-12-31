@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -162,9 +162,10 @@ function get_vars($vars_order = [], $auth = FALSE) {
   // <sCrIpT> < / s c r i p t >
   // javascript:alert("Hello world");/
   // <svg onload=alert(document.domain)>
+  // <style/onload=alert(document.domain)>
   $prevent_xss = '!(^\s*(J\s*A\s*V\s*A\s*)?S\s*C\s*R\s*I\s*P\s*T\s*:'.
                  '|<\s*/?\s*S\s*C\s*R\s*I\s*P\s*T\s*>'.
-                 '|(<\s*s\s*v\s*g.*(o\s*n\s*l\s*o\s*a\s*d|s\s*c\s*r\s*i\s*p\s*t))'.
+                 '|(<\s*\w+.*[\s\/&](o\s*n\s*l\s*o\s*a\s*d|s\s*c\s*r\s*i\s*p\s*t))'.
                  '|<\s*i\s*m\s*g.*o\s*n\s*e\s*r\s*r\s*o\s*r)!i';
 
   // Allow using var_decode(), this prevents to use potentially unsafe serialize functions
@@ -216,7 +217,6 @@ function get_vars($vars_order = [], $auth = FALSE) {
 
         //sr($segments);
         //r($_SERVER['REQUEST_URI']);
-
         foreach ($segments as $pos => $segment) {
           //$segment = urldecode($segment);
           if ($pos == "0" && !str_contains_array($segment, '=')) {
@@ -236,12 +236,12 @@ function get_vars($vars_order = [], $auth = FALSE) {
               if (!isset($value) || $value === '') {
                 $vars[$name] = 'yes';
               } else {
-                //r($value);
                 if ($compressed && $value_uncompress = str_decompress($value)) {
                   $value = $value_uncompress;
                   unset($value_uncompress);
                 } else {
-                  $value = str_replace('%7F', '/', urldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
+                  // rawurldecode() instead of urldecode() to translate %n and not mangle +
+                  $value = str_replace('%7F', '/', rawurldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
                 }
                 if (preg_match($prevent_xss, $value)) {
                   // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
@@ -250,6 +250,7 @@ function get_vars($vars_order = [], $auth = FALSE) {
 
                 // Better to understand quoted vars
                 $vars[$name] = get_var_csv($value, $auth);
+
                 if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name])) {
                   // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                   unset($vars[$name]);
@@ -273,7 +274,8 @@ function get_vars($vars_order = [], $auth = FALSE) {
               $value = $value_uncompress;
               unset($value_uncompress);
             } else {
-              $value = str_replace('%7F', '/', urldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
+              // rawurldecode() instead of urldecode() to translate %n and not mangle +
+              $value = str_replace('%7F', '/', rawurldecode($value)); // %7F (DEL, delete) - not defined in HTML 4 standard
             }
             if (preg_match($prevent_xss, $value)) {
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
@@ -310,7 +312,6 @@ function get_vars($vars_order = [], $auth = FALSE) {
     }
   }
 
-  //r($vars);
   return($vars);
 }
 
@@ -523,12 +524,10 @@ function detect_browser_type()
  *                                             screen_size  - initial size of browser window (if exist)
  */
 // TESTME! needs unit testing
-function detect_browser($user_agent = NULL)
-{
+function detect_browser($user_agent = NULL) {
   $ua_custom = !is_null($user_agent); // Used custom user agent?
 
-  if (!$ua_custom && isset($GLOBALS['cache']['detect_browser']))
-  {
+  if (!$ua_custom && isset($GLOBALS['cache']['detect_browser'])) {
     //if (isset($_COOKIE['observium_screen_ratio']) && !isset($GLOBALS['cache']['detect_browser']['screen_resolution']))
     //{
     //  r($_COOKIE);
@@ -539,8 +538,7 @@ function detect_browser($user_agent = NULL)
 
   $detect = new Mobile_Detect;
 
-  if ($ua_custom)
-  {
+  if ($ua_custom) {
     // Set custom User-Agent
     $detect->setUserAgent($user_agent);
   } else {
@@ -550,13 +548,11 @@ function detect_browser($user_agent = NULL)
   // Default type and icon
   $type = 'generic';
   $icon = 'icon-laptop';
-  if ($detect->isMobile())
-  {
+  if ($detect->isMobile()) {
     // Any phone device (exclude tablets).
     $type = 'mobile';
     $icon = 'glyphicon glyphicon-phone';
-    if ($detect->isTablet())
-    {
+    if ($detect->isTablet()) {
       // Any tablet device.
       $type = 'tablet';
       $icon = 'icon-tablet';
@@ -565,8 +561,7 @@ function detect_browser($user_agent = NULL)
 
   // Detect Browser name, version and platform
   $ua_info = [];
-  if (!empty($user_agent))
-  {
+  if (!empty($user_agent)) {
 
     //$ua_info = parse_user_agent($user_agent);
     $parser = new \donatj\UserAgent\UserAgentParser();
@@ -574,22 +569,23 @@ function detect_browser($user_agent = NULL)
     //r($ua);
     $ua_info['browser']  = $ua->browser();
     $ua_info['version']  = $ua->browserVersion();
-    $ua_info['platform'] = $ua->platform();
+    $ua_info['platform'] = str_replace('Macintosh', 'MacOS', $ua->platform());
     $ua_info['browser_full'] = $ua_info['browser'] . ' ' . preg_replace('/^([^\.]+(?:\.[^\.]+)?).*$/', '\1', $ua_info['version']);
     //r($ua_info);
   }
 
-  $detect_browser = array('user_agent' => $user_agent,
-                          'type'       => $type,
-                          'icon'       => $icon,
-                          'browser_full' => $ua_info['browser_full'],
-                          'browser'    => $ua_info['browser'],
-                          'version'    => $ua_info['version'],
-                          'platform'   => $ua_info['platform']);
+  $detect_browser = [
+    'user_agent'   => $user_agent,
+    'type'         => $type,
+    'icon'         => $icon,
+    'browser_full' => $ua_info['browser_full'],
+    'browser'      => $ua_info['browser'],
+    'version'      => $ua_info['version'],
+    'platform'     => $ua_info['platform']
+  ];
 
    // For custom UA, do not cache and return only base User-Agent info
-  if ($ua_custom)
-  {
+  if ($ua_custom) {
     return $detect_browser;
   }
 
@@ -600,15 +596,12 @@ function detect_browser($user_agent = NULL)
   register_html_resource('js', 'observium-screen.js');
 
   // Additional browser info (screen_ratio, screen_size, svg)
-  if ($ua_info['browser'] === 'Firefox' && version_compare($ua_info['version'], '47.0') < 0)
-  {
+  if ($ua_info['browser'] === 'Firefox' && version_compare($ua_info['version'], '47.0') < 0) {
     // Do not use srcset in FF, while issue open:
     // https://bugzilla.mozilla.org/show_bug.cgi?id=1149357
     // Update, seems as in 47.0 partially fixed
     $zoom = 1;
-  }
-  else if (isset($_COOKIE['observium_screen_ratio']))
-  {
+  } elseif (isset($_COOKIE['observium_screen_ratio'])) {
     // Note, Opera uses ratio 1.5
     $zoom = round($_COOKIE['observium_screen_ratio']); // Use int zoom
   } else {
@@ -617,8 +610,7 @@ function detect_browser($user_agent = NULL)
   }
   $detect_browser['screen_ratio'] = $zoom;
   //$detect_browser['svg']          = ($ua_info['browser'] == 'Firefox'); // SVG supported or allowed
-  if (isset($_COOKIE['observium_screen_resolution']))
-  {
+  if (isset($_COOKIE['observium_screen_resolution'])) {
     $detect_browser['screen_resolution'] = $_COOKIE['observium_screen_resolution'];
     //$detect_browser['screen_size']       = $_COOKIE['observium_screen_size'];
   }
@@ -677,34 +669,29 @@ function generate_link($text, $vars, $new_vars = array(), $escape = TRUE)
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function pagination(&$vars, $total, $return_vars = FALSE)
-{
-  $pagesizes = array(10,20,50,100,500,1000,10000,50000); // Permitted pagesizes
-  if (is_numeric($vars['pagesize']))
-  {
+function pagination(&$vars, $total, $options = array()) {
+
+  // Compatibility with pre-options
+  if($options === TRUE) { $options = []; $options['return_vars'] = TRUE; }
+
+  $pagesizes = [ 10, 20, 50, 100, 500, 1000, 10000, 50000 ]; // Permitted pagesizes
+  if (is_numeric($vars['pagesize'])) {
     $per_page = (int)$vars['pagesize'];
-  }
-  else if (isset($_SESSION['pagesize']))
-  {
+  } elseif (isset($_SESSION['pagesize'])) {
     $per_page = $_SESSION['pagesize'];
   } else {
     $per_page = $GLOBALS['config']['web_pagesize'];
   }
-  if (!$vars['short'])
-  {
+
+  if (!$vars['short']) {
     // Permit fixed pagesizes only (except $vars['short'] == TRUE)
-    foreach ($pagesizes as $pagesize)
-    {
+    foreach ($pagesizes as $pagesize) {
       if ($per_page <= $pagesize) { $per_page = $pagesize; break; }
     }
-    if (isset($vars['pagesize']) && $vars['pagesize'] != $_SESSION['pagesize'])
-    {
-      if ($vars['pagesize'] != $GLOBALS['config']['web_pagesize'])
-      {
+    if (isset($vars['pagesize']) && $vars['pagesize'] != $_SESSION['pagesize']) {
+      if ($vars['pagesize'] != $GLOBALS['config']['web_pagesize']) {
         session_set_var('pagesize', $per_page); // Store pagesize in session only if changed default
-      }
-      else if (isset($_SESSION['pagesize']))
-      {
+      } elseif (isset($_SESSION['pagesize'])) {
         session_unset_var('pagesize');          // Reset pagesize from session
       }
     }
@@ -713,11 +700,14 @@ function pagination(&$vars, $total, $return_vars = FALSE)
 
   $page     = (int)$vars['pageno'];
   $lastpage = ceil($total/$per_page);
-  if ($page < 1) { $page = 1; }
-  else if (!$return_vars && $lastpage < $page) { $page = (int)$lastpage; }
+  if ($page < 1) {
+    $page = 1;
+  } elseif (!$options['return_vars'] && $lastpage < $page) {
+    $page = (int)$lastpage;
+  }
   $vars['pageno'] = $page; // Return back current pageno
 
-  if ($return_vars) { return ''; } // Silent exit (needed for detect default pagesize/pageno)
+  if ($options['return_vars'] == TRUE) { return ''; } // Silent exit (needed for detect default pagesize/pageno)
 
   $start = ($page - 1) * $per_page;
   $prev  = $page - 1;
@@ -728,13 +718,14 @@ function pagination(&$vars, $total, $return_vars = FALSE)
   $pagination = '';
 
   // Show pagination if total > 99, total > page size, or web_always_paginate is set.
-  if ($total > 99 || $total > $per_page || ( isset($GLOBALS['config']['web_always_paginate']) && $GLOBALS['config']['web_always_paginate'] === 1))
-  {
+  if ($total > 99 || $total > $per_page ||
+      (isset($GLOBALS['config']['web_always_paginate']) && $GLOBALS['config']['web_always_paginate'] === 1)) {
 
-
-
-    if($total > 9999) { $total_text = format_si($total); } else { $total_text = $total; }
-
+    if ($total > 9999) {
+      $total_text = format_si($total);
+    } else {
+      $total_text = $total;
+    }
 
     $pagination .= '<div class="row">' . PHP_EOL .
                    '  <div class="col-lg-1 col-md-2 col-sm-2" style="display: inline-block;">' . PHP_EOL .
@@ -744,32 +735,23 @@ function pagination(&$vars, $total, $return_vars = FALSE)
                    '  <div class="col-lg-10 col-md-8 col-sm-8">' . PHP_EOL .
                    '    <div class="pagination pagination-centered"><ul>' . PHP_EOL;
 
-    if ($prev)
-    {
+    if ($prev) {
       //$pagination .= '      <li><a href="'.generate_url($vars, array('pageno' => 1)).'">First</a></li>' . PHP_EOL;
       $pagination .= '      <li><a href="'.generate_url($vars, array('pageno' => $prev)).'">Prev</a></li>' . PHP_EOL;
     }
 
-    if ($lastpage < 7 + ($adjacents * 2))
-    {
-      for ($counter = 1; $counter <= $lastpage; $counter++)
-      {
-        if ($counter == $page)
-        {
+    if ($lastpage < 7 + ($adjacents * 2)) {
+      for ($counter = 1; $counter <= $lastpage; $counter++) {
+        if ($counter == $page) {
           $pagination.= "<li class='active'><a>$counter</a></li>";
         } else {
-          $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $counter))."'>$counter</a></li>";
+          $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $counter ])."'>$counter</a></li>";
         }
       }
-    }
-    elseif ($lastpage > 5 + ($adjacents * 2))
-    {
-      if ($page < 1 + ($adjacents * 2))
-      {
-        for ($counter = 1; $counter < 4 + ($adjacents * 2); $counter++)
-        {
-          if ($counter == $page)
-          {
+    } elseif ($lastpage > 5 + ($adjacents * 2)) {
+      if ($page < 1 + ($adjacents * 2)) {
+        for ($counter = 1; $counter < 4 + ($adjacents * 2); $counter++) {
+          if ($counter == $page) {
             $pagination .= "<li class='active'><a>$counter</a></li>";
           } else {
             $class = '';
@@ -781,37 +763,31 @@ function pagination(&$vars, $total, $return_vars = FALSE)
             //{
             //  $class = ' class="hidden-sm hidden-xs"';
             //}
-            $pagination .= "<li$class><a href='".generate_url($vars, array('pageno' => $counter))."'>$counter</a></li>";
+            $pagination .= "<li$class><a href='".generate_url($vars, [ 'pageno' => $counter ])."'>$counter</a></li>";
           }
         }
 
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $lpm1))."'>$lpm1</a></li>";
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $lastpage))."'>$lastpage</a></li>";
-      }
-      elseif ($lastpage - ($adjacents * 2) > $page && $page > ($adjacents * 2))
-      {
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => '1'))."'>1</a></li>";
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => '2'))."'>2</a></li>";
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $lpm1 ])."'>$lpm1</a></li>";
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $lastpage ])."'>$lastpage</a></li>";
+      } elseif ($lastpage - ($adjacents * 2) > $page && $page > ($adjacents * 2)) {
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => '1' ])."'>1</a></li>";
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => '2' ])."'>2</a></li>";
 
-        for ($counter = $page - $adjacents; $counter <= $page + $adjacents; $counter++)
-        {
-          if ($counter == $page)
-          {
+        for ($counter = $page - $adjacents; $counter <= $page + $adjacents; $counter++) {
+          if ($counter == $page) {
             $pagination.= "<li class='active'><a>$counter</a></li>";
           } else {
-            $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $counter))."'>$counter</a></li>";
+            $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $counter ])."'>$counter</a></li>";
           }
         }
 
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $lpm1))."'>$lpm1</a></li>";
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $lastpage))."'>$lastpage</a></li>";
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $lpm1 ])."'>$lpm1</a></li>";
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $lastpage ])."'>$lastpage</a></li>";
       } else {
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => '1'))."'>1</a></li>";
-        $pagination.= "<li><a href='".generate_url($vars, array('pageno' => '2'))."'>2</a></li>";
-        for ($counter = $lastpage - (2 + ($adjacents * 2)); $counter <= $lastpage; $counter++)
-        {
-          if ($counter == $page)
-          {
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => '1' ])."'>1</a></li>";
+        $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => '2' ])."'>2</a></li>";
+        for ($counter = $lastpage - (2 + ($adjacents * 2)); $counter <= $lastpage; $counter++) {
+          if ($counter == $page) {
             $pagination.= "<li class='active'><a>$counter</a></li>";
           } else {
             $class = '';
@@ -823,20 +799,17 @@ function pagination(&$vars, $total, $return_vars = FALSE)
             //{
             //  $class = ' class="hidden-sm hidden-xs"';
             //}
-            $pagination.= "<li$class><a href='".generate_url($vars, array('pageno' => $counter))."'>$counter</a></li>";
+            $pagination.= "<li$class><a href='".generate_url($vars, [ 'pageno' => $counter ])."'>$counter</a></li>";
           }
         }
       }
     }
 
-    if ($page < $counter - 1)
-    {
-      $pagination.= "<li><a href='".generate_url($vars, array('pageno' => $next))."'>Next</a></li>";
+    if ($page < $counter - 1) {
+      $pagination.= "<li><a href='".generate_url($vars, [ 'pageno' => $next ])."'>Next</a></li>";
       # No need for "Last" as we don't have "First", 1, 2 and the 2 last pages are always in the list.
       #$pagination.= "<li><a href='".generate_url($vars, array('pageno' => $lastpage))."'>Last</a></li>";
-    }
-    else if ($lastpage > 1)
-    {
+    } elseif ($lastpage > 1) {
       $pagination.= "<li class='active'><a>Next</a></li>";
       #$pagination.= "<li class='active'><a>Last</a></li>";
     }
@@ -844,21 +817,22 @@ function pagination(&$vars, $total, $return_vars = FALSE)
     $pagination.= "</ul></div></div>";
 
     //$values = array('' => array('name'))
-    foreach ($pagesizes as $pagesize)
-    {
-      $value = generate_url($vars, array('pagesize' => $pagesize, 'pageno' => floor($start / $pagesize)));
-      $name  = ($pagesize == $GLOBALS['config']['web_pagesize'] ? "[ $pagesize ]" : $pagesize);
-      $values[$value] = array('name' => $name, 'class' => 'text-center');
+    foreach ($pagesizes as $pagesize) {
+      $value = generate_url($vars, [ 'pagesize' => $pagesize, 'pageno' => floor(fdiv($start, $pagesize)) ]);
+      $name  = $pagesize == $GLOBALS['config']['web_pagesize'] ? "[ $pagesize ]" : $pagesize;
+      $values[$value] = [ 'name' => $name, 'class' => 'text-center' ];
     }
-    $element = array('type'     => 'select',
-                     'class'    => 'pagination',
-                     'id'       => 'pagesize',
-                     'name'     => '# '.$per_page,
-                     'width'    => '90px',
-                     'onchange' => "window.open(this.options[this.selectedIndex].value,'_top')",
-                     'value'    => $per_page,
-                     'data-style' => 'box',
-                     'values'   => $values);
+    $element = [
+      'type'     => 'select',
+      'class'    => 'pagination',
+      'id'       => 'pagesize',
+      'name'     => '# '.$per_page,
+      'width'    => '90px',
+      'onchange' => "window.open(this.options[this.selectedIndex].value,'_top')",
+      'value'    => $per_page,
+      'data-style' => 'box',
+      'values'   => $values
+    ];
 
     $pagination.= '
        <div class="col-lg-1 col-md-2 col-sm-2">
@@ -1130,6 +1104,28 @@ function generate_popup_link($type, $text = NULL, $vars = array(), $class = NULL
   return '<a href="'.$url.'" class="entity-popup'.($class ? " $class" : '').'" data-eid="'.$data.'" data-etype="'.$type.'">'.$text.'</a>';
 }
 
+function generate_tooltip_time($timestamp, $text = '') {
+  if (is_numeric($timestamp) && $timestamp > OBS_MIN_UNIXTIME) {
+    // Unixtime
+    $timediff = get_time() - $timestamp;
+    $timetext = format_uptime($timediff, "short-3");
+    if (!safe_empty($text)) {
+      $timetext .= " $text";
+    }
+
+    return generate_tooltip_link('', $timetext, format_unixtime($timestamp), NULL);
+  }
+
+  // Timestamp
+  $timediff = get_time() - strtotime($timestamp);
+  $timetext = format_uptime($timediff, "short-3");
+  if (!safe_empty($text)) {
+    $timetext .= " $text";
+  }
+
+  return generate_tooltip_link('', $timetext, format_timestamp($timestamp), NULL);
+}
+
 /**
  * Generate mouseover links with static tooltip from URL, link text, contents and a class.
  *
@@ -1146,21 +1142,19 @@ function generate_popup_link($type, $text = NULL, $vars = array(), $class = NULL
  * @return string
  */
 // TESTME needs unit testing
-function generate_tooltip_link($url, $text, $contents = '', $class = NULL, $attribs = [], $escape = FALSE)
-{
+function generate_tooltip_link($url, $text, $contents = '', $class = NULL, $attribs = [], $escape = FALSE) {
   global $config, $link_iter;
 
   $link_iter++;
 
-  $href = (strlen($url) ? 'href="' . $url . '"' : '');
+  $href = !safe_empty($url) ? 'href="' . $url . '"' : '';
   if ($escape) { $text = escape_html($text); }
 
   $attribs['class'] = array_merge((array)$class, (array)$attribs['class']);
 
   // Allow the Grinch to disable popups and destroy Christmas.
-  $allow_mobile = (in_array(detect_browser_type(), array('mobile', 'tablet')) ? $config['web_mouseover_mobile'] : TRUE);
-  if ($config['web_mouseover'] && strlen($contents) && $allow_mobile)
-  {
+  $allow_mobile = !in_array(detect_browser_type(), [ 'mobile', 'tablet' ]) || $config['web_mouseover_mobile'];
+  if ($config['web_mouseover'] && $allow_mobile && !safe_empty($contents)) {
     $attribs['style']        = 'cursor: pointer;';
     $attribs['data-rel']     = 'tooltip';
     $attribs['data-tooltip'] = $contents;
@@ -1387,26 +1381,29 @@ function print_graph_popup($graph_array)
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function permissions_cache($user_id)
-{
-  $permissions = array();
+function permissions_cache($user_id) {
+
+  $cache_key = 'permissions_'.$GLOBALS['config']['auth_mechanism'].$user_id;
+  $cache_item = get_cache_item($cache_key);
+  if (ishit_cache_item($cache_item)) {
+    return get_cache_data($cache_item);
+  }
+
+  $permissions = [];
 
   // Get permissions from user-specific and role tables.
   $permission_where  = '`user_id` = ? AND `auth_mechanism` = ?';
   $permission_params = [ $user_id, $GLOBALS['config']['auth_mechanism'] ];
   $entity_permissions = dbFetchRows("SELECT * FROM `entity_permissions` WHERE " . $permission_where, $permission_params);
   $roles_entity_permissions = dbFetchRows("SELECT * FROM `roles_entity_permissions` LEFT JOIN `roles_users` USING (`role_id`) WHERE " . $permission_where, $permission_params);
-  foreach (array_merge((array)$entity_permissions, (array)$roles_entity_permissions) as $entity)
-  {
+  foreach (array_merge((array)$entity_permissions, (array)$roles_entity_permissions) as $entity) {
     // Set access to ro if it's not in the defined list.
     $access = (in_array($entity['access'], array('ro', 'rw')) ? $entity['access'] : 'ro');
 
-    switch ($entity['entity_type'])
-    {
+    switch ($entity['entity_type']) {
       case "group": // this is a group, so expand its members into an array
         $group = get_group_by_id($entity['entity_id']);
-        foreach (get_group_entities($entity['entity_id']) as $group_entity_id)
-        {
+        foreach (get_group_entities($entity['entity_id']) as $group_entity_id) {
           $permissions[$group['entity_type']][$group_entity_id] = $access;
         }
       //break; // And also store self group permission in cache
@@ -1425,19 +1422,21 @@ function permissions_cache($user_id)
 
   // Alerts
   // FIXME - this seems like it would be slow on very large installs
-  $alert = array();
-  foreach (dbFetchRows('SELECT `alert_table_id`, `device_id`, `entity_id`, `entity_type` FROM `alert_table`') as $alert_table_entry)
-  {
+  $alert = [];
+  foreach (dbFetchRows('SELECT `alert_table_id`, `device_id`, `entity_id`, `entity_type` FROM `alert_table`') as $alert_table_entry) {
     //r($alert_table_entry);
-    if (is_entity_permitted($alert_table_entry['entity_id'], $alert_table_entry['entity_type'], $alert_table_entry['device_id'], $permissions))
-    {
+    if (is_entity_permitted($alert_table_entry['entity_id'], $alert_table_entry['entity_type'], $alert_table_entry['device_id'], $permissions)) {
       $alert[$alert_table_entry['alert_table_id']] = TRUE;
     }
   }
-  if (count($alert))
-  {
+  if (count($alert)) {
     $permissions['alert'] = $alert;
   }
+
+  set_cache_item($cache_item, $permissions);
+
+  // Clear expired cache
+  del_cache_expired();
 
   return $permissions;
 
@@ -1882,11 +1881,11 @@ function get_locations($filter = array()) {
       case 'location_city':
         // Check geo params only when GEO enabled globally
         if ($GLOBALS['config']['geocoding']['enable']) {
-          $where_array[$var] = generate_query_values($value, $var);
+          $where_array[$var] = generate_query_values_and($value, $var);
         }
         break;
       case 'location':
-        $where_array[$var] = generate_query_values($value, $var);
+        $where_array[$var] = generate_query_values_and($value, $var);
         break;
     }
   }
@@ -2209,13 +2208,16 @@ function generate_query_permitted($type_array = [ 'device' ], $options = []) {
         if (!isset($options['port_null']) || !$options['port_null']) {
           //$query_permitted[] = "($column != '' AND $column IS NOT NULL)";
           $query_permitted[] = "$column IS NOT NULL";
-        } elseif (!$user_limited) {
+        } elseif (!$user_limited && safe_count($query_permitted)) {
           // FIXME. derp code, need rewrite
-          $query_permitted[] = safe_count($query_permitted) ? "OR $column IS NULL" : "$column IS NULL";
+          //$query_permitted[] = safe_count($query_permitted) ? "OR $column IS NULL" : "$column IS NULL";
+          $query_permitted[] = "OR $column IS NULL";
         }
         $query_permitted = implode(" AND ", (array)$query_permitted);
 
-        $query_part[] = str_replace(" AND OR ", ' OR ', $query_permitted);
+        if (!safe_empty($query_permitted)) {
+          $query_part[] = str_replace(" AND OR ", ' OR ', $query_permitted);
+        }
         unset($query_permitted);
 
         break;
@@ -2384,7 +2386,7 @@ function load_user_config(&$load_config, $user_id) {
     if (!isset($config_variable[$item['pref']]['useredit']) ||
         !$config_variable[$item['pref']]['useredit']) {
       // Load only permitted settings
-      print_debug("User [$user_id] setting '${item['pref']}' not permitted by definitions.");
+      print_debug("User [$user_id] setting '{$item['pref']}' not permitted by definitions.");
       continue;
     }
 
@@ -2628,11 +2630,10 @@ function get_smokeping_files($rdebug = 0)
 
   if ($rdebug) { echo('- Recursing through ' . $config['smokeping']['dir'] . '<br />'); }
 
-  if (isset($config['smokeping']['master_hostname']))
-  {
+  if (isset($config['smokeping']['master_hostname'])) {
     $master_hostname = $config['smokeping']['master_hostname'];
   } else {
-    $master_hostname = $config['own_hostname'];
+    $master_hostname = $config['own_hostname'] ?: get_localhost();
   }
 
   if (is_dir($config['smokeping']['dir']))

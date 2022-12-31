@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,7 +22,7 @@ function mysql_authenticate($username, $password)
 {
   global $config;
 
-  $row = dbFetchRow("SELECT `username`, `password` FROM `users` WHERE `username` = ?", array($username));
+  $row = dbFetchRow("SELECT `username`, `password` FROM `users` WHERE `username` = ? AND `type` = ?", [ $username, 'mysql' ]);
   if ($row['username'] && $row['username'] == $username)
   {
     if ($config['auth']['remote_user']) { return 1; }
@@ -78,12 +77,11 @@ function mysql_auth_can_change_password($username = "")
 {
   global $config;
 
-  if ((empty($username) || !mysql_auth_user_exists($username)) && !$config['auth']['remote_user'])
-  {
+  if ((empty($username) || !mysql_auth_user_exists($username)) && !$config['auth']['remote_user']) {
     return TRUE;
-  } else {
-    return dbFetchCell("SELECT `can_modify_passwd` FROM `users` WHERE `username` = ?", array($username)); // FIXME should return BOOL
   }
+
+  return dbFetchCell("SELECT `can_modify_passwd` FROM `users` WHERE `username` = ? AND `type` = ?", [ $username, 'mysql' ]); // FIXME should return BOOL
 }
 
 /**
@@ -99,7 +97,7 @@ function mysql_auth_change_password($username,$password)
 
   // $hash = crypt($password, '$1$' . strgen(8).'$'); // This is old hash, do not used anymore (keep for history)
   $hash = password_hash($password, PASSWORD_DEFAULT);
-  return dbUpdate(array('password' => $hash), 'users', '`username` = ?', array($username)); // FIXME should return BOOL
+  return dbUpdate([ 'password' => $hash ], 'users', '`username` = ? AND `type` = ?', [ $username, 'mysql' ]); // FIXME should return BOOL
 }
 
 /**
@@ -124,16 +122,22 @@ function mysql_auth_usermanagement()
  * @param string $description User's description
  * @return bool TRUE if user addition is successful, FALSE if it is not
  */
-function mysql_adduser($username, $password, $level, $email = "", $realname = "", $can_modify_passwd='1', $description = "")
+function mysql_adduser($username, $password, $level, $email = "", $realname = "", $can_modify_passwd = '1', $description = "")
 {
   if (!mysql_auth_user_exists($username))
   {
     // $hash = crypt($password, '$1$' . strgen(8).'$'); // This is old hash, do not used anymore (keep for history)
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    return dbInsert(array('username' => $username, 'password' => $hash, 'level' => $level, 'email' => $email, 'realname' => $realname, 'can_modify_passwd' => $can_modify_passwd, 'descr' => $description), 'users');
-  } else {
-    return FALSE;
+    return dbInsert([ 'username' => $username,
+                      'password' => $hash,
+                      'level' => $level,
+                      'email' => $email,
+                      'realname' => $realname,
+                      'can_modify_passwd' => $can_modify_passwd,
+                      'descr' => $description ], 'users');
   }
+
+  return FALSE;
 }
 
 /**
@@ -145,7 +149,7 @@ function mysql_adduser($username, $password, $level, $email = "", $realname = ""
 function mysql_auth_user_exists($username)
 {
   //return @dbFetchCell("SELECT COUNT(*) FROM `users` WHERE `username` = ?", array($username)); // FIXME should return BOOL
-  return dbExist('users', '`username` = ?', array($username));
+  return dbExist('users', '`username` = ? AND `type` = ?', [ $username, 'mysql' ]);
 }
 
 /**
@@ -156,7 +160,7 @@ function mysql_auth_user_exists($username)
  */
 function mysql_auth_username_by_id($user_id)
 {
-  return dbFetchCell("SELECT `username` FROM `users` WHERE `user_id` = ?", array($user_id)); // FIXME should return FALSE if not found
+  return dbFetchCell("SELECT `username` FROM `users` WHERE `user_id` = ? AND `type` = ?", [ $user_id, 'mysql' ]); // FIXME should return FALSE if not found
 }
   
 /**
@@ -167,7 +171,7 @@ function mysql_auth_username_by_id($user_id)
  */
 function mysql_auth_user_level($username)
 {
-  return dbFetchCell("SELECT `level` FROM `users` WHERE `username` = ?", array($username));
+  return dbFetchCell("SELECT `level` FROM `users` WHERE `username` = ? AND `type` = ?", [ $username, 'mysql' ]);
 }
 
 /**
@@ -178,7 +182,7 @@ function mysql_auth_user_level($username)
  */
 function mysql_auth_user_id($username)
 {
-  return dbFetchCell("SELECT `user_id` FROM `users` WHERE `username` = ?", array($username));
+  return dbFetchCell("SELECT `user_id` FROM `users` WHERE `username` = ? AND `type` = ?", [ $username, 'mysql' ]);
 }
 
 /**
@@ -196,7 +200,7 @@ function mysql_deluser($username)
   dbDelete('users_prefs',        "`user_id` = ?", array($user_id));
   dbDelete('users_ckeys',       "`username` = ?", array($username));
 
-  return dbDelete('users', "`username` =  ?", array($username)); // FIXME should return BOOL
+  return dbDelete('users', "`username` = ? AND `type` = ?", [ $username, 'mysql' ]); // FIXME should return BOOL
 }
 
 /**
@@ -206,7 +210,7 @@ function mysql_deluser($username)
  */
 function mysql_auth_user_list()
 {
-  return dbFetchRows("SELECT * FROM `users`"); // FIXME hardcode list of returned fields as in all other backends; array content should not depend on db changes/column names.
+  return dbFetchRows("SELECT * FROM `users` WHERE `type` = ?", [ 'mysql' ]); // FIXME hardcode list of returned fields as in all other backends; array content should not depend on db changes/column names.
 }
 
 /**
@@ -217,7 +221,7 @@ function mysql_auth_user_list()
  */
 function mysql_auth_user_info($username)
 {
-  return dbFetchRow("SELECT * FROM `users` WHERE `username` = ?", array($username));
+  return dbFetchRow("SELECT * FROM `users` WHERE `username` = ? AND `type` = ?", [ $username, 'mysql' ]);
 }
 
 // EOF

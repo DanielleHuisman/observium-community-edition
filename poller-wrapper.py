@@ -205,6 +205,8 @@ try:
     # parser.add_argument('process', nargs='?', default='poller', choices=['poller', 'discovery', 'billing'], help='Process name, one of \'poller\', \'discovery\', \'billing\'.')
     parser.add_argument('-w', '--workers', nargs='?', type=int, default=0,
                         help='Number of threads to spawn. Default: CPUs x 2')
+    parser.add_argument('--timeout', nargs='?', type=int, default=0,
+                        help='Hard timeout for run poller/discovery for each device in seconds (greater than 90s).')
     parser.add_argument('-p', '--poller_id', nargs='?', type=int, default=-1,
                         help='Specify poller_id for a partitioned poller. Usually not needed for partitioned operation.')
     parser.add_argument('-s', '--stats', action='store_true', help='Store total polling times to RRD.', default=False)
@@ -453,6 +455,22 @@ except:
 if max_la <= 0:
     max_la = 10
 
+# poller/discovery timeouts per device
+# Notes:
+# subprocess.run() was added in 3.5
+# subprocess.check_call() can migrate to subprocess.run(..., check=True)
+# timeout param was added to subprocess.check_call() in 3.3
+timeout = 0
+if entity == 'device' and python_version >= (3, 3):
+    # only for poller/discovery with python 3.3+
+
+    if int(args.timeout) > 0:
+        # timeout param passed from cmd line (can use any positive value)
+        timeout = int(args.timeout)
+    elif int(config['poller-wrapper'][process + '_timeout']) >= 90:
+        # hard limit can't be less than 90s (prevent use random numbers as timeout)
+        timeout = int(config['poller-wrapper'][process + '_timeout'])
+
 # partitioned poller
 poller_arg = False  # pass poller id to requested script
 if poller_id < 0:
@@ -465,6 +483,9 @@ else:
     # poller_arg = args.poller_id > 0
     poller_arg = True
     # poller_id = args.poller_id
+
+if test:
+    print("Timeout: %ss" % timeout)
 
 """
     Check mibs dir for stale .index files
@@ -657,7 +678,8 @@ else:
                 # print("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
                 os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
                 print("INFO: finished %s for %s on poller id %s" % (process, host_wildcard, poller_id))
-                # sys.exit(0) # this not worked inside try, see: https://stackoverflow.com/questions/7709411/why-finally-block-is-executing-after-calling-sys-exit0-in-except-block
+                # sys.exit(0) # this not worked inside try,
+                # see: https://stackoverflow.com/questions/7709411/why-finally-block-is-executing-after-calling-sys-exit0-in-except-block
                 stop_script = True
                 # wc_query = query + " AND (last_discovered IS NULL OR last_discovered = '0000-00-00 00:00:00' OR force_discovery = '1')"
                 # cursor.execute(wc_query)
@@ -799,9 +821,9 @@ FNULL = open(os.devnull, 'w')
 if process == 'discovery' and instance_number == 0 and 'host_wildcard' not in globals():
     # print("/usr/bin/env php %s -q -u >> /dev/null 2>&1" % (discovery_path))
     if debug:
-        command_options = '-d -u'
+        command_options = '-d -u -a'
     else:
-        command_options = '-q -u'
+        command_options = '-q -u -a'
 
     print("INFO: starting discovery.php for update")
     os.system("/usr/bin/env php %s %s >> /dev/null 2>&1" % (discovery_path, command_options))
@@ -933,7 +955,18 @@ def process_worker():
             if debug:
                 command_out = open(temp_path + '/observium_' + process + '_' + str(device_id) + '.debug', 'w')
             # print(command_args) #debug
-            subprocess.check_call(map(str, command_args), stdout=command_out, stderr=subprocess.STDOUT)
+
+            if timeout > 0:
+                # append timeout param for python 3.3+ and when option set
+                try:
+                    subprocess.check_call(map(str, command_args),
+                                          stdout=command_out, stderr=subprocess.STDOUT, timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    print("WARNING: %s for device_id %s ran too long, stopped by timeout." % (process, device_id))
+                    logfile("WARNING: %s for device_id %s ran too long, stopped by timeout." % (process, device_id))
+            else:
+                subprocess.check_call(map(str, command_args), stdout=command_out, stderr=subprocess.STDOUT)
+
             if debug:
                 command_out.close()
 
@@ -971,11 +1004,11 @@ for device_id in devices_list:
 
 for i in range(amount_of_workers):
     t = threading.Thread(target=process_worker)
-    t.setDaemon(True)
+    t.daemon = True
     t.start()
 
 p = threading.Thread(target=printworker)
-p.setDaemon(True)
+p.daemon = True
 p.start()
 
 try:

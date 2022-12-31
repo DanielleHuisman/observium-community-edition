@@ -7,13 +7,13 @@
  *
  * @package    observium
  * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
-$options = getopt("a:c:rd");
+$options = getopt("a:c:rsd");
 
 include("includes/sql-config.inc.php");
 include($config['html_dir']."/includes/functions.inc.php");
@@ -57,7 +57,9 @@ if ($options['a'] || $options['c']) {
     $ids   = array();
 
     // Fetch notification example from json file
-    if (isset($options['r'])) {
+    if (isset($options['s'])) {
+      $type = 'SYSLOG';
+    } elseif (isset($options['r'])) {
       $type = 'RECOVER';
     } else {
       $type = 'ALERT';
@@ -100,7 +102,7 @@ if ($options['a'] || $options['c']) {
 
   print_cli("USAGE:
 $scriptname -a alert_entry_id [-d debug]
-$scriptname -c contact_id [-r] [-d debug]
+$scriptname -c contact_id [-r] [-s] [-d debug]
 
 ", 'color');
 
@@ -114,6 +116,7 @@ $scriptname -c contact_id [-r] [-d debug]
     'default'     => '<contact id>',
     'description' => 'Send test notification to this contact id'));
   $arguments->addFlag('-r',  'With -c <ID> option, send RECOVER notification instead ALERT');
+  $arguments->addFlag('-s',  'With -c <ID> option, send SYSLOG notification');
   echo $arguments->getHelpScreen();
   echo PHP_EOL . PHP_EOL;
 }

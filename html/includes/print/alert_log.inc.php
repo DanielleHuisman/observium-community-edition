@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -77,35 +77,42 @@ function print_alert_log($vars)
       // Functionize?
 
       // Set colours and classes based on the status of the alert
-      if ($entry['log_type'] == 'OK')
-      {
-        $entry['class']  = "green";  $entry['html_row_class'] = "success";
-      } else if ($entry['log_type'] == 'RECOVER_NOTIFY') {
-        $entry['class']  = "green";  $entry['html_row_class'] = "info";
-      } else if ($entry['log_type'] == 'ALERT_NOTIFY') {
-        $entry['class']  = "red";    $entry['html_row_class'] = "error";
-      } elseif($entry['log_type'] == 'FAIL') {
-        $entry['class']  = "red";    $entry['html_row_class'] = "error";
-      } elseif($entry['log_type'] == 'FAIL_DELAYED') {
-        $entry['class']  = "purple"; $entry['html_row_class'] = "warning";
-      } elseif($entry['log_type'] == 'FAIL_SUPPRESSED') {
-        $entry['class']  = "purple"; $entry['html_row_class'] = "suppressed";
-      } elseif($entry['log_type'] == 'RECOVER_SUPPRESSED') {
-        $entry['class']  = "purple"; $entry['html_row_class'] = "suppressed";
-      } else {
-        // Anything else set the colour to grey and the class to disabled.
-        $entry['class']  = "gray"; $entry['html_row_class'] = "disabled";
+      switch ($entry['log_type']) {
+        case 'OK':
+          $entry['class'] = "green";
+          $entry['html_row_class'] = "success";
+          break;
+        case 'RECOVER_NOTIFY':
+          $entry['class'] = "green";
+          $entry['html_row_class'] = "info";
+          break;
+        case 'ALERT_NOTIFY':
+        case 'FAIL':
+          $entry['class'] = "red";
+          $entry['html_row_class'] = "error";
+          break;
+        case 'FAIL_DELAYED':
+          $entry['class'] = "purple";
+          $entry['html_row_class'] = "warning";
+          break;
+        case 'FAIL_SUPPRESSED':
+        case 'RECOVER_SUPPRESSED':
+          $entry['class'] = "purple";
+          $entry['html_row_class'] = "suppressed";
+          break;
+        default:
+          // Anything else set the colour to grey and the class to disabled.
+          $entry['class'] = "gray";
+          $entry['html_row_class'] = "disabled";
       }
 
       $string .= '  <tr class="'.$entry['html_row_class'].'">' . PHP_EOL;
 
       $string .= '<td class="state-marker"></td>' . PHP_EOL;
 
-      if ($events['short'])
-      {
-        $string .= '    <td class="syslog" style="white-space: nowrap">';
-        $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
-        $string .= generate_tooltip_link('', format_uptime($timediff, "short-3"), format_timestamp($entry['timestamp']), NULL) . '</td>' . PHP_EOL;
+      if ($events['short']) {
+        $string .= '    <td class="syslog text-nowrap">';
+        $string .= generate_tooltip_time($entry['timestamp']) . '</td>' . PHP_EOL;
       } else {
         $string .= '    <td>';
         $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
@@ -217,26 +224,26 @@ function get_alert_log($vars)
       switch ($var)
       {
 //        case 'alert_entry':
-//          $where .= generate_query_values($value, 'alert_table_id');
+//          $where .= generate_query_values_and($value, 'alert_table_id');
 //          break;
         case 'log_type':
-          $where .= generate_query_values($value, 'log_type');
+          $where .= generate_query_values_and($value, 'log_type');
           break;
         case 'alert_test_id':
-          $where .= generate_query_values($value, 'alert_test_id');
+          $where .= generate_query_values_and($value, 'alert_test_id');
           break;
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'entity_id':
-          $where .= generate_query_values($value, 'entity_id');
+          $where .= generate_query_values_and($value, 'entity_id');
           break;
         case 'entity_type':
-          $where .= generate_query_values($value, 'entity_type');
+          $where .= generate_query_values_and($value, 'entity_type');
           break;
         case 'message':
-          $where .= generate_query_values($value, 'message', '%LIKE%');
+          $where .= generate_query_values_and($value, 'message', '%LIKE%');
           break;
         case 'timestamp_from':
           $where .= ' AND `timestamp` >= ?';

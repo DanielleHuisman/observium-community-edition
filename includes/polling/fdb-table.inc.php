@@ -349,20 +349,28 @@ foreach ($fdbs_db as $vlan => $fdb_macs) {
     $table_row = [];
     $table_row[] = $vlan;
     $table_row[] = $mac;
-    //$table_row[] = $data['port_label_short'];
+    $table_row[] = "Port {$data['port_index']}";
     $table_row[] = $data['port_id'];
     //$table_row[] = $fdb_port;
     //$table_row[] = $data['ifIndex'];
-    $table_row[] = '%rdeleted%n';
-    $table_rows[] = $table_row;
     //echo(str_pad($vlan, 8) . ' | ' . str_pad($mac,12) . ' | ' .  str_pad($data['port_id'],25) .' | '. str_pad($data['fdb_status'],16));
     //echo("-\n");
     if (isset($data['fdb_id'])) {
       // Multi delete (for faster loop)
-      $fdb_delete[] = $data['fdb_id'];
+      //print_debug_vars($data);
+      if ($data['deleted']) {
+        // Do not poke db change when already deleted
+        $table_row[] = '%ydeleted '.format_unixtime($data['fdb_last_change']).'%n';
+      } else {
+        $table_row[] = '%rdeleted%n';
+        $fdb_delete[] = $data['fdb_id'];
+      }
     } else {
+      // CLEANME. After r12500
+      $table_row[] = '%rdeleted%n';
       dbDelete('vlans_fdb', '`device_id` = ? AND `vlan_id` = ? AND `mac_address` = ?', [ $device['device_id'], $vlan, $mac ]);
     }
+    $table_rows[] = $table_row;
   }
 }
 
@@ -370,8 +378,8 @@ foreach ($fdbs_db as $vlan => $fdb_macs) {
 if (safe_count($fdb_delete)) {
   print_debug_vars($fdb_delete);
   // do not delete, set deleted flag
-  dbUpdate([ 'fdb_last_change' => $polled, 'deleted' => 1 ], 'vlans_fdb', generate_query_values($fdb_delete, 'fdb_id', NULL, FALSE));
-  //dbDelete('vlans_fdb', generate_query_values($fdb_delete, 'fdb_id', NULL, FALSE));
+  dbUpdate([ 'fdb_last_change' => $polled, 'deleted' => 1 ], 'vlans_fdb', generate_query_values_ng($fdb_delete, 'fdb_id'));
+  //dbDelete('vlans_fdb', generate_query_values_ng($fdb_delete, 'fdb_id'));
 }
 
 /* MultiInsert new fdb entries

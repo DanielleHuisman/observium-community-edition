@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -151,6 +151,12 @@ if ($cdp_array) {
         if (!is_null($if)) {
           $query = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
           $remote_port_id = dbFetchCell($query, array($if, $if, $if, $remote_device_id, 0));
+
+          // Aruba devices can report ifAlias instead ifDescr
+          if (!$remote_port_id && !isHexString($if)) {
+            $query = 'SELECT `port_id` FROM `ports` WHERE `ifAlias` = ? AND `device_id` = ? AND `deleted` = ?';
+            $remote_port_id = dbFetchCell($query, [ $if, $remote_device_id, 0 ]);
+          }
         }
         if (!$remote_port_id) {
           if (!is_null($remote_mac)) {
@@ -164,7 +170,7 @@ if ($cdp_array) {
 
           if (!$remote_port_id) {
             // Try by IP
-            $peer_where = generate_query_values($remote_device_id, 'device_id'); // Additional filter for include self IPs
+            $peer_where = generate_query_values_and($remote_device_id, 'device_id'); // Additional filter for include self IPs
             // Fetch all ports with peer IP and filter by UP
             if ($ids = get_entity_ids_ip_by_network('port', $remote_address, $peer_where))
             {

@@ -18,6 +18,7 @@
  *
  */
 function print_fdbtable($vars) {
+  //r($vars);
   $entries = get_fdbtable_array($vars);
 
   if (!$entries['count']) {
@@ -27,8 +28,13 @@ function print_fdbtable($vars) {
   }
 
   $list = array('device' => FALSE, 'port' => FALSE);
-  if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'search') { $list['device'] = TRUE; }
-  if (!isset($vars['port'])   || empty($vars['port'])   || $vars['page'] === 'search') { $list['port'] = TRUE; }
+
+
+
+  if (!isset($vars['device']) || is_array($vars['device']) || empty($vars['device']) || $vars['page'] === 'search') { $list['device'] = TRUE; }
+  if (!isset($vars['port'])   || is_array($vars['port']) || empty($vars['port'])   || $vars['page'] === 'search') { $list['port'] = TRUE; }
+
+  //r($list);
 
   $string = generate_box_open();
 
@@ -119,50 +125,54 @@ function get_fdbtable_array($vars) {
     // Do not show deleted entries by default
     $vars['deleted'] = 0;
   }
-  //r($vars);
+
   foreach ($vars as $var => $value) {
-    if ($value != '') {
-      switch ($var) {
-        case 'device':
-        case 'device_id':
-          $where .= generate_query_values($value, 'F.device_id');
-          break;
-        case 'port':
-        case 'port_id':
-          $where .= generate_query_values($value, 'F.port_id');
-          break;
-        case 'interface':
-        case 'port_name':
-          $where .= generate_query_values($value, 'I.ifDescr', 'LIKE%');
+
+    // Skip empty variables (and array with empty first entry) when building query
+    if ($value == '' || (is_array($value) && count($value) == 1 && $value[0] == '')) { continue; }
+
+    switch ($var) {
+      case 'device':
+      case 'device_id':
+        $where .= generate_query_values_and($value, 'F.device_id');
+        break;
+      case 'port':
+      case 'port_id':
+        $where .= generate_query_values_and($value, 'F.port_id');
+        break;
+      case 'interface':
+      case 'port_name':
+        $where      .= generate_query_values_and($value, 'I.ifDescr', 'LIKE%');
+        $join_ports = TRUE;
+        break;
+      case 'trunk':
+        if (get_var_true($value)) {
+          $where      .= " AND (`I`.`ifTrunk` IS NOT NULL AND `I`.`ifTrunk` != '')";
           $join_ports = TRUE;
-          break;
-        case 'trunk':
-          if (get_var_true($value)) {
-            $where .= " AND (`I`.`ifTrunk` IS NOT NULL AND `I`.`ifTrunk` != '')";
-            $join_ports = TRUE;
-          } elseif (in_array($value, [ 'none', 'no', '0' ])) {
-            $where .= " AND (`I`.`ifTrunk` IS NULL OR `I`.`ifTrunk` = '')";
-            $join_ports = TRUE;
-          }
-          break;
-        case 'vlan_id':
-          $where .= generate_query_values($value, 'F.vlan_id');
-          break;
-        case 'vlan_name':
-          $where .= generate_query_values($value, 'V.vlan_name');
-          break;
-        case 'address':
-          if (str_contains_array($value, [ '*', '?' ])) {
-            $like = 'LIKE';
-          } else {
-            $like = '%LIKE%';
-          }
-          $where .= generate_query_values(str_replace([ ':', ' ', '-', '.', '0x' ],'', $value), 'F.mac_address', $like);
-          break;
-        case 'deleted':
-          $where .= ' AND `deleted` = ?';
-          $params[] = $value;
-      }
+        }
+        else if (in_array($value, ['none', 'no', '0'])) {
+          $where      .= " AND (`I`.`ifTrunk` IS NULL OR `I`.`ifTrunk` = '')";
+          $join_ports = TRUE;
+        }
+        break;
+      case 'vlan_id':
+        $where .= generate_query_values_and($value, 'F.vlan_id');
+        break;
+      case 'vlan_name':
+        $where .= generate_query_values_and($value, 'V.vlan_name');
+        break;
+      case 'address':
+        if (str_contains_array($value, ['*', '?'])) {
+          $like = 'LIKE';
+        }
+        else {
+          $like = '%LIKE%';
+        }
+        $where .= generate_query_values_and(str_replace([':', ' ', '-', '.', '0x'], '', $value), 'F.mac_address', $like);
+        break;
+      case 'deleted':
+        $where    .= ' AND `deleted` = ?';
+        $params[] = $value;
     }
   }
 
@@ -205,6 +215,9 @@ function get_fdbtable_array($vars) {
   $query =  'SELECT F.*, V.`vlan_vlan`, V.`vlan_name` ' . $query;
   $query .= $sort;
   $query .= " LIMIT $start,$pagesize";
+
+  //r($query);
+  //r($params);
 
   // Query addresses
   //$array['entries'] = dbFetchRows($query, $params, TRUE);

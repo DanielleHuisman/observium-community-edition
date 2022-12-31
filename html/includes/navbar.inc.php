@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -37,27 +37,24 @@ $menu_start = utime();
 
                    // Dashboards
 
+                   $dashboards = dbFetchRows("SELECT * FROM `dashboards`");
+
+                   $entries = array();
+
+                   if (safe_count($dashboards))
+                   {
+                      //$navbar['observium']['dash']['text'] = "Dashboards";
+                      foreach ($dashboards as $dash)
+                      {
+                         $entries[] = array('text' => $dash['dash_name'], 'url' => generate_url(array('page' => "dashboard", 'dash' => $dash['dash_id'])), 'icon' => $config['icon']['overview']);
+                      }
+                   }
+
+                   $entries[] = array('divider' => TRUE);
+
                    if ($_SESSION['userlevel'] > 7)
                    {
-
-                      $dashboards = dbFetchRows("SELECT * FROM `dashboards`");
-
-                      $entries = array();
-
-                      if (safe_count($dashboards))
-                      {
-                         //$navbar['observium']['dash']['text'] = "Dashboards";
-                         foreach ($dashboards as $dash)
-                         {
-                            $entries[] = array('text' => $dash['dash_name'], 'url' => generate_url(array('page' => "dashboard", 'dash' => $dash['dash_id'])), 'icon' => $config['icon']['overview']);
-                         }
-                      }
-
-                     $entries[] = array('divider' => TRUE);
-
-
                      $entries[] = array('title' => 'Create Dashboard', 'url' => generate_url(array('page' => 'dashboard_add')), 'icon' => $config['icon']['plus']);
-
                    }
 
                    $navbar['observium']['entries'][] = array('title' => 'Dashboard', 'url' => generate_url(array('page' => 'dashboard')), 'icon' => $config['icon']['overview'], 'entries' => $entries);
@@ -106,7 +103,7 @@ $menu_start = utime();
                          $ids[] = $group['group_id'];
                        }
                      }
-                     foreach (dbFetchRows("SELECT COUNT(*) AS `count`, `group_id` FROM `group_table` WHERE 1" . generate_query_values($ids, 'group_id') . " GROUP BY `group_id`") as $entry) {
+                     foreach (dbFetchRows("SELECT COUNT(*) AS `count`, `group_id` FROM `group_table` WHERE " . generate_query_values_ng($ids, 'group_id') . " GROUP BY `group_id`") as $entry) {
                        $groups_count[$entry['group_id']] = $entry['count'];
                      }
                      unset($ids);
@@ -204,15 +201,14 @@ $menu_start = utime();
                    }
 
                    $navbar['observium']['entries'][] = array('title' => 'Network Map', 'url' => generate_url(array('page' => 'map')), 'icon' => $config['icon']['netmap']);
-
+                   $navbar['observium']['entries'][] = array('title' => 'Network Traffic Map', 'url' => generate_url(array('page' => 'map_traffic')), 'icon' => $config['icon']['map']);
 
                    $navbar['observium']['entries'][] = array('title' => 'Event Log', 'url' => generate_url(array('page' => 'eventlog')), 'icon' => $config['icon']['eventlog']);
 
 
                    $navbar['observium']['entries'][] = array('divider' => TRUE);
 
-                   if ($_SESSION['userlevel'] >= 7)
-                   {
+                   if ($_SESSION['userlevel'] >= 7) {
                       // Print Contacts
                       $counts['contacts'] = dbFetchCell("SELECT COUNT(*) FROM `alert_contacts`");
 
@@ -220,31 +216,30 @@ $menu_start = utime();
                       $navbar['observium']['entries'][] = array('divider' => TRUE);
                    }
 
-                   if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5)
-                   {
+                   if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5) {
                       // Custom OIDs
 
                       $oids = dbFetchRows("SELECT `oids`.*, COUNT(*) AS `count` FROM `oids` JOIN `oids_entries` ON `oids`.`oid_id` = `oids_entries`.`oid_id` WHERE 1 GROUP BY `oids`.`oid_id`");
 
                       $oid_count = safe_count($oids);
 
-                      foreach ($oids AS $oid)
-                      {
-                         $oids_menu[] = array('title' => $oid['oid_descr'], 'url' => generate_url(array('page' => 'customoid', 'oid_id' => $oid['oid_id'])), 'count' => $oid['count'], 'icon' => $config['icon']['customoid']);
+                      $oids_menu = [];
+                      foreach ($oids as $oid) {
+                         $oids_menu[] = [ 'title' => $oid['oid_descr'], 'url' => generate_url([ 'page' => 'customoid', 'oid_id' => $oid['oid_id'] ]), 'count' => $oid['count'], 'icon' => $config['icon']['customoid'] ];
                       }
 
-                      $navbar['observium']['entries'][] = array('title' => 'Custom OIDs', 'url' => generate_url(array('page' => 'customoids')), 'count' => $oid_count, 'icon' => $config['icon']['customoid'], 'entries' => $oids_menu);
+                      $navbar['observium']['entries'][] = [ 'title' => 'Custom OIDs', 'url' => generate_url([ 'page' => 'customoids' ]), 'count' => $oid_count, 'icon' => $config['icon']['customoid'], 'entries' => $oids_menu ];
                       //$navbar['observium']['entries'][] = array('divider' => TRUE);
 
-                      $navbar['observium']['entries'][] = array('title' => 'Probes', 'url' => generate_url(array('page' => 'probes')), 'icon' => $config['icon']['status']);
-                      $navbar['observium']['entries'][] = array('divider' => TRUE);
+                      // Probes
+                      $navbar['observium']['entries'][] = [ 'title' => 'Probes', 'url' => generate_url([ 'page' => 'probes' ]), 'icon' => $config['icon']['status'] ];
+                      $navbar['observium']['entries'][] = [ 'divider' => TRUE ];
 
                    }
 
                    $navbar['observium']['entries'][] = array('title' => 'Hardware Inventory', 'url' => generate_url(array('page' => 'inventory')), 'icon' => $config['icon']['inventory']);
 
-                   if ($cache['packages']['count'])
-                   {
+                   if ($cache['packages']['count']) {
                       $navbar['observium']['entries'][] = array('title' => 'Software Packages', 'url' => generate_url(array('page' => 'packages')), 'icon' => $config['icon']['packages']);
                    }
 
@@ -568,12 +563,12 @@ $menu_start = utime();
 
                    //r($cache['sensor_types']);
 
-                   $menu_items[0] = array('fanspeed', 'humidity', 'temperature', 'airflow');
-                   $menu_items[1] = array('current', 'voltage', 'power', 'apower', 'rpower', 'frequency');
+                   $menu_items[0] = [ 'temperature', 'humidity', 'fanspeed', 'airflow' ];
+                   $menu_items[1] = [ 'current', 'voltage', 'power', 'apower', 'rpower', 'frequency' ];
                    $menu_items[2] = array_diff(array_keys((array)$cache['sensors']['types']), $menu_items[0], $menu_items[1]);
 
-                   foreach ($menu_items as $items) {
-                      if (is_array($items)) { sort($items); }
+                   foreach ($menu_items as $key => $items) {
+                      if ($key > 1 && is_array($items)) { sort($items); } // Do not sort first basic health entities
 
                       foreach ($items as $item)
                       {
@@ -753,7 +748,7 @@ $menu_start = utime();
 
                       echo('            <li class="dropdown">' . PHP_EOL);
                       echo('              <a href="' . $dropdown['url'] . '" class="visible-lg visible-xl dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
-                      echo('                <' . $element . ' class="' . $dropdown['icon'] . '"></' . $element . '> ' . $dropdown['title'] . ' <b class="caret"></b></a>' . PHP_EOL);
+                      echo('                <' . $element . ' class="' . $dropdown['icon'] . '"></' . $element . '> ' . escape_html($dropdown['title']) . ' <b class="caret"></b></a>' . PHP_EOL);
                       echo('              <a href="' . $dropdown['url'] . '" class="visible-xs visible-sm visible-md dropdown-toggle" data-hover="dropdown" data-toggle="dropdown">' . PHP_EOL);
                       echo('                <' . $element . ' class="' . $dropdown['icon'] . '" style="margin-right: 5px;"></i></a>' . PHP_EOL);
                       echo('              <ul role="menu" class="dropdown-menu">' . PHP_EOL);
@@ -944,6 +939,10 @@ $(function() {
                               echo('    <li><a href="' . generate_url(array('page' => 'settings')) . '"><i class="' . $config['icon']['settings-change'] . '"></i> Edit</a></li>');
                               echo('    <li><a href="' . generate_url(array('page' => 'settings', 'format' => 'config')) . '"><i class="' . $config['icon']['config'] . '"></i> Full Dump</a></li>');
                               echo('    <li><a href="' . generate_url(array('page' => 'settings', 'format' => 'changed_config')) . '"><i class="' . $config['icon']['config'] . '"></i> Changed Dump</a></li>');
+                              if (OBS_DISTRIBUTED) {
+                                echo('    <li class="divider"></li>');
+                                echo('    <li><a href="' . generate_url([ 'page' => 'pollers' ]) . '"><i class="' . $config['icon']['pollers'] . '"></i> Pollers</a></li>');
+                              }
                               echo('  </ul>');
                               echo('</li>');
                            }
@@ -992,7 +991,9 @@ $(function() {
             $('#suggestions').fadeOut(); // Hide the suggestions box
         } else {
             key_count_global++;
-            setTimeout("lookupwait(" + key_count_global + ",\"" + inputString + "\")", 300); // Added timeout 0.3s before send query
+            // Added timeout 0.3s before send query
+            // Prevent use quotes in query string, for do not use XSS attacks
+            setTimeout("lookupwait(" + key_count_global + ",\"" + inputString.replace(/"/g, '\\x22').replace(/'/g, '\\x27') + "\")", 300);
         }
         key_press_time = Date.now()
     }

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,28 +23,28 @@ function build_printersupplies_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'printersupplies.supply_id');
+        $sql .= generate_query_values_and($values, 'printersupplies.supply_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'printersupplies.device_id');
+        $sql .= generate_query_values_and($values, 'printersupplies.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'printersupplies.device_id');
+        $sql .= generate_query_values_and($value, 'printersupplies.device_id');
         break;
       case "supply":
       case "supply_type";
-        $sql .= generate_query_values($value, 'printersupplies.supply_type');
+        $sql .= generate_query_values_and($value, 'printersupplies.supply_type');
         break;
       case "colour":
       case "supply_colour";
-        $sql .= generate_query_values($value, 'supply_colour');
+        $sql .= generate_query_values_and($value, 'supply_colour');
         break;
       case "descr":
       case "supply_descr";
-        $sql .= generate_query_values($value, 'supply_descr', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'supply_descr', '%LIKE%');
         break;
     }
   }

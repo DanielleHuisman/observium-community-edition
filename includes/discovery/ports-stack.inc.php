@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -14,31 +14,45 @@
 // FIXME. Need rename db schema port_id_high -> port_ifIndex_high, port_id_low -> port_ifIndex_low
 
 $query = 'SELECT * FROM `ports_stack` WHERE `device_id` = ?';
+$stack_db_array = [];
 foreach (dbFetchRows($query, array($device['device_id'])) as $entry) {
   $stack_db_array[$entry['port_id_high']][$entry['port_id_low']] = $entry;
 }
 
+$ifmib_stack = FALSE;
 $insert_array = [];
 if (is_device_mib($device, 'IF-MIB')) {
-  $stack_poll_array = snmpwalk_cache_twopart_oid($device, 'ifStackStatus', array(), 'IF-MIB');
+  $stack_poll_array = snmpwalk_cache_twopart_oid($device, 'ifStackStatus', [], 'IF-MIB');
 
   foreach ($stack_poll_array as $port_ifIndex_high => $entry_high) {
     if (is_numeric($port_ifIndex_high)) {
-      $port_high = get_port_by_index_cache($device, $port_ifIndex_high);
-      if ($device['os'] === 'ciscosb' && $port_high['ifType'] === 'propVirtual') {
-        // Skip stacking on Vlan ports (Cisco SB)
-        continue;
+      if ($device['os'] === 'ciscosb') {
+        $port_high = get_port_by_index_cache($device, $port_ifIndex_high); // Limit port queries to specific os(es)
+        if ($port_high['ifType'] === 'propVirtual') {
+          // Skip stacking on Vlan ports (Cisco SB)
+          continue;
+        }
       }
 
       foreach ($entry_high as $port_ifIndex_low => $entry_low) {
         if (is_numeric($port_ifIndex_low)) {
-          $port_low = get_port_by_index_cache($device, $port_ifIndex_low);
-          if ($device['os'] === 'ciscosb' && $port_low['ifType'] === 'propVirtual') {
-            // Skip stacking on Vlan ports (Cisco SB)
+          if ($device['os'] === 'ciscosb') {
+            $port_low = get_port_by_index_cache($device, $port_ifIndex_low); // Limit port queries to specific os(es)
+            if ($port_low['ifType'] === 'propVirtual') {
+              // Skip stacking on Vlan ports (Cisco SB)
+              continue;
+            }
+          }
+
+          $ifStackStatus = $entry_low['ifStackStatus'];
+          //if ($ifStackStatus === 'notInService') { continue; } // FIXME. Skip inactive entries
+          if ($ifStackStatus === 'notInService' && ($port_ifIndex_low == 0 || $port_ifIndex_high == 0)) {
+            print_debug("Skipped inactive stack entry: high [$port_ifIndex_high] & low [$port_ifIndex_low], ifStackStatus [$ifStackStatus].");
             continue;
           }
-          $ifStackStatus = $entry_low['ifStackStatus'];
-          //if ($ifStackStatus !== 'active') { continue; } // Skip inactive entries
+
+          // Set stacks found by IF-MIB
+          $ifmib_stack = TRUE;
 
           // Store valid for others
           $valid[$module][$port_ifIndex_high][$port_ifIndex_low] = $ifStackStatus;
@@ -48,8 +62,8 @@ if (is_device_mib($device, 'IF-MIB')) {
               //echo('.');
               $GLOBALS['module_stats'][$module]['unchanged']++;
             } else {
-              $update_array = array( 'ifStackStatus' => $ifStackStatus );
-              dbUpdate($update_array, 'ports_stack', '`port_stack_id` = ?', array( $entry_low['port_stack_id'] ));
+              $update_array = [ 'ifStackStatus' => $ifStackStatus ];
+              dbUpdate($update_array, 'ports_stack', '`port_stack_id` = ?', [ $entry_low['port_stack_id'] ]);
               //echo('U');
               $GLOBALS['module_stats'][$module]['updated']++;
             }
@@ -60,15 +74,81 @@ if (is_device_mib($device, 'IF-MIB')) {
             //                       'port_id_low'   => $port_ifIndex_low,
             //                       'ifStackStatus' => $ifStackStatus);
             //dbInsert($update_array, 'ports_stack');
-            $insert_array[] = [ 'device_id'     => $device['device_id'],
-                                'port_id_high'  => $port_ifIndex_high,
-                                'port_id_low'   => $port_ifIndex_low,
-                                'ifStackStatus' => $ifStackStatus ];
+            $insert_array[] = [
+              'device_id'     => $device['device_id'],
+              'port_id_high'  => $port_ifIndex_high,
+              'port_id_low'   => $port_ifIndex_low,
+              'ifStackStatus' => $ifStackStatus
+            ];
             $GLOBALS['module_stats'][$module]['added']++;
             //echo('+');
           }
         }
       }
+    }
+  }
+}
+
+if (!$ifmib_stack && is_device_mib($device, 'IEEE8023-LAG-MIB') &&
+    $stack_list_ports = snmpwalk_cache_oid($device, 'dot3adAggPortListPorts', [], 'IEEE8023-LAG-MIB')) {
+  // ifDescr.51 = 1/1/51
+  // ifDescr.52 = 1/1/52
+  // ifDescr.769 = lag1
+  // IEEE8023-LAG-MIB::dot3adAggPortListPorts.769 = STRING: "1/1/51,1/1/52"
+  // IEEE8023-LAG-MIB::dot3adAggPortSelectedAggID.51 = INTEGER: 769
+  // IEEE8023-LAG-MIB::dot3adAggPortSelectedAggID.52 = INTEGER: 769
+  // IEEE8023-LAG-MIB::dot3adAggPortAttachedAggID.51 = INTEGER: 769
+  // IEEE8023-LAG-MIB::dot3adAggPortAttachedAggID.52 = INTEGER: 769
+  $stack_agg_ports = snmpwalk_cache_oid($device, 'dot3adAggPortSelectedAggID', [], 'IEEE8023-LAG-MIB');
+  $stack_agg_ports = snmpwalk_cache_oid($device, 'dot3adAggPortAttachedAggID', $stack_agg_ports, 'IEEE8023-LAG-MIB');
+  $stack_agg_ports = snmpwalk_cache_oid($device, 'dot3adAggPortAggregateOrIndividual', $stack_agg_ports, 'IEEE8023-LAG-MIB');
+
+  // IEEE8023-LAG-MIB::dot3adAggPortActorAdminState.1000009 = BITS: E0 lacpActivity(0) lacpTimeout(1) aggregation(2)
+  // IEEE8023-LAG-MIB::dot3adAggPortActorAdminState.1000010 = BITS: E0 lacpActivity(0) lacpTimeout(1) aggregation(2)
+  $stack_agg_ports = snmpwalk_cache_oid($device, 'dot3adAggPortActorAdminState', $stack_agg_ports, 'IEEE8023-LAG-MIB', NULL, OBS_SNMP_ALL_HEX);
+  print_debug_vars($stack_agg_ports);
+
+  foreach ($stack_agg_ports as $port_ifIndex_low => $entry_low) {
+    $entry_low['admin_bits'] = get_bits_state_array($entry_low['dot3adAggPortActorAdminState'], 'IEEE8023-LAG-MIB', 'LacpState');
+    print_debug_vars($entry_low);
+
+    $port_ifIndex_high = $entry_low['dot3adAggPortAttachedAggID'];
+    $ifStackStatus = 'active'; // always active
+
+    if ($entry_low['dot3adAggPortAggregateOrIndividual'] === 'false' || !in_array('aggregation', (array)$entry_low['admin_bits'], TRUE)) {
+      // Skip not aggregate ports
+      print_debug("Skipped inactive stack entry: high [$port_ifIndex_high] & low [$port_ifIndex_low], dot3adAggPortAggregateOrIndividual [{$entry_low['dot3adAggPortAggregateOrIndividual']}].");
+      continue;
+    }
+
+    // Store valid for others
+    $valid[$module][$port_ifIndex_high][$port_ifIndex_low] = $ifStackStatus;
+
+    if (isset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low])) {
+      if ($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]['ifStackStatus'] == $ifStackStatus) {
+        //echo('.');
+        $GLOBALS['module_stats'][$module]['unchanged']++;
+      } else {
+        $update_array = [ 'ifStackStatus' => $ifStackStatus ];
+        dbUpdate($update_array, 'ports_stack', '`port_stack_id` = ?', [ $entry_low['port_stack_id'] ]);
+        //echo('U');
+        $GLOBALS['module_stats'][$module]['updated']++;
+      }
+      unset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]);
+    } else {
+      // $update_array = array('device_id'     => $device['device_id'],
+      //                       'port_id_high'  => $port_ifIndex_high,
+      //                       'port_id_low'   => $port_ifIndex_low,
+      //                       'ifStackStatus' => $ifStackStatus);
+      //dbInsert($update_array, 'ports_stack');
+      $insert_array[] = [
+        'device_id'     => $device['device_id'],
+        'port_id_high'  => $port_ifIndex_high,
+        'port_id_low'   => $port_ifIndex_low,
+        'ifStackStatus' => $ifStackStatus
+      ];
+      $GLOBALS['module_stats'][$module]['added']++;
+      //echo('+');
     }
   }
 }
@@ -130,10 +210,12 @@ if (is_device_mib($device, 'HUAWEI-IF-EXT-MIB')) {
         }
         unset($stack_db_array[$port_ifIndex_high][$port_ifIndex_low]);
       } else {
-        $insert_array[] = [ 'device_id'     => $device['device_id'],
-                            'port_id_high'  => $port_ifIndex_high,
-                            'port_id_low'   => $port_ifIndex_low,
-                            'ifStackStatus' => $ifStackStatus ];
+        $insert_array[] = [
+          'device_id'     => $device['device_id'],
+          'port_id_high'  => $port_ifIndex_high,
+          'port_id_low'   => $port_ifIndex_low,
+          'ifStackStatus' => $ifStackStatus
+        ];
         $GLOBALS['module_stats'][$module]['added']++;
       }
     }
@@ -159,7 +241,7 @@ foreach ($stack_db_array as $port_ifIndex_high => $array) {
 // MultiDelete old entries
 if (count($delete_array)) {
   print_debug_vars($delete_array);
-  dbDelete('ports_stack', generate_query_values($delete_array, 'port_stack_id', NULL, FALSE));
+  dbDelete('ports_stack', generate_query_values_ng($delete_array, 'port_stack_id'));
 }
 
 unset($insert_array, $update_array, $delete_array);

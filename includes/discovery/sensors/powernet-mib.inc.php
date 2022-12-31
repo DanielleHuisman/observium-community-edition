@@ -1407,7 +1407,7 @@ foreach ($cache['apc'] as $index => $entry)
   $descr           = $entry['uioSensorStatusSensorName'];
 
   $status          = $entry['uioSensorStatusCommStatus'];
-  if ($status != 'commsOK') { continue; } // Skip unconnected sensors entirely
+  if ($status !== 'commsOK') { continue; } // Skip unconnected sensors entirely
 
   // Humidity
   $value           = $entry['uioSensorStatusHumidity'];
@@ -1417,7 +1417,7 @@ foreach ($cache['apc'] as $index => $entry)
   if ($value != '' && $value > 0) // Humidity = 0 or -1 -> Sensor not available
   {
     // Skip if already discovered through iem
-    if (!in_array($descr, $iem_sensors['humidity']))
+    if (!in_array($descr, (array)$iem_sensors['humidity']))
     {
       //discover_sensor('humidity', $device, $oid, "uioSensorStatusHumidity.$index", 'apc', $descr, 1, $value);
       $options = [ 'rename_rrd' => 'apc-uioSensorStatusHumidity.%index%' ];
@@ -1435,7 +1435,7 @@ foreach ($cache['apc'] as $index => $entry)
   if ($value != '' && $value != -1) // Temperature = -1 -> Sensor not available
   {
     // Skip if already discovered through iem
-    if (!in_array($descr, $iem_sensors['temperature']))
+    if (!in_array($descr, (array)$iem_sensors['temperature']))
     {
       //discover_sensor('temperature', $device, $oid, "uioSensorStatusTemperatureDegC.$index", 'apc', $descr, 1, $value);
       $options = [ 'rename_rrd' => 'apc-uioSensorStatusTemperatureDegC.%index%' ];

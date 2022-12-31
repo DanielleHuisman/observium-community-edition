@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -30,23 +30,23 @@ function generate_storage_query($vars)
         case "group":
         case "group_id":
           $values = get_group_entities($value);
-          $sql .= generate_query_values($values, 'storage.storage_id');
+          $sql .= generate_query_values_and($values, 'storage.storage_id');
           break;
         case 'device_group_id':
         case 'device_group':
           $values = get_group_entities($value, 'device');
-          $sql .= generate_query_values($values, 'storage.device_id');
+          $sql .= generate_query_values_and($values, 'storage.device_id');
           break;
         case "device":
         case "device_id":
-          $sql .= generate_query_values($value, 'storage.device_id');
+          $sql .= generate_query_values_and($value, 'storage.device_id');
           break;
         case "descr":
         case "storage_descr";
-          $sql .= generate_query_values($value, 'storage_descr', '%LIKE%');
+          $sql .= generate_query_values_and($value, 'storage_descr', '%LIKE%');
           break;
         case 'ignored':
-          $sql .= generate_query_values($value, 'storage.storage_ignore');
+          $sql .= generate_query_values_and($value, 'storage.storage_ignore');
           break;
       }
     }
@@ -92,8 +92,7 @@ function generate_storage_query($vars)
 
 }
 
-function print_storage_table($vars)
-{
+function print_storage_table($vars) {
 
     global $cache, $config;
 
@@ -101,13 +100,16 @@ function print_storage_table($vars)
 
     $sql = generate_storage_query($vars);
 
-    $storages = array();
+    $storages = [];
     foreach (dbFetchRows($sql) as $storage)
     {
       if (isset($cache['devices']['id'][$storage['device_id']]))
       {
         $storage['hostname']       = $cache['devices']['id'][$storage['device_id']]['hostname'];
         $storage['html_row_class'] = $cache['devices']['id'][$storage['device_id']]['html_row_class'];
+
+        // FIXME. Should be part of humanize_storage()
+        $storage['human_type'] = array_preg_replace($config['rewrites']['storage_type_regexp'], $storage['storage_type']);
         $storages[] = $storage;
       }
     }
@@ -152,19 +154,19 @@ function print_storage_table_header($vars)
   }
 
   echo('<table class="' . $table_class . '">' . PHP_EOL);
-  $cols = array(
-                    array(NULL, 'class="state-marker"'),
-    'device'     => array('Device', 'style="width: 250px;"'),
-    'mountpoint' => array('Mountpoint'),
-    'size'       => array('Size', 'style="width: 100px;"'),
-    'used'       => array('Used', 'style="width: 100px;"'),
-    'free'       => array('Free', 'style="width: 100px;"'),
-                    array('', 'style="width: 100px;"'),
-    'usage'      => array('Usage %', 'style="width: 200px;"'),
-  );
+  $cols = [
+                    [ NULL, 'class="state-marker"' ],
+    'device'     => [ 'Device', 'style="width: 250px;"' ],
+    'mountpoint' => [ 'Mountpoint' ],
+    'fstype'     => [ 'FS Type', 'style="width: 90px;"' ],
+    'size'       => [ 'Size', 'style="width: 100px;"' ],
+    'used'       => [ 'Used', 'style="width: 100px;"' ],
+    'free'       => [ 'Free', 'style="width: 100px;"' ],
+                    [ '', 'style="width: 100px;"' ],
+    'usage'      => [ 'Usage %', 'style="width: 200px;"' ],
+  ];
 
-  if ($vars['page'] === "device")
-  {
+  if ($vars['page'] === "device") {
     unset($cols['device']);
   }
 
@@ -182,10 +184,10 @@ function generate_storage_row($storage, $vars) {
 
   global $config;
 
-  $table_cols = 8;
+  $table_cols = 9;
   if ($vars['page'] !== "device" && $vars['popup'] != TRUE) { $table_cols++; } // Add a column for device.
 
-  if(isset($vars['graph_type']) && $vars['graph_type'] == "perc") 
+  if(isset($vars['graph_type']) && $vars['graph_type'] === "perc")
 
   $graph_array           = array();
   $graph_array['to']     = $config['time']['now'];
@@ -225,6 +227,7 @@ function generate_storage_row($storage, $vars) {
   if ($vars['page'] !== "device" && $vars['popup'] != TRUE) { $row .= '<td class="entity">' . generate_device_link($storage) . '</td>'; }
 
   $row .= '  <td class="entity">'.generate_entity_link('storage', $storage).'</td>
+      <td>'.$storage['human_type'].'</td>
       <td>'.$total.'</td>
       <td>'.$used.'</td>
       <td>'.$free.'</td>

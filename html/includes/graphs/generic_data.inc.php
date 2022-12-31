@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -17,12 +16,13 @@
 include($config['html_dir']."/includes/graphs/common.inc.php");
 
 $graph_return['valid_options'][] = "previous";
-//$graph_return['valid_options'][] = "total";
+$graph_return['valid_options'][] = "95th";
 $graph_return['valid_options'][] = "trend";
 $graph_return['valid_options'][] = "inverse";
 
-switch ($format)
-{
+$do_95th = !(isset($vars['95th']) && get_var_false($vars['95th']));
+
+switch ($format) {
   case 'octets':
   case 'bytes':
     //$units = "Bps";
@@ -58,14 +58,12 @@ if ($format == "octets" || $format == "bytes")
 $i = 0;
 $unit_text = rrdtool_escape($unit_text, 9);
 
-if (!$noheader)
-{
-  $rrd_options .= " COMMENT:'$unit_text  Last     Avg      Max     95th \\n'";
+if (!$noheader) {
+  $rrd_options .= " COMMENT:'$unit_text  Last     Avg      Max" . ($do_95th ? "     95th" : "") . " \\n'";
 }
 
 // Alternative style
-if ($graph_style == 'mrtg')
-{
+if ($graph_style == 'mrtg') {
   $out_scale = 1;
 } else {
   $out_scale = -1;
@@ -200,7 +198,8 @@ $rrd_options .= ":'In '";
 $rrd_options .= " GPRINT:in".$format.":LAST:%6.2lf%s";
 $rrd_options .= " GPRINT:in".$format.":AVERAGE:%6.2lf%s";
 $rrd_options .= " GPRINT:in".$format."_max:MAX:%6.2lf%s";
-$rrd_options .= " GPRINT:95thin:%6.2lf%s\\n";
+if ($do_95th) { $rrd_options .= " GPRINT:95thin:%6.2lf%s"; }
+$rrd_options .= " COMMENT:\\n";
 
 if ($graph_max)
 {
@@ -222,27 +221,32 @@ $rrd_options .= " LINE1.25:dout".$format."#".$config['colours']['graphs']['data'
 $rrd_options .= " GPRINT:out".$format.":LAST:%6.2lf%s";
 $rrd_options .= " GPRINT:out".$format.":AVERAGE:%6.2lf%s";
 $rrd_options .= " GPRINT:out".$format."_max:MAX:%6.2lf%s";
-$rrd_options .= " GPRINT:95thout:%6.2lf%s\\n";
+if ($do_95th) { $rrd_options .= " GPRINT:95thout:%6.2lf%s"; }
+$rrd_options .= " COMMENT:\\n";
 
-if ($config['rrdgraph_real_95th'])
-{
-  $rrd_options .= " HRULE:95thhigh#FF0000:'Highest'";
-  $rrd_options .= " GPRINT:95thhigh:%30.2lf%s\\n";
-} else {
-//$rrd_options .= " LINE1:95thin#aa0000";
-//$rrd_options .= " LINE1:d95thout#bb0000";
-  $rrd_options .= " HRULE:95thin#aa0000";
-  $rrd_options .= " HRULE:d95thout#aa0000";
+if ($do_95th) {
+    if ($config['rrdgraph_real_95th']) {
+        $rrd_options .= " HRULE:95thhigh#FF0000:'Highest'";
+        $rrd_options .= " GPRINT:95thhigh:%30.2lf%s\\n";
+    } else {
+        $rrd_options .= " HRULE:95thin#aa0000";
+        $rrd_options .= " HRULE:d95thout#aa0000";
+    }
 }
 
 $rrd_options .= " GPRINT:tot:'Total %6.2lf%s'";
 $rrd_options .= " GPRINT:totin:'(In %6.2lf%s'";
 $rrd_options .= " GPRINT:totout:'Out %6.2lf%s)\\l'";
 
+$graph_return['legend_lines'] = 4;
+
 if ($vars['previous'] == "yes")
 {
   $rrd_options .= " LINE1.25:in".$format."X#009900:'Prev In \\n'";
   $rrd_options .= " LINE1.25:dout".$format."X#000099:'Prev Out'";
+
+  $graph_return['legend_lines'] += 2;
+
 } else {
   $rrd_options .= " AREA:wrongin".$nan_colour;
   $rrd_options .= " AREA:wrongout".$nan_colour;
@@ -267,7 +271,7 @@ if ($vars['trend'])
 //  $midnight = strtotime('today midnight');
 //  for ($i = 1; $i <= 2; $i++)
 //  {
-//    $rrd_options .= " VRULE:${midnight}#FF0000";
+//    $rrd_options .= " VRULE:{$midnight}#FF0000";
 //    $midnight -= 86400;
 //  }
 //}

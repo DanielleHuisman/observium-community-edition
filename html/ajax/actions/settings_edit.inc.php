@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -34,7 +34,7 @@ $updates = 0;
 
 // Set fields that were submitted with custom value
 if (safe_count($sets)) {
-  $query = 'SELECT * FROM `users_prefs` WHERE `user_id` = ?' . generate_query_values(array_keys($sets), 'pref');
+  $query = 'SELECT * FROM `users_prefs` WHERE `user_id` = ?' . generate_query_values_and(array_keys($sets), 'pref');
   // Fetch current rows in config file so we know which one to UPDATE and which one to INSERT
   $in_db = [];
   foreach (dbFetchRows($query, [ $user_id ]) as $row) {
@@ -52,7 +52,7 @@ if (safe_count($sets)) {
 
 // Delete fields that were reset to default
 if (safe_count($deletes)) {
-  dbDelete('users_prefs', '`user_id` = ? ' . generate_query_values($deletes, 'pref'), [ $user_id ]);
+  dbDelete('users_prefs', '`user_id` = ? ' . generate_query_values_and($deletes, 'pref'), [ $user_id ]);
   $updates++;
 }
 

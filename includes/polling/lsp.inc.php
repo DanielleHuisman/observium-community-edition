@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -64,7 +63,7 @@ foreach (dbFetchRows($query, array($device['device_id'])) as $lsp)
    foreach (array('uptime', 'total_uptime', 'primary_uptime') as $ds)
    {
       $rrd_ds          .= "DS:" . $ds . ":GAUGE:600:0:U ";
-      $uptime_values[] = $lsp["lsp_${ds}"];
+      $uptime_values[] = $lsp["lsp_{$ds}"];
    }
    if (count($uptime_values))
    {
@@ -80,7 +79,7 @@ foreach (dbFetchRows($query, array($device['device_id'])) as $lsp)
    foreach (array('transitions', 'path_changes') as $ds)
    {
       $rrd_ds         .= "DS:" . $ds . ":COUNTER:600:0:U ";
-      $stats_values[] = $lsp["lsp_${ds}"];
+      $stats_values[] = $lsp["lsp_{$ds}"];
    }
    if (count($stats_values))
    {
@@ -97,7 +96,7 @@ foreach (dbFetchRows($query, array($device['device_id'])) as $lsp)
    foreach (array('octets', 'packets') as $ds)
    {
       $rrd_ds       .= "DS:" . $ds . ":COUNTER:600:0:" . $config['max_port_speed'] . ' ';
-      $lsp_values[] = $lsp["lsp_${ds}"];
+      $lsp_values[] = $lsp["lsp_{$ds}"];
    }
    if (count($lsp_values))
    {

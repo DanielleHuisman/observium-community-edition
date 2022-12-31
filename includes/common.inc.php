@@ -46,7 +46,12 @@ function observium_autoload($class_name) {
 
     case 'Flight':
       $class_file = array_pop($class_array) . '.php';
-      $class_file = 'flight/' . $class_file;
+      if (PHP_VERSION_ID >= 70400) {
+        $class_file = 'flight2/' . $class_file;
+      } else {
+        // Old compat version
+        $class_file = 'flight/' . $class_file;
+      }
       break;
 
     case 'Ramsey':
@@ -407,13 +412,25 @@ function get_localhost() {
   global $cache;
 
   if (!isset($cache['localhost'])) {
-    $cache['localhost'] = php_uname('n');
-    if (!str_contains($cache['localhost'], '.')) {
-      // try use hostname -f for get FQDN hostname
-      $localhost_t = external_exec('/bin/hostname -f');
-      if (str_contains($localhost_t, '.')) {
-        $cache['localhost'] = $localhost_t;
+    // FastCache for less system exec
+    $cache_item = get_cache_item('own_hostname');
+    if (!ishit_cache_item($cache_item)) {
+
+      $cache['localhost'] = php_uname('n');
+      if (!str_contains($cache['localhost'], '.')) {
+        // try use hostname -f for get FQDN hostname
+        $localhost_t = external_exec('/bin/hostname -f');
+        if (str_contains($localhost_t, '.')) {
+          $cache['localhost'] = $localhost_t;
+        }
       }
+
+      // Store in fast caching (this value very rare changed (mostly - never)
+      set_cache_item($cache_item, $cache['localhost'], [ 'ttl' => 3600 ]); // set valid for 1 hour
+
+    } else {
+      // Cached item
+      $cache['localhost'] = get_cache_data($cache_item);
     }
   }
 
@@ -673,6 +690,11 @@ function list_to_range($str, $separator = ',', $sort = TRUE) {
 function logfile($filename, $string = NULL) {
   global $config, $argv;
 
+  if (defined('__PHPUNIT_PHAR__')) {
+    print_debug("Skip logging to '$filename' when run phpunit tests.");
+    return FALSE;
+  }
+
   // Use default logfile if none specified
   if (safe_empty($string)) {
     $string = $filename;
@@ -893,7 +915,7 @@ function get_versions($program = NULL) {
         }
         $versions['rrdtool_old'] = version_compare($versions['rrdtool_version'], OBS_MIN_RRD_VERSION, '<');
 
-        if (strlen($GLOBALS['config']['rrdcached'])) {
+        if (!safe_empty($GLOBALS['config']['rrdcached'])) {
           if (OBS_RRD_NOLOCAL) {
             // Remote rrdcached daemon (unknown version)
             $rrdtool_version .= ' (rrdcached remote: ' . $GLOBALS['config']['rrdcached'] . ')';
@@ -948,7 +970,7 @@ function get_versions($program = NULL) {
       case 'http':
         // Apache (or any http used?)
         if (is_cli()) {
-          foreach (array('apache2', 'httpd') as $http_cmd) {
+          foreach ([ 'apache2', 'httpd' ] as $http_cmd) {
             if (is_executable('/usr/sbin/'.$http_cmd)) {
               $http_cmd = '/usr/sbin/'.$http_cmd;
             } else {
@@ -1041,8 +1063,9 @@ function print_versions() {
     print_cli_data("PHP",     ($php_memory_limit >= 0 && $php_memory_limit < 268435456 ? '%r' : '') . $php_memory_limit_text, 3);
 
     echo(PHP_EOL);
-    print_cli_heading("$mysql_name mode", 3);
-    print_cli_data($mysql_name, $mysql_mode, 3);
+    print_cli_heading("DB info", 3);
+    print_cli_data("DB schema", get_db_version(), 3);
+    print_cli_data("$mysql_name mode", $mysql_mode, 3);
 
     echo(PHP_EOL);
     print_cli_heading("Charset info", 3);
@@ -1118,7 +1141,7 @@ function print_versions() {
       $rrdtool_version = escape_html($rrdtool_version);
     }
 
-    echo generate_box_open(array('title' => 'Version Information'));
+    echo generate_box_open([ 'title' => 'Version Information' ]);
     echo('
         <table class="table table-striped table-condensed-more">
           <tbody>
@@ -1346,15 +1369,12 @@ function timeticks_to_sec($timetick, $float = FALSE)
  *
  * @return integer Unixtime
  */
-function datetime_to_unixtime($datetime, $use_gmt = FALSE)
-{
+function datetime_to_unixtime($datetime, $use_gmt = FALSE) {
   $timezone = get_timezone();
 
   $datetime = trim($datetime);
-  if (preg_match('/(?<year>\d+)-(?<mon>\d+)-(?<day>\d+)(?:,(?<hour>\d+):(?<min>\d+):(?<sec>\d+)(?<millisec>\.\d+)?(?:,(?<tzs>[+\-]?)(?<tzh>\d+):(?<tzm>\d+))?)/', $datetime, $matches))
-  {
-    if (isset($matches['tzh']))
-    {
+  if (preg_match('/(?<year>\d+)-(?<mon>\d+)-(?<day>\d+)(?:,(?<hour>\d+):(?<min>\d+):(?<sec>\d+)(?<millisec>\.\d+)?(?:,(?<tzs>[+\-]?)(?<tzh>\d+):(?<tzm>\d+))?)/', $datetime, $matches)) {
+    if (isset($matches['tzh'])) {
       // Use TZ offset from datetime string
       $offset = $matches['tzs'] . ($matches['tzh'] * 3600 + $matches['tzm'] * 60); // Offset from GMT in seconds
     } else {
@@ -1370,19 +1390,17 @@ function datetime_to_unixtime($datetime, $use_gmt = FALSE)
     $time_gmt   = $time_local - $timezone['php_offset']; // Current unixtime in GMT
   }
 
-  if (OBS_DEBUG > 1)
-  {
+  if (OBS_DEBUG > 1) {
     $debug_msg  = 'UNIXTIME from DATETIME "' . ($time_tmp ? $datetime : 'time()') . '": ';
     $debug_msg .= 'LOCAL (' . format_unixtime($time_local) . '), GMT (' . format_unixtime($time_gmt) . '), TZ (' . $timezone['php'] . ')';
     print_message($debug_msg);
   }
 
-  if ($use_gmt)
-  {
+  if ($use_gmt) {
     return ($time_gmt);
-  } else {
-    return ($time_local);
   }
+
+  return ($time_local);
 }
 
 /**
@@ -1471,7 +1489,7 @@ function format_uptime($uptime, $format = "long") {
 /**
  * Get current timezones for mysql and php.
  * Use this function when need display timedate from mysql
- * for fix diffs betwen this timezones
+ * for fix diffs between this timezones
  *
  * Example:
  * Array
@@ -1488,30 +1506,29 @@ function format_uptime($uptime, $format = "long") {
  *
  * @return array Timezones info
  */
-function get_timezone($refresh = FALSE)
-{
+function get_timezone($refresh = FALSE) {
   global $cache;
 
-  if ($refresh || !isset($cache['timezone']))
-  {
-    $timezone = array();
-    $timezone['system'] = external_exec('date "+%:z"');                            // return '+03:00'
-    if (!OBS_DB_SKIP)
-    {
+  if ($refresh || !isset($cache['timezone'])) {
+    $timezone = [];
+    if ($refresh) {
+      // Call to external exec only when refresh (basically it's not required)
+      $timezone['system'] = external_exec('date "+%:z"');                            // return '+03:00'
+    }
+    if (!OBS_DB_SKIP) {
       $timezone['mysql']  = dbFetchCell('SELECT TIMEDIFF(NOW(), UTC_TIMESTAMP);'); // return '03:00:00'
-      if ($timezone['mysql'][0] != '-')
-      {
+      if ($timezone['mysql'][0] !== '-') {
         $timezone['mysql'] = '+'.$timezone['mysql'];
       }
       $timezone['mysql']       = preg_replace('/:00$/', '', $timezone['mysql']);  // convert to '+03:00'
     }
-    $timezone['php']         = date('P');                                       // return '+03:00'
-    $timezone['php_abbr']    = date('T');                                       // return 'MSK'
-    $timezone['php_name']    = date('e');                                       // return 'Europe/Moscow'
-    $timezone['php_daylight'] = date('I');                                      // return '0'
+    list($timezone['php'], $timezone['php_abbr'], $timezone['php_name'], $timezone['php_daylight']) = explode('|', date('P|T|e|I'));
+    //$timezone['php']         = date('P');                                       // return '+03:00'
+    //$timezone['php_abbr']    = date('T');                                       // return 'MSK'
+    //$timezone['php_name']    = date('e');                                       // return 'Europe/Moscow'
+    //$timezone['php_daylight'] = date('I');                                      // return '0'
 
-    foreach (array('php', 'mysql') as $entry)
-    {
+    foreach ([ 'php', 'mysql' ] as $entry) {
       if (!isset($timezone[$entry])) { continue; } // skip mysql if OBS_DB_SKIP
 
       $sign = $timezone[$entry][0];
@@ -1519,13 +1536,12 @@ function get_timezone($refresh = FALSE)
       $timezone[$entry . '_offset'] = $sign . (abs($hours) * 3600 + $minutes * 60); // Offset from GMT in seconds
     }
 
-    if (OBS_DB_SKIP)
-    {
+    if (OBS_DB_SKIP) {
       // If mysql skipped, just return system/php timezones without caching
       return $timezone;
     }
 
-    // Get get the difference in sec between mysql and php timezones
+    // Get the difference in sec between mysql and php timezones
     $timezone['diff'] = (int)$timezone['mysql_offset'] - (int)$timezone['php_offset'];
     $cache['timezone'] = $timezone;
   }
@@ -1533,16 +1549,6 @@ function get_timezone($refresh = FALSE)
   return $cache['timezone'];
 }
 
-// DOCME needs phpdoc block
-function humanspeed($speed)
-{
-  if ($speed == '')
-  {
-    return '-';
-  } else {
-    return formatRates($speed);
-  }
-}
 
 /**
  * Convert common MAC strings to fixed 12 char string
@@ -1733,7 +1739,7 @@ function pipe_read($command, &$pipes, $fullread = TRUE) {
     $stdout = '';
     while (strlen($line) < 1 && $iter < 1000) {
       // wait for 10 milliseconds to loosen loop (max 1s)
-      usleep(10000);
+      usleep(1000);
       $line = fgets($pipes[1], 1024);
       $stdout .= $line;
       $iter++;
@@ -1944,24 +1950,20 @@ function external_exec($command, $timeout = NULL) {
  * @param boolean $stats  If true, additionally show cpu/memory stats
  * @return array|false  Array with information about process, If process not found, return FALSE
  */
-function get_pid_info($pid, $stats = FALSE)
-{
+function get_pid_info($pid, $stats = FALSE) {
   $pid = (int)$pid;
-  if ($pid < 1)
-  {
+  if ($pid < 1) {
     print_debug("Incorrect PID passed");
     //trigger_error("PID ".$pid." doesn't exists", E_USER_WARNING);
     return FALSE;
   }
 
-  if (!$stats && stripos(PHP_OS, 'Linux') === 0)
-  {
+  if (!$stats && stripos(PHP_OS, 'Linux') === 0) {
     // Do not use call to ps on Linux and extended stat not required
     // FIXME. Need something same on BSD and other Unix platforms
 
-    if ($pid_stat = lstat("/proc/$pid"))
-    {
-      $pid_info = array('PID' => "$pid");
+    if ($pid_stat = lstat("/proc/$pid")) {
+      $pid_info = [ 'PID' => (string)$pid ];
       $ps_stat = explode(" ", file_get_contents("/proc/$pid/stat"));
       //echo PHP_EOL; print_vars($ps_stat); echo PHP_EOL;
       //echo PHP_EOL; print_vars($pid_stat); echo PHP_EOL;
@@ -1979,15 +1981,14 @@ function get_pid_info($pid, $stats = FALSE)
   } else {
     // Use ps call, have troubles on high load systems!
 
-    if ($stats)
-    {
+    if ($stats) {
       // Add CPU/Mem stats
       $options = 'pid,ppid,uid,gid,pcpu,pmem,vsz,rss,tty,stat,time,lstart,args';
     } else {
       $options = 'pid,ppid,uid,gid,tty,stat,time,lstart,args';
     }
 
-    $timezone = get_timezone(); // Get system timezone info, for correct started time conversion
+    //$timezone = get_timezone(); // Get system timezone info, for correct started time conversion
 
     $ps = external_exec('/bin/ps -ww -o '.$options.' -p '.$pid, 1); // Set timeout 1sec for exec
     $ps = explode("\n", rtrim($ps));
@@ -2015,7 +2016,8 @@ function get_pid_info($pid, $stats = FALSE)
     $started = preg_split("/\s+/", array_pop($entries), 6, PREG_SPLIT_NO_EMPTY);
     $command = array_pop($started);
 
-    $started[]    = str_replace(':', '', $timezone['system']); // Add system TZ to started time
+    //$started[]    = str_replace(':', '', $timezone['system']); // Add system TZ to started time
+    $started[]    = external_exec('date "+%z"');  // Add system TZ to started time
     $started_rfc  = array_shift($started) . ','; // Sun
     // Reimplode and convert to RFC2822 started date 'Sun, 20 Mar 2016 18:01:53 +0300'
     $started_rfc .= ' ' . $started[1]; // 20
@@ -2030,9 +2032,8 @@ function get_pid_info($pid, $stats = FALSE)
     //print_vars($entries);
     //print_vars($started);
 
-    $pid_info = array();
-    foreach ($keys as $i => $key)
-    {
+    $pid_info = [];
+    foreach ($keys as $i => $key) {
       $pid_info[$key] = $entries[$i];
     }
     $pid_info['STARTED_UNIX'] = strtotime($pid_info['STARTED']);
@@ -2478,7 +2479,7 @@ function str_compress($string, $encode = 'base64') {
 
     if (OBS_DEBUG > 1) {
       $compressed = $encode === 'hex' ? bin2hex($compressed) : safe_base64_encode($compressed);
-      print_cli("String '$string' [".strlen($string)."] compressed to '".$compressed."' [".strlen($compressed)."].");
+      print_cli("DEBUG: String '$string' [".strlen($string)."] compressed to '".$compressed."' [".strlen($compressed)."].");
       return $compressed;
     }
 
@@ -2511,7 +2512,7 @@ function str_decompress($compressed) {
   }
 
   if (OBS_DEBUG > 1) {
-    print_cli("String '$compressed' [".strlen($compressed)."] decompressed to '".$string."' [".strlen($string)."].");
+    print_cli("DEBUG: String '$compressed' [".strlen($compressed)."] decompressed to '".$string."' [".strlen($string)."].");
   }
   return $string;
 }
@@ -2525,6 +2526,9 @@ function is_cli() {
   }
   if (!defined('OBS_CLI')) {
     define('OBS_CLI', PHP_SAPI === 'cli' && empty($_SERVER['REMOTE_ADDR']));
+    if (OBS_DEBUG > 1) {
+      print_cli("DEBUG: is_cli() == " . (OBS_CLI ? 'TRUE' : 'FALSE') . ", PHP_SAPI: '" . PHP_SAPI . "', REMOTE_ADDR: '" . $_SERVER['REMOTE_ADDR'] . "'");
+    }
   }
 
   return OBS_CLI;
@@ -2947,7 +2951,7 @@ function is_module_enabled($device, $module, $process = NULL, $settings = TRUE) 
     } elseif ($module === 'wifi' && !in_array($device['type'], [ 'network', 'firewall', 'wireless' ], TRUE)) {
       // WiFi by default allowed only for network/wireless/firewall types
       $ok = FALSE;
-      $debug_reason = "disabled for device type '${device['type']}'.";
+      $debug_reason = "disabled for device type '{$device['type']}'.";
     } /* else {
       $model = get_model_array($device);
       if (isset($model[$module_name])) {
@@ -3093,69 +3097,20 @@ function check_extension_exists($extension, $text = FALSE, $fatal = FALSE)
   return $exist;
 }
 
-// TESTME needs unit testing
 /**
  * Sign function
  *
  * This function extracts the sign of the number.
  * Returns -1 (negative), 0 (zero), 1 (positive)
  *
- * @param integer $int
+ * @param integer|float $int
  * @return integer
  */
-function sgn($int)
-{
-  if ($int < 0)
-  {
+function sgn($int) {
+  if ($int < 0) {
     return -1;
-  } elseif ($int == 0) {
-    return 0;
-  } else {
-    return 1;
   }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_bill_by_id($bill_id)
-{
-  $bill = dbFetchRow("SELECT * FROM `bills` WHERE `bill_id` = ?", array($bill_id));
-
-  if (is_array($bill))
-  {
-    return $bill;
-  } else {
-    return FALSE;
-  }
-
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_application_by_id($application_id)
-{
-  if (is_numeric($application_id))
-  {
-    $application = dbFetchRow("SELECT * FROM `applications` WHERE `app_id` = ?", array($application_id));
-  }
-  if (is_array($application))
-  {
-    return $application;
-  } else {
-    return FALSE;
-  }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function accesspoint_by_id($ap_id, $refresh = '0')
-{
-  $ap = dbFetchRow("SELECT * FROM `accesspoints` WHERE `accesspoint_id` = ?", array($ap_id));
-
-  return $ap;
+  return $int > 0 ? 1 : 0;
 }
 
 // DOCME needs phpdoc block
@@ -3169,13 +3124,15 @@ function truncate($substring, $max = 50, $rep = '...') {
   } else {
     $rep_len = strlen($rep);
   }
-  if (strlen($substring) < 1) {
-    $string = $rep;
-  } else {
-    $string = $substring;
+  if (safe_empty($substring)) {
+    //$string = $rep;
+    return $rep;
   }
-  $leave = $max - $rep_len;
+
+  $string = (string)$substring;
+
   if (strlen($string) > $max) {
+    $leave = $max - $rep_len;
     return substr_replace($string, $rep, $leave);
   }
   return $string;
@@ -3254,13 +3211,6 @@ function safename($filename)
 function zeropad($num, $length = 2)
 {
   return str_pad($num, $length, '0', STR_PAD_LEFT);
-}
-
-// OBSOLETE, remove when all function calls will be deleted
-function get_dev_attrib($device, $attrib_type)
-{
-  // Call to new function
-  return get_entity_attrib('device', $device, $attrib_type);
 }
 
 /**
@@ -3578,11 +3528,15 @@ function is_valid_param($string, $type = '') {
 
   switch (strtolower($type)) {
     case 'asset_tag':
+    case 'hardware':
+    case 'vendor':
     case 'serial':
+    case 'version':
+    case 'revision':
       $valid = ctype_print($string) &&
                !(str_istarts($string, [ 'Not Avail', 'Not Specified', 'To be filled by O.E.M.' ]) ||
-                 str_contains_array($string, [ 'denied' ]) || preg_match($poor_default_pattern, $string) ||
-                 in_array($string, [ '<EMPTY>', 'empty', 'n/a', 'N/A', '1234567890', '0123456789',
+                 str_contains_array($string, [ 'denied', 'No Such' ]) || preg_match($poor_default_pattern, $string) ||
+                 in_array($string, [ '<EMPTY>', 'empty', 'n/a', 'N/A', 'na', 'NA', '1234567890', '0123456789',
                                      'No Asset Tag', 'Tag 12345', 'sim', 'Unknown' ], TRUE));
       break;
 
@@ -3632,7 +3586,8 @@ function is_valid_param($string, $type = '') {
       // posix 32 chars
       // windows/ldap 20 chars
       // pre-windows2000 256 chars
-      $valid = strlen($string) <= 256 && preg_match('/^\w[\w\-\\\\]+\$?$/u', $string); // allow utf8 usernames
+      //$valid = strlen($string) <= 256 && preg_match('/^\w[\w\-\\\\]+\$?$/u', $string); // allow utf8 usernames
+      $valid = preg_match('/^[\w!][\w@!#^~+\$\-\.\ \\\\]{0,254}[\w\$]$/u', $string); // allow utf8 usernames
       break;
 
     case 'password':
@@ -3640,7 +3595,8 @@ function is_valid_param($string, $type = '') {
       break;
 
     case 'snmp_community':
-      $valid = preg_match('/^[\w#@=:\(\)\ \-\.\/]{1,32}$/', $string);
+      // allow all common latin and special chars
+      $valid = preg_match('/^[\w\ %!@#\$%\^&\*\(\)_\-\+~`\[\]\{\}\|\\\\<>,\.\/\?;:]{1,32}$/', $string);
       break;
 
     case 'snmp_timeout':
@@ -3670,7 +3626,7 @@ function is_valid_param($string, $type = '') {
     print_debug("Detected invalid value '$string' for param '$type'.");
   }
 
-  return $valid;
+  return (bool) $valid;
 }
 
 /**
@@ -3867,17 +3823,6 @@ function gethostbyaddr6($ip) {
   return $ptr;
 }
 
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// CLEANME DEPRECATED
-function add_service($device, $service, $descr)
-{
-  $insert = array('device_id' => $device['device_id'], 'service_ip' => $device['hostname'], 'service_type' => $service,
-                  'service_changed' => array('UNIX_TIMESTAMP(NOW())'), 'service_desc' => $descr, 'service_param' => "", 'service_ignore' => "0");
-
-  echo dbInsert($insert, 'services');
-}
-
 /**
  * Request an http(s) url.
  * Note. If first runtime request exit with timeout,
@@ -3963,11 +3908,10 @@ function get_http_request($request, $context = [], $rate_limit = FALSE) {
   $response = '';
 
   // Add common http context
-  $opts = array('http' => generate_http_context_defaults($context));
+  $opts = [ 'http' => generate_http_context_defaults($context) ];
 
   // Force IPv4 or IPv6
-  if (isset($config['http_ip_version']))
-  {
+  if (isset($config['http_ip_version'])) {
     $bindto = str_contains($config['http_ip_version'], '6') ? '[::]:0' : '0:0';
     $opts['socket'] = [ 'bindto' => $bindto ];
     //$opts['socket'] = [ 'bindto' => '0:0' ]; // IPv4
@@ -3996,13 +3940,12 @@ function get_http_request($request, $context = [], $rate_limit = FALSE) {
     if (isset($opts['http']['timeout'])) {
       $curl_cmd .= ' --connect-timeout '.$opts['http']['timeout'];
     }
-    if (isset($opts['http']['method']))
-    {
+    if (isset($opts['http']['method'])) {
       $curl_cmd .= ' -X '.$opts['http']['method'];
     }
     if (isset($opts['http']['header'])) {
       foreach (explode("\r\n", $opts['http']['header']) as $curl_header) {
-        if (!strlen($curl_header)) { continue; }
+        if (safe_empty($curl_header)) { continue; }
         $curl_cmd .= ' -H \'' . $curl_header . '\'';
       }
     }
@@ -4059,7 +4002,7 @@ function get_http_request($request, $context = [], $rate_limit = FALSE) {
     $GLOBALS['request_status'] = FALSE;
   } elseif ($response === FALSE) {
     // An error in get response
-    $GLOBALS['response_headers'] = array('code' => 408, 'descr' => 'Request Timeout');
+    $GLOBALS['response_headers'] = [ 'code' => 408, 'descr' => 'Request Timeout' ];
     $GLOBALS['request_status'] = FALSE;
   } else {
     // Valid statuses: 2xx Success, 3xx Redirection or head code not set (ie response not correctly parsed)
@@ -4073,14 +4016,14 @@ function get_http_request($request, $context = [], $rate_limit = FALSE) {
       if ($runtime < 1 &&
           isset($config['http_proxy']) && $config['http_proxy'] &&
           !(isset($config['proxy_user']) || isset($config['proxy_password']))) {
-        $GLOBALS['response_headers'] = array('code' => 407, 'descr' => 'Proxy Authentication Required');
+        $GLOBALS['response_headers'] = [ 'code' => 407, 'descr' => 'Proxy Authentication Required' ];
       } else {
-        $GLOBALS['response_headers'] = array('code' => 408, 'descr' => 'Request Timeout');
+        $GLOBALS['response_headers'] = [ 'code' => 408, 'descr' => 'Request Timeout' ];
       }
       $GLOBALS['request_status'] = FALSE;
 
       // Validate host from request and check if it timeout request
-      if (gethostbyname6(parse_url($request, PHP_URL_HOST))) {
+      if (OBS_PROCESS_NAME === 'poller' && gethostbyname6(parse_url($request, PHP_URL_HOST))) {
         // Timeout error, only if not received response headers
         define('OBS_HTTP_REQUEST', FALSE);
         print_debug(__FUNCTION__.'() exit with timeout. Access to outside localnet is blocked by firewall or network problems. Check proxy settings.');

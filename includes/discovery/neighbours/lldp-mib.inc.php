@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -206,7 +206,7 @@ if ($lldp_array) {
           }
           unset($id, $ip);
           */
-          $peer_where = generate_query_values($device['device_id'], 'device_id'); // Additional filter for include self IPs
+          $peer_where = generate_query_values_and($device['device_id'], 'device_id'); // Additional filter for include self IPs
           // Fetch all devices with peer IP and filter by UP
           if ($ids = get_entity_ids_ip_by_network('port', $ip, $peer_where)) {
             $port = get_port_by_id_cache($ids[0]);
@@ -344,8 +344,7 @@ if ($lldp_array) {
           // Try lldpRemPortId
           $query = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
           $remote_port_id = dbFetchCell($query, array($id, $id, $id, $remote_device_id, 0));
-          if (!$remote_port_id && strlen($if))
-          {
+          if (!$remote_port_id && !safe_empty($if)) {
             // Try same by lldpRemPortDesc
             $remote_port_id = dbFetchCell($query, array($if, $if, $if, $remote_device_id, 0));
           }
@@ -353,6 +352,11 @@ if ($lldp_array) {
 
         case 'macAddress':
           $remote_port_id = get_port_id_by_mac($remote_device_id, $id);
+          if (!$remote_port_id && !safe_empty($if)) {
+            // Try same by lldpRemPortDesc
+            $query = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
+            $remote_port_id = dbFetchCell($query, [ $if, $if, $if, $remote_device_id, 0 ]);
+          }
           break;
 
         case 'networkAddress':
@@ -360,7 +364,7 @@ if ($lldp_array) {
           if ($ip_version)
           {
             // Try by IP
-            $peer_where = generate_query_values($remote_device_id, 'device_id'); // Additional filter for include self IPs
+            $peer_where = generate_query_values_and($remote_device_id, 'device_id'); // Additional filter for include self IPs
             // Fetch all devices with peer IP and filter by UP
             if ($ids = get_entity_ids_ip_by_network('port', $id, $peer_where))
             {

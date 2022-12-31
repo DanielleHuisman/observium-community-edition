@@ -1,9 +1,18 @@
 <?php
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ *
+ */
 
-function get_vlans($vars)
-{
+function get_vlans($vars) {
 
-  $vlans = array();
+  $vlans = [];
 
   $vls = dbFetchRows("SELECT * FROM `vlans`");
   foreach ($vls as $vlan) {
@@ -12,14 +21,14 @@ function get_vlans($vars)
       $vlan['vlan_name'] = 'Vlan ' . $vlan['vlan_vlan'];
     }
     $vlans[$vlan['vlan_vlan']]['names'][$vlan['vlan_name']]++;
-    $vlans[$vlan['vlan_vlan']]['counts']['devices']  = 0;
-    $vlans[$vlan['vlan_vlan']]['counts']['ports_tagged']    = 0;
+    $vlans[$vlan['vlan_vlan']]['counts']['devices'] = 0;
+    $vlans[$vlan['vlan_vlan']]['counts']['ports_tagged'] = 0;
     $vlans[$vlan['vlan_vlan']]['counts']['ports_untagged'] = 0;
   }
 
-  $otherports = dbFetchRows("SELECT `ifVlan`, COUNT(`ifVlan`) AS `count` FROM `ports` GROUP BY `ifVlan`");
-  foreach ($otherports as $otherport) {
-    if ($otherport['ifVlan'] == "") {
+  $sql = 'SELECT `ifVlan`, COUNT(`ifVlan`) AS `count` FROM `ports` WHERE `deleted` != 1 GROUP BY `ifVlan`';
+  foreach (dbFetchRows($sql) as $otherport) {
+    if (safe_empty($otherport['ifVlan'])) {
       continue;
     }
 
@@ -56,3 +65,5 @@ function get_vlans($vars)
   return $vlans;
 
 }
+
+// EOF

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -63,7 +63,8 @@ function messagebus_send($message)
 
 function get_var_true($var, $true = NULL) {
   return $var === '1' || $var === 1 ||
-         $var === 'on' || $var === 'yes' ||
+         $var === 'on' || $var === 'yes' || $var === 'YES' ||
+         $var === 'true' || $var === 'TRUE' ||
          $var === TRUE ||
          // allow extra param for true, ie confirm
          (!empty($true) && $var === $true);
@@ -71,7 +72,8 @@ function get_var_true($var, $true = NULL) {
 
 function get_var_false($var, $false = NULL) {
   return $var === '0' || $var === 0 ||
-         $var === 'off' || $var === 'no' ||
+         $var === 'off' || $var === 'no' || $var === 'NO' ||
+         $var === 'false' || $var === 'FALSE' ||
          $var === FALSE || $var === NULL ||
          // allow extra param for false, ie confirm
          (!empty($false) && $var === $false);
@@ -1545,9 +1547,20 @@ function isSNMPable($device) {
     $device['ip'] = get_status_var('dns_ip');
   }
 
-  if (isset($device['os'][0]) && isset($GLOBALS['config']['os'][$device['os']]['snmpable']) && $device['os'] !== 'generic') {
+  if (isset($device['snmpable']) && !empty($device['snmpable'])) {
+    // Custom OID for check snmpable (can be multiple OIDs by space)
+    $oids = [];
+    foreach (explode(' ', $device['snmpable']) as $oid) {
+      if (preg_match(OBS_PATTERN_SNMP_OID_NUM, $oid)) {
+        $oids[] = $oid;
+      }
+    }
+    $pos = snmp_get_multi_oid($device, $oids, [], 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
+    //$err   = snmp_error_code();
+    $count = safe_count($pos);
+  } elseif (isset($device['os'][0], $GLOBALS['config']['os'][$device['os']]['snmpable']) && $device['os'] !== 'generic') {
     // Known device os, and defined custom snmpable OIDs
-    $pos   = snmp_get_multi_oid($device, $GLOBALS['config']['os'][$device['os']]['snmpable'], array(), 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
+    $pos = snmp_get_multi_oid($device, $GLOBALS['config']['os'][$device['os']]['snmpable'], [], 'SNMPv2-MIB', NULL, OBS_SNMP_ALL_NUMERIC);
     //$err   = snmp_error_code();
     $count = safe_count($pos);
   } else {
@@ -1575,8 +1588,8 @@ function isSNMPable($device) {
   if ($GLOBALS['snmp_status'] && $count > 0) {
     // SNMP response time in milliseconds.
     $time_snmp = $GLOBALS['exec_status']['runtime'] * 1000;
-    $time_snmp = number_format($time_snmp, 2, '.', '');
-    return $time_snmp;
+
+    return number_format($time_snmp, 2, '.', '');
   }
 
   return 0;
@@ -2432,8 +2445,7 @@ function load_sqlconfig(&$config) {
   foreach ($config_defined as $key => $definition) {
     //if (is_null($config['definitions_whitelist'])) { print_error("NULL on $key"); } else { print_warning("ARRAY on $key"); }
     if (in_array($key, $GLOBALS['config']['definitions_whitelist']) && // Always use global config here!
-        is_array($definition) && is_array($config[$key]))
-    {
+        is_array($definition) && is_array($config[$key])) {
       /* Fix mib definitions for dumb users, who copied old defaults.php
          where mibs was just MIB => 1,
          This definition should be array */
@@ -3070,8 +3082,7 @@ function print_cli_table($table_rows, $table_header = array(), $descr = NULL, $o
 /**
  * Prints Observium banner containing ASCII logo and version information for use in CLI utilities.
  */
-function print_cli_banner()
-{
+function print_cli_banner() {
   if (OBS_QUIET || !is_cli()) { return; } // Silent exit if not cli or quiet
 
   print_message("%W
@@ -3085,8 +3096,7 @@ function print_cli_banner()
   str_pad(OBSERVIUM_URL , 59, " ", STR_PAD_LEFT)."%N\n", 'color');
 
   // One time alert about deprecated (eol) php version
-  if (version_compare(PHP_VERSION, OBS_MIN_PHP_VERSION, '<'))
-  {
+  if (version_compare(PHP_VERSION, OBS_MIN_PHP_VERSION, '<')) {
     $php_version = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
     print_message("
 
@@ -3102,6 +3112,27 @@ function print_cli_banner()
 | See additional information here:                        |
 | %c".
   str_pad(OBSERVIUM_DOCS_URL . '/software_requirements/' , 56, ' ')."%n|
+|                                                         |
++---------------------------------------------------------+
+", 'color');
+  }
+  // Same for MySQL/MariaDB
+  $versions = get_versions();
+  if ($versions['mysql_old']) {
+    $mysql_recommented = $versions['mysql_name'] === 'MariaDB' ? OBS_MIN_MARIADB_VERSION : OBS_MIN_MYSQL_VERSION;
+    print_message("
+
++---------------------------------------------------------+
+|                                                         |
+|                %rDANGER! ACHTUNG! BHUMAHUE!%n               |
+|                                                         |
+".
+                  str_pad("| %WYour ".$versions['mysql_name']." version is old (%r".$versions['mysql_version']."%W),", 64, ' ')."%n|
+| %WCurrently recommended version(s): >=%g".$mysql_recommented."%n                |
+|                                                         |
+| See additional information here:                        |
+| %c".
+                  str_pad(OBSERVIUM_DOCS_URL . '/software_requirements/' , 56, ' ')."%n|
 |                                                         |
 +---------------------------------------------------------+
 ", 'color');
@@ -3257,13 +3288,14 @@ function calculate_mempool_properties($scale, $used, $total, $free, $perc = NULL
     $free   = 100 - $perc;
     //$scale  = 1; // Reset scale for percentage-only
   }
+  $valid = ($total > 0) && ($perc >= 0) && ($perc <= 100);
 
   if (OBS_DEBUG && ($perc < 0 || $perc > 100)) {
     print_error('Incorrect scales or passed params to function ' . __FUNCTION__ . '()');
   }
   print_debug_vars([ 'used' => $used, 'total' => $total, 'free' => $free, 'perc' => $perc, 'units' => $scale, 'scale' => $scale ], 1);
 
-  return [ 'used' => $used, 'total' => $total, 'free' => $free, 'perc' => $perc, 'units' => $scale, 'scale' => $scale ];
+  return [ 'used' => $used, 'total' => $total, 'free' => $free, 'perc' => $perc, 'units' => $scale, 'scale' => $scale, 'valid' => $valid ];
 }
 
 function discovery_check_if_type_exist($entry, $entity_type, $entity = []) {

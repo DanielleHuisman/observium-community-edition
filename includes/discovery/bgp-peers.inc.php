@@ -208,7 +208,7 @@ if (safe_count($peerlist)) {
   echo(PHP_EOL);
   // Filter IP search by BGP enabled devices (without self)
   $bgp_device_ids = dbFetchColumn('SELECT `device_id` FROM `devices` WHERE `device_id` != ? AND `bgpLocalAs` > 0 AND `disabled` = 0 AND `status` = 1', [ $device['device_id'] ]);
-  $peer_as_where  = generate_query_values($bgp_device_ids, 'device_id');
+  $peer_as_where  = generate_query_values_and($bgp_device_ids, 'device_id');
 
   $peer_devices = [];
   $peer_devices_ids = [];
@@ -218,7 +218,7 @@ if (safe_count($peerlist)) {
   }
   print_debug_vars($peer_devices);
 
-  $peer_ip_where  = generate_query_values($peer_devices_ids, 'device_id') . generate_query_values('up', 'ifOperStatus');
+  $peer_ip_where  = generate_query_values_and($peer_devices_ids, 'device_id') . generate_query_values_and('up', 'ifOperStatus');
 
   foreach ($peerlist as $peer) {
 
@@ -371,7 +371,7 @@ if (safe_count($peerlist)) {
   } # AF list
   if (safe_count($cbgp_delete)) {
     // Multi-delete
-    dbDelete('bgpPeers_cbgp', generate_query_values($cbgp_delete, 'cbgp_id', NULL, FALSE));
+    dbDelete('bgpPeers_cbgp', generate_query_values_ng($cbgp_delete, 'cbgp_id'));
   }
   unset($af_list, $cbgp_delete);
 } # end peerlist
@@ -395,8 +395,8 @@ foreach (dbFetchRows($query, [ $device['device_id'] ]) as $entry) {
 }
 if (count($peers_delete)) {
   // Multi-delete
-  dbDelete('bgpPeers', generate_query_values($peers_delete, 'bgpPeer_id', NULL, FALSE));
-  dbDelete('bgpPeers_cbgp', generate_query_values($peers_delete, 'bgpPeer_id', NULL, FALSE));
+  dbDelete('bgpPeers', generate_query_values_ng($peers_delete, 'bgpPeer_id'));
+  dbDelete('bgpPeers_cbgp', generate_query_values_ng($peers_delete, 'bgpPeer_id'));
 }
 
 $table_headers = array('%WLocal: AS (VRF)%n', '%WIP%n', '%WPeer: AS%n', '%WIP%n', '%WFamily%n', '%WrDNS%n', '%WRemote Device%n');

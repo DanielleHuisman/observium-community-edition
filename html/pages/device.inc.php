@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -530,11 +530,16 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
     }
 
     // Print the inventory tab if inventory is enabled and either entphysical or hrdevice tables have entries
-    //if (dbFetchCell('SELECT COUNT(*) FROM `entPhysical` WHERE `device_id` = ?', array($device['device_id'])) > 0)
     if (dbExist('entPhysical', '`device_id` = ? AND `deleted` IS NULL', [ $device['device_id'] ])) {
-      $navbar['options']['entphysical'] = array('text' => 'Inventory', 'icon' => $config['icon']['inventory']);
-    } elseif (dbExist('hrDevice', '`device_id` = ?', array($device['device_id']))) {
-      $navbar['options']['hrdevice'] = array('text' => 'Inventory', 'icon' => $config['icon']['inventory']);
+      $navbar['options']['entphysical'] = [ 'text' => 'Inventory', 'icon' => $config['icon']['inventory'] ];
+
+      if ($device['os_group'] === 'unix' && is_device_mib($device, 'HOST-RESOURCES-MIB') &&
+          dbExist('hrDevice', '`device_id` = ?', [ $device['device_id'] ])) {
+        // Some unix OS can have both inventory tables, ie VMWare
+        $navbar['options']['hrdevice'] = [ 'text' => 'Resources', 'icon' => $config['icon']['inventory'] ];
+      }
+    } elseif (is_device_mib($device, 'HOST-RESOURCES-MIB') && dbExist('hrDevice', '`device_id` = ?', [ $device['device_id'] ])) {
+      $navbar['options']['hrdevice'] = [ 'text' => 'Resources', 'icon' => $config['icon']['inventory'] ];
     }
 
     if (isset($attribs['ps_list'])) {
@@ -632,7 +637,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || safe_count($permit_tabs))
       $navbar['options']['tools']['suboptions']['connect']       = array('text' => 'Connect', 'icon' => 'sprite-config', 'url' => '#');
       $navbar['options']['tools']['suboptions']['connect']['entries']       = $connect_entries;
       $navbar['options']['tools']['suboptions']['divider_2']  = array('divider' => TRUE);
-      
+
       $navbar['options']['tools']['suboptions']['delete']['url']  = "#modal-delete_device";
       $navbar['options']['tools']['suboptions']['delete']['text'] = 'Delete Device';
       $navbar['options']['tools']['suboptions']['delete']['link_opts'] = 'data-toggle="modal"';

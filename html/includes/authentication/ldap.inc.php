@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -67,7 +67,7 @@ function ldap_search_user($ldap_group, $userdn, $depth = -1) {
 
     $ldap_search  = ldap_search($ds, trim($config['auth_ldap_groupbase'], ', '), $filter, array($config['auth_ldap_attr']['dn']));
     //r($filter);
-    if (is_resource($ldap_search)) {
+    if (ldap_internal_is_valid($ldap_search)) {
       $ldap_results = ldap_get_entries($ds, $ldap_search);
 
       //r($ldap_results);
@@ -101,30 +101,30 @@ function ldap_search_user($ldap_group, $userdn, $depth = -1) {
  * Initializes the LDAP connection to the specified server(s). Cycles through all servers, throws error when no server can be reached.
  * Private function for this LDAP module only.
  */
-function ldap_init()
-{
+function ldap_init() {
   global $ds, $config;
 
-  if (!is_resource($ds))
-  {
+  if (!ldap_internal_is_valid($ds)) {
     print_debug('LDAP[Connecting to ' . implode(' ',$config['auth_ldap_server']) . ']');
-    $ds = @ldap_connect(implode(' ',$config['auth_ldap_server']), $config['auth_ldap_port']);
+    if ($config['auth_ldap_port'] === 636) {
+      print_debug('LDAP[Port 636. Prepending ldaps:// to server URI]');
+      $ds = @ldap_connect(implode(' ',preg_filter('/^(ldaps:\/\/)?/', 'ldaps://', $config['auth_ldap_server'])), $config['auth_ldap_port']);
+    } else {
+      $ds = @ldap_connect(implode(' ',$config['auth_ldap_server']), $config['auth_ldap_port']);
+    }
     print_debug("LDAP[Connected]");
 
     if ($config['auth_ldap_starttls'] &&
-        (in_array($config['auth_ldap_starttls'], [ 'optional', 'require', '1', 1, TRUE ], TRUE)))
-    {
+        (in_array($config['auth_ldap_starttls'], [ 'optional', 'require', '1', 1, TRUE ], TRUE))) {
       $tls = ldap_start_tls($ds);
-      if ($config['auth_ldap_starttls'] === 'require' && !$tls)
-      {
+      if ($config['auth_ldap_starttls'] === 'require' && !$tls) {
         session_logout();
         print_error("Fatal error: LDAP TLS required but not successfully negotiated [" . ldap_error($ds) . "]");
         exit;
       }
     }
 
-    if ($config['auth_ldap_referrals'])
-    {
+    if ($config['auth_ldap_referrals']) {
       ldap_set_option($ds, LDAP_OPT_REFERRALS, $config['auth_ldap_referrals']);
       print_debug("LDAP[Referrals][Set to " . $config['auth_ldap_referrals'] . "]");
     } else {
@@ -132,8 +132,7 @@ function ldap_init()
       print_debug("LDAP[Referrals][Disabled]");
     }
 
-    if ($config['auth_ldap_version'])
-    {
+    if ($config['auth_ldap_version']) {
       ldap_set_option($ds, LDAP_OPT_PROTOCOL_VERSION, $config['auth_ldap_version']);
       print_debug("LDAP[Version][Set to " . $config['auth_ldap_version'] . "]");
     }
@@ -385,11 +384,12 @@ function ldap_auth_user_id($username)
   $filter_params[] = ldap_filter_create('objectClass', $config['auth_ldap_objectclass']);
   $filter_params[] = ldap_filter_create($config['auth_ldap_attr']['uid'], $username);
   $filter          = ldap_filter_combine($filter_params);
-  
+
   print_debug("LDAP[Filter][$filter][" . trim($config['auth_ldap_suffix'], ', ') . "]");
   $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter);
-  $entries = is_resource($search) ? ldap_get_entries($ds, $search) : [];
-  //print_vars($entries);
+  //r($search);
+  $entries = ldap_internal_is_valid($search) ? ldap_get_entries($ds, $search) : [];
+  //r($entries);
 
   if ($entries['count'])
   {
@@ -500,7 +500,7 @@ function ldap_auth_user_list($username = NULL) {
       //$group_filter .= '(memberof='.$group.')';
       $group_params[] = ldap_filter_create($config['auth_ldap_attr']['memberOf'], $group);
     }
-    
+
     $filter_params[] = ldap_filter_combine($group_params, '|');
 
     //$filter = '(&'.$filter.'(|'.$group_filter.'))';
@@ -566,7 +566,7 @@ function ldap_internal_user_entries($entries, &$userlist) {
 
         $compare = ldap_search_user($ldap_group, $userdn);
         //print_warning("$username, $realname, ");
-        //print_vars($compare);
+        //r($compare);
 
         if ($compare === -1) {
           print_debug("LDAP[UserList][Compare LDAP error: " . ldap_error($ds) . "]");
@@ -606,9 +606,9 @@ function ldap_internal_paged_entries($filter, $attributes)
     do {
       $search = ldap_search(
         $ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes, 0, 0, 0, LDAP_DEREF_NEVER,
-        [['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => $page_size, 'cookie' => $cookie]]]
+        [['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => [ 'size' => $page_size, 'cookie' => $cookie ]]]
       );
-      if (is_resource($search)) {
+      if (ldap_internal_is_valid($search)) {
         ldap_parse_result($ds, $search, $errcode, $matcheddn, $errmsg, $referrals, $controls);
         print_debug(ldap_error($ds));
         $entries = array_merge($entries, ldap_get_entries($ds, $search));
@@ -642,7 +642,7 @@ function ldap_internal_paged_entries($filter, $attributes)
 
       $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
       print_debug(ldap_error($ds));
-      if (is_resource($search)) {
+      if (ldap_internal_is_valid($search)) {
         $entries = array_merge($entries, ldap_get_entries($ds, $search));
         //print_vars($filter);
         //print_vars($search);
@@ -665,7 +665,7 @@ function ldap_internal_paged_entries($filter, $attributes)
     $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
     print_debug(ldap_error($ds));
 
-    if (is_resource($search)) {
+    if (ldap_internal_is_valid($search)) {
       $entries = ldap_get_entries($ds, $search);
       //print_vars($filter);
       //print_vars($search);
@@ -800,6 +800,9 @@ function ldap_bind_dn($username = "", $password = "")
  */
 function ldap_internal_dn_from_username($username)
 {
+
+  //r(debug_backtrace());
+
   global $config, $ds, $cache;
 
   if (!isset($cache['ldap']['dn'][$username]))
@@ -813,7 +816,11 @@ function ldap_internal_dn_from_username($username)
     print_debug("LDAP[Filter][$filter][" . trim($config['auth_ldap_suffix'], ', ') . "]");
 
     $search  = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter);
-    if (is_resource($search)) {
+
+    //r($search);
+    //r(ldap_get_entries($ds, $search));
+
+    if (ldap_internal_is_valid($search)) {
       $entries = ldap_get_entries($ds, $search);
 
       if ($entries['count']) {
@@ -1108,6 +1115,16 @@ function ldap_unescape_filter_value($values = array())
   }
 
   return $values;
+}
+
+function ldap_internal_is_valid($obj) {
+  if (PHP_VERSION_ID >= 80100) {
+    // ldap_bind() returns an LDAP\Connection instance in 8.1; previously, a resource was returned
+    // ldap_search() returns an LDAP\Result instance in 8.1; previously, a resource was returned.
+    return is_object($obj);
+  }
+
+  return is_resource($obj);
 }
 
 /**

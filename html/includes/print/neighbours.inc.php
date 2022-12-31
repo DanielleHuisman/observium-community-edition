@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -177,31 +176,33 @@ function get_neighbours_array($vars)
     if ($value != '') {
       switch ($var) {
         case 'device':
+        case 'device_id':
         case 'device_a':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'port':
+        case 'port_id':
         case 'port_a':
-          $where .= generate_query_values($value, 'port_id');
+          $where .= generate_query_values_and($value, 'port_id');
           break;
         case 'device_b':
-          $where .= generate_query_values($value, 'remote_hostname');
+          $where .= generate_query_values_and($value, 'remote_hostname');
           break;
         case 'port_b':
-          $where .= generate_query_values($value, 'remote_port');
+          $where .= generate_query_values_and($value, 'remote_port');
           break;
         case 'protocol':
-          $where .= generate_query_values($value, 'protocol');
+          $where .= generate_query_values_and($value, 'protocol');
           break;
         case 'platform':
-          $where .= generate_query_values($value, 'remote_platform');
+          $where .= generate_query_values_and($value, 'remote_platform');
           break;
         case 'version':
-          $where .= generate_query_values($value, 'remote_version');
+          $where .= generate_query_values_and($value, 'remote_version');
           break;
         case 'active':
-          $value = $value && $value != 'no' ? '1' : '0';
-          $where .= generate_query_values($value, 'active');
+          $value = !get_var_false($value, 'no') ? '1' : '0';
+          $where .= generate_query_values_and($value, 'active');
           break;
         case 'remote_port_id':
           if ($value === 'NULL' || $value == 0) {

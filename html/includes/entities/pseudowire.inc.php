@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -24,42 +23,42 @@ function generate_pseudowire_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'pseudowire_id');
+        $sql .= generate_query_values_and($values, 'pseudowire_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'device_id');
+        $sql .= generate_query_values_and($values, 'device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'device_id');
+        $sql .= generate_query_values_and($value, 'device_id');
         break;
       case "port":
       case "port_id":
-        $sql .= generate_query_values($value, 'port_id');
+        $sql .= generate_query_values_and($value, 'port_id');
         break;
       case "id":
-        $sql .= generate_query_values($value, 'pseudowire_id');
+        $sql .= generate_query_values_and($value, 'pseudowire_id');
         break;
       case "pwid":
       case "pwID":
-        $sql .= generate_query_values($value, 'pwID');
+        $sql .= generate_query_values_and($value, 'pwID');
         break;
       case "pwtype":
-        $sql .= generate_query_values($value, 'pwType');
+        $sql .= generate_query_values_and($value, 'pwType');
         break;
       case "psntype":
-        $sql .= generate_query_values($value, 'pwPsnType');
+        $sql .= generate_query_values_and($value, 'pwPsnType');
         break;
       case "peer_id":
-        $sql .= generate_query_values($value, 'peer_device_id');
+        $sql .= generate_query_values_and($value, 'peer_device_id');
         break;
       case "peer_addr":
-        $sql .= generate_query_values($value, 'peer_addr');
+        $sql .= generate_query_values_and($value, 'peer_addr');
         break;
       case "event":
-        $sql .= generate_query_values($value, 'event');
+        $sql .= generate_query_values_and($value, 'event');
         break;
     }
   }
@@ -130,7 +129,7 @@ function get_pseudowire_table($vars)
 
       if (!is_array($cache_pseudowires['ips'][$peer_addr]))
       {
-        $cache_pseudowires['ips'][$peer_addr]['port_id'] = dbFetchCell('SELECT `port_id` FROM `'.$peer_addr_type.'_addresses` WHERE `'.$peer_addr_type.'_address` = ? '.generate_query_values($GLOBALS['cache']['ports']['pseudowires'], 'port_id').' LIMIT 1;', array($peer_addr));
+        $cache_pseudowires['ips'][$peer_addr]['port_id'] = dbFetchCell('SELECT `port_id` FROM `'.$peer_addr_type.'_addresses` WHERE `'.$peer_addr_type.'_address` = ? '.generate_query_values_and($GLOBALS['cache']['ports']['pseudowires'], 'port_id').' LIMIT 1;', array($peer_addr));
         if (!is_numeric($cache_pseudowires['ips'][$peer_addr]['port_id']))
         {
           // Separate entry for find correct port

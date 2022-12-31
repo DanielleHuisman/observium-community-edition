@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,6 +23,7 @@ unset($vars['page']);
   $thumb_width=113;
 //}
 
+// Timestamps from Graphs page form, convert to common from/to unixtime
 if (isset($vars['timestamp_from']) && preg_match(OBS_PATTERN_TIMESTAMP, $vars['timestamp_from'])) {
   $vars['from'] = strtotime($vars['timestamp_from']);
   unset($vars['timestamp_from']);
@@ -160,10 +161,15 @@ if (!$auth) {
 
     foreach($vars as $var => $value) { if(in_array($var, $valid))  { $add_array[$var] = $value; } }
 
-    if (isset($vars['dash_add']) && dashboard_exists($vars['dash_add'])) {
-      $widget_id = dbInsert(array('dash_id' => $vars['dash_add'], 'widget_config' => json_encode($add_array), 'widget_type' => 'graph', 'x' => 0, 'y' => 99, 'width' => 3, 'height' => 2), 'dash_widgets');
+    $dash_add_key = 'widget_graph_'.$vars['dash_add'].'_'.var_encode($add_array); // prevent clone widget graphs
+    if (isset($vars['dash_add']) && empty($_SESSION[$dash_add_key]) && dashboard_exists($vars['dash_add'])) {
+      $widget_id = dbInsert([ 'dash_id' => $vars['dash_add'],
+                              'widget_config' => safe_json_encode($add_array),
+                              'widget_type' => 'graph',
+                              'x' => 0, 'y' => 99, 'width' => 3, 'height' => 2 ], 'dash_widgets');
       print_message('Graph widget added to dashboard.', 'info');
       unset($vars['dash_add']);
+      session_set_var($dash_add_key, 1);
     }
 
     if (isset($vars['dash_add_widget'])) {
@@ -276,13 +282,34 @@ if (!$auth) {
   unset($form_vars['to']);
   unset($form_vars['period']);
 
-  $form = array('type'          => 'rows',
-                'space'         => '5px',
-                'submit_by_key' => TRUE,
-                'url'           => 'graphs'.generate_url($form_vars));
+  $form = [
+    'type'          => 'rows',
+    'space'         => '5px',
+    'submit_by_key' => TRUE,
+    'url'           => 'graphs'.generate_url($form_vars)
+  ];
 
-  if (is_numeric($vars['from']) && $vars['from'] < 0) { $text_from = time() + $vars['from']; } elseif(is_numeric($vars['from'])) { $text_from = date('Y-m-d H:i:s', $vars['from']); }
-if (is_numeric($vars['to']) && $vars['to'] < 0) { $text_to = time() + $vars['to']; } elseif ($vars['to'] === 'now' || $vars['to'] === "NOW") { $text_to = time(); } elseif(is_numeric($vars['to'])) { $text_to = date('Y-m-d H:i:s', $vars['to']); }
+  if (is_numeric($vars['from']) && $vars['from'] < 0) {
+    $text_from = time() + $vars['from'];
+  } elseif (is_numeric($vars['from'])) {
+    $text_from = date('Y-m-d H:i:s', $vars['from']);
+  }
+  if (is_numeric($vars['to']) && $vars['to'] < 0) {
+    $text_to = time() + $vars['to'];
+  } elseif ($vars['to'] === 'now' || $vars['to'] === "NOW") {
+    $text_to = time();
+  } elseif (is_numeric($vars['to'])) {
+    $text_to = date('Y-m-d H:i:s', $vars['to']);
+  }
+
+  if ($vars['to'] === 'now' || $vars['to'] === "NOW") {
+    //$text_to = time() + $vars['to'];
+    $text_to = date('Y-m-d H:i:s');
+  } elseif (is_numeric($vars['to'])) {
+    $text_to = date('Y-m-d H:i:s', $vars['to']);
+  } else {
+    $text_to = $vars['to'];
+  }
 
   if (isset($vars['period']) && (!isset($vars['from']) || !isset($vars['to']))) {
       $text_to = date('Y-m-d H:i:s', time());
@@ -305,14 +332,14 @@ if (is_numeric($vars['to']) && $vars['to'] < 0) { $text_to = time() + $vars['to'
                               'to'          => $text_to);
 
   $search_grid = 2;
-  if ($type == "port")
+  if ($type === "port")
   {
-    if ($subtype == "bits")
+    if ($subtype === "bits")
     {
       $speed_list = array('auto' => 'Autoscale', 'speed'  => 'Interface Speed ('.formatRates($port['ifSpeed'], 4, 4).')');
       foreach ($config['graphs']['ports_scale_list'] as $entry)
       {
-        $speed = intval(unit_string_to_numeric($entry, 1000));
+        $speed = (int)unit_string_to_numeric($entry, 1000);
         $speed_list[$entry] = formatRates($speed, 4, 4);
       }
       $form['row'][0]['scale'] = array(
@@ -364,45 +391,45 @@ unset($vars['command_only']);
 
 // Print options navbar
 
-$navbar = array();
+$navbar = [];
 $navbar['brand'] = "Options";
 $navbar['class'] = "navbar-narrow";
 
-$navbar['options']['legend']   =  array('text' => 'Show Legend', 'inverse' => TRUE);
-$navbar['options']['previous'] =  array('text' => 'Graph Previous');
+$navbar['options']['legend']          = [ 'text' => 'Show Legend', 'inverse' => TRUE ];
+$navbar['options']['title']           = [ 'text' => 'Show Title' ];
+$navbar['options']['force_autoscale'] = [ 'text' => 'Force Autoscale' ];
+$navbar['options']['previous']        = [ 'text' => 'Graph Previous' ];
 
-if (in_array('trend', $graph_return['valid_options'])) {
-  $navbar['options']['trend']    =  array('text' => 'Graph Trend');
+if (in_array('95th', (array)$graph_return['valid_options'])) {
+  $navbar['options']['95th']          = [ 'text' => '95th %ile', 'inverse' => TRUE ];
+}
+
+if (in_array('trend', (array)$graph_return['valid_options'])) {
+  $navbar['options']['trend']         = [ 'text' => 'Graph Trend' ];
 }
 //$navbar['options']['max']      =  array('text' => 'Graph Maximum');
 
-if (in_array('inverse', $graph_return['valid_options'])) {
-   $navbar['options']['inverse']    =  array('text' => 'Invert Graph');
+if (in_array('inverse', (array)$graph_return['valid_options'])) {
+  $navbar['options']['inverse']       = [ 'text' => 'Invert Graph' ];
 }
 
-if (in_array('line_graph', $graph_return['valid_options'])) {
-  $navbar['options']['line_graph']    =  array('text' => 'Line Graph');
+if (in_array('line_graph', (array)$graph_return['valid_options'])) {
+  $navbar['options']['line_graph']    = [ 'text' => 'Line Graph' ];
 }
 
+$navbar['options_right']['showcommand'] = [ 'text' => 'RRD Command' ];
 
-$navbar['options_right']['showcommand'] =  array('text' => 'RRD Command');
-
-foreach (array('options' => $navbar['options'], 'options_right' => $navbar['options_right'] ) as $side => $options)
-{
-  foreach ($options AS $option => $array)
-  {
-    if ($array['inverse'] == TRUE)
-    {
-      if ($vars[$option] == "no")
-      {
+foreach ([ 'options' => $navbar['options'], 'options_right' => $navbar['options_right'] ] as $side => $options) {
+  foreach ($options as $option => $array) {
+    if ($array['inverse']) {
+      if (isset($vars[$option]) && get_var_false($vars[$option])) {
         $navbar[$side][$option]['url'] = generate_url($vars, array('page' => "graphs", $option => NULL));
       } else {
         $navbar[$side][$option]['url'] = generate_url($vars, array('page' => "graphs", $option => 'no'));
         $navbar[$side][$option]['class'] .= " active";
       }
     } else {
-      if ($vars[$option] == "yes")
-      {
+      if (get_var_true($vars[$option])) {
         $navbar[$side][$option]['url'] = generate_url($vars, array('page' => "graphs", $option => NULL));
         $navbar[$side][$option]['class'] .= " active";
       } else {
@@ -622,7 +649,7 @@ LINE1:d95thout#aa0000';
     echo generate_box_close();
   }
 
-  #print_vars($graph_return);
+  //r($graph_return);
 
   if (isset($vars['showcommand']))
   {
@@ -639,9 +666,16 @@ LINE1:d95thout#aa0000';
     echo generate_box_open(array('title' => 'RRDTool Files Used', 'padding' => TRUE));
     if (is_array($graph_return['rrds']))
     {
-      foreach ($graph_return['rrds'] as $rrd)
+      foreach ($graph_return['rrds'] as $key => $val)
       {
-        echo "$rrd <br />";
+        if(is_array($val))
+        {
+          echo "$key [";
+          echo "[".implode("] [", $val)."]";
+          echo "]<br />";
+        } else {
+          echo "$val <br />";
+        }
       }
     } else {
         echo "No RRD information returned. This may be because the graph module doesn't yet return this data. <br />";

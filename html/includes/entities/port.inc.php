@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -14,7 +14,7 @@
  * Build ports WHERE array
  *
  * This function returns an array of "WHERE" statements from a $vars array.
- * The returned array can be implode()d and used on the ports table.
+ * The returned array can be imploded and used on the ports table.
  * Originally extracted from the /ports/ page
  *
  * @param array $vars
@@ -27,20 +27,20 @@ function build_ports_where_array($vars) {
     if (!safe_empty($value)) {
       switch ($var) {
         case 'location':
-          $where[] = generate_query_values($value, $var);
+          $where[] = generate_query_values_and($value, $var);
           break;
         case 'device_id':
-          $where[] = generate_query_values($value, 'ports.device_id');
+          $where[] = generate_query_values_and($value, 'ports.device_id');
           break;
         case 'group':
         case 'group_id':
           $values  = get_group_entities($value);
-          $where[] = generate_query_values($values, 'ports.port_id');
+          $where[] = generate_query_values_and($values, 'ports.port_id');
           break;
         case 'device_group_id':
         case 'device_group':
           $values = get_group_entities($value, 'device');
-          $where[] = generate_query_values($values, 'ports.device_id');
+          $where[] = generate_query_values_and($values, 'ports.device_id');
           break;
         case 'disable':
           $var = 'disabled';
@@ -49,25 +49,26 @@ function build_ports_where_array($vars) {
         case 'ignore':
         case 'ifSpeed':
         case 'ifType':
+        case 'ifVlan':
         case 'port_id':
-          $where[] = generate_query_values($value, 'ports.'.$var);
+          $where[] = generate_query_values_and($value, 'ports.'.$var);
           break;
         case 'hostname':
         case 'ifAlias':
         case 'ifDescr': // FIXME, probably better always use port_label instead ifDescr for search
-          $where[] = generate_query_values($value, $var, '%LIKE%');
+          $where[] = generate_query_values_and($value, $var, '%LIKE%');
           break;
         case 'label':
         case 'port_label':
-          $where[] = generate_query_values($value, 'port_label', '%LIKE%');
+          $where[] = generate_query_values_and($value, 'port_label', '%LIKE%');
           break;
         case 'mac':
         case 'ifPhysAddress':
           $value = str_replace([ '.', '-', ':' ], '', $value);
-          $where[] = generate_query_values($value, 'ifPhysAddress', '%LIKE%');
+          $where[] = generate_query_values_and($value, 'ifPhysAddress', '%LIKE%');
           break;
         case 'port_descr_type':
-          $where[] = generate_query_values($value, $var, 'LIKE');
+          $where[] = generate_query_values_and($value, $var, 'LIKE');
           break;
         case 'errors':
           if (get_var_true($value)) {
@@ -88,13 +89,13 @@ function build_ports_where_array($vars) {
           foreach ((array)$value as $state) {
             if ($state === "down") {
               $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("lowerLayerDown", "down")';
-              //$state_where[] = generate_query_values('up', 'ifAdminStatus', NULL, FALSE) . generate_query_values(['down', 'lowerLayerDown'], 'ifOperStatus');
+              //$state_where[] = generate_query_values_ng('up', 'ifAdminStatus') . generate_query_values_and(['down', 'lowerLayerDown'], 'ifOperStatus');
             } elseif ($state === "up") {
               $state_where[] = '`ifAdminStatus` = "up" AND `ifOperStatus` IN ("up", "testing", "monitoring")';
-              //$state_where[] = generate_query_values('up', 'ifAdminStatus', NULL, FALSE) . generate_query_values(['up', 'testing', 'monitoring'], 'ifOperStatus');
+              //$state_where[] = generate_query_values_ng('up', 'ifAdminStatus') . generate_query_values_and(['up', 'testing', 'monitoring'], 'ifOperStatus');
             } elseif ($state === "admindown" || $state === "shutdown") {
               $state_where[] = '`ifAdminStatus` = "down"';
-              //$state_where[] = generate_query_values('down', 'ifAdminStatus', NULL, FALSE);
+              //$state_where[] = generate_query_values_ng('down', 'ifAdminStatus');
             }
           }
           switch (count($state_where)) {
@@ -110,12 +111,12 @@ function build_ports_where_array($vars) {
           break;
         case 'cbqos':
           if ($value && $value !== 'no') {
-            $where[] = generate_query_values($GLOBALS['cache']['ports']['cbqos'], 'ports.port_id');
+            $where[] = generate_query_values_and($GLOBALS['cache']['ports']['cbqos'], 'ports.port_id');
           }
           break;
         case 'mac_accounting':
           if ($value && $value !== 'no') {
-            $where[] = generate_query_values($GLOBALS['cache']['ports']['mac_accounting'], 'ports.port_id');
+            $where[] = generate_query_values_and($GLOBALS['cache']['ports']['mac_accounting'], 'ports.port_id');
           }
           break;
       }
@@ -194,24 +195,26 @@ function generate_port_popup($port, $text = NULL, $type = NULL)
   $content  = generate_device_popup_header($port);
   $content .= generate_port_popup_header($port);
 
-  $content .= '<div style="width: 700px">';
-  //$content .= generate_box_open(array('body-style' => 'width: 700px;'));
-  $graph_array['type'] = $port['graph_type'];
-  $graph_array['legend'] = "yes";
-  $graph_array['height'] = "100";
-  $graph_array['width'] = "275";
-  $graph_array['to'] = $time['now'];
-  $graph_array['from'] = $time['day'];
-  $graph_array['id'] = $port['port_id'];
-  $content .= generate_graph_tag($graph_array);
-  $graph_array['from'] = $time['week'];
-  $content .= generate_graph_tag($graph_array);
-  $graph_array['from'] = $time['month'];
-  $content .= generate_graph_tag($graph_array);
-  $graph_array['from'] = $time['year'];
-  $content .= generate_graph_tag($graph_array);
-  $content .= "</div>";
-  //$content .= generate_box_close();
+  if($type != "none") {
+    $content .= '<div style="width: 700px">';
+    //$content .= generate_box_open(array('body-style' => 'width: 700px;'));
+    $graph_array['type']   = $port['graph_type'];
+    $graph_array['legend'] = "yes";
+    $graph_array['height'] = "100";
+    $graph_array['width']  = "275";
+    $graph_array['to']     = $time['now'];
+    $graph_array['from']   = $time['day'];
+    $graph_array['id']     = $port['port_id'];
+    $content               .= generate_graph_tag($graph_array);
+    $graph_array['from']   = $time['week'];
+    $content               .= generate_graph_tag($graph_array);
+    $graph_array['from']   = $time['month'];
+    $content               .= generate_graph_tag($graph_array);
+    $graph_array['from']   = $time['year'];
+    $content               .= generate_graph_tag($graph_array);
+    $content               .= "</div>";
+    //$content .= generate_box_close();
+  }
 
   return $content;
 }
@@ -454,7 +457,7 @@ function generate_port_row($port, $vars = array())
     if (!isset($cache['ports_option']['ipv4_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv4_addresses'])) {
       $sql = "SELECT * FROM `ipv4_addresses` WHERE `port_id` = ?";
       // Do not exclude IPv4 link-local
-      $sql .= generate_query_values(array_diff($ignore_type, [ 'link-local' ]), 'ipv4_type', '!='); // Do not show ignored ip types
+      $sql .= generate_query_values_and(array_diff($ignore_type, [ 'link-local' ]), 'ipv4_type', '!='); // Do not show ignored ip types
       foreach (dbFetchRows($sql, array($port['port_id'])) as $ip)
       {
         $string .= $break . generate_popup_link('ip', $ip['ipv4_address'].'/'.$ip['ipv4_prefixlen'], NULL, 'small');
@@ -464,7 +467,7 @@ function generate_port_row($port, $vars = array())
     if (!isset($cache['ports_option']['ipv6_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv6_addresses']))
     {
       $sql = "SELECT * FROM `ipv6_addresses` WHERE `port_id` = ?";
-      $sql .= generate_query_values($ignore_type, 'ipv6_type', '!='); // Do not show ignored ip types
+      $sql .= generate_query_values_and($ignore_type, 'ipv6_type', '!='); // Do not show ignored ip types
       foreach (dbFetchRows($sql, array($port['port_id'])) as $ip6)
       {
         $string .= $break . generate_popup_link('ip', $ip6['ipv6_address'].'/'.$ip6['ipv6_prefixlen'], NULL, 'small');

@@ -199,8 +199,12 @@ function fetch_data() {
 function plot_data(obj) {
   // Show datetimelegend
   var now = new Date();
-  var datetime = (now.getMonth()+1) + "/" + now.getDate() + "/" + now.getFullYear() + ' ' +
-    LZ(now.getHours()) + ":" + LZ(now.getMinutes()) + ":" + LZ(now.getSeconds());
+  //var datetime = (now.getMonth()+1) + "/" + now.getDate() + "/" + now.getFullYear() + ' ' +
+  //  LZ(now.getHours()) + ":" + LZ(now.getMinutes()) + ":" + LZ(now.getSeconds());
+
+  datetime = now.toLocaleString();
+  //datetime = now.toISOString();
+
   SVGDoc.getElementById('datetime').firstChild.data = datetime;
 
   if (!obj.success)

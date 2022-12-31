@@ -6,12 +6,12 @@
  *
  * @package    observium
  * @subpackage update
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 $sql = "SELECT * FROM `sensors` WHERE 1";
-$sql .= generate_query_values(array_keys($config['counter_types']), 'sensor_class');
+$sql .= generate_query_values_and(array_keys($config['counter_types']), 'sensor_class');
 $sensors = dbFetchRows($sql);
 
 if (count($sensors))

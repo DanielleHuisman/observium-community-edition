@@ -64,6 +64,7 @@ $config['escape_html']['entities'][]      = '#8203';  // &#x200B; U+200B ZERO WI
 $config['pages']['gridstack']['no_panel'] = TRUE;
 $config['pages']['dashboard']['no_panel'] = TRUE;
 $config['pages']['map']['no_panel']       = TRUE;
+$config['pages']['map-traffic']['no_panel']       = TRUE;
 
 // Refresh pages definitions
 $config['wui']['refresh_times']       = array(0, 60, 120, 300, 900, 1800); // Allowed refresh times in seconds
@@ -194,6 +195,7 @@ $config['icon']['pollers']           = "sprite-module";
 $config['icon']['processes']         = "sprite-processes";
 
 $config['icon']['netmap']            = "sprite-netmap";
+$config['icon']['map']            = "sprite-map";
 $config['icon']['contacts']          = "sprite-mail";
 $config['icon']['contact-add']       = $config['icon']['plus'];
 
@@ -348,6 +350,8 @@ $config['icon']['databases']         = "sprite-databases";
 $config['icon']['database']          = "sprite-database";
 
 $config['icon']['mibs']              = "sprite-map-2";
+
+
 
 $config['icon']['notes']             = "sprite-note";
 

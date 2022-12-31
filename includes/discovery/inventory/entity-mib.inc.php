@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -51,26 +51,35 @@ if (is_device_mib($device, 'ELTEX-MES-PHYSICAL-DESCRIPTION-MIB')) {
   $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
   //print_vars($entity_array);
   //print_debug_vars($vendor_oids);
-  } elseif (is_device_mib($device, 'DGS-3420-28SC-L2MGMT-MIB')) {
-    $vendor_mib = 'DGS-3420-28SC-L2MGMT-MIB';
-    $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
-    //print_vars($entity_array);
-    //print_debug_vars($vendor_oids);
-  } elseif (is_device_mib($device, 'DGS-3420-26SC-L2MGMT-MIB')) {
-    $vendor_mib = 'DGS-3420-26SC-L2MGMT-MIB';
-    $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
-    //print_vars($entity_array);
-    //print_debug_vars($vendor_oids);
-  } elseif (is_device_mib($device, 'DGS-3620-28SC-L2MGMT-MIB')) {
-    $vendor_mib = 'DGS-3620-28SC-L2MGMT-MIB';
-    $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
-    //print_vars($entity_array);
-    //print_debug_vars($vendor_oids);
-  } elseif (is_device_mib($device, 'DGS-3620-26SC-L2MGMT-MIB')) {
-    $vendor_mib = 'DGS-3620-26SC-L2MGMT-MIB';
-    $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
-    //print_vars($entity_array);
-    //print_debug_vars($vendor_oids);
+} elseif (is_device_mib($device, 'DGS-3420-28SC-L2MGMT-MIB')) {
+  $vendor_mib = 'DGS-3420-28SC-L2MGMT-MIB';
+  $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  //print_vars($entity_array);
+  //print_debug_vars($vendor_oids);
+} elseif (is_device_mib($device, 'DGS-3420-26SC-L2MGMT-MIB')) {
+  $vendor_mib = 'DGS-3420-26SC-L2MGMT-MIB';
+  $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  //print_vars($entity_array);
+  //print_debug_vars($vendor_oids);
+} elseif (is_device_mib($device, 'DGS-3620-28SC-L2MGMT-MIB')) {
+  $vendor_mib = 'DGS-3620-28SC-L2MGMT-MIB';
+  $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  //print_vars($entity_array);
+  //print_debug_vars($vendor_oids);
+} elseif (is_device_mib($device, 'DGS-3620-26SC-L2MGMT-MIB')) {
+  $vendor_mib = 'DGS-3620-26SC-L2MGMT-MIB';
+  $vendor_oids = snmpwalk_cache_oid($device, "swL2PortSfpInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  //print_vars($entity_array);
+  //print_debug_vars($vendor_oids);
+} elseif (is_device_mib($device, 'HUAWEI-ENTITY-EXTENT-MIB') &&
+          $vendor_oids = snmpwalk_cache_oid($device, "hwEntityOpticalVendorSn", $vendor_oids, 'HUAWEI-ENTITY-EXTENT-MIB', NULL, $snmp_flags)) {
+  $vendor_mib = 'HUAWEI-ENTITY-EXTENT-MIB';
+  $vendor_oids = snmpwalk_cache_oid($device, "hwEntityOpticalType",       $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  $vendor_oids = snmpwalk_cache_oid($device, "hwEntityOpticalVenderName", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  $vendor_oids = snmpwalk_cache_oid($device, "hwEntityOpticalVenderPn",   $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  $vendor_oids = snmpwalk_cache_oid($device, "hwEntityOpticalTransType",  $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+  //print_vars($entity_array);
+  //print_debug_vars($vendor_oids);
 }
 
 foreach ($entity_array as $entPhysicalIndex => $entry) {
@@ -198,6 +207,27 @@ foreach ($entity_array as $entPhysicalIndex => $entry) {
     $entry['entPhysicalSerialNum']   = trim($vendor_oids[$entry['entPhysicalParentRelPos']]['swL2PortSfpInfoVendorSN']);
     $entry['entPhysicalMfgName']     = trim($vendor_oids[$entry['entPhysicalParentRelPos']]['swL2PortSfpInfoVendorName']);
     $entry['entPhysicalModelName']   = trim($vendor_oids[$entry['entPhysicalParentRelPos']]['swL2PortSfpInfoFiberType']);
+  } elseif ($vendor_mib === 'HUAWEI-ENTITY-EXTENT-MIB' && isset($vendor_oids[$entPhysicalIndex]) &&
+            $vendor_oids[$entPhysicalIndex]['hwEntityOpticalType'] !== 'unknown') {
+    //$entry = array_merge($entry, $vendor_oids[$entry['ifIndex']]);
+    print_debug_vars($vendor_oids[$entPhysicalIndex]);
+
+    // entPhysicalVendorType  -> hwEntityOpticalType
+    // entPhysicalHardwareRev -> ??
+    // entPhysicalFirmwareRev -> ??
+    // entPhysicalSoftwareRev -> ??
+    // entPhysicalSerialNum   -> hwEntityOpticalVendorSn
+    // entPhysicalMfgName     -> hwEntityOpticalVenderName
+    // entPhysicalModelName   -> hwEntityOpticalVenderPn
+    // entPhysicalAlias       -> hwEntityOpticalTransType
+    // entPhysicalAssetID     -> ??
+    $entry['entPhysicalVendorType'] = trim($vendor_oids[$entPhysicalIndex]['hwEntityOpticalType']);
+    //$entry['entPhysicalHardwareRev'] = trim($vendor_oids[$entPhysicalIndex]['']);
+    //$entry['entPhysicalFirmwareRev'] = trim($vendor_oids[$entPhysicalIndex]['']);
+    $entry['entPhysicalSerialNum'] = trim($vendor_oids[$entPhysicalIndex]['hwEntityOpticalVendorSn']);
+    $entry['entPhysicalMfgName']   = trim($vendor_oids[$entPhysicalIndex]['hwEntityOpticalVenderName']);
+    $entry['entPhysicalModelName'] = trim($vendor_oids[$entPhysicalIndex]['hwEntityOpticalVenderPn']);
+    $entry['entPhysicalAlias']     = trim($vendor_oids[$entPhysicalIndex]['hwEntityOpticalTransType']);
   }
 
   if ($entry['entPhysicalDescr'] || $entry['entPhysicalName']) {

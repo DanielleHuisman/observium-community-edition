@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,14 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 $neighbours_ports = dbFetchColumn('SELECT DISTINCT `port_id` FROM `neighbours` WHERE 1' . $cache['where']['ports_permitted']);
 
 $where = ' WHERE 1 ';
-$where .= generate_query_values($neighbours_ports, 'port_id');
+$where .= generate_query_values_and($neighbours_ports, 'port_id');
 //r($where);
 
 $form_items = array();
@@ -24,9 +23,9 @@ $form_items['devices'] = generate_form_values('device', dbFetchColumn('SELECT DI
 // If device IDs passed, limit ports to specified devices
 if ($vars['device'])
 {
-  $neighbours_ports = dbFetchColumn('SELECT DISTINCT `port_id` FROM `ports`' . $where . generate_query_values($vars['device'], 'device_id'));
+  $neighbours_ports = dbFetchColumn('SELECT DISTINCT `port_id` FROM `ports`' . $where . generate_query_values_and($vars['device'], 'device_id'));
   $where = ' WHERE 1 ';
-  $where .= generate_query_values($neighbours_ports, 'port_id');
+  $where .= generate_query_values_and($neighbours_ports, 'port_id');
   //r($where);
 }
 

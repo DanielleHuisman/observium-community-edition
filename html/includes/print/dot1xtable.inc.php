@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -37,19 +36,19 @@ function print_dot1xtable($vars)
       {
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'address':
-          if (isset($vars['searchby']) && $vars['searchby'] == 'ip')
+          if (isset($vars['searchby']) && $vars['searchby'] === 'ip')
           {
             $value = trim($value);
-            $where .= generate_query_values($value, 'ipv4_addr', '%LIKE%');
-          } else if (isset($vars['searchby']) && $vars['searchby'] == 'mac') {
-            $value = str_replace(array(':', ' ', '-', '.', '0x'), '', $value);
-            $where .= generate_query_values($value, 'M.mac_addr', '%LIKE%');
+            $where .= generate_query_values_and($value, 'ipv4_addr', '%LIKE%');
+          } elseif (isset($vars['searchby']) && $vars['searchby'] === 'mac') {
+            $value = str_replace([ ':', ' ', '-', '.', '0x' ], '', $value);
+            $where .= generate_query_values_and($value, 'M.mac_addr', '%LIKE%');
           } else {
             $value = trim($value);
-            $where .= generate_query_values($value, 'username', '%LIKE%');
+            $where .= generate_query_values_and($value, 'username', '%LIKE%');
           }
           break;
       }

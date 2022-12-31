@@ -6,20 +6,16 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 $entity_array = snmpwalk_cache_oid($device, 'entSensorValueEntry', $entity_array, 'CISCO-ENTITY-SENSOR-MIB');
-if ($GLOBALS['snmp_status'])
-{
-  if (is_array($GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']]))
-  {
+if (snmp_status()) {
+  if (is_array($GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']])) {
     // If this already received in inventory module, skip walking
-    foreach ($GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']] as $index => $entry)
-    {
-      if (isset($entity_array[$index]))
-      {
+    foreach ($GLOBALS['cache']['snmp']['ENTITY-MIB'][$device['device_id']] as $index => $entry) {
+      if (isset($entity_array[$index])) {
         $entity_array[$index] = array_merge($entity_array[$index], $entry);
       } else {
         $entity_array[$index] = $entry;
@@ -54,10 +50,9 @@ if ($GLOBALS['snmp_status'])
     }
   }
 
-  $t_oids = array('entSensorThresholdSeverity', 'entSensorThresholdRelation', 'entSensorThresholdValue');
-  $t_entity_array = array();
-  foreach ($t_oids as $oid)
-  {
+  $t_oids = [ 'entSensorThresholdSeverity', 'entSensorThresholdRelation', 'entSensorThresholdValue' ];
+  $t_entity_array = [];
+  foreach ($t_oids as $oid) {
     $t_entity_array = snmpwalk_cache_twopart_oid($device, $oid, $t_entity_array, 'CISCO-ENTITY-SENSOR-MIB');
   }
 
@@ -79,7 +74,7 @@ if ($GLOBALS['snmp_status'])
       dBm(14): dB relative to 1mW of power
   */
 
-  $c_entitysensor = array(
+  $c_entitysensor = [
     'voltsAC'     => 'voltage',
     'voltsDC'     => 'voltage',
     'amperes'     => 'current',
@@ -92,14 +87,14 @@ if ($GLOBALS['snmp_status'])
     'truthvalue'  => 'state',
     //'specialEnum' => 'gauge', // This sensors seems as useless
     'dBm'         => 'dbm'
-  );
+  ];
 
   $i = [];
   foreach ($entity_array as $index => $entry) {
     if (is_numeric($index) && isset($c_entitysensor[$entry['entSensorType']]) &&
         is_numeric($entry['entSensorValue']) && $entry['entSensorStatus'] === 'ok') {
       $ok = TRUE;
-      $options = array('entPhysicalIndex' => $index);
+      $options = [ 'entPhysicalIndex' => $index ];
 
       $descr = rewrite_entity_name($entry['entPhysicalDescr']);
       if ($device['os'] === 'cisco-firepower') {
@@ -174,7 +169,7 @@ if ($GLOBALS['snmp_status'])
       print_debug_vars($entry);
 
       // Now try to search port bounded with sensor by ENTITY-MIB
-      if ($ok && in_array($type, array('temperature', 'voltage', 'current', 'dbm', 'power'))) {
+      if ($ok && in_array($type, [ 'temperature', 'voltage', 'current', 'dbm', 'power' ])) {
         $port    = get_port_by_ent_index($device, $index);
         $options['entPhysicalIndex'] = $index;
         if (is_array($port)) {
@@ -209,16 +204,21 @@ if ($GLOBALS['snmp_status'])
       }
 
       // Set thresholds for numeric sensors
-      $limits = array();
+      $limits = [];
       $scale  = NULL;
       if ($c_entitysensor[$entry['entSensorType']] !== 'state') {
         $precision = $entry['entSensorPrecision'];
-        // See: https://jira.observium.org/browse/OBS-3026
-        // Note, issue not actual on firmware less than 16.11, not sure if fixed on more newer firmwares
-        // Seems as not actual on 16.12.x, see: https://jira.observium.org/browse/OBS-3707
         if ($device['os'] === 'iosxe' && $precision > 0 &&
             version_compare($device['version'], '16.11', '>=') && version_compare($device['version'], '16.12', '<')) {
+          // See: https://jira.observium.org/browse/OBS-3026
+          // Note, issue not actual on firmware less than 16.11, not sure if fixed on newer firmwares
+          // Seems as not actual on 16.12.x, see: https://jira.observium.org/browse/OBS-3707
           // I not sure that this fully correct, but for issue case - works
+          $precision -= 1;
+        } elseif ($device['os'] === 'iosxr' && $precision > 0 && $type === 'power' &&
+                  $device['version'] === '6.4.2' && preg_match('/ASR\-90\d{2}/', $device['hardware'])) {
+          // See: https://jira.observium.org/browse/OBS-4079
+          // ASR9k 32bit platform issue for power sensor
           $precision -= 1;
         }
         $scale = si_to_scale($entry['entSensorScale'], $precision);

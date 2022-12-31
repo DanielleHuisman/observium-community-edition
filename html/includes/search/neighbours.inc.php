@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -24,8 +24,9 @@ $sql = "SELECT * FROM `neighbours` WHERE `active` = ? AND (`remote_hostname` LIK
 $params = [ 1, $query_param, $query_param, $query_param ];
 $results = dbFetchRows($sql, $params);
 
-if (safe_count($results)) {
+if (!safe_empty($results)) {
 
+  $max_len = 35;
   $protocol_classmap = [
     'cdp'  => 'success',
     'lldp' => 'warning',
@@ -39,12 +40,14 @@ if (safe_count($results)) {
     $result_device = device_by_id_cache($result['device_id']);
     $result_port = get_port_by_id_cache($result['port_id']);
 
-    $name = $result_device['hostname'];
-    if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
+    $name = truncate($result_device['hostname'], $max_len);
+    if ($result_device['hostname'] != $result_device['sysName'] && $result_device['sysName']) {
+      $name .= ' | ' . truncate($result_device['sysName'], $max_len);
+    }
 
     //$num_ports = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE device_id = ?", array($result['device_id']));
 
-    $remote_host = strlen($result['remote_hostname']) > 35 ? substr($result['remote_hostname'], 0, 35) . "..." : $result['remote_hostname'];
+    $remote_host = truncate($result['remote_hostname'], $max_len);
     $remote_host .= ' | ';
     if ($result['remote_address'] && $result['remote_address'] !== '0.0.0.0') {
       $remote_host .= $result['remote_address'] . ' | ';
@@ -55,7 +58,7 @@ if (safe_count($results)) {
 
     $remote_descr = $result['remote_platform'] . ' | ';
     if ($len = strlen($result['remote_version'])) {
-      if ($len > 35) { $result['remote_version'] = substr($result['remote_version'], 0, 35) . "..."; }
+      $result['remote_version'] = truncate($result['remote_version'], 35);
       $remote_descr .= $result['remote_version'] . ' | ';
     }
 

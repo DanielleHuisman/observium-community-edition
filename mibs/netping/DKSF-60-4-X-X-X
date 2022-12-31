@@ -21,14 +21,26 @@ IMPORTS
                 
  
 netPing MODULE-IDENTITY 
-        LAST-UPDATED "201411210000Z"  
+        LAST-UPDATED "201601140000Z"  
         ORGANIZATION "NetPing East, Alentis Electronics" 
         CONTACT-INFO 
                 "developers@netping.ru" 
         DESCRIPTION 
                 "Generic MIB for NetPing remote sensing and control" 
+                
+        REVISION "201601140000Z"        
+        DESCRIPTION                
+                "npIrStatus values changed"                
+                
+        REVISION "201509240000Z"        
+        DESCRIPTION                
+                "npElecMeter branch added"
 
-        REVISION "201411210000Z"        
+        REVISION "201504090000Z"        
+        DESCRIPTION                
+                "npRelHumTrap added; npIoTrapLevelLegend added"
+                
+        REVISION "201411210000Z"
         DESCRIPTION 
                 "npRelayFlip variable max-access bugfix"	
                 
@@ -518,11 +530,19 @@ npIoTrapMemo OBJECT-TYPE
     DESCRIPTION  "Trap data, IO line memo" 
     ::= { npIoTraps 6 }
     
+npIoTrapLevelLegend OBJECT-TYPE 
+    SYNTAX     DisplayString 
+    MAX-ACCESS     read-only 
+    STATUS     current 
+    DESCRIPTION  "Legend for current logic level on the IO line" 
+    ::= { npIoTraps 7 }
+    
 npIoTrap NOTIFICATION-TYPE
     OBJECTS { 
           npIoTrapLineN,
           npIoTrapLevelIn,
-          npIoTrapMemo
+          npIoTrapMemo,
+          npIoTrapLevelLegend
         }
     STATUS  current
     DESCRIPTION
@@ -741,8 +761,24 @@ npRelHumSensorValueT100   OBJECT-TYPE
     STATUS     current 
     DESCRIPTION  "Sensor temperature, deg.C * 100 (fixed point two decimal places)
                   Used to get access to the fractional part of T value" 
-    ::= { npRelHumSensor 9 }  
-   
+    ::= { npRelHumSensor 9 }
+
+npRelHumTraps   OBJECT IDENTIFIER::={npRelHumidity 9} 
+npRelHumTrapPrefix OBJECT IDENTIFIER::={npRelHumTraps 0} 	
+
+npRelHumTrap NOTIFICATION-TYPE
+    OBJECTS { 
+	npRelHumSensorStatusH,
+    npRelHumSensorValueH,
+	npRelHumSafeRangeHigh,
+	npRelHumSafeRangeLow
+        }
+    STATUS  current
+    DESCRIPTION
+        "Status of Relative Humidity RH sensor has changed!"
+    ::= { npRelHumTrapPrefix 1 }    
+    
+    
 
 npIr  OBJECT IDENTIFIER::={lightcom 7900}
 npIrCtrl OBJECT IDENTIFIER::={npIr 1}
@@ -764,16 +800,83 @@ npIrReset  OBJECT-TYPE
     
 npIrStatus  OBJECT-TYPE 
     SYNTAX     INTEGER {
-                  ok (0),
-                  busyCaptureWaitingButton (1),
-                  busyCaptureWaitingIr (2),
-                  busyPlayback (3),
-                  error (255)
+                  commandCompleted (0),
+                  protocolError (1),
+                  commandAccepted (2),
+                  errorUnknown (16),
+                  errorBadNumber (17),
+                  errorEmptyRecord (18),
+                  errorFlashChip (19),
+                  errorTimeout (20),
+                  errorExtBusBusy (21)
                 } 
     MAX-ACCESS  read-only
     STATUS     current 
     DESCRIPTION  "IR transiever status" 
     ::= { npIrCtrl 3 } 
+
+
+
+npElecMeter  OBJECT IDENTIFIER::={lightcom 9700}
+     
+npElecTable       OBJECT-TYPE 
+    SYNTAX     SEQUENCE OF NpElecEntry 
+    MAX-ACCESS     not-accessible 
+    STATUS     current 
+    DESCRIPTION  "Electricity Meter Table"     
+    ::= { npElecMeter 1 } 
+
+npElecEntry        OBJECT-TYPE 
+    SYNTAX     NpElecEntry
+    MAX-ACCESS     not-accessible 
+    STATUS     current 
+    DESCRIPTION  "Electricity Meter Table Table Row"     
+    INDEX     { npElecIndex } 
+    ::= { npElecTable 1 } 
+
+NpElecEntry   ::= SEQUENCE { 
+    npElecIndex           INTEGER,
+    npElecPulsesPerKwh    INTEGER,
+    npElecPower           Gauge32,
+    npElecEnergy          Counter32, 
+    npElecEnergy100       Counter32    
+    } 
+
+npElecIndex      OBJECT-TYPE 
+    SYNTAX     INTEGER (1..4)
+    MAX-ACCESS     read-only 
+    STATUS     current 
+    DESCRIPTION  "Number of elec.meter, associated with IO line" 
+    ::= { npElecEntry 1 }
+
+npElecPulsesPerKwh      OBJECT-TYPE 
+    SYNTAX     INTEGER
+    MAX-ACCESS     read-write 
+    STATUS     current 
+    DESCRIPTION  "Pulses on IO line input per 1 kWh of consumed energy" 
+    ::= { npElecEntry 2 }    
+    
+npElecPower    OBJECT-TYPE 
+    SYNTAX     Gauge32
+    MAX-ACCESS     read-only 
+    STATUS     current 
+    DESCRIPTION  "Power, Watts, based on pulse rate/interval, 5 minute average" 
+    ::= { npElecEntry 3 }      
+    
+npElecEnergy    OBJECT-TYPE 
+    SYNTAX     Counter32
+    MAX-ACCESS     read-write 
+    STATUS     current 
+    DESCRIPTION  "Energy counter, kWh, based on pulse count" 
+    ::= { npElecEntry 4 } 
+ 
+npElecEnergy100    OBJECT-TYPE 
+    SYNTAX     Counter32
+    MAX-ACCESS     read-write 
+    STATUS     current 
+    DESCRIPTION  "Energy counter, kWh*100, based on pulse count" 
+    ::= { npElecEntry 5 } 
+    
     
 	
 npReboot OBJECT IDENTIFIER::={ lightcom 911 }   

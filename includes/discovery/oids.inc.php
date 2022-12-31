@@ -33,7 +33,7 @@ $oids_db = dbFetchRows("SELECT * FROM `oids` WHERE `oid_autodiscover` = '1'");
 
 foreach($oids_db as $oid)
 {
-  $value = snmp_get($device, $oid['oid'], "-OUQnv");
+  $value = snmp_get($device, $oid['oid'], "-OUQtnv");
   if (is_numeric($value) && $value != '4294967295' && $value != '2147483647' && $value != '-2147483647') // Don't discover stuff which is returning min/max 32 bit values
   {
     if(!isset($entries[$oid['oid_id']]))

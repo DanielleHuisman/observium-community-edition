@@ -310,14 +310,9 @@ function openLink(url) {
 
 function entity_popup(element)
 {
-
-    //console.log(element);
-
     $(element).qtip({
-
         content: {
-            //text: '<img class="" style"margin: 0 auto;" src="images/loading.gif" alt="Loading..." />',
-            text: '<big><i class="icon-spinner icon-spin text-center vertical-align" style="width: 100%;"></i></big>',
+            text: '<i class="icon-spinner icon-spin text-center vertical-align" style="width: 100%;"></i>',
             ajax: {
                 url: 'ajax/entity_popup.php',
                 type: 'POST',
@@ -338,17 +333,9 @@ function entity_popup(element)
             }
         },
         hide: {
-            //target: false, // Defaults to target element
-            //event: 'click mouseleave', // Hide on mouse out by default
-            //effect: true,       // true - Use default 90ms fade effect
-            //delay: 0, // No hide delay by default
             fixed: true, // Non-hoverable by default
-            //inactive: false, // Do not hide when inactive
-            //leave: 'window', // Hide when we leave the window
-            //distance: false // Don't hide after a set distance
         }
     });
-
 }
 
 
@@ -510,7 +497,36 @@ function ajax_action (action, value = '')
   event.preventDefault();
 
   return false;
+}
 
+function ajax_settings(setting, value = '')
+{
+
+    var params = {
+        action: 'settings_user',
+        setting: setting,
+        value: value
+    };
+
+    $.ajax({
+        type: "POST",
+        url: "ajax/actions.php",
+        async: true,
+        cache: false,
+        data: jQuery.param(params),
+        success: function (response) {
+            if (response.status === 'ok') {
+                location.reload(true);
+                //console.log(response);
+            } else {
+                console.log(response);
+            }
+        }
+    });
+
+    event.preventDefault();
+
+    return false;
 }
 
 function processAjaxForm(event) {
@@ -612,18 +628,17 @@ delete_ap = function (id) {
 
 };
 
-$(document).on('change', 'input[name="widget-config-input"]', function(event) {
-
-    $(this).style = 'background-color: pink;';
-
-});
-
-    $(document).on('blur', 'input[name="widget-config-input"]', function(event) {
+$(document).on('blur', 'input[name^="widget-config-"]', function(event) {
         event.preventDefault();
         var $this = $(this);
         var field = $this.data("field");
         var id    = $this.data("id");
-        var value = $this.val();
+        // console.log($this);
+        if($this.data("type") === "checkbox") {
+            var value = $this.is(":checked") ? "yes" : "no";
+        } else {
+            var value = $this.val();
+        }
         if ($this[0].checkValidity()) {
             $.ajax({
                 type: 'POST',

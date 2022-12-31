@@ -13,9 +13,10 @@
 //MOVEME. to includes/entities/wifi.inc.php
 // Discover an entity by populating/updating a database table and returning an id
 
-/* I think this is still experimental by adama, pls see discover_entity_definition() common as other entities
 function discover_entity($device_id, $entity_type, $data)
 {
+
+    return FALSE;
 
     if (is_array($GLOBALS['config']['entities'][$entity_type])) {
 
@@ -25,8 +26,6 @@ function discover_entity($device_id, $entity_type, $data)
 
         if (isset($params['table_fields']['index']) && is_array())
         {
-
-
 
         } elseif (isset($params['table_fields']['index'])) {
 
@@ -89,7 +88,6 @@ function discover_entity($device_id, $entity_type, $data)
     return $id;
 
 }
-*/
 
 /**
  * Discover WIFI Access Point. Returns ap_id.

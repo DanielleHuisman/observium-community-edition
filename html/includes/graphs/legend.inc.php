@@ -65,6 +65,9 @@ if ($legend != 'no')
   if (in_array("max", $data_show)) { $rrd_options .= " COMMENT:'    Max'"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " COMMENT:'  Total'"; }
   $rrd_options .= " COMMENT:'\\l'";
+
+  $graph_return['legend_lines']++;
+
 }
 
 // EOF

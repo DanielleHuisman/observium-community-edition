@@ -48,7 +48,7 @@ if ($device['type'] == 'wireless')
   if ($vars['view'] == "graphs" || $vars['view'] == "services") { $table_class="table-striped-two"; } else { $table_class="table-striped"; }
 
   echo generate_box_open();
-  echo '<table class="table table-striped table-condensed" style="margin-top: 10px;">';
+  echo '<table class="table table-striped table-condensed">';
   echo '  <thead>';
   echo '     <tr>';
   echo '       <th class="state-marker"></th>';

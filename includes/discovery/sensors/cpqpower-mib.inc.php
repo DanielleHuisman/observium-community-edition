@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,17 +6,16 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2014 Adam Armstrong
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-$hpups_array = array();
+$hpups_array = [];
 $hpups_array = snmpwalk_cache_oid($device, 'upsInput', $hpups_array, 'CPQPOWER-MIB');
 $hpups_array = snmpwalk_cache_oid($device, 'upsOutput', $hpups_array, 'CPQPOWER-MIB');
 $hpups_array = snmpwalk_cache_oid($device, 'upsBypass', $hpups_array, 'CPQPOWER-MIB');
 
-foreach (array_slice(array_keys($hpups_array),1) as $phase)
-{
+foreach (array_slice(array_keys($hpups_array),1) as $phase) {
   # Skip garbage output:
   # upsOutput.6.0 = 0
   # upsOutput.7.0 = 0
@@ -39,8 +37,7 @@ foreach (array_slice(array_keys($hpups_array),1) as $phase)
   $oid   = ".1.3.6.1.4.1.232.165.3.3.4.1.3.$index"; # CPQPOWER-MIB:upsInputCurrent.$index
   $value = $hpups_array[$phase]['upsInputCurrent'];
 
-  if ($value < 10000) # upsInputCurrent.1 = 136137420 ? really? You're nuts.
-  {
+  if ($value < 10000) { # upsInputCurrent.1 = 136137420 ? really? You're nuts.
     $options = [ 'rename_rrd' => "CPQPOWER-MIB-upsInputEntry.$index" ];
     discover_sensor_ng($device, 'current', $mib, 'upsInputCurrent', $oid, $index, NULL, $descr, 1, $value, $options);
   }
@@ -132,29 +129,26 @@ unset($hpups_array);
 //CPQPOWER-MIB::pduOutputPower.2 = INTEGER: 671
 //CPQPOWER-MIB::pduOutputNumBreakers.1 = INTEGER: 3
 //CPQPOWER-MIB::pduOutputNumBreakers.2 = INTEGER: 3
-$hppdu_array = snmpwalk_cache_oid($device, 'pduIdentTable', array(), 'CPQPOWER-MIB');
+$hppdu_array = snmpwalk_cache_oid($device, 'pduIdentTable', [], 'CPQPOWER-MIB');
 $hppdu_array = snmpwalk_cache_oid($device, 'pduOutputTable', $hppdu_array, 'CPQPOWER-MIB');
-foreach ($hppdu_array as $index => $entry)
-{
+foreach ($hppdu_array as $index => $entry) {
   // Monitor PDU Status
   $oid   = ".1.3.6.1.4.1.232.165.2.1.2.1.8.$index";
   $descr = $entry['pduName'].' Status';
-  if (!empty($entry['pduStatus']))
-  {
+  if (!empty($entry['pduStatus'])) {
     discover_status_ng($device, $mib, 'pduStatus', $oid, $index, 'cpqpower-pdu-status', $descr, $entry['pduStatus'], array('entPhysicalClass' => 'power', 'rename_rrd' => 'cpqpower-pdu-status-%index%'));
   }
 
   // Monitor PDU Output load
   $oid   = ".1.3.6.1.4.1.232.165.2.3.1.1.2.$index";
   $descr = $entry['pduName'].' Load';
-  $limits = array();
-  if (!empty($entry['pduOutputLoad']) && $entry['pduOutputLoad'] != '-1')
-  {
+  $limits = [];
+  if (!empty($entry['pduOutputLoad']) && $entry['pduOutputLoad'] != '-1') {
     $options = [ 'rename_rrd' => "CPQPOWER-MIB-%index%" ];
     discover_sensor_ng($device, 'capacity', $mib, 'pduOutputLoad', $oid, $index, NULL, $descr, 1, $entry['pduOutputLoad'], $options);
 
     // Find power limit by measure the reported output power divided by the reported load of the PDU
-    $pdu_maxload = 100 * ($entry['pduOutputPower'] / $entry['pduOutputLoad']);
+    $pdu_maxload = 100 * float_div($entry['pduOutputPower'], $entry['pduOutputLoad']);
     $pdu_warnload = 0.8 * $pdu_maxload;
     $limits = array('limit_high'      => round($pdu_maxload, 2),
                     'limit_high_warn' => round($pdu_warnload, 2));
@@ -164,8 +158,7 @@ foreach ($hppdu_array as $index => $entry)
   $oid   = ".1.3.6.1.4.1.232.165.2.3.1.1.4.$index";
   $descr = $entry['pduName'].' Output Power';
 
-  if (!empty($entry['pduOutputPower']) && $entry['pduOutputPower'] != '-1')
-  {
+  if (!empty($entry['pduOutputPower']) && $entry['pduOutputPower'] != '-1') {
     $options = $limits;
     $options['rename_rrd'] = "CPQPOWER-MIB-%index%";
     discover_sensor_ng($device, 'power', $mib, 'pduOutputPower', $oid, $index, NULL, $descr, 1, $entry['pduOutputPower'], $options);
@@ -182,9 +175,8 @@ foreach ($hppdu_array as $index => $entry)
 //CPQPOWER-MIB::breakerPercentLoad.2.6 = INTEGER: 0
 //CPQPOWER-MIB::breakerStatus.1.1 = INTEGER: 0
 //CPQPOWER-MIB::breakerStatus.2.6 = INTEGER: 0
-$hppdu_breaker_array = snmpwalk_cache_oid($device, 'pduOutputBreakerTable', array(), 'CPQPOWER-MIB');
-foreach ($hppdu_breaker_array as $index => $entry)
-{
+$hppdu_breaker_array = snmpwalk_cache_oid($device, 'pduOutputBreakerTable', [], 'CPQPOWER-MIB');
+foreach ($hppdu_breaker_array as $index => $entry) {
   if ($entry['breakerVoltage'] <= 0) { continue; }
 
   list($breaker_output, $breaker_unit) = explode('.', $index, 2);
@@ -192,7 +184,7 @@ foreach ($hppdu_breaker_array as $index => $entry)
 
   // Find powerlimit by measure the reported output power devivded by the reported load of the PDU
   //$breaker_maxload = 100 * ($entry['breakerCurrent'] / $entry['breakerPercentLoad']);
-  $breaker_maxload = $entry['breakerCurrent'] / $entry['breakerPercentLoad']; // breakerCurrent already scaled by 100
+  $breaker_maxload = float_div($entry['breakerCurrent'], $entry['breakerPercentLoad']); // breakerCurrent already scaled by 100
   $breaker_warnload = 0.8 * $breaker_maxload;
   $limits = array('limit_high'      => round($breaker_maxload, 2),
                   'limit_high_warn' => round($breaker_warnload, 2));

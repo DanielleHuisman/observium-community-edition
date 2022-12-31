@@ -7,13 +7,13 @@
  *
  * @package    observium
  * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
-$options = getopt("h:i:m:n:p:dqrsV");
+$options = getopt("h:p:dqrsV");
 
 include("includes/sql-config.inc.php");
 
@@ -40,7 +40,7 @@ if ($options['h'] === "all") {
   $where = " ";
   $doing = "all";
 } elseif ($options['h']) {
-  $params = array();
+  $params = [];
   if (is_numeric($options['h'])) {
     $where = "AND `device_id` = ?";
     $doing = $options['h'];
@@ -52,25 +52,26 @@ if ($options['h'] === "all") {
   }
 }
 
+if (isset($options['p'])) {
+  print_cli_heading("%WConstrained to poller partition id ".$options['p']);
+  $where .= ' AND `poller_id` = ?';
+  $params[] = $options['p'];
+}
+
 if (!$where) {
   print_message("%n
 USAGE:
-$scriptname [-drqV] [-i instances] [-n number] [-m module] [-h device]
+$scriptname [-drqV] [-p poller_id] [-h device]
 
 EXAMPLE:
 -h <device id> | <device hostname wildcard>  Poll single device
--h odd                                       Poll odd numbered devices  (same as -i 2 -n 0)
--h even                                      Poll even numbered devices (same as -i 2 -n 1)
 -h all                                       Poll all devices
--h new                                       Poll all devices that have not had a discovery run before
 
--i <instances> -n <number>                   Poll as instance <number> of <instances>
-                                             Instances start at 0. 0-3 for -n 4
+-p <poller_id>                               Poll for specific poller_id
 
 OPTIONS:
- -h                                          Device hostname, id or key odd/even/all/new.
- -i                                          Poll instance.
- -n                                          Poll number.
+ -h                                          Device hostname, id or hostname or keys all.
+ -p                                          Poller ID.
  -s                                          Sends alerts even if they have already been sent.
  -q                                          Quiet output.
  -V                                          Show version and exit.
@@ -79,7 +80,6 @@ DEBUGGING OPTIONS:
  -r                                          Do not create or update RRDs
  -d                                          Enable debugging output.
  -dd                                         More verbose debugging output.
- -m                                          Specify module(s) (separated by commas) to be run.
 
 %rInvalid arguments!%n", 'color');
   exit;
@@ -100,14 +100,16 @@ $_SESSION['userlevel'] = 10;
 //$params[] = $config['poller_id'];
 
 $query = "SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER BY `device_id` ASC";
-foreach (dbFetch($query, $params) as $device) {
+foreach (dbFetchRows($query, $params) as $device) {
 
   humanize_device($device);
 
   process_alerts($device);
-  process_notifications(array('device_id' => $device['device_id'])); // Send all notifications (also for syslog from queue)
+  if ($config['poller-wrapper']['notifications'] || $spam) {
+    process_notifications([ 'device_id' => $device['device_id'] ]); // Send all notifications (also for syslog from queue)
+  }
 
-  dbUpdate(array('last_alerter' => array('NOW()')), 'devices', '`device_id` = ?', array($device['device_id']));
+  dbUpdate([ 'last_alerter' => [ 'NOW()' ] ], 'devices', '`device_id` = ?', [ $device['device_id'] ]);
 
 }
 

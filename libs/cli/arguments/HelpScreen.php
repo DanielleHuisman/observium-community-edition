@@ -91,13 +91,13 @@ class HelpScreen {
 
 			$pad = str_repeat(' ', $max + 3);
 			while ($desc = array_shift($description)) {
-				$formatted .= "\n${pad}${desc}";
+				$formatted .= "\n{$pad}{$desc}";
 			}
 
 			array_push($help, $formatted);
 		}
 
-		return join("\n", $help);
+		return implode("\n", $help);
 	}
 
 	private function _consume($options) {
@@ -115,7 +115,7 @@ class HelpScreen {
 				array_push($names, '-' . $alias);
 			}
 
-			$names = join(', ', $names);
+			$names = implode(', ', $names);
 			$max = max(strlen($names), $max);
 			$out[$names] = $settings;
 		}

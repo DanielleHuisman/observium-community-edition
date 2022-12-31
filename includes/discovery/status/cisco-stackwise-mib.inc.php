@@ -73,7 +73,6 @@ if (snmp_status())
     $oid   = '.1.3.6.1.4.1.9.9.500.1.1.3.0';
     $descr = 'Stackports in redundant ring';
     discover_status_ng($device, $mib, 'cswRingRedundant', $oid, '0', 'cisco-stackwise-redundant-state', $descr, $stackredundant, array('entPhysicalClass' => 'stack'));
-    //discover_status($device, $oid, "cswRingRedundant.0", 'cisco-stackwise-redundant-state', $descr, $stackredundant, array('entPhysicalClass' => 'stack'));
 
     foreach ($stackportoper as $index => $entry)
     {

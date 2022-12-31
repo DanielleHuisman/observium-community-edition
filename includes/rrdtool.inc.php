@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage rrdtool
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -33,8 +33,7 @@ function get_rrd_path($device, $filename) {
 
   // If filename empty, return base rrd dirname for device (for example in delete_device())
   $rrd_file = $rrd_dir;
-  if (strlen($device['hostname']))
-  {
+  if (strlen($device['hostname'])) {
     $rrd_file .= $device['hostname'] . '/';
   }
 
@@ -337,6 +336,7 @@ function rrdtool($command, $filename, $options)
     // FIXME, need add check if pipes exist
     $start = microtime(TRUE);
     fwrite($rrd_pipes[0], $cmd."\n");
+    // FIXME, complete not sure why sleep required here.. @mike
     usleep(1000);
 
     $stdout = trim(stream_get_contents($rrd_pipes[1]));
@@ -416,7 +416,7 @@ function rrdtool_create($device, $filename, $ds, $options = '') {
     return NULL;
   }
 
-  if (OBS_RRD_NOLOCAL && !$config['cache']['enable']) {
+  if (OBS_RRD_NOLOCAL && !$config['cache']['enable_cli']) {
     // do not check remote without caching
   } elseif (rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename already exists - no need to create.");
@@ -513,7 +513,7 @@ function rrdtool_create_ng($device, $type, $index = NULL, $options = []) {
     return NULL;
   }
 
-  if (OBS_RRD_NOLOCAL && !$config['cache']['enable']) {
+  if (OBS_RRD_NOLOCAL && !$config['cache']['enable_cli']) {
     // do not check remote without caching
   } elseif (rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename already exists - no need to create.");
@@ -1118,8 +1118,8 @@ function rrdtool_add_rra($device, $filename, $options)
 /**
  * Escapes strings for RRDtool
  *
- * @param string String to escape
- * @param integer if passed, string will be padded and trimmed to exactly this length (after rrdtool unescapes it)
+ * @param string $string String to escape
+ * @param integer $maxlength if passed, string will be padded and trimmed to exactly this length (after rrdtool unescapes it)
  *
  * @return string Escaped string
  */

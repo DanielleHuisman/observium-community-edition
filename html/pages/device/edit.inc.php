@@ -6,18 +6,17 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-if ($_SESSION['userlevel'] < 7 && !is_entity_write_permitted($device['device_id'], 'device'))
-{
+if ($_SESSION['userlevel'] < 7 && !is_entity_write_permitted($device['device_id'], 'device')) {
   print_error_permission();
   return;
 }
 
 // User level 7-9 only can see config
-$readonly = $_SESSION['userlevel'] < 10;
+//$readonly = $_SESSION['userlevel'] < 10;
 
 // Allow write for users with write permission to this entity
 $readonly = !is_entity_write_permitted($device['device_id'], 'device');

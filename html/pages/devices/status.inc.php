@@ -29,6 +29,8 @@ foreach ($devices as $device)
 {
   if (device_permitted($device['device_id']))
   {
+    get_device_graphs($device);
+
     if (!$location_filter || $device['location'] == $location_filter)
     {
       print_device_row($device, 'status');

@@ -783,40 +783,64 @@ function dbPlaceHolders($values)
 
 /**
  * This function generates WHERE condition string from array with values
+ * NOTE, value should be exploded by comma before use generate_query_values(), for example in get_vars().
+ *
+ * NOTE, WHERE condition always preceded with leading AND!
+ *
+ * @param mixed  $value       Values
+ * @param string $column      Table column name
+ * @param string $condition   Compare condition, known: =, !=, NOT, NULL, NOT NULL, LIKE (and variants %LIKE%, %LIKE, LIKE%)
+ * @param array  $options     ifnull - add IFNULL(column, '')
+ *
+ * @return string             Generated query
+ */
+function generate_query_values_and($value, $column, $condition = NULL, $options = []) {
+  $options[] = 'leading_and';
+  return generate_query_values_ng($value, $column, $condition, $options);
+}
+
+// DEPRECATED
+function generate_query_values($value, $column, $condition = NULL, $options = []) {
+  if (is_bool($options) && !$options) {
+    $options = [];
+  } elseif (!in_array('no_leading_and', (array)$options)) {
+    // Compat with old
+    $options[] = 'leading_and';
+  }
+  return generate_query_values_ng($value, $column, $condition, $options);
+}
+
+/**
+ * This function generates WHERE condition string from array with values
  * NOTE, value should be exploded by comma before use generate_query_values(), for example in get_vars()
  *
  * @param mixed  $value       Values
  * @param string $column      Table column name
  * @param string $condition   Compare condition, known: =, !=, NOT, NULL, NOT NULL, LIKE (and variants %LIKE%, %LIKE, LIKE%)
- * @param bool|int $flags     OBS_DB_NO_LEADING_AND - Do not add leading AND to result query,
- *                            OBS_DB_IFNULL - add IFNULL(column, '')
+ * @param array  $options     leading_and - Add leading AND to result query,
+ *                            ifnull - add IFNULL(column, '')
  * @return string             Generated query
  */
-function generate_query_values($value, $column, $condition = NULL, $flags = 0) {
+function generate_query_values_ng($value, $column, $condition = NULL, $options = []) {
   //if (!is_array($value)) { $value = explode(',', $value); }
   if (!is_array($value)) { $value = array((string)$value); }
-  $column = '`' . str_replace(array('`', '.'), array('', '`.`'), $column) . '`'; // I.column -> `I`.`column`
+  $column = '`' . str_replace([ '`', '.' ], [ '', '`.`' ], $column) . '`'; // I.column -> `I`.`column`
   $condition = ($condition === TRUE ? 'LIKE' : strtoupper(trim($condition)));
   if (str_contains_array($condition, [ 'NOT', '!=' ])) {
     $negative  = TRUE;
-    $condition = str_replace(array('NOT', '!=', ' '), '', $condition);
+    $condition = str_replace([ 'NOT', '!=', ' ' ], '', $condition);
   } else {
     $negative  = FALSE;
   }
 
-  // Flags
-  if (is_bool($flags)) {
-    // Compat with old param style
-    $leading_and = $flags;
-    $ifnull = FALSE;
-  } else {
-    $leading_and = !is_flag_set(OBS_DB_NO_LEADING_AND, $flags);
-    $ifnull = is_flag_set(OBS_DB_IFNULL, $flags);
-  }
+  // Options
+  //$leading_and = !in_array('no_leading_and', (array)$options);
+  $leading_and = in_array('leading_and', (array)$options, TRUE);
+  $ifnull = in_array('ifnull', (array)$options, TRUE);
 
-  $search  = array('%', '_');
-  $replace = array('\%', '\_');
-  $values  = array();
+  $search  = [ '%', '_' ];
+  $replace = [ '\%', '\_' ];
+  $values  = [];
   switch ($condition) {
     // Use LIKE condition
     case 'LIKE':
@@ -828,41 +852,74 @@ function generate_query_values($value, $column, $condition = NULL, $flags = 0) {
     case '%LIKE%':
     case '%LIKE':
     case 'LIKE%':
-      if ($negative) { $implode = ' AND '; $like = ' NOT LIKE '; }
-      else           { $implode = ' OR ';  $like = ' LIKE '; }
+      if ($negative) {
+        $implode = ' AND ';
+        $cond    = ' NOT LIKE ';
+      } else {
+        $implode = ' OR ';
+        $cond    = ' LIKE ';
+      }
       foreach ($value as $v) {
         if ($v === '*') {
-          $values = array("ISNULL($column, 1)" . $like . "'%'");
+          $values = [ "ISNULL($column, 1)" . $cond . "'%'" ];
           break;
-        } elseif ($v === '') {
-          $values[] = "COALESCE($column, '')" . $like . "''";
+        }
+        if ($v === '') {
+          $values[] = "COALESCE($column, '')" . $cond . "''";
         } else {
           $v = dbEscape($v); // Escape BEFORE replace!
           $v = str_replace($search, $replace, $v);
           $v = str_replace('LIKE', $v, $condition);
-          $values[] = $column . $like . "'" . $v . "'";
+          $values[] = $column . $cond . "'" . $v . "'";
         }
       }
       $values = array_unique($values); // Removes duplicate values
       if (count($values)) {
-        $where = ' AND (' . implode($implode, $values) . ')';
+        $where = '(' . implode($implode, $values) . ')';
       } else {
         // Empty values
-        $where  = ' AND ';
-        $where .= $negative ? '1' : '0';
+        $where = $negative ? '1' : '0';
       }
+      //$where = ($leading_and ? ' AND ' : ' ') . $where;
       break;
+
+    // Use REGEXP condition
+    case 'REGEX':
+    case 'REGEXP':
+      if ($negative) {
+        $implode = ' AND ';
+        $cond    = ' NOT REGEXP ';
+      } else {
+        $implode = ' OR ';
+        $cond    = ' REGEXP ';
+      }
+      
+      foreach ($value as $v) {
+        $values[] = $column . $cond . "'" . dbEscape($v) . "'"; // FIXME. not sure about escape, but need fixate!
+      }
+      $values = array_unique($values); // Removes duplicate values
+      if (count($values)) {
+        $where = '(' . implode($implode, $values) . ')';
+      } else {
+        // Empty values
+        $where = $negative ? '1' : '0';
+      }
+      //$where = ($leading_and ? ' AND ' : ' ') . $where;
+      break;
+
     // Use NULL condition
     case 'NULL':
       $value = array_shift($value);
       $value = ($negative) ? !$value : (bool)$value; // When required negative null condition (NOT NULL), reverse $value sign
       //r($value);
       if ($value) {
-        $where = ' AND ' . $column . ' IS NULL';
+        $where = $column . ' IS NULL';
       } else {
-        $where = ' AND ' . $column . ' IS NOT NULL';
+        $where = $column . ' IS NOT NULL';
       }
+      //$where = ($leading_and ? ' AND ' : ' ') . $where;
       break;
+
     // Use IN condition
     default:
       $where = '';
@@ -896,13 +953,17 @@ function generate_query_values($value, $column, $condition = NULL, $flags = 0) {
       //   }
       //   $where = " AND ($where)";
       // } else {
-        $where = " AND " . $where;
+        //$where = " AND " . $where;
+      //$where = ($leading_and ? ' AND ' : ' ') . $where;
       // }
       break;
   }
-  if (!$leading_and) { $where = preg_replace('/^(\ )+AND/', '', $where); }
-
-  return $where;
+  //if (!$leading_and) { $where = preg_replace('/^(\ )+AND/', '', $where); }
+  if ($leading_and) {
+    // Append leading AND
+    return ' AND ' . $where;
+  }
+  return ' ' . $where;
 }
 
 /**

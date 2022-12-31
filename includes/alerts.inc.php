@@ -506,7 +506,7 @@ function update_alert_table($alert, $silent = TRUE) {
 
   if (!$silent) {
     if (is_cli()) {
-      print_cli("Alert Checker " . str_pad("'${alert['alert_name']}'", 30, ' ', STR_PAD_LEFT) . ": " . safe_count($existing_entities) . " existing, " . safe_count($entities) . " new entries (+" . safe_count($add) . "/-" . safe_count($remove) . ").\n");
+      print_cli("Alert Checker " . str_pad("'{$alert['alert_name']}'", 30, ' ', STR_PAD_LEFT) . ": " . safe_count($existing_entities) . " existing, " . safe_count($entities) . " new entries (+" . safe_count($add) . "/-" . safe_count($remove) . ").\n");
     } else {
       print_message(safe_count($existing_entities) . " existing entries.<br />" .
                     safe_count($entities) . " new entries.<br />" .
@@ -945,6 +945,27 @@ function test_condition($value_a, $condition, $value_b) {
             //$alert = !in_array($value_a, $value_b);
             break;
 
+      case 'between':
+      case 'notbetween':
+          $alert = FALSE;
+
+          if (!is_array($value_b)) {
+            $value_b = array_map('trim', explode(',', $value_b));
+          } // perhaps extend to allow space-separated values
+          
+          if(isset($value_b[0]) && is_numeric($value_b[0]) && isset($value_b[1]) && is_numeric($value_b[1]))
+          {
+            if($condition == "between") {
+              if ($value_a < $value_b[0] || $value_a > $value_b[1]) { $alert = TRUE; }
+            } else { // notbetween
+              if ($value_a > $value_b[0] && $value_a < $value_b[1]) { $alert = TRUE; }
+            }
+          } else {
+            print_debug("ERROR: Invalid values passed to 'between' operator in test_condition().");
+          }
+
+          break;
+
         default:
             print_debug("ERROR: Unknown condition '$condition' passed to test_condition().");
             $alert = FALSE;
@@ -1043,13 +1064,13 @@ function match_device($device, $attributes, $ignore = TRUE)
                 break;
             case 'in':
             case 'list':
-                $where .= generate_query_values(explode(',', $attrib['value']), 'd.' . $attrib['attrib']);
+                $where .= generate_query_values_and(explode(',', $attrib['value']), 'd.' . $attrib['attrib']);
                 break;
             case '!in':
             case '!list':
             case 'notin':
             case 'notlist':
-                $where .= generate_query_values(explode(',', $attrib['value']), 'd.' . $attrib['attrib'], '!=');
+                $where .= generate_query_values_and(explode(',', $attrib['value']), 'd.' . $attrib['attrib'], '!=');
                 break;
             case 'include':
             case 'includes':
@@ -1190,13 +1211,13 @@ function match_device_entities($device_id, $entity_attribs, $entity_type)
                 break;
             case 'in':
             case 'list':
-                $sql .= generate_query_values(explode(',', $attrib['value']), $attrib['attrib'], NULL, OBS_DB_IFNULL);
+                $sql .= generate_query_values_and(explode(',', $attrib['value']), $attrib['attrib'], NULL, [ 'ifnull' ]);
                 break;
             case '!in':
             case '!list':
             case 'notin':
             case 'notlist':
-                $sql .= generate_query_values(explode(',', $attrib['value']), $attrib['attrib'], '!=', OBS_DB_IFNULL);
+                $sql .= generate_query_values_and(explode(',', $attrib['value']), $attrib['attrib'], '!=', [ 'ifnull' ]);
                 break;
             case 'include':
             case 'includes':
@@ -1208,7 +1229,7 @@ function match_device_entities($device_id, $entity_attribs, $entity_type)
                         }
                     case 'group_id':
                         $values = get_group_entities($attrib['value']);
-                        $sql .= generate_query_values($values, $entity_type['table_fields']['id']);
+                        $sql .= generate_query_values_and($values, $entity_type['table_fields']['id']);
                         break;
                 }
         }
@@ -1545,19 +1566,18 @@ function alert_notifier($entry, $type = "alert", $log_id = NULL)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function alert_generate_subject($device, $prefix, $message_tags)
-{
-    $subject = "$prefix: [" . $device['hostname'] . ']';
+function alert_generate_subject($device, $prefix, $message_tags) {
+  $subject = "$prefix: [" . device_name($device) . ']';
 
-    if ($message_tags['ENTITY_TYPE']) {
-        $subject .= ' [' . $message_tags['ENTITY_TYPE'] . ']';
-    }
-    if ($message_tags['ENTITY_NAME'] && $message_tags['ENTITY_NAME'] != $device['hostname']) {
-        $subject .= ' [' . $message_tags['ENTITY_NAME'] . ']';
-    }
-    $subject .= ' ' . $message_tags['ALERT_MESSAGE'];
+  if ($message_tags['ENTITY_TYPE']) {
+    $subject .= ' [' . $message_tags['ENTITY_TYPE'] . ']';
+  }
+  if ($message_tags['ENTITY_NAME'] && $message_tags['ENTITY_NAME'] != $device['hostname']) {
+    $subject .= ' [' . $message_tags['ENTITY_NAME'] . ']';
+  }
+  $subject .= ' ' . $message_tags['ALERT_MESSAGE'];
 
-    return $subject;
+  return $subject;
 }
 
 function alert_generate_tags($entry, $type = "alert")
@@ -1766,7 +1786,7 @@ function get_alert_contacts($device, $alert_id, $notification_type) {
   $contacts = array();
 
   if ($device['ignore']) {
-    print_error("Device '${device['hostname']}' set ignored in Device -> Edit -> Settings.");
+    print_error("Device '{$device['hostname']}' set ignored in Device -> Edit -> Settings.");
     return $contacts;
   }
   if ($GLOBALS['config']['alerts']['disable']['all']) {
@@ -1774,7 +1794,7 @@ function get_alert_contacts($device, $alert_id, $notification_type) {
     return $contacts;
   }
   if (get_dev_attrib($device, 'disable_notify')) {
-    print_error("Alert notifications disabled for device '${device['hostname']}' in Device -> Edit -> Alerts.");
+    print_error("Alert notifications disabled for device '{$device['hostname']}' in Device -> Edit -> Alerts.");
     return $contacts;
   }
 
@@ -1828,266 +1848,257 @@ function get_alert_contacts($device, $alert_id, $notification_type) {
   return $contacts;
 }
 
-function process_notifications($vars = array())
-{
-    global $config;
+function process_notifications($vars = []) {
+  global $config;
 
-    $result = array();
-    $params = array();
+  $result = [];
+  $params = [];
 
-    $sql = 'SELECT * FROM `notifications_queue` WHERE 1';
+  $sql = 'SELECT * FROM `notifications_queue` WHERE 1';
 
-    foreach ($vars as $var => $value)
-    {
-      switch ($var)
-      {
-        case 'device_id':
-        case 'notification_id':
-        case 'aca_type':
-          $sql .= generate_query_values($value, $var);
-          //$sql .= ' AND `device_id` = ?';
-          //$params[] = $value;
-          break;
+  foreach ($vars as $var => $value) {
+    switch ($var) {
+      case 'device_id':
+      case 'notification_id':
+      case 'aca_type':
+        $sql .= generate_query_values_and($value, $var);
+        //$sql .= ' AND `device_id` = ?';
+        //$params[] = $value;
+        break;
+    }
+  }
+
+  /**
+   * switch ($notification_type)
+   * {
+   * case 'alert':
+   * case 'syslog':
+   * // Alerts/syslog required device_id
+   * $sql     .= ' AND `device_id` = ?';
+   * $params[] = $device['device_id'];
+   * break;
+   * case 'web':
+   * // Currently not used
+   * break;
+   * }
+   **/
+
+  foreach (dbFetchRows($sql, $params) as $notification) {
+
+    print_debug_vars($notification);
+
+    // Recheck if current notification is locked
+    $locked = dbFetchCell('SELECT `notification_locked` FROM `notifications_queue` WHERE `notification_id` = ?', [ $notification['notification_id'] ]); //ALTER TABLE `notifications_queue` ADD `notification_locked` BOOLEAN NOT NULL DEFAULT FALSE AFTER `notification_entry`;
+    //if ($locked || $locked === NULL || $locked === FALSE) // If notification not exist or column 'notification_locked' not exist this query return NULL or (possible?) FALSE
+    if ($locked || $locked === FALSE) {
+      // Notification already processed by other alerter or has already been sent
+      print_debug('Notification ID ('.$notification['notification_id'].') locked or not exist anymore in table. Skipped.');
+      print_debug_vars($notification, 1);
+      continue;
+    }
+
+    // Lock current notification
+    dbUpdate([ 'notification_locked' => 1 ], 'notifications_queue', '`notification_id` = ?', [ $notification['notification_id'] ]);
+
+    $notification_count = 0;
+    $endpoint = safe_json_decode($notification['endpoints']);
+
+    // If this notification is older than lifetime, unset the endpoints so that it is removed.
+    if ((time() - $notification['notification_added']) > $notification['notification_lifetime']) {
+      $endpoint = [];
+      print_debug('Notification ID ('.$notification['notification_id'].') expired.');
+      print_debug_vars($notification, 1);
+    } else {
+      $notification_age = time() - $notification['notification_added'];
+      $notification_timeleft = $notification['notification_lifetime'] - $notification_age;
+    }
+
+    $message_tags = safe_json_decode($notification['message_tags']);
+    $message_graphs = safe_json_decode($notification['message_graphs']);
+    if (is_array($message_graphs) && count($message_graphs)) {
+      $message_tags['ENTITY_GRAPHS_ARRAY'] = $message_graphs;
+    }
+    if (isset($message_tags['ALERT_UNIXTIME']) && empty($message_tags['DURATION'])) {
+      $message_tags['DURATION'] = format_uptime(time() - $message_tags['ALERT_UNIXTIME']) . ' (' . $message_tags['ALERT_TIMESTAMP'] . ')';
+    }
+
+    if (isset($GLOBALS['config']['alerts']['disable'][$endpoint['contact_method']]) &&
+        $GLOBALS['config']['alerts']['disable'][$endpoint['contact_method']]) {
+      $result[$endpoint['contact_method']] = 'disabled';
+      unset($endpoint);
+      continue;
+    } // Skip if method disabled globally
+
+    $transport = $endpoint['contact_method']; // Just set transport name for use in includes
+    $method_include = $GLOBALS['config']['install_dir'] . '/includes/alerting/' . $transport . '.inc.php';
+
+    $is_transport_def  = isset($config['transports'][$transport]['notification']); // Is definition for transport
+    $is_transport_file = is_file($method_include); // Is file based transport
+    if ($is_transport_def || $is_transport_file) {
+
+      //print_cli_data("Notifying", "[" . $endpoint['contact_method'] . "] " . $endpoint['contact_descr'] . ": " . $endpoint['contact_endpoint']);
+      print_cli_data_field("Notifying");
+      echo("[" . $endpoint['contact_method'] . "] " . $endpoint['contact_descr'] . ": " . $endpoint['contact_endpoint']);
+
+      // Split out endpoint data as stored JSON in the database into array for use in transport
+      // The original string also remains available as the contact_endpoint key
+      foreach (safe_json_decode($endpoint['contact_endpoint']) as $field => $value) {
+        $endpoint[$field] = $value;
       }
+
+      // Clean data array for use with definition based processing
+      $data = [];
+      $message = [];
+
+      // File based transport
+      if ($is_transport_file) {
+        print_debug("\nUse file-based notification transport");
+        include($method_include);
+      }
+
+      // Definition based generate transport options, url and process request
+      if ($is_transport_def) {
+        print_debug("\nUse definition based notification transport");
+        $notification_def = $config['transports'][$transport]['notification'];
+
+        // Pass message tags to request as ARRAY (example in opsgenie)
+        if (isset($notification_def['message_tags']) && $notification_def['message_tags']) {
+          $data = array_merge($data, $message_tags);
+          unset($data['ENTITY_GRAPHS_ARRAY']);
+          //print_debug_vars(safe_json_encode($data));
+        } elseif (isset($notification_def['message_json'])) {
+          // Pass raw json as $data (example in webhook-json)
+          $json = array_tag_replace(generate_transport_tags($transport, $endpoint, [], [], array_map('json_escape', $message_tags)), $notification_def['message_json']);
+          //print_vars(generate_transport_tags($transport, $endpoint, [], [], array_map('json_escape', $message_tags)));
+          //print_vars($json);
+          $json_array = safe_json_decode($json);
+          //print_vars($json_array);
+          if (!safe_empty($json_array)) {
+            $data = array_merge($data, $json_array);
+          }
+          unset($json, $json_array);
+        } else {
+          // Or set common title tag
+          $message['title'] = $message_tags['TITLE'];
+        }
+
+        // Generate notification message from tags using mustache template system
+        if (isset($endpoint['contact_message_custom']) && $endpoint['contact_message_custom'] &&
+            empty(!$endpoint['contact_message_template'])) {
+          // Use user defined template
+          print_debug("User-defined message template is used.");
+          $message['text'] = simple_template($endpoint['contact_message_template'], $message_tags);
+        } elseif (isset($notification_def['message_template'])) {
+          print_debug("Definition message template file is used.");
+          // template can have tags (ie telegram)
+          if (str_contains($notification_def['message_template'], '%')) {
+            //print_vars($notification_def['message_template']);
+            $message_template = array_tag_replace(generate_transport_tags($transport, $endpoint), $notification_def['message_template']);
+            $message_template = strtolower($message_template);
+            //print_vars($message_template);
+          } else {
+            $message_template = $notification_def['message_template'];
+          }
+          // Template in file, see: includes/templates/notification/
+          $message['text'] = simple_template($message_template, $message_tags, [ 'is_file' => TRUE ]);
+          //$data['message'] = $message['text'];
+        } elseif (isset($notification_def['message_text'])) {
+          print_debug("Definition message template is used.");
+          // Template in definition
+          $message['text'] = simple_template($notification_def['message_text'], $message_tags);
+          //$data['message'] = $message['text'];
+        }
+
+        // Afterall message transform
+        if (isset($notification_def['message_transform']) && $message['text']) {
+          $message['text'] = string_transform($message['text'], $notification_def['message_transform']);
+        }
+
+        // Generate transport tags, used for rewrites in definition
+        $tags = generate_transport_tags($transport, $endpoint, $data, $message, $message_tags);
+
+        // Generate context/options with encoded data and transport specific api headers
+        $options = generate_http_context($transport, $tags, $data);
+        // Always get response also with bad status
+        $options['ignore_errors'] = TRUE;
+
+        // Retry count (default 1, max 10). See discord definition
+        $request_retry = 1;
+        $request_sleep = 0;
+        if (isset($notification_def['request_retry']) && is_intnum($notification_def['request_retry']) &&
+            $notification_def['request_retry'] > 1 && $notification_def['request_retry'] <= 10) {
+          $request_retry = $notification_def['request_retry'];
+          $request_sleep = 1;
+        }
+
+        // API URL to POST to
+        $url = generate_http_url($transport, $tags, $data);
+
+        // Send out API call and parse response
+        for ($retry = 1; $retry <= $request_retry; $retry++) {
+          print_debug("Request #$retry:");
+          if ($notify_status['success'] = test_http_request($transport, get_http_request($url, $options))) {
+            // stop for on success
+            break;
+          }
+          // wait little time
+          sleep($request_sleep);
+        }
+
+        // Clean after transport data and request generation
+        unset($message, $color, $url, $data, $options, $tags);
+      }
+
+      // FIXME check success
+      // FIXME log notification + success/failure!
+      if ($notify_status['success']) {
+        $result[$transport] = 'ok';
+        unset($endpoint);
+        $notification_count++;
+        print_message(" [%gOK%n]", 'color');
+      } else {
+        $result[$transport] = 'false';
+        print_message(" [%rFALSE%n]", 'color');
+        if ($notify_status['error']) {
+          print_cli_data_field('', 4);
+          print_message("[%y".$notify_status['error']."%n]", 'color');
+        }
+      }
+    } else {
+      $result[$transport] = 'missing';
+      unset($endpoint); // Remove it because it's dumb and doesn't exist. Don't retry it if it doesn't exist.
+      print_cli_data("Missing include", $method_include);
     }
 
-    /**
-     * switch ($notification_type)
-     * {
-     * case 'alert':
-     * case 'syslog':
-     * // Alerts/syslog required device_id
-     * $sql     .= ' AND `device_id` = ?';
-     * $params[] = $device['device_id'];
-     * break;
-     * case 'web':
-     * // Currently not used
-     * break;
-     * }
-     **/
-
-    foreach (dbFetchRows($sql, $params) as $notification) {
-
-        print_debug_vars($notification);
-
-        // Recheck if current notification is locked
-        $locked = dbFetchCell('SELECT `notification_locked` FROM `notifications_queue` WHERE `notification_id` = ?', array($notification['notification_id'])); //ALTER TABLE `notifications_queue` ADD `notification_locked` BOOLEAN NOT NULL DEFAULT FALSE AFTER `notification_entry`;
-        //if ($locked || $locked === NULL || $locked === FALSE) // If notification not exist or column 'notification_locked' not exist this query return NULL or (possible?) FALSE
-        if ($locked || $locked === FALSE)
-        {
-            // Notification already processed by other alerter or has already been sent
-            print_debug('Notification ID ('.$notification['notification_id'].') locked or not exist anymore in table. Skipped.');
-            print_debug_vars($notification, 1);
-            continue;
-        } else {
-            // Lock current notification
-            dbUpdate(array('notification_locked' => 1), 'notifications_queue', '`notification_id` = ?', array($notification['notification_id']));
+    // Remove notification from queue,
+    // currently in any case, lifetime, added time and result status is ignored!
+    switch ($notification['aca_type']) {
+      case 'alert':
+        if ($notification_count) {
+          dbUpdate([ 'notified' => 1 ], 'alert_log', '`event_id` = ?', [ $notification['log_id'] ]);
         }
+        break;
 
-        $notification_count = 0;
-        $endpoint = safe_json_decode($notification['endpoints']);
-
-        // If this notification is older than lifetime, unset the endpoints so that it is removed.
-        if ((time() - $notification['notification_added']) > $notification['notification_lifetime']) {
-            $endpoint = array();
-            print_debug('Notification ID ('.$notification['notification_id'].') expired.');
-            print_debug_vars($notification, 1);
-        } else {
-            $notification_age = time() - $notification['notification_added'];
-            $notification_timeleft = $notification['notification_lifetime'] - $notification_age;
+      case 'syslog':
+        if ($notification_count) {
+          dbUpdate([ 'notified' => 1 ], 'syslog_alerts', '`lal_id` = ?', [ $notification['log_id'] ]);
         }
+        break;
 
-        $message_tags = safe_json_decode($notification['message_tags']);
-        $message_graphs = safe_json_decode($notification['message_graphs']);
-        if (is_array($message_graphs) && count($message_graphs)) {
-            $message_tags['ENTITY_GRAPHS_ARRAY'] = $message_graphs;
-        }
-        if (isset($message_tags['ALERT_UNIXTIME']) && empty($message_tags['DURATION'])) {
-            $message_tags['DURATION'] = format_uptime(time() - $message_tags['ALERT_UNIXTIME']) . ' (' . $message_tags['ALERT_TIMESTAMP'] . ')';
-        }
-
-        if (isset($GLOBALS['config']['alerts']['disable'][$endpoint['contact_method']]) &&
-                  $GLOBALS['config']['alerts']['disable'][$endpoint['contact_method']]) {
-            $result[$endpoint['contact_method']] = 'disabled';
-            unset($endpoint);
-            continue;
-        } // Skip if method disabled globally
-
-        $transport = $endpoint['contact_method']; // Just set transport name for use in includes
-        $method_include = $GLOBALS['config']['install_dir'] . '/includes/alerting/' . $transport . '.inc.php';
-
-        $is_transport_def  = isset($config['transports'][$transport]['notification']); // Is definition for transport
-        $is_transport_file = is_file($method_include); // Is file based transport
-        if ($is_transport_def || $is_transport_file)
-        {
-
-            //print_cli_data("Notifying", "[" . $endpoint['contact_method'] . "] " . $endpoint['contact_descr'] . ": " . $endpoint['contact_endpoint']);
-            print_cli_data_field("Notifying");
-            echo("[" . $endpoint['contact_method'] . "] " . $endpoint['contact_descr'] . ": " . $endpoint['contact_endpoint']);
-
-            // Split out endpoint data as stored JSON in the database into array for use in transport
-            // The original string also remains available as the contact_endpoint key
-            foreach (safe_json_decode($endpoint['contact_endpoint']) as $field => $value) {
-              $endpoint[$field] = $value;
-            }
-
-            // Clean data array for use with definition based processing
-            $data = array();
-            $message = array();
-
-            // File based transport
-            if ($is_transport_file)
-            {
-              print_debug("\nUse file-based notification transport");
-              include($method_include);
-            }
-
-            // Definition based generate transport options, url and process request
-            if ($is_transport_def)
-            {
-              print_debug("\nUse definition based notification transport");
-              $notification_def = $config['transports'][$transport]['notification'];
-
-              // Pass message tags to request as ARRAY (example in opsgenie)
-              if (isset($notification_def['message_tags']) && $notification_def['message_tags']) {
-                $data = array_merge($data, $message_tags);
-                unset($data['ENTITY_GRAPHS_ARRAY']);
-                //print_debug_vars(safe_json_encode($data));
-              } elseif (isset($notification_def['message_json'])) {
-                // Pass raw json as $data (example in webhook-json)
-                $json = array_tag_replace(generate_transport_tags($transport, $endpoint, [], [], array_map('json_escape', $message_tags)), $notification_def['message_json']);
-                //print_vars(generate_transport_tags($transport, $endpoint, [], [], array_map('json_escape', $message_tags)));
-                //print_vars($json);
-                $json_array = safe_json_decode($json);
-                //print_vars($json_array);
-                if (!safe_empty($json_array)) {
-                  $data = array_merge($data, $json_array);
-                }
-                unset($json, $json_array);
-              } else {
-                // Or set common title tag
-                $message['title'] = $message_tags['TITLE'];
-              }
-
-              // Generate notification message from tags using mustache template system
-              if (isset($endpoint['contact_message_custom']) && $endpoint['contact_message_custom'] &&
-                  empty(!$endpoint['contact_message_template'])) {
-                // Use user defined template
-                print_debug("User-defined message template is used.");
-                $message['text'] = simple_template($endpoint['contact_message_template'], $message_tags);
-              } elseif (isset($notification_def['message_template'])) {
-                print_debug("Definition message template file is used.");
-                // template can have tags (ie telegram)
-                if (str_contains($notification_def['message_template'], '%')) {
-                  //print_vars($notification_def['message_template']);
-                  $message_template = array_tag_replace(generate_transport_tags($transport, $endpoint), $notification_def['message_template']);
-                  $message_template = strtolower($message_template);
-                  //print_vars($message_template);
-                } else {
-                  $message_template = $notification_def['message_template'];
-                }
-                // Template in file, see: includes/templates/notification/
-                $message['text'] = simple_template($message_template, $message_tags, array('is_file' => TRUE));
-                //$data['message'] = $message['text'];
-              } elseif (isset($notification_def['message_text'])) {
-                print_debug("Definition message template is used.");
-                // Template in definition
-                $message['text'] = simple_template($notification_def['message_text'], $message_tags);
-                //$data['message'] = $message['text'];
-              }
-
-              // Afterall message transform
-              if (isset($notification_def['message_transform']) && $message['text']) {
-                $message['text'] = string_transform($message['text'], $notification_def['message_transform']);
-              }
-
-              // Generate transport tags, used for rewrites in definition
-              $tags = generate_transport_tags($transport, $endpoint, $data, $message, $message_tags);
-
-              // Generate context/options with encoded data and transport specific api headers
-              $options = generate_http_context($transport, $tags, $data);
-              // Always get response also with bad status
-              $options['ignore_errors'] = TRUE;
-
-              // Retry count (default 1, max 10). See discord definition
-              $request_retry = 1;
-              $request_sleep = 0;
-              if (isset($notification_def['request_retry']) && is_intnum($notification_def['request_retry']) &&
-                  $notification_def['request_retry'] > 1 && $notification_def['request_retry'] <= 10) {
-                $request_retry = $notification_def['request_retry'];
-                $request_sleep = 1;
-              }
-
-              // API URL to POST to
-              $url = generate_http_url($transport, $tags, $data);
-
-              // Send out API call and parse response
-              for ($retry = 1; $retry <= $request_retry; $retry++) {
-                print_debug("Request #$retry:");
-                if ($notify_status['success'] = test_http_request($transport, get_http_request($url, $options))) {
-                  // stop for on success
-                  break;
-                }
-                // wait little time
-                sleep($request_sleep);
-              }
-
-              // Clean after transport data and request generation
-              unset($message, $color, $url, $data, $options, $tags);
-            }
-
-            // FIXME check success
-            // FIXME log notification + success/failure!
-            if ($notify_status['success'])
-            {
-                $result[$transport] = 'ok';
-                unset($endpoint);
-                $notification_count++;
-                print_message(" [%gOK%n]", 'color');
-            } else {
-                $result[$transport] = 'false';
-                print_message(" [%rFALSE%n]", 'color');
-                if ($notify_status['error'])
-                {
-                  print_cli_data_field('', 4);
-                  print_message("[%y".$notify_status['error']."%n]", 'color');
-                }
-            }
-        } else {
-            $result[$transport] = 'missing';
-            unset($endpoint); // Remove it because it's dumb and doesn't exist. Don't retry it if it doesn't exist.
-            print_cli_data("Missing include", $method_include);
-        }
-
-        // Remove notification from queue,
-        // currently in any case, lifetime, added time and result status is ignored!
-        switch ($notification['aca_type'])
-        {
-            case 'alert':
-                if ($notification_count) {
-                    dbUpdate(array('notified' => 1), 'alert_log', '`event_id` = ?', array($notification['log_id']));
-                }
-                break;
-            case 'syslog':
-                if ($notification_count) {
-                    dbUpdate(array('notified' => 1), 'syslog_alerts', '`lal_id` = ?', array($notification['log_id']));
-                }
-                break;
-            case 'web':
-                // Currently not used
-                break;
-        }
-
-        if (empty($endpoint))
-        {
-            dbDelete('notifications_queue', '`notification_id` = ?', array($notification['notification_id']));
-        } else {
-            // Set the endpoints to the remaining un-notified endpoints and unlock the queue entry.
-            dbUpdate(array('notification_locked' => 0, 'endpoints' => safe_json_encode($endpoint)), 'notifications_queue', '`notification_id` = ?', array($notification['notification_id']));
-        }
+      case 'web':
+        // Currently not used
+        break;
     }
 
-    return $result;
+    if (empty($endpoint)) {
+      dbDelete('notifications_queue', '`notification_id` = ?', [ $notification['notification_id'] ]);
+    } else {
+      // Set the endpoints to the remaining un-notified endpoints and unlock the queue entry.
+      dbUpdate(array('notification_locked' => 0, 'endpoints' => safe_json_encode($endpoint)), 'notifications_queue', '`notification_id` = ?', [ $notification['notification_id'] ]);
+    }
+  }
+
+  return $result;
 }
 
 // Use this function to write to the alert_log table
@@ -2193,12 +2204,10 @@ function check_thresholds($alert_low, $warn_low, $warn_high, $alert_high, $value
  * @param array  $message_tags (optional) Array with all message tags
  * @return array           HTTP Context which can used in get_http_request_test() or get_http_request()
  */
-function generate_transport_tags($transport, $tags = array(), $params = array(), $message = array(), $message_tags = array())
-{
+function generate_transport_tags($transport, $tags = [], $params = [], $message = [], $message_tags = []) {
   global $config;
 
-  if (!isset($message['message']))
-  {
+  if (!isset($message['message'])) {
     // Just use text version of message (also possible in future html, etc
     $message['message'] = $message['text'];
   }
@@ -2206,38 +2215,39 @@ function generate_transport_tags($transport, $tags = array(), $params = array(),
 
   // If transport config options exist, merge it with tags array
   // for use in replace/etc, ie: smsbox
-  if (isset($config[$transport]))
-  {
-    foreach ($config[$transport] as $param => $value)
-    {
-      if (!isset($tags[$param]) || $tags[$param] === '')
-      {
+  if (isset($config[$transport])) {
+    foreach ($config[$transport] as $param => $value) {
+      if (!isset($tags[$param]) || $tags[$param] === '') {
         $tags[$param] = $value;
       }
     }
   }
 
   // Set defaults and transform params if required
-  $def_params = array();
+  $def_params = [];
   // Merge required/global and optional parameters
-  foreach (array_keys($config['transports'][$transport]['parameters']) as $tmp)
-  {
+  foreach (array_keys($config['transports'][$transport]['parameters']) as $tmp) {
     $def_params = array_merge($def_params, $config['transports'][$transport]['parameters'][$tmp]);
   }
-  foreach ($def_params as $param => $entry)
-  {
+  foreach ($def_params as $param => $entry) {
     // Set default if tag empty
-    if (isset($entry['default']) && strlen($tags[$param]) == 0)
-    {
+    if (isset($entry['default']) && safe_empty($tags[$param])) {
       $tags[$param] = $entry['default'];
     }
     // Transform param if defined
-    if (isset($entry['transform']) && isset($tags[$param]))
-    {
+    if (isset($entry['transform'], $tags[$param])) {
       $tags[$param] = string_transform($tags[$param], $entry['transform']);
     }
   }
   //print_vars($tags);
+  // if ($config['transports'][$transport]['notification']['request_format'] === 'json') {
+  //   // escape tags for json
+  //   print_debug("Transport TAGs escaped for JSON.");
+  //   if (OBS_DEBUG > 1) {
+  //     print_debug_vars(array_map('json_escape', $tags));
+  //   }
+  //   return array_map('json_escape', $tags);
+  // }
 
   return $tags;
 }
@@ -2349,13 +2359,13 @@ function get_alert_entities_from_assocs($alert)
                break;
             case 'in':
             case 'list':
-               $where .= generate_query_values(get_var_csv($attrib['value']), '`devices`.' . $attrib['attrib'], NULL, OBS_DB_IFNULL);
+               $where .= generate_query_values_and(get_var_csv($attrib['value']), '`devices`.' . $attrib['attrib'], NULL, [ 'ifnull' ]);
                break;
             case '!in':
             case '!list':
             case 'notin':
             case 'notlist':
-               $where .= generate_query_values(get_var_csv($attrib['value']), '`devices`.' . $attrib['attrib'], '!=', OBS_DB_IFNULL);
+               $where .= generate_query_values_and(get_var_csv($attrib['value']), '`devices`.' . $attrib['attrib'], '!=', [ 'ifnull' ]);
                break;
             case 'include':
             case 'includes':
@@ -2365,7 +2375,7 @@ function get_alert_entities_from_assocs($alert)
                      $attrib['value'] = group_id_by_name($attrib['value']);
                   case 'group_id':
                      $values = get_group_entities($attrib['value']);
-                     $where .= generate_query_values($values, "`devices`.`device_id`");
+                     $where .= generate_query_values_and($values, "`devices`.`device_id`");
                      break;
                }
                break;
@@ -2444,13 +2454,13 @@ function get_alert_entities_from_assocs($alert)
                break;
             case 'in':
             case 'list':
-               $where .= generate_query_values(get_var_csv($attrib['value']), $attrib['attrib'], NULL, OBS_DB_IFNULL);
+               $where .= generate_query_values_and(get_var_csv($attrib['value']), $attrib['attrib'], NULL, [ 'ifnull' ]);
                break;
             case '!in':
             case '!list':
             case 'notin':
             case 'notlist':
-               $where .= generate_query_values(get_var_csv($attrib['value']), $attrib['attrib'], '!=', OBS_DB_IFNULL);
+               $where .= generate_query_values_and(get_var_csv($attrib['value']), $attrib['attrib'], '!=', [ 'ifnull' ]);
                break;
             case 'include':
             case 'includes':
@@ -2463,7 +2473,7 @@ function get_alert_entities_from_assocs($alert)
                      if($group['entity_type'] == $entity_type)
                      {
                         $values = get_group_entities($attrib['value']);
-                        $where  .= generate_query_values($values, $entity_type['table_fields']['id']);
+                        $where  .= generate_query_values_and($values, $entity_type['table_fields']['id']);
                      }
                      break;
                }
@@ -3133,7 +3143,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
               //$group_ids = get_group_ids_by_name_match($rule['value_original'], $entity_type);
               if ($values = get_group_entities($group_ids)) {
                 //$values = get_group_entities($group['group_id']);
-                $part   = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), NULL, FALSE);
+                $part   = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']));
               }
               break;
             default:
@@ -3152,7 +3162,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
               //$group_ids = get_group_ids_by_name_match($rule['value_original'], $entity_type);
               if ($values = get_group_entities($group_ids)) {
                 //$values = get_group_entities($group['group_id']);
-                $part   = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), '!=', FALSE);
+                $part   = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'] . '.' . $entity_type_data['table_fields']['id']), '!=');
               }
               break;
             default:
@@ -3181,7 +3191,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
           switch ($field) {
             case 'group_id':
               $values = get_group_entities($rule['value_original']);
-              $part = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'].'.'.$entity_type_data['table_fields']['id']), NULL, FALSE);
+              $part = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'].'.'.$entity_type_data['table_fields']['id']));
               break;
             default:
               if (isset($entity_attribs[$field]['transformations'])) {
@@ -3196,7 +3206,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
               //r($values);
               //logfile('alerts.log', $rule['field_quoted'] . ': ' . var_export($values, TRUE));
               //logfile('alerts.log', var_export($rule, TRUE));
-              $part = generate_query_values($values, $rule['field_quoted'], NULL, OBS_DB_NO_LEADING_AND | OBS_DB_IFNULL);
+              $part = generate_query_values_ng($values, $rule['field_quoted'], NULL, [ 'ifnull' ]);
               break;
           }
           //print_vars($parts);
@@ -3206,7 +3216,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
           switch ($field) {
             case 'group_id':
               $values = get_group_entities($rule['value_original']);
-              $part = generate_query_values($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'].'.'.$entity_type_data['table_fields']['id']), '!=', FALSE);
+              $part = generate_query_values_ng($values, ($table === "device" ? "devices.device_id" : $table_type_data['table'].'.'.$entity_type_data['table_fields']['id']), '!=');
               break;
             default:
               if (isset($entity_attribs[$field]['transformations'])) {
@@ -3218,7 +3228,7 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
                 // When transformations not used, can use other value overrides, ie function calls
                 $values = get_var_csv($rule['value']);
               }
-              $part = generate_query_values($values, $rule['field_quoted'], '!=', OBS_DB_NO_LEADING_AND | OBS_DB_IFNULL);
+              $part = generate_query_values_ng($values, $rule['field_quoted'], '!=', [ 'ifnull' ]);
               break;
           }
           break;
@@ -3253,41 +3263,35 @@ function parse_qb_rules($entity_type, $rules, $ignore = FALSE) {
 
 }
 
-function migrate_assoc_rules($entry)
-{
+function migrate_assoc_rules($entry) {
 
   $entity_type = $entry['entity_type'];
 
-  $ruleset = array();
+  $ruleset = [];
   $ruleset['condition'] = 'OR';
   $ruleset['valid'] = 'true';
 
-  foreach ($entry['assocs'] as $assoc)
-  {
+  foreach ($entry['assocs'] as $assoc) {
 
-    $x = array();
+    $x = [];
     $x['condition'] = 'AND';
 
-    $a = array('device' => $assoc['device_attribs'], 'entity' => $assoc['entity_attribs']);
+    $a = [ 'device' => $assoc['device_attribs'], 'entity' => $assoc['entity_attribs'] ];
 
-    foreach ($a as $type => $rules)
-    {
+    foreach ($a as $type => $rules) {
 
-      foreach ($rules as $rule)
-      {
+      foreach ($rules as $rule) {
 
-        if ($rule['attrib'] != '*')
-        {
+        if ($rule['attrib'] !== '*') {
 
-          if ($type == 'device' || $entity_type == 'device')
-          {
+          if ($type === 'device' || $entity_type === 'device') {
             $def = $GLOBALS['config']['entities'][$type]['attribs'][$rule['attrib']];
           } else {
             $def = $GLOBALS['config']['entities'][$entity_type]['attribs'][$rule['attrib']];
           }
 
-          $e = array();
-          $e['id'] = ($type == 'device' ? 'device.' : 'entity.') . $rule['attrib'];
+          $e = [];
+          $e['id'] = ($type === 'device' ? 'device.' : 'entity.') . $rule['attrib'];
           $e['field'] = $e['id'];
           $e['type'] = $def['type'];
           $e['value'] = $rule['value'];
@@ -3377,17 +3381,13 @@ function migrate_assoc_rules($entry)
           }
 
           if (isset($def['values']) &&
-              in_array($e['operator'], array("equals", "notequals", "match", "notmatch", "regexp", "notregexp")))
-          {
+              in_array($e['operator'], [ "equals", "notequals", "match", "notmatch", "regexp", "notregexp" ])) {
             $e['id'] .= ".free";
           }
 
-          if (in_array($e['operator'], array('in', 'notin')))
-          {
+          if (in_array($e['operator'], [ 'in', 'notin' ])) {
             $e['input'] = 'select';
-          }
-          else if ($def['type'] == 'integer')
-          {
+          } elseif ($def['type'] === 'integer') {
             $e['input'] = 'number';
           } else {
             $e['input'] = 'text';
@@ -3404,14 +3404,11 @@ function migrate_assoc_rules($entry)
   }
 
   // Collapse group if there is only one entry.
-  if (count($ruleset['rules']) == 1)
-  {
+  $rules_count = count($ruleset['rules']);
+  if ($rules_count === 1) {
     $ruleset['rules'] = $ruleset['rules'][0]['rules'];
     $ruleset['condition'] = 'AND';
-  }
-
-  if (count($ruleset['rules']) < 1)
-  {
+  } elseif ($rules_count < 1) {
     $ruleset['rules'][] = array('id' => 'device.hostname', 'field' => 'device.hostname', 'type' => 'string', 'value' => '*', 'operator' => 'match', 'input' => 'text');
   }
 
@@ -3419,52 +3416,47 @@ function migrate_assoc_rules($entry)
 
 }
 
-function render_qb_rules($entity_type, $rules)
-{
+function render_qb_rules($entity_type, $rules) {
 
-  $parts = array();
+  $parts = [];
 
   $entity_type_data = entity_type_translate_array($entity_type);
 
-  foreach ($rules['rules'] as $rule)
-  {
-    if (is_array($rule['rules']))
-    {
+  foreach ($rules['rules'] as $rule) {
+    if (is_array($rule['rules'])) {
       $parts[] = render_qb_rules($entity_type, $rule);
 
     } else {
 
       list($table, $field) = explode('.', $rule['field']);
 
-      if ($table == "device")
-      {
+      if ($table === "device") {
 
-      } elseif ($table == "entity") {
+      } elseif ($table === "entity") {
 
         $table = $entity_type;
 
-      } elseif ($table == "parent") {
+      } elseif ($table === "parent") {
 
         $table = $entity_type_data['parent_type'];
 
       }
 
       // Boolean stored as bool object, can not be displayed
-      if ($rule['type'] == 'boolean')
-      {
-        $rule['value'] = intval($rule['value']);
+      if ($rule['type'] === 'boolean') {
+        $rule['value'] = (int)$rule['value'];
       }
 
-      $parts[] = "<code style='margin: 1px'>$table.$field " . $rule['operator'] . " " .
-                 (is_array($rule['value']) ? implode('|', $rule['value']) : $rule['value']) . "</code>";
+      $values = is_array($rule['value']) ? implode('|', $rule['value']) : $rule['value'];
+      $parts[] = "<code style='margin: 1px'>" . escape_html("$table.$field " . $rule['operator']) . " " .
+                 escape_html($values) . "</code>";
     }
 
   }
 
-  $part = implode('' . ($rules['condition'] == "AND" ? ' <span class="label label-primary">AND</span> ' : ' <span class="label label-info">OR</span> ') . '',$parts);
+  $part = implode(($rules['condition'] === "AND" ? ' <span class="label label-primary">AND</span> ' : ' <span class="label label-info">OR</span> '), $parts);
 
-  if(count($parts) > 1)
-  {
+  if (count($parts) > 1) {
     $part = '<b style="font-size: 1.2em">(</b>'.$part.'<b>)</b>';
   }
 

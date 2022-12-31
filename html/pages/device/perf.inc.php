@@ -17,13 +17,10 @@
 
 <?php
 
-$graph_array = array('type'   => 'device_poller_perf',
-                     'device' => $device['device_id']
-                     );
-?>
-
-
-<?php
+$graph_array = [
+  'type'   => 'device_poller_perf',
+  'device' => $device['device_id']
+];
 
 echo generate_box_open(array('title' => 'Poller Performance'));
 print_graph_row($graph_array);
@@ -61,6 +58,9 @@ unset($navbar);
 
 if (is_array($device['state']['poller_mod_perf'])) {
   arsort($device['state']['poller_mod_perf']);
+}
+if (is_array($device['state']['discovery_mod_perf'])) {
+  arsort($device['state']['discovery_mod_perf']);
 }
 
 if ($vars['view'] === 'db')
@@ -164,7 +164,7 @@ elseif ($vars['view'] === 'poller')
 </div>
 
 <div class="row">
-  <div class="col-md-6">
+  <div class="col-md-4">
     <div class="box box-solid">
       <div class="box-header with-border">
         <h3 class="box-title">Poller Module Times</h3>
@@ -181,21 +181,18 @@ elseif ($vars['view'] === 'poller')
           <tbody>
 <?php
 
-foreach ($device['state']['poller_mod_perf'] as $module => $time)
-{
-  if ($time > 0.001)
-  {
+foreach ($device['state']['poller_mod_perf'] as $module => $time) {
+  if ($time > 0.001) {
     $perc = round(float_div($time, $device['last_polled_timetaken']) * 100, 2, 2);
 
     echo('    <tr>
       <td><strong>'.$module.'</strong></td>
       <td style="width: 80px;">'.number_format($time, 4).'s</td>
-      <td style="width: 70px;">'.$perc.'%</td>
+      <td style="width: 70px;"><span style="color:'.percent_colour($perc).'">'.$perc.'%</span></td>
     </tr>');
 
     // Separate sub-module perf (ie ports)
-    foreach ($device['state']['poller_'.$module.'_perf'] as $submodule => $subtime)
-    {
+    foreach ($device['state']['poller_'.$module.'_perf'] as $submodule => $subtime) {
       echo('    <tr>
         <td>&nbsp;<i class="icon-share-alt icon-flip-vertical"></i><strong style="padding-left:1em"><i>'.$submodule.'</i></strong></td>
         <td style="width: 80px;"><i>'.number_format($subtime, 4).'s</i></td>
@@ -212,27 +209,26 @@ foreach ($device['state']['poller_mod_perf'] as $module => $time)
     </div>
   </div>
 
-  <div class="col-md-3">
+  <div class="col-md-2">
       <div class="box box-solid">
         <div class="box-header with-border">
-          <h3 class="box-title">Poller Total Times</h3>
+          <h3 class="box-title">Poller Times</h3>
         </div>
         <div class="box-body no-padding">
           <table class="table table-hover table-striped table-condensed ">
             <thead>
               <tr>
                 <th>Time</th>
-                <th>Duration</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
 <?php
 
 $times = is_array($device['state']['poller_history']) ? array_slice($device['state']['poller_history'], 0, 30, TRUE) : [];
-foreach ($times as $start => $duration)
-{
+foreach ($times as $start => $duration) {
   echo('    <tr>
-      <td>'.format_unixtime($start).'</td>
+      <td>'.generate_tooltip_time($start, 'ago').'</td>
       <td>'.format_uptime($duration).'</td>
     </tr>');
 }
@@ -244,7 +240,57 @@ foreach ($times as $start => $duration)
       </div>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-md-4">
+
+
+    <div class="box box-solid">
+        <div class="box-header with-border">
+            <h3 class="box-title">Discovery Module Times</h3>
+        </div>
+        <div class="box-body no-padding">
+            <table class="table table-hover table-striped table-condensed">
+                <thead>
+                <tr>
+                    <th>Module</th>
+                    <th colspan="2">Duration</th>
+
+                </tr>
+                </thead>
+                <tbody>
+                <?php
+
+                //r($device['state']);
+
+                foreach ($device['state']['discovery_mod_perf'] as $module => $time) {
+                  if ($time > 0.001) {
+                    $perc = round(float_div($time, $device['last_discovered_timetaken']) * 100, 2, 2);
+
+                    echo('    <tr>
+      <td><strong>'.$module.'</strong></td>
+      <td style="width: 80px;">'.number_format($time, 4).'s</td>
+      <td style="width: 70px;"><span style="color:'.percent_colour($perc).'">'.$perc.'%</span></td>
+    </tr>');
+
+                    // Separate sub-module perf (ie ports)
+                    foreach ($device['state']['discovery_'.$module.'_perf'] as $submodule => $subtime) {
+                      echo('    <tr>
+        <td>&nbsp;<i class="icon-share-alt icon-flip-vertical"></i><strong style="padding-left:1em"><i>'.$submodule.'</i></strong></td>
+        <td style="width: 80px;"><i>'.number_format($subtime, 4).'s</i></td>
+        <td style="width: 70px;"></td>
+      </tr>');
+                    }
+                  }
+                }
+
+                ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </div>
+
+  <div class="col-md-2">
+
       <div class="box box-solid">
         <div class="box-header with-border">
           <h3 class="box-title">Discovery Times</h3>
@@ -254,20 +300,19 @@ foreach ($times as $start => $duration)
             <thead>
               <tr>
                 <th>Time</th>
-                <th>Duration</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
 <?php
 
-$times = is_array($device['state']['discovery_history']) ? array_slice($device['state']['discovery_history'], 0, 30, TRUE) : [];
-foreach ($times as $start => $duration)
-{
-  echo('    <tr>
-      <td>'.format_unixtime($start).'</td>
+  $times = is_array($device['state']['discovery_history']) ? array_slice($device['state']['discovery_history'], 0, 30, TRUE) : [];
+  foreach ($times as $start => $duration) {
+    echo('    <tr>
+      <td>'.generate_tooltip_time($start, 'ago').'</td>
       <td>'.format_uptime($duration).'</td>
     </tr>');
-}
+  }
 
 ?>
             </tbody>

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -27,20 +27,20 @@ function generate_processor_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'processor_id');
+        $sql .= generate_query_values_and($values, 'processor_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'processors.device_id');
+        $sql .= generate_query_values_and($values, 'processors.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'processors.device_id');
+        $sql .= generate_query_values_and($value, 'processors.device_id');
         break;
       case "descr":
       case "processor_descr";
-        $sql .= generate_query_values($value, 'processor_descr', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'processor_descr', '%LIKE%');
         break;
     }
   }

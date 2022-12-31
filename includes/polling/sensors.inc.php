@@ -6,14 +6,14 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 global $graphs;
 
 $query  = 'SELECT DISTINCT `sensor_class` FROM `sensors` WHERE `device_id` = ? AND `sensor_deleted` = ?';
-$query .= generate_query_values(array_keys($config['sensor_types']), 'sensor_class'); // Limit by known classes
+$query .= generate_query_values_and(array_keys($config['sensor_types']), 'sensor_class'); // Limit by known classes
 
 $sensor_classes = dbFetchColumn($query, array($device['device_id'], '0'));
 //$count = dbFetchCell('SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `sensor_deleted` = ?;', array($device['device_id'], '0'));

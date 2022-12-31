@@ -82,7 +82,7 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
               <?php
 
               foreach($roles as $role) {
-                  echo '<tr><td><b>'.$role['role_name'].'</td><td>'.$role['role_descr'].'</td></tr>';
+                  echo '<tr><td><b>'.escape_html($role['role_name']).'</td><td>'.escape_html($role['role_descr']).'</td></tr>';
 
                   //print_vars($role);
               }

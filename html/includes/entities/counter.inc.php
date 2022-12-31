@@ -6,14 +6,14 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 /**
  * Humanize counter.
  *
- * Returns a the $counter array with processed information:
+ * Returns a $counter array with processed information:
  * counter_state (TRUE: state counter, FALSE: normal counter)
  * human_value, counter_symbol, state_name, state_event, state_class
  *
@@ -164,42 +164,42 @@ function build_counter_query($vars, $query_count = FALSE)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'counters.counter_id');
+        $sql .= generate_query_values_and($values, 'counters.counter_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'counters.device_id');
+        $sql .= generate_query_values_and($values, 'counters.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'counters.device_id');
+        $sql .= generate_query_values_and($value, 'counters.device_id');
         break;
       case "id":
       case "counter_id":
-        $sql .= generate_query_values($value, 'counters.counter_id');
+        $sql .= generate_query_values_and($value, 'counters.counter_id');
         break;
       case "entity_id":
-        $sql .= generate_query_values($value, 'counters.measured_entity');
+        $sql .= generate_query_values_and($value, 'counters.measured_entity');
         break;
       case "entity_type":
-        $sql .= generate_query_values($value, 'counters.measured_class');
+        $sql .= generate_query_values_and($value, 'counters.measured_class');
         break;
       case 'entity_state':
       case "measured_state":
-        $sql .= build_entity_measured_where('counter', ['measured_state' => $value]);
+        $sql .= build_entity_measured_where('counter', [ 'measured_state' => $value ]);
         break;
       case 'class':
       case "counter_class":
-        $sql .= generate_query_values($value, 'counter_class');
+        $sql .= generate_query_values_and($value, 'counter_class');
         break;
       case "descr":
       case "counter_descr":
-        $sql .= generate_query_values($value, 'counters.counter_descr', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'counters.counter_descr', '%LIKE%');
         break;
       case "event":
       case "counter_event":
-        $sql .= generate_query_values($value, 'counter_event');
+        $sql .= generate_query_values_and($value, 'counter_event');
         break;
     }
   }
@@ -443,7 +443,7 @@ function generate_counter_row($counter, $vars)
                             $counter['counter_class'],
                             $config['counter_types'][$counter['counter_class']]['alt_units']) as $unit => $unit_value)
     {
-      if (is_numeric($unit_value)) { $counter_tooltip .= "<br />${unit_value}${unit}"; }
+      if (is_numeric($unit_value)) { $counter_tooltip .= "<br />{$unit_value}{$unit}"; }
     }
   }
 

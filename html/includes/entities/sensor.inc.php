@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -121,30 +121,30 @@ function build_sensor_query($vars, $query_count = FALSE) {
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'sensors.sensor_id');
+        $sql .= generate_query_values_and($values, 'sensors.sensor_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'sensors.device_id');
+        $sql .= generate_query_values_and($values, 'sensors.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'sensors.device_id');
+        $sql .= generate_query_values_and($value, 'sensors.device_id');
         break;
       case "id":
       case "sensor_id":
-        $sql .= generate_query_values($value, 'sensors.sensor_id');
+        $sql .= generate_query_values_and($value, 'sensors.sensor_id');
         break;
       case "entity_id":
-        $sql .= generate_query_values($value, 'sensors.measured_entity');
+        $sql .= generate_query_values_and($value, 'sensors.measured_entity');
         break;
       case "entity_type":
-        $sql .= generate_query_values($value, 'sensors.measured_class');
+        $sql .= generate_query_values_and($value, 'sensors.measured_class');
         break;
       case 'entity_state':
       case "measured_state":
-        $sql .= build_entity_measured_where('sensor', ['measured_state' => $value]);
+        $sql .= build_entity_measured_where('sensor', [ 'measured_state' => $value ]);
         break;
       case "metric":
         // old metric param not allow array
@@ -153,19 +153,19 @@ function build_sensor_query($vars, $query_count = FALSE) {
         }
       case 'class':
       case "sensor_class":
-        $sql .= generate_query_values($value, 'sensor_class');
+        $sql .= generate_query_values_and($value, 'sensor_class');
         break;
       case "descr":
       case "sensor_descr":
-        $sql .= generate_query_values($value, 'sensors.sensor_descr', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'sensors.sensor_descr', '%LIKE%');
         break;
       case "type":
       case "sensor_type":
-        $sql .= generate_query_values($value, 'sensor_type', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'sensor_type', '%LIKE%');
         break;
       case "event":
       case "sensor_event":
-        $sql .= generate_query_values($value, 'sensor_event');
+        $sql .= generate_query_values_and($value, 'sensor_event');
         break;
     }
   }
@@ -304,6 +304,126 @@ function print_sensor_table_header($vars) {
   echo('<tbody>' . PHP_EOL);
 }
 
+function generate_sensor_line($sensor, $vars) {
+  global $config;
+
+  humanize_sensor($sensor);
+
+  $graph_array           = [];
+  $graph_array['to']     = get_time();
+  $graph_array['id']     = $sensor['sensor_id'];
+  $graph_array['type']   = "sensor_graph";
+  $graph_array['width']  = 80;
+  $graph_array['height'] = 20;
+  $graph_array['bg']     = 'ffffff00';
+  $graph_array['from']   = get_time('day');
+  $graph_array['style']  = 'margin-top: 5px';
+
+  if ($sensor['sensor_event'] && is_numeric($sensor['sensor_value'])) {
+    $mini_graph = generate_graph_tag($graph_array);
+  } else {
+    // Do not show "Draw Error" minigraph
+    $mini_graph = '';
+  }
+
+  /*
+  $sensor_tooltip = $sensor['event_descr'];
+  // Append value in alternative units to tooltip
+  if (isset($config['sensor_types'][$sensor['sensor_class']]['alt_units'])) {
+    foreach (value_to_units($sensor['sensor_value'],
+                            $config['sensor_types'][$sensor['sensor_class']]['symbol'],
+                            $sensor['sensor_class'],
+                            $config['sensor_types'][$sensor['sensor_class']]['alt_units']) as $unit => $unit_value) {
+      if (is_numeric($unit_value)) { $sensor_tooltip .= "<br />{$unit_value}{$unit}"; }
+    }
+  }
+  */
+
+  //r($sensor);
+  $text = '<span class="'. $sensor['event_class'].'">' . $sensor['human_value'] . $sensor['sensor_symbol'] . '</span>';
+
+  //$line = '<td class="state-marker"></td>';
+  $line = '<td class="entity '.$sensor['row_class'].'">';
+  //$btn_class = str_replace('label', 'btn', $sensor['event_class']); // FIXME Need button-outline-* class from bs4+
+  if (get_var_true($vars['compact'])) {
+    $line .= '<button class="btn btn-default" style="width: 105px; text-align: right;">';
+  } else {
+    // fixed button size for keep size without images
+    $line .= '<button class="btn btn-default" style="width: 105px; height: 55px;">';
+  }
+
+  $icon = get_icon($config['sensor_types'][$sensor['sensor_class']]['icon']);
+  if ($sensor['sensor_class'] === 'power' || $sensor['sensor_class'] === 'dbm') {
+    if (str_icontains_array($sensor['sensor_descr'], [ ' Rx', 'Rx ', 'Receive' ])) {
+      // rx
+      $icon = get_icon('glyphicon-arrow-down text-primary').'&nbsp;';
+    } elseif (str_icontains_array($sensor['sensor_descr'], [ ' Tx', 'Tx ', 'Trans' ])) {
+      // tx
+      $icon = get_icon('glyphicon-arrow-up text-danger').'&nbsp;';
+    }
+  }
+
+  $line .= $icon.'&nbsp;';
+  $line .= generate_entity_link('sensor', $sensor, $text, NULL, FALSE);
+  if (!get_var_true($vars['compact'])) {
+    $line .= '<br />' .generate_entity_link('sensor', $sensor, $mini_graph, NULL, FALSE);
+  }
+  //$line .= '<strong>' . generate_tooltip_link('', $sensor['human_value'] . $sensor['sensor_symbol'], $sensor_tooltip, $sensor['event_class']) . '</strong>';
+  $line .= '</button>';
+  $line .= '</td>';
+
+  //r($line);
+  return $line;
+}
+
+function get_compact_sensors_line($measured_class, $entry, $vars) {
+
+  // order dom sensors always by temperature, voltage, current, dbm, power
+  $order = [];
+  if (safe_count($entry) > 0) {
+    $classes = array_keys($entry);
+    //r($types);
+    if ($measured_class === 'port') {
+      // always display all classes for dom (also if not exist)
+      $order = [ 'temperature', 'voltage', 'current', /* 'dbm', 'power' */ ];
+      // or dbm or power
+      if (in_array('dbm', $classes, TRUE)) {
+        $order[] = 'dbm';
+      } elseif (in_array('power', $classes, TRUE)) {
+        $order[] = 'power';
+      } else {
+        $order[] = 'dbm';
+      }
+    } else {
+      $order = array_intersect([ 'temperature', 'voltage', 'current', 'dbm', 'power' ], $classes);
+    }
+    $order = array_merge($order, array_diff($classes, $order));
+    //r($order);
+  }
+  $line = '';
+  foreach ($order as $class) {
+    if (!isset($entry[$class])) {
+      // Add empty columns for port entities (for correct align)
+      $line .= '<td class="entity"></td>';
+    }
+
+    foreach ($entry[$class] as $sensor) {
+      /*
+      $sensor['sensor_descr'] = trim(str_ireplace($rename_from, '', $sensor['sensor_descr']), ":- \t\n\r\0\x0B");
+      if (empty($sensor['sensor_descr'])) {
+        // Some time sensor descriptions equals to entity name
+        $sensor['sensor_descr'] = nicecase($sensor['sensor_class']);
+      }
+      */
+
+      // Compact view per entity/lane
+      $line .= generate_sensor_line($sensor, $vars);
+    }
+  }
+
+  return $line;
+}
+
 function print_sensor_row($sensor, $vars)
 {
   echo generate_sensor_row($sensor, $vars);
@@ -404,7 +524,7 @@ function generate_sensor_row($sensor, $vars)
                             $sensor['sensor_class'],
                             $config['sensor_types'][$sensor['sensor_class']]['alt_units']) as $unit => $unit_value)
     {
-      if (is_numeric($unit_value)) { $sensor_tooltip .= "<br />${unit_value}${unit}"; }
+      if (is_numeric($unit_value)) { $sensor_tooltip .= "<br />{$unit_value}{$unit}"; }
     }
   }
 

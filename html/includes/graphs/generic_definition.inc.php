@@ -12,6 +12,12 @@
 
 $graph_def = $config['graph_types'][$type][$subtype];
 
+$graph_return['legend_lines'] = 0;
+
+if(isset($graph_def['descr'])) {
+  $graph_return['descr'] = $graph_def['descr'];
+}
+
 // Set some defaults and convert $graph_def values to global values for use by common.inc.php.
 // common.inc.php needs converted to use $graph_def so we can remove this.
 
@@ -149,6 +155,8 @@ foreach ($graph_def['ds'] as $ds_name => $ds)
     $cmd_def .= " CDEF:".$ds_name."_max=".$ds_name;
   }
 
+  //$graph_return['rrds'][$ds['file']][] = $ds_name;
+
   if (!empty($ds['cdef']))
   {
     $ds_name = $ds_name."_c";
@@ -217,6 +225,7 @@ foreach ($graph_def['ds'] as $ds_name => $ds)
       }
     }
     $cmd_graph .= " COMMENT:'\\l'";
+    $graph_return['legend_lines']++;
 
     if ($ds['line']) {
       if (is_numeric($ds['line'])) {

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -144,7 +144,7 @@ if (count($contacts)) {
     $form = array('type'       => 'horizontal',
                   'userlevel'  => 10,          // Minimum user level for display form
                   'id'         => 'modal-contact_delete_'.$contact['contact_id'],
-                  'title'      => 'Delete Contact "'   . $contact['contact_descr'] .
+                  'title'      => 'Delete Contact "' . escape_html($contact['contact_descr']) .
                                   '" (Id: '. $contact['contact_id'] . ', ' . $config['transports'][$contact['contact_method']]['name'] . ')',
                   //'modal_args' => $modal_args, // modal specific options
                   //'help'      => 'This will delete the selected contact and any alert assocations.',

@@ -73,6 +73,7 @@ foreach ($cache_discovery['DKSF-50-11-X-X-X']['loop'] as $index => $entry)
   }
 }
 
+/* Moved to DEF
 $cache_discovery['DKSF-50-11-X-X-X']['temphum'] = snmpwalk_cache_oid($device, 'npRelHumTable', array(), 'DKSF-50-11-X-X-X');
 foreach ($cache_discovery['DKSF-50-11-X-X-X']['temphum'] as $index => $entry)
 {
@@ -113,6 +114,7 @@ foreach ($cache_discovery['DKSF-50-11-X-X-X']['thermo'] as $index => $entry)
     discover_sensor('temperature', $device, $oid, "npThermoValue.$index", 'dskf-mib', $descr, 1, $value, $limits);
   }
 }
+*/
 
 $cache_discovery['DKSF-50-11-X-X-X']['io'] = snmpwalk_cache_oid($device, 'npIoTable', array(), 'DKSF-50-11-X-X-X');
 foreach ($cache_discovery['DKSF-50-11-X-X-X']['io'] as $index => $entry)

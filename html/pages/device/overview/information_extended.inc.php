@@ -128,7 +128,9 @@ if ($device['state']['la']['5min']) {
   }
   echo('<tr>
         <td class="entity">Load average</td>
-        <td class="'.$la_class.'">' . $device['state']['la']['1min'] . ', ' . $device['state']['la']['5min'] . ', ' . $device['state']['la']['15min'] . '</td>
+        <td class="'.$la_class.'">' . number_format((float)$device['state']['la']['1min'],2) . ', ' .
+                                      number_format((float)$device['state']['la']['5min'], 2) . ', ' .
+                                      number_format((float)$device['state']['la']['15min'], 2) . '</td>
       </tr>');
 }
 

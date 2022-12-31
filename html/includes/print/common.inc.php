@@ -212,6 +212,114 @@ function print_refresh($vars)
 }
 
 /**
+ * This generates an HTML <thead> element based on the contents of the $header array, modified by the current request $vars
+ *
+ * @param array $header Array with table header definition including columns and classes.
+ * @param array $vars Array with current selected column ID and/or variables for generate column link
+ * @return string $string
+ */
+
+function generate_table_header($header = [], $vars = []) {
+
+  // Store current $vars sort variables
+  $sort       = $vars['sort'];
+  $sort_order = strtolower($vars['sort_order']);
+  if (!in_array($sort_order, array('asc', 'desc', 'reset'))) {
+    $sort_order = 'asc';
+  }
+
+  // Reset current $vars sort variables
+  unset($vars['sort'], $vars['sort_order']);
+
+  $output = '<thead'.(isset($header['class']) ? ' class="'.$header['class'].'"' : '').
+                     (isset($header['style']) ? ' style="'.$header['style'].'"' : '').
+                     (isset($vars['show_header']) && !$vars['show_header'] ? 'style="line-height: 0; visibility: collapse;"' : '') . '>';
+
+  $output .= '    <tr>' . PHP_EOL;
+
+  //r($header);
+
+  // Loop each column generating a <th> element
+  foreach($header AS $id => $col)
+  {
+
+     //if (in_array($id, ['class', 'group', 'style'])) { continue; } // skip html metadata
+
+     if ($id === 'class' ||  $id === 'style') { continue; } // skip html data
+
+     $fields = []; // Empty array for fields
+
+     if(empty($col) || !is_array($col)) {  $col = [ $id => $col ]; } // If col is not an array, make it one
+
+     if($id == 'state-marker') { $col['class'] = 'state-marker'; }  // Hard code handling of state-marker
+
+     // Loop each field and generate an <a> element
+     foreach ($col as $field_id => $field) {
+
+        if ($field_id === 'class' ||  $field_id === 'style' || $field_id == 'subfields') { continue; } // skip html data
+
+        $header_field = generate_table_header_field($field_id, $field, $vars, $sort, $sort_order);
+
+        if(strlen($header_field) > 0) {
+          $fields[] = $header_field;
+        }
+
+     }
+     $output .= '      <th'.( isset($col['class']) ? ' class="'.$col['class'].'"' : '').'>';
+     $output .= implode(' / ', $fields);
+     $output .= '</th>' . PHP_EOL;
+  }
+
+  $output .= '    </tr>' . PHP_EOL;
+  $output .= '  </thead>' . PHP_EOL;
+
+  return $output;
+
+
+}
+
+function generate_table_header_field($field_id, $field, $vars, $sort, $sort_order)
+{
+
+  if(empty($field)) {                                  // No label, generate empty column header.
+    $return = '';
+  } elseif ( is_numeric($field_id) && !is_array($field)) {   // Label without id, generate simple column header
+    $return = $field;
+  } else {
+    if(!is_array($field)) { $field = [ 'label' => $field ]; }
+    if(!isset($field['label'])) { $field['label'] = $field[0]; }
+
+    if($sort == $field_id) {
+      $field['label'] = '<span class="text-primary" style="font-style: italic">'.$field['label'].'</span>';
+      if($sort_order == 'asc') {
+        $new_vars = [ 'sort' => $field_id, 'sort_order' => 'desc' ];
+        $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-up"></i>';
+      } else {
+        $new_vars = [ 'sort' => NULL, 'sort_order' => NULL ];
+        $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-down"></i>';
+      }
+    } else {
+      $new_vars = [ 'sort' => $field_id ];
+    }
+    $return = '<a href="'.generate_url($vars, $new_vars).'">'.$field['label'].$field['caret'].'</a>';
+
+    // Generate slash separated links for subfields
+    if(isset($field['subfields']))
+    {
+      foreach($field['subfields'] as $subfield_id => $subfield)
+      {
+        //r($subfield); r($subfield_id);
+        $subfields[] = generate_table_header_field($subfield_id, $subfield, $vars, $sort, $sort_order);
+      }
+      $return .= ' ['.implode(" / ", $subfields).']';
+    }
+  }
+
+  return $return;
+
+}
+
+/**
  * Helper function for generate table header with sort links
  * This used in other print_* functions
  *

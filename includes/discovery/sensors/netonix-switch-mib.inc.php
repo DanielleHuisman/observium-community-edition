@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@
 //POWER-ETHERNET-MIB::pethMainPseConsumptionPower.10 = Gauge32: 0 Watts
 //POWER-ETHERNET-MIB::pethMainPseConsumptionPower.11 = Gauge32: 1 Watts
 
-$oids = snmpwalk_cache_oid($device, 'pethMainPseTable', array(), 'POWER-ETHERNET-MIB');
+$oids = snmpwalk_cache_oid($device, 'pethMainPseTable', [], 'POWER-ETHERNET-MIB');
 
 //NETONIX-SWITCH-MIB::poeStatus.10 = STRING: Off
 //NETONIX-SWITCH-MIB::poeStatus.11 = STRING: 48V
@@ -30,14 +29,12 @@ print_debug_vars($oids);
 
 ////// Per-port Statistics
 
-foreach ($oids as $index => $entry)
-{
-  $options = array('entPhysicalIndex' => $index);
+foreach ($oids as $index => $entry) {
+  $options = [ 'entPhysicalIndex' => $index ];
   $port    = get_port_by_ifIndex($device['device_id'], $index);
   // print_vars($port);
 
-  if (is_array($port))
-  {
+  if (is_array($port)) {
     $entry['ifDescr']           = $port['port_label'];
     $options['measured_class']  = 'port';
     $options['measured_entity'] = $port['port_id'];
@@ -55,8 +52,7 @@ foreach ($oids as $index => $entry)
 
   discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, $options);
 
-  if ($entry['pethMainPseOperStatus'] != 'off')
-  {
+  if ($entry['pethMainPseOperStatus'] != 'off') {
     $descr    = $entry['ifDescr'] . ' PoE Power';
 
     $oid_name = 'pethMainPseConsumptionPower';

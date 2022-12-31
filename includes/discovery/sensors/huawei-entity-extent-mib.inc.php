@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -105,6 +105,7 @@ $entity_array = [];
  */
 $power_class = 'power';
 $power_scale = 0.000001;
+$power_scale_multi = 0.01;
 foreach (snmpwalk_cache_oid($device, 'hwEntityOpticalTemperature', [], 'HUAWEI-ENTITY-EXTENT-MIB') as $index => $entry) {
   // Ignore optical sensors with temperature of zero or negative
   if ($entry['hwEntityOpticalTemperature'] > 1) {
@@ -223,25 +224,40 @@ foreach ($entity_array as $index => $entry) {
     }
 
     if ($multilane) {
+      // Fix incorrect Power scale.. again
+      // See: https://jira.observium.org/browse/OBS-4148
+      /*
+      hwEntityOpticalRxPower.16850463 = -121
+      hwEntityOpticalRxHighThreshold.16850463 = 400
+      hwEntityOpticalRxHighWarnThreshold.16850463 = No Such Object available on this agent at this OID
+      hwEntityOpticalRxLowThreshold.16850463 = -1801
+      hwEntityOpticalRxLowWarnThreshold.16850463 = No Such Object available on this agent at this OID
+      hwEntityOpticalLaneRxPower.16850463 = -1.21,-1.51,-1.83,-2.18
+       */
+      list($lane1_rxpower) = explode(',', $entry['hwEntityOpticalLaneRxPower']);
+      if (($entry['hwEntityOpticalRxPower'] != -1) && float_cmp($entry['hwEntityOpticalRxPower'] * 0.01, $lane1_rxpower, 0.01) === 0) {
+        $power_scale_multi = 1;
+      }
+
       $rxoptions['sensor_unit'] = 'split1';
       $lane_descr = $entry['ifDescr'] . ' Lane 1 Rx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
 
       $rxoptions['sensor_unit'] = 'split2';
       $lane_descr = $entry['ifDescr'] . ' Lane 2 Rx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
 
       $rxoptions['sensor_unit'] = 'split3';
       $lane_descr = $entry['ifDescr'] . ' Lane 3 Rx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
 
       $rxoptions['sensor_unit'] = 'split4';
       $lane_descr = $entry['ifDescr'] . ' Lane 4 Rx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
     } else {
       $rxoptions['rename_rrd'] = "HUAWEI-ENTITY-EXTENT-MIB-hwEntityOpticalRxPower-$index";
       $lane_descr = $entry['ifDescr'] . ' Rx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneRxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneRxPower'], $rxoptions);
     }
   } elseif ($entry['hwEntityOpticalRxPower'] != -1) {
     // Huawei does not follow their own MIB for some devices and instead reports Rx/Tx Power as dBm converted to mW then multiplied by 1000
@@ -275,21 +291,36 @@ foreach ($entity_array as $index => $entry) {
     }
 
     if ($multilane) {
+      // Fix incorrect Power scale.. again
+      // See: https://jira.observium.org/browse/OBS-4148
+      /*
+      hwEntityOpticalTxPower.16850463 = -25
+      hwEntityOpticalTxHighThreshold.16850463 = 400
+      hwEntityOpticalTxHighWarnThreshold.16850463 = No Such Object available on this agent at this OID
+      hwEntityOpticalTxLowThreshold.16850463 = -1060
+      hwEntityOpticalTxLowWarnThreshold.16850463 = No Such Object available on this agent at this OID
+      hwEntityOpticalLaneTxPower.16850463 = -0.25,-0.26,-0.26,-0.23
+       */
+      list($lane1_txpower) = explode(',', $entry['hwEntityOpticalLaneTxPower']);
+      if (($entry['hwEntityOpticalTxPower'] != -1) && float_cmp($entry['hwEntityOpticalTxPower'] * 0.01, $lane1_txpower, 0.01) === 0) {
+        $power_scale_multi = 1;
+      }
+
       $txoptions['sensor_unit'] = 'split1';
       $lane_descr = $entry['ifDescr'] . ' Lane 1 Tx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
 
       $txoptions['sensor_unit'] = 'split2';
       $lane_descr = $entry['ifDescr'] . ' Lane 2 Tx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
 
       $txoptions['sensor_unit'] = 'split3';
       $lane_descr = $entry['ifDescr'] . ' Lane 3 Tx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
 
       $txoptions['sensor_unit'] = 'split4';
       $lane_descr = $entry['ifDescr'] . ' Lane 4 Tx Power' . $trans;
-      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, 0.01, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
+      discover_sensor_ng($device, 'dbm', $mib, 'hwEntityOpticalLaneTxPower', $lane_oid, $index, NULL, $lane_descr, $power_scale_multi, $entry['hwEntityOpticalLaneTxPower'], $txoptions);
     } else {
       $txoptions['rename_rrd'] = "HUAWEI-ENTITY-EXTENT-MIB-hwEntityOpticalTxPower-$index";
       $lane_descr = $entry['ifDescr'] . ' Tx Power' . $trans;

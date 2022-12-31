@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -205,8 +205,7 @@ foreach ($alert_check as $check)
 
   echo('<td>');
 
-  if(!is_null($check['alert_assoc']))
-  {
+  if (!is_null($check['alert_assoc'])) {
 
      $check['assoc'] = safe_json_decode($check['alert_assoc']);
      echo render_qb_rules($check['entity_type'], $check['assoc']);
@@ -274,10 +273,11 @@ foreach ($alert_check as $check)
 
   echo '<br />';
 
-  if ($notifiers_count = safe_count($contacts[$check['alert_test_id']]))
-  {
+  if ($notifiers_count = safe_count($contacts[$check['alert_test_id']])) {
     $content = "";
-    foreach($contacts[$check['alert_test_id']] as $contact) { $content .= '<span class="label">'.$contact['contact_method'].'</span> '.$contact['contact_descr'].'<br />'; }
+    foreach($contacts[$check['alert_test_id']] as $contact) {
+      $content .= '<span class="label">'.$contact['contact_method'].'</span> '.escape_html($contact['contact_descr']).'<br />';
+    }
     echo generate_tooltip_link('', '<span class="label label-success">'.$notifiers_count.' Notifiers</span>', $content);
   } else {
     echo '<span class="label label-primary">Default Notifier</span>';

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage snmp
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -150,12 +150,14 @@ function snmp_dewrap32bit($value)
  *
  * @param integer $high High bits value
  * @param integer $low  Low bits value
- * @return integer Result sum 64bit
+ * @return integer|null Result sum 64bit
  */
-function snmp_size64_high_low($high, $low)
-{
-  return $high * 4294967296 + $low;
-  //return $high << 32 + $low;
+function snmp_size64_high_low($high, $low) {
+  if (is_numeric($high) && is_numeric($low)) {
+    return $high * 4294967296 + $low;
+    //return $high << 32 + $low;
+  }
+  return NULL;
 }
 
 /**
@@ -542,25 +544,21 @@ function snmp_parse_line($line, $flags = OBS_SNMP_ALL) {
 // '.1.3.6.1.4.1.9.1.685' -> 'ciscoAIRAP1240'
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function snmp_translate($oid, $mib = NULL, $mibdir = NULL)
-{
+function snmp_translate($oid, $mib = NULL, $mibdir = NULL) {
   // $rewrite_oids set in rewrites.inc.php
   global $config;
 
-  if (empty($mib) && str_contains($oid, '::'))
-  {
+  if (empty($mib) && str_contains($oid, '::')) {
     // Split Oid names passed as full (ie SNMPv2-MIB::sysUpTime) into MIB name (SNMPv2-MIB) and Oid (sysUpTime)
     list($mib, $oid) = explode('::', $oid);
   }
 
-  if (is_numeric(str_replace('.', '', $oid)))
-  {
+  if (preg_match(OBS_PATTERN_SNMP_OID_NUM, $oid)) {
+    // Numeric OID to Named
     $options = '-Os';
-  }
-  elseif ($mib)
-  {
-    if (isset($config['mibs'][$mib]['translate'][$oid]))
-    {
+  } elseif ($mib) {
+    // Named to Numeric
+    if (isset($config['mibs'][$mib]['translate'][$oid])) {
       print_debug("SNMP TRANSLATE (REWRITE): '$mib::$oid' -> '".$config['mibs'][$mib]['translate'][$oid]."'");
       return $config['mibs'][$mib]['translate'][$oid];
     }
@@ -569,7 +567,11 @@ function snmp_translate($oid, $mib = NULL, $mibdir = NULL)
   }
 
   $cmd  = $config['snmptranslate'];
-  if (isset($options)) { $cmd .= ' ' . $options; } else { $cmd .= ' -On'; }
+  if (isset($options)) {
+    $cmd .= ' ' . $options;
+  } else {
+    $cmd .= ' -On';
+  }
 
   // Hardcode ignoring underscore parsing errors because net-snmp is dumb as a bag of rocks
   // -Pu    Toggles whether to allow the underline character in MIB object names and other symbols.
@@ -580,8 +582,7 @@ function snmp_translate($oid, $mib = NULL, $mibdir = NULL)
 
   // Set correct MIB directories based on passed dirs and OS definition
   // If $mibdir variable is passed to the function, we use it directly
-  if ($mibdir)
-  {
+  if ($mibdir) {
     $cmd .= " -M $mibdir";
   } else {
     $cmd .= ' -M ' . snmp_mib2mibdirs($mib);
@@ -646,7 +647,7 @@ function snmp_command($command, $device, $oids, $options, $mib = NULL, &$mibdir 
         // Append end oid (can speedup snmpwalk in some cases)
         if (isset($GLOBALS['snmp_oid_end'])) {
           $options .= ' -CE ' . escapeshellarg($GLOBALS['snmp_oid_end']);
-          print_debug("Added Oid END '${GLOBALS['snmp_oid_end']}' for snmpwalk '$oids'.");
+          print_debug("Added Oid END '{$GLOBALS['snmp_oid_end']}' for snmpwalk '$oids'.");
           unset($GLOBALS['snmp_oid_end']);
         }
       } else {
@@ -970,6 +971,9 @@ function snmp_log_errors($command, $device, $oid, $options, $mib, $mibdir)
             $oid === 'sysObjectID.0 sysUpTime.0') {
           // this is isSNMPable test, ignore
           $error_code = OBS_SNMP_ERROR_ISSNMPABLE; // 900;
+        } elseif (isset($device['snmpable']) && !empty($device['snmpable']) &&
+                  ($oid === $device['snmpable'])) {
+          $error_code = OBS_SNMP_ERROR_ISSNMPABLE; // 900; // This is also isSNMPable, ignore
         } elseif (isset($GLOBALS['config']['os'][$device['os']]['snmpable']) &&
                   in_array($oid, $GLOBALS['config']['os'][$device['os']]['snmpable'], TRUE)) {
           $error_code = OBS_SNMP_ERROR_ISSNMPABLE; // 900; // This is also isSNMPable, ignore
@@ -1021,8 +1025,10 @@ function snmp_log_errors($command, $device, $oid, $options, $mib, $mibdir)
         $error_code = OBS_SNMP_ERROR_FAILED_RESPONSE; // 1000;
       }
     } elseif ($error_code === OBS_SNMP_ERROR_UNKNOWN) {
-      if ($GLOBALS['exec_status']['exitcode'] === 2 && str_contains($GLOBALS['exec_status']['stderr'], 'Response message would have been too large')) {
+      if ($GLOBALS['exec_status']['exitcode'] === 2 &&
+          str_contains_array($GLOBALS['exec_status']['stderr'], [ 'Response message would have been too large', 'Reason: (genError)' ])) {
         // "Reason: (tooBig) Response message would have been too large."
+        // "Reason: (genError) A general failure occured"
         // Too big max-rep definition used,
         // this is not exactly device or net-snmp error, just need to set less max-rep in os definition
         $error_code = OBS_SNMP_ERROR_TOO_BIG_MAX_REPETITION_IN_GETBULK; // 4;
@@ -1261,25 +1267,22 @@ function snmp_get($device, $oid, $options = NULL, $mib = NULL, $mibdir = NULL, $
   $data = external_exec($cmd);
 
   $data = snmp_value_clean($data, $flags);
-  $GLOBALS['snmp_status'] = ($GLOBALS['exec_status']['exitcode'] === 0 ? TRUE : FALSE);
+  $GLOBALS['snmp_status'] = $GLOBALS['exec_status']['exitcode'] === 0;
   $GLOBALS['snmp_endtime'] = $GLOBALS['exec_status']['endtime'];
 
   $GLOBALS['snmp_stats']['snmpget']['count']++;
   $GLOBALS['snmp_stats']['snmpget']['time'] += $GLOBALS['exec_status']['runtime'];
 
-  if (isset($data[0])) // same as strlen($data) > 0
-  {
+  if (isset($data[0])) { // same as strlen($data) > 0
     if (preg_match('/(?:No Such Instance|No Such Object|There is no such variable|No more variables left|Authentication failure)/i', $data) ||
-        $data === 'NULL')
-    {
+        $data === 'NULL') {
       $data = '';
       $GLOBALS['snmp_status'] = FALSE;
     }
   } else {
     $GLOBALS['snmp_status'] = FALSE;
   }
-  if (OBS_DEBUG)
-  {
+  if (OBS_DEBUG) {
     print_message('SNMP STATUS['.($GLOBALS['snmp_status'] ? '%gTRUE': '%rFALSE').'%n]', 'color');
   }
   snmp_log_errors('snmpget', $device, $oid, $options, $mib, $mibdir);
@@ -1531,7 +1534,7 @@ function snmp_getnext_oid($device, $oid, $mib = NULL, $mibdir = NULL, $flags = O
   elseif (!is_flag_set(OBS_SNMP_NUMERIC, $flags) && $entry['oid_name'] !== $oid)
   {
     // Validate requested Oid vs Returned (while getnext can return any other next Oid)
-    print_debug("SNMPGETNEXT returned different Oid (${entry['oid_name']}) instead requested ($mib::$oid).");
+    print_debug("SNMPGETNEXT returned different Oid ({$entry['oid_name']}) instead requested ($mib::$oid).");
     $entry['value'] = '';
     $GLOBALS['snmp_status'] = FALSE;
   }
@@ -1560,8 +1563,7 @@ function snmp_getnext_oid($device, $oid, $mib = NULL, $mibdir = NULL, $flags = O
  * @return array
  */
 // TESTME needs unit testing
-function snmp_get_multi_oid($device, $oids, $array = array(), $mib = NULL, $mibdir = NULL, $flags = OBS_QUOTES_TRIM)
-{
+function snmp_get_multi_oid($device, $oids, $array = [], $mib = NULL, $mibdir = NULL, $flags = OBS_QUOTES_TRIM) {
   global $config, $cache;
 
   $numeric_oids = is_flag_set(OBS_SNMP_NUMERIC, $flags); // Numeric oids, do not parse oid part
@@ -1575,26 +1577,21 @@ function snmp_get_multi_oid($device, $oids, $array = array(), $mib = NULL, $mibd
 
   // Split Oids list by $max_get count
   if (isset($cache['devices']['model'][$device['device_id']]['snmp']['max-get']) &&
-            $cache['devices']['model'][$device['device_id']]['snmp']['max-get'] >= 1)
-  {
+            $cache['devices']['model'][$device['device_id']]['snmp']['max-get'] >= 1) {
     // Device model specific
     $max_get = (int)$cache['devices']['model'][$device['device_id']]['snmp']['max-get'];
 
     // Convert Oids passed as string to array, for chunk it by defined max-get
-    if ($oids_multiple)
-    {
+    if ($oids_multiple) {
       $oids = preg_split('/\s+/', $oids);
     }
-  }
-  elseif (isset($config['os'][$device['os']]['snmp']['max-get']) &&
-          $config['os'][$device['os']]['snmp']['max-get'] >= 1)
-  {
+  } elseif (isset($config['os'][$device['os']]['snmp']['max-get']) &&
+            $config['os'][$device['os']]['snmp']['max-get'] >= 1) {
     // OS specific
     $max_get = (int)$config['os'][$device['os']]['snmp']['max-get'];
 
     // Convert Oids passed as string to array, for chunk it by defined max-get
-    if ($oids_multiple)
-    {
+    if ($oids_multiple) {
       $oids = preg_split('/\s+/', $oids);
     }
   } else {
@@ -1606,24 +1603,21 @@ function snmp_get_multi_oid($device, $oids, $array = array(), $mib = NULL, $mibd
     // See notes below
   }
 
-  if (is_array($oids))
-  {
+  if (is_array($oids)) {
 
-    if (OBS_DEBUG && count($oids) > $max_get)
-    {
+    if (OBS_DEBUG && count($oids) > $max_get) {
       print_warning("Passed to snmp_get_multi_oid() Oids count (".count($oids).") more than max-get ($max_get). Command snmpget splitted to multiple chunks.");
     }
 
     $data = '';
     $oid_chunks = array_chunk($oids, $max_get);
     $GLOBALS['snmp_status'] = FALSE;
-    foreach ($oid_chunks as $oid_chunk)
-    {
+    foreach ($oid_chunks as $oid_chunk) {
       $oid_text  = implode(' ', $oid_chunk);
       $cmd       = snmp_command('snmpget', $device, $oid_text, $options, $mib, $mibdir, $flags);
       $this_data = trim(external_exec($cmd));
 
-      $GLOBALS['snmp_status'] = ($GLOBALS['exec_status']['exitcode'] === 0 ? TRUE : $GLOBALS['snmp_status']);
+      $GLOBALS['snmp_status'] = ($GLOBALS['exec_status']['exitcode'] === 0 || $GLOBALS['snmp_status']);
       snmp_log_errors('snmpget', $device, $oid_text, $options, $mib, $mibdir);
       $data .= $this_data."\n";
 
@@ -1638,39 +1632,34 @@ function snmp_get_multi_oid($device, $oids, $array = array(), $mib = NULL, $mibd
     $cmd  = snmp_command('snmpget', $device, $oids, $options, $mib, $mibdir, $flags);
     $data = trim(external_exec($cmd));
 
-    $GLOBALS['snmp_status'] = ($GLOBALS['exec_status']['exitcode'] === 0 ? TRUE : FALSE);
+    $GLOBALS['snmp_status'] = $GLOBALS['exec_status']['exitcode'] === 0;
     snmp_log_errors('snmpget', $device, $oids, $options, $mib, $mibdir);
     $GLOBALS['snmp_stats']['snmpget']['count']++;
     $GLOBALS['snmp_stats']['snmpget']['time'] += $GLOBALS['exec_status']['runtime'];
   }
   $GLOBALS['snmp_endtime'] = $GLOBALS['exec_status']['endtime'];
 
-  foreach (explode("\n", $data) as $line)
-  {
+  foreach (explode("\n", $data) as $line) {
     $entry = snmp_parse_line($line, $flags);
 
     // For numeric oids do not split oid and index part
-    if ($numeric_oids && $entry['index_count'] > 0 && is_valid_snmp_value($entry['value']))
-    {
+    if ($numeric_oids && $entry['index_count'] > 0 && is_valid_snmp_value($entry['value'])) {
       $array[$entry['index']] = $entry['value'];
       continue;
     }
 
     //list($oid, $index) = explode('.', $oid, 2);
-    if (isset($entry['oid_name'][0]) && $entry['index_count'] > 0 && is_valid_snmp_value($entry['value']))
-    {
+    if (isset($entry['oid_name'][0]) && $entry['index_count'] > 0 && is_valid_snmp_value($entry['value'])) {
       $array[$entry['index']][$entry['oid_name']] = $entry['value'];
     }
   }
 
-  if (empty($array))
-  {
+  if (empty($array)) {
     $GLOBALS['snmp_status'] = FALSE;
     snmp_log_errors('snmpget', $device, $oids, $options, $mib, $mibdir);
   }
 
-  if (OBS_DEBUG)
-  {
+  if (OBS_DEBUG) {
     print_message('SNMP STATUS['.($GLOBALS['snmp_status'] ? '%gTRUE': '%rFALSE').'%n]', 'color');
   }
 
@@ -1980,11 +1969,21 @@ function snmpwalk_multipart_oid($device, $oid, $array, $mib = NULL, $mibdir = NU
  *                   NULL when context not exist or not permitted
  */
 function snmp_virtual_exist($device, $virtual, $oid = 'dot1dBasePortIfIndex', $mib = 'BRIDGE-MIB') {
+  global $config;
+
   // Detect contexts not permitted by os
-  if (!isset($GLOBALS['config']['os'][$device['os']]['snmp']['virtual']) ||
-      !$GLOBALS['config']['os'][$device['os']]['snmp']['virtual']) {
+  if (!isset($config['os'][$device['os']]['snmp']['virtual']) ||
+      !$config['os'][$device['os']]['snmp']['virtual']) {
     print_debug("SNMP virtual routing engine not permitted by os definition.");
     return NULL;
+  }
+
+  // Ignored virtual contexts
+  foreach ($config['snmp']['virtual_ignore'] as $pattern) {
+    if (preg_match($pattern, $virtual)) {
+      print_debug("SNMP virtual context '$virtual' ignored by config '$pattern'.");
+      return NULL;
+    }
   }
 
   // Change defaults when BRIDGE-MIB not permitted

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage ajax
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -48,11 +48,11 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
       list($ip_version)  = explode('_', $vars['field']);
       $query_permitted   = generate_query_permitted('ports');
       $network_permitted = dbFetchColumn('SELECT DISTINCT(`' . $ip_version . '_network_id`) FROM `' . $ip_version . '_addresses` WHERE 1' . $query_permitted);
-      $query = 'SELECT `' . $ip_version . '_network` FROM `' . $ip_version . '_networks` WHERE 1 ' . generate_query_values($network_permitted, $ip_version . '_network_id');
+      $query = 'SELECT `' . $ip_version . '_network` FROM `' . $ip_version . '_networks` WHERE 1 ' . generate_query_values_and($network_permitted, $ip_version . '_network_id');
       if (!safe_empty($vars['query'])) {
         //$query .= ' AND `' . $ip_version . '_network` LIKE ?';
         //$params[] = '%' . $vars['query'] . '%';
-        $query .= generate_query_values($vars['query'], $vars['field'], '%LIKE%');
+        $query .= generate_query_values_and($vars['query'], $vars['field'], '%LIKE%');
       }
       $query .= ' ORDER BY `' . $ip_version . '_network`;';
       //print_vars($query);
@@ -69,7 +69,7 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
       //$query_permitted   = generate_query_permitted();
       $query = 'SELECT DISTINCT `program` FROM `syslog`';
       if (is_intnum($vars['device_id'])) {
-        $query .= ' WHERE ' . generate_query_values($vars['device_id'], 'device_id', NULL, FALSE);
+        $query .= ' WHERE ' . generate_query_values_ng($vars['device_id'], 'device_id');
       }
       $array_filter = TRUE; // Search query string in array instead sql query (when this faster)
       break;
@@ -86,7 +86,7 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
         $query .= ' AND (`' . $column . '` LIKE ? OR `astext` LIKE ?)';
         $params[] = '%' . $vars['query'] . '%';
         $params[] = '%' . $vars['query'] . '%';
-        //$query .= generate_query_values($vars['query'], $vars['field'], '%LIKE%');
+        //$query .= generate_query_values_and($vars['query'], $vars['field'], '%LIKE%');
       }
       break;
 
@@ -100,7 +100,7 @@ if ($cache_key && $options = get_cache_session($cache_key)) {
       $query_permitted = generate_query_permitted('devices');
       $query = 'SELECT DISTINCT `' . $column . '` FROM `bgpPeers` WHERE 1 ' . $query_permitted;
       if (!safe_empty($vars['query'])) {
-        $query .= generate_query_values($vars['query'], $column, '%LIKE%');
+        $query .= generate_query_values_and($vars['query'], $column, '%LIKE%');
       }
       break;
 

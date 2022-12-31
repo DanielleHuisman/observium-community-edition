@@ -415,15 +415,20 @@ if (!get_var_true($vars['bare'])) {
                                     <tr>
                                         <th>Page</th>
                                         <td><?php echo(number_format($gentime, 3)); ?>s</td>
-                                    </tr>
+                                    </tr><!--
                                     <tr>
                                         <th>Cache</th>
                                         <td><?php echo(number_format($cache_time, 3)); ?>s</td>
+                                    </tr>-->
+                                    <tr>
+                                        <th>Cache Data</th>
+                                        <td><?php echo(number_format($cache_data_time, 3)); ?>s</td>
                                     </tr>
                                     <tr>
                                         <th>Menu</th>
                                         <td><?php echo(number_format($menu_time, 3)); ?>s</td>
                                     </tr>
+
                                   <?php
                                   if (isset($form_time))
                                   {

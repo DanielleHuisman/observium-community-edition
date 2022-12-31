@@ -6,10 +6,11 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
+$cache_data_start = microtime(TRUE);
 $cache_item = get_cache_item('data');
 //print_vars($cache_item->isHit());
 
@@ -33,17 +34,22 @@ if (!ishit_cache_item($cache_item))
   // This means device_by_id_cache actually never has to do any queries by itself, it'll always get the
   // cached version when running from the web interface. From the commandline obviously we'll need to fetch
   // the data per-device. We pre-fetch the graphs list as well, much faster than a query per device obviously.
-  $graphs_array = dbFetchRows("SELECT * FROM `device_graphs` FORCE INDEX (`graph`) ORDER BY `graph`;");
+  //$graphs_array = dbFetchRows("SELECT * FROM `device_graphs` FORCE INDEX (`graph`) ORDER BY `graph`;");
 
-  foreach ($graphs_array as $graph)
+  $cache['graphs'] = [];
+  foreach(dbFetchRows("SELECT `graph` FROM `device_graphs` GROUP BY `graph` ORDER BY `graph`;") as $entry)
+  {
+    $cache['graphs'][$entry['graph']] = $entry['graph'];
+  }
+
+  /*foreach ($graphs_array as $graph)
   {
     // Cache this per device_id so we can assign it to the correct (cached) device in the for loop below
     if ($graph['enabled'])
     {
       $device_graphs[$graph['device_id']][$graph['graph']] = $graph;
     }
-  }
-  $cache['graphs'] = array(); // All permitted graphs
+  }*/
 
   // Cache scheduled maintenance currently active
   $cache['maint'] = cache_alert_maintenance();
@@ -54,16 +60,18 @@ if (!ishit_cache_item($cache_item))
   } else {
     $devices_array = dbFetchRows("SELECT * FROM `devices` ORDER BY `hostname`;");
   }
+
   foreach ($devices_array as $device)
   {
     if (device_permitted($device['device_id']))
     {
       // Process device and add all the human-readable stuff.
-      humanize_device($device);
+      // Very slow on larger systems (3s with 2000 devices)
+      //humanize_device($device);
 
       // Assign device graphs from array created above
-      $device['graphs'] = (array)$device_graphs[$device['device_id']];
-      $cache['graphs']  = array_unique(array_merge($cache['graphs'], array_keys($device['graphs']))); // Add to global array cache
+      //$device['graphs'] = (array)$device_graphs[$device['device_id']];
+      //$cache['graphs']  = array_unique(array_merge($cache['graphs'], array_keys($device['graphs']))); // Add to global array cache
 
       $cache['devices']['permitted'][] = (int)$device['device_id']; // Collect IDs for permitted
       $cache['devices']['hostname'][$device['hostname']] = $device['device_id'];
@@ -184,10 +192,10 @@ if (!ishit_cache_item($cache_item))
   // Devices disabled
   if (isset($cache['devices']['disabled']) && count($cache['devices']['disabled']) > 0)
   {
-    $cache['ports']['device_disabled'] = dbFetchColumn("SELECT `port_id` FROM `ports` WHERE 1 " . $where_permitted . generate_query_values($cache['devices']['disabled'], 'device_id'));
+    $cache['ports']['device_disabled'] = dbFetchColumn("SELECT `port_id` FROM `ports` WHERE 1 " . $where_permitted . generate_query_values_and($cache['devices']['disabled'], 'device_id'));
     if (!$config['web_show_disabled'])
     {
-      $where_hide  .= generate_query_values($cache['devices']['disabled'], 'device_id', '!=');
+      $where_hide  .= generate_query_values_and($cache['devices']['disabled'], 'device_id', '!=');
     }
   }
 
@@ -195,9 +203,9 @@ if (!ishit_cache_item($cache_item))
   $where_devices_ignored = '';
   if (isset($cache['devices']['ignored']) && count($cache['devices']['ignored']) > 0)
   {
-    $cache['ports']['device_ignored'] = dbFetchColumn("SELECT `port_id` FROM `ports` WHERE 1 " . $where_permitted . $where_hide . generate_query_values($cache['devices']['ignored'], 'device_id'));
-    $where_hide  .= generate_query_values($cache['devices']['ignored'], 'device_id', '!=');
-    $where_devices_ignored = generate_query_values($cache['devices']['ignored'], 'device_id');
+    $cache['ports']['device_ignored'] = dbFetchColumn("SELECT `port_id` FROM `ports` WHERE 1 " . $where_permitted . $where_hide . generate_query_values_and($cache['devices']['ignored'], 'device_id'));
+    $where_hide  .= generate_query_values_and($cache['devices']['ignored'], 'device_id', '!=');
+    $where_devices_ignored = generate_query_values_and($cache['devices']['ignored'], 'device_id');
   }
   $cache['ports']['stat']['device_ignored']   = count($cache['ports']['device_ignored']);
 
@@ -649,6 +657,8 @@ unset($cache_item);
 //del_cache_expired();
 //print_vars(get_cache_items('__wui'));
 //print_vars(get_cache_stats());
+
+$cache_data_time = microtime(TRUE) - $cache_data_start;
 
 // EOF
 

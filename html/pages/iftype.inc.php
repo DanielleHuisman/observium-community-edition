@@ -13,7 +13,7 @@
 if (!is_array($vars['type'])) { $vars['type'] = [ $vars['type'] ]; }
 
 $where = 'WHERE 1';
-$where .= generate_query_values($vars['type'], 'port_descr_type', 'LIKE');
+$where .= generate_query_values_and($vars['type'], 'port_descr_type', 'LIKE');
 $where .= generate_query_permitted([ 'port' ]);
 //$where .= $cache['where']['ports_permitted'];
 
@@ -48,6 +48,10 @@ if ($port_count) {
   $graph_array['type']   = 'multi-port_bits_separate';
   $graph_array['to']     = get_time();
   $graph_array['id']     = $port_list;
+  if($port_count > 10)
+  {
+    $graph_array['legend'] = 'no';
+  }
   if ($port_compress) {
     $graph_array['compressed'] = 1;
   }

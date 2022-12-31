@@ -10,11 +10,10 @@
  *
  */
 
-// print_r($permissions);
+// print_vars($permissions);
 
 // Global write permissions required.
-if ($_SESSION['userlevel'] < 10)
-{
+if ($_SESSION['userlevel'] < 10) {
   print_error_permission();
   return;
 }
@@ -804,7 +803,7 @@ if (isset($vars['role_id'])) {
       echo '<td>' . $role['role_id'] . '</td>';
       echo '<td><strong><a href="' . $role['edit_url'] . '">' . escape_html($role['role_name']) . '</a></strong></td>';
       echo '<td><label class="label">' . $role['count'] . '</label></td>';
-      echo '<td>' . $role['role_descr'] . '</td>';
+      echo '<td>' . escape_html($role['role_descr']) . '</td>';
       echo '</tr>';
     }
 

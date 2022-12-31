@@ -278,7 +278,7 @@ function get_ip_prefix($entry) {
             $net = Net_IPv4::parseAddress($entry['ip'].'/'.$prefix);
             if (Net_IPv4::ipInNetwork($entry['gateway'], $net->network.'/'.$prefix)) {
               // Gateway IP in network, stop loop
-              print_debug("Prefix '$prefix' detected by IP '${entry['ip']}' and Gateway '${entry['gateway']}'.");
+              print_debug("Prefix '$prefix' detected by IP '{$entry['ip']}' and Gateway '{$entry['gateway']}'.");
               break;
             }
             $prefix++;
@@ -291,7 +291,7 @@ function get_ip_prefix($entry) {
               if (Net_IPv4::ipInNetwork($entry['gateway'], $net->network.'/'.$tmp_prefix)) {
                 // Gateway IP in network, stop loop
                 $prefix = $tmp_prefix;
-                print_debug("Prefix '$prefix' detected by IP '${entry['ip']}' and Gateway '${entry['gateway']}'.");
+                print_debug("Prefix '$prefix' detected by IP '{$entry['ip']}' and Gateway '{$entry['gateway']}'.");
                 break;
               }
               $tmp_prefix--;
@@ -313,7 +313,7 @@ function get_ip_prefix($entry) {
   }
 
   // Incorrect IP
-  print_debug("Incorrect: ${entry['ip']}");
+  print_debug("Incorrect: {$entry['ip']}");
   return NULL;
 }
 

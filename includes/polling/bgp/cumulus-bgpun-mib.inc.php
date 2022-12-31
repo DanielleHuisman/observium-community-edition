@@ -45,7 +45,9 @@ $bgp4_peers = snmpwalk_cache_oid($device, $def['oids']['PeerInUpdateElapsedTime'
 //$bgp4_peers = snmpwalk_cache_oid($device, $def['oids']['PeerIdentifier']['oid'],         $bgp4_peers, $mib);
 
 // Collect founded peers
-$bgp_peers = []; // need rewrite array for fix incorrect indexes
+if (!is_array($bgp_peers)) {
+  $bgp_peers = []; // need rewrite array for fix incorrect indexes
+}
 foreach ($bgp4_peers as $index => $bgp4_entry) {
   $peer_ip = $index;
   $peer_as  = snmp_dewrap32bit($bgp4_entry['bgpPeerRemoteAs']); // Dewrap for 32bit ASN

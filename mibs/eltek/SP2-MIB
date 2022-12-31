@@ -1,10 +1,10 @@
 
 -- Mon Aug 8 2016: Added support for inverter, grid inverter and rectiverter.
 -- 
--- $Revision:69$
+-- $Revision:88$
 -- $Author: jujino$
--- $Archive: Documents/EltekEnexusPowersystem_branch10.mib$
--- $Date: 12. august 2019 10:56:50$
+-- $Archive: Documents/EltekEnexusPowersystem.mib$
+-- $Date: 4. mars 2021 13:56:51$
 -- 
 
 SP2-MIB DEFINITIONS ::= BEGIN
@@ -16,10 +16,71 @@ IMPORTS
 	NOTIFICATION-GROUP
 		FROM SNMPv2-CONF
 	DateAndTime, DisplayString
-		FROM SNMPv2-TC
-	eltek
-		FROM ELTEK-COMMON-MIB;
-		
+		FROM SNMPv2-TC;
+
+eltek MODULE-IDENTITY
+	LAST-UPDATED "201306271334Z"
+	ORGANIZATION 
+		"ELTEK power System MIB Working Group"
+	CONTACT-INFO 
+		"Eltek R&D.
+		         Postal: Eltek AS
+		         P.O. Box 3043
+		         N-3003 Drammen
+		         Norway
+		         Tel: +47-32 20 32 00
+		         Fax: +47-32 20 31 20
+		         web:  www.eltek.com
+		         "
+	DESCRIPTION 
+		"An ongoing effort toward a generic MIB for all ELTEK products.
+		         Branch overview:
+		         Aeongold branch will be 1
+		         AL175 branch will be 2
+		         AL6000 branch will be 3
+		         Internal used branch will be 4
+		         Internal used branch will be 5
+		         OEM Smartpack branch will be 6
+		         ELTEK Common branch will be 7 (SmartPack, MCU, AEON w/WebPower sw V2.x)
+		         ELTEK Distributed branch will be 8 (SmartPack w/WebPower sw V3.x)
+		         ELTEK Distributed V2 branch will be 9 (SmartPack w/WebPower sw V4.0)
+		         ELTEK Distributed V3 branch will be 9 (SmartPack w/WebPower sw V4.1)
+		         ELTEK Distributed V4 branch will be 9 (SmartPack w/WebPower sw V4.1, V4.2, V4.3, V4.5 and compack V1.0, V1.01, V1.02, V1.03)
+		         ELTEK Distributed V5 branch will be 9 (SmartPack w/WebPower sw V4.1, V4.2, V4.3, V4.5, V4.6)
+		         ELTEK Distributed V6 branch will be 9 (SmartPack2 sw V1.1, V1.2, V1.3)
+		         ELTEK Distributed V7 branch will be 9 (SmartPack w/WebPower sw V4.1, V4.2, V4.3, V4.5, V4.6, V4.7 and compack V1.04, V1.05)
+		         ELTEK eNexus MIB branch will be 10 (SmartPack2 Touch V2.x, Smartpack R V2.x, SmartPack2 V2.x, SmartPack S V2.x and Compack V2.x)
+		         ELTEK Brasil office will have branch 11 
+		         ELTEK BMS-EM MIB will have branch 12
+		         ELTEK TELMEX MIB will have branch 13
+		         ELTEK MSM MIB will have branch 14
+		                        "
+
+	REVISION "201306271033Z"
+	DESCRIPTION 
+		"added support for rectifier group, mains group, battery group and flexi monitor"
+
+	REVISION "201111250958Z"
+	DESCRIPTION 
+		"additional values to all alarm status enums"
+
+	REVISION "201110171334Z"
+	DESCRIPTION 
+		"Major changes in OID order and names; added mains monitor energy log and generator fail status"
+
+	REVISION "201108190916Z"
+	DESCRIPTION 
+		"hopefully final version. Stared implementation of eltek api"
+
+	REVISION "201108190947Z"
+	DESCRIPTION 
+		"adjustment"
+
+	REVISION "201109051128Z"
+	DESCRIPTION 
+		"fixed up mains group"
+::= { enterprises 12148 }
+
 
 -- Supported by SmartPack2 Touch, Smartpack R, SmartPack2, Smartpack S and Compack products
 -- SNMP V1,V2c and V3.
@@ -104,6 +165,10 @@ generatorFuelConsumptionLog  OBJECT IDENTIFIER ::= { generator 25 }
 -- DSE Generator
 
 gseGenerator         OBJECT IDENTIFIER ::= { generator 26 }
+
+-- This is the monitor of generator failure
+
+generatorFailure     OBJECT IDENTIFIER ::= { generator 27 }
 
 -- This branch contains OIDs related to the Rectifiers subsystem. 
 -- Here you will find info about the rectifiers status, capacity and health, currents and 
@@ -295,6 +360,18 @@ batteryAhDischarged  OBJECT IDENTIFIER ::= { battery 24 }
 
 batteryRunTimeLog    OBJECT IDENTIFIER ::= { battery 25 }
 
+-- information of battery modules
+
+batteryModule        OBJECT IDENTIFIER ::= { battery 26 }
+
+-- This branch contains information about the battery error monitor.
+
+batteryModuleError   OBJECT IDENTIFIER ::= { batteryModule 2 }
+
+-- This branch contains information about the battery comm error monitor.
+
+batteryModuleCommError  OBJECT IDENTIFIER ::= { batteryModule 3 }
+
 -- This branch is a container for the status of programmable inputs for
 -- control units and I/O units.  The two dimensional tables are double indexed.
 -- Input number index and control unit index. Note that the inputs should not be
@@ -384,6 +461,14 @@ deltaTemperature     OBJECT IDENTIFIER ::= { controlSystem 14 }
 -- This is the monitor of number of failed attempt of user log-in.
 
 userSuspended        OBJECT IDENTIFIER ::= { controlSystem 15 }
+
+-- Information regarding demand response
+
+demandResponse       OBJECT IDENTIFIER ::= { controlSystem 25 }
+
+-- Information regarding tariff control
+
+tariffControl        OBJECT IDENTIFIER ::= { controlSystem 31 }
 
 -- This branch contains OIDs related to the systems alarm groups. The alarm groups are internal entities 
 -- that serves as input sources for the Alarm outputs
@@ -521,43 +606,7 @@ invertersAcFrequencyDeviation  OBJECT IDENTIFIER ::= { inverters 10 }
 -- energy consumption history
 -- 
 
-gridInverters        OBJECT IDENTIFIER ::= { eNexus 17 }
-
--- This branch contains information about the inverter error monitor.
-
-gridInvertersError   OBJECT IDENTIFIER ::= { gridInverters 2 }
-
--- Show The highest value of the rectifier temperature measurements
-
-gridInvertersTemperature  OBJECT IDENTIFIER ::= { gridInverters 3 }
-
--- This branch contains information about the total rectifier current, which is calculated 
--- by summing up current from each rectifier.
-
-gridInvertersAcCurrent1  OBJECT IDENTIFIER ::= { gridInverters 4 }
-
--- This branch contains information about the total rectifier current, which is calculated 
--- by summing up current from each rectifier.
-
-gridInvertersAcCurrent2  OBJECT IDENTIFIER ::= { gridInverters 5 }
-
--- This branch contains information about the total rectifier current, which is calculated 
--- by summing up current from each rectifier.
-
-gridInvertersAcCurrent3  OBJECT IDENTIFIER ::= { gridInverters 6 }
-
--- This branch contains information about the total active power fed into grid.
-
-gridInvertersPower   OBJECT IDENTIFIER ::= { gridInverters 7 }
-
--- This branch contains information about the total active power fed into grid.
-
-gridInvertersFrequency  OBJECT IDENTIFIER ::= { gridInverters 8 }
-
--- This branch contains information about the total rectifier current, which is calculated 
--- by summing up current from each rectifier.
-
-gridInvertersAcDisconnect  OBJECT IDENTIFIER ::= { gridInverters 9 }
+gridInvertersObsolete  OBJECT IDENTIFIER ::= { eNexus 17 }
 
 -- This branch contains OIDs related to the Rectiverters subsystem. 
 -- Here you will find info about the rectifiers status, capacity and health, currents and 
@@ -613,6 +662,23 @@ rectivertersAcOutVoltage3  OBJECT IDENTIFIER ::= { rectiverters 10 }
 -- by summing up current from each rectiverter.
 
 rectivertersAcFrequencyDeviation  OBJECT IDENTIFIER ::= { rectiverters 11 }
+fuelCells            OBJECT IDENTIFIER ::= { eNexus 19 }
+
+-- This branch contains information about the total fuel cell current.
+
+fuelCellsCurrent     OBJECT IDENTIFIER ::= { fuelCells 2 }
+
+-- This branch is obsolete.
+
+fuelCellsPower       OBJECT IDENTIFIER ::= { fuelCells 3 }
+
+-- This branch contains information about the fuel cell error monitor.
+
+fuelCellsError       OBJECT IDENTIFIER ::= { fuelCells 4 }
+
+-- This branch contains information about fuel cell chargers' energy logs.
+
+fuelCellsEnergyLog   OBJECT IDENTIFIER ::= { fuelCells 7 }
 
 alarmSubsysSourceDescr  OBJECT-TYPE
 	SYNTAX     DisplayString (SIZE(0..32))
@@ -1040,15 +1106,7 @@ alarmInverterTrap  NOTIFICATION-TYPE
 -- OID of the variable indicated the Measured value
 -- Measured value
 
-alarmGridInverterTrap  NOTIFICATION-TYPE
-	OBJECTS { alarmSubsysSourceDescr, 
-		alarmSubsysStatusOid, 
-		alarmSubsysStatusValue, 
-		alarmSubsysStatusOnOff, 
-		alarmMeasuredVarOid, 
-		alarmMeasuredVarValue, 
-		alarmTrapCounterVarValue, 
-		alarmTrapTime }
+alarmGridInverterTrapObsolete  NOTIFICATION-TYPE
 	STATUS     current
 	DESCRIPTION 
 		"This Trap is sent when an alarm condition occurs in the Grid Inverter subsystem."
@@ -1076,6 +1134,31 @@ alarmRectiverterTrap  NOTIFICATION-TYPE
 	DESCRIPTION 
 		"This Trap is sent when an alarm condition occurs in the Rectiverter subsystem."
 	::= { powerSystemTraps 16 }
+
+infoBatteryTestTrap  NOTIFICATION-TYPE
+	OBJECTS { alarmSubsysSourceDescr, 
+		alarmSubsysStatusOnOff, 
+		alarmTrapCounterVarValue, 
+		alarmTrapTime }
+	STATUS     current
+	DESCRIPTION 
+		"This Trap is sent when battery test is performed in the power system: 
+		"
+	::= { powerSystemTraps 17 }
+
+alarmFuelCellTrap  NOTIFICATION-TYPE
+	OBJECTS { alarmSubsysSourceDescr, 
+		alarmSubsysStatusOid, 
+		alarmSubsysStatusValue, 
+		alarmSubsysStatusOnOff, 
+		alarmMeasuredVarOid, 
+		alarmMeasuredVarValue, 
+		alarmTrapCounterVarValue, 
+		alarmTrapTime }
+	STATUS     current
+	DESCRIPTION 
+		"This Trap is sent when an alarm condition occurs in the fuel cell subsystem."
+	::= { powerSystemTraps 18 }
 
 powerSystemStatus  OBJECT-TYPE
 	SYNTAX     INTEGER {
@@ -2229,6 +2312,363 @@ mainsMonitorEnergyLogLastWeeksValue  OBJECT-TYPE
 	DESCRIPTION 
 		"Energy consumption value logged every week in AC Mains Monitor."
 	::= { mainsMonitorEnergyLogLastWeeksEntry 2 }
+
+mainsMonitorActivePowerTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF MainsMonitorActivePowerEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains information about mains active power in AC Mains Monitor"
+	::= { mainsMonitors 13 }
+
+mainsMonitorActivePowerEntry  OBJECT-TYPE
+	SYNTAX 	MainsMonitorActivePowerEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { mainsMonitorIndex, 
+		mainsMonitorPhaseIndex }
+	::= { mainsMonitorActivePowerTable 1 }
+
+MainsMonitorActivePowerEntry ::= SEQUENCE {
+	mainsMonitorActivePowerStatus
+		INTEGER,
+	mainsMonitorActivePowerDescription
+		DisplayString,
+	mainsMonitorActivePowerTrapRepeatCounter
+		Counter32,
+	mainsMonitorActivePowerAlarmEnable
+		INTEGER,
+	mainsMonitorActivePowerValue
+		Integer32,
+	mainsMonitorActivePowerMajorHighLevel
+		Integer32,
+	mainsMonitorActivePowerMinorHighLevel
+		Integer32
+}
+
+mainsMonitorActivePowerStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The status of the measured mains active power in AC Mains Monitor."
+	::= { mainsMonitorActivePowerEntry 1 }
+
+mainsMonitorActivePowerDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(1..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the mains active power in AC Mains Monitor. This is stored in the system controller
+		and can be changed by the user."
+	::= { mainsMonitorActivePowerEntry 2 }
+
+mainsMonitorActivePowerTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { mainsMonitorActivePowerEntry 3 }
+
+mainsMonitorActivePowerAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { mainsMonitorActivePowerEntry 4 }
+
+mainsMonitorActivePowerValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The value of the measured mains active power in AC Mains Monitor."
+	::= { mainsMonitorActivePowerEntry 5 }
+
+mainsMonitorActivePowerMajorHighLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major high alarm limit"
+	::= { mainsMonitorActivePowerEntry 6 }
+
+mainsMonitorActivePowerMinorHighLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor high alarm limit"
+	::= { mainsMonitorActivePowerEntry 7 }
+
+mainsMonitorReactivePowerTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF MainsMonitorReactivePowerEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains information about mains reactive power in AC Mains Monitor"
+	::= { mainsMonitors 14 }
+
+mainsMonitorReactivePowerEntry  OBJECT-TYPE
+	SYNTAX 	MainsMonitorReactivePowerEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { mainsMonitorIndex, 
+		mainsMonitorPhaseIndex }
+	::= { mainsMonitorReactivePowerTable 1 }
+
+MainsMonitorReactivePowerEntry ::= SEQUENCE {
+	mainsMonitorReactivePowerStatus
+		INTEGER,
+	mainsMonitorReactivePowerDescription
+		DisplayString,
+	mainsMonitorReactivePowerTrapRepeatCounter
+		Counter32,
+	mainsMonitorReactivePowerAlarmEnable
+		INTEGER,
+	mainsMonitorReactivePowerValue
+		Integer32,
+	mainsMonitorReactivePowerMajorHighLevel
+		Integer32,
+	mainsMonitorReactivePowerMinorHighLevel
+		Integer32
+}
+
+mainsMonitorReactivePowerStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The status of the measured mains reactive power in AC Mains Monitor."
+	::= { mainsMonitorReactivePowerEntry 1 }
+
+mainsMonitorReactivePowerDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(1..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the mains reactive power in AC Mains Monitor. This is stored in the system controller
+		and can be changed by the user."
+	::= { mainsMonitorReactivePowerEntry 2 }
+
+mainsMonitorReactivePowerTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { mainsMonitorReactivePowerEntry 3 }
+
+mainsMonitorReactivePowerAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { mainsMonitorReactivePowerEntry 4 }
+
+mainsMonitorReactivePowerValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The value of the measured mains reactive power in AC Mains Monitor."
+	::= { mainsMonitorReactivePowerEntry 5 }
+
+mainsMonitorReactivePowerMajorHighLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major high alarm limit"
+	::= { mainsMonitorReactivePowerEntry 6 }
+
+mainsMonitorReactivePowerMinorHighLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor high alarm limit"
+	::= { mainsMonitorReactivePowerEntry 7 }
+
+mainsMonitorApparentPowerTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF MainsMonitorApparentPowerEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains information about mains apparent power in AC Mains Monitor"
+	::= { mainsMonitors 15 }
+
+mainsMonitorApparentPowerEntry  OBJECT-TYPE
+	SYNTAX 	MainsMonitorApparentPowerEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { mainsMonitorIndex, 
+		mainsMonitorPhaseIndex }
+	::= { mainsMonitorApparentPowerTable 1 }
+
+MainsMonitorApparentPowerEntry ::= SEQUENCE {
+	mainsMonitorApparentPowerStatus
+		INTEGER,
+	mainsMonitorApparentPowerDescription
+		DisplayString,
+	mainsMonitorApparentPowerTrapRepeatCounter
+		Counter32,
+	mainsMonitorApparentPowerAlarmEnable
+		INTEGER,
+	mainsMonitorApparentPowerValue
+		Integer32,
+	mainsMonitorApparentPowerMajorHighLevel
+		Integer32,
+	mainsMonitorApparentPowerMinorHighLevel
+		Integer32
+}
+
+mainsMonitorApparentPowerStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The status of the measured mains apparent power in AC Mains Monitor."
+	::= { mainsMonitorApparentPowerEntry 1 }
+
+mainsMonitorApparentPowerDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(1..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the mains apparent power in AC Mains Monitor. This is stored in the system controller
+		and can be changed by the user."
+	::= { mainsMonitorApparentPowerEntry 2 }
+
+mainsMonitorApparentPowerTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { mainsMonitorApparentPowerEntry 3 }
+
+mainsMonitorApparentPowerAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { mainsMonitorApparentPowerEntry 4 }
+
+mainsMonitorApparentPowerValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The value of the measured mains apparent power in AC Mains Monitor."
+	::= { mainsMonitorApparentPowerEntry 5 }
+
+mainsMonitorApparentPowerMajorHighLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major high alarm limit"
+	::= { mainsMonitorApparentPowerEntry 6 }
+
+mainsMonitorApparentPowerMinorHighLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor high alarm limit"
+	::= { mainsMonitorApparentPowerEntry 7 }
 
 mainsOutageTotal  OBJECT-TYPE
 	SYNTAX     Integer32
@@ -3919,12 +4359,21 @@ gseGeneratorRunning  OBJECT-TYPE
 		running (3),
 		coolingDown (4),
 		engineStoped (5),
-		postRun (6)
+		postRun (6),
+		notDefined (7),
+		sae1 (8),
+		sae2 (9),
+		sae3 (10),
+		sae4 (11),
+		sae5 (12),
+		sae6 (13),
+		reserved (14),
+		notAvailable (15)
 	}
 	MAX-ACCESS read-only
 	STATUS     current
 	DESCRIPTION 
-		""
+		"generator operating state"
 	::= { gseGenerator 9 }
 
 gseGeneratorHighTemperature  OBJECT-TYPE
@@ -4058,6 +4507,96 @@ gseGeneratorRMSCommunicationFailure  OBJECT-TYPE
 	DESCRIPTION 
 		""
 	::= { gseGenerator 15 }
+
+gseGeneratorOtherAlarms  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabledInput (0),
+		notActiveAlarm (1),
+		warningAlarm (2),
+		shutdownAlarm (3),
+		electricalTripAlarm (4),
+		controlledShutdownAlarm (5),
+		reserved1 (6),
+		reserved2 (7),
+		inactiveIndication1 (8),
+		inactiveIndication2 (9),
+		activeIndication (10),
+		reserved3 (11),
+		unimplementedAlarm (12)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { gseGenerator 16 }
+
+generatorFailureStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This status value shows if the number of failed phases is higher than the defined alarm level."
+	::= { generatorFailure 1 }
+
+generatorFailureDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the generator failure monitor. This is stored in the system controller
+		and can be changed by the user."
+	::= { generatorFailure 2 }
+
+generatorFailureTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alam condition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off."
+	::= { generatorFailure 3 }
+
+generatorFailureAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { generatorFailure 4 }
+
+generatorFailureValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The value of the monitor."
+	::= { generatorFailure 5 }
 
 rectifiersStatus  OBJECT-TYPE
 	SYNTAX     INTEGER {
@@ -5631,6 +6170,25 @@ rectifierGroupTemperatureMajorLowLevel  OBJECT-TYPE
 		"The major low alarm limit"
 	::= { rectifierGroupTemperatureEntry 9 }
 
+rectifiersCurrentLimitEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Enable/disable current limit"
+	::= { rectifiers 20 }
+
+rectifiersCurrentLimitValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Current limit value"
+	::= { rectifiers 21 }
+
 dcdcNumberOfGroups  OBJECT-TYPE
 	SYNTAX     Integer32 (0..5)
 	MAX-ACCESS read-only
@@ -5674,7 +6232,7 @@ DcdcGroupsEntry ::= SEQUENCE {
 }
 
 dcdcGroupIndex  OBJECT-TYPE
-	SYNTAX     Integer32 (1..5)
+	SYNTAX     Integer32 (1..10)
 	MAX-ACCESS not-accessible
 	STATUS     current
 	DESCRIPTION 
@@ -8122,11 +8680,11 @@ batteryVoltageAlarmEnable  OBJECT-TYPE
 	::= { batteryVoltage 4 }
 
 batteryVoltageValue  OBJECT-TYPE
-	SYNTAX     Integer32 (0..7500)
+	SYNTAX     Integer32
 	MAX-ACCESS read-only
 	STATUS     current
 	DESCRIPTION 
-		"The value of the measured battery voltage."
+		"The value of the measured battery voltage. Scale is 0.01v."
 	::= { batteryVoltage 5 }
 
 batteryVoltageMajorHighLevel  OBJECT-TYPE
@@ -8134,7 +8692,7 @@ batteryVoltageMajorHighLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Major High Battery Voltage alarm limit set voltage"
+		"The Major High Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryVoltage 6 }
 
 batteryVoltageMinorHighLevel  OBJECT-TYPE
@@ -8142,7 +8700,7 @@ batteryVoltageMinorHighLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Minor High Battery Voltage alarm limit set voltage"
+		"The Minor High Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryVoltage 7 }
 
 batteryVoltageMinorLowLevel  OBJECT-TYPE
@@ -8150,7 +8708,7 @@ batteryVoltageMinorLowLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Minor Low Battery Voltage alarm limit set voltage"
+		"The Minor Low Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryVoltage 8 }
 
 batteryVoltageMajorLowLevel  OBJECT-TYPE
@@ -8158,7 +8716,7 @@ batteryVoltageMajorLowLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Major Low Battery Voltage alarm limit set voltage"
+		"The Major Low Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryVoltage 9 }
 
 batteryCurrentsStatus  OBJECT-TYPE
@@ -11074,6 +11632,423 @@ batteryRunTimeLogMonthsValue  OBJECT-TYPE
 		"Battery running hours logged every month."
 	::= { batteryRunTimeLogMonthsEntry 2 }
 
+batteryModuleNoOfBatteryModules  OBJECT-TYPE
+	SYNTAX     Integer32 (0..100)
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The number of battery modules installed"
+	::= { batteryModule 1 }
+
+batteryModuleErrorStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This status value shows if the number of failed units is higher than the defined alarm level."
+	::= { batteryModuleError 1 }
+
+batteryModuleErrorDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the battery error monitor. This is stored in the system controller
+		and can be changed by the user"
+	::= { batteryModuleError 2 }
+
+batteryModuleErrorTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { batteryModuleError 3 }
+
+batteryModuleErrorEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { batteryModuleError 4 }
+
+batteryModuleErrorValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The number of failed batteries."
+	::= { batteryModuleError 5 }
+
+batteryModuleErrorMajorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major alarm limit"
+	::= { batteryModuleError 6 }
+
+batteryModuleErrorMinorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor alarm limit"
+	::= { batteryModuleError 7 }
+
+batteryModuleCommErrorStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This status value shows if the number of failed units is higher than the defined alarm level."
+	::= { batteryModuleCommError 1 }
+
+batteryModuleCommErrorDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the battery comm error monitor. This is stored in the system controller
+		and can be changed by the user"
+	::= { batteryModuleCommError 2 }
+
+batteryModuleCommErrorTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { batteryModuleCommError 3 }
+
+batteryModuleCommErrorEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { batteryModuleCommError 4 }
+
+batteryModuleCommErrorValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The number of batteries in comm error."
+	::= { batteryModuleCommError 5 }
+
+batteryModuleCommErrorMajorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major alarm limit"
+	::= { batteryModuleCommError 6 }
+
+batteryModuleCommErrorMinorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor alarm limit"
+	::= { batteryModuleCommError 7 }
+
+batteryModuleTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF BatteryModuleEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Information of individule battery module"
+	::= { batteryModule 4 }
+
+batteryModuleEntry  OBJECT-TYPE
+	SYNTAX 	BatteryModuleEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { batteryModuleIndex }
+	::= { batteryModuleTable 1 }
+
+BatteryModuleEntry ::= SEQUENCE {
+	batteryModuleIndex
+		Integer32,
+	batteryModuleStatus
+		INTEGER,
+	batteryModuleBatteryVoltage
+		Integer32,
+	batteryModuleBatteryCurrent
+		Integer32,
+	batteryModuleBatteryRemCap
+		Integer32,
+	batteryModuleBatteryTemperature
+		Integer32,
+	batteryModuleBatteryQuality
+		Integer32,
+	batteryModuleMaxChargeCurrent
+		Integer32,
+	batteryModuleMaxDischargeCurrent
+		Integer32,
+	batteryModuleBatteryMode
+		DisplayString,
+	batteryModuleChargeMode
+		DisplayString,
+	batteryModuleManufacturer
+		DisplayString,
+	batteryModulePartNumber
+		DisplayString,
+	batteryModuleSerialNumber
+		DisplayString,
+	batteryModuleSoftwareVersion
+		DisplayString,
+	batteryModuleProductionDate
+		DateAndTime,
+	batteryModuleAccumulatedAhCharged
+		Integer32,
+	batteryModuleAccumulatedAhDischarged
+		Integer32,
+	batteryModuleNoOfChargeCycles
+		Integer32,
+	batteryModuleNoOfDischargeCycles
+		Integer32
+}
+
+batteryModuleIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..100)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..100  of batteryModuleTable "
+	::= { batteryModuleEntry 1 }
+
+batteryModuleStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		" The status value for the battery module"
+	::= { batteryModuleEntry 2 }
+
+batteryModuleBatteryVoltage  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery voltage value"
+	::= { batteryModuleEntry 3 }
+
+batteryModuleBatteryCurrent  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery current value"
+	::= { batteryModuleEntry 4 }
+
+batteryModuleBatteryRemCap  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery remaining capacity value"
+	::= { batteryModuleEntry 5 }
+
+batteryModuleBatteryTemperature  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery temperature value"
+	::= { batteryModuleEntry 6 }
+
+batteryModuleBatteryQuality  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery quality value "
+	::= { batteryModuleEntry 7 }
+
+batteryModuleMaxChargeCurrent  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Maximal charging current in Amp"
+	::= { batteryModuleEntry 8 }
+
+batteryModuleMaxDischargeCurrent  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Maximal discharge current in Amp"
+	::= { batteryModuleEntry 9 }
+
+batteryModuleBatteryMode  OBJECT-TYPE
+	SYNTAX     DisplayString
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery mode"
+	::= { batteryModuleEntry 10 }
+
+batteryModuleChargeMode  OBJECT-TYPE
+	SYNTAX     DisplayString
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Charge mode"
+	::= { batteryModuleEntry 11 }
+
+batteryModuleManufacturer  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..27))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Battery manufaturer"
+	::= { batteryModuleEntry 12 }
+
+batteryModulePartNumber  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Part number"
+	::= { batteryModuleEntry 13 }
+
+batteryModuleSerialNumber  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Serial number"
+	::= { batteryModuleEntry 14 }
+
+batteryModuleSoftwareVersion  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Software version"
+	::= { batteryModuleEntry 15 }
+
+batteryModuleProductionDate  OBJECT-TYPE
+	SYNTAX     DateAndTime (SIZE(8..11))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Date of production"
+	::= { batteryModuleEntry 16 }
+
+batteryModuleAccumulatedAhCharged  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Accumulated Ah charged"
+	::= { batteryModuleEntry 17 }
+
+batteryModuleAccumulatedAhDischarged  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Accumulated Ah discharged"
+	::= { batteryModuleEntry 18 }
+
+batteryModuleNoOfChargeCycles  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Number of charge cycles"
+	::= { batteryModuleEntry 19 }
+
+batteryModuleNoOfDischargeCycles  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Number of discharge cycles"
+	::= { batteryModuleEntry 20 }
+
 -- In smartpack2 system, highest inputControlUnitIndex corresponds to smartpack2 master controller
 
 inputControlUnitsTable  OBJECT-TYPE
@@ -13266,6 +14241,187 @@ flexiMonitorEnergyCostLogLastYearsCost  OBJECT-TYPE
 		"Energy cost"
 	::= { flexiMonitorEnergyCostLogLastYearsEntry 4 }
 
+flexiMonitorEnergyLogAccumulatedTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FlexiMonitorEnergyLogAccumulatedEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains the accumulated energy consumption measured in fleximonitor"
+	::= { flexiMonitors 10 }
+
+flexiMonitorEnergyLogAccumulatedEntry  OBJECT-TYPE
+	SYNTAX 	FlexiMonitorEnergyLogAccumulatedEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { flexiMonitorIndex, 
+		flexiMonitorCurrentInputIndex }
+	::= { flexiMonitorEnergyLogAccumulatedTable 1 }
+
+FlexiMonitorEnergyLogAccumulatedEntry ::= SEQUENCE {
+	flexiMonitorEnergyLogAccumulated
+		Integer32
+}
+
+flexiMonitorEnergyLogAccumulated  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The accumulated energy consumption value"
+	::= { flexiMonitorEnergyLogAccumulatedEntry 1 }
+
+flexiMonitorEnergyLogLastHoursNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32 (0..52)
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in hourly energy log"
+	::= { flexiMonitors 11 }
+
+flexiMonitorEnergyLogLastHoursTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FlexiMonitorEnergyLogLastHoursEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains energy consumption values logged every hour in fleximonitor."
+	::= { flexiMonitors 12 }
+
+flexiMonitorEnergyLogLastHoursEntry  OBJECT-TYPE
+	SYNTAX 	FlexiMonitorEnergyLogLastHoursEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { flexiMonitorIndex, 
+		flexiMonitorCurrentInputIndex, 
+		flexiMonitorEnergyLogLastHoursIndex }
+	::= { flexiMonitorEnergyLogLastHoursTable 1 }
+
+FlexiMonitorEnergyLogLastHoursEntry ::= SEQUENCE {
+	flexiMonitorEnergyLogLastHoursIndex
+		Integer32,
+	flexiMonitorEnergyLogLastHoursValue
+		Integer32
+}
+
+flexiMonitorEnergyLogLastHoursIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52  of flexiMonitorEnergyLogLastHoursTable"
+	::= { flexiMonitorEnergyLogLastHoursEntry 1 }
+
+flexiMonitorEnergyLogLastHoursValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Energy consumption value logged every hour in fleximonitor."
+	::= { flexiMonitorEnergyLogLastHoursEntry 2 }
+
+flexiMonitorEnergyLogLastDaysNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32 (0..52)
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in daily energy log"
+	::= { flexiMonitors 13 }
+
+flexiMonitorEnergyLogLastDaysTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FlexiMonitorEnergyLogLastDaysEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains energy consumption values logged every day in fleximonitor."
+	::= { flexiMonitors 14 }
+
+flexiMonitorEnergyLogLastDaysEntry  OBJECT-TYPE
+	SYNTAX 	FlexiMonitorEnergyLogLastDaysEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { flexiMonitorIndex, 
+		flexiMonitorCurrentInputIndex, 
+		flexiMonitorEnergyLogLastDaysIndex }
+	::= { flexiMonitorEnergyLogLastDaysTable 1 }
+
+FlexiMonitorEnergyLogLastDaysEntry ::= SEQUENCE {
+	flexiMonitorEnergyLogLastDaysIndex
+		Integer32,
+	flexiMonitorEnergyLogLastDaysValue
+		Integer32
+}
+
+flexiMonitorEnergyLogLastDaysIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52  of flexiMonitorEnergyLogLastDaysTable"
+	::= { flexiMonitorEnergyLogLastDaysEntry 1 }
+
+flexiMonitorEnergyLogLastDaysValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Energy consumption value logged every day in fleximonitor."
+	::= { flexiMonitorEnergyLogLastDaysEntry 2 }
+
+flexiMonitorEnergyLogLastWeeksNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32 (0..52)
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in weekly energy log"
+	::= { flexiMonitors 15 }
+
+flexiMonitorEnergyLogLastWeeksTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FlexiMonitorEnergyLogLastWeeksEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains energy consumption values logged every week in fleximonitor."
+	::= { flexiMonitors 16 }
+
+flexiMonitorEnergyLogLastWeeksEntry  OBJECT-TYPE
+	SYNTAX 	FlexiMonitorEnergyLogLastWeeksEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { flexiMonitorIndex, 
+		flexiMonitorCurrentInputIndex, 
+		flexiMonitorEnergyLogLastWeeksIndex }
+	::= { flexiMonitorEnergyLogLastWeeksTable 1 }
+
+FlexiMonitorEnergyLogLastWeeksEntry ::= SEQUENCE {
+	flexiMonitorEnergyLogLastWeeksIndex
+		Integer32,
+	flexiMonitorEnergyLogLastWeeksValue
+		Integer32
+}
+
+flexiMonitorEnergyLogLastWeeksIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52  of flexiMonitorEnergyLogLastWeeksTable"
+	::= { flexiMonitorEnergyLogLastWeeksEntry 1 }
+
+flexiMonitorEnergyLogLastWeeksValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Energy consumption value logged every week in fleximonitor."
+	::= { flexiMonitorEnergyLogLastWeeksEntry 2 }
+
 mainControlUnitsTable  OBJECT-TYPE
 	SYNTAX SEQUENCE OF MainControlUnitsEntry
 	MAX-ACCESS not-accessible
@@ -14507,6 +15663,532 @@ controlSystemSetCfgFromXmlFiles  OBJECT-TYPE
 		"Set configurations from default1.XML, default2.XML and default3.XML in Default folder"
 	::= { controlSystem 22 }
 
+controlSystemNumberOfGenericModbusData  OBJECT-TYPE
+	SYNTAX     Integer32 (0..50)
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Number of genaric Modbus data configured in system"
+	::= { controlSystem 23 }
+
+controlSystemGenericModbusDataTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF ControlSystemGenericModbusDataEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { controlSystem 24 }
+
+controlSystemGenericModbusDataEntry  OBJECT-TYPE
+	SYNTAX 	ControlSystemGenericModbusDataEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { controlSystemGenericModbusDataIndex }
+	::= { controlSystemGenericModbusDataTable 1 }
+
+ControlSystemGenericModbusDataEntry ::= SEQUENCE {
+	controlSystemGenericModbusDataIndex
+		Integer32,
+	controlSystemGenericModbusDataDescription
+		DisplayString,
+	controlSystemGenericModbusDataValue
+		DisplayString,
+	controlSystemGenericModbusDataUnit
+		DisplayString
+}
+
+controlSystemGenericModbusDataIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..50)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows of table
+		The size of the table is defined by the system"
+	::= { controlSystemGenericModbusDataEntry 1 }
+
+controlSystemGenericModbusDataDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..32))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"description of generic Modbus data"
+	::= { controlSystemGenericModbusDataEntry 2 }
+
+controlSystemGenericModbusDataValue  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..32))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Value of generic Modbus data"
+	::= { controlSystemGenericModbusDataEntry 3 }
+
+controlSystemGenericModbusDataUnit  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..12))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Unit of generic Modbus data"
+	::= { controlSystemGenericModbusDataEntry 4 }
+
+demandResponseStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		notInitialized (0),
+		notEnabled (1),
+		initializedAndReady (2),
+		active (3),
+		active-phaseDependant (4),
+		reachedDoDStopLevelOrVoltStopLevel (5),
+		reachedDoDStopLevel (6),
+		reachedVoltStopLevel (7),
+		feed-inFromBatteryNotReady (8),
+		terminatedOnMAXTime (9),
+		notEnoughBackupCapacity (10),
+		notReady-NotInFLOAT (11),
+		notReady-AlarmsInSystem (12)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Status of demand response"
+	::= { demandResponse 1 }
+
+demandResponseMinBatteryBackupTime  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This parameter set the required minimum battery backup time in minutes for this system. 
+		The controller must ensure that there always are at least the required battery backup time left 
+		during and after an DSR event. "
+	::= { demandResponse 2 }
+
+demandResponsePowerForecast  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is an average load power in watt during last 52 hours "
+	::= { demandResponse 3 }
+
+demandResponseAvailableEnergy  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Estimated available energy based on the battery capacity, the load power and the expected backup time of the load groups"
+	::= { demandResponse 4 }
+
+demandResponseBatteryDischargePower  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This parameter controls the discharge power of the battery during an DSR event.
+		Scale is 0.01kw"
+	::= { demandResponse 5 }
+
+demandResponseMaxTime  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The maximum discharge duration in minutes"
+	::= { demandResponse 6 }
+
+demandResponseControl  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		pushButton (0),
+		activate (1),
+		deactivate (2)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Activate/deactivate demand response"
+	::= { demandResponse 7 }
+
+genericAlarmMonitorTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF GenericAlarmMonitorEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"generic alarm monitors to be used with 3rd-party modbus devices"
+	::= { controlSystem 26 }
+
+genericAlarmMonitorEntry  OBJECT-TYPE
+	SYNTAX 	GenericAlarmMonitorEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { genericAlarmMonitorIndex }
+	::= { genericAlarmMonitorTable 1 }
+
+GenericAlarmMonitorEntry ::= SEQUENCE {
+	genericAlarmMonitorIndex
+		Integer32,
+	genericAlarmMonitorStatus
+		INTEGER,
+	genericAlarmMonitorDescription
+		DisplayString,
+	genericAlarmMonitorTrapRepeatCounter
+		Counter32,
+	genericAlarmMonitorAlarmEnable
+		INTEGER,
+	genericAlarmMonitorValue
+		Integer32,
+	genericAlarmMonitorUnit
+		DisplayString
+}
+
+genericAlarmMonitorIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..100)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { genericAlarmMonitorEntry 1 }
+
+genericAlarmMonitorStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The state of the alarm monitor can be either one of the defined enumerated values"
+	::= { genericAlarmMonitorEntry 2 }
+
+genericAlarmMonitorDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the generic alarm monitor. This is stored in the system controller
+		and can be changed by the user. "
+	::= { genericAlarmMonitorEntry 3 }
+
+genericAlarmMonitorTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { genericAlarmMonitorEntry 4 }
+
+genericAlarmMonitorAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { genericAlarmMonitorEntry 5 }
+
+genericAlarmMonitorValue  OBJECT-TYPE
+	SYNTAX     Integer32 (0..9999)
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The generic alarm monitor value. Scale is dependent on the scale setting of the corresponding generic modbus value."
+	::= { genericAlarmMonitorEntry 6 }
+
+genericAlarmMonitorUnit  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the unit of generic alarm monitor. "
+	::= { genericAlarmMonitorEntry 7 }
+
+genericLogsTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF GenericLogsEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Generic logs connected to the last ten generic alarm monitors (#91-#100)"
+	::= { controlSystem 27 }
+
+genericLogsEntry  OBJECT-TYPE
+	SYNTAX 	GenericLogsEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { genericLogsIndex }
+	::= { genericLogsTable 1 }
+
+GenericLogsEntry ::= SEQUENCE {
+	genericLogsIndex
+		Integer32,
+	genericLogsAccumulated
+		Unsigned32,
+	genericLogsDaysNumberOfEntries
+		Integer32,
+	genericLogsWeeksNumberOfEntries
+		Integer32,
+	genericLogsMonthsNumberOfEntries
+		Integer32
+}
+
+genericLogsIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..10)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"generic log index 1...10"
+	::= { genericLogsEntry 1 }
+
+genericLogsAccumulated  OBJECT-TYPE
+	SYNTAX     Unsigned32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the accumulated trip log value in hours."
+	::= { genericLogsEntry 2 }
+
+genericLogsDaysNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in daily log"
+	::= { genericLogsEntry 3 }
+
+genericLogsWeeksNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in weekly log"
+	::= { genericLogsEntry 4 }
+
+genericLogsMonthsNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in monthly log"
+	::= { genericLogsEntry 5 }
+
+genericLogDaysTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF GenericLogDaysEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains daily generic log."
+	::= { controlSystem 28 }
+
+genericLogDaysEntry  OBJECT-TYPE
+	SYNTAX 	GenericLogDaysEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { genericLogsIndex, 
+		genericLogDaysIndex }
+	::= { genericLogDaysTable 1 }
+
+GenericLogDaysEntry ::= SEQUENCE {
+	genericLogDaysIndex
+		Unsigned32,
+	genericLogDaysValue
+		Integer32
+}
+
+genericLogDaysIndex  OBJECT-TYPE
+	SYNTAX     Unsigned32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52  of genericLogDaysTable"
+	::= { genericLogDaysEntry 1 }
+
+genericLogDaysValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"generic monitor value in minutes logged every day."
+	::= { genericLogDaysEntry 2 }
+
+genericLogWeeksTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF GenericLogWeeksEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains weekly generic log."
+	::= { controlSystem 29 }
+
+genericLogWeeksEntry  OBJECT-TYPE
+	SYNTAX 	GenericLogWeeksEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { genericLogsIndex, 
+		genericLogWeeksIndex }
+	::= { genericLogWeeksTable 1 }
+
+GenericLogWeeksEntry ::= SEQUENCE {
+	genericLogWeeksIndex
+		Unsigned32,
+	genericLogWeeksValue
+		Integer32
+}
+
+genericLogWeeksIndex  OBJECT-TYPE
+	SYNTAX     Unsigned32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52  of genericLogWeeksTable"
+	::= { genericLogWeeksEntry 1 }
+
+genericLogWeeksValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"generic monitor value in hours logged every week."
+	::= { genericLogWeeksEntry 2 }
+
+genericLogMonthsTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF GenericLogMonthsEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains monthly generic log."
+	::= { controlSystem 30 }
+
+genericLogMonthsEntry  OBJECT-TYPE
+	SYNTAX 	GenericLogMonthsEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { genericLogsIndex, 
+		genericLogMonthsIndex }
+	::= { genericLogMonthsTable 1 }
+
+GenericLogMonthsEntry ::= SEQUENCE {
+	genericLogMonthsIndex
+		Unsigned32,
+	genericLogMonthsValue
+		Integer32
+}
+
+genericLogMonthsIndex  OBJECT-TYPE
+	SYNTAX     Unsigned32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52  of genericLogMonthsTable"
+	::= { genericLogMonthsEntry 1 }
+
+genericLogMonthsValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"generic monitor value in hours logged every month."
+	::= { genericLogMonthsEntry 2 }
+
+tariffControlEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		diasable (0),
+		enable (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Enable/disable tariff control function"
+	::= { tariffControl 1 }
+
+tariffControlChargeInhibit  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disable (0),
+		enable (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Enable/disable battery charge inhibit"
+	::= { tariffControl 2 }
+
+tariffControlMaxTime  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The maximum discharge duration in minutes"
+	::= { tariffControl 3 }
+
+tariffControlBatteryVoltageStopControl  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disable (0),
+		enable (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Enable/disable battery voltage stop control"
+	::= { tariffControl 4 }
+
+tariffControlBatteryVoltageStopLimit  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { tariffControl 5 }
+
+tariffControlBatteryVoltageHysteresis  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { tariffControl 6 }
+
+tariffControlActivate  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		pushButton (0),
+		activate (1),
+		deactivate (2)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Activate/deactivate demand response"
+	::= { tariffControl 7 }
+
 alarmGroupTable  OBJECT-TYPE
 	SYNTAX SEQUENCE OF AlarmGroupEntry
 	MAX-ACCESS not-accessible
@@ -14705,11 +16387,11 @@ batteryGroup2VoltageAlarmEnable  OBJECT-TYPE
 	::= { batteryGroup2Voltage 4 }
 
 batteryGroup2VoltageValue  OBJECT-TYPE
-	SYNTAX     Integer32 (0..7500)
+	SYNTAX     Integer32
 	MAX-ACCESS read-only
 	STATUS     current
 	DESCRIPTION 
-		"The value of the measured battery voltage."
+		"The value of the measured battery voltage.Scale is 0.01v."
 	::= { batteryGroup2Voltage 5 }
 
 batteryGroup2VoltageMajorHighLevel  OBJECT-TYPE
@@ -14717,7 +16399,7 @@ batteryGroup2VoltageMajorHighLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Major High Battery Voltage alarm limit set voltage"
+		"The Major High Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryGroup2Voltage 6 }
 
 batteryGroup2VoltageMinorHighLevel  OBJECT-TYPE
@@ -14725,7 +16407,7 @@ batteryGroup2VoltageMinorHighLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Minor High Battery Voltage alarm limit set voltage"
+		"The Minor High Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryGroup2Voltage 7 }
 
 batteryGroup2VoltageMinorLowLevel  OBJECT-TYPE
@@ -14733,7 +16415,7 @@ batteryGroup2VoltageMinorLowLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Minor Low Battery Voltage alarm limit set voltage"
+		"The Minor Low Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryGroup2Voltage 8 }
 
 batteryGroup2VoltageMajorLowLevel  OBJECT-TYPE
@@ -14741,7 +16423,7 @@ batteryGroup2VoltageMajorLowLevel  OBJECT-TYPE
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"The Major Low Battery Voltage alarm limit set voltage"
+		"The Major Low Battery Voltage alarm limit set voltage.Scale is 0.01v."
 	::= { batteryGroup2Voltage 9 }
 
 batteryGroup2CurrentsStatus  OBJECT-TYPE
@@ -17700,773 +19382,6 @@ invertersAcFrequency  OBJECT-TYPE
 		""
 	::= { inverters 11 }
 
-gridInvertersStatus  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The overall status of inverter subsystem."
-	::= { gridInverters 1 }
-
-gridInvertersErrorStatus  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"This status value shows if the number of failed units is higher than the defined alarm level."
-	::= { gridInvertersError 1 }
-
-gridInvertersErrorDescription  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the inverter error monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersError 2 }
-
-gridInvertersErrorTrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersError 3 }
-
-gridInvertersErrorEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersError 4 }
-
-gridInvertersErrorValue  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The number of failed inverters."
-	::= { gridInvertersError 5 }
-
-gridInvertersErrorMajorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersError 6 }
-
-gridInvertersErrorMinorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersError 7 }
-
-gridInvertersTemperatureStatus  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The state of the rectifier temperature can be either one of the defined enumerated values"
-	::= { gridInvertersTemperature 1 }
-
-gridInvertersTemperatureDescription  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the rectifier temperature monitor. This is stored in the system controller
-		and can be changed by the user. "
-	::= { gridInvertersTemperature 2 }
-
-gridInvertersTemperatureTrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersTemperature 3 }
-
-gridInvertersTemperatureAlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersTemperature 4 }
-
-gridInvertersTemperatureValue  OBJECT-TYPE
-	SYNTAX     Integer32 (0..9999)
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The highest value of the rectifier temperature measurements.
-		Depending on the global setting in the Control unit, this value will be presented in Celsius
-		or Fahrenheit."
-	::= { gridInvertersTemperature 5 }
-
-gridInvertersTemperatureMajorHighLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major high alarm limit"
-	::= { gridInvertersTemperature 6 }
-
-gridInvertersTemperatureMinorHighLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor high alarm limit"
-	::= { gridInvertersTemperature 7 }
-
-gridInvertersTemperatureMinorLowLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor low alarm limit"
-	::= { gridInvertersTemperature 8 }
-
-gridInvertersTemperatureMajorLowLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major low alarm limit"
-	::= { gridInvertersTemperature 9 }
-
-gridInvertersAcCurrent1Status  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The status of the measured total rectifier current."
-	::= { gridInvertersAcCurrent1 1 }
-
-gridInvertersAcCurrent1Description  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the total rectifier current monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersAcCurrent1 2 }
-
-gridInvertersAcCurrent1TrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersAcCurrent1 3 }
-
-gridInvertersAcCurrent1AlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersAcCurrent1 4 }
-
-gridInvertersAcCurrent1Value  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The value of the measured total rectifier current."
-	::= { gridInvertersAcCurrent1 5 }
-
-gridInvertersAcCurrent1MajorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersAcCurrent1 6 }
-
-gridInvertersAcCurrent1MinorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersAcCurrent1 7 }
-
-gridInvertersAcCurrent2Status  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The status of the measured total rectifier current."
-	::= { gridInvertersAcCurrent2 1 }
-
-gridInvertersAcCurrent2Description  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the total rectifier current monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersAcCurrent2 2 }
-
-gridInvertersAcCurrent2TrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersAcCurrent2 3 }
-
-gridInvertersAcCurrent2AlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersAcCurrent2 4 }
-
-gridInvertersAcCurrent2Value  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The value of the measured total rectifier current."
-	::= { gridInvertersAcCurrent2 5 }
-
-gridInvertersAcCurrent2MajorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersAcCurrent2 6 }
-
-gridInvertersAcCurrent2MinorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersAcCurrent2 7 }
-
-gridInvertersAcCurrent3Status  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The status of the measured total rectifier current."
-	::= { gridInvertersAcCurrent3 1 }
-
-gridInvertersAcCurrent3Description  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the total rectifier current monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersAcCurrent3 2 }
-
-gridInvertersAcCurrent3TrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersAcCurrent3 3 }
-
-gridInvertersAcCurrent3AlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersAcCurrent3 4 }
-
-gridInvertersAcCurrent3Value  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The value of the measured total rectifier current."
-	::= { gridInvertersAcCurrent3 5 }
-
-gridInvertersAcCurrent3MajorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersAcCurrent3 6 }
-
-gridInvertersAcCurrent3MinorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersAcCurrent3 7 }
-
-gridInvertersPowerStatus  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The status of the measured total inverter power"
-	::= { gridInvertersPower 1 }
-
-gridInvertersPowerDescription  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the total inverter power monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersPower 2 }
-
-gridInvertersPowerTrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersPower 3 }
-
-gridInvertersPowerAlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersPower 4 }
-
-gridInvertersPowerValue  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The value of the measured total inverter current."
-	::= { gridInvertersPower 5 }
-
-gridInvertersPowerMajorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersPower 6 }
-
-gridInvertersPowerMinorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersPower 7 }
-
-gridInvertersFrequencyStatus  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The status of the measured total inverter power"
-	::= { gridInvertersFrequency 1 }
-
-gridInvertersFrequencyDescription  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the total inverter power monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersFrequency 2 }
-
-gridInvertersFrequencyTrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersFrequency 3 }
-
-gridInvertersFrequencyAlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersFrequency 4 }
-
-gridInvertersFrequencyValue  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The value of the measured total inverter current."
-	::= { gridInvertersFrequency 5 }
-
-gridInvertersFrequencyMajorHighLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersFrequency 6 }
-
-gridInvertersFrequencyMinorHighLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersFrequency 7 }
-
-gridInvertersFrequencyMinorLowLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersFrequency 8 }
-
-gridInvertersFrequencyMajorLowLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersFrequency 9 }
-
-gridInvertersAcDisconnectStatus  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		error (0),
-		normal (1),
-		minorAlarm (2),
-		majorAlarm (3),
-		disabled (4),
-		disconnected (5),
-		notPresent (6),
-		minorAndMajor (7),
-		majorLow (8),
-		minorLow (9),
-		majorHigh (10),
-		minorHigh (11),
-		event (12),
-		valueVolt (13),
-		valueAmp (14),
-		valueTemp (15),
-		valueUnit (16),
-		valuePerCent (17),
-		critical (18),
-		warning (19)
-	}
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The status of the measured total rectifier current."
-	::= { gridInvertersAcDisconnect 1 }
-
-gridInvertersAcDisconnectDescription  OBJECT-TYPE
-	SYNTAX     DisplayString (SIZE(0..16))
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"A textual description of the total rectifier current monitor. This is stored in the system controller
-		and can be changed by the user"
-	::= { gridInvertersAcDisconnect 2 }
-
-gridInvertersAcDisconnectTrapRepeatCounter  OBJECT-TYPE
-	SYNTAX     Counter32
-	MAX-ACCESS accessible-for-notify
-	STATUS     current
-	DESCRIPTION 
-		"The number of consecutive times this alamcondition has been transmitted in a trap. 
-		When trap repetition is enabled, this counter increments every time this trap is repeated.  
-		The counter is automatically set to zero when the alarm condition is reset and the
-		alarm goes off"
-	::= { gridInvertersAcDisconnect 3 }
-
-gridInvertersAcDisconnectAlarmEnable  OBJECT-TYPE
-	SYNTAX     INTEGER {
-		disabled (0),
-		enabled (1)
-	}
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"This value once enabled, the alarm condition of the monitor will be reported."
-	::= { gridInvertersAcDisconnect 4 }
-
-gridInvertersAcDisconnectValue  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"The value of the measured total rectifier current."
-	::= { gridInvertersAcDisconnect 5 }
-
-gridInvertersAcDisconnectMajorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The major alarm limit"
-	::= { gridInvertersAcDisconnect 6 }
-
-gridInvertersAcDisconnectMinorAlarmLevel  OBJECT-TYPE
-	SYNTAX     Integer32
-	MAX-ACCESS read-write
-	STATUS     current
-	DESCRIPTION 
-		"The minor alarm limit"
-	::= { gridInvertersAcDisconnect 7 }
-
-gridInvertersDcCurrent  OBJECT-TYPE
-	SYNTAX     Integer32 (0..100)
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"Total installed/available inverter power."
-	::= { gridInverters 10 }
-
-gridInvertersAcVoltage1  OBJECT-TYPE
-	SYNTAX     Integer32 (0..100)
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"Total installed/available inverter power."
-	::= { gridInverters 11 }
-
-gridInvertersAcVoltage2  OBJECT-TYPE
-	SYNTAX     Integer32 (0..100)
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"Total installed/available inverter power."
-	::= { gridInverters 12 }
-
-gridInvertersAcVoltage3  OBJECT-TYPE
-	SYNTAX     Integer32 (0..100)
-	MAX-ACCESS read-only
-	STATUS     current
-	DESCRIPTION 
-		"Total installed/available inverter power."
-	::= { gridInverters 13 }
-
 rectivertersStatus  OBJECT-TYPE
 	SYNTAX     INTEGER {
 		error (0),
@@ -19435,19 +20350,888 @@ rectivertersAcOutVoltageConfig  OBJECT-TYPE
 	::= { rectiverters 13 }
 
 rectivertersAcOutFrequencyConfig  OBJECT-TYPE
-	SYNTAX     Integer32 (45..66)
+	SYNTAX     Integer32 (4500..10600)
 	MAX-ACCESS read-write
 	STATUS     current
 	DESCRIPTION 
-		"Set ac output frequency"
+		"Set ac output frequency. Scale is 0.01 Hz."
 	::= { rectiverters 14 }
+
+fuelCellsStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The overall status of fuel cell charger subsystem."
+	::= { fuelCells 1 }
+
+fuelCellsCurrentStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The status of the measured total fuel cell current."
+	::= { fuelCellsCurrent 1 }
+
+fuelCellsCurrentDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the total fuel cell current monitor. This is stored in the system controller
+		and can be changed by the user"
+	::= { fuelCellsCurrent 2 }
+
+fuelCellsCurrentTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { fuelCellsCurrent 3 }
+
+fuelCellsCurrentAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { fuelCellsCurrent 4 }
+
+fuelCellsCurrentValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The value of the measured total fuel cell current."
+	::= { fuelCellsCurrent 5 }
+
+fuelCellsCurrentMajorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major alarm limit"
+	::= { fuelCellsCurrent 6 }
+
+fuelCellsCurrentMinorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor alarm limit"
+	::= { fuelCellsCurrent 7 }
+
+fuelCellsPowerStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The status of the measured total fuel cell power."
+	::= { fuelCellsPower 1 }
+
+fuelCellsPowerDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the total fuel cell current monitor. This is stored in the system controller
+		and can be changed by the user"
+	::= { fuelCellsPower 2 }
+
+fuelCellsPowerTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { fuelCellsPower 3 }
+
+fuelCellsPowerAlarmEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { fuelCellsPower 4 }
+
+fuelCellsPowerValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The value of the measured total fuel cell power."
+	::= { fuelCellsPower 5 }
+
+fuelCellsPowerMajorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major alarm limit"
+	::= { fuelCellsPower 6 }
+
+fuelCellsPowerMinorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor alarm limit"
+	::= { fuelCellsPower 7 }
+
+fuelCellsErrorStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		error (0),
+		normal (1),
+		minorAlarm (2),
+		majorAlarm (3),
+		disabled (4),
+		disconnected (5),
+		notPresent (6),
+		minorAndMajor (7),
+		majorLow (8),
+		minorLow (9),
+		majorHigh (10),
+		minorHigh (11),
+		event (12),
+		valueVolt (13),
+		valueAmp (14),
+		valueTemp (15),
+		valueUnit (16),
+		valuePerCent (17),
+		critical (18),
+		warning (19)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This status value shows if the number of failed units is higher than the defined alarm level."
+	::= { fuelCellsError 1 }
+
+fuelCellsErrorDescription  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..16))
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"A textual description of the fuel cell error monitor. This is stored in the system controller
+		and can be changed by the user"
+	::= { fuelCellsError 2 }
+
+fuelCellsErrorTrapRepeatCounter  OBJECT-TYPE
+	SYNTAX     Counter32
+	MAX-ACCESS accessible-for-notify
+	STATUS     current
+	DESCRIPTION 
+		"The number of consecutive times this alamcondition has been transmitted in a trap. 
+		When trap repetition is enabled, this counter increments every time this trap is repeated.  
+		The counter is automatically set to zero when the alarm condition is reset and the
+		alarm goes off"
+	::= { fuelCellsError 3 }
+
+fuelCellsErrorEnable  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		disabled (0),
+		enabled (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"This value once enabled, the alarm condition of the monitor will be reported."
+	::= { fuelCellsError 4 }
+
+fuelCellsErrorValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The number of failed fuel cell chargers."
+	::= { fuelCellsError 5 }
+
+fuelCellsErrorMajorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The major alarm limit"
+	::= { fuelCellsError 6 }
+
+fuelCellsErrorMinorAlarmLevel  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"The minor alarm limit"
+	::= { fuelCellsError 7 }
+
+fuelCellsNumberOfFuelCells  OBJECT-TYPE
+	SYNTAX     Integer32 (0..100)
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Number of installed fuel cell chargers."
+	::= { fuelCells 5 }
+
+fuelCellTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FuelCellEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table shows the information of each fuel cell installed in the system."
+	::= { fuelCells 6 }
+
+fuelCellEntry  OBJECT-TYPE
+	SYNTAX 	FuelCellEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { fuelCellIndex }
+	::= { fuelCellTable 1 }
+
+FuelCellEntry ::= SEQUENCE {
+	fuelCellIndex
+		Integer32,
+	fuelCellStatus
+		INTEGER,
+	fuelCellMode
+		INTEGER,
+	fuelCellCurrentValue
+		Integer32,
+	fuelCellVoltageValue
+		Integer32,
+	fuelCellPowerValue
+		Integer32,
+	fuelCellType
+		DisplayString,
+	fuelCellInletTemperature
+		Integer32,
+	fuelCellOutletTemperature
+		Integer32,
+	fuelCellRoomTemperature
+		Integer32,
+	fuelCellFan
+		Integer32,
+	fuelCellH2Storage1
+		INTEGER,
+	fuelCellH2Storage2
+		INTEGER,
+	fuelCellH2Storage3
+		INTEGER,
+	fuelCellDO22
+		Integer32,
+	fuelCellDO23
+		Integer32,
+	fuelCellDO24
+		Integer32,
+	fuelCellDO25
+		Integer32,
+	fuelCellDO26
+		Integer32,
+	fuelCellDO27
+		Integer32,
+	fuelCellDC1current
+		Integer32,
+	fuelCellDC2current
+		Integer32,
+	fuelCellDC3current
+		Integer32,
+	fuelCellDC4current
+		Integer32,
+	fuelCellDC5current
+		Integer32,
+	fuelCellDC6current
+		Integer32
+}
+
+fuelCellIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..100)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..100 of fuelCellTable"
+	::= { fuelCellEntry 1 }
+
+fuelCellStatus  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		normal (0),
+		fileSystemInitError (1),
+		rTDBInitError (2),
+		rTDBMemAllocError (3),
+		datalogMemAllocError (4),
+		versionConfigFailed (5),
+		loggerConfigError (6),
+		diagnostMemoryAllocationError (7),
+		diagnostParametersNotFound (8),
+		reserved0 (9),
+		h2StorageEmpty (10),
+		h2Sup1ValveError (11),
+		h2Sup2ValveError (12),
+		h2Sup3ValveError (13),
+		pS1ValveError (14),
+		pS2ValveError (15),
+		sT1OrPS1ValveError (16),
+		sT2OrPS2ValveError (17),
+		stack1InputValveError (18),
+		stack2InputValveError (19),
+		pWMValveError (20),
+		h2SupplyValvesError (21),
+		menuInitMemoryAllocationError (22),
+		reserved1 (23),
+		reserved2 (24),
+		uiRTDBParamNotFound (25),
+		reserved3 (26),
+		reserved4 (27),
+		pbRTDBParamNotFound (28),
+		reserved5 (29),
+		validatorMemoryAllocError (30),
+		validatorInitTooMuchItems (31),
+		validatorNotInitedCorrectly (32),
+		xMLParserInitError (33),
+		xMLParserError (34),
+		dcdcRTDBParamNotFound (35),
+		reserved6 (36),
+		funcTaskInitFails (37),
+		pbConfigurationFailed (38),
+		regulatorsConfigFailed (39),
+		pbCommunicationError (40),
+		pbFLASHError (41),
+		pbRAMError (42),
+		reserved7 (43),
+		pbValvesError (44),
+		pbSup1-2ValveError (45),
+		pbSup3-InletValveError (46),
+		pbSt1_In-PS1ValveError (47),
+		pbAux1ValveError (48),
+		pbSt2In-PS2ValveError (49),
+		pbPWM-Aux2ValveError (50),
+		pb5BarSensorError (51),
+		pb0dot5BarSensorError (52),
+		pbSafetyAlarm (53),
+		pbSafetyChainLocked (54),
+		reserved8 (55),
+		reserved9 (56),
+		uiVersionNotSupported (57),
+		pbVersionNotSupported (58),
+		dcdcVersionNotSupported (59),
+		dcdcCommunicationError (60),
+		reserved10 (61),
+		dcdc-1CommunicationError (62),
+		dcdc-2CommunicationError (63),
+		dcdc-3CommunicationError (64),
+		dcdc-4CommunicationError (65),
+		dcdc-5CommunicationError (66),
+		dcdc-6CommunicationError (67),
+		dcdcConfigError (68),
+		dcdcErrorCodeReturned (69),
+		systemLockedCallSupport (70),
+		bothStacksInBadConditions (71),
+		powerNetBootloaderError (72),
+		systemTypeNotDefined (73),
+		powerNetSettingsError (74),
+		noWorkingDCDCLeft (75),
+		reserved11 (76),
+		selfTestDCDC1-2-3TestLoadError (77),
+		reserved12 (78),
+		reserved13 (79),
+		selfTestDCDC4-5-6TestLoadError (80),
+		aUXIOMemoryAllocError (81),
+		aUXRTDBParamNotFound (82),
+		highExhaustTemperature (83),
+		reserved14 (84),
+		reserved15 (85),
+		reserved16 (86),
+		reserved17 (87),
+		timeZoneConfigError (88),
+		canNotCopyRTDBToFlash (89),
+		wrongHWorSWVersionInRTDB (90),
+		wrongRTDBInFlash (91),
+		noValidRTDBonFlashAndSDcard (92),
+		errorLoadingRTDBfromFlash (93)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The overall status of fuel cell."
+	::= { fuelCellEntry 2 }
+
+fuelCellMode  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		init (0),
+		diagnost (1),
+		standBy (2),
+		powerUp (3),
+		backUp (4),
+		powerDown (5),
+		selfTest (6),
+		override (7),
+		shutDown (8),
+		safeMode (9),
+		safeLock (10)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The mode value of fuel cell."
+	::= { fuelCellEntry 3 }
+
+fuelCellCurrentValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The output current value of fuel cell."
+	::= { fuelCellEntry 4 }
+
+fuelCellVoltageValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The input voltage value of fuel cell."
+	::= { fuelCellEntry 5 }
+
+fuelCellPowerValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The input voltage value of fuel cell."
+	::= { fuelCellEntry 6 }
+
+fuelCellType  OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE(0..27))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Type of fuel cell"
+	::= { fuelCellEntry 7 }
+
+fuelCellInletTemperature  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The inlet temp value of fuel cell."
+	::= { fuelCellEntry 8 }
+
+fuelCellOutletTemperature  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The outlet temp value of fuel cell."
+	::= { fuelCellEntry 9 }
+
+fuelCellRoomTemperature  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The room temp value of fuel cell."
+	::= { fuelCellEntry 10 }
+
+fuelCellFan  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The fan value of fuel cell."
+	::= { fuelCellEntry 11 }
+
+fuelCellH2Storage1  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		empty (0),
+		full (1)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The H2 storage 1 value of fuel cell."
+	::= { fuelCellEntry 12 }
+
+fuelCellH2Storage2  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		empty (0),
+		full (1)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The H2 storage 2 value of fuel cell."
+	::= { fuelCellEntry 13 }
+
+fuelCellH2Storage3  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		empty (0),
+		full (1)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The H2 storage 3 value of fuel cell."
+	::= { fuelCellEntry 14 }
+
+fuelCellDO22  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DO22 value of fuel cell."
+	::= { fuelCellEntry 15 }
+
+fuelCellDO23  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DO23 value of fuel cell."
+	::= { fuelCellEntry 16 }
+
+fuelCellDO24  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DO24 value of fuel cell."
+	::= { fuelCellEntry 17 }
+
+fuelCellDO25  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DO25 value of fuel cell."
+	::= { fuelCellEntry 18 }
+
+fuelCellDO26  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DO26 value of fuel cell."
+	::= { fuelCellEntry 19 }
+
+fuelCellDO27  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DO27 value of fuel cell."
+	::= { fuelCellEntry 20 }
+
+fuelCellDC1current  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DC1 current value of fuel cell."
+	::= { fuelCellEntry 21 }
+
+fuelCellDC2current  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DC2 current value of fuel cell."
+	::= { fuelCellEntry 22 }
+
+fuelCellDC3current  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DC3 current value of fuel cell."
+	::= { fuelCellEntry 23 }
+
+fuelCellDC4current  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DC4 current value of fuel cell."
+	::= { fuelCellEntry 24 }
+
+fuelCellDC5current  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DC5 current value of fuel cell."
+	::= { fuelCellEntry 25 }
+
+fuelCellDC6current  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"The DC6 current value of fuel cell."
+	::= { fuelCellEntry 26 }
+
+fuelCellsEnergyLogAccumulated  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the accumulated energy delivered from fuel cell."
+	::= { fuelCellsEnergyLog 1 }
+
+fuelCellsEnergyLogLastHoursNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in fuel cell hourly energy log."
+	::= { fuelCellsEnergyLog 2 }
+
+fuelCellsEnergyLogLastHoursTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FuelCellsEnergyLogLastHoursEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains hourly energy log of fuel cell."
+	::= { fuelCellsEnergyLog 3 }
+
+fuelCellsEnergyLogLastHoursEntry  OBJECT-TYPE
+	SYNTAX 	FuelCellsEnergyLogLastHoursEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { fuelCellsEnergyLogLastHoursIndex }
+	::= { fuelCellsEnergyLogLastHoursTable 1 }
+
+FuelCellsEnergyLogLastHoursEntry ::= SEQUENCE {
+	fuelCellsEnergyLogLastHoursIndex
+		Integer32,
+	fuelCellsEnergyLogLastHoursValue
+		Integer32
+}
+
+fuelCellsEnergyLogLastHoursIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52 of fuelCellsEnergyLogLastHoursTable"
+	::= { fuelCellsEnergyLogLastHoursEntry 1 }
+
+fuelCellsEnergyLogLastHoursValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Energy value logged every hour."
+	::= { fuelCellsEnergyLogLastHoursEntry 2 }
+
+fuelCellsEnergyLogLastDaysNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in fuel cell daily energy log."
+	::= { fuelCellsEnergyLog 4 }
+
+fuelCellsEnergyLogLastDaysTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FuelCellsEnergyLogLastDaysEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains daily energy log of fuel cell."
+	::= { fuelCellsEnergyLog 5 }
+
+fuelCellsEnergyLogLastDaysEntry  OBJECT-TYPE
+	SYNTAX 	FuelCellsEnergyLogLastDaysEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { fuelCellsEnergyLogLastDaysIndex }
+	::= { fuelCellsEnergyLogLastDaysTable 1 }
+
+FuelCellsEnergyLogLastDaysEntry ::= SEQUENCE {
+	fuelCellsEnergyLogLastDaysIndex
+		Integer32,
+	fuelCellsEnergyLogLastDaysValue
+		Integer32
+}
+
+fuelCellsEnergyLogLastDaysIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52 of fuelCellsEnergyLogLastDaysTable"
+	::= { fuelCellsEnergyLogLastDaysEntry 1 }
+
+fuelCellsEnergyLogLastDaysValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Energy value logged every day."
+	::= { fuelCellsEnergyLogLastDaysEntry 2 }
+
+fuelCellsEnergyLogLastWeeksNumberOfEntries  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"This is the maximal number of entries stored in fuel cell weekly energy log."
+	::= { fuelCellsEnergyLog 6 }
+
+fuelCellsEnergyLogLastWeeksTable  OBJECT-TYPE
+	SYNTAX SEQUENCE OF FuelCellsEnergyLogLastWeeksEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"This table contains weekly energy log of fuel cell."
+	::= { fuelCellsEnergyLog 7 }
+
+fuelCellsEnergyLogLastWeeksEntry  OBJECT-TYPE
+	SYNTAX 	FuelCellsEnergyLogLastWeeksEntry
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		""
+	INDEX { fuelCellsEnergyLogLastWeeksIndex }
+	::= { fuelCellsEnergyLogLastWeeksTable 1 }
+
+FuelCellsEnergyLogLastWeeksEntry ::= SEQUENCE {
+	fuelCellsEnergyLogLastWeeksIndex
+		Integer32,
+	fuelCellsEnergyLogLastWeeksValue
+		Integer32
+}
+
+fuelCellsEnergyLogLastWeeksIndex  OBJECT-TYPE
+	SYNTAX     Integer32 (1..52)
+	MAX-ACCESS not-accessible
+	STATUS     current
+	DESCRIPTION 
+		"Index used for navigating the rows 1..52 of fuelCellsEnergyLogLastWeekTable"
+	::= { fuelCellsEnergyLogLastWeeksEntry 1 }
+
+fuelCellsEnergyLogLastWeeksValue  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Energy value logged every week."
+	::= { fuelCellsEnergyLogLastWeeksEntry 2 }
+
+fuelCellsReset  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		pushbutton (0),
+		reset (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { fuelCells 8 }
+
+fuelCellsUnlock  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		pushbutton (0),
+		unlock (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { fuelCells 9 }
+
+fuelCellsSelfTest  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		pushbutton (0),
+		selfTest (1)
+	}
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		""
+	::= { fuelCells 10 }
 
 powerSystemTrapsGroup  NOTIFICATION-GROUP
 	NOTIFICATIONS { alarmBatteryTrap, 
 		alarmControlSystemTrap, 
 		alarmDcDcTrap, 
 		alarmGeneratorTrap, 
-		alarmGridInverterTrap, 
 		alarmInputsTrap, 
 		alarmInverterTrap, 
 		alarmLoadGroupTrap, 
@@ -19457,7 +21241,9 @@ powerSystemTrapsGroup  NOTIFICATION-GROUP
 		alarmRectifierTrap, 
 		alarmRectiverterTrap, 
 		alarmSolarChargerTrap, 
-		alarmWindChargerTrap }
+		alarmWindChargerTrap, 
+		infoBatteryTestTrap, 
+		alarmFuelCellTrap }
 	STATUS     current
 	DESCRIPTION 
 		"The powerSystem Trap goup. Entry point for the trap list."

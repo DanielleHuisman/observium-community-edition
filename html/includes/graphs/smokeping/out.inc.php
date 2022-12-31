@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -46,11 +45,10 @@ $target=$dest['hostname'];
 if($config['smokeping']['suffix']) $target = str_replace($config['smokeping']['suffix'],"",$target);
 if($config['smokeping']['split_char']) $target = str_replace(".", $config['smokeping']['split_char'],$target);
 
-if (isset($config['smokeping']['master_hostname']))
-{
+if (isset($config['smokeping']['master_hostname'])) {
   $master_hostname = $config['smokeping']['master_hostname'];
 } else {
-  $master_hostname = $config['own_hostname'];
+  $master_hostname = $config['own_hostname'] ?: get_localhost();
 }
 
 foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($config['smokeping']['dir'])) as $filename_dir)

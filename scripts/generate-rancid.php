@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage scripts
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -107,7 +107,7 @@ if (!isset($options['a'])) {
   $params[] = $config['poller_id'];
 }
 // Limit devices with rancid supported os
-$where .= generate_query_values(array_keys($os_maps), 'os');
+$where .= generate_query_values_and(array_keys($os_maps), 'os');
 $sql = "SELECT `hostname`, `os`, `version`, `hardware`, `disabled`, `status` FROM `devices` " . $where . " ORDER BY `hostname`";
 foreach (dbFetchRows($sql, $params) as $device) {
   // rancid_device_blacklist or rancid_host_blacklist??

@@ -26,8 +26,7 @@ $query_limit = 8; // Limit per query
 $vars = get_vars([ 'POST', 'GET' ]);
 
 // Is there a POST/GET query string?
-if (isset($vars['queryString']))
-{
+if (isset($vars['queryString'])) {
   $queryString = trim($vars['queryString']);
 
   // Is the string length greater than 0?

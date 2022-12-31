@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -21,8 +21,8 @@ register_html_resource('js', 'gridstack.all.js');
 register_html_resource('js', 'leaflet.js');
 // IE (pre Edge) js fetch fix
 $ua = detect_browser();
-if ($ua['browser'] == 'MSIE' ||
-    ($ua['browser'] == 'Firefox' && version_compare($ua['version'], '61', '<'))) // Also for FF ESR60 and older
+if ($ua['browser'] === 'MSIE' ||
+    ($ua['browser'] === 'Firefox' && version_compare($ua['version'], '61', '<'))) // Also for FF ESR60 and older
 {
   register_html_resource('js', 'js/compat/bluebird.min.js');
   register_html_resource('js', 'js/compat/fetch.js');
@@ -331,7 +331,7 @@ if (is_array($dashboard))
             refreshAllUpdatableImages = function () {
 
                 // Add or replace nocache parameter on image src and then rewrite the image.
-                var pt = /\&nocache=.+/;
+                var pt = /\&nocache=\d+/;
 
                 $('.image-refresh').each(function () {
                     if (this.src) {
@@ -642,9 +642,14 @@ if (is_array($dashboard))
 
   <?php
 
-  if ($_SESSION['userlevel'] > 7)
-  {
-    if(isset($vars['edit'])) { $url = generate_url($vars, array('edit' => NULL)); $text = "Enable Editing Mode"; } else { $url = generate_url($vars, array('edit' => 'yes')); $text = "Disable Editing Mode"; }
+  if ($_SESSION['userlevel'] > 7) {
+    if (isset($vars['edit'])) {
+      $url = generate_url($vars, array('edit' => NULL));
+      $text = "Enable Editing Mode";
+    } else {
+      $url = generate_url($vars, array('edit' => 'yes'));
+      $text = "Disable Editing Mode";
+    }
 
     $footer_entry = '<li><a href="' .$url. '"><i class="sprite-sliders"></i></a></li>';
     $footer_entries[] = $footer_entry;
@@ -652,9 +657,7 @@ if (is_array($dashboard))
 
 
 
-}
-else
-{
+} else {
   print_error('Dashboard does not exist!');
 }
 

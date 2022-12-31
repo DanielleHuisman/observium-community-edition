@@ -1284,33 +1284,33 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
   public function providerCalculateMempoolProperties()
   {
     $results = array(
-      array(  1, 123456789, 234567890, NULL, NULL, array('used' => 123456789,  'total' => 234567890,   'free' => 111111101,  'perc' => 52.63, 'units' => 1,   'scale' => 1)), // Used + Total known
-      array( 10, 123456789, 234567890, NULL, NULL, array('used' => 1234567890, 'total' => 2345678900,  'free' => 1111111010, 'perc' => 52.63, 'units' => 10,  'scale' => 10)), // Used + Total known, scale factor 10
-      array(0.5, 123456789, 234567890, NULL, NULL, array('used' => 61728394.5, 'total' => 117283945.0, 'free' => 55555550.5, 'perc' => 52.63, 'units' => 0.5, 'scale' => 0.5)), // Used + Total known, scale factor 0.5
+      array(  1, 123456789, 234567890, NULL, NULL, array('used' => 123456789,  'total' => 234567890,   'free' => 111111101,  'perc' => 52.63, 'units' => 1,   'scale' => 1,   'valid' => TRUE)), // Used + Total known
+      array( 10, 123456789, 234567890, NULL, NULL, array('used' => 1234567890, 'total' => 2345678900,  'free' => 1111111010, 'perc' => 52.63, 'units' => 10,  'scale' => 10,  'valid' => TRUE)), // Used + Total known, scale factor 10
+      array(0.5, 123456789, 234567890, NULL, NULL, array('used' => 61728394.5, 'total' => 117283945.0, 'free' => 55555550.5, 'perc' => 52.63, 'units' => 0.5, 'scale' => 0.5, 'valid' => TRUE)), // Used + Total known, scale factor 0.5
 
-      array(  1, NULL, 1234567890, 1597590, NULL, array('used' => 1232970300,   'total' => 1234567890,   'free' => 1597590,   'perc' => 99.87, 'units' => 1,   'scale' => 1)), // Total + Free known
-      array(100, NULL, 1234567890, 1597590, NULL, array('used' => 123297030000, 'total' => 123456789000, 'free' => 159759000, 'perc' => 99.87, 'units' => 100, 'scale' => 100)), // Total + Free known, scale factor 10
-      array(0.5, NULL, 1234567890, 1597590, NULL, array('used' => 616485150.0,  'total' => 617283945.0,  'free' => 798795.0,  'perc' => 99.87, 'units' => 0.5, 'scale' => 0.5)), // Total + Free known, scale factor 0.5
+      array(  1, NULL, 1234567890, 1597590, NULL, array('used' => 1232970300,   'total' => 1234567890,   'free' => 1597590,   'perc' => 99.87, 'units' => 1,   'scale' => 1,   'valid' => TRUE)), // Total + Free known
+      array(100, NULL, 1234567890, 1597590, NULL, array('used' => 123297030000, 'total' => 123456789000, 'free' => 159759000, 'perc' => 99.87, 'units' => 100, 'scale' => 100, 'valid' => TRUE)), // Total + Free known, scale factor 10
+      array(0.5, NULL, 1234567890, 1597590, NULL, array('used' => 616485150.0,  'total' => 617283945.0,  'free' => 798795.0,  'perc' => 99.87, 'units' => 0.5, 'scale' => 0.5, 'valid' => TRUE)), // Total + Free known, scale factor 0.5
 
-      array(  1, 13333337, 23333337, 10000000, NULL, array('used' => 13333337,  'total' => 23333337,   'free' => 10000000,    'perc' => 57.14, 'units' => 1,   'scale' => 1)), // All known
-      array( 10, 13333337, 23333337, 10000000, NULL, array('used' => 133333370, 'total' => 233333370,  'free' => 100000000,   'perc' => 57.14, 'units' => 10,  'scale' => 10)), // All known, scale factor 10
-      array(0.5, 13333337, 23333337, 10000000, NULL, array('used' => 6666668.5, 'total' => 11666668.5, 'free' => 5000000.0,   'perc' => 57.14, 'units' => 0.5, 'scale' => 0.5)), // All known, scale factor 0.5
+      array(  1, 13333337, 23333337, 10000000, NULL, array('used' => 13333337,  'total' => 23333337,   'free' => 10000000,    'perc' => 57.14, 'units' => 1,   'scale' => 1,   'valid' => TRUE)), // All known
+      array( 10, 13333337, 23333337, 10000000, NULL, array('used' => 133333370, 'total' => 233333370,  'free' => 100000000,   'perc' => 57.14, 'units' => 10,  'scale' => 10,  'valid' => TRUE)), // All known, scale factor 10
+      array(0.5, 13333337, 23333337, 10000000, NULL, array('used' => 6666668.5, 'total' => 11666668.5, 'free' => 5000000.0,   'perc' => 57.14, 'units' => 0.5, 'scale' => 0.5, 'valid' => TRUE)), // All known, scale factor 0.5
 
-      array(  1, 123456789, NULL, 163840, NULL, array('used' => 123456789,   'total' => 123620629,   'free' => 163840,        'perc' => 99.87, 'units' => 1,   'scale' => 1)), // Used + Free known
-      array(100, 123456789, NULL, 163840, NULL, array('used' => 12345678900, 'total' => 12362062900, 'free' => 16384000,      'perc' => 99.87, 'units' => 100, 'scale' => 100)), // Used + Free known, scale factor 100
-      array(0.5, 123456789, NULL, 163840, NULL, array('used' => 61728394.5,  'total' => 61810314.5,  'free' => 81920.0,       'perc' => 99.87, 'units' => 0.5, 'scale' => 0.5)), // Used + Free known, scale factor 0.5
+      array(  1, 123456789, NULL, 163840, NULL, array('used' => 123456789,   'total' => 123620629,   'free' => 163840,        'perc' => 99.87, 'units' => 1,   'scale' => 1,   'valid' => TRUE)), // Used + Free known
+      array(100, 123456789, NULL, 163840, NULL, array('used' => 12345678900, 'total' => 12362062900, 'free' => 16384000,      'perc' => 99.87, 'units' => 100, 'scale' => 100, 'valid' => TRUE)), // Used + Free known, scale factor 100
+      array(0.5, 123456789, NULL, 163840, NULL, array('used' => 61728394.5,  'total' => 61810314.5,  'free' => 81920.0,       'perc' => 99.87, 'units' => 0.5, 'scale' => 0.5, 'valid' => TRUE)), // Used + Free known, scale factor 0.5
 
-      array(   1, NULL, 600000000, NULL, 30, array('used' => 180000000,    'total' => 600000000,    'free' => 420000000,      'perc' => 30, 'units' => 1,   'scale' => 1)),    // Total + Percentage known
-      array(1000, NULL, 600000000, NULL, 30, array('used' => 180000000000, 'total' => 600000000000, 'free' => 420000000000,   'perc' => 30, 'units' => 1000, 'scale' => 1000)),    // Total + Percentage known, scale factor 1000
-      array( 0.5, NULL, 600000000, NULL, 30, array('used' => 90000000.0,   'total' => 300000000.0,  'free' => 210000000.0,    'perc' => 30, 'units' => 0.5, 'scale' => 0.5)),    // Total + Percentage known, scale factor 0.5
+      array(   1, NULL, 600000000, NULL, 30, array('used' => 180000000,    'total' => 600000000,    'free' => 420000000,      'perc' => 30, 'units' => 1,    'scale' => 1,    'valid' => TRUE)),    // Total + Percentage known
+      array(1000, NULL, 600000000, NULL, 30, array('used' => 180000000000, 'total' => 600000000000, 'free' => 420000000000,   'perc' => 30, 'units' => 1000, 'scale' => 1000, 'valid' => TRUE)),    // Total + Percentage known, scale factor 1000
+      array( 0.5, NULL, 600000000, NULL, 30, array('used' => 90000000.0,   'total' => 300000000.0,  'free' => 210000000.0,    'perc' => 30, 'units' => 0.5,  'scale' => 0.5,  'valid' => TRUE)),    // Total + Percentage known, scale factor 0.5
 
-      array(  1, 1597590, 1234567890, NULL, NULL, array('used' => 1597590,  'total' => 1234567890,  'free' => 1232970300,     'perc' => 0.13, 'units' => 1,   'scale' => 1)),  // Used + Total known
-      array( 10, 1597590, 1234567890, NULL, NULL, array('used' => 15975900, 'total' => 12345678900, 'free' => 12329703000,    'perc' => 0.13, 'units' => 10,  'scale' => 10)),  // Used + Total known, scale factor 10
-      array(0.5, 1597590, 1234567890, NULL, NULL, array('used' => 798795.0, 'total' => 617283945.0, 'free' => 616485150.0,    'perc' => 0.13, 'units' => 0.5, 'scale' => 0.5)),  // Used + Total known, scale factor 0.5
+      array(  1, 1597590, 1234567890, NULL, NULL, array('used' => 1597590,  'total' => 1234567890,  'free' => 1232970300,     'perc' => 0.13, 'units' => 1,   'scale' => 1,   'valid' => TRUE)),  // Used + Total known
+      array( 10, 1597590, 1234567890, NULL, NULL, array('used' => 15975900, 'total' => 12345678900, 'free' => 12329703000,    'perc' => 0.13, 'units' => 10,  'scale' => 10,  'valid' => TRUE)),  // Used + Total known, scale factor 10
+      array(0.5, 1597590, 1234567890, NULL, NULL, array('used' => 798795.0, 'total' => 617283945.0, 'free' => 616485150.0,    'perc' => 0.13, 'units' => 0.5, 'scale' => 0.5, 'valid' => TRUE)),  // Used + Total known, scale factor 0.5
 
-      array(  1, NULL, NULL, NULL, 57, array('used' => 57, 'total' => 100, 'free' => 43, 'perc' => 57, 'units' => 1,   'scale' => 1)),    // Only percentage known
-      array( 40, NULL, NULL, NULL, 23, array('used' => 23, 'total' => 100, 'free' => 77, 'perc' => 23, 'units' => 40,  'scale' => 40)),   // Only percentage known, scale factor 40
-      array(0.1, NULL, NULL, NULL, 16, array('used' => 16, 'total' => 100, 'free' => 84, 'perc' => 16, 'units' => 0.1, 'scale' => 0.1)),  // Only percentage known, scale factor 0.1
+      array(  1, NULL, NULL, NULL, 57, array('used' => 57, 'total' => 100, 'free' => 43, 'perc' => 57, 'units' => 1,   'scale' => 1,   'valid' => TRUE)),    // Only percentage known
+      array( 40, NULL, NULL, NULL, 23, array('used' => 23, 'total' => 100, 'free' => 77, 'perc' => 23, 'units' => 40,  'scale' => 40,  'valid' => TRUE)),   // Only percentage known, scale factor 40
+      array(0.1, NULL, NULL, NULL, 16, array('used' => 16, 'total' => 100, 'free' => 84, 'perc' => 16, 'units' => 0.1, 'scale' => 0.1, 'valid' => TRUE)),  // Only percentage known, scale factor 0.1
     );
     return $results;
   }
@@ -1331,13 +1331,13 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     $scale3 = array('scale_free'  => 4096);
 
     $results = array(
-      array(  1, 123456789, 234567890, NULL, NULL, $scale1, array('used' => 123456789,    'total' => 240197519360,  'free' => 240074062571,  'perc' =>     0.05, 'units' => 1,   'scale' => 1)),   // Used + Total known
-      array( 10, 123456789, 234567890, NULL, NULL, $scale2, array('used' => 252839503872, 'total' => 2345678900,    'free' => -250493824972, 'perc' => 10778.95, 'units' => 10,  'scale' => 10)),  // Used + Total known, scale factor 10
-      array(0.5, 123456789, 234567890, NULL, NULL, $scale3, array('used' => 61728394.5,   'total' => 117283945.0,   'free' => 55555550.5,    'perc' =>    52.63, 'units' => 0.5, 'scale' => 0.5)), // Used + Total known, scale factor 0.5
+      array(  1, 123456789, 234567890, NULL, NULL, $scale1, array('used' => 123456789,    'total' => 240197519360,  'free' => 240074062571,  'perc' =>     0.05, 'units' => 1,   'scale' => 1, 'valid' => TRUE)),   // Used + Total known
+      array( 10, 123456789, 234567890, NULL, NULL, $scale2, array('used' => 252839503872, 'total' => 2345678900,    'free' => -250493824972, 'perc' => 10778.95, 'units' => 10,  'scale' => 10, 'valid' => FALSE)),  // Used + Total known, scale factor 10
+      array(0.5, 123456789, 234567890, NULL, NULL, $scale3, array('used' => 61728394.5,   'total' => 117283945.0,   'free' => 55555550.5,    'perc' =>    52.63, 'units' => 0.5, 'scale' => 0.5, 'valid' => TRUE)), // Used + Total known, scale factor 0.5
 
-      array(  1, NULL, 1234567890, 1597590, NULL, $scale1, array('used' => 1264195921770, 'total' => 1264197519360, 'free' => 1597590,       'perc' =>    100.0, 'units' => 1,   'scale' => 1)),   // Total + Free known
-      array(100, NULL, 1234567890, 1597590, NULL, $scale2, array('used' => 123297030000,  'total' => 123456789000,  'free' => 159759000,     'perc' =>    99.87, 'units' => 100, 'scale' => 100)), // Total + Free known, scale factor 10
-      array(0.5, NULL, 1234567890, 1597590, NULL, $scale3, array('used' => -5926444695.0, 'total' => 617283945.0,   'free' => 6543728640,    'perc' =>  -960.08, 'units' => 0.5, 'scale' => 0.5)), // Total + Free known, scale factor 0.5
+      array(  1, NULL, 1234567890, 1597590, NULL, $scale1, array('used' => 1264195921770, 'total' => 1264197519360, 'free' => 1597590,       'perc' =>    100.0, 'units' => 1,   'scale' => 1, 'valid' => TRUE)),   // Total + Free known
+      array(100, NULL, 1234567890, 1597590, NULL, $scale2, array('used' => 123297030000,  'total' => 123456789000,  'free' => 159759000,     'perc' =>    99.87, 'units' => 100, 'scale' => 100, 'valid' => TRUE)), // Total + Free known, scale factor 10
+      array(0.5, NULL, 1234567890, 1597590, NULL, $scale3, array('used' => -5926444695.0, 'total' => 617283945.0,   'free' => 6543728640,    'perc' =>  -960.08, 'units' => 0.5, 'scale' => 0.5, 'valid' => FALSE)), // Total + Free known, scale factor 0.5
     );
     return $results;
   }

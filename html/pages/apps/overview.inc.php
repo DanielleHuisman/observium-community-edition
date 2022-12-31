@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -21,7 +20,7 @@ $graph_array_zoom['height'] = "150";
 $graph_array_zoom['width']  = "400";
 $graph_array['legend']      = "no";
 
-foreach (dbFetchRows("SELECT * FROM `applications` WHERE 1 ".generate_query_values(array_keys($app_types), 'app_type').$GLOBALS['cache']['where']['devices_permitted'].' ORDER BY `app_type`;') as $app)
+foreach (dbFetchRows("SELECT * FROM `applications` WHERE 1 ".generate_query_values_and(array_keys((array)$app_types), 'app_type').$GLOBALS['cache']['where']['devices_permitted'].' ORDER BY `app_type`;') as $app)
 {
   if (isset($cache['devices']['id'][$app['device_id']]))
   {

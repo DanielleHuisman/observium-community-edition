@@ -11,10 +11,10 @@
  */
 
 //if ($_SESSION['permissions'] < '5')
-if ($_SESSION['userlevel'] < '5') {
-  print_error_permission();
-  return;
-}
+//if ($_SESSION['userlevel'] < '5') {
+//  print_error_permission();
+//  return;
+//}
 
 $form_items = [];
 $form_limit = 250; // Limit count for multiselect (use input instead)
@@ -244,9 +244,6 @@ foreach ($types as $option => $text) {
   $navbar['brand'] = "BGP";
   print_navbar($navbar);
   unset($navbar);
-
-  // Pagination
-  $vars['pagination'] = TRUE;
 
   //r($cache['bgp']);
   print_bgp_peer_table($vars);

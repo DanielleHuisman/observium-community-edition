@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -48,7 +48,8 @@ if (preg_match('/^(?:(?<both>\d+)|(?<ipv6>[\d\:abcdef]+)|(?<ipv4>[\d\.]+))$/i', 
   $results = array();
 }
 
-if (safe_count($results)) {
+if (!safe_empty($results)) {
+  $max_len = 35;
   foreach ($results as $result)
   {
     $port = get_port_by_id_cache($result['port_id']);
@@ -60,18 +61,23 @@ if (safe_count($results)) {
     $name = $result['ip_address'].'/'.$result['ip_prefixlen'];
     if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
 
+    $device_name = truncate($device['hostname'], $max_len);
+    if ($device['hostname'] != $device['sysName'] && $device['sysName']) {
+      $device_name .= ' | ' . truncate($device['sysName'], $max_len);
+    }
+
     $tab_colour = '#194B7F'; // FIXME: This colour pulled from functions.inc.php humanize_device, maybe set it centrally in definitions?
 
     $view = str_contains($result['ip_address'], '.') ? 'ipv4' : 'ipv6';
-    $ip_search_results[] = array(
+    $ip_search_results[] = [
       'url'    => $port ? generate_port_url($port) : generate_device_url($device, [ 'tab' => 'ports', 'view' => $view ]),
       'name'   => $name,
       'colour' => $tab_colour,
       'icon'   => $config['icon'][$view],
-      'data'   => array(
-        '| ' . escape_html($device['hostname']),
-        escape_html($descr)),
-    );
+      'data'   => [
+        '| ' . escape_html($device_name),
+        escape_html($descr) ],
+    ];
 
   }
 
@@ -79,7 +85,7 @@ if (safe_count($results)) {
   // Counter data came from: foreach ($results as $result) {$addr_ports[$result['port_id']][] = $result; }
   // echo('<li class="nav-header">IPs found: '.count($results).' (on '.count($addr_ports).' ports)</li>');
 
-  $search_results['ip-addresses'] = array('descr' => 'IPs found', 'results' => $ip_search_results);
+  $search_results['ip-addresses'] = [ 'descr' => 'IPs found', 'results' => $ip_search_results ];
 }
 
 // EOF

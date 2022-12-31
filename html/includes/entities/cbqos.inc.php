@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -28,21 +28,21 @@ function build_cbqos_query($vars)
     switch ($var) {
       case "policy_name":
       case "object_name":
-        $sql .= generate_query_values($value, $var);
+        $sql .= generate_query_values_and($value, $var);
         break;
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'cbqos_id');
+        $sql .= generate_query_values_and($values, 'cbqos_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'ports_cbqos.device_id');
+        $sql .= generate_query_values_and($values, 'ports_cbqos.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'ports_cbqos.device_id');
+        $sql .= generate_query_values_and($value, 'ports_cbqos.device_id');
         break;
     }
   }

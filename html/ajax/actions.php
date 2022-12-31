@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage ajax
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -235,13 +235,18 @@ switch ($vars['action']) {
       exit();
     }
 
-    $widget                  = dbFetchRow("SELECT * FROM `dash_widgets` WHERE widget_id = ?", array($vars['widget_id']));
+    $widget                  = dbFetchRow("SELECT * FROM `dash_widgets` WHERE `widget_id` = ?", array($vars['widget_id']));
     $widget['widget_config'] = safe_json_decode($widget['widget_config']);
 
     // Verify config value applies to this widget here
 
+    $default_on = [ 'legend' ];
+
     if (isset($vars['config_field']) && isset($vars['config_value'])) {
-      if (empty($vars['config_value'])) {
+      if ( empty($vars['config_value']) ||
+           (in_array($vars['config_field'], $default_on) && get_var_true($vars['config_value'])) ||
+           (!in_array($vars['config_field'], $default_on) && get_var_false($vars['config_value'])) ) {
+        // Just unset the value if it's empty or it's a default value.
         unset($widget['widget_config'][$vars['config_field']]);
       } else {
         $widget['widget_config'][$vars['config_field']] = $vars['config_value'];
@@ -265,7 +270,7 @@ switch ($vars['action']) {
     // Validate CSRF Token
     //r($vars);
     $json = '';
-    if (!str_contains_array($vars['action'], [ 'widget', 'dash' ]) && // widget & dashboard currently not send request token
+    if (!str_contains_array($vars['action'], [ 'widget', 'dash', 'settings_user' ]) && // widget & dashboard currently not send request token
         !request_token_valid($vars, $json)) {
       $json = safe_json_decode($json);
       $json['reload'] = TRUE;

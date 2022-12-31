@@ -16,6 +16,8 @@ $graph_return['valid_options'][] = "previous";
 $graph_return['valid_options'][] = "total";
 $graph_return['valid_options'][] = "trend";
 
+$graph_return['legend_lines'] = 0;
+
 // Here we scale the number of numerical columns shown to make sure we keep the text.
 
 if ($width > 600) {
@@ -74,6 +76,9 @@ if ($legend != 'no')
   if (in_array("max", $data_show)) { $rrd_options .= " COMMENT:'    Max'"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " COMMENT:'  Total'"; }
   $rrd_options .= " COMMENT:'\\l'";
+
+  $graph_return['legend_lines']++;
+
 }
 
 $i = 0;
@@ -150,18 +155,20 @@ foreach ($rrd_list as $rrd)
   if (in_array("min", $data_show)) { $rrd_options .= " GPRINT:inbits".$i.":MIN:%6.2lf%s"; }
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:inbits".$i.":MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totinB".$i.":%6.2lf%s".$total_units; }
-
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
+
+
   $rrd_optionsb .= " AREA:outbits".$i."_neg#" . $colour_out . ":".$stack;
   $rrd_options .= "  HRULE:999999999999999#" . $colour_out . ":'" . rrdtool_escape($rrd['descr_out'], $descr_len - 3) . " Tx'";
-
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:outbits".$i.":LAST:%6.2lf%s"; }
   if (in_array("avg", $data_show)) { $rrd_options .= " GPRINT:outbits".$i.":AVERAGE:%6.2lf%s"; }
   if (in_array("min", $data_show)) { $rrd_options .= " GPRINT:outbits".$i.":MIN:%6.2lf%s"; }
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:outbits".$i.":MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totoutB".$i.":%6.2lf%s".$total_units; }
-
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
+
   $i++; $iter++;
 }
 
@@ -208,6 +215,7 @@ if (in_array("tot", $data_show))
   $rrd_options .= " VDEF:tot=octets,TOTAL";
 
   $rrd_options .= " COMMENT:' \\l'";
+  $graph_return['legend_lines']++;
 
   $rrd_options .= "  HRULE:999999999999999#FFFFFF:'" . rrdtool_escape("Total", $descr_len - 3) . " Rx'";
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:inbits:LAST:%6.2lf%s"; }
@@ -216,6 +224,7 @@ if (in_array("tot", $data_show))
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:inbits:MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totin:%6.2lf%s".$total_units; }
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
 
   $rrd_options .= "  HRULE:999999999999999#FFFFFF:'" . rrdtool_escape("", $descr_len - 3) . " Tx'";
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:outbits:LAST:%6.2lf%s"; }
@@ -224,6 +233,7 @@ if (in_array("tot", $data_show))
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:outbits:MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totout:%6.2lf%s".$total_units; }
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
 
   $rrd_options .= "  HRULE:999999999999999#FFFFFF:'" . rrdtool_escape("", $descr_len - 4) . " Agg'";
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:bits:LAST:%6.2lf%s"; }
@@ -232,6 +242,7 @@ if (in_array("tot", $data_show))
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:bits:MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:tot:%6.2lf%s".$total_units; }
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
 
   if ($vars['trend'])
   {
@@ -251,6 +262,7 @@ if (in_array("tot", $data_show) && $vars['previous'] == "yes")
   $rrd_options .= " VDEF:totoutX=outBX,TOTAL";
   $rrd_options .= " VDEF:totX=octetsX,TOTAL";
   $rrd_options .= " COMMENT:' \\l'";
+  $graph_return['legend_lines']++;
 
   $rrd_options .= "  HRULE:999999999999999#AAAAAA:'" . rrdtool_escape("Prev Total", $descr_len - 3) . " Rx'";
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:inbitsX:LAST:%6.2lf%s"; }
@@ -259,6 +271,7 @@ if (in_array("tot", $data_show) && $vars['previous'] == "yes")
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:inbitsX:MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totinX:%6.2lf%s".$total_units; }
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
 
   $rrd_options .= "  HRULE:999999999999999#AAAAAA:'" . rrdtool_escape("", $descr_len - 3) . " Tx'";
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:outbitsX:LAST:%6.2lf%s"; }
@@ -267,6 +280,7 @@ if (in_array("tot", $data_show) && $vars['previous'] == "yes")
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:outbitsX:MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totoutX:%6.2lf%s".$total_units; }
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
 
   $rrd_options .= "  HRULE:999999999999999#AAAAAA:'" . rrdtool_escape("", $descr_len - 4) . " Agg'";
   if (in_array("lst", $data_show)) { $rrd_options .= " GPRINT:bitsX:LAST:%6.2lf%s"; }
@@ -275,6 +289,7 @@ if (in_array("tot", $data_show) && $vars['previous'] == "yes")
   if (in_array("max", $data_show)) { $rrd_options .= " GPRINT:bitsX:MAX:%6.2lf%s"; }
   if (in_array("tot", $data_show)) { $rrd_options .= " GPRINT:totX:%6.2lf%s".$total_units; }
   $rrd_options .= " COMMENT:'\\l'";
+  $graph_return['legend_lines']++;
 
 }
 

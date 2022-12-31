@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -39,11 +39,11 @@ $form['row'][0]['device_id'] = array(
                               'values'      => $form_items['devices']);
 
 // Add device_id limit for other fields
-$query_devices = generate_query_values($form_devices, 'device_id'); // Convert NOT IN to IN for correctly use indexes
+$query_devices = generate_query_values_and($form_devices, 'device_id'); // Convert NOT IN to IN for correctly use indexes
 if (isset($vars['device_id']))
 {
-  $query_devices .= generate_query_values($vars['device_id'], 'device_id');
-  $where .= generate_query_values($vars['device_id'], 'device_id');
+  $query_devices .= generate_query_values_and($vars['device_id'], 'device_id');
+  $where .= generate_query_values_and($vars['device_id'], 'device_id');
 }
 
 // Message field

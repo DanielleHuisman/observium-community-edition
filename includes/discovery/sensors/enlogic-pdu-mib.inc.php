@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -38,7 +38,7 @@ $scale_current = 0.01;
 // ENLOGIC-PDU2-MIB::pduUnitConfigAlarmStateChangeDelay.1 = Wrong Type (should be Gauge32 or Unsigned32): INTEGER: 0
 // ENLOGIC-PDU2-MIB::pduUnitConfigEnabledThresholds.1 = BITS: 00
 
-$oids = snmpwalk_cache_oid($device, 'pduUnitStatusEntry', array(), $mib);
+$oids = snmpwalk_cache_oid($device, 'pduUnitStatusEntry', [], $mib);
 $oids = snmpwalk_cache_oid($device, 'pduUnitConfigLowerCriticalThreshold', $oids, $mib);
 $oids = snmpwalk_cache_oid($device, 'pduUnitConfigLowerWarningThreshold',  $oids, $mib);
 $oids = snmpwalk_cache_oid($device, 'pduUnitConfigUpperCriticalThreshold', $oids, $mib);
@@ -46,8 +46,7 @@ $oids = snmpwalk_cache_oid($device, 'pduUnitConfigUpperWarningThreshold',  $oids
 $oids = snmpwalk_cache_oid($device, 'pduUnitConfigEnabledThresholds',      $oids, $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
   $name     = "Unit $index";
 
   // pduUnitStatusLoadState
@@ -68,22 +67,18 @@ foreach ($oids as $index => $entry)
   //        upperWarning  (2),
   //        upperCritical (3)
   //  }
-  $options      = array();
+  $options      = [];
   $limits_flags = base_convert(str_replace(' ', '', $entry['pduUnitConfigEnabledThresholds']), 16, 10);
-  if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
-  {
+  if (is_flag_set(bindec(10000000), $limits_flags)) { // 0b 1000 0000
     $options['limit_low']       = $entry['pduUnitConfigLowerCriticalThreshold'] * $scale;
   }
-  if (is_flag_set(bindec(1000000),  $limits_flags)) // 0b 0100 0000
-  {
+  if (is_flag_set(bindec(1000000),  $limits_flags)) { // 0b 0100 0000
     $options['limit_low_warn']  = $entry['pduUnitConfigLowerWarningThreshold']  * $scale;
   }
-  if (is_flag_set(bindec(100000),   $limits_flags)) // 0b 0010 0000
-  {
+  if (is_flag_set(bindec(100000),   $limits_flags)) { // 0b 0010 0000
     $options['limit_high_warn'] = $entry['pduUnitConfigUpperWarningThreshold']  * $scale;
   }
-  if (is_flag_set(bindec(10000),    $limits_flags)) // 0b 0001 0000
-  {
+  if (is_flag_set(bindec(10000),    $limits_flags)) { // 0b 0001 0000
     $options['limit_high']      = $entry['pduUnitConfigUpperCriticalThreshold'] * $scale;
   }
 
@@ -110,8 +105,7 @@ foreach ($oids as $index => $entry)
   $oid_num  = ".1.3.6.1.4.1.38446.1.2.4.1.9.$index";
   $value    = $entry[$oid_name];
 
-  if ($value > 0)
-  {
+  if ($value > 0) {
     discover_counter($device, 'energy', $mib, $oid_name, $oid_num, $index, $descr, 1, $value);
   }
 }
@@ -136,7 +130,7 @@ $units = snmpwalk_cache_oid($device, 'pduUnitPropertiesCircuitBreakerCount',    
 $units = snmpwalk_cache_oid($device, 'pduUnitPropertiesConnExternalSensorCount', $units, $mib); // The current number of external sensors connected to the PDU
 print_debug_vars($units);
 
-$oids = snmpwalk_cache_twopart_oid($device, 'pduInputPhaseStatusEntry', array(), $mib);
+$oids = snmpwalk_cache_twopart_oid($device, 'pduInputPhaseStatusEntry', [], $mib);
 
 $oids = snmpwalk_cache_twopart_oid($device, 'pduInputPhaseConfigCurrentLowerCriticalThreshold', $oids, $mib);
 $oids = snmpwalk_cache_twopart_oid($device, 'pduInputPhaseConfigCurrentLowerWarningThreshold',  $oids, $mib);
@@ -151,10 +145,8 @@ $oids = snmpwalk_cache_twopart_oid($device, 'pduInputPhaseConfigVoltageUpperWarn
 $oids = snmpwalk_cache_twopart_oid($device, 'pduInputPhaseConfigVoltageEnabledThresholds',      $oids, $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $unit => $entry1)
-{
-  foreach ($entry1 as $phase => $entry)
-  {
+foreach ($oids as $unit => $entry1) {
+  foreach ($entry1 as $phase => $entry) {
     if ($entry['pduInputPhaseStatusCount'] < 1) { continue; } // Skip not exist phases
 
     $name     = "Unit $unit, Phase $phase Input";
@@ -187,22 +179,18 @@ foreach ($oids as $unit => $entry1)
     //        upperWarning  (2),
     //        upperCritical (3)
     //  }
-    $options      = array();
+    $options      = [];
     $limits_flags = base_convert(str_replace(' ', '', $entry['pduInputPhaseConfigCurrentEnabledThresholds']), 16, 10);
-    if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
-    {
+    if (is_flag_set(bindec(10000000), $limits_flags)) { // 0b 1000 0000
       $options['limit_low']       = $entry['pduInputPhaseConfigCurrentLowerCriticalThreshold'] * $scale_current;
     }
-    if (is_flag_set(bindec(1000000),  $limits_flags)) // 0b 0100 0000
-    {
+    if (is_flag_set(bindec(1000000),  $limits_flags)) { // 0b 0100 0000
       $options['limit_low_warn']  = $entry['pduInputPhaseConfigCurrentLowerWarningThreshold']  * $scale_current;
     }
-    if (is_flag_set(bindec(100000),   $limits_flags)) // 0b 0010 0000
-    {
+    if (is_flag_set(bindec(100000),   $limits_flags)) { // 0b 0010 0000
       $options['limit_high_warn'] = $entry['pduInputPhaseConfigCurrentUpperWarningThreshold']  * $scale_current;
     }
-    if (is_flag_set(bindec(10000),    $limits_flags)) // 0b 0001 0000
-    {
+    if (is_flag_set(bindec(10000),    $limits_flags)) { // 0b 0001 0000
       $options['limit_high']      = $entry['pduInputPhaseConfigCurrentUpperCriticalThreshold'] * $scale_current;
     }
 
@@ -223,22 +211,18 @@ foreach ($oids as $unit => $entry1)
     //        upperWarning  (2),
     //        upperCritical (3)
     //  }
-    $options      = array();
+    $options      = [];
     $limits_flags = base_convert(str_replace(' ', '', $entry['pduInputPhaseConfigVoltageEnabledThresholds']), 16, 10);
-    if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
-    {
+    if (is_flag_set(bindec(10000000), $limits_flags)) { // 0b 1000 0000
       $options['limit_low']       = $entry['pduInputPhaseConfigVoltageLowerCriticalThreshold'] * $scale;
     }
-    if (is_flag_set(bindec(1000000),  $limits_flags)) // 0b 0100 0000
-    {
+    if (is_flag_set(bindec(1000000),  $limits_flags)) { // 0b 0100 0000
       $options['limit_low_warn']  = $entry['pduInputPhaseConfigVoltageLowerWarningThreshold']  * $scale;
     }
-    if (is_flag_set(bindec(100000),   $limits_flags)) // 0b 0010 0000
-    {
+    if (is_flag_set(bindec(100000),   $limits_flags)) { // 0b 0010 0000
       $options['limit_high_warn'] = $entry['pduInputPhaseConfigVoltageUpperWarningThreshold']  * $scale;
     }
-    if (is_flag_set(bindec(10000),    $limits_flags)) // 0b 0001 0000
-    {
+    if (is_flag_set(bindec(10000),    $limits_flags)) { // 0b 0001 0000
       $options['limit_high']      = $entry['pduInputPhaseConfigVoltageUpperCriticalThreshold'] * $scale;
     }
 
@@ -279,7 +263,7 @@ foreach ($oids as $unit => $entry1)
   }
 }
 
-$oids = snmpwalk_cache_twopart_oid($device, 'pduCircuitBreakerStatusEntry', array(), $mib);
+$oids = snmpwalk_cache_twopart_oid($device, 'pduCircuitBreakerStatusEntry', [], $mib);
 
 $oids = snmpwalk_cache_twopart_oid($device, 'pduCircuitBreakerConfigLowerCriticalThreshold', $oids, $mib);
 $oids = snmpwalk_cache_twopart_oid($device, 'pduCircuitBreakerConfigLowerWarningThreshold',  $oids, $mib);
@@ -288,10 +272,8 @@ $oids = snmpwalk_cache_twopart_oid($device, 'pduCircuitBreakerConfigUpperWarning
 $oids = snmpwalk_cache_twopart_oid($device, 'pduCircuitBreakerConfigEnabledThresholds',      $oids, $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $unit => $entry1)
-{
-  foreach ($entry1 as $i => $entry)
-  {
+foreach ($oids as $unit => $entry1) {
+  foreach ($entry1 as $i => $entry) {
     if ($entry['pduCircuitBreakerStatusCount'] < 1) { continue; } // Skip not exist Circuit Breaker
 
     $name     = "Unit $unit, Circuit Breaker $i";
@@ -315,22 +297,18 @@ foreach ($oids as $unit => $entry1)
     //        upperWarning  (2),
     //        upperCritical (3)
     //  }
-    $options      = array();
+    $options      = [];
     $limits_flags = base_convert(str_replace(' ', '', $entry['pduCircuitBreakerConfigEnabledThresholds']), 16, 10);
-    if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
-    {
+    if (is_flag_set(bindec(10000000), $limits_flags)) { // 0b 1000 0000
       $options['limit_low']       = $entry['pduCircuitBreakerConfigLowerCriticalThreshold'] * $scale_current;
     }
-    if (is_flag_set(bindec(1000000),  $limits_flags)) // 0b 0100 0000
-    {
+    if (is_flag_set(bindec(1000000),  $limits_flags)) { // 0b 0100 0000
       $options['limit_low_warn']  = $entry['pduCircuitBreakerConfigLowerWarningThreshold']  * $scale_current;
     }
-    if (is_flag_set(bindec(100000),   $limits_flags)) // 0b 0010 0000
-    {
+    if (is_flag_set(bindec(100000),   $limits_flags)) { // 0b 0010 0000
       $options['limit_high_warn'] = $entry['pduCircuitBreakerConfigUpperWarningThreshold']  * $scale_current;
     }
-    if (is_flag_set(bindec(10000),    $limits_flags)) // 0b 0001 0000
-    {
+    if (is_flag_set(bindec(10000),    $limits_flags)) { // 0b 0001 0000
       $options['limit_high']      = $entry['pduCircuitBreakerConfigUpperCriticalThreshold'] * $scale_current;
     }
 
@@ -347,14 +325,13 @@ foreach ($oids as $unit => $entry1)
 
 // NOTE, next part not tested, but should be working (mike)
 $sensors_count = 0;
-foreach ($units as $entry)
-{
+foreach ($units as $entry) {
   $sensors_count += $entry['pduUnitPropertiesConnExternalSensorCount'];
 }
 
 if ($sensors_count == 0) { return; } // Skip next sensors discovery (not exist)
 
-$oids = snmpwalk_cache_twopart_oid($device, 'pduExternalSensorStatusEntry',  array(), $mib);
+$oids = snmpwalk_cache_twopart_oid($device, 'pduExternalSensorStatusEntry', [], $mib);
 
 $oids = snmpwalk_cache_twopart_oid($device, 'pduExternalSensorNamePlateType',  $oids, $mib);
 $oids = snmpwalk_cache_twopart_oid($device, 'pduExternalSensorNamePlateUnits', $oids, $mib);
@@ -366,10 +343,8 @@ $oids = snmpwalk_cache_twopart_oid($device, 'pduExternalSensorConfigUpperWarning
 $oids = snmpwalk_cache_twopart_oid($device, 'pduExternalSensorConfigEnabledThresholds',      $oids, $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $unit => $entry1)
-{
-  foreach ($entry1 as $i => $entry)
-  {
+foreach ($oids as $unit => $entry1) {
+  foreach ($entry1 as $i => $entry) {
     if ($entry['pduExternalSensorStatusState'] === 'notPresent') { continue; } // Skip not exist Sensors
 
     $name     = "Unit $unit, Sensor ".$entry['pduExternalSensorStatusName'];
@@ -394,22 +369,18 @@ foreach ($oids as $unit => $entry1)
     //        upperWarning  (2),
     //        upperCritical (3)
     //  }
-    $options      = array();
+    $options      = [];
     $limits_flags = base_convert(str_replace(' ', '', $entry['pduExternalSensorConfigEnabledThresholds']), 16, 10);
-    if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
-    {
+    if (is_flag_set(bindec(10000000), $limits_flags)) { // 0b 1000 0000
       $options['limit_low']       = $entry['pduExternalSensorConfigLowerCriticalThreshold'] * $scale;
     }
-    if (is_flag_set(bindec(1000000),  $limits_flags)) // 0b 0100 0000
-    {
+    if (is_flag_set(bindec(1000000),  $limits_flags)) { // 0b 0100 0000
       $options['limit_low_warn']  = $entry['pduExternalSensorConfigLowerWarningThreshold']  * $scale;
     }
-    if (is_flag_set(bindec(100000),   $limits_flags)) // 0b 0010 0000
-    {
+    if (is_flag_set(bindec(100000),   $limits_flags)) { // 0b 0010 0000
       $options['limit_high_warn'] = $entry['pduExternalSensorConfigUpperWarningThreshold']  * $scale;
     }
-    if (is_flag_set(bindec(10000),    $limits_flags)) // 0b 0001 0000
-    {
+    if (is_flag_set(bindec(10000),    $limits_flags)) { // 0b 0001 0000
       $options['limit_high']      = $entry['pduExternalSensorConfigUpperCriticalThreshold'] * $scale;
     }
 
@@ -427,8 +398,7 @@ foreach ($oids as $unit => $entry1)
     //        modbusAdapter (17),
     //        hidAdapter (18)
     //  }
-    switch ($entry['pduExternalSensorNamePlateType'])
-    {
+    switch ($entry['pduExternalSensorNamePlateType']) {
       case 'temperature':
       case 'humidity':
         $sensor_class = $entry['pduExternalSensorNamePlateType'];
@@ -439,13 +409,11 @@ foreach ($oids as $unit => $entry1)
       default:
         continue 2;
     }
-    if ($entry['pduExternalSensorNamePlateUnits'] === 'degreeF')
-    {
+    if ($entry['pduExternalSensorNamePlateUnits'] === 'degreeF') {
       $options['sensor_unit'] = 'F';
     }
 
-    if (isset($entry['pduExternalSensorStatusHighPrecisionValue'])) // && $entry['pduExternalSensorStatusHighPrecisionValue'] > 0)
-    {
+    if (isset($entry['pduExternalSensorStatusHighPrecisionValue'])) { // && $entry['pduExternalSensorStatusHighPrecisionValue'] > 0)
       $scale = 0.1;
       $oid_name = 'pduExternalSensorStatusHighPrecisionValue';
       $oid_num  = ".1.3.6.1.4.1.38446.1.6.4.1.8.$index";

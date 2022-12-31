@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -15,25 +14,19 @@
 //AXIS-VIDEO-MIB::tempSensorStatus.common.2 = INTEGER: ok(1)
 //AXIS-VIDEO-MIB::tempSensorValue.common.1 = INTEGER: 26
 //AXIS-VIDEO-MIB::tempSensorValue.common.2 = INTEGER: 32
-//AXIS-VIDEO-MIB::storageName.1 = STRING: SD_DISK
-//AXIS-VIDEO-MIB::storageName.2 = STRING: NetworkShare
-//AXIS-VIDEO-MIB::storageDisruptionDetected.1 = INTEGER: no(1)
-//AXIS-VIDEO-MIB::storageDisruptionDetected.2 = INTEGER: yes(2)
 
 $mib = 'AXIS-VIDEO-MIB';
 
 // Temperature Sensor
-$oids = snmpwalk_cache_oid($device, 'tempSensorEntry', array(), $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$oids = snmpwalk_cache_oid($device, 'tempSensorEntry', [], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 print_debug_vars($oids);
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
   //if ($entry['tempSensorStatus'] == 'failure') { continue; } // ok(1), failure(2), outOfBoundary(3)
 
   // common(1), housing(2), rack(3), cpu(4)
   list($tempSensorType, $tempSensorId) = explode('.', $index);
-  switch ($tempSensorType)
-  {
+  switch ($tempSensorType) {
     case '1':
       $descr = 'System temperature';
       break;
@@ -49,8 +42,7 @@ foreach ($oids as $index => $entry)
     default:
       $descr = 'Temperature';
   }
-  if (count($oids) > 1)
-  {
+  if (count($oids) > 1) {
     $descr .= ' ' . $tempSensorId;
   }
 
@@ -69,19 +61,17 @@ foreach ($oids as $index => $entry)
   $type     = 'axisStatus';
   $value    = $entry[$oid_name];
 
-  discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'other'));
+  discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, [ 'entPhysicalClass' => 'other' ]);
 }
 
 // Fan Sensor
-$oids = snmpwalk_cache_oid($device, 'fanEntry', array(), $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$oids = snmpwalk_cache_oid($device, 'fanEntry', [], $mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 print_debug_vars($oids);
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
   // common(1), housing(2), rack(3), cpu(4)
   list($SensorType, $SensorId) = explode('.', $index);
-  switch ($SensorType)
-  {
+  switch ($SensorType) {
     case '1':
       $descr = 'System fan';
       break;
@@ -97,8 +87,7 @@ foreach ($oids as $index => $entry)
     default:
       $descr = 'Fan';
   }
-  if (count($oids) > 1)
-  {
+  if (count($oids) > 1) {
     $descr .= ' ' . $SensorId;
   }
 
@@ -107,7 +96,7 @@ foreach ($oids as $index => $entry)
   $type     = 'axisStatus';
   $value    = $entry[$oid_name];
 
-  discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'fan'));
+  discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, [ 'entPhysicalClass' => 'fan' ]);
 }
 
 // EOF

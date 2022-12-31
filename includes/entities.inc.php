@@ -6,13 +6,14 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 // Include entity specific functions
 require_once($config['install_dir'] . "/includes/entities/device.inc.php");
 require_once($config['install_dir'] . "/includes/entities/port.inc.php");
+require_once($config['install_dir'] . "/includes/entities/storage.inc.php");
 require_once($config['install_dir'] . "/includes/entities/sensor.inc.php");
 require_once($config['install_dir'] . "/includes/entities/status.inc.php");
 require_once($config['install_dir'] . "/includes/entities/counter.inc.php");
@@ -70,11 +71,13 @@ function get_entity_attribs($entity_type, $entity_id, $refresh = FALSE) {
       $device_id = $entity_id['device_id'];
 
       // Pre-check if entity attribs for device exist
-      if ($refresh || !isset($GLOBALS['cache']['devices_attribs'][$device_id][$entity_type])) {
-        $GLOBALS['cache']['devices_attribs'][$device_id][$entity_type] = dbExist('entity_attribs', '`entity_type` = ? AND `device_id` = ?', [ $entity_type, $device_id ]);
-      }
+      cache_device_attribs_exist($device_id, $refresh);
+      // if ($refresh || !isset($GLOBALS['cache']['devices_attribs'][$device_id][$entity_type])) {
+      //   $GLOBALS['cache']['devices_attribs'][$device_id][$entity_type] = dbExist('entity_attribs', '`entity_type` = ? AND `device_id` = ?', [ $entity_type, $device_id ]);
+      // }
       // Speedup queries, when not exist attribs
-      if (!$GLOBALS['cache']['devices_attribs'][$device_id][$entity_type]) {
+      if (!isset($GLOBALS['cache']['devices_attribs'][$device_id][$entity_type]) ||
+          !$GLOBALS['cache']['devices_attribs'][$device_id][$entity_type]) {
         return [];
       }
     }
@@ -245,7 +248,7 @@ function get_device_entities_attribs($device_id, $entity_types = NULL)
   $query = "SELECT * FROM `entity_attribs` WHERE `device_id` = ?";
   if ($entity_types)
   {
-    $query .= generate_query_values($entity_types, 'entity_type');
+    $query .= generate_query_values_and($entity_types, 'entity_type');
   }
 
   foreach (dbFetchRows($query, array($device_id)) as $entry)
@@ -748,10 +751,6 @@ function get_entity_by_id_cache($entity_type, $entity_id) {
       }
       break;
 
-    case "port":
-      $entity = get_port_by_id($entity_id);
-      break;
-
     default:
       $sql = 'SELECT * FROM `'.$translate['table'].'`';
 
@@ -791,6 +790,67 @@ function get_entity_by_id_cache($entity_type, $entity_id) {
   }
 
   return FALSE;
+}
+
+function cache_entities_by_id($entity_type, $entity_ids) {
+  global $cache;
+
+  $translate = entity_type_translate_array($entity_type);
+  //print_vars($translate);
+
+  foreach($entity_ids as $key => $entity_id)
+  {
+    // Skip non-numeric values and already cached entities
+    if(!is_numeric($entity_id) || is_array($cache[$entity_type][$entity_id])) { unset($entity_ids[$key]); }
+  }
+  if(safe_count($entity_ids) == 0) { return; } // Nothing to do
+
+  switch($entity_type) {
+
+    default:
+
+      $sql = 'SELECT * FROM `'.$translate['table'].'`';
+
+      if (isset($translate['state_table'])) {
+        $sql .= ' LEFT JOIN `'.$translate['state_table'].'` USING (`'.$translate['id_field'].'`)';
+      }
+
+      if (isset($translate['parent_table'])) {
+        $sql .= ' LEFT JOIN `'.$translate['parent_table'].'` USING (`'.$translate['parent_id_field'].'`)';
+      }
+      //$sql .= ' WHERE `'.$translate['table'].'`.`'.$translate['id_field'].'` IN ?';
+      //$sql .= ' WHERE `'.$translate['table'].'`.`'.$translate['id_field'].'` IN ('.implode(',', $entity_ids).')';
+
+      $sql .= ' WHERE 1 '.generate_query_values_and($entity_ids, '`'.$translate['table'].'`.`'.$translate['id_field'].'`');
+      //print_r($entity_type);
+      //print_r($entity_ids);
+      //print_r($translate);
+      //print_r($sql.PHP_EOL);
+
+      $entities = dbFetchRows($sql);
+      //print_r($entities);
+      //print_r(dbError());
+      break;
+  }
+
+  if (is_array($entities)) {
+    foreach ($entities as $entity) {
+      if (function_exists('humanize_' . $entity_type)) {
+        $do = 'humanize_' . $entity_type;
+        $do($entity);
+      }
+      else if (isset($translate['humanize_function']) && function_exists($translate['humanize_function'])) {
+        $do = $translate['humanize_function'];
+        $do($entity);
+      }
+
+      entity_rewrite($entity_type, $entity);
+
+      $entity_id = $entity[$translate['id_field']];
+      $cache[$entity_type][$entity_id] = $entity;
+    }
+  }
+  return TRUE;
 }
 
 /* Network/ARP/MAC specific entity functions */
@@ -874,7 +934,7 @@ function get_entity_ids_ip_by_network($entity_type, $network, $add_where = '') {
         $params[] = $network_array['network_end_binary'];
       } else {
         // Match IP addresses by part of string
-        $where .=  generate_query_values($network_array['address'], 'ipv4_address', $network_array['query_type']);
+        $where .=  generate_query_values_and($network_array['address'], 'ipv4_address', $network_array['query_type']);
       }
       break;
     case 'ipv6':
@@ -890,8 +950,8 @@ function get_entity_ids_ip_by_network($entity_type, $network, $add_where = '') {
         $params[] = $network_array['network_end_binary'];
       } else {
         // Match IP addresses by part of string
-        $where .= ' AND (' . generate_query_values($network_array['address'], 'ipv6_address',    $network_array['query_type'], FALSE) .
-                  ' OR '   . generate_query_values($network_array['address'], 'ipv6_compressed', $network_array['query_type'], FALSE) . ')';
+        $where .= ' AND (' . generate_query_values_ng($network_array['address'], 'ipv6_address',    $network_array['query_type']) .
+                  ' OR '   . generate_query_values_ng($network_array['address'], 'ipv6_compressed', $network_array['query_type']) . ')';
       }
       break;
   }
@@ -1198,7 +1258,7 @@ function entity_descr_definition($entity_type, $definition, $descr_entry, $count
 function entity_measured_match_definition($device, $definition, $entity = [], $entity_type = NULL) {
   // $entity_type unused currently
 
-  $options = array();
+  $options = [];
 
   // Just append label for sorting and grouping
   if (isset($definition['measured_label'])) {
@@ -1210,6 +1270,10 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
     $definition['measured_match'] = $definition['entity_match'];
   }
   if (!isset($definition['measured_match'])) {
+    if (isset($definition['measured']) && in_array($definition['measured'], [ 'port', 'outlet' ], TRUE)) {
+      // Currently for outlets
+      $options['measured_class'] = $definition['measured'];
+    }
     return $options;
   }
 
@@ -1234,6 +1298,8 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
     }
 
     // Associate defined entity type
+    //$sql_options = [ 'no_leading_and' ];
+    $sql_options = [];
     switch($rule['entity_type']) {
       case 'entity':
         // Generic entities
@@ -1242,9 +1308,9 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
           case 'name':
           case 'label':
             $sql_rules = [];
-            $sql_rules[] = generate_query_values($rule['match'], 'entity_descr',     $sql_condition, FALSE);
+            $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_descr',     $sql_condition, $sql_options);
             if (!safe_empty($rule['class'])) {
-              $sql_rules[] = generate_query_values($rule['match'], 'entity_class',   $sql_condition, FALSE);
+              $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_class',   $sql_condition, $sql_options);
             }
             $sql_rule = implode(' AND ', $sql_rules);
             $sql = "SELECT * FROM `entities` WHERE `device_id` = ? AND ($sql_rule) AND `deleted` = ? LIMIT 1";
@@ -1262,9 +1328,9 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
 
           case 'index':
             $sql_rules = [];
-            $sql_rules[] = generate_query_values($rule['match'], 'entity_index',     $sql_condition, FALSE);
+            $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_index',     $sql_condition, $sql_options);
             if (!safe_empty($rule['class'])) {
-              $sql_rules[] = generate_query_values($rule['match'], 'entity_class',   $sql_condition, FALSE);
+              $sql_rules[] = generate_query_values_ng($rule['match'], 'entity_class',   $sql_condition, $sql_options);
             }
             $sql_rule = implode(' AND ', $sql_rules);
             $sql = "SELECT * FROM `entities` WHERE `device_id` = ? AND ($sql_rule) AND `deleted` = ? LIMIT 1";
@@ -1289,10 +1355,10 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
           case 'ifname':
           case 'label':
             $sql_rules = [];
-            $sql_rules[] = generate_query_values($rule['match'], 'ifDescr',          $sql_condition, FALSE);
-            $sql_rules[] = generate_query_values($rule['match'], 'ifName',           $sql_condition, FALSE);
-            $sql_rules[] = generate_query_values($rule['match'], 'port_label',       $sql_condition, FALSE);
-            $sql_rules[] = generate_query_values($rule['match'], 'port_label_short', $sql_condition, FALSE);
+            $sql_rules[] = generate_query_values_ng($rule['match'], 'ifDescr',          $sql_condition, $sql_options);
+            $sql_rules[] = generate_query_values_ng($rule['match'], 'ifName',           $sql_condition, $sql_options);
+            $sql_rules[] = generate_query_values_ng($rule['match'], 'port_label',       $sql_condition, $sql_options);
+            $sql_rules[] = generate_query_values_ng($rule['match'], 'port_label_short', $sql_condition, $sql_options);
             $sql_rule = implode(' OR ', $sql_rules);
             $sql = "SELECT * FROM `ports` WHERE `device_id` = ? AND ($sql_rule) AND `deleted` = ? LIMIT 1";
             $params = [ $device['device_id'], 0 ];
@@ -1308,7 +1374,7 @@ function entity_measured_match_definition($device, $definition, $entity = [], $e
             break;
 
           case 'ifalias':
-            $sql_rule = generate_query_values($rule['match'], 'ifAlias', $sql_condition, FALSE);
+            $sql_rule = generate_query_values_ng($rule['match'], 'ifAlias', $sql_condition, $sql_options);
             $sql = "SELECT * FROM `ports` WHERE `device_id` = ? AND $sql_rule AND `deleted` = ? LIMIT 1";
             $params = [ $device['device_id'], 0 ];
             if ($measured = dbFetchRow($sql, $params)) {
@@ -1688,49 +1754,38 @@ function entity_type_translate_array($entity_type)
 /**
  * Returns TRUE if the logged in user is permitted to view the supplied entity.
  *
- * @param $entity_id
- * @param $entity_type
- * @param $device_id
- * @param $permissions Permissions array, by default used global var $permissions generated by permissions_cache()
+ * @param string|integer $entity_id
+ * @param string $entity_type
+ * @param string|mixed $device_id
+ * @param array $permissions Permissions array, by default used global var $permissions generated by permissions_cache()
  *
  * @return bool
  */
-// TESTME needs unit testing
-function is_entity_permitted($entity_id, $entity_type, $device_id = NULL, $permissions = NULL)
-{
-  if (is_null($permissions) && isset($GLOBALS['permissions']))
-  {
+function is_entity_permitted($entity_id, $entity_type, $device_id = NULL, $permissions = NULL) {
+
+  if (is_null($permissions) && isset($GLOBALS['permissions'])) {
     // Note, pass permissions array by param used in permissions_cache()
-    $permissions = $GLOBALS['permissions'];
+    $permissions = (array)$GLOBALS['permissions'];
   }
 
   if (!is_numeric($device_id)) { $device_id = get_device_id_by_entity_id($entity_id, $entity_type); }
 
-  if ($_SESSION['userlevel'] >= 5)
-  {
+  if ($_SESSION['userlevel'] >= 5) {
     // User not limited (userlevel >= 5)
     $allowed = TRUE;
-  }
-  else if (is_numeric($device_id) && device_permitted($device_id))
-  {
+  } elseif (is_numeric($device_id) && device_permitted($device_id)) {
     $allowed = TRUE;
-  }
-  else if (isset($permissions[$entity_type][$entity_id]) && $permissions[$entity_type][$entity_id])
-  {
+  } elseif (isset($permissions[$entity_type][$entity_id]) && $permissions[$entity_type][$entity_id]) {
     $allowed = TRUE;
-  }
-  else if (isset($GLOBALS['auth']) && is_graph())
-  {
+  } elseif (isset($GLOBALS['auth']) && is_graph()) {
     $allowed = $GLOBALS['auth'];
   } else {
     $allowed = FALSE;
   }
 
-  if (OBS_DEBUG)
-  {
-    $debug_msg = "PERMISSIONS CHECK. Entity type: $entity_type, Entity ID: $entity_id, Device ID: ".($device_id ? $device_id : 'NULL').", Allowed: ".($allowed ? 'TRUE' : 'FALSE').".";
-    if (isset($GLOBALS['notifications']))
-    {
+  if (OBS_DEBUG) {
+    $debug_msg = "PERMISSIONS CHECK. Entity type: $entity_type, Entity ID: $entity_id, Device ID: ".($device_id ?: 'NULL') . ", Allowed: " . ($allowed ? 'TRUE' : 'FALSE') . ".";
+    if (isset($GLOBALS['notifications'])) {
       $GLOBALS['notifications'][] = array('text' => $debug_msg, 'severity' => 'debug');
     } else {
       print_debug($debug_msg);
@@ -1742,46 +1797,37 @@ function is_entity_permitted($entity_id, $entity_type, $device_id = NULL, $permi
 /**
  * Returns TRUE if the logged in user is permitted to view the supplied entity.
  *
- * @param $entity_id
- * @param $entity_type
- * @param $device_id
- * @param $permissions Permissions array, by default used global var $permissions generated by permissions_cache()
+ * @param string|integer $entity_id
+ * @param string $entity_type
+ * @param string|mixed $device_id
+ * @param array $permissions Permissions array, by default used global var $permissions generated by permissions_cache()
  *
  * @return bool
  */
-// TESTME needs unit testing
-function is_entity_write_permitted($entity_id, $entity_type, $device_id = NULL, $permissions = NULL)
-{
-  if (is_null($permissions) && isset($GLOBALS['permissions']))
-  {
+function is_entity_write_permitted($entity_id, $entity_type, $device_id = NULL, $permissions = NULL) {
+
+  if (is_null($permissions) && isset($GLOBALS['permissions'])) {
     // Note, pass permissions array by param used in permissions_cache()
-    $permissions = $GLOBALS['permissions'];
+    $permissions = (array)$GLOBALS['permissions'];
   }
 
   if (!is_numeric($device_id)) { $device_id = get_device_id_by_entity_id($entity_id, $entity_type); }
 
-  if ($_SESSION['userlevel'] >= 9)
-  {
+  if ($_SESSION['userlevel'] >= 9) {
     // User has global device/entity write permissions
     $allowed = TRUE;
-  }
-  else if (is_numeric($device_id) && isset($permissions['device'][$device_id]) && $permissions['device'][$device_id] == "rw")
-  {
+  } elseif (is_numeric($device_id) && isset($permissions['device'][$device_id]) && $permissions['device'][$device_id] === "rw") {
     // User has device write permissions
     $allowed = TRUE;
-  }
-  else if (isset($permissions[$entity_type][$entity_id]) && $permissions[$entity_type][$entity_id] == "rw")
-  {
+  } elseif (isset($permissions[$entity_type][$entity_id]) && $permissions[$entity_type][$entity_id] === "rw") {
     $allowed = TRUE;
   } else {
     $allowed = FALSE;
   }
 
-  if (OBS_DEBUG)
-  {
-    $debug_msg = "WRITE PERMISSIONS CHECK. Entity type: $entity_type, Entity ID: $entity_id, Device ID: ".($device_id ? $device_id : 'NULL').", Allowed: ".($allowed ? 'TRUE' : 'FALSE').".";
-    if (isset($GLOBALS['notifications']))
-    {
+  if (OBS_DEBUG) {
+    $debug_msg = "WRITE PERMISSIONS CHECK. Entity type: $entity_type, Entity ID: $entity_id, Device ID: ".($device_id ?: 'NULL') . ", Allowed: " . ($allowed ? 'TRUE' : 'FALSE') . ".";
+    if (isset($GLOBALS['notifications'])) {
       $GLOBALS['notifications'][] = array('text' => $debug_msg, 'severity' => 'debug');
     } else {
       print_debug($debug_msg);

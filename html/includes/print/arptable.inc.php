@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -38,33 +38,32 @@ function print_arptable($vars)
       {
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'port':
         case 'port_id':
-          $where .= generate_query_values($value, 'I.port_id');
+          $where .= generate_query_values_and($value, 'I.port_id');
           break;
         case 'ip_version':
-          $where .= generate_query_values($value, 'ip_version');
+          $where .= generate_query_values_and($value, 'ip_version');
           break;
         case 'address':
-          if (isset($vars['searchby']) && $vars['searchby'] == 'ip')
+          if (isset($vars['searchby']) && $vars['searchby'] === 'ip')
           {
             $value = trim($value);
-            if (strpos($value, ':') !== FALSE)
-            {
-              if (Net_IPv6::checkIPv6($value))
+            if (str_contains($value, ':')) {
+              if (get_ip_version($value) === 5)
               {
-                $value = Net_IPv6::uncompress($value, TRUE);
+                $value = ip_uncompress($value);
               } else {
                 // FIXME. Need another conversion ("2001:b08:b08" -> "2001:0b08:0b08") -- mike
               }
             }
-            $where .= generate_query_values($value, 'ip_address', '%LIKE%');
+            $where .= generate_query_values_and($value, 'ip_address', '%LIKE%');
           } else {
             // MAC Addresses
-            $value = str_replace(array(':', ' ', '-', '.', '0x'), '', $value);
-            $where .= generate_query_values($value, 'mac_address', '%LIKE%');
+            $value = str_replace([ ':', ' ', '-', '.', '0x' ], '', $value);
+            $where .= generate_query_values_and($value, 'mac_address', '%LIKE%');
           }
           break;
       }

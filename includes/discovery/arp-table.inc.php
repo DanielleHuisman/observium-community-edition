@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -62,7 +62,7 @@ if ($ipNetToPhysicalPhysAddress_oid)
     }
   }
 }
-if (!strstr($oid_data, 'ipv4'))
+if (!str_contains($oid_data, 'ipv4'))
 {
   // Check IP-MIB::ipNetToMediaPhysAddress (IPv4 only)
   //ipNetToMediaPhysAddress[213][10.0.0.162] 70:81:5:ec:f9:bf
@@ -179,7 +179,7 @@ foreach ($cache_arp as $entry)
 }
 if (count($remove_mac_ids))
 {
-  dbDelete('ip_mac', '1' . generate_query_values($remove_mac_ids, 'mac_id'));
+  dbDelete('ip_mac', generate_query_values_ng($remove_mac_ids, 'mac_id'));
 }
 echo(PHP_EOL);
 

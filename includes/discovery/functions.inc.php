@@ -753,7 +753,7 @@ function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL
   if (!$remote_device_id && $ip_type && !in_array($ip_type, [ 'unspecified', 'loopback' ])) { // 'link-local' ?
 
     //$remote_device_id = dbFetchCell("SELECT `device_id` FROM `ports` LEFT JOIN `ipv4_addresses` on `ports`.`port_id`=`ipv4_addresses`.`port_id` WHERE `deleted` = '0' AND `ipv4_address` = ? LIMIT 1;", array($entry['mtxrNeighborIpAddress']));
-    $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
+    $peer_where = generate_query_values_and($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
     // Fetch all devices with peer IP and filter by UP
     if ($ids = get_entity_ids_ip_by_network('device', $ip, $peer_where)) {
       $remote_device_id = $ids[0];
@@ -1385,7 +1385,13 @@ function discover_neighbour($port, $protocol, $neighbour)
 
   $neighbour['protocol'] = $protocol;
   $neighbour['active'] = '1';
-  $params   = array('protocol', 'remote_port_id', 'remote_hostname', 'remote_port', 'remote_platform', 'remote_version', 'remote_address', 'autodiscovery_id', 'active');
+  
+  // Get the remote device id if we've not been told it
+  if(isset($neighbour['remote_port_id']) && !isset($neighbour['remote_device_id'])) {
+    $neighbour['remote_device_id'] = get_device_id_by_port_id($neighbour['remote_port_id']);
+  }
+
+  $params   = array('protocol', 'remote_device_id', 'remote_port_id', 'remote_hostname', 'remote_port', 'remote_platform', 'remote_version', 'remote_address', 'autodiscovery_id', 'active');
   $neighbour_db = dbFetchRow("SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime` FROM `neighbours` WHERE `port_id` = ? AND `protocol` = ? AND `remote_hostname` = ? AND `remote_port` = ?", array($port['port_id'], $protocol, $neighbour['remote_hostname'], $neighbour['remote_port']));
   if (!isset($neighbour_db['neighbour_id']))
   {

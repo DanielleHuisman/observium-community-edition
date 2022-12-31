@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -16,28 +16,33 @@ $results = dbFetchRows("SELECT * FROM `status`
                         WHERE `status_descr` LIKE ? $query_permitted_device
                         ORDER BY `status_descr` LIMIT $query_limit", array($query_param));
 
-if (safe_count($results)) {
+if (!safe_empty($results)) {
+  $max_len = 35;
   foreach ($results as $result) {
-    $name = $result['status_descr'];
-    if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
+    $name = truncate($result['status_descr'], $max_len);
+    $device_name = truncate($result['hostname'], $max_len);
+    if ($result['hostname'] != $result['sysName'] && $result['sysName']) {
+      $device_name .= ' | ' . truncate($result['sysName'], $max_len);
+    }
     $descr = strlen($result['location']) ? escape_html($result['location']) . ' | ' : '';
     $descr .= nicecase($result['entPhysicalClass']) . ' status';
 
     /// FIXME: once we have alerting, colour this to the sensor's status
     $tab_colour = '#194B7F'; // FIXME: This colour pulled from functions.inc.php humanize_device, maybe set it centrally in definitions?
 
-    $status_search_results[] = array('url' => 'graphs/type=status_graph/id=' . $result['status_id'] . '/',
+    $status_search_results[] = [
+      'url' => 'graphs/type=status_graph/id=' . $result['status_id'] . '/',
       'name' => $name,
       'colour' => $tab_colour,
       'icon' => $config['icon']['status'],
-      'data' => array(
-        '| ' . escape_html($result['hostname']),
-        $descr)
-    );
+      'data' => [
+        '| ' . escape_html($device_name),
+        $descr ]
+    ];
 
   }
 
-  $search_results['status'] = array('descr' => 'Status Indicators found', 'results' => $status_search_results);
+  $search_results['status'] = [ 'descr' => 'Status Indicators found', 'results' => $status_search_results ];
 }
 
 // EOF

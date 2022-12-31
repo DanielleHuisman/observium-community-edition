@@ -6,15 +6,14 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 function generate_oid_template_link($entry)
 {
   $url = generate_url(array('page' => 'customoid', 'oid_id' => $entry['oid_id']));
-  $link = '<a href="'.$url.'">'.$entry['oid_descr'].'</a>';
-  return $link;
+  return '<a href="'.$url.'">'.$entry['oid_descr'].'</a>';
 }
 
 function build_oid_query($vars)
@@ -33,21 +32,21 @@ function build_oid_query($vars)
       case "oid_descr":
       case "oid":
       case "oid_name":
-        $sql .= generate_query_values($value, $var);
+        $sql .= generate_query_values_and($value, $var);
         break;
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'oid_entry_id');
+        $sql .= generate_query_values_and($values, 'oid_entry_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'oids_entries.device_id');
+        $sql .= generate_query_values_and($values, 'oids_entries.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'oids_entries.device_id');
+        $sql .= generate_query_values_and($value, 'oids_entries.device_id');
         break;
     }
   }
@@ -97,7 +96,7 @@ function print_oid_table_header($vars, $entries)
     $cols['event']  = array('Event', 'style="width: 60px;"');
 
     if ($entries[0]['oid_autodiscover'] == '0' && $vars['page'] === "customoid") {
-        $cols['actions'] = array('', 'style="width: 40px;"'); echo "derp";
+        $cols['actions'] = array('', 'style="width: 40px;"');
     }
 
     echo get_table_header($cols, $vars);
@@ -111,7 +110,6 @@ function print_oid_table($vars)
   $sql = build_oid_query($vars);
   $entries = dbFetchRows($sql);
   $count = count($entries);
-
 
   if (count($entries)) {
 

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -25,23 +25,20 @@ $results = dbFetchRows("SELECT * FROM `devices`
                         WHERE $where $query_permitted_device
                         ORDER BY `hostname` LIMIT $query_limit", $params);
 if (safe_count($results)) {
+  $max_len = 35;
   foreach ($results as $result) {
     humanize_device($result);
 
-    $name = $result['hostname'];
-    $max_len = 35;
-    if (strlen($name) > 35) {
-      $name = substr($name, 0, 35) . "...";
-    }
+    $name = truncate($result['hostname'], $max_len);
     if ($_SESSION['userlevel'] >= 5 && !safe_empty($result['ip'])) {
       $name .= ' ('.$result['ip'].')';
     }
 
-    $num_ports = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE device_id = ?", array($result['device_id']));
+    $num_ports = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `device_id` = ?", [ $result['device_id'] ]);
 
     $descr = '';
     if ($result['hostname'] != $result['sysName'] && $result['sysName']) {
-      $descr .= strlen($result['sysName']) > 35 ? substr($result['sysName'], 0, 35) . "..." : $result['sysName'];
+      $descr .= truncate($result['sysName'], $max_len);
       $descr .= ' | ';
     }
     if ($result['location']) {
@@ -58,9 +55,9 @@ if (safe_count($results)) {
       'row_class' => $result['row_class'],
       'html_row_class' => $result['html_row_class'],
       'icon'   => get_device_icon($result),
-      'data'   => array(
+      'data'   => [
         escape_html($result['hardware'] . ' | ' . $config['os'][$result['os']]['text'] . ' ' . $result['version']),
-        html_highlight(escape_html($descr), $queryString) . $num_ports . ' ports'),
+        html_highlight(escape_html($descr), $queryString) . $num_ports . ' ports' ],
     );
   }
   

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,38 +23,38 @@ function generate_sla_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'slas.sla_id');
+        $sql .= generate_query_values_and($values, 'slas.sla_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'storage.device_id');
+        $sql .= generate_query_values_and($values, 'storage.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'slas.device_id');
+        $sql .= generate_query_values_and($value, 'slas.device_id');
         break;
       case "id":
       case "sla_id":
-        $sql .= generate_query_values($value, 'slas.sla_id');
+        $sql .= generate_query_values_and($value, 'slas.sla_id');
         break;
       case "owner":
-        $sql .= generate_query_values($value, 'slas.sla_owner');
+        $sql .= generate_query_values_and($value, 'slas.sla_owner');
         break;
       case "target":
       case "sla_target":
-        $sql .= generate_query_values($value, 'slas.sla_target', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'slas.sla_target', '%LIKE%');
         break;
       case "sla_tag":
-        $sql .= generate_query_values($value, 'slas.sla_tag');
+        $sql .= generate_query_values_and($value, 'slas.sla_tag');
         break;
       case "rtt_type":
       case "rtt_sense":
-        $sql .= generate_query_values($value, 'slas.'.$var);
+        $sql .= generate_query_values_and($value, 'slas.'.$var);
         break;
       case "event":
       case "rtt_event":
-        $sql .= generate_query_values($value, 'slas.rtt_event');
+        $sql .= generate_query_values_and($value, 'slas.rtt_event');
         break;
     }
   }

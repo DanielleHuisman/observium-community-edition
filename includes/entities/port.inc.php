@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -87,21 +87,24 @@ function get_port_id_by_ip_cache($device, $ip)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function get_port_id_by_mac($device, $mac)
-{
-  if (is_array($device) && isset($device['device_id']))
-  {
+function get_port_id_by_mac($device, $mac) {
+  if (is_array($device) && isset($device['device_id'])) {
     $device_id = $device['device_id'];
-  }
-  elseif (is_numeric($device))
-  {
+  } elseif (is_numeric($device)) {
     $device_id = $device;
+  } else {
+    return FALSE;
   }
 
   $remote_mac = mac_zeropad($mac);
-  if ($remote_mac && $remote_mac != '000000000000')
-  {
-    return dbFetchCell("SELECT `port_id` FROM `ports` WHERE `deleted` = '0' AND `ifPhysAddress` = ? AND `device_id` = ? LIMIT 1", [ $remote_mac, $device_id ]);
+  if ($remote_mac && $remote_mac !== '000000000000' &&
+      $ids = dbFetchColumn("SELECT `port_id` FROM `ports` WHERE `ifPhysAddress` = ? AND `device_id` = ? AND `deleted` = ?", [ $remote_mac, $device_id, 0 ])) {
+    if (count($ids) > 1) {
+      print_debug("WARNING. Found multiple ports [".count($ids)."] with same MAC address $mac on device ($device_id).");
+    }
+
+    return $ids[0];
+    //return dbFetchCell("SELECT `port_id` FROM `ports` WHERE `deleted` = '0' AND `ifPhysAddress` = ? AND `device_id` = ? LIMIT 1", [ $remote_mac, $device_id ]);
   }
 
   return FALSE;
@@ -507,14 +510,14 @@ function get_port_id_by_customer($customer)
         {
           case 'device':
           case 'device_id':
-            $where .= generate_query_values($value, 'device_id');
+            $where .= generate_query_values_and($value, 'device_id');
             break;
           case 'type':
           case 'descr':
           case 'circuit':
           case 'speed':
           case 'notes':
-            $where .= generate_query_values($value, 'port_descr_'.$var);
+            $where .= generate_query_values_and($value, 'port_descr_'.$var);
             break;
         }
       }
@@ -573,17 +576,17 @@ function get_device_ids_by_customer($type, $customer)
   {
     case 'device':
     case 'device_id':
-      $where .= generate_query_values($customer, 'device_id');
+      $where .= generate_query_values_and($customer, 'device_id');
       break;
     case 'type':
     case 'descr':
     case 'circuit':
     case 'speed':
     case 'notes':
-      $where .= generate_query_values($customer, 'port_descr_'.$type);
+      $where .= generate_query_values_and($customer, 'port_descr_'.$type);
       break;
     default:
-      $where .= generate_query_values($customer, 'port_descr_descr');
+      $where .= generate_query_values_and($customer, 'port_descr_descr');
   }
 
   $query = 'SELECT DISTINCT `device_id` FROM `ports` ' . $where;
@@ -808,7 +811,7 @@ function delete_port($int_id, $delete_rrd = TRUE) {
   $deleted_entities = array();
   foreach ($config['entity_tables'] as $table)
   {
-    $where = '`entity_type` = ?' . generate_query_values($int_id, 'entity_id');
+    $where = '`entity_type` = ?' . generate_query_values_and($int_id, 'entity_id');
     $table_status = dbDelete($table, $where, array('port'));
     if ($table_status) { $deleted_entities['port'] = 1; }
   }
@@ -908,6 +911,11 @@ function get_port_rrdindex($port)
   }
 
   return $this_port_identifier;
+}
+
+// DOCME needs phpdoc block
+function humanspeed($speed) {
+  return safe_empty($speed) ? '-' : formatRates($speed);
 }
 
 // CLEANME DEPRECATED

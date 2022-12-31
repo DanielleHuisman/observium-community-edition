@@ -122,14 +122,13 @@ if (isset($options['h'])) {
   }
 }
 
-if (isset($options['i']) && $options['i'] && isset($options['n'])) {
+if (isset($options['i'], $options['n']) && $options['i']) {
   $where .= ' AND MOD(device_id,' . $options['i'] . ') = ?';
   $params[] = $options['n'];
   $doing = $options['n'] . '/' . $options['i'];
 }
 
-if (!$where && !$options['u'] && !isset($options['a']))
-{
+if (!$where && !$options['u'] && !isset($options['a'])) {
   print_message("%n
 USAGE:
 $scriptname [-dquV] [-i instances] [-n number] [-m module] [-h device]
@@ -169,10 +168,19 @@ if ($config['version_check'] && ($options['h'] !== 'new' || $options['u'])) {
 if (!$where) {
   // Only update Group/Alert tables
   if (isset($options['a'])) {
-    $silent = isset($options['q']);
-    // Not exist in CE
-    if (function_exists('update_group_tables')) { update_group_tables($silent); }
-    if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
+
+    if (OBS_DISTRIBUTED && function_exists('run_action_queue')) {
+      //run_action_queue('device_add');
+      //run_action_queue('device_rename');
+      //run_action_queue('device_delete');
+
+      // Update alert and group tables
+      run_action_queue('tables_update');
+    } else {
+      $silent = isset($options['q']);
+      if (function_exists('update_group_tables')) { update_group_tables($silent); } // Not exist in CE
+      if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
+    }
   }
 
   exit;
@@ -215,11 +223,10 @@ if (($discovered_devices && !isset($options['m'])) || isset($options['a'])) {
   if (OBS_DISTRIBUTED && !isset($options['a']) && function_exists('add_action_queue') &&
       $action_id = add_action_queue('tables_update', 'discovery', [ 'silent' => $silent ])) {
     print_message("Update alert and group tables added to queue [$action_id].");
-    //log_event("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [${vars['poller_id']}].", NULL, 'info', NULL, 7);
-  } elseif (OBSERVIUM_EDITION !== 'community') {
-    // Not exist in CE
-    update_group_tables($silent);
-    update_alert_tables($silent);
+    //log_event("Device with hostname '$hostname' added to queue [$action_id] for addition on remote Poller [{$vars['poller_id']}].", NULL, 'info', NULL, 7);
+  } else {
+    if (function_exists('update_group_tables')) { update_group_tables($silent); } // Not exist in CE
+    if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
   }
 }
 

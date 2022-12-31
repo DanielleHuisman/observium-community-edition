@@ -1451,6 +1451,19 @@ class Parsedown
             $Element['attributes']['title'] = $Definition['title'];
         }
 
+        // Prevent XSS Observium Hack (based on same trick in get_vars())
+        // <sCrIpT> < / s c r i p t >
+        // javascript:alert("Hello world");/
+        // <svg onload=alert(document.domain)>
+        $prevent_xss = '!(^\s*(J\s*A\s*V\s*A\s*)?S\s*C\s*R\s*I\s*P\s*T\s*:'.
+                       '|<\s*/?\s*S\s*C\s*R\s*I\s*P\s*T\s*>'.
+                       '|(<\s*s\s*v\s*g.*(o\s*n\s*l\s*o\s*a\s*d|s\s*c\s*r\s*i\s*p\s*t))'.
+                       '|<\s*i\s*m\s*g.*o\s*n\s*e\s*r\s*r\s*o\s*r)!i';
+        if (is_string($Element['attributes']['href']) && preg_match($prevent_xss, $Element['attributes']['href'])) {
+          // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
+          $Element['attributes']['href'] = 'javascript:void(0)';
+        }
+
         return array(
             'extent' => $extent,
             'element' => $Element,

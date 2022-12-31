@@ -21,9 +21,11 @@ if (!$_SESSION['authenticated']) { print_error('Session expired, please log in a
 
 ob_start();
 
-$vars = get_vars();
+$vars = get_vars([ 'JSON', 'POST', 'GET' ]);
 
 $vars['page'] = "popup";
+
+if(isset($vars['debug'])) { r($vars); }
 
 switch ($vars['entity_type']) {
   case "port":
@@ -34,6 +36,23 @@ switch ($vars['entity_type']) {
       print_warning("You are not permitted to view this port.");
     }
     break;
+
+  case "link":
+    if (is_numeric($vars['entity_id_a']) && (port_permitted($vars['entity_id_a']))) {
+      $port = get_port_by_id($vars['entity_id_a']);
+      echo generate_port_popup($port);
+    } else {
+      print_warning("You are not permitted to view this port.");
+    }
+
+    if (is_numeric($vars['entity_id_b']) && (port_permitted($vars['entity_id_b']))) {
+      $port = get_port_by_id($vars['entity_id_b']);
+      echo generate_port_popup($port, '','none'); // suppress graph for b side of link
+    } else {
+      print_warning("You are not permitted to view this port.");
+    }
+    break;
+
 
   case "device":
     if (is_numeric($vars['entity_id']) && device_permitted($vars['entity_id'])) {
@@ -53,7 +72,6 @@ switch ($vars['entity_type']) {
     }
     break;
 
-  // FIXME : mac is not an observium entity. This should go elsewhere!
   case "mac":
     if (preg_match('/^' . OBS_PATTERN_MAC . '$/i', $vars['entity_id'])) {
       $mac = format_mac($vars['entity_id']);

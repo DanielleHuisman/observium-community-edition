@@ -1,16 +1,16 @@
 <?php
-
 /**
+ * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-$datas = array('overview' => array('icon' => $config['icon']['overview']));
+$datas = [ 'overview' => [ 'icon' => $config['icon']['overview'] ] ];
 
 if ($health_exist['processors']) { $datas['processor'] = array('icon' => $config['entities']['processor']['icon']); }
 if ($health_exist['mempools'])   { $datas['mempool']   = array('icon' => $config['entities']['mempool']['icon']); }
@@ -19,13 +19,18 @@ if ($health_exist['diskio'])     { $datas['diskio']    = array('icon' => $config
 
 if ($health_exist['status'])     { $datas['status']    = array('icon' => $config['entities']['status']['icon']); }
 
-if ($health_exist['sensors'])
-{
-  $sensors_device = dbFetchRows("SELECT DISTINCT `sensor_class` FROM `sensors` WHERE `device_id` = ? AND `sensor_deleted` = ?", array($device['device_id'], 0));
-  foreach ($sensors_device as $sensor)
-  {
-    if ($sensor['sensor_class'] == 'counter') { continue; } // DEVEL
-    $datas[$sensor['sensor_class']] = array('icon' => $config['sensor_types'][$sensor['sensor_class']]['icon']);
+if ($health_exist['sensors']) {
+  // Keep sensors order for base types static
+  $sensor_types = [ 'temperature', 'humidity', 'fanspeed', 'airflow', 'current', 'voltage', 'power', 'apower', 'rpower', 'frequency' ];
+  $other_types  = array_diff(array_keys($config['sensor_types']), $sensor_types);
+  $sensor_types = array_merge($sensor_types, $other_types);
+  //r($sensor_types);
+
+  $sensors_device = dbFetchColumn("SELECT DISTINCT `sensor_class` FROM `sensors` WHERE `device_id` = ? AND `sensor_deleted` = ?", [ $device['device_id'], 0 ]);
+  //r($sensors_device);
+  foreach (array_intersect($sensor_types, $sensors_device) as $sensor_type) {
+    //if ($sensor['sensor_class'] == 'counter') { continue; } // DEVEL
+    $datas[$sensor_type] = [ 'icon' => $config['sensor_types'][$sensor_type]['icon'] ];
   }
 }
 
@@ -42,9 +47,11 @@ if ($health_exist['counter'])
 }
 */
 
-$link_array = array('page'    => 'device',
-                    'device'  => $device['device_id'],
-                    'tab'     => 'health');
+$link_array = [
+  'page'    => 'device',
+  'device'  => $device['device_id'],
+  'tab'     => 'health'
+];
 
 if (!$vars['metric']) { $vars['metric'] = "overview"; }
 if (!$vars['view'])   { $vars['view']   = "details"; }

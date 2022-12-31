@@ -15,18 +15,22 @@ $scale_max = "100";
 
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-if($width > 500)
+if($width > 350)
 {
-  $descr_len = 22;
+  $padding = 45;
+  $text_width = 7;
 } else {
-  $descr_len = 12;
+  $padding = 39;
+  $text_width = 6;
 }
-$descr_len += round(($width - 250) / 8);
+$legend_len = ($vars['width'] + $padding) / $text_width;
+$descr_len = $legend_len - 31;
 
 $iter = 0;
 $colours = 'mixed-10c';
-$rrd_options .= " COMMENT:'".str_pad('Size      Used    %used', $descr_len+31, ' ', STR_PAD_LEFT)."\\l'";
-//$rrd_options .= " COMMENT:'                    Size      Used    %age\\l'";
+$rrd_options .= " COMMENT:'".str_pad('Size       Used  % Used', $legend_len, ' ', STR_PAD_LEFT)."\\l'";
+$graph_return['legend_lines'] = 1;
+
 
 foreach (dbFetchRows("SELECT * FROM storage where device_id = ?", array($device['device_id'])) as $storage)
 {
@@ -47,7 +51,14 @@ foreach (dbFetchRows("SELECT * FROM storage where device_id = ?", array($device[
     $rrd_options .= " GPRINT:".$storage['storage_id']."used:LAST:%6.2lf%sB";
     $rrd_options .= " GPRINT:".$storage['storage_id']."perc:LAST:%5.2lf%%\\l";
     $iter++;
+    $graph_return['legend_lines']++;
+    $graph_return['rrds'][] = $rrd;
+  } else {
+    $graph_return['missing_rrds'][] = $rrd;
   }
 }
+
+
+
 
 // EOF

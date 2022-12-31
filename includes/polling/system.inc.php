@@ -45,9 +45,9 @@ if (!isset($polled)) {
 
 if (isset($agent_data['uptime'])) {
   list($agent_data['uptime']) = explode(' ', $agent_data['uptime']);
-  $uptimes['unix-agent'] = round($agent_data['uptime']);
+  $uptimes['unix-agent'] = round((float)$agent_data['uptime']);
 } elseif (isset($wmi['uptime'])) {
-  $uptimes['wmi'] = round($wmi['uptime']);
+  $uptimes['wmi'] = round((float)$wmi['uptime']);
 }
 
 if (is_numeric($agent_data['uptime']) && $agent_data['uptime'] > 0) {
@@ -61,9 +61,9 @@ if (is_numeric($agent_data['uptime']) && $agent_data['uptime'] > 0) {
 } elseif (isset($poll_device['device_uptime']) && is_numeric($poll_device['device_uptime']) && $poll_device['device_uptime'] > 0) {
   // 2. Uptime from os specific OID, see in includes/polling/system MIB specific
   // Get uptime by some custom way in device os poller, see example in wowza-engine os poller
-  $uptimes['device_uptime'] = round($poll_device['device_uptime']);
+  $uptimes['device_uptime'] = round((float)$poll_device['device_uptime']);
   $uptimes['use']           = 'device_uptime';
-  $uptimes['message']       = ($uptimes['message']) ? $uptimes['message'] : 'Using device MIB poller Uptime';
+  $uptimes['message']       = $uptimes['message'] ?: 'Using device MIB poller Uptime';
 } else {
   // 3. Uptime from hrSystemUptime (only in snmp v2c/v3)
   // NOTE, about windows uptime,
@@ -76,46 +76,39 @@ if (is_numeric($agent_data['uptime']) && $agent_data['uptime'] > 0) {
     $hrSystemUptime = snmp_get_oid($device, 'hrSystemUptime.0', 'HOST-RESOURCES-MIB');
     $uptimes['hrSystemUptime'] = timeticks_to_sec($hrSystemUptime);
 
-    if (is_numeric($uptimes['hrSystemUptime']) && $uptimes['hrSystemUptime'] > 0)
-    {
+    if (is_numeric($uptimes['hrSystemUptime']) && $uptimes['hrSystemUptime'] > 0) {
       // hrSystemUptime always prefer if not zero
       $uptimes['use'] = 'hrSystemUptime';
     }
   }
 
   // 4. Uptime from snmpEngineTime (only in snmp v2c/v3)
-  if ($device['snmp_version'] !== 'v1' && is_device_mib($device, 'SNMP-FRAMEWORK-MIB'))
-  {
+  if ($device['snmp_version'] !== 'v1' && is_device_mib($device, 'SNMP-FRAMEWORK-MIB')) {
     $snmpEngineTime = snmp_get_oid($device, 'snmpEngineTime.0', 'SNMP-FRAMEWORK-MIB');
 
-    if (is_numeric($snmpEngineTime) && $snmpEngineTime > 0)
-    {
-      if ($device['os'] === 'aos' && strlen($snmpEngineTime) > 8)
-      {
+    if (is_numeric($snmpEngineTime) && $snmpEngineTime > 0) {
+      if ($device['os'] === 'aos' && strlen($snmpEngineTime) > 8) {
         // Some Alcatel have bug with snmpEngineTime
         // See: http://jira.observium.org/browse/OBSERVIUM-763
         $snmpEngineTime = 0;
-      }
-      elseif ($device['os'] === 'ironware')
-      {
+      } elseif ($device['os'] === 'ironware') {
         // Check if version correct like "07.4.00fT7f3"
         $ironware_version = explode('.', $device['version']);
-        if (count($ironware_version) > 2 && $ironware_version[0] > 0 && version_compare($device['version'], '5.1.0') === -1)
-        {
+        if (count($ironware_version) > 2 && $ironware_version[0] > 0 &&
+            version_compare($device['version'], '5.1.0') === -1) {
           // IronWare before Release 05.1.00b have bug (firmware returning snmpEngineTime * 10)
           // See: http://jira.observium.org/browse/OBSERVIUM-1199
           $snmpEngineTime /= 10;
         }
       }
-      $uptimes['snmpEngineTime'] = intval($snmpEngineTime);
+      $uptimes['snmpEngineTime'] = (int)$snmpEngineTime;
 
-      if ($uptimes['use'] === 'hrSystemUptime')
-      {
+      if ($uptimes['use'] === 'hrSystemUptime') {
         // Prefer snmpEngineTime only if more than hrSystemUptime
-        if ($uptimes['snmpEngineTime'] > $uptimes['hrSystemUptime']) { $uptimes['use'] = 'snmpEngineTime'; }
-      }
-      elseif ($uptimes['snmpEngineTime'] >= $uptimes['sysUpTime'])
-      {
+        if ($uptimes['snmpEngineTime'] > $uptimes['hrSystemUptime']) {
+          $uptimes['use'] = 'snmpEngineTime';
+        }
+      } elseif ($uptimes['snmpEngineTime'] >= $uptimes['sysUpTime']) {
         // in other cases prefer if more than sysUpTime
         $uptimes['use'] = 'snmpEngineTime';
       }
@@ -378,14 +371,16 @@ if ($poll_empty_count >= 2) {
 
 // Check if both (sysObjectID and sysDescr) changed, force full device rediscovery
 if (!$force_discovery && // Check if not already forced
-    isset($update_array['sysObjectID']) && isset($update_array['sysDescr']) &&
+    isset($update_array['sysObjectID'], $update_array['sysDescr']) &&
     strlen($poll_device['sysObjectID']) && strlen($device['sysObjectID']) &&
-    strlen($poll_device['sysDescr']) && strlen($device['sysDescr']))
-{
+    strlen($poll_device['sysDescr']) && strlen($device['sysDescr'])) {
   log_event('sysObjectID and sysDescr changed: seems the device was replaced. The device will be rediscovered.', $device, 'device', $device['device_id'], 4);
   force_discovery($device);
 }
 
+if (!empty($device['snmpable'])) {
+  print_cli_data('SNMPable OID',  $device['snmpable'], 2);
+}
 print_cli_data('sysObjectID',  $poll_device['sysObjectID'], 2);
 print_cli_data('snmpEngineID', $poll_device['snmpEngineID'], 2);
 print_cli_data('sysDescr',     $poll_device['sysDescr'], 2);

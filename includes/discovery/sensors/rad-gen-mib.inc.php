@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -91,7 +91,7 @@ foreach ($physicalConnectorEntry as $ifIndex => $entry)
   //print_debug_vars($options);
 
   $name = $options['port_label'];
-  $name_ext = " (${entry['portMfgName']} ${entry['portVendorPartNo']} ${entry['physicalConnectorString']})";
+  $name_ext = " ({$entry['portMfgName']} {$entry['portVendorPartNo']} {$entry['physicalConnectorString']})";
 
   // Temperature
   $descr     = $name . ' Temperature' . $name_ext;

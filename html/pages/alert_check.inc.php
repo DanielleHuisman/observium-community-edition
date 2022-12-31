@@ -6,12 +6,11 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-if ($_SESSION['userlevel'] < 5)
-{
+if ($_SESSION['userlevel'] < 5) {
   print_error_permission();
   return;
 }
@@ -22,7 +21,10 @@ include($config['html_dir']."/includes/alerting-navbar.inc.php");
 // Begin Actions
 $readonly = $_SESSION['userlevel'] < 10; // Currently edit allowed only for Admins
 
-$check = dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", array($vars['alert_test_id']));
+if (!$check = dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", [ $vars['alert_test_id'] ])) {
+  print_error_permission();
+  return;
+}
 
 // Hardcode Device sysContact
 if (!dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
@@ -40,11 +42,9 @@ if (!dbExist('alert_contacts', '`contact_method` = ?', [ 'syscontact' ])) {
 
 // FIXME: move all actions to separate include(s) with common options!
 //if (!$readonly && isset($vars['action']))
-if (!$readonly && $vars['action'])
-{
+if (!$readonly && $vars['action'] && request_token_valid($vars)) {
   // We are editing. Lets see what we are editing.
-  if ($vars['action'] === "check_conditions")
-  {
+  if ($vars['action'] === "check_conditions") {
     $conds = array(); $cond_array = array();
     foreach (explode("\n", trim($vars['check_conditions'])) as $cond)
     {
@@ -53,11 +53,8 @@ if (!$readonly && $vars['action'])
     }
     $conds = json_encode($conds);
     $rows_updated = dbUpdate(array('conditions' => $conds, 'and' => $vars['alert_and']), 'alert_tests', '`alert_test_id` = ?', array($vars['alert_test_id']));
-  }
-  elseif ($vars['action'] === "alert_details")
-  {
-    if ($entry = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', array($vars['alert_test_id'])))
-    {
+  } elseif ($vars['action'] === "alert_details") {
+    if ($entry = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', [ $vars['alert_test_id'] ])) {
       //print_vars($entry);
       $update_array = [
         'alert_name'        => $vars['alert_name'],
@@ -273,10 +270,11 @@ humanize_alert_check($check);
             </td>
             <td><i>' . $check['status_numbers'] . '</i><br />';
 
-  if (count($contacts))
-  {
+  if (safe_count($contacts)) {
     $content = "";
-    foreach($contacts as $contact) { $content .= '<span class="label">'.$contact['contact_method'].'</span> '.$contact['contact_descr'].'<br />'; }
+    foreach($contacts as $contact) {
+      $content .= '<span class="label">'.$contact['contact_method'].'</span> '.escape_html($contact['contact_descr']).'<br />';
+    }
     echo generate_tooltip_link('', '<span class="label label-success">'.count($contacts).' Notifiers</span>', $content);
   } else {
     echo '<span class="label label-primary">Default Notifier</span>';
@@ -1241,13 +1239,13 @@ echo generate_box_close(array('footer_content' => $footer_content));
                                       // confirmation dialog
                                       'attribs'     => array('data-toggle' => 'confirmation', // Enable confirmation dialog
                                                              'data-confirm-placement' => 'left',
-                                                             'data-confirm-content' => 'Delete contact \''.$contact['contact_descr'].'\'?'),
+                                                             'data-confirm-content' => 'Delete contact \''.escape_html($contact['contact_descr']).'\'?'),
                                       'value'       => 'delete_alert_checker_contact');
 
       echo '
     <tr>
       <td><span class="label">'.$contact['contact_method'].'</span></td>
-      <td>' . $contact['contact_descr'] . '</td>
+      <td>' . escape_html($contact['contact_descr']) . '</td>
       <td>' . generate_form($form) . '</td>
     </tr>';
       unset($form);

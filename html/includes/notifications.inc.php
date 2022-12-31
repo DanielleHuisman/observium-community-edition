@@ -23,6 +23,7 @@ $alerts_item        = get_cache_item('alerts');
 if (!ishit_cache_item($notifications_item) || !ishit_cache_item($alerts_item)) {
   // Generate/collect notifications/alerts
 
+
   if ($_SESSION['userlevel'] > 7) {
     $latest = [];
     $latest['version']  = get_obs_attrib('latest_ver');
@@ -39,17 +40,6 @@ if (!ishit_cache_item($notifications_item) || !ishit_cache_item($alerts_item)) {
       ];
     }
 
-
-    if (version_compare(PHP_VERSION, OBS_MIN_PHP_VERSION, '<')) {
-      $notifications[] = array('text' => '<h4>Your PHP version is too old.</h4>
-                                          Your currently installed PHP version <b>' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION . '</b>
-                                          is older than the required minimum.
-                                          Please upgrade your version of PHP to prevent possible incompatibilities and security problems.<br/>
-                                          Currently recommended version(s): <b>7.2.x</b> and newer.',
-                               'severity' => 'danger',
-                               'unixtime' => $config['time']['now']);
-    }
-
 //if (!function_exists('hash_exists'))
 //{
 //  $alerts[] = array('text' => '<b>The PHP `hash` module is missing</b> This will cause editing and other forms to fail. Please install it.', 'severity' => 'danger');
@@ -63,8 +53,7 @@ if (!ishit_cache_item($notifications_item) || !ishit_cache_item($alerts_item)) {
     }
 
     // Warning about web_url config, only for ssl
-    if (is_ssl() && preg_match('/^http:/', $config['web_url']))
-    {
+    if (is_ssl() && preg_match('/^http:/', $config['web_url'])) {
       $notifications[] = array('text' => 'Setting \'web_url\' for "External Web URL" not set or incorrect, please update on ' . generate_link('Global Settings Edit', array('page' => 'settings', 'section' => 'wui')) . ' page.', 'severity' => 'warning',
                                'unixtime' => $config['time']['now']);
     }
@@ -93,15 +82,6 @@ if (!ishit_cache_item($notifications_item) || !ishit_cache_item($alerts_item)) {
       $notifications[] = array('unixtime' => strtotime($entry['timestamp']),
                                'text'     => $entry['message'],
                                'severity' => $entry['severity']);
-    }
-
-    // Warning about obsolete config on some pages
-    if (OBS_DEBUG ||
-        in_array($vars['tab'], array('data', 'perf', 'edit', 'showtech')) ||
-        in_array($vars['page'], array('pollerlog', 'settings', 'preferences')))
-    {
-      // FIXME move to notification center?
-      print_obsolete_config();
     }
   }
 
@@ -142,6 +122,53 @@ if (!ishit_cache_item($notifications_item) || !ishit_cache_item($alerts_item)) {
   $alerts        = array_merge(get_cache_data($alerts_item),        $alerts);
 }
 
+// Admin level notifications on settings/perf pages
+if ($_SESSION['userlevel'] >= 10 && (in_array($vars['tab'], [ 'data', 'perf', 'edit', 'showtech' ]) ||
+                                     in_array($vars['page'], [ 'about', 'pollerlog', 'settings', 'preferences' ]))) {
+
+  if (version_compare(PHP_VERSION, OBS_MIN_PHP_VERSION, '<')) {
+    $notifications[] = array('text' => '<h4>Your PHP version is too old.</h4>
+                                          Your currently installed PHP version <b>' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION . '</b>
+                                          is older than the required minimum.
+                                          Please upgrade your version of PHP to prevent possible incompatibilities and security problems.<br/>
+                                          Currently recommended version(s): <b>7.2.x</b> and newer.',
+                             'severity' => 'danger',
+                             'unixtime' => $config['time']['now']);
+    $alerts[] = [
+      'title'    => 'PHP version is old',
+      'text'     => 'Your currently installed PHP version <b>' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION .
+                    "</b> is older than the recommended minimum <b>7.2.x</b>.",
+      'severity' => 'alert'
+    ];
+  }
+
+  // Same for MySQL/MariaDB
+  $versions = get_versions();
+  if ($versions['mysql_old']) {
+    $mysql_recommented = $versions['mysql_name'] === 'MariaDB' ? OBS_MIN_MARIADB_VERSION : OBS_MIN_MYSQL_VERSION;
+
+    $notifications[] = array('text' => '<h4>Your '.$versions['mysql_name'].' version is old.</h4>
+                                          Your currently installed '.$versions['mysql_name'].' version <b>' . $versions['mysql_version'] . '</b>
+                                          is older than the recommended minimum.
+                                          Please upgrade your version of '.$versions['mysql_name'].' to prevent possible incompatibilities and security problems.<br/>
+                                          Currently recommended version is <b>'.$mysql_recommented.'</b> and newer.',
+                             'severity' => 'warning',
+                             'unixtime' => $config['time']['now']);
+    $alerts[] = [
+      'title'    => $versions['mysql_name'].' version is old',
+      'text'     => 'Your currently installed '.$versions['mysql_name'].' version <b>' . $versions['mysql_version'] .
+                    "</b> is older than the recommended minimum <b>$mysql_recommented</b>.",
+      'severity' => 'warning'
+    ];
+  }
+  
+  // Warning about obsolete config on some pages
+  if (OBS_DEBUG) {
+    // FIXME move to notification center?
+    print_obsolete_config();
+  }
+
+}
 // Sort by unixtime
 $notifications = array_sort_by($notifications, 'unixtime', SORT_DESC, SORT_NUMERIC);
 

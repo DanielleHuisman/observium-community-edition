@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -31,7 +30,7 @@ echo generate_box_open();
 
 echo('<table class="table table-hover  table-striped table-condensed ">'. PHP_EOL);
 
-//$location_where = generate_query_values($vars['location'], 'location');
+//$location_where = generate_query_values_and($vars['location'], 'location');
 
 $cols = array(
                  array(NULL, 'class="state-marker"'),
@@ -57,7 +56,7 @@ echo('      </tr>');
 
 foreach (get_locations() as $location)
 {
-  $location_where = ' WHERE 1 ' . generate_query_values($location, 'location');
+  $location_where = ' WHERE 1 ' . generate_query_values_and($location, 'location');
   $location_where .= $GLOBALS['cache']['where']['devices_permitted'];
 
   $num        = dbFetchCell('SELECT COUNT(*) FROM `devices`' . $location_where);
@@ -67,11 +66,10 @@ foreach (get_locations() as $location)
 
   if ($location === '') { $location = OBS_VAR_UNSET; }
   $value = var_encode($location);
-  $name  = escape_html($location);
 
   echo('<tr class="'.$row_class.'">
           <td class="state-marker"></td>
-          <td class="entity">' . generate_link($name, array('page' => 'devices', 'location' => $value)) . '</td>
+          <td class="entity">' . generate_link($location, array('page' => 'devices', 'location' => $value)) . '</td>
           <td style="text-align: right;"><strong class="label label-success">' . $num . '</strong></td>' . PHP_EOL);
   foreach (array_keys($cache['device_types']) as $type)
   {

@@ -57,6 +57,9 @@ switch ($vars['sort']) {
   case 'mac':
     $select .= ',`ifPhysAddress`';
     break;
+  case 'mtu':
+    $select .= ',`ifMtu`';
+    break;
   case 'device':
     $select .= ',`devices`.`hostname`';
     break;

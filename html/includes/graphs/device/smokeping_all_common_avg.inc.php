@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -164,8 +163,6 @@ $rrd_options .= $rrd_options_lc;
 $rrd_options .= $rrd_options_bg;
 
 $rrd_options .= " COMMENT:'\l'";                    # matt.ayre: annotation showing smokeping parameters
-$rrd_options .= " COMMENT:'probes\:\t$pings ICMP Echo Pings ($description) every ${interval}s\l'";
- 
+$rrd_options .= " COMMENT:'probes\:\t$pings ICMP Echo Pings ($description) every {$interval}s\l'";
 
-
-?>
+// EOF

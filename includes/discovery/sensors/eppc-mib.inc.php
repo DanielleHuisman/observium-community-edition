@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,70 +6,199 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2015 Adam Armstrong
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
-echo('Caching OIDs: ');
-$ups_array = array();
-
-$InputTableCount = snmp_get($device, 'upsESystemInputNumPhases.0', '-OQv', $mib);
-echo('upsESystemInputTable ('.$InputTableCount.' entries)');
-$ups_array = snmpwalk_cache_oid($device, 'upsESystemInputTable', $ups_array, $mib);
-
-$OutputTableCount = snmp_get($device, 'upsESystemOutputNumPhase.0', '-OQv', $mib);
-echo('upsESystemOutputTable ('.$OutputTableCount.' entries)');
-$ups_array = snmpwalk_cache_oid($device, 'upsESystemOutputTable', $ups_array, $mib);
-
-$BypassTableCount = snmp_get($device, 'upsESystemBypassNumPhase.0', '-OQv', $mib);
-echo('upsESystemBypassTable ('.$BypassTableCount.' entries)');
-$ups_array = snmpwalk_cache_oid($device, 'upsESystemBypassTable', $ups_array, $mib);
-
-$scale = 0.1;
-$nominal = snmp_get($device, 'upsESystemConfigOutputVoltage.0', '-OQv', $mib) * $scale;
-$voltage_limits = array('limit_high' => ($nominal * 1.03), 'limit_high_warn' => ($nominal * 1.01), 'limit_low' => ($nominal * 0.97), 'limit_low_warn' => ($nominal * 0.99));
-
 # Input Sensors
-for ($index = 1; $index <= $InputTableCount; $index++)
-{
-  $data = $ups_array[$index];
 
-  $descr  = 'Input';
-  $oid    = '.1.3.6.1.4.1.935.10.1.1.2.16.1.3.'.$index; # EPPC-MIB:upsESystemInputVoltage.$index
-  $value  = $data['upsESystemInputVoltage'];
-  discover_sensor('voltage', $device, $oid, "upsESystemInputVoltage.$index", 'eppc-mib', $descr, 0.1, $value, $voltage_limits);
+// EPPC-MIB::upsESystemConfigInputVoltage.0 = INTEGER: 2300
+// EPPC-MIB::upsESystemConfigInputFrequence.0 = INTEGER: 500
+// EPPC-MIB::upsESystemInputSourceNum.0 = INTEGER: 1
+// EPPC-MIB::upsESystemInputLineBads.0 = Counter32: 0
+// EPPC-MIB::upsESystemInputNumPhases.0 = INTEGER: 1
+// EPPC-MIB::upsESystemInputFrequency.1 = INTEGER: 500
+// EPPC-MIB::upsESystemInputVoltage.1 = INTEGER: 2301
+// EPPC-MIB::upsESystemInputCurrent.1 = INTEGER: -1
+// EPPC-MIB::upsESystemInputWatts.1 = INTEGER: -1
+$input_phases = snmp_get_oid($device, 'upsESystemInputNumPhases.0', $mib);
+if ($input_phases > 0) {
+  echo('upsESystemInputTable ('.$input_phases.' phases)');
 
-  $descr  = "Input";
-  $oid    = ".1.3.6.1.4.1.935.10.1.1.2.16.1.2.".$index; # EPPC-MIB:upsESystemInputFrequency.$index
-  $value  = $data['upsESystemInputFrequency'];
-  $limits = array('limit_high' => 55, 'limit_high_warn' => 51, 'limit_low' => 45, 'limit_low_warn' => 49);
-  discover_sensor('frequency', $device, $oid, "upsESystemInputFrequency.$index", 'eppc-mib', $descr, 0.1, $value, $limits);
+  $scale = 0.1;
+  $ups_array = snmpwalk_cache_oid($device, 'upsESystemInputTable', [], $mib);
+  $input_voltage = snmp_get_oid($device, 'upsESystemConfigInputVoltage.0', $mib) * $scale;
+  if ($input_voltage > 0) {
+    $voltage_limits = [
+      'limit_high' => $input_voltage * 1.03, 'limit_high_warn' => $input_voltage * 1.01,
+      'limit_low'  => $input_voltage * 0.97, 'limit_low_warn' => $input_voltage * 0.99
+    ];
+  } else {
+    $voltage_limits = [];
+  }
+  $input_frequency = snmp_get_oid($device, 'upsESystemConfigInputFrequence.0', $mib) * $scale;
+  if ($input_frequency > 0) {
+    $frequency_limits = [
+      'limit_high' => $input_frequency * 1.10, 'limit_high_warn' => $input_frequency * 1.02,
+      'limit_low'  => $input_frequency * 0.90, 'limit_low_warn' => $input_frequency * 0.98
+    ];
+  } else {
+    $frequency_limits = [];
+  }
+
+  foreach ($ups_array as $phase => $entry) {
+    $descr  = 'Input';
+    if ($input_phases > 1) {
+      $descr .= ' (Phase '.$phase.')';
+    }
+
+    $oid_name = 'upsESystemInputVoltage';
+    $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.16.1.3.'.$phase;
+    $value    = $entry[$oid_name];
+
+    $options  = $voltage_limits;
+    $options['rename_rrd'] = "eppc-mib-upsESystemInputVoltage.%index%";
+    //discover_sensor('voltage', $device, $oid, "upsESystemInputVoltage.$index", 'eppc-mib', $descr, 0.1, $value, $voltage_limits);
+    discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+
+    $oid_name = 'upsESystemInputFrequency';
+    $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.16.1.2.'.$phase;
+    $value    = $entry[$oid_name];
+
+    $options  = $frequency_limits;
+    $options['rename_rrd'] = "eppc-mib-upsESystemInputFrequency.%index%";
+    //discover_sensor('frequency', $device, $oid, "upsESystemInputFrequency.$index", 'eppc-mib', $descr, 0.1, $value, $limits);
+    discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+
+    if ($entry['upsESystemInputCurrent'] > 0) {
+      $oid_name = 'upsESystemInputCurrent';
+      $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.16.1.4.'.$phase;
+      $value    = $entry[$oid_name];
+
+      discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value);
+    }
+
+    if ($entry['upsESystemInputWatts'] > 0) {
+      $oid_name = 'upsESystemInputWatts';
+      $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.16.1.5.'.$phase;
+      $value    = $entry[$oid_name];
+
+      discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value);
+    }
+  }
 }
 
 # Output Sensors
-for ($index = 1; $index <= $InputTableCount; $index++)
-{
-  $data = $ups_array[$index];
+// EPPC-MIB::upsESystemConfigOutputVoltage.0 = INTEGER: -1
+// EPPC-MIB::upsESystemConfigOutputFrequency.0 = INTEGER: -1
+// EPPC-MIB::upsESystemConfigOutputVA.0 = INTEGER: -1
+// EPPC-MIB::upsESystemConfigOutputPower.0 = INTEGER: -1
+// EPPC-MIB::upsESystemConfigOutputLoadHighSetPoint.0 = INTEGER: 90
+// EPPC-MIB::upsESystemOutputNumPhase.0 = INTEGER: 1
+// EPPC-MIB::upsESystemOutputFrequency.1 = INTEGER: 500
+// EPPC-MIB::upsESystemOutputVoltage.1 = INTEGER: 2299
+// EPPC-MIB::upsESystemOutputCurrent.1 = INTEGER: 64
+// EPPC-MIB::upsESystemOutputWatts.1 = INTEGER: 1300
+// EPPC-MIB::upsESystemOutputVA.1 = INTEGER: 1400
+// EPPC-MIB::upsESystemOutputLoad.1 = INTEGER: 24
 
-  $descr  = "Output";
-  $oid    = ".1.3.6.1.4.1.935.10.1.1.2.18.1.3.$index"; # EPPC-MIB:upsESystemOutputVoltage.$index
-  $value  = $data['upsESystemOutputVoltage'];
-  discover_sensor('voltage', $device, $oid, "upsESystemOutputVoltage.$index", 'eppc-mib', $descr, 0.1, $value, $voltage_limits);
+$output_phases = snmp_get_oid($device, 'upsESystemOutputNumPhase.0', $mib);
+if ($output_phases > 0) {
+  echo('upsESystemOutputTable (' . $output_phases . ' phases)');
 
-  $descr  = "Output";
-  $oid    = ".1.3.6.1.4.1.935.10.1.1.2.18.1.2.$index"; # EPPC-MIB:upsESystemOutputFrequency.$index
-  $value  = $data['upsESystemOutputFrequency'];
-  $limits = array('limit_high' => 55, 'limit_high_warn' => 51, 'limit_low' => 45, 'limit_low_warn' => 49); // FIXME orly? 50Hz only?
-  discover_sensor('frequency', $device, $oid, "upsESystemOutputFrequency.$index", 'eppc-mib', $descr, 0.1, $value, $limits);
+  $scale = 0.1;
+  $ups_array = snmpwalk_cache_oid($device, 'upsESystemOutputTable', [], $mib);
 
-  $descr  = "Output";
-  $oid    = ".1.3.6.1.4.1.935.10.1.1.2.18.1.7.$index"; # EPPC-MIB:upsESystemOutputLoad.$index
-  $value  = $data['upsESystemOutputLoad'];
-  $limits = array('limit_high' => 100, 'limit_high_warn' => 75, 'limit_low' => 0);
-  discover_sensor('load', $device, $oid, "upsESystemOutputLoad.$index", 'eppc-mib', $descr, 1, $value, $limits);
+  $output_voltage = snmp_get_oid($device, 'upsESystemConfigOutputVoltage.0', $mib) * $scale;
+  if ($output_voltage > 0) {
+    $voltage_limits = [
+      'limit_high' => $output_voltage * 1.03, 'limit_high_warn' => $output_voltage * 1.01,
+      'limit_low'  => $output_voltage * 0.97, 'limit_low_warn' => $output_voltage * 0.99
+    ];
+  } else {
+    // Keep input voltage limits
+    //$voltage_limits = [];
+  }
+
+  $output_frequency = snmp_get_oid($device, 'upsESystemConfigOutputFrequency.0', $mib) * $scale;
+  if ($output_frequency > 0) {
+    $frequency_limits = [
+      'limit_high' => $output_frequency * 1.10, 'limit_high_warn' => $output_frequency * 1.02,
+      'limit_low'  => $output_frequency * 0.90, 'limit_low_warn' => $output_frequency * 0.98
+    ];
+  } else {
+    // Keep input frequency limits
+    //$frequency_limits = [];
+  }
+
+  foreach ($ups_array as $phase => $entry) {
+    $descr = 'Output';
+    if ($input_phases > 1) {
+      $descr .= ' (Phase ' . $phase . ')';
+    }
+
+    $oid_name = 'upsESystemOutputVoltage';
+    $oid_num  = ".1.3.6.1.4.1.935.10.1.1.2.18.1.3.$index";
+    $value    = $entry[$oid_name];
+
+    $options  = $voltage_limits;
+    $options['rename_rrd'] = "eppc-mib-upsESystemOutputVoltage.%index%";
+    //discover_sensor('voltage', $device, $oid, "upsESystemOutputVoltage.$index", 'eppc-mib', $descr, 0.1, $value, $voltage_limits);
+    discover_sensor_ng($device, 'voltage', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+
+    $oid_name = 'upsESystemOutputFrequency';
+    $oid_num  = ".1.3.6.1.4.1.935.10.1.1.2.18.1.2.$index";
+    $value    = $entry[$oid_name];
+
+    $options  = $frequency_limits;
+    $options['rename_rrd'] = "eppc-mib-upsESystemOutputFrequency.%index%";
+    //discover_sensor('frequency', $device, $oid, "upsESystemOutputFrequency.$index", 'eppc-mib', $descr, 0.1, $value, $limits);
+    discover_sensor_ng($device, 'frequency', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value, $options);
+
+    $oid_name = 'upsESystemOutputLoad';
+    $oid_num  = ".1.3.6.1.4.1.935.10.1.1.2.18.1.7.$index";
+    $value    = $entry[$oid_name];
+
+    $options  = [ 'limit_high' => 90, 'limit_high_warn' => 75 ];
+    $options['rename_rrd'] = "eppc-mib-upsESystemOutputLoad.%index%";
+    //discover_sensor('load', $device, $oid, "upsESystemOutputLoad.$index", 'eppc-mib', $descr, 1, $value, $limits);
+    discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value, $options);
+
+    if ($entry['upsESystemOutputCurrent'] > 0) {
+      $oid_name = 'upsESystemOutputCurrent';
+      $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.4.'.$phase;
+      $value    = $entry[$oid_name];
+
+      discover_sensor_ng($device, 'current', $mib, $oid_name, $oid_num, $phase, NULL, $descr, $scale, $value);
+    }
+
+    if ($entry['upsESystemOutputWatts'] > 0) {
+      $oid_name = 'upsESystemOutputWatts';
+      $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.5.'.$phase;
+      $value    = $entry[$oid_name];
+
+      discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value);
+    }
+
+    if ($entry['upsESystemOutputVA'] > 0) {
+      $oid_name = 'upsESystemOutputVA';
+      $oid_num  = '.1.3.6.1.4.1.935.10.1.1.2.18.1.6.'.$phase;
+      $value    = $entry[$oid_name];
+
+      discover_sensor_ng($device, 'apower', $mib, $oid_name, $oid_num, $phase, NULL, $descr, 1, $value);
+    }
+  }
 }
 
-// FIXME Sensors below are a definite candidate for definition-based discovery
+# bypass sensors
+// EPPC-MIB::upsESystemBypassNumPhase.0 = INTEGER: -1
+$bypass_phases = snmp_get_oid($device, 'upsESystemBypassNumPhase.0', $mib);
+if ($bypass_phases > 0) {
+  echo('upsESystemBypassTable (' . $bypass_phases . ' phases)');
+  $ups_array = snmpwalk_cache_oid($device, 'upsESystemBypassTable', [], $mib);
+}
+
+/* FIXME Sensors below are a definite candidate for definition-based discovery
 
 $descr  = 'Charge Remaining';
 $oid    = '.1.3.6.1.4.1.935.10.1.1.3.4.0'; # EPPC-MIB:upsEBatteryEstimatedChargeRemaining
@@ -96,7 +224,7 @@ $high   = snmp_get($device, 'upsEEnvironmentTemperatureHighSetPoint.0', '-OQv', 
 $low    = snmp_get($device, 'upsEEnvironmentTemperatureLowSetPoint.0', '-OQv', $mib);
 $limits = array('limit_high' => $high * $scale, 'limit_high_warn' => ($high * $scale) * .75, 'limit_low' => $low * $scale);
 discover_sensor('temperature', $device, $oid, 'upsESystemTemperature', 'eppc-mib', $descr, $scale, $value, $limits); // FIXME should be upsESystemTemperature.0
-
+*/
 unset($limits, $ups_array);
 
 // EOF

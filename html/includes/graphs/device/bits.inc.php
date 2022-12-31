@@ -15,7 +15,7 @@
 $ds_in  = "INOCTETS";
 $ds_out = "OUTOCTETS";
 
-$graph_return = array('descr' => 'Device total traffic in bits/sec.');
+$graph_return['descr'] = 'Device total traffic in bits/sec.';
 
 // init
 $i = 0;

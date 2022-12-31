@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -101,10 +101,10 @@ if (!safe_empty($hrStorage)) {
       }
     }
 
-    if (is_numeric($index)) {
+    if (is_numeric($index) && $size != 0) {
       discover_storage($valid['storage'], $device, $index, $fstype, $mib, $descr, $units, $size, $used, [ 'storage_hc' => $hc ]);
 
-      $dsk_done[$descr] = $descr;
+      $dsk_done[$descr] = $path;
     }
 
     unset($fstype, $descr, $size, $used, $units, $path, $dsk, $hc);
@@ -136,7 +136,7 @@ if (!safe_empty($cache_discovery['ucd-snmp-mib'])) {
       $used  = $dsk['dskUsed'] * $units;
     }
 
-    if (is_numeric($index)) {
+    if (is_numeric($index) && $size != 0) {
       discover_storage($valid['storage'], $device, $index, $fstype, $mib, $descr, $units, $size, $used, [ 'storage_hc' => $hc ]);
     }
     unset($fstype, $descr, $size, $used, $units, $hc);

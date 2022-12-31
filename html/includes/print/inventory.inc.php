@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -28,31 +28,31 @@ function generate_inventory_query($vars) {
       {
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'os':
-          $where .= generate_query_values($value, 'os');
+          $where .= generate_query_values_and($value, 'os');
           $select[] = 'devices.os';
           $devices = TRUE;
           break;
         case 'parts':
         case 'entPhysicalModelName':
-          $where .= generate_query_values($value, 'entPhysicalModelName', 'LIKE');
+          $where .= generate_query_values_and($value, 'entPhysicalModelName', 'LIKE');
           break;
         case 'serial':
         case 'entPhysicalSerialNum':
-        $where .= generate_query_values($value, 'entPhysicalSerialNum', '%LIKE%');
+        $where .= generate_query_values_and($value, 'entPhysicalSerialNum', '%LIKE%');
           break;
         case 'description':
         case 'entPhysicalDescr':
-          $where .= generate_query_values($value, 'entPhysicalDescr', '%LIKE%');
+          $where .= generate_query_values_and($value, 'entPhysicalDescr', '%LIKE%');
           break;
         case 'class':
         case 'entPhysicalClass':
-          $where .= generate_query_values($value, 'entPhysicalClass', '%LIKE%');
+          $where .= generate_query_values_and($value, 'entPhysicalClass', '%LIKE%');
           break;
         case 'deleted':
-          $where .= generate_query_values($value, 'deleted', 'NOT NULL');
+          $where .= generate_query_values_and($value, 'deleted', 'NOT NULL');
           break;
       }
     }
@@ -371,15 +371,15 @@ relay
 
     // vendor + model + hw
     $ent_model = '';
-    if ($ent['entPhysicalModelName'] && !in_array($ent['entPhysicalModelName'], [ 'N/A' ])) {
-      if ($ent['entPhysicalMfgName'] && !in_array($ent['entPhysicalMfgName'], [ 'N/A' ])) {
+    if ($ent['entPhysicalModelName'] && is_valid_param($ent['entPhysicalModelName'], 'hardware')) {
+      if ($ent['entPhysicalMfgName'] && is_valid_param($ent['entPhysicalMfgName'], 'vendor')) {
         $ent_model .= $ent['entPhysicalMfgName'];
       }
 
       $ent_model .= ' ' . $ent['entPhysicalModelName'];
 
-      if ($ent['entPhysicalHardwareRev'] && !in_array($ent['entPhysicalHardwareRev'], [ 'N/A' ])) {
-        $ent_model .= " ${ent['entPhysicalHardwareRev']}";
+      if ($ent['entPhysicalHardwareRev'] && is_valid_param($ent['entPhysicalHardwareRev'], 'revision')) {
+        $ent_model .= " " . $ent['entPhysicalHardwareRev'];
       }
       $ent_model = trim($ent_model);
     }

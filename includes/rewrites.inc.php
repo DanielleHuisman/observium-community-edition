@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -297,8 +297,7 @@ function humanize_alert_entry(&$entry)
  * @return none
  */
 // TESTME needs unit testing
-function humanize_device(&$device)
-{
+function humanize_device(&$device) {
   global $config;
 
   // Exit if already humanized
@@ -308,8 +307,7 @@ function humanize_device(&$device)
   $device['state'] = safe_unserialize($device['device_state']);
 
   // Set the HTML class and Tab color for the device based on status
-  if ($device['status'] == '0')
-  {
+  if ($device['status'] == '0') {
     $device['row_class'] = "danger";
     $device['html_row_class'] = "error";
   } else {
@@ -319,23 +317,20 @@ function humanize_device(&$device)
   if ($device['ignore'] == '1' || (!is_null($device['ignore_until']) && strtotime($device['ignore_until']) > time()) )
   {
     $device['html_row_class'] = "suppressed";
-    if ($device['status'] == '1')
-    {
+    if ($device['status'] == '1') {
       $device['html_row_class'] = "success";  // Why green for ignore? Confusing!
                                               // I chose this purely because using green for up and blue for up/ignore was uglier.
     } else {
       $device['row_class'] = "suppressed";
     }
   }
-  if ($device['disabled'] == '1')
-  {
+  if ($device['disabled'] == '1') {
     $device['row_class'] = "disabled";
     $device['html_row_class'] = "disabled";
   }
 
   // Set country code always lowercase
-  if (isset($device['location_country']))
-  {
+  if (isset($device['location_country'])) {
     $device['location_country'] = strtolower($device['location_country']);
   }
 
@@ -444,9 +439,11 @@ function process_port_label(&$this_port, $device) {
 
   // Will copy ifDescr -> ifAlias if ifDescr != ifName (Actually for Brocade NOS and Allied Telesys devices)
   if (isset($config['os'][$device['os']]['ifDescr_ifAlias']) && $config['os'][$device['os']]['ifDescr_ifAlias'] &&
-      $this_port['ifType'] === 'ethernetCsmacd' && $this_port['ifDescr'] !== $this_port['ifName'] &&
-      $this_port['ifDescr'] !== '-' && !str_starts($this_port['ifDescr'], 'Allied Teles')) {
-    if (empty($this_port['ifAlias']) || $this_port['ifName'] === $this_port['ifAlias']) {
+      $this_port['ifDescr'] !== $this_port['ifName'] && $this_port['ifDescr'] !== '-' &&
+      in_array($this_port['ifType'], [ 'ethernetCsmacd', 'opticalTransport', 'opticalChannel', 'ip' ], TRUE) &&
+      !str_starts($this_port['ifDescr'], [ 'Allied Teles', 'No description configured' ])) {
+
+    if (safe_empty($this_port['ifAlias']) || $this_port['ifName'] === $this_port['ifAlias']) {
       $this_port['ifAlias'] = $this_port['ifDescr'];
     }
   }
@@ -709,11 +706,15 @@ function humanize_port(&$port) {
   if (isset($port['humanized']) && $port['humanized']) { return; }
 
   // Pre-check if port attribs for device exist
-  if (!isset($GLOBALS['cache']['devices_attribs'][$port['device_id']]['port'])) {
-    $GLOBALS['cache']['devices_attribs'][$port['device_id']]['port'] = dbExist('entity_attribs', '`entity_type` = ? AND `device_id` = ?', [ 'port', $port['device_id'] ]);
+  if (!isset($GLOBALS['cache']['devices_attribs'][$port['device_id']])) {
+    cache_device_attribs_exist($port);
   }
+  // if (!isset($GLOBALS['cache']['devices_attribs'][$port['device_id']]['port'])) {
+  //   $GLOBALS['cache']['devices_attribs'][$port['device_id']]['port'] = dbExist('entity_attribs', '`entity_type` = ? AND `device_id` = ?', [ 'port', $port['device_id'] ]);
+  // }
   // Speedup queries, when not exist attribs
-  if ($GLOBALS['cache']['devices_attribs'][$port['device_id']]['port']) {
+  if (isset($GLOBALS['cache']['devices_attribs'][$port['device_id']]['port']) &&
+      $GLOBALS['cache']['devices_attribs'][$port['device_id']]['port']) {
     $port['attribs'] = get_entity_attribs('port', $port['port_id']);
   } else {
     $port['attribs'] = [];
@@ -828,148 +829,6 @@ function humanize_port(&$port) {
 
 // Rewrite arrays
 /// FIXME. Clean, rename GLOBAL $rewrite_* variables into $config['rewrite'] definition
-
-$rewrite_breeze_type = array(
-  'aubs'     => 'AU-BS',    // modular access unit
-  'ausa'     => 'AU-SA',    // stand-alone access unit
-  'su-6-1d'  => 'SU-6-1D',  // subscriber unit supporting 6 Mbps (after 5.0 - deprecated)
-  'su-6-bd'  => 'SU-6-BD',  // subscriber unit supporting 6 Mbps
-  'su-24-bd' => 'SU-24-BD', // subscriber unit supporting 24 Mbps
-  'bu-b14'   => 'BU-B14',   // BreezeNET Base Unit supporting 14 Mbps
-  'bu-b28'   => 'BU-B28',   // BreezeNET Base Unit supporting 28 Mbps
-  'rb-b14'   => 'RB-B14',   // BreezeNET Remote Bridge supporting 14 Mbps
-  'rb-b28'   => 'RB-B28',   // BreezeNET Remote Bridge supporting 28 Mbps
-  'su-bd'    => 'SU-BD',    // subscriber unit
-  'su-54-bd' => 'SU-54-BD', // subscriber unit supporting 54 Mbps
-  'su-3-1d'  => 'SU-3-1D',  // subscriber unit supporting 3 Mbps (after 5.0 - deprecated)
-  'su-3-4d'  => 'SU-3-4D',  // subscriber unit supporting 3 Mbps
-  'ausbs'    => 'AUS-BS',   // modular access unit supporting maximum 25 subscribers
-  'aussa'    => 'AUS-SA',   // stand-alone access unit supporting maximum 25 subscribers
-  'aubs4900' => 'AU-BS-4900', // BreezeAccess 4900 modular access unit
-  'ausa4900' => 'AU-SA-4900', // BreezeAccess 4900 stand alone access unit
-  'subd4900' => 'SU-BD-4900', // BreezeAccess 4900 subscriber unit
-  'bu-b100'  => 'BU-B100',  // BreezeNET Base Unit unlimited throughput
-  'rb-b100'  => 'BU-B100',  // BreezeNET Remote Bridge unlimited throughput
-  'su-i'     => 'SU-I',
-  'au-ez'    => 'AU-EZ',
-  'su-ez'    => 'SU-EZ',
-  'su-v'     => 'SU-V',     // subscriber unit supporting 12 Mbps downlink and 8 Mbps uplink
-  'bu-b10'   => 'BU-B10',   // BreezeNET Base Unit supporting 5 Mbps
-  'rb-b10'   => 'RB-B10',   // BreezeNET Base Unit supporting 5 Mbps
-  'su-8-bd'  => 'SU-8-BD',  // subscriber unit supporting 8 Mbps
-  'su-1-bd'  => 'SU-1-BD',  // subscriber unit supporting 1 Mbps
-  'su-3-l'   => 'SU-3-L',   // subscriber unit supporting 3 Mbps
-  'su-6-l'   => 'SU-6-L',   // subscriber unit supporting 6 Mbps
-  'su-12-l'  => 'SU-12-L',  // subscriber unit supporting 12 Mbps
-  'au'       => 'AU',       // security access unit
-  'su'       => 'SU',       // security subscriber unit
-);
-
-$rewrite_cpqida_hardware = array(
-  'other'      => 'Other',
-  'ida'        => 'IDA',
-  'idaExpansion' => 'IDA Expansion',
-  'ida-2'      => 'IDA - 2',
-  'smart'      => 'SMART',
-  'smart-2e'   => 'SMART - 2/E',
-  'smart-2p'   => 'SMART - 2/P',
-  'smart-2sl'  => 'SMART - 2SL',
-  'smart-3100es' => 'Smart - 3100ES',
-  'smart-3200' => 'Smart - 3200',
-  'smart-2dh'  => 'SMART - 2DH',
-  'smart-221'  => 'Smart - 221',
-  'sa-4250es'  => 'Smart Array 4250ES',
-  'sa-4200'    => 'Smart Array 4200',
-  'sa-integrated' => 'Integrated Smart Array',
-  'sa-431'     => 'Smart Array 431',
-  'sa-5300'    => 'Smart Array 5300',
-  'raidLc2'    => 'RAID LC2 Controller',
-  'sa-5i'      => 'Smart Array 5i',
-  'sa-532'     => 'Smart Array 532',
-  'sa-5312'    => 'Smart Array 5312',
-  'sa-641'     => 'Smart Array 641',
-  'sa-642'     => 'Smart Array 642',
-  'sa-6400'    => 'Smart Array 6400',
-  'sa-6400em'  => 'Smart Array 6400 EM',
-  'sa-6i'      => 'Smart Array 6i',
-  'sa-generic' => 'Generic Array',
-  'sa-p600'    => 'Smart Array P600',
-  'sa-p400'    => 'Smart Array P400',
-  'sa-e200'    => 'Smart Array E200',
-  'sa-e200i'   => 'Smart Array E200i',
-  'sa-p400i'   => 'Smart Array P400i',
-  'sa-p800'    => 'Smart Array P800',
-  'sa-e500'    => 'Smart Array E500',
-  'sa-p700m'   => 'Smart Array P700m',
-  'sa-p212'    => 'Smart Array P212',
-  'sa-p410'    => 'Smart Array P410',
-  'sa-p410i'   => 'Smart Array P410i',
-  'sa-p411'    => 'Smart Array P411',
-  'sa-b110i'   => 'Smart Array B110i',
-  'sa-p712m'   => 'Smart Array P712m',
-  'sa-p711m'   => 'Smart Array P711m',
-  'sa-p812'    => 'Smart Array P812',
-  'sw-1210m'   => 'StorageWorks 1210m',
-  'sa-p220i'   => 'Smart Array P220i',
-  'sa-p222'    => 'Smart Array P222',
-  'sa-p420'    => 'Smart Array P420',
-  'sa-p420i'   => 'Smart Array P420i',
-  'sa-p421'    => 'Smart Array P421',
-  'sa-b320i'   => 'Smart Array B320i',
-  'sa-p822'    => 'Smart Array P822',
-  'sa-p721m'   => 'Smart Array P721m',
-  'sa-b120i'   => 'Smart Array B120i',
-  'hps-1224'   => 'HP Storage p1224',
-  'hps-1228'   => 'HP Storage p1228',
-  'hps-1228m'  => 'HP Storage p1228m',
-  'sa-p822se'  => 'Smart Array P822se',
-  'hps-1224e'  => 'HP Storage p1224e',
-  'hps-1228e'  => 'HP Storage p1228e',
-  'hps-1228em' => 'HP Storage p1228em',
-  'sa-p230i'   => 'Smart Array P230i',
-  'sa-p430i'   => 'Smart Array P430i',
-  'sa-p430'    => 'Smart Array P430',
-  'sa-p431'    => 'Smart Array P431',
-  'sa-p731m'   => 'Smart Array P731m',
-  'sa-p830i'   => 'Smart Array P830i',
-  'sa-p830'    => 'Smart Array P830',
-  'sa-p831'    => 'Smart Array P831',
-  'sa-p530'    => 'Smart Array P530',
-  'sa-p531'    => 'Smart Array P531',
-  'sa-p244br'  => 'Smart Array P244br',
-  'sa-p246br'  => 'Smart Array P246br',
-  'sa-p440'    => 'Smart Array P440',
-  'sa-p440ar'  => 'Smart Array P440ar',
-  'sa-p441'    => 'Smart Array P441',
-  'sa-p741m'   => 'Smart Array P741m',
-  'sa-p840'    => 'Smart Array P840',
-  'sa-p841'    => 'Smart Array P841',
-  'sh-h240ar'  => 'Smart HBA H240ar',
-  'sh-h244br'  => 'Smart HBA H244br',
-  'sh-h240'    => 'Smart HBA H240',
-  'sh-h241'    => 'Smart HBA H241',
-  'sa-b140i'   => 'Smart Array B140i',
-  'sh-generic' => 'Smart HBA',
-  'sa-p240nr'  => 'Smart Array P240nr',
-  'sh-h240nr'  => 'Smart HBA H240nr',
-  'sa-p840ar'  => 'Smart Array P840ar',
-  'sa-p542d'   => 'Smart Array P542D',
-  's100i'      => 'Smart Array S100i',
-  'e208i-p'    => 'Smart Array E208i-p',
-  'e208i-a'    => 'Smart Array E208i-a',
-  'e208i-c'    => 'Smart Array E208i-c',
-  'e208e-p'    => 'Smart Array E208e-p',
-  'p204i-b'    => 'Smart Array P204i-b',
-  'p204i-c'    => 'Smart Array P204i-c',
-  'p408i-p'    => 'Smart Array P408i-p',
-  'p408i-a'    => 'Smart Array P408i-a',
-  'p408e-p'    => 'Smart Array P408e-p',
-  'p408i-c'    => 'Smart Array P408i-c',
-  'p408e-m'    => 'Smart Array P408e-m',
-  'p416ie-m'   => 'Smart Array P416ie-m',
-  'p816i-a'    => 'Smart Array P816i-a',
-  'p408i-sb'   => 'Smart Array P408i-sb'
-);
 
 $rewrite_liebert_hardware = array(
   // UpsProducts - Liebert UPS Registrations
@@ -1123,13 +982,8 @@ function rewrite_extreme_hardware($hardware)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_cpqida_hardware($hardware)
-{
-  global $rewrite_cpqida_hardware;
-
-  $hardware = array_str_replace($rewrite_cpqida_hardware, $hardware);
-
-  return ($hardware);
+function rewrite_cpqida_hardware($hardware) {
+  return array_str_replace($GLOBALS['config']['rewrites']['cpqida_hardware'], $hardware);
 }
 
 // DOCME needs phpdoc block
@@ -1148,61 +1002,50 @@ function rewrite_liebert_hardware($hardware)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_breeze_type($type)
-{
+function rewrite_breeze_type($type) {
   $type = strtolower($type);
-  if (isset($GLOBALS['rewrite_breeze_type'][$type]))
-  {
-    return $GLOBALS['rewrite_breeze_type'][$type];
-  } else {
-    return strtoupper($type);
-  }
+
+  return isset($GLOBALS['config']['rewrites']['breeze_type'][$type]) ? $GLOBALS['config']['rewrites']['breeze_type'][$type] : strtoupper($type);
 }
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_unix_hardware($descr, $hw = NULL)
-{
-  $hardware = (!empty($hw) ? trim($hw): 'Generic');
+function rewrite_unix_hardware($descr, $hw = NULL) {
+
+  $hardware = !empty($hw) ? trim($hw): 'Generic';
 
   if     (preg_match('/i[3456]86/i',    $descr)) { $hardware .= ' x86 [32bit]'; }
   elseif (preg_match('/x86_64|amd64/i', $descr)) { $hardware .= ' x86 [64bit]'; }
-  elseif (stristr($descr, 'ia64'))    { $hardware .= ' IA [64bit]'; }
-  elseif (stristr($descr, 'ppc'))     { $hardware .= ' PPC [32bit]'; }
-  elseif (stristr($descr, 'sparc32')) { $hardware .= ' SPARC [32bit]'; }
-  elseif (stristr($descr, 'sparc64')) { $hardware .= ' SPARC [64bit]'; }
-  elseif (stristr($descr, 'mips64'))  { $hardware .= ' MIPS [64bit]'; }
-  elseif (stristr($descr, 'mips'))    { $hardware .= ' MIPS [32bit]'; }
-  elseif (preg_match('/armv(\d+)/i', $descr, $matches))
-  {
+  elseif (stripos($descr, 'ia64') !== FALSE)     { $hardware .= ' IA [64bit]'; }
+  elseif (stripos($descr, 'ppc') !== FALSE)      { $hardware .= ' PPC [32bit]'; }
+  elseif (stripos($descr, 'sparc32') !== FALSE)  { $hardware .= ' SPARC [32bit]'; }
+  elseif (stripos($descr, 'sparc64') !== FALSE)  { $hardware .= ' SPARC [64bit]'; }
+  elseif (stripos($descr, 'mips64') !== FALSE)   { $hardware .= ' MIPS [64bit]'; }
+  elseif (stripos($descr, 'mips') !== FALSE)     { $hardware .= ' MIPS [32bit]'; }
+  elseif (preg_match('/armv(\d+)/i', $descr, $matches)) {
     $hardware .= ' ARMv' . $matches[1];
   }
-  //elseif (stristr($descr, 'armv5'))   { $hardware .= ' ARMv5'; }
-  //elseif (stristr($descr, 'armv6'))   { $hardware .= ' ARMv6'; }
-  //elseif (stristr($descr, 'armv7'))   { $hardware .= ' ARMv7'; }
-  elseif (stristr($descr, 'armv'))    { $hardware .= ' ARM'; }
+  elseif (stripos($descr, 'armv') !== FALSE)     { $hardware .= ' ARM'; }
 
-  return ($hardware);
+  return $hardware;
 }
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_ftos_vlanid($device, $ifindex)
-{
+function rewrite_ftos_vlanid($device, $ifindex) {
   // damn DELL use them one known indexes
   //dot1qVlanStaticName.1107787777 = Vlan 1
   //dot1qVlanStaticName.1107787998 = mgmt
-  $ftos_vlan = dbFetchCell('SELECT ifName FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?', array($device['device_id'], $ifindex));
+  $ftos_vlan = dbFetchCell('SELECT `ifName` FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?', [ $device['device_id'], $ifindex ]);
   list(,$vlanid) = explode(' ', $ftos_vlan);
+
   return $vlanid;
 }
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_iftype($type)
-{
-  $type = array_key_replace($GLOBALS['config']['rewrites']['iftype'], $type);
-  return $type;
+function rewrite_iftype($type) {
+  return array_key_replace($GLOBALS['config']['rewrites']['iftype'], $type);
 }
 
 // NOTE. For graphs use $escape = FALSE

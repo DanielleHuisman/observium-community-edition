@@ -184,7 +184,7 @@ $rrd_options .= " HRULE:0#999999";
 //  $midnight = strtotime('today midnight');
 //  for ($i = 1; $i <= 2; $i++)
 //  {
-//    $rrd_options .= " VRULE:${midnight}#FF0000";
+//    $rrd_options .= " VRULE:{$midnight}#FF0000";
 //    $midnight -= 86400;
 //  }
 //}

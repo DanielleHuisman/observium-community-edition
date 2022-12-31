@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -150,20 +149,20 @@ function generate_authlog_where($vars)
       case "user":
       case "username":
         if ($value == '') { continue 2; }
-        $sql .= generate_query_values($value, 'user');
+        $sql .= generate_query_values_and($value, 'user');
         break;
       case "address":
       case "ip":
         if ($value == '') { continue 2; }
-        $sql .= generate_query_values($value, 'address', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'address', '%LIKE%');
         break;
       case "useragent":
       case "user_agent":
-        $sql .= generate_query_values($value, 'user_agent', '%LIKE%');
+        $sql .= generate_query_values_and($value, 'user_agent', '%LIKE%');
         break;
       case "result":
       //case "action":
-        $sql .= generate_query_values($value, 'result', 'LIKE%');
+        $sql .= generate_query_values_and($value, 'result', 'LIKE%');
         break;
     }
   }

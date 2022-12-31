@@ -57,13 +57,14 @@ if (isset($vars['device'])) {
 
 $format = isset($vars['format']) && in_array($vars['format'], [ 'dot', 'png', 'svg' ]) ? $vars['format'] : 'svg';
 
+if(isset($vars['device'])) { $rankdir="LR"; } else { $rankdir = "TB"; }
+
 #  $map = 'digraph G { bgcolor=transparent; splines=true; overlap=scale; concentrate=0; epsilon=0.001; rankdir=LR
-  $map = 'digraph G { bgcolor=transparent; splines=true; overlap=scale; rankdir="TB"
+
+  $map = 'digraph G { bgcolor=transparent; splines=true; overlap=scale; rankdir='.$rankdir.'; concentrate=0; epsilon=0.001;
      node [ fontname="helvetica", fontstyle=bold, style=filled, color=white, fillcolor=lightgrey, overlap=false];
      edge [ bgcolor=white, fontname="helvetica", fontstyle=bold, arrowhead=dot, arrowtail=dot];
-     graph [bgcolor=transparent;];
-
-';
+     graph [bgcolor=transparent;];';
 
   if (!$_SESSION['authenticated']) {
     // never will happen this if
@@ -237,7 +238,7 @@ $format = isset($vars['format']) && in_array($vars['format'], [ 'dot', 'png', 's
     $maptool = $config['unflatten'];
   } else {
 */
-    $maptool = $config['dot'];
+    $maptool = $config['dot'] . ' -Gpack -Goverlap=prism';
 /*
   }
 

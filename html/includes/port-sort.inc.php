@@ -64,6 +64,9 @@ switch ($vars['sort']) {
   case 'media':
     $ports = array_sort_by($ports, 'ifType', $sort_order, SORT_STRING);
     break;
+  case 'mtu':
+    $ports = array_sort_by($ports, 'ifMtu', $sort_order, SORT_NUMERIC);
+    break;
   case 'descr':
     $ports = array_sort_by($ports, 'ifAlias', $sort_order, SORT_STRING);
     break;

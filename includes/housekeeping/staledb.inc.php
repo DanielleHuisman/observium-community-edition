@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage housekeeping
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -95,7 +95,7 @@ if (dbExist('autodiscovery', '`remote_device_id` IS NOT NULL AND `remote_device_
 /*
  * Probably not the best idea to remove user-generated configuration like this, this very occasionally seems to delete billing ports
  *
-$where = " WHERE " . generate_query_values([ 'bill', 'group' ], 'entity_type', '!=', FALSE); // Exclude pseudo-entities from permissions checks
+$where = " WHERE " . generate_query_values_ng([ 'bill', 'group' ], 'entity_type', '!='); // Exclude pseudo-entities from permissions checks
 foreach ($config['entity_tables'] as $table) {
   $query = "SELECT DISTINCT `entity_type` FROM `$table` $where";
   foreach (dbFetchColumn($query, NULL, $test) as $entity_type) {
@@ -113,7 +113,7 @@ foreach ($config['entity_tables'] as $table) {
       // Remove stale entries
       print_debug("Database cleanup for table '$table': deleted $count '$entity_type' entities");
       if (!$test) {
-        $table_status = dbDelete($table, "`entity_type` = ? ".generate_query_values($ids, 'entity_id'), [ $entity_type ]);
+        $table_status = dbDelete($table, "`entity_type` = ? ".generate_query_values_and($ids, 'entity_id'), [ $entity_type ]);
         logfile("housekeeping.log", "Database cleanup for table '$table': deleted $count '$entity_type' entities");
       }
     } elseif ($prompt) {

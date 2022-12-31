@@ -223,7 +223,14 @@ function get_bgp_localas_array($device) {
       // append this mib to entries, ie HUAWEI-BGP-VPN-MIB, CUMULUS-BGPUN-MIB
       snmp_getnext_oid($device, $def['oids']['PeerRemoteAs']['oid'], $mib);
       if (snmp_status()) {
-        $entries[] = [ 'mib' => $mib ];
+        $entry = [ 'mib' => $mib ];
+        if ($mib === 'CUMULUS-BGPUN-MIB' && $local_as = snmp_get_oid($device, 'bgpLocalAs', $mib)) {
+          // Cumulus OS not always return LocalAs
+          $entry['oid'] = 'bgpLocalAs';
+          $entry['LocalAs'] = snmp_dewrap32bit($local_as); // .1.3.6.1.4.1.40310.4.2 = INTEGER: 64732
+        }
+        $entries[] = $entry;
+        unset($entry);
       }
     }
 
@@ -552,6 +559,37 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB') {
       if (get_ip_version($peer_ip)) {
         $peer['os10bgp4V2PeerRemoteAddr'] = $peer_ip;
       }
+
+      // Uptimes really reported with x100 multiplier
+      if (isset($peer['os10bgp4V2PeerFsmEstablishedTime'])) {
+        $peer['os10bgp4V2PeerFsmEstablishedTime'] *= 0.01;
+      }
+      if (isset($peer['os10bgp4V2PeerInUpdatesElapsedTime'])) {
+        $peer['os10bgp4V2PeerInUpdatesElapsedTime'] *= 0.01;
+      }
+
+      // It seems as firmware issue, always report as halted
+      // See: https://jira.observium.org/browse/OBS-4134
+      if ($peer['os10bgp4V2PeerAdminStatus'] === 'halted' && $peer['os10bgp4V2PeerState'] !== 'idle') {
+        // running: established, connect, active (not sure about opensent, openconfirm)
+        print_debug("Fixed Dell OS10 issue, DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerAdminStatus always report halted");
+        $peer['os10bgp4V2PeerAdminStatus'] = 'running';
+      } elseif ($peer['os10bgp4V2PeerAdminStatus'] === 'running' && $peer['os10bgp4V2PeerState'] === 'idle') {
+        // See: https://jira.observium.org/browse/OBS-4280
+        /*
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerAdminStatus.1.ipv4."255.79.16.154" = INTEGER: halted(1)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerAdminStatus.1.ipv4."255.118.129.119" = INTEGER: running(2)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerAdminStatus.1.ipv4."254.145.182.212" = INTEGER: halted(1)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerAdminStatus.1.ipv4."254.145.182.214" = INTEGER: halted(1)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerState.1.ipv4."255.79.16.154" = INTEGER: established(6)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerState.1.ipv4."255.118.129.119" = INTEGER: idle(1)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerState.1.ipv4."254.145.182.212" = INTEGER: established(6)
+         * DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerState.1.ipv4."254.145.182.214" = INTEGER: established(6)
+         */
+        print_debug("Fixed Dell OS10 issue, DELLEMC-OS10-BGP4V2-MIB::os10bgp4V2PeerAdminStatus report running for shutdown");
+        $peer['os10bgp4V2PeerAdminStatus'] = 'halted';
+      }
+
       break;
 
     case 'FORCE10-BGP4-V2-MIB':
@@ -623,6 +661,24 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB') {
       if (!isset($peer['bgpBgpNeighborAdminState'])) {
         // Always set this Oid to start, while not really exist and while peer entry exist in this table
         $peer['bgpBgpNeighborAdminState'] = in_array($peer['bgpBgpNeighborState'], [ 'clearing', 'deleted' ]) ? 'stop' : 'start';
+      }
+      break;
+
+    case 'FIREBRICK-BGP-MIB':
+      $peer_type = array_shift($index_parts);
+      if (isset($address_types[$peer_type])) {
+        $peer['fbBgpPeerAddressType'] = $address_types[$peer_type];
+      }
+      $ip_len = array_shift($index_parts);
+      $peer_ip = implode('.', $index_parts);
+      if ((int)$ip_len === 16) {
+        $peer_ip = snmp2ipv6($peer_ip);
+      }
+      $peer['fbBgpPeerAddress'] = $peer_ip;
+
+      if (!isset($peer['fbBgpPeerAdminState'])) {
+        // Always set this Oid to start, while not really exist and while peer entry exist in this table
+        $peer['fbBgpPeerAdminState'] = in_array($peer['fbBgpPeerState'], [ 'clearing', 'deleted' ]) ? 'stop' : 'start';
       }
       break;
   }

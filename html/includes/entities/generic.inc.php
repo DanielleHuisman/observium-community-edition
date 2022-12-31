@@ -54,6 +54,30 @@ function get_customoid_by_id($oid_id) {
 
 } // end function get_customoid_by_id()
 
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function get_application_by_id($application_id)
+{
+  if (is_numeric($application_id))
+  {
+    $application = dbFetchRow("SELECT * FROM `applications` WHERE `app_id` = ?", array($application_id));
+  }
+  if (is_array($application))
+  {
+    return $application;
+  } else {
+    return FALSE;
+  }
+}
+
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function accesspoint_by_id($ap_id, $refresh = '0')
+{
+  $ap = dbFetchRow("SELECT * FROM `accesspoints` WHERE `accesspoint_id` = ?", array($ap_id));
+
+  return $ap;
+}
 
 function generate_entity_popup_graphs($entity, $vars)
 {
@@ -376,8 +400,8 @@ function build_entity_measured_where($entity_type, $vars)
           {
             case 'port':
             case 'printersupply':
-              $measure_sql  = generate_query_values($measured_type, $column_measured_type, NULL, OBS_DB_NO_LEADING_AND);
-              $measure_sql .= generate_query_values($entities,      $column_measured_id);
+              $measure_sql  = generate_query_values_ng($measured_type, $column_measured_type);
+              $measure_sql .= generate_query_values_and($entities,      $column_measured_id);
               break;
           }
           if ($measure_sql) { $measure_array[] = $measure_sql; }
@@ -388,7 +412,7 @@ function build_entity_measured_where($entity_type, $vars)
         //$value = (array)$value;
         // Select all without measured entities
         if (in_array('none', $value)) {
-          $measure_array[] = generate_query_values(1, $column_measured_id, 'NULL', OBS_DB_NO_LEADING_AND);
+          $measure_array[] = generate_query_values_ng(1, $column_measured_id);
           $value = array_diff($value, [ 'none' ]);
         }
         if (count($value))
@@ -410,8 +434,8 @@ function build_entity_measured_where($entity_type, $vars)
                 $entities = dbFetchColumn($entity_sql);
                 //$entities = dbFetchColumn($entity_sql, NULL, TRUE);
                 //r($entities);
-                $measure_sql  = generate_query_values($measured_type, $column_measured_type, NULL, OBS_DB_NO_LEADING_AND);
-                $measure_sql .= generate_query_values($entities,      $column_measured_id);
+                $measure_sql  = generate_query_values_ng($measured_type, $column_measured_type);
+                $measure_sql .= generate_query_values_and($entities,     $column_measured_id);
                 break;
               case 'printersupply':
                 break;

@@ -13,7 +13,7 @@
 /* Canceled converting
 
 $sql = "SELECT * FROM `device_graphs` WHERE 1";
-$sql .= generate_query_values(['hr_processes', 'hr_users'], 'graph');
+$sql .= generate_query_values_and(['hr_processes', 'hr_users'], 'graph');
 $device_graphs = dbFetchRows($sql);
 
 if (count($device_graphs))

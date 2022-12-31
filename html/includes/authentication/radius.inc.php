@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -219,14 +218,14 @@ function radius_adduser($username, $password, $level, $email = "", $realname = "
 
 /**
  * Check if a user, specified by username, exists in the user backend.
- * This is not currently possible using the RADIUS backend.
+ * This will only return users that have logged in at least once and inserted into MySQL
  *
  * @param string $username Username to check
  * @return bool TRUE if the user exists, FALSE if they do not
  */
 function radius_auth_user_exists($username)
 {
-  return FALSE;
+  return dbExist('users', '`username` = ? AND `type` = ?', [ $username, 'radius' ]);
 }
 
 /**
@@ -246,7 +245,7 @@ function radius_auth_user_level($username)
 
     if (!isset($cache['radius']['level'][$username]))
     {
-      if ($config['auth_radius_groupmemberattr'] == 18 || strtolower($config['auth_radius_groupmemberattr']) == 'reply-message')
+      if ($config['auth_radius_groupmemberattr'] == 18 || strtolower($config['auth_radius_groupmemberattr']) === 'reply-message')
       {
         // Reply-Message (18)
         $attribute = RADIUS_REPLY_MESSAGE;
@@ -285,7 +284,18 @@ function radius_auth_user_level($username)
       $rad_userlevel = 10;
     }
   }
-  //r($rad_userlevel);
+
+  // If we don't already have an entry for this RADIUS user in the MySQL database, create one
+  if (!radius_auth_user_exists($username)){
+    $user_id = radius_auth_user_id($username);
+    create_mysql_user($username, $user_id, $rad_userlevel, 'radius');
+  } else {
+    // Update the user's level in MySQL if it doesn't match. This is really informational only.
+    if (dbFetchCell("SELECT `level` FROM `users` WHERE `username` = ? AND `type` = ?", [ $username, 'radius' ]) != $rad_userlevel) {
+      $user_id = radius_auth_user_id($username);
+      dbUpdate([ 'level' => $rad_userlevel, 'user_id' => $user_id ], 'users', '`username` = ? AND `type` = ?', [ $username, 'radius' ]);
+    }
+  }
 
   return $rad_userlevel;
 }
@@ -324,8 +334,8 @@ function radius_deluser($username)
  */
 function radius_auth_user_list()
 {
-  $userlist = array();
-  return $userlist;
+    // Send list of users from MySQL
+    return dbFetchRows("SELECT * FROM `users` WHERE `type` = ?", [ 'radius' ]);
 }
 
 // EOF

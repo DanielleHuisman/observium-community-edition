@@ -117,7 +117,7 @@ if ($i)
 
   if ($vars['previous'] == "yes")
   {
-    $rrd_options .= " AREA:inbitsX#9999966:";
+    $rrd_options .= " AREA:inbitsX#99999966:";
     $rrd_options .= " AREA:doutbitsX#99999966:";
   }
 

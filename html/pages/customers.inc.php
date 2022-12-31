@@ -83,10 +83,19 @@ echo generate_box_open();
         </thead>
 
 <?php
-foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' GROUP BY `port_descr_descr` ORDER BY `port_descr_descr`") as $customer) {
-    $customer_name = $customer['port_descr_descr'];
 
-    foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' AND `port_descr_descr` = ?", array($customer['port_descr_descr'])) as $port) {
+
+
+$customers = [];
+foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' ORDER BY `port_descr_descr`") as $customer) {
+  $customers[$customer['port_descr_descr']][] = $customer;
+}
+
+foreach($customers as $customer => $ports) {
+
+  $customer_name = $customer; // Set text name to use on first port.
+
+    foreach ($ports as $port) {
         $device = device_by_id_cache($port['device_id']);
 
         unset($class);
@@ -122,7 +131,7 @@ foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' GRO
 
         $graph_array['type'] = "customer_bits";
         $graph_array['to'] = $config['time']['now'];
-        $graph_array['id'] = '"' . $customer['port_descr_descr'] . '"'; // use double quotes for prevent split var by commas
+        $graph_array['id'] = '"' . $port['port_descr_descr'] . '"'; // use double quotes for prevent split var by commas
 
         print_graph_row($graph_array);
 

@@ -5,8 +5,8 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,15 +23,19 @@ define('OBS_AJAX', (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SE
 
 $debug_auth = FALSE; // Do not use this debug unless you Observium Developer ;)
 
-if (PHP_VERSION_ID < 70100)
-{
+if (PHP_VERSION_ID < 70100) {
   // Use sha1 to generate the session ID (option removed in php 7.1)
   // session.sid_length (Number of session ID characters - 22 to 256.
   // session.sid_bits_per_character (Bits used per character - 4 to 6.
   @ini_set('session.hash_function', '1');
 }
+
 @ini_set('session.referer_check', '');     // This config was causing so much trouble with Chrome
-@ini_set('session.name', 'OBSID');         // Session name
+if (OBS_API) {
+  @ini_set('session.name', 'OBSAPI');      // Session name for API
+} else {
+  @ini_set('session.name', 'OBSID');       // Session name for common Web UI
+}
 @ini_set('session.use_cookies', '1');      // Use cookies to store the session id on the client side
 @ini_set('session.use_only_cookies', '1'); // This prevents attacks involved passing session ids in URLs
 @ini_set('session.use_trans_sid', '0');    // Disable SID (no session id in url)
@@ -48,13 +52,13 @@ $cookie_httponly = FALSE;
 //$cookie_httponly = TRUE;
 
 // Use custom session lifetime
-if (is_numeric($GLOBALS['config']['web_session_lifetime']) && $GLOBALS['config']['web_session_lifetime'] >= 0) {
+if (is_intnum($GLOBALS['config']['web_session_lifetime']) && $GLOBALS['config']['web_session_lifetime'] >= 0) {
   $lifetime = (int)$GLOBALS['config']['web_session_lifetime'];
 }
 
 @ini_set('session.gc_maxlifetime',  $lifetime); // Session lifetime (for non "remember me" sessions)
-if (PHP_VERSION_ID >= 70300)
-{
+
+if (PHP_VERSION_ID >= 70300) {
   // Allows servers to assert that a cookie ought not to be sent along with cross-site requests.
   // Lax will sent the cookie for cross-domain GET requests, while Strict will not
   //@ini_set('session.cookie_samesite', 'Strict');
@@ -64,7 +68,7 @@ if (PHP_VERSION_ID >= 70300)
     'domain'   => $cookie_domain,
     'secure'   => $cookie_https,
     'httponly' => $cookie_httponly,
-    'samesite' => 'Strict'
+    'samesite' => 'Lax' // 'Strict' /// FIXME. Set this configurable? See: https://jira.observium.org/browse/OBS-4214
   ];
   session_set_cookie_params($cookie_params);
 } else {
@@ -77,28 +81,24 @@ if (!session_is_active()) {
   session_regenerate();
 }
 
-if ($debug_auth && empty($_SESSION['authenticated']))
-{
+if ($debug_auth && empty($_SESSION['authenticated'])) {
   logfile('debug_auth.log', __LINE__ . " NOT Authenticated!!!. IP=[" . get_remote_addr($config['web_session_ip_by_header']) . "]. URL=[" . $_SERVER['REQUEST_URI'] . "]");
   logfile('debug_auth.log', __LINE__ . ' ' . json_encode($_SESSION));
 }
 
 // Fallback to MySQL auth as default - FIXME do this in sqlconfig file?
-if (!isset($config['auth_mechanism']))
-{
+if (!isset($config['auth_mechanism'])) {
   $config['auth_mechanism'] = "mysql";
 }
 
 // Trust Apache authenticated user, if configured to do so and username is available
-if ($config['auth']['remote_user'] && $_SERVER['REMOTE_USER'] != '')
-{
+if ($config['auth']['remote_user'] && is_valid_param($_SERVER['REMOTE_USER'], 'username')) {
   session_set_var('username', $_SERVER['REMOTE_USER']);
 }
 
 $auth_file = $config['html_dir'].'/includes/authentication/' . $config['auth_mechanism'] . '.inc.php';
 if (is_file($auth_file)) {
-  if (isset($_SESSION['auth_mechanism']) && $_SESSION['auth_mechanism'] != $config['auth_mechanism'])
-  {
+  if (isset($_SESSION['auth_mechanism']) && $_SESSION['auth_mechanism'] != $config['auth_mechanism']) {
     // Logout if AUTH mechanism changed
     session_logout();
     reauth_with_message('Authentication mechanism changed, please log in again!');
@@ -123,14 +123,12 @@ if (is_file($auth_file)) {
 if ($_SESSION['authenticated'] && str_starts(ltrim($_SERVER['REQUEST_URI'], '/'), 'logout')) {
   // Do not use $vars and get_vars here!
   //print_vars($_SERVER['REQUEST_URI']);
-  if (auth_can_logout())
-  {
+  if (auth_can_logout()) {
     // No need for a feedback message if user requested a logout
     session_logout(function_exists('auth_require_login'));
 
     $redirect = auth_logout_url();
-    if ($redirect)
-    {
+    if ($redirect) {
       redirect_to_url($redirect);
       exit();
     }
@@ -144,8 +142,7 @@ $user_unique_id = session_unique_id(); // Get unique user id and check if IP cha
 // Store logged remote IP with real proxied IP (if configured and available)
 $remote_addr = get_remote_addr();
 $remote_addr_header = get_remote_addr(TRUE); // Remote addr by http header
-if ($remote_addr_header && $remote_addr != $remote_addr_header)
-{
+if ($remote_addr_header && $remote_addr != $remote_addr_header) {
   $remote_addr = $remote_addr_header . ' (' . $remote_addr . ')';
 }
 
@@ -156,15 +153,16 @@ if (isset($config['web_session_cidr']) && count($config['web_session_cidr'])) {
 }
 
 if (!$_SESSION['authenticated']) {
-  if (isset($_GET['username']) && isset($_GET['password']) &&
-      is_string($_GET['username']) && is_string($_GET['password'])) {
+  if (isset($_GET['username'], $_GET['password']) &&
+      is_valid_param($_GET['username'], 'username') && is_valid_param($_GET['password'], 'password')) {
+
     session_set_var('username', $_GET['username']);
     $auth_password        = $_GET['password'];
     //r($_GET);
     //r($_SESSION);
-  } elseif (isset($_POST['username']) && isset($_POST['password']) &&
-            is_string($_POST['username']) && is_string($_POST['password']))
-  {
+  } elseif (isset($_POST['username'], $_POST['password']) &&
+            is_valid_param($_POST['username'], 'username') && is_valid_param($_POST['password'], 'password')) {
+
     session_set_var('username', $_POST['username']);
     $auth_password        = $_POST['password'];
   } elseif (isset($_SERVER['PHP_AUTH_USER']) && isset($_SERVER['PHP_AUTH_PW'])) {
@@ -256,8 +254,7 @@ if (isset($_SESSION['username'])) {
                    'user_agent' => $_SERVER['HTTP_USER_AGENT'],
                    'result'     => 'Logged In'), 'authlog');
     // Generate keys for cookie auth
-    if (isset($_POST['remember']) && OBS_ENCRYPT)
-    {
+    if (isset($_POST['remember']) && OBS_ENCRYPT) {
       $ckey = md5(strgen());
       $dkey = md5(strgen());
       $encpass = encrypt($auth_password, $dkey);
@@ -307,28 +304,15 @@ if (isset($_SESSION['username'])) {
     session_commit();
 
     // Hardcoded level permissions
+    /// FIXME. It's seems unused?..
 
-    $user_perms = array();
+    $user_perms = [];
 
-    $perms[0]  = [];
-    $perms[1]  = ['LOGIN'];
-    $perms[2]  = [];
-    $perms[3]  = [];
-    $perms[5]  = ['GLOBAL_READ'];
-    $perms[6]  = [];
-    $perms[7]  = [];
-    $perms[8]  = [];
-    $perms[9]  = [];
-    $perms[10] = ['ADMIN'];
-
-    foreach($perms as $level => $array)
-    {
-      if($_SESSION['userlevel'] >= $level)
-      {
-        foreach($array AS $entry) { $user_perms[$entry] = $entry; }
+    foreach ($config['user_level'] as $level => $array) {
+      if ($_SESSION['userlevel'] >= $level) {
+        foreach($array['roles'] as $entry) { $user_perms[$entry] = $entry; }
       }
     }
-
     //print_vars($user_perms);
 
     //print_vars($_SESSION);

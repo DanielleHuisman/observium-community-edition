@@ -51,18 +51,22 @@ if ($vars['inverse']) {
    $inverse = FALSE;
 }
 
-
-if ($vars['legend'] === 'no') {
-   $rrd_options .= ' -g';
-   $legend      = 'no';
-}
-
 if (get_var_true($vars['title']) && !safe_empty($graph_title)) {
-   $rrd_options .= " --title='" . rrdtool_escape($graph_title) . "' ";
+  // Note, do not escape title by rrdtool escape
+  //$rrd_options .= " --title='" . rrdtool_escape($graph_title) . "' ";
+  $rrd_options .= " --title=" . escapeshellarg($graph_title) . " ";
 }
 
 if (isset($vars['graph_title'])) {
-   $rrd_options .= " --title='" . rrdtool_escape($vars['graph_title']) . "' ";
+  // Note, do not escape title by rrdtool escape
+  //$rrd_options .= " --title='" . rrdtool_escape($vars['graph_title']) . "' ";
+  $rrd_options .= " --title=" . escapeshellarg($vars['graph_title']) . " ";
+}
+
+// Vertical label
+if (!safe_empty($graph_label)) {
+  // Note, do not escape title by rrdtool escape
+  $rrd_options .= " --vertical-label=" . escapeshellarg($graph_label) . " ";
 }
 
 if (isset($log_y)) {
@@ -90,7 +94,9 @@ if (isset($vars['style']) && $vars['style']) {
 }
 
 // Autoscale
-if (!isset($scale_min) && !isset($scale_max)) {
+if(isset($vars['force_autoscale']) && in_array($vars['force_autoscale'], ['yes', 'true', 1])) {
+   $rrd_options .= ' -A';
+} elseif (!isset($scale_min) && !isset($scale_max)) {
    if ($graph_style === 'mrtg' && !isset($log_y)) { // Don't use this if we're doing logarithmic scale, else it breaks.
       $rrd_options .= ' --alt-autoscale-max';
    } else {
@@ -137,19 +143,14 @@ if (!$config['graphs']['always_draw_max']) {
    }
 }
 
-$rrd_options .= '  --start ' . rrdtool_escape($from) .
-                ' --end ' . rrdtool_escape($to) .
-                ' --width ' . rrdtool_escape($width) .
-                ' --height ' . rrdtool_escape($height) . ' ';
-
 // Parse pango markup. Breaks chevrons and other stuff.
 //$rrd_options .= ' -P ';
 
 if ($config['themes'][$_SESSION['theme']]['type'] === 'dark') {
-  $rrd_options .= str_replace("  ", " ", $config['rrdgraph']['dark']);
+  $rrd_options .= ' ' .str_replace("  ", " ", $config['rrdgraph']['dark']);
   $nan_colour = "#FF000020";
 } else {
-  $rrd_options .= str_replace("  ", " ", $config['rrdgraph']['light']);
+  $rrd_options .= ' '. str_replace("  ", " ", $config['rrdgraph']['light']);
   $nan_colour = "#FFAAAA20";
 }
 
@@ -169,8 +170,11 @@ if ($width <= '350') {
    $rrd_options .= " --font LEGEND:8:'" . $config['mono_font'] . "' --font AXIS:7:'" . $config['mono_font'] . "'";
 }
 
-//$rrd_options .= ' --font-render-mode normal --dynamic-labels'; // dynamic-labels not supported in rrdtool < 1.4
 $rrd_options .= ' --font-render-mode normal';
+if ($config['graphs']['dynamic_labels']) {
+  // dynamic-labels not supported in rrdtool < 1.4
+  $rrd_options .= ' --dynamic-labels';
+}
 
 if ($step != TRUE) {
    $rrd_options .= ' -E';

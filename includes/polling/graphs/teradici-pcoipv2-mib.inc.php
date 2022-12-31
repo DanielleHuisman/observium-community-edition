@@ -21,11 +21,11 @@ $table_defs['TERADICI-PCOIPv2-MIB']['pcoipGenStatsTable'] = array (
   'graphs'        => array('pcoip-net-packets'),
   'ds_rename'     => array('pcoipGenStats' => ''),
   'oids'          => array(
-     'pcoipGenStatsPacketsSent'     =>  array('numeric' => '2', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.2', 'descr' => 'Packets sent'),
-     'pcoipGenStatsBytesSent'   =>  array('numeric' => '3', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.3', 'descr' => 'Bytes sent'),
-     'pcoipGenStatsPacketsReceived'  =>  array('numeric' => '4', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.4',  'descr' => 'Packets received'),
-     'pcoipGenStatsBytesReceived'  =>  array('numeric' => '5', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.5', 'descr' => 'Bytes received'),
-     'pcoipGenStatsTxPacketsLost'  =>  array('numeric' => '6', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.6', 'descr' => 'Packets lost', 'ds_type'   => 'GAUGE')
+     'pcoipGenStatsPacketsSent'      =>  array('numeric' => '2', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.2', 'descr' => 'Packets sent'),
+     'pcoipGenStatsBytesSent'        =>  array('numeric' => '3', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.3', 'descr' => 'Bytes sent'),
+     'pcoipGenStatsPacketsReceived'  =>  array('numeric' => '4', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.4', 'descr' => 'Packets received'),
+     'pcoipGenStatsBytesReceived'    =>  array('numeric' => '5', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.5', 'descr' => 'Bytes received'),
+     'pcoipGenStatsTxPacketsLost'    =>  array('numeric' => '6', 'index'=>'1', 'oid'=>'.1.3.6.1.4.1.25071.1.2.1.1.1.6', 'descr' => 'Packets lost', 'ds_type'   => 'GAUGE')
   )
 );
 

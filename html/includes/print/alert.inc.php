@@ -30,18 +30,18 @@ function build_alert_table_query($vars) {
       switch ($var) {
         // Search by device_id if we have a device or device_id
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'entity_type':
           if ($value !== 'all') {
-            $where .= generate_query_values($value, 'entity_type');
+            $where .= generate_query_values_and($value, 'entity_type');
           }
           break;
         case 'entity_id':
-          $where .= generate_query_values($value, 'entity_id');
+          $where .= generate_query_values_and($value, 'entity_id');
           break;
         case 'alert_test_id':
-          $where .= generate_query_values($value, 'alert_test_id');
+          $where .= generate_query_values_and($value, 'alert_test_id');
           break;
         case 'status':
           if ($value === 'failed_delayed') {

@@ -86,7 +86,7 @@ foreach ($ports_vlans_oids as $ifIndex => $entry)
     {
       $vlan_num = $i;
 
-      //print_debug("ifIndex = $ifIndex, \$i = $i, mode ${entry['portMode']}");
+      //print_debug("ifIndex = $ifIndex, \$i = $i, mode {$entry['portMode']}");
       if (isset($discovery_vlans[$vtp_domain_index][$vlan_num]))
       {
         $discovery_ports_vlans[$ifIndex][$vlan_num] = array('vlan' => $vlan_num);

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -34,7 +33,7 @@ if ($GLOBALS['snmp_status'] === FALSE)
     echo('PWS_WALK: '.count($pws)."\n"); print_vars($pws);
   }
 
-  $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
+  $peer_where = generate_query_values_and($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
   foreach ($pws as $pw_type => $entry)
   {
     foreach ($entry as $pw_name => $entry2)

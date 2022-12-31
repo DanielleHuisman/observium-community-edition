@@ -6,14 +6,13 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 register_html_title("Edit user");
 
-if ($_SESSION['userlevel'] < 10)
-{
+if ($_SESSION['userlevel'] < 10) {
   print_error_permission();
   return;
 }
@@ -43,45 +42,51 @@ register_html_resource('js', 'observium-entities.js');
   // FIXME, currently users list more than 1000 have troubles with memory use
   // Do not generate this unusable dropdown form, need to switch ajax input
   if (safe_count($user_list) <= 512) {
-    $item = array('id'       => 'page',
-                  'value'    => 'user_edit');
+    $item = [
+      'id'       => 'page',
+      'value'    => 'user_edit'
+    ];
     echo(generate_form_element($item, 'hidden'));
-    $item = array('id'       => 'user_id',
-                  'title'    => 'Select User',
-                  'width'    => '150px',
-                  'onchange' => "location.href='user_edit/user_id=' + this.options[this.selectedIndex].value + '/';",
-                  'values'   => $user_list,
-                  'value'    => $vars['user_id']);
+    $item = [
+      'id'       => 'user_id',
+      'title'    => 'Select User',
+      'width'    => '150px',
+      'onchange' => "location.href='user_edit/user_id=' + this.options[this.selectedIndex].value + '/';",
+      'values'   => $user_list,
+      'value'    => $vars['user_id']
+    ];
     echo(generate_form_element($item, 'select'));
   }
   echo('
       </li>
     </ul>');
 
-  if ($vars['user_id'])
-  {
+  if ($vars['user_id']) {
     // Load the user's information
-    if (isset($user_list[$vars['user_id']]))
-    {
+    if (isset($user_list[$vars['user_id']])) {
       $user_data = $user_list[$vars['user_id']];
     } else {
-      $user_data = dbFetchRow("SELECT * FROM `users` WHERE `user_id` = ?", array($vars['user_id']));
+      $user_data = dbFetchRow("SELECT * FROM `users` WHERE `user_id` = ?", [ $vars['user_id'] ]);
     }
-    $user_data['username'] = auth_username_by_id($vars['user_id']);
-    $user_data['level']    = auth_user_level($user_data['username']);
+    if (!isset($user_data['username'])) {
+      $user_data['username'] = auth_username_by_id($vars['user_id']);
+    }
+    if (!isset($user_data['level']) && !is_numeric($user_data['level'])) {
+      $user_data['level']    = auth_user_level($user_data['username']);
+    }
+
     humanize_user($user_data); // Get level_label, level_real, row_class, etc
 
     // Delete the selected user.
-    if (auth_usermanagement() && $vars['user_id'] !== $_SESSION['user_id'])
-    {
+    if (auth_usermanagement() && $vars['user_id'] !== $_SESSION['user_id']) {
       echo('<ul class="nav pull-right">');
-      echo('<li><a href="'.generate_url(array('page'         => 'user_edit',
-                                              'action'       => 'deleteuser',
-                                              'user_id'      => $vars['user_id'],
-                                              'confirm'      => 'yes',
-                                              'requesttoken' => $_SESSION['requesttoken'])) . '"
+      echo('<li><a href="'.generate_url([ 'page'         => 'user_edit',
+                                          'action'       => 'deleteuser',
+                                          'user_id'      => $vars['user_id'],
+                                          'confirm'      => 'yes',
+                                          'requesttoken' => $_SESSION['requesttoken'] ]) . '"
                    data-toggle="confirmation"
-                   data-confirm-content="You have requested deletion of the user <strong>'.$user_data['username'].'</strong>.<br />This action can not be reversed."
+                   data-confirm-content="You have requested deletion of the user <strong>'.escape_html($user_data['username']).'</strong>.<br />This action can not be reversed."
                    data-confirm-placement="bottom">
                 <i class="'.$config['icon']['cancel'].'"></i> Delete User</a></li>');
       echo('</ul>');
@@ -98,45 +103,36 @@ register_html_resource('js', 'observium-entities.js');
 </form>
 
 <?php
-  if ($vars['user_id'])
-  {
+  if ($vars['user_id']) {
     // Check if correct auth secret passed
     $auth_secret_fail = empty($_SESSION['auth_secret']) || empty($vars['auth_secret']) || !hash_equals($_SESSION['auth_secret'], $vars['auth_secret']);
     //print_vars($auth_secret_fail);
     //$auth_secret_fail = TRUE;
 
-    if ($vars['action'] == "deleteuser" && request_token_valid($vars))
-    {
+    if ($vars['action'] == "deleteuser" && request_token_valid($vars)) {
       include($config['html_dir']."/pages/edituser/deleteuser.inc.php");
     } else {
 
       // Perform actions if requested
 
-    if (auth_usermanagement() && isset($vars['action']) && request_token_valid($vars)) // Admins always can change user info & password
-    {
-      switch($vars['action'])
-      {
+    if (auth_usermanagement() && isset($vars['action']) && request_token_valid($vars)) { // Admins always can change user info & password
+      switch($vars['action']) {
         case "changepass":
-          if ($vars['new_pass'] == "" || $vars['new_pass2'] == "")
-          {
+          if ($vars['new_pass'] == "" || $vars['new_pass2'] == "") {
             print_warning("Password cannot be blank.");
-          }
-          elseif ($auth_secret_fail)
-          {
+          } elseif ($auth_secret_fail) {
             // Incorrect auth secret, seems as someone try to hack system ;)
             print_debug("Incorrect admin auth, get out from here nasty hacker.");
-          }
-          elseif ($vars['new_pass'] == $vars['new_pass2'])
-          {
+          } elseif ($vars['new_pass'] === $vars['new_pass2'] &&
+                    is_valid_param($vars['new_pass'], 'password')) {
             $status = auth_change_password($user_data['username'], $vars['new_pass']);
-            if ($status)
-            {
+            if ($status) {
               print_success("Password Changed.");
             } else {
               print_error("Password not changed.");
             }
           } else {
-            print_error("Passwords don't match!");
+            print_error("Passwords don't match or contain non printable chars.");
           }
           break;
 
@@ -145,15 +141,16 @@ register_html_resource('js', 'observium-entities.js');
             // Incorrect auth secret, seems as someone try to hack system ;)
             print_debug("Incorrect admin auth, get out from here nasty hacker.");
           } else {
-            $update_array = array();
+            $update_array = [];
             $vars['new_can_modify_passwd'] = (isset($vars['new_can_modify_passwd']) && $vars['new_can_modify_passwd'] ? 1 : 0);
-            foreach (array('realname', 'level', 'email', 'descr', 'can_modify_passwd') as $param) {
+            foreach ([ 'realname', 'level', 'email', 'descr', 'can_modify_passwd' ] as $param) {
               if ($vars['new_' . $param] != $user_data[$param]) {
                 $update_array[$param] = $vars['new_' . $param];
               }
             }
+            $status = FALSE;
             if (count($update_array)) {
-              $status = dbUpdate($update_array, 'users', '`user_id` = ?', array($vars['user_id']));
+              $status = dbUpdate($update_array, 'users', '`user_id` = ?', [ $vars['user_id'] ]);
             }
             if ($status) {
               print_success("User Info Changed.");
@@ -186,7 +183,7 @@ register_html_resource('js', 'observium-entities.js');
           $vars['entity_id'] = $vars[$vars['entity_type'].'_entity_id'];
         }
 
-        $where = '`user_id` = ? AND `entity_type` = ? AND `auth_mechanism` = ?' . generate_query_values($vars['entity_id'], 'entity_id');
+        $where = '`user_id` = ? AND `entity_type` = ? AND `auth_mechanism` = ?' . generate_query_values_and($vars['entity_id'], 'entity_id');
         $params = [ $vars['user_id'], $vars['entity_type'], $config['auth_mechanism'] ];
         //if (@dbFetchCell("SELECT COUNT(*) FROM `entity_permissions` WHERE " . $where, array($vars['user_id'], $vars['entity_type'])))
         if (dbExist('entity_permissions', $where, $params))
@@ -194,28 +191,25 @@ register_html_resource('js', 'observium-entities.js');
           dbDelete('entity_permissions', $where, $params);
         }
       }
-    }
-    elseif (($vars['submit'] == "user_perm_add" || $vars['action'] == "user_perm_add") && request_token_valid($vars))
-    {
-      if ($auth_secret_fail)
-      {
+    } elseif (($vars['submit'] == "user_perm_add" || $vars['action'] == "user_perm_add") &&
+              request_token_valid($vars)) {
+      if ($auth_secret_fail) {
         // Incorrect auth secret, seems as someone try to hack system ;)
         print_debug("Incorrect admin auth, get out from here nasty hacker.");
       } else {
-        if     (isset($vars['entity_id'])) {} // use entity_id
-        elseif (isset($vars[$vars['entity_type'].'_entity_id'])) // use type_entity_id
-        {
+        if     (isset($vars['entity_id'])) { // use entity_id
+        } elseif (isset($vars[$vars['entity_type'].'_entity_id'])) { // use type_entity_id
           $vars['entity_id'] = $vars[$vars['entity_type'].'_entity_id'];
         }
-        if (!is_array($vars['entity_id'])) { $vars['entity_id'] = array($vars['entity_id']); }
+        if (!is_array($vars['entity_id'])) {
+          $vars['entity_id'] = [ $vars['entity_id'] ];
+        }
 
-        foreach ($vars['entity_id'] as $entry)
-        {
+        foreach ($vars['entity_id'] as $entry) {
           $where = '`user_id` = ? AND `entity_type` = ? AND `entity_id` = ? AND `auth_mechanism` = ?';
           $params = [ $vars['user_id'], $vars['entity_type'], $entry, $config['auth_mechanism'] ];
           if (get_entity_by_id_cache($vars['entity_type'], $entry) && // Skip not exist entities
-              !dbExist('entity_permissions', $where, $params))
-          {
+              !dbExist('entity_permissions', $where, $params)) {
             dbInsert([ 'entity_id' => $entry, 'entity_type' => $vars['entity_type'], 'user_id' => $vars['user_id'], 'auth_mechanism' => $config['auth_mechanism'] ], 'entity_permissions');
           }
         }
@@ -264,6 +258,10 @@ register_html_resource('js', 'observium-entities.js');
               <th>Description</th>
               <td><?php echo(escape_html($user_data['descr'])); ?></td>
             </tr>
+              <tr>
+                  <th>User Source</th>
+                  <td><?php echo(get_type_class_label($user_data['type'], 'user_type')); ?></td>
+              </tr>
           </table>
 
           <div class="form-actions" style="margin: 0;">
@@ -431,8 +429,8 @@ register_html_resource('js', 'observium-entities.js');
 
               echo '<tr>';
               echo '<td width="5"></td>';
-              echo '<td width="200" class="entity">' . $role['role_name'] . '</td>';
-              echo '<td>' . $role['role_descr'] . '</td>';
+              echo '<td width="200" class="entity">' . escape_html($role['role_name']) . '</td>';
+              echo '<td>' . escape_html($role['role_descr']) . '</td>';
               echo '<td width="40">';
               $form = array('type'  => 'simple');
 
@@ -1042,6 +1040,7 @@ register_html_resource('js', 'observium-entities.js');
         echo('<td><i class="'.$user['icon'].'"></i> <span class="label label-'.$user['label_class'].'">'.$user['level_label'].'</span></td>');
         echo('<td><strong>'.escape_html($user['realname']).'</strong></td>');
         echo('<td><strong>'.escape_html($user['email']).'</strong></td>');
+        echo '<td>'.get_type_class_label($user['type'], 'user_type').'</td>';
 
         echo('</tr>');
       }

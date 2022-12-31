@@ -6,10 +6,9 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
-
 
 /**
  * Poll and cache entity _NUMERIC_ Oids,
@@ -21,8 +20,7 @@
  *
  * @return bool
  */
-function poll_cache_oids($device, $entity_type, &$oid_cache)
-{
+function poll_cache_oids($device, $entity_type, &$oid_cache) {
   global $config;
 
   $use_walk = FALSE; // Use multi get by default
@@ -37,8 +35,7 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
   $deleted_field  = $translate['deleted_field'];
   $device_field   = $translate['device_id_field'];
 
-  switch ($entity_type)
-  {
+  switch ($entity_type) {
     case 'sensor':
     case 'status':
     case 'counter':
@@ -52,11 +49,17 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
       // Walk query
       $walk_query = "SELECT DISTINCT `$mib_field`, `$object_field` FROM `$table` WHERE `$device_field` = ? AND `$deleted_field` = ? AND `poller_type` = ?";
       $walk_query .= " AND `$mib_field` != ? AND `$object_field` != ?";
-      $walk_params = [$device['device_id'], '0', 'snmp', '', ''];
+      $walk_params = [ $device['device_id'], '0', 'snmp', '', '' ];
 
       // Multi-get query
       $get_query = "SELECT DISTINCT `$oid_field` FROM `$table` WHERE `$device_field` = ? AND `$deleted_field` = ? AND `poller_type` = ?";
-      $get_params = [$device['device_id'], '0', 'snmp'];
+      $get_params = [ $device['device_id'], '0', 'snmp' ];
+
+      break;
+
+    case 'storage':
+
+      return poll_cache_storage($device, $oid_cache);
 
       break;
 
@@ -65,8 +68,8 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
       return FALSE;
   }
 
-  if ($use_walk)
-  {
+  // This seems actual only for sensor/status/counter
+  if ($use_walk) {
     // Walk by mib & object
     $oid_to_cache = dbFetchRows($walk_query, $walk_params);
     print_debug_vars($oid_to_cache);
@@ -202,28 +205,28 @@ function poll_device($device, $options) {
     $device['status_type'] = $status_type;
   }
 
-  rrdtool_update_ng($device, 'status', array('status' => $status));
+  rrdtool_update_ng($device, 'status', [ 'status' => $status ]);
   //print_vars(rrdtool_export_ng($device, 'status'));
 
   if (!$attribs['ping_skip']) {
     // Ping response RRD database.
-    rrdtool_update_ng($device, 'ping', array('ping' => ($device['pingable'] ?: 'U')));
+    rrdtool_update_ng($device, 'ping', [ 'ping' => ($device['status_pingable'] ?: 'U') ]);
   }
 
   // SNMP response RRD database.
-  rrdtool_update_ng($device, 'ping_snmp', array('ping_snmp' => ($device['snmpable'] ?: 'U')));
+  rrdtool_update_ng($device, 'ping_snmp', [ 'ping_snmp' => ($device['status_snmpable'] ?: 'U') ]);
 
   $alert_metrics['device_status'] = $status;
   $alert_metrics['device_status_type'] = $status_type;
-  $alert_metrics['device_ping'] = $device['pingable']; // FIXME, when ping skipped, here always 0.001
-  $alert_metrics['device_snmp'] = $device['snmpable'];
+  $alert_metrics['device_ping'] = $device['status_pingable']; // FIXME, when ping skipped, here always 0.001
+  $alert_metrics['device_snmp'] = $device['status_snmpable'];
 
   if ($status == "1") {
     // Arrays for store and check enabled/disabled graphs
-    $graphs    = array();
-    $graphs_db = array();
-    $graphs_insert = array();
-    $graphs_delete = array();
+    $graphs    = [];
+    $graphs_db = [];
+    $graphs_insert = [];
+    $graphs_delete = [];
     foreach (dbFetchRows("SELECT * FROM `device_graphs` WHERE `device_id` = ?", array($device['device_id'])) as $entry) {
       // Not know how empty was here
       if (empty($entry['graph'])) {
@@ -369,7 +372,7 @@ function poll_device($device, $options) {
       dbInsertMulti($graphs_insert, 'device_graphs');
     }
     if (safe_count($graphs_delete)) {
-      dbDelete('device_graphs', generate_query_values($graphs_delete, 'device_graph_id', NULL, FALSE));
+      dbDelete('device_graphs', generate_query_values_ng($graphs_delete, 'device_graph_id'));
     }
 
     // Print graphs stats

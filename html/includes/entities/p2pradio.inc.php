@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,16 +23,16 @@ function generate_p2pradio_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'radio_id');
+        $sql .= generate_query_values_and($values, 'radio_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'p2p_radios.device_id');
+        $sql .= generate_query_values_and($values, 'p2p_radios.device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'device_id');
+        $sql .= generate_query_values_and($value, 'device_id');
         break;
     }
   }

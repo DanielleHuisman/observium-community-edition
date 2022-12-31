@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -15,10 +15,10 @@ $results = dbFetchRows("SELECT * FROM `wifi_aps`
                         WHERE `ap_name` LIKE ? $query_permitted_device
                         ORDER BY `ap_name` LIMIT $query_limit", array($query_param));
 
-if (safe_count($results)) {
+if (!safe_empty($results)) {
+  $max_len = 35;
   foreach ($results as $result) {
-    $name = $result['ap_name'];
-    if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
+    $name = truncate($result['ap_name']);
 
     /// FIXME: once we have alerting, colour this to the sensor's status
     $tab_colour = '#194B7F'; // FIXME: This colour pulled from functions.inc.php humanize_device, maybe set it centrally in definitions?

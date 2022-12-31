@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -23,28 +22,28 @@ function generate_vm_query($vars)
       case "group":
       case "group_id":
         $values = get_group_entities($value);
-        $sql .= generate_query_values($values, 'vm_id');
+        $sql .= generate_query_values_and($values, 'vm_id');
         break;
       case 'device_group_id':
       case 'device_group':
         $values = get_group_entities($value, 'device');
-        $sql .= generate_query_values($values, 'device_id');
+        $sql .= generate_query_values_and($values, 'device_id');
         break;
       case "device":
       case "device_id":
-        $sql .= generate_query_values($value, 'device_id');
+        $sql .= generate_query_values_and($value, 'device_id');
         break;
       case "os":
-        $sql .= generate_query_values($value, 'vm_guestos');
+        $sql .= generate_query_values_and($value, 'vm_guestos');
         break;
       case "state":
-        $sql .= generate_query_values($value, 'vm_state');
+        $sql .= generate_query_values_and($value, 'vm_state');
         break;
       case "memory":
-        $sql .= generate_query_values($value, 'vm_memory');
+        $sql .= generate_query_values_and($value, 'vm_memory');
         break;
       case "cpu":
-        $sql .= generate_query_values($value, 'vm_cpucount');
+        $sql .= generate_query_values_and($value, 'vm_cpucount');
         break;
     }
   }

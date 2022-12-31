@@ -1,0 +1,697 @@
+--     
+--  Affirmed Networks Slice Selection Function MIB 
+--
+AFFIRMED-SSF-MIB DEFINITIONS ::= BEGIN
+IMPORTS
+       MODULE-IDENTITY,
+       enterprises,
+       OBJECT-TYPE,
+       Integer32,
+       NOTIFICATION-TYPE                  FROM SNMPv2-SMI
+       ItuPerceivedSeverity               FROM ITU-ALARM-TC-MIB;
+
+
+affirmedSsf MODULE-IDENTITY
+       LAST-UPDATED 
+          "201907160000Z"
+       ORGANIZATION
+          "Affirmed Networks, Inc."
+       CONTACT-INFO
+          "Affirmed Networks, Inc. 35 Nagog Park Acton, MA USA "
+       DESCRIPTION "Slice Selection Function MIB"
+       REVISION
+          "202001140000Z"
+       DESCRIPTION "SSF-4.0 Release, add Gateway SNMP alarm"
+       REVISION
+          "201907160000Z"
+       DESCRIPTION "SSF-4.0 Release, add Status Sync alarm"
+       REVISION
+          "201905200000Z"
+       DESCRIPTION "SSF-3.0 Release, add network context static route and next hop alarms"
+       REVISION
+          "201904150000Z"
+       DESCRIPTION "SSF-3.0 Release, add File system, CPU, and Memory alarms"
+       REVISION 
+          "201904110000Z"
+       DESCRIPTION "SSF-3.0 Release, add login failure alarm"
+       REVISION 
+          "201901150000Z"
+       DESCRIPTION "SSF-2.3 Release, add Config Sync alarm"
+       REVISION 
+          "201810230000Z"
+       DESCRIPTION "SSF-2.1 Release, add DNS name error alarm"
+       REVISION 
+          "201809260000Z"
+       DESCRIPTION "SSF-2.1 Release, add 2 Diameter interface alarms"
+       REVISION 
+          "201807310000Z"
+       DESCRIPTION "SSF-2.1 Release, add 2 REST interface alarms"
+       REVISION 
+          "201804300000Z"
+       DESCRIPTION "SSF-2.0 Release"
+       REVISION 
+          "201710230000Z"
+       DESCRIPTION "SSF-1.2 Release"
+       ::= { enterprises 37963 7}
+--     
+--  From AFFIRMED-SNMP-MIB we get affirmedSnmp = enterprises 37963
+--      
+
+--     
+--  AFFIRMED-SSF textual conventions, objects and notifications
+--
+affirmedSsfTc                      OBJECT IDENTIFIER ::= {affirmedSsf 1}
+affirmedSsfObjects                 OBJECT IDENTIFIER ::= {affirmedSsf 2}
+affirmedSsfNotifications           OBJECT IDENTIFIER ::= {affirmedSsf 3}
+
+--     
+--  AFFIRMED-SSF trap varbinds 
+--
+affirmedSsfAlarmObjects OBJECT IDENTIFIER ::= { affirmedSsfObjects 1 }
+affirmedSsfAlarmSeqId OBJECT-TYPE
+    SYNTAX        INTEGER
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object defines the alarm sequence id"
+    ::= { affirmedSsfAlarmObjects 1 }
+
+affirmedSsfAlarmDateTime OBJECT-TYPE
+    SYNTAX         OCTET STRING (SIZE(1..128))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object defines the date and time of the alarm"
+    ::= { affirmedSsfAlarmObjects 2 }
+       
+affirmedSsfAlarmResource OBJECT-TYPE
+    SYNTAX    OCTET STRING (SIZE(1..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Resource xpath that uniquely defines an alarm instance"
+    ::= { affirmedSsfAlarmObjects 3 }
+
+affirmedSsfAlarmSeverity OBJECT-TYPE
+    SYNTAX    ItuPerceivedSeverity
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Alarm severity"
+    ::= { affirmedSsfAlarmObjects 4 }
+
+affirmedSsfAlarmDetails OBJECT-TYPE
+    SYNTAX    OCTET STRING (SIZE(1..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Alarm details"
+    ::= { affirmedSsfAlarmObjects 5 }
+
+--     
+--  AFFIRMED-SSF specific traps 
+--
+affirmedSsfTraps           OBJECT IDENTIFIER ::= {affirmedSsfNotifications 1}
+
+anSsfAlarmDnsServiceReachability NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"One or more DNS servers are not reachable by the SSF.  This is an aggregate alarm for all configured servers, up to 8."
+-- IMPACT
+--     "One or more of the configured DNS servers is not reachable. 
+--      Transactions rely on static cache first, then check dynamic cache. 
+--      If there is a cache miss, then an external query to a DNS server is made. 
+--      In the event that no servers are reachable, the removal of dynamic cache entries with expired TTL is 
+--      suspended until one or more servers recover."
+--
+-- REPAIR-ACTION  
+--     "Check the status and reachability of affected DNS server nodes as 
+--      identified by name in the details text of this alarm."
+::= { affirmedSsfTraps 1}
+
+anSsfAlarmGtpPathStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"One or more GTP paths have timed out. This is an aggregate alarm, summarizing status for all paths."
+-- IMPACT
+--     "The SSF will remove the affected GW from the eligible selection list and start an inactivity timer.  
+--      The SSF will continuously try GTP echo during that period, but if at the end of the inactivity period, 
+--      the GW still has not responded, it is removed from the path list. 
+--      The severity of this alarm is major if any affected GW is configured and unlocked. 
+--      Administratively locked GW (individually locked or group locked) are not reported by this alarm. If all affected GW 
+--      are discovered (via DNS), the severity is minor.  This alarm is cleared when all known paths 
+--      for unlocked GW are up. 
+--
+-- REPAIR-ACTION  
+--     "Check the status and reachability of affected GW nodes as identified by IP address in the details text of this alarm.
+--      If planned maintenance is on-going for a GW, consider changing its admin-state to locked under the configured gateway list." 
+::= { affirmedSsfTraps 2}
+
+anSsfAlarmLdapPeerStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"No connections to the LDAP peer for database. This alarm is raised when all connections to the configured LDAP peer are down."
+-- IMPACT
+--     "There are no connections to the LDAP peer identified in the alarm. The SSF can initiate many 
+--      connections to a given peer by changing the source port number, but this alarm means that peer 
+--      is not reachable. There may be other peer connections for this database configured on the SSF, 
+--      so the database is not necessarily unreachable. This alarm applies to a peer in primary or
+--      secondary role. Secondary peers are only used if all primary peers are halted."
+--
+-- REPAIR-ACTION
+--     "Check the connection of affected LDAP peer as identified by the IP and
+--      port address in the details text of this alarm. For connections in the
+--      halted state (per the 'show ldap peer' command), use the restart
+--      command to attempt recovery."
+::= { affirmedSsfTraps 3}
+
+anSsfAlarmNetworkKeepaliveStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"All network context keepalive sessions report failure."
+-- IMPACT
+--     "All configured keepalive sessions report failure for the network
+--      context identified in the alarm. This typically indicates that the next
+--      hop router is not reachable, or is not functioning correctly, or that
+--      keepalive is misconfigured. Depending on system configuration, this
+--      event may trigger a take down of keepalive in a dependent-context-group.
+--      In the case of BFD keepalive, an alarm for the network-contexts in the
+--      dependent groups may be triggered as well."
+--
+-- REPAIR-ACTION
+--     "Check that keepalive sessions for the network context identified in the
+--      alarm are correctly configured. Check that the network context
+--      identified in the alarm is correctly configured. Check the underlying
+--      network used by network context identified in the alarm is functioning
+--      (i.e. that the next hop router is reachable and up). This alarm will
+--      clear when one or more keepalive sessions for the affected network
+--      context report success."
+::= { affirmedSsfTraps 4}
+
+anSsfAlarmLdapDbStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"No connections to any LDAP peer for database. This alarm is raised when all connections to all configured LDAP peers for a database are down."
+-- IMPACT
+--     "There are no connections to LDAP peers for the database identified in
+--      the alarm. The SSF can initiate connections to many peers, but this
+--      alarm means that all peers are unreachable and therefore the database is
+--      unreachable."
+--
+-- REPAIR-ACTION
+--     "Check the connections of LDAP peers configured for the database as
+--      identified by in the details text of this alarm. Each LDAP peer will
+--      have separate alarms with details identifying each peer. For
+--      connections in the halted state (per the 'show ldap peer' command), use
+--      the restart command to attempt recovery."
+::= { affirmedSsfTraps 5}
+
+anSsfAlarmOperState NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"Operational state of the SSF is disabled."
+-- IMPACT
+--     "The SSF is not able to provide service because one or more applications
+--      are down. This alarm is raised with critical severity when the SSF
+--      operational state is disabled, and updated with clear severity when the
+--      SSF operational state is enabled. Check the current state from the CLI
+--      with the command 'show system'."
+--
+-- REPAIR-ACTION
+--     "SSF applications restart automatically, so if this alarm occurs for a
+--      brief interval, it means a process restarted, and it should be reported
+--      to technical support with an attachment of 'support save-info' output.
+--      If this alarm is set for an extended period of time, it may be
+--      appropriate to try a reboot of the system, or check the deployment
+--      parameters and health of the system in general."
+::= { affirmedSsfTraps 6}
+
+anSsfAlarmRestPeerStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"Connection loss to session database from REST peer. This alarm is raised when all connections to the configured REST peer are down or if the peer is experiencing failures."
+-- IMPACT
+--     "There is a loss of connection to the REST peer identified in the alarm. The SSF can initiate many 
+--      connections to a given peer by changing the source port number, but this alarm means that peer 
+--      is not reachable, or that authorization fails, or there is a certificate failure or the peer 
+--      is experiencing query failures in the last 1 minute.  There may be other peer connections 
+--      for this database configured on the SSF, so the database is not necessarily unreachable.
+--      This alarm has MAJOR severity."
+--
+-- REPAIR-ACTION
+--     "Check the connection of affected REST peer as identified by the IP and
+--      port address in the details text of this alarm.  Verify that the 
+--      configured authorization credentials are correct and that the certificates are 
+--      setup correctly for the case of HTTPS. Because HTTP/HTTPS connections are short-lived,
+--      this alarm is only triggered by traffic, and will automatically clear in 30 minutes
+--      if there is no traffic, or it will clear within 1 minute for an interval in which a
+--      majority of transactions to this peer are successful."
+::= { affirmedSsfTraps 7}
+
+anSsfAlarmRestDbStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"No connections to any REST peer for database. This alarm is raised when all connections to all configured REST peers for a database are down."
+-- IMPACT
+--     "There are no connections to REST peers for the database identified in
+--      the alarm. The SSF can initiate connections to many peers, but this
+--      alarm means that all peers are unreachable and therefore the database is
+--      unreachable.
+--      This alarm has CRITICAL severity."
+--
+-- REPAIR-ACTION
+--     "Check the connections of REST peers configured for the database as
+--      identified by in the details text of this alarm. Each REST peer will
+--      have separate alarms with details identifying each peer."
+::= { affirmedSsfTraps 8}
+
+anSsfAlarmPgwGxMapping NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"Missing PGW Gx Name Mapping. One or more PGW Gx names cannot be resolved to an S2 FQDN."
+-- IMPACT
+--     "In LTE to Wi-Fi handover scenarios it is necessary for the SSF to query
+--      a session database to correlate the session to the correct PGW. Session
+--      databases typically return a Gx name, so the SSF must map that to an S2
+--      FQDN and then resolve that to an IP by DNS in order to send the CSR
+--      (Create Session Request) to the correct PGW IP. Gx to S2 FQDN mapping
+--      is configured under /gateway/pgw-gx-mapping. An unresolved mapping will
+--      result in a reject for that CSR.
+--      This alarm has MAJOR severity."
+--
+-- REPAIR-ACTION
+--     "The alarm details field lists some of the unresolved PGW Gx names. If
+--      these PGWs are supported in the network, then configure the mapping to
+--      S2 FQDN on the SSF under /gateway/pgw-gx-mapping. The list of
+--      unresolved PGW Gx name mappings has a 24 hour aging timer to remove
+--      entries not referenced in the last day."
+::= { affirmedSsfTraps 9}
+
+anSsfAlarmDiameterPeerStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"Connection loss to session database from DIAMETER peer. This alarm is raised when connection to the configured DIAMETER peer is down or if the peer is experiencing failures."
+-- IMPACT
+--     "There is a loss of connection to the DIAMETER peer identified in the alarm. 
+--      There may be other peers for this database configured on the SSF, so the 
+--      database is not necessarily unreachable. Secondary peers are only used if all 
+--      primary peers are down.
+--      This alarm has MAJOR severity."
+--
+-- REPAIR-ACTION
+--     "Check the connection of affected DIAMETER peer as identified by the IP and
+--      port address in the details text of this alarm. Also confirm that the DIAMETER 
+--      remote node supports the GLA application (ID 16777321). Use the CLI command "show 
+--      diameter peer" to check the current status."
+::= { affirmedSsfTraps 10}
+
+anSsfAlarmDiameterDbStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity, 
+       affirmedSsfAlarmDetails 
+}
+STATUS current
+DESCRIPTION
+"No connection to any DIAMETER peer for database. This alarm is raised when all configured DIAMETER peers for a database are down."
+-- IMPACT
+--     "There is no peer connections to DIAMETER database identified in
+--      the alarm. This alarm means that all peers are unreachable and therefore 
+--      the database is unreachable.
+--      This alarm has CRITICAL severity."
+--
+-- REPAIR-ACTION
+--     "Check the connection of DIAMETER peers configured for the database as
+--      identified by in the details text of this alarm. Each DIAMETER peer will
+--      have separate alarms with details identifying each peer."
+::= { affirmedSsfTraps 11}
+
+anSsfAlarmDnsNameError NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"DNS query returned a name error. One or more FQDNs cannot be resolved."
+-- IMPACT
+--     "Session activations related to the specific FQDN will fail. This applies 
+--      to all 4 record types: A, AAAA, SRV, and NAPTR, and applies to any of up 
+--      to 8 configured servers. Negative responses from a DNS server can result 
+--      in negative caching as defined by RFC 2308. The retention time of these 
+--      entries is defined by the minimum of the TTL from the server and the locally 
+--      configured dns dns-if negative-cache-ttl. This alarm also covers the case 
+--      where all query results were eliminated by the configured dns-if exclude-label, 
+--      and the details string of the alarm tags it with [exclude-label]."
+--
+-- REPAIR-ACTION
+--     "Update configuration on the DNS server or the SSF dns static-cache to 
+--      include the missing records as listed in the details portion of the alarm.  
+--      An unresolved name entry will be removed from the alarm immediately after 
+--      static-cache addition or when its negative cache TTL expires and another 
+--      query is triggered for that name and it is successful. A manual flush of
+--      the dynamic-cache will also clear negative entries and hence the alarm.
+--      Name errors due to exclude-label configuration can be resolved by updating the
+--      static-cache, the DNS server, or the exclude-label.  In the case of the latter 
+--      option, a manual action is required to clear the alarm entry, dynamic-cache flush."
+::= { affirmedSsfTraps 12}
+
+anSsfAlarmConfigSync NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"Configuration data synchronization from master SSF failed."
+-- IMPACT
+--     "Config data sync from master SSF failed, please refer to the alarm details
+--      string for specific reason. This alarm implies that this SSF may not be in sync
+--      with the master SSF as configured at /sync/config-master. This implies that any
+--      changes in master configuration (e.g. additional dns static-cache entries, or
+--      change in gateway admin-state), will not be synced. If /sync/config-interval
+--      is configured to a non-zero value, then this SSF will periodically retry to
+--      pull the portable configuration data from the master SSF. Sync may be attempted
+--      manually by invoking the command 'sync config-pull'. This alarm has major
+--      severity."
+--
+-- REPAIR-ACTION
+--     "Please refer to the details string of the alarm for a specific failure reason.
+--      If sync is not desired, then de-configure the master IP address under
+--      /sync/config-master. Otherwise, check that the master IP address is reachable,
+--      and that the correct readonly user credentials are input at /sync/userid and
+--      /sync/password. Also verify that all loopback IP names on this SSF match those
+--      used on the SSF master."
+::= { affirmedSsfTraps 13}
+
+anSsfAlarmLoginFailure NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"SSF user login failure."
+-- IMPACT
+--     "A user has failed to login to the SSF by either SSH, CONSOLE, NETCONF or
+--      RESTCONF as instrumented by linux PAM system, which may use remote LDAP
+--      authentication or local authentication. If a user repeatedly fails login, a
+--      temporary lockout will occur. The administrator can configure the number of
+--      repeated login attempts and the lockout interval in /etc/pam.d directory by
+--      adjusting the pam_tally2 parameters. The severity of this alarm is informational,
+--      it does not go on the active list because it does not have state."
+--
+-- REPAIR-ACTION
+--     "If a legitimate user needs to regain access and can't wait for the lockout time
+--      to expire, then contact the SSF administrator and ask them to run the pam_tally
+--      reset command. If the user id is not legitimate, this is a security incident.
+--      Additional details are in the syslog stream for the auth facility, which is
+--      local file /var/log/auth.log. The details field of the alarm will indicate the
+--      username, the rhost (e.g. IP address) from which the user is connecting, and
+--      the service through which they are connecting (e.g. sshd)."
+--
+::= { affirmedSsfTraps 14}
+
+anSsfAlarmFileSystem NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"File system utilization threshold alarm"
+-- IMPACT
+--     "File system utilization threshold reached, please refer to the details string of 
+--      the alarm for the specific reason. The thresholds are configurable at 
+--      /engineering/file-system, and include separate levels for minor, major and critical
+--      severities. The file system is indicated in the resource xpath field of the alarm. 
+--      The current value is also presented by the command 'show statistics platform filesystem'.
+--      A full file system can impair the operation of the SSF, including ability to output 
+--      statistics and logs. When the usage percentage is increasing, the alarm onset value 
+--      is used to determine the severity level, and when the usage is decreasing, the 
+--      abatement value is used to determine the severity. The alarm is cleared when the 
+--      usage level as a percentage falls below the minor abatement level."
+--
+-- REPAIR-ACTION
+--     "Possible remedial actions may include 1) looking for unexpected files in user home 
+--      directories, 2) checking the storage size selected for SSF at deployment time (e.g. by
+--      Openstack Flavor), 3) adjusting the configured thresholds under /engineering/file-system. 
+--      File rotation and retention policies should keep directories that have periodic output 
+--      at acceptable levels (e.g. /var/lib/ssf/statistics, /var/log) assuming the recommended 
+--      minimum disk size specified in the deployment guide is used."
+::= { affirmedSsfTraps 15}
+
+anSsfAlarmCpu NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"CPU utilization threshold alarm"
+-- IMPACT
+--     "CPU utilization threshold reached, please refer to the alarm details
+--      string for specific reason. This alarm implies that average CPU usage on the SSF is 
+--      approaching certain threshold that requires attention. The severity of the alarm
+--      can be minor, major, or critical depending on the percentage criteria defined in 
+--      /engineering/cpu. The alarm level evaluation is conducted every 1 minute. 
+--      When the usage percentage is increasing, the alarm onset value is used to 
+--      determine the severity level, and when the usage is decreasing, the abatement 
+--      value is used to determine the severity. The alarm is cleared when the usage 
+--      percentage falls below the minor abatement level."
+--
+-- REPAIR-ACTION
+--      "Remedial actions for high CPU utilization may include: 1) scale-out the system 
+--       by adding another SSF instance, 2) scale-up the system by instantiating with 
+--       more virtual CPU (e.g. per Openstack Flavor), 3) adjust the configured alarm 
+--       thresholds to higher values. Please consult the deployment guide for recommended 
+--       system sizing. Other factors that can affect CPU utilization include number of 
+--       configured subscriber analyzers, type of EDR events enabled, and most importantly 
+--       the GTP traffic rate presented on the left side of the SSF. The current utilization 
+--       levels and quantity of cpu cores allocated can be checked with the command 
+--       'show statistics platform resource'."
+::= { affirmedSsfTraps 16}
+
+anSsfAlarmMemory NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"Memory utilization threshold alarm"
+-- IMPACT
+--     "Memory utilization threshold reached, please refer to the alarm details
+--      string for specific reason. This alarm implies that memory usage on the SSF is 
+--      approaching certain threshold that requires attention. The severity of the alarm
+--      can be minor, major, or critical depending on the percentage criteria configured in 
+--      /engineering/memory. The alarm level evaluation is conducted every 1 minute. 
+--      When the usage percentage is increasing, the alarm onset value is used to 
+--      determine the severity level, and when the usage is decreasing, the abatement 
+--      value is used to determine the severity. The alarm is cleared when the usage 
+--      percentage falls below the minor abatement level."
+--
+-- REPAIR-ACTION
+--      "Remedial actions for high memory utilization my include: 1) redeploy the SSF 
+--       with higher memory allocation (e.g. per Openstack Flavor), 2) adjust the configured 
+--       alarm thresholds to higher values. Please consult the deployment guide for 
+--       recommended system sizing. The current utilization levels and amount of memory 
+--       allocated can be checked with the command 'show statistics platform resource'."
+::= { affirmedSsfTraps 17}
+
+anSsfAlarmNetworkNextHopStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"Network context next hop status alarm"
+-- IMPACT
+--     "One or more BFD keepalive sessions for layer 3 routing are down for the specified 
+--      next hop. If all keepalive sesions are down for a next hop, that next hop is removed 
+---     from the applicable static route. The severity is major when some of the sessions are 
+---     down, and critical when all of the sessions are down for a given next hop. The alarm is 
+---     cleared when all sessions for a given next hop are up."
+--
+-- REPAIR-ACTION
+--     "Check the status of all BFD keepalive sessions configured for the affected next hop 
+--      in the affected static route and network context."
+::= { affirmedSsfTraps 18}
+
+anSsfAlarmNetworkStaticRouteStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"Network context static route status alarm"
+-- IMPACT
+--     "The static route for a given network context is down, no next hops are viable. 
+--      This is based on BFD keepalive sessions for each next hop of a given static route, 
+--      and does not apply to systems using ping keepalive. The usage of the nextwork context 
+--      and static route may vary depending on the configuration of the SSF system (e.g. for 
+--      GTP or REST). Unless there is also a default route configured, the destination 
+--      subnet is unreachable."
+--
+-- REPAIR-ACTION
+--     "Check the status of all next hops configured for the affected static route in the 
+--      affected network context."
+::= { affirmedSsfTraps 19}
+
+anSsfAlarmStatusSync NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"Status data synchronization from an SSF failed."
+-- IMPACT
+--     "Status data sync from an SSF failed, please refer to the alarm details string
+--      for specific reason. This alarm implies that this SSF may not have the most
+--      recent gateway status from the SSF as configured at primary-ssf or
+--      secondary-ssf under /gateway/configured. If /sync/status-interval is configured
+--      to a non-zero value, then this SSF will periodically retry to pull the status
+--      data from the SSF. This alarm has major severity."
+--
+-- REPAIR-ACTION
+--     "Please refer to the details string of the alarm for a specific failure reason.
+--      If sync is not desired, then de-configure /sync/status-interval. Otherwise,
+--      check that the SSF is reachable, and that the correct readonly user credentials
+--      are input at /sync/userid and /sync/password."
+::= { affirmedSsfTraps 20}
+
+anSsfAlarmGatewaySnmpStatus NOTIFICATION-TYPE
+OBJECTS   {
+       affirmedSsfAlarmSeqId,
+       affirmedSsfAlarmDateTime,
+       affirmedSsfAlarmResource,
+       affirmedSsfAlarmSeverity,
+       affirmedSsfAlarmDetails
+}
+STATUS current
+DESCRIPTION
+"Load data retrieval by SNMP from gateway status."
+-- IMPACT
+--     "Load data retrieval by SNMP from gateway(s) has failed. This alarm implies that
+--      this SSF may not have the most recent status from some gateways. Existing
+--      samples are considered stale after /ssf/gateway-selection/load-information/oam-lci-validity-time
+--      minutes (default 60). Once stale, an LCI will be substituted using the
+--      /ssf/gateway-selection/load-information/substitution algorithm (default
+--      average). Load data retrieval is attempted per /gateway/profile/polling-rate
+--      seconds (default 300). This alarm has major severity."
+--
+-- REPAIR-ACTION
+--     "This alarm is an aggregate so there may be several causes impacting various
+--      gateways. Causes include: Incorrectly configured and/or unreachable
+--      /gateway/configured/oam-ip-address. Incorrectly configured
+--      /gateway/profile/snmp-port (default 161). Incorrectly configured
+--      /gateway/profile/snmp-community (default affirmed). Incorrectly configured
+--      /gateway/profile/gw-architecture (default affirmed-mcc). Upon recovery, it
+--      takes approximately /gateway/profile/polling-rate seconds for a gateway to be
+--      removed from the aggregate. The alarm is cleared when all gateways have been
+--      removed from the aggregate."
+::= { affirmedSsfTraps 21}
+
+END

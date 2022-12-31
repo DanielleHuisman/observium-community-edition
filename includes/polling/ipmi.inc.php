@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -33,9 +33,19 @@ if ($ipmi['host'] = get_dev_attrib($device,'ipmi_hostname')) {
     $ipmi['interface'] = 'lan';
   }
 
+  $own_hostname = $config['own_hostname'] ?: get_localhost();
   $remote = '';
-  if ($config['own_hostname'] !== $device['hostname'] && $ipmi['host'] !== 'localhost' && $ipmi['host'] !== '127.0.0.1') {
-    $remote = " -I " . escapeshellarg($ipmi['interface']) . " -p " . $ipmi['port'] . " -H " . escapeshellarg($ipmi['host']) . " -L " . escapeshellarg($ipmi['userlevel']) . " -U " . escapeshellarg($ipmi['user']) . " -P " . escapeshellarg($ipmi['password']);
+  if ($own_hostname !== $device['hostname'] &&
+      !in_array($ipmi['host'], [ 'localhost', '127.0.0.1', '::1' ], TRUE)) {
+
+    $remote = " -I " . escapeshellarg($ipmi['interface']) . " -p " . $ipmi['port'] . " -H " .
+              escapeshellarg($ipmi['host']) . " -L " . escapeshellarg($ipmi['userlevel']) .
+              " -U " . escapeshellarg($ipmi['user']) . " -P " . escapeshellarg($ipmi['password']);
+  }
+
+  if(is_numeric($device['ipmi_ciper']) && $device['ipmi_ciper'] == '17')
+  {
+    $remote .= " -C ".$device['ipmi_cipher'];
   }
 
   $results = external_exec($config['ipmitool'] . $remote . " sensor 2>/dev/null");

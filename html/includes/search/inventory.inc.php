@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -16,10 +16,14 @@ $results = dbFetchRows("SELECT * FROM `entPhysical`
                         WHERE `deleted` IS NULL AND (`entPhysicalSerialNum` LIKE ? OR `entPhysicalModelName` LIKE ?) $query_permitted_device
                         ORDER BY `entPhysicalName` LIMIT $query_limit", [ $query_param, $query_param ]);
 
-if (safe_count($results)) {
+if (!safe_empty($results)) {
+  $max_len = 35;
   foreach ($results as $result) {
-    $name = $result['entPhysicalPhysicalName'];
-    if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
+    $name = truncate($result['entPhysicalPhysicalName'], $max_len);
+    $device_name = truncate($result['hostname'], $max_len);
+    if ($result['hostname'] != $result['sysName'] && $result['sysName']) {
+      $device_name .= ' | ' . truncate($result['sysName'], $max_len);
+    }
 
     if (strlen($result['entPhysicalModelName'])) {
       $model = $result['entPhysicalModelName'];
@@ -38,7 +42,7 @@ if (safe_count($results)) {
       'name' => $name, 'colour' => $tab_colour,
       'icon' => $config['icon']['inventory'],
       'data' => array(
-        escape_html($result['hostname']),
+        escape_html($device_name),
         html_highlight(escape_html($model) . ' | SN: ' . escape_html($result['entPhysicalSerialNum']), $queryString)
         )
     );

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -43,10 +43,10 @@ $temp_unit = snmp_get_oid($device, 'cmcIIISetTempUnit.0', $mib);
 //RITTAL-CMC-III-MIB::cmcIIIVarName.1.26 = STRING: Input 2.Delay
 //RITTAL-CMC-III-MIB::cmcIIIVarName.1.27 = STRING: Input 2.Status
 //RITTAL-CMC-III-MIB::cmcIIIVarName.1.28 = STRING: Input 2.Category
-$oids = snmpwalk_cache_oid($device, "cmcIIIVarTable", array(), $mib);
+$oids = snmpwalk_cache_oid($device, "cmcIIIVarTable", [], $mib);
 //print_debug_vars($oids);
 
-$device_oids = snmpwalk_cache_oid($device, "cmcIIIDevTable", array(), $mib);
+$device_oids = snmpwalk_cache_oid($device, "cmcIIIDevTable", [], $mib);
 print_debug_vars($device_oids);
 
 $device_names = [];
@@ -68,7 +68,7 @@ foreach ($device_oids as $index => $entry) {
 }
 
 // Rearrage this dumb array as more logic
-$device_sensors = array();
+$device_sensors = [];
 foreach ($oids as $index => $entry) {
   $device_index = explode('.', $index)[0];
 
@@ -96,8 +96,8 @@ foreach($device_sensors as $device_index => $sensors) {
     }
 
     if (strlen($sensor['description']['cmcIIIVarValueStr'])) {
-      $tmp = str_replace(array( '_', 'Sys ' ),
-                         array( ' ', 'System ' ), $sensor['description']['cmcIIIVarValueStr']);
+      $tmp = str_replace([  '_', 'Sys '  ],
+                         [  ' ', 'System '  ], $sensor['description']['cmcIIIVarValueStr']);
       if (!str_contains_array($name, $tmp)) {
         $descr .= ' - ' . $sensor['description']['cmcIIIVarValueStr'];
       }
@@ -115,7 +115,6 @@ foreach($device_sensors as $device_index => $sensors) {
       $oid_num = '.1.3.6.1.4.1.2606.7.4.2.2.1.11.' . $index;
 
       if ($datatype === 'enum') {
-        //discover_status($device, $oid_num, "$oid_name.$index", 'cmcIIIMsgStatus', $descr, $value, array( 'entPhysicalClass' => 'other' ));
         discover_status_ng($device, $mib, $oid_name, $oid_num, $index, 'cmcIIIMsgStatus', $descr, $value, [ 'entPhysicalClass' => 'other' ]);
       }
 
@@ -149,7 +148,7 @@ foreach($device_sensors as $device_index => $sensors) {
       $value   = $entry['cmcIIIVarValueInt'];
       $oid_num = '.1.3.6.1.4.1.2606.7.4.2.2.1.11.' . $index;
 
-      $options = array();
+      $options = [];
       /*
       if ($type == 'outputPWM')
       {
@@ -174,7 +173,7 @@ foreach($device_sensors as $device_index => $sensors) {
       } elseif (str_ends($unit, 'V')) {
         $type = "voltage";
       } elseif ($unit === "%") {
-        if (str_icontains_array($name, [ 'RPM', ' Fan', 'Valve' ]) || str_iends($entry['cmcIIIVarName'], 'Rpm')) {
+        if (str_icontains_array($descr, [ 'RPM', ' Fan', 'Valve', 'Airflow' ]) || str_iends($entry['cmcIIIVarName'], 'Rpm')) {
           $type = "load";
         } elseif (str_icontains_array($name, 'Humidity')) {
           $type = "humidity";

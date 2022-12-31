@@ -23,6 +23,15 @@ class IncludesDbTest extends \PHPUnit\Framework\TestCase
    */
   public function testGenerateQueryValues($value, $column, $condition, $result)
   {
+    $this->assertSame($result, generate_query_values_and($value, $column, $condition));
+  }
+
+  /**
+   * @dataProvider providerGenerateQueryValues
+   * @group sql
+   */
+  public function testGenerateQueryValuesCompat($value, $column, $condition, $result)
+  {
     $this->assertSame($result, generate_query_values($value, $column, $condition));
   }
 
@@ -33,7 +42,7 @@ class IncludesDbTest extends \PHPUnit\Framework\TestCase
   public function testGenerateQueryValuesNoAnd($value, $column, $condition, $result)
   {
     $result = preg_replace('/^ AND/', '', $result);
-    $this->assertSame($result, generate_query_values($value, $column, $condition, FALSE));
+    $this->assertSame($result, generate_query_values_ng($value, $column, $condition));
   }
 
   public function providerGenerateQueryValues()

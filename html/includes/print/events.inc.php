@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -90,9 +90,8 @@ function print_events($vars) {
       $string .= '<td class="state-marker"></td>' . PHP_EOL;
 
       if ($events['short']) {
-        $string .= '    <td class="syslog" style="white-space: nowrap">';
-        $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
-        $string .= generate_tooltip_link('', format_uptime($timediff, "short-3"), format_timestamp($entry['timestamp']), NULL) . '</td>' . PHP_EOL;
+        $string .= '    <td class="syslog text-nowrap">';
+        $string .= generate_tooltip_time($entry['timestamp']) . '</td>' . PHP_EOL;
       } else {
         $string .= '    <td style="width: 160px">';
         $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
@@ -215,22 +214,22 @@ function get_events_array($vars)
       {
         case 'device':
         case 'device_id':
-          $where .= generate_query_values($value, 'device_id');
+          $where .= generate_query_values_and($value, 'device_id');
           break;
         case 'port':
         case 'entity':
         case 'entity_id':
-          $where .= generate_query_values($value, 'entity_id');
+          $where .= generate_query_values_and($value, 'entity_id');
           break;
         case 'severity':
-          $where .= generate_query_values($value, 'severity');
+          $where .= generate_query_values_and($value, 'severity');
           break;
         case 'type':
         case 'entity_type':
-          $where .= generate_query_values($value, 'entity_type');
+          $where .= generate_query_values_and($value, 'entity_type');
           break;
         case 'message':
-          $where .= generate_query_values($value, 'message', '%LIKE%');
+          $where .= generate_query_values_and($value, 'message', '%LIKE%');
           break;
         case 'timestamp_from':
           $where .= ' AND `timestamp` >= ?';
@@ -243,8 +242,8 @@ function get_events_array($vars)
         case "group":
         case "group_id":
           $values = get_group_entities($value);
-          $where .= generate_query_values($values, 'entity_id');
-          $where .= generate_query_values(get_group_entity_type($value), 'entity_type');
+          $where .= generate_query_values_and($values, 'entity_id');
+          $where .= generate_query_values_and(get_group_entity_type($value), 'entity_type');
           break;
       }
     }

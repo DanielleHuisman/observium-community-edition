@@ -6,42 +6,36 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
 /// MOVEME. states.inc.php
-function get_bits_state_array($hex, $mib = NULL, $object = NULL, $bits_def = NULL)
-{
+function get_bits_state_array($hex, $mib = NULL, $object = NULL, $bits_def = NULL) {
   global $config;
 
   // Fetch validate BITS definition
-  if (is_array($bits_def))
-  {
+  if (!empty($bits_def) && is_array($bits_def)) {
     // Use passed bits definitions
     $def = $bits_def;
-  }
-  else if (strlen($mib) && strlen($object) &&
-           isset($config['mibs'][$mib]['states_bits'][$object]))
-  {
+  } elseif (!safe_empty($mib) && !safe_empty($object) &&
+           isset($config['mibs'][$mib]['states_bits'][$object])) {
     $def = $config['mibs'][$mib]['states_bits'][$object];
   }
-  if (empty($def))
-  {
+
+  if (empty($def) || !is_array($def)) {
     print_debug("Incorrect BITS state definition passed.");
-    return NULL;
+    return [];
   }
-  print_debug_vars($def);
+  //print_debug_vars($def);
 
   //$bit_array = array_reverse(str_split(hex2binmap($hex)));
   $bit_array = str_split(hex2binmap($hex));
-  print_debug_vars($bit_array);
+  //print_debug_vars($bit_array);
 
   $state_array = [];
-  foreach ($bit_array as $bit => $value)
-  {
-    if ($value)
-    {
+  foreach ($bit_array as $bit => $set) {
+    if ($set) {
       $state_array[$bit] = $def[$bit]['name'];
     }
   }
@@ -736,7 +730,7 @@ function poll_status($device, &$oid_cache)
         if (isset($old_state_array['discovery']) && is_module_enabled($device, $old_state_array['discovery'], 'discovery'))
         {
           force_discovery($device, $old_state_array['discovery']);
-          print_debug("Module ${old_state_array['discovery']} force for discovery by changed status type ${status_db['status_mib']}::${status_db['status_object']}");
+          print_debug("Module {$old_state_array['discovery']} force for discovery by changed status type {$status_db['status_mib']}::{$status_db['status_object']}");
         }
       }
     } else {

@@ -12,21 +12,23 @@
  */
 
 // Display devices as a list in detailed format
+
+$header = [  'state-marker' => '',
+             '',
+             [ 'hostname' => 'Hostname', 'domain' => 'Domain', 'location' => 'Location'],
+             '',
+             [ 'os' => 'Operating System', 'hardware' => 'Hardware Platform'],
+             [ 'uptime' => 'Uptime', 'sysName' => 'sysName']];
+
+//r($table_header);
+
 ?>
 
-<table class="table table-hover table-striped  table-condensed ">
-  <thead>
-    <tr>
-      <th class="state-marker"></th>
-      <th></th>
-      <th>Device / Location</th>
-      <th></th>
-      <th>Operating System / Hardware Platform</th>
-      <th>Uptime / sysName</th>
-    </tr>
-  </thead>
-
+    <table class="table table-hover table-striped table-condensed ">
 <?php
+
+echo generate_table_header($header, $vars);
+
 foreach ($devices as $device)
 {
   if (device_permitted($device['device_id']))

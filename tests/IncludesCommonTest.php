@@ -2150,6 +2150,10 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       '{“method”:”sms.send_togroup”, “params”:{“access_token”:”0005gOjCOlMH8F2BP8″,”groupname”:”admins”,”message”:”mymessage”,”highpriority”:”1″}}',
       [ 'method' => 'sms.send_togroup', 'params' => [ 'access_token' => '0005gOjCOlMH8F2BP8', 'groupname' => 'admins', 'message' => 'mymessage', 'highpriority' => '1' ] ]
     ];
+    $array[] = [
+      "[ \"/^ONU.+ Operation-&gt;Deactivated/\n/^ONU.+ Operation-&gt;Deactivated/\" ]",
+      [ '/^ONU.+ Operation-&gt;Deactivated//^ONU.+ Operation-&gt;Deactivated/' ]
+    ];
     // ctrl chars
     $array[] = [
       '{"url":"https://<apiurl>","json":"{'."\r\n".'    \"ALERT_ID\": \"%ALERT_ID%\",'."\r\n".'    \"ALERT_MESSAGE\": \"%ALERT_MESSAGE%\",'."\r\n".'    \"ALERT_SEVERITY\": \"%ALERT_SEVERITY%\",'."\r\n".'    \"ALERT_STATE\": \"%ALERT_STATE%\",'."\r\n".'    \"ALERT_STATUS\": \"%ALERT_STATUS%\",'."\r\n".'    \"ALERT_TIMESTAMP\": \"%ALERT_TIMESTAMP%\",'."\r\n".'    \"CONDITIONS\": \"%CONDITIONS%\",'."\r\n".'    \"DEVICE_HOSTNAME\": \"%DEVICE_HOSTNAME%\",'."\r\n".'    \"DEVICE_SYSNAME\": \"%DEVICE_SYSNAME%\",'."\r\n".'    \"DURATION\": \"%DURATION%\",'."\r\n".'    \"ENTITY_LINK\": \"%ENTITY_LINK%\",'."\r\n".'    \"METRICS\": \"%METRICS%\",'."\r\n".'    \"TITLE\": \"%TITLE%\"'."\r\n".'}"}',
@@ -2485,6 +2489,11 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       [ 'Ã´▒Â¿i+',                                       'serial', FALSE ],
       [ '22:00:00:33:FF:AA',                             'serial', TRUE ],
       [ '~!@#$%^&*()_+`1234567890-=[]\\{}|;: \'",./<>?', 'serial', TRUE ],
+      // snmp community
+      [ 'f%!@#$%^&*()_+~`[]{}\|<>,./?;:',                'snmp_community', TRUE ],
+      [ 'Domain observiuvm.org wasddddddd',              'snmp_community', TRUE ],
+      [ '32chars.........................',              'snmp_community', TRUE ],
+      [ '32+chars.........................',             'snmp_community', FALSE ],
     ];
   }
 
@@ -2735,10 +2744,10 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   public function providerGetHttpRequest()
   {
     return array(
-      array('http://observium.org',      '<html',  TRUE, 200), // OK, http
-      array('https://www.observium.org', '<html',  TRUE, 200), // OK, https
-      array('http://somewrong.test',       FALSE, FALSE, 408), // Unknown host
-      array('http://observium.org/404',    FALSE, FALSE, 404), // OK, not found
+      array('http://info.cern.ch',         '<html',  TRUE, 200), // OK, http
+      array('https://www.observium.org',   '<html',  TRUE, 200), // OK, https
+      array('http://somewrong.test',         FALSE, FALSE, 408), // Unknown host
+      array('https://www.observium.org/404', FALSE, FALSE, 404), // OK, not found
     );
   }
 

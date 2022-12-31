@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
  *
  */
 
@@ -209,7 +209,7 @@ foreach ($ports_ids as $port_id => $port)
 // Complete remove duplicates
 if (count($ports_duplicates_ids))
 {
-  dbDelete('ports', generate_query_values($ports_duplicates_ids, 'port_id', NULL, FALSE));
+  dbDelete('ports', generate_query_values_ng($ports_duplicates_ids, 'port_id'));
 }
 // End interfaces clean
 echo(PHP_EOL);

@@ -273,7 +273,8 @@ if (safe_count($ups_array)) {
     $oid_name = 'upsInputVoltage';
     if (isset($entry[$oid_name]) &&
         !discovery_check_if_type_exist([ 'voltage->TRIPPLITE-PRODUCTS-tlpUpsInputPhaseVoltage',
-                                         'voltage->HUAWEI-UPS-MIB-hwUpsInputVoltageA' ], 'sensor')) {
+                                         'voltage->HUAWEI-UPS-MIB-hwUpsInputVoltageA',
+                                         'voltage->CPS-MIB-upsAdvanceInputLineVoltage' ], 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.3.3.1.3.$index";
       //discover_sensor('voltage', $device, $oid, "upsInputEntry.".$phase, 'ups-mib', $descr, 1, $entry[$oid_name]);
       $options = [ 'rename_rrd' => 'ups-mib-upsInputEntry.'.$phase ];
@@ -368,7 +369,8 @@ if (safe_count($ups_array)) {
     $oid_name = 'upsOutputVoltage';
     if (isset($entry[$oid_name]) && $entry[$oid_name] > 0 &&
         !discovery_check_if_type_exist([ 'voltage->TRIPPLITE-PRODUCTS-tlpUpsOutputLineVoltage',
-                                         'voltage->HUAWEI-UPS-MIB-hwUpsOutputVoltageA' ], 'sensor')) {
+                                         'voltage->HUAWEI-UPS-MIB-hwUpsOutputVoltageA',
+                                         'voltage->CPS-MIB-upsAdvanceOutputVoltage' ], 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.4.4.1.2.$index";
       //discover_sensor('voltage', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsOutputVoltage']);
       $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
@@ -382,7 +384,8 @@ if (safe_count($ups_array)) {
     ## Output current
     $oid_name = 'upsOutputCurrent';
     if (isset($entry[$oid_name]) && $ups_total[$oid_name] > 0 &&
-        !discovery_check_if_type_exist([ 'current->HUAWEI-UPS-MIB-hwUpsOutputCurrentA' ], 'sensor')) {
+        !discovery_check_if_type_exist([ 'current->HUAWEI-UPS-MIB-hwUpsOutputCurrentA',
+                                         'current->CPS-MIB-upsAdvanceOutputCurrent' ], 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.4.4.1.3.$index";
       //discover_sensor('current', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, $scale_current, $entry['upsOutputCurrent']);
       $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
@@ -392,7 +395,8 @@ if (safe_count($ups_array)) {
     ## Output power
     $oid_name = 'upsOutputPower';
     if (isset($entry[$oid_name])  && $ups_total[$oid_name] > 0 &&
-        !discovery_check_if_type_exist('power->HUAWEI-UPS-MIB-hwUpsOutputActivePowerA', 'sensor')) {
+        !discovery_check_if_type_exist([ 'power->HUAWEI-UPS-MIB-hwUpsOutputActivePowerA',
+                                         'power->CPS-MIB-upsAdvanceOutputPower' ], 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.4.4.1.4.$index";
       //discover_sensor('power', $device, $oid, "upsOutputEntry.".$phase, 'ups-mib', $descr, 1, $entry['upsOutputPower']);
       $options = [ 'rename_rrd' => 'ups-mib-upsOutputEntry.'.$phase ];
@@ -403,7 +407,7 @@ if (safe_count($ups_array)) {
     if (isset($entry[$oid_name]) &&
         !discovery_check_if_type_exist('load->HUAWEI-UPS-MIB-hwUpsOutputLoadA', 'sensor')) {
       $oid   = ".1.3.6.1.2.1.33.1.4.4.1.5.$index";
-      //rename_rrd($device, "sensor-capacity-ups-mib-upsOutputPercentLoad.${phase}", "sensor-load-ups-mib-upsOutputPercentLoad.${phase}");
+      //rename_rrd($device, "sensor-capacity-ups-mib-upsOutputPercentLoad.{$phase}", "sensor-load-ups-mib-upsOutputPercentLoad.{$phase}");
       //discover_sensor('load', $device, $oid, "upsOutputPercentLoad.$phase", 'ups-mib', $descr, 1, $entry['upsOutputPercentLoad']);
       $options = [ 'rename_rrd' => 'ups-mib-upsOutputPercentLoad.'.$phase ];
       discover_sensor_ng($device, 'load', $mib, $oid_name, $oid, $index, NULL, $descr, 1, $entry[$oid_name], $options);
