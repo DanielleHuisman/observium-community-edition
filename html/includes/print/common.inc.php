@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -224,7 +224,7 @@ function generate_table_header($header = [], $vars = []) {
   // Store current $vars sort variables
   $sort       = $vars['sort'];
   $sort_order = strtolower($vars['sort_order']);
-  if (!in_array($sort_order, array('asc', 'desc', 'reset'))) {
+  if (!in_array($sort_order, [ 'asc', 'desc', 'reset' ])) {
     $sort_order = 'asc';
   }
 
@@ -240,8 +240,7 @@ function generate_table_header($header = [], $vars = []) {
   //r($header);
 
   // Loop each column generating a <th> element
-  foreach($header AS $id => $col)
-  {
+  foreach($header as $id => $col) {
 
      //if (in_array($id, ['class', 'group', 'style'])) { continue; } // skip html metadata
 
@@ -249,18 +248,18 @@ function generate_table_header($header = [], $vars = []) {
 
      $fields = []; // Empty array for fields
 
-     if(empty($col) || !is_array($col)) {  $col = [ $id => $col ]; } // If col is not an array, make it one
+     if (empty($col) || !is_array($col)) { $col = [ $id => $col ]; } // If col is not an array, make it one
 
-     if($id == 'state-marker') { $col['class'] = 'state-marker'; }  // Hard code handling of state-marker
+     if ($id === 'state-marker') { $col['class'] = 'state-marker'; }  // Hard code handling of state-marker
 
      // Loop each field and generate an <a> element
      foreach ($col as $field_id => $field) {
 
-        if ($field_id === 'class' ||  $field_id === 'style' || $field_id == 'subfields') { continue; } // skip html data
+        if ($field_id === 'class' ||  $field_id === 'style' || $field_id === 'subfields') { continue; } // skip html data
 
         $header_field = generate_table_header_field($field_id, $field, $vars, $sort, $sort_order);
 
-        if(strlen($header_field) > 0) {
+        if (!safe_empty($header_field)) {
           $fields[] = $header_field;
         }
 
@@ -278,20 +277,19 @@ function generate_table_header($header = [], $vars = []) {
 
 }
 
-function generate_table_header_field($field_id, $field, $vars, $sort, $sort_order)
-{
+function generate_table_header_field($field_id, $field, $vars, $sort, $sort_order) {
 
-  if(empty($field)) {                                  // No label, generate empty column header.
+  if (empty($field)) {                                  // No label, generate empty column header.
     $return = '';
   } elseif ( is_numeric($field_id) && !is_array($field)) {   // Label without id, generate simple column header
     $return = $field;
   } else {
-    if(!is_array($field)) { $field = [ 'label' => $field ]; }
-    if(!isset($field['label'])) { $field['label'] = $field[0]; }
+    if (!is_array($field)) { $field = [ 'label' => $field ]; }
+    if (!isset($field['label'])) { $field['label'] = $field[0]; }
 
-    if($sort == $field_id) {
+    if ($sort == $field_id) {
       $field['label'] = '<span class="text-primary" style="font-style: italic">'.$field['label'].'</span>';
-      if($sort_order == 'asc') {
+      if ($sort_order === 'asc') {
         $new_vars = [ 'sort' => $field_id, 'sort_order' => 'desc' ];
         $field['caret'] = '&nbsp;<i class="text-primary small glyphicon glyphicon-arrow-up"></i>';
       } else {
@@ -304,10 +302,9 @@ function generate_table_header_field($field_id, $field, $vars, $sort, $sort_orde
     $return = '<a href="'.generate_url($vars, $new_vars).'">'.$field['label'].$field['caret'].'</a>';
 
     // Generate slash separated links for subfields
-    if(isset($field['subfields']))
-    {
-      foreach($field['subfields'] as $subfield_id => $subfield)
-      {
+    if (isset($field['subfields'])) {
+      $subfields = [];
+      foreach($field['subfields'] as $subfield_id => $subfield) {
         //r($subfield); r($subfield_id);
         $subfields[] = generate_table_header_field($subfield_id, $subfield, $vars, $sort, $sort_order);
       }
@@ -388,6 +385,47 @@ function get_table_header($cols, $vars = array()) {
   $string .= '  </thead>' . PHP_EOL;
 
   return $string;
+}
+
+function print_button_group($data, $return = FALSE) {
+  $data = [
+    'id'    => 'rule_actions',
+    'name'  => 'Rule actions',
+    'size'  => 'xs', // xs, sm, lg
+    'class' => ''
+  ];
+  $data['rows'][0][] = '';
+
+  $button_group_start = '      <div';
+  if ($data['id']) {
+    $button_group_start .= ' id="' . $data['id'] . '"';
+  }
+  if ($data['name']) {
+    $button_group_start .= ' aria-label="' . $data['name'] . '"';
+  }
+
+  $button_group_class = 'btn-group';
+  if ($data['size']) {
+    $button_group_class .= ' btn-group-' . $data['size'];
+  }
+  if ($data['class']) {
+    $button_group_class .= ' ' . $data['class'];
+  }
+  $button_group_start .= ' class="' . $button_group_class . '"';
+  $button_group_start .= ' role="group">' . PHP_EOL;
+
+  /*
+      <div class="btn-group btn-group-xs" role="group" aria-label="Rule actions">
+        <a class="btn btn-default" role="group" title="Edit" href="#modal-edit_syslog_rule_'.$la['la_id'].'" data-toggle="modal"><i class="icon-cog text-muted"></i></a>
+        <a class="btn btn-danger"  role="group" title="Delete" href="#modal-delete_syslog_rule_'.$la['la_id'].'" data-toggle="modal"><i class="icon-trash"></i></a>
+      </div>
+   */
+  $button_group_end = '      </div>' . PHP_EOL;
+
+  if ($return) {
+    return $button_group_start . $button_group . $button_group_end;
+  }
+  echo $button_group_start . $button_group . $button_group_end;
 }
 
 function print_error_permission($text = NULL, $escape = TRUE)
@@ -588,40 +626,33 @@ function get_markdown($markdown, $escape = TRUE, $extra = FALSE) {
  *
  * @return string HTML icon tag like <i class="sprite-flag"></i> or emoji style :flag-us: -> <span class="icon-emoji">&#x1F1FA;&#x1F1F8;</span>
  */
-function get_icon($icon, $class = '', $attribs = [])
-{
+function get_icon($icon, $class = '', $attribs = []) {
   global $config;
 
   // Passed already html icon tag, return as is
   if (str_contains_array($icon, [ '<', '>' ])) { return $icon; }
 
   $icon = trim(strtolower($icon));
-  if (isset($config['icon'][$icon]))
-  {
+  if (isset($config['icon'][$icon])) {
     // Defined icons
     $icon = $config['icon'][$icon];
-  }
-  elseif (!strlen($icon))
-  {
+  } elseif (!strlen($icon)) {
     // Empty icon, return empty string
     return '';
   }
 
   // Emoji styled icons, ie :flag-us:
-  if (preg_match('/^:[\w\-_]+:$/', $icon))
-  {
+  if (preg_match('/^:[\w\-_]+:$/', $icon) || is_intnum($icon)) {
     // icon-emoji is pseudo class, for styling emoji as other icons
     return '<span class="icon-emoji">' . get_icon_emoji($icon) . '</span>';
   }
 
   // Append glyphicon main class if these icons used
-  if (str_starts($icon, 'glyphicon-'))
-  {
+  if (str_starts($icon, 'glyphicon-')) {
     $icon = 'glyphicon '.$icon;
   }
 
-  if ($class)
-  {
+  if ($class) {
     // Additional classes
     $attribs['class'] = array_merge((array)$class, (array)$attribs['class']);
   }
@@ -639,29 +670,45 @@ function get_icon($icon, $class = '', $attribs = [])
  *
  * @return string Emoji in requested type, for html ie: :flag-us: -> &#x1F1FA;&#x1F1F8;
  */
-function get_icon_emoji($emoji, $type = 'html', $attribs = [])
-{
+function get_icon_emoji($emoji, $type = 'html', $attribs = []) {
   global $config;
 
   // Emoji definitions not loaded by default!
   // Load of first request
-  if (!isset($config['emoji']['zero']))
-  {
+  if (!isset($config['emoji']['zero'])) {
     include_once $config['install_dir'] . '/includes/definitions/emoji.inc.php';
   }
 
   $emoji_name = strtolower(trim($emoji, ": \t\n\r\0\x0B"));
 
+  if (is_intnum($emoji)) {
+    // convert int number string to emoji number
+    $return = '';
+    foreach (str_split($emoji) as $num) {
+      switch ($num) {
+        case '0': $return .= get_icon_emoji(':zero:',  $type, $attribs); break;
+        case '1': $return .= get_icon_emoji(':one:',   $type, $attribs); break;
+        case '2': $return .= get_icon_emoji(':two:',   $type, $attribs); break;
+        case '3': $return .= get_icon_emoji(':three:', $type, $attribs); break;
+        case '4': $return .= get_icon_emoji(':four:',  $type, $attribs); break;
+        case '5': $return .= get_icon_emoji(':five:',  $type, $attribs); break;
+        case '6': $return .= get_icon_emoji(':six:',   $type, $attribs); break;
+        case '7': $return .= get_icon_emoji(':seven:', $type, $attribs); break;
+        case '8': $return .= get_icon_emoji(':eight:', $type, $attribs); break;
+        case '9': $return .= get_icon_emoji(':nine:',  $type, $attribs); break;
+      }
+    }
+    return $return;
+  }
+
   // Unknown emoji name, return original string
-  if (!isset($config['emoji'][$emoji_name]))
-  {
+  if (!isset($config['emoji'][$emoji_name])) {
     return $emoji;
   }
   $type  = strtolower($type);
   $entry = $config['emoji'][$emoji_name];
 
-  switch ($type)
-  {
+  switch ($type) {
     case 'unified':
     case 'non_qualified':
       $return = escape_html($entry[$type]);

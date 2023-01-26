@@ -506,14 +506,21 @@ function get_status_array($options)
       foreach ($entries as $peer)
       {
         humanize_bgp($peer);
-        $peer_ip = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
+        $peer_link = generate_entity_link("bgp_peer", $peer, $peer['human_remoteip']);
+
+        if(isset($options['bgp_peer_name']) && $options['bgp_peer_name'] == "peer_dns")
+        {
+          if(strlen($peer['reverse_dns'])) {
+            $peer_link = generate_entity_link("bgp_peer", $peer, short_hostname($peer['reverse_dns']));
+          }
+        }
 
         $peer['wide'] = str_contains($peer['bgpPeerRemoteAddr'], ':');
         $boxes[] = array('sev' => 75,
                          'class' => 'BGP Session',
                          'event' => 'Down',
                          'device_link' => generate_device_link_short($peer),
-                         'entity_link' => $peer_ip,
+                         'entity_link' => $peer_link,
                          'wide' => $peer['wide'],
                          'time' => format_uptime($peer['bgpPeerFsmEstablishedTime'], 'short-3'),
                          'location' => $device['location'],

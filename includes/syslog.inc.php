@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage syslog
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -98,16 +98,30 @@ function get_cache($host, $value) {
             $addresses = dbFetchRows($query, [ $ip, 0 ]);
             $address_count = safe_count($addresses);
 
+            // Try to check cached IP addresses
+            if ($address_count === 0 && $GLOBALS['config']['syslog']['use_ip']) {
+              // Cached IPs compressed
+              $query = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
+              $addresses = dbFetchRows($query, [ ip_compress($host) ]);
+              $address_count = safe_count($addresses);
+            }
+
             if ($address_count) {
               $dev_cache[$host]['device_id'] = $addresses[0]['device_id'];
 
               // Additional checks if multiple addresses found
               if ($address_count > 1) {
                 foreach ($addresses as $entry) {
-                  $device_tmp = device_by_id_cache($entry['device_id']);
-                  if ($device_tmp['disabled'] || !$device_tmp['status']) { continue; }   // Skip disabled and down devices
-                  if ($entry['ifAdminStatus'] === 'down' ||                                         // Skip disabled ports
-                      in_array($entry['ifOperStatus'], [ 'down', 'lowerLayerDown' ])) { continue; } // Skip down ports
+                  if (isset($entry['ifAdminStatus'])) {
+                    // IP & ports table query
+                    $device_tmp = device_by_id_cache($entry['device_id']);
+                    if ($device_tmp['disabled'] || !$device_tmp['status']) { continue; }   // Skip disabled and down devices
+                    if ($entry['ifAdminStatus'] === 'down' ||                                         // Skip disabled ports
+                        in_array($entry['ifOperStatus'], [ 'down', 'lowerLayerDown' ])) { continue; } // Skip down ports
+                  } elseif ($entry['disabled'] || !$entry['status']) {
+                    // Cached IP & devices table query
+                    continue; // Skip disabled and down devices
+                  }
 
                   // Override cached host device_id
                   $dev_cache[$host]['device_id'] = $entry['device_id'];
@@ -118,21 +132,53 @@ function get_cache($host, $value) {
 
             }
           }
+        } elseif ($GLOBALS['config']['syslog']['use_ip']) {
+          // Try associate hosts by DNS IP query
+          $dns_found = FALSE;
+          $dns_ip = gethostbyname6($host, OBS_DNS_A); // IPv4
+          if (!$dns_ip) {
+            $dns_ip = gethostbyname6($host, OBS_DNS_AAAA); // IPv6
+          }
+          if ($dns_ip) {
+            $query = 'SELECT `device_id`, `hostname`, `disabled`, `status` FROM `devices` WHERE `ip` = ?';
+            if ($addresses = dbFetchRows($query, [ ip_compress($dns_ip) ])) {
+              $dns_found = TRUE;
+              $dev_cache[$host]['device_id'] = $addresses[0]['device_id'];
+
+              foreach ($addresses as $entry) {
+                if ($entry['disabled'] || !$entry['status']) {
+                  // Cached IP & devices table query
+                  continue; // Skip disabled and down devices
+                }
+
+                // Override cached host device_id
+                $dev_cache[$host]['device_id'] = $entry['device_id'];
+                break; // End loop on first founded entry
+              }
+            }
+          }
+
+          if (!$dns_found) {
+            // Set empty device_id for prevent other DNS queries while not expired
+            $dev_cache[$host]['device_id'] = 0;
+          }
         }
         break;
+
       case 'os':
       case 'version':
-        if ($device_id = get_cache($host, 'device_id'))
-        {
+        if ($device_id = get_cache($host, 'device_id')) {
           $dev_cache[$host][$value] = dbFetchCell('SELECT `'.$value.'` FROM `devices` WHERE `device_id` = ?', array($device_id));
         } else {
           return NULL;
         }
         break;
+
       case 'os_group':
         $os = get_cache($host, 'os');
-        $dev_cache[$host]['os_group'] = (isset($GLOBALS['config']['os'][$os]['group']) ? $GLOBALS['config']['os'][$os]['group'] : '');
+        $dev_cache[$host]['os_group'] = isset($GLOBALS['config']['os'][$os]['group']) ? $GLOBALS['config']['os'][$os]['group'] : '';
         break;
+
       default:
         return NULL;
     }
@@ -141,48 +187,39 @@ function get_cache($host, $value) {
   return $dev_cache[$host][$value];
 }
 
-function cache_syslog_rules()
-{
+function cache_syslog_rules() {
 
-  $rules = array();
-  foreach(dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_disable` = ?", array('0')) as $lat)
-  {
+  $rules = [];
+  foreach(dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_disable` = ?", [ '0' ]) as $lat) {
     $rules[$lat['la_id']] = $lat;
   }
 
   return $rules;
-
 }
 
-function cache_syslog_rules_assoc()
-{
-  $device_rules = array();
-  foreach (dbFetchRows("SELECT * FROM `syslog_rules_assoc`") as $laa)
-  {
+function cache_syslog_rules_assoc() {
+
+  $device_rules = [];
+  foreach (dbFetchRows("SELECT * FROM `syslog_rules_assoc`") as $laa) {
 
     //print_r($laa);
 
-    if ($laa['entity_type'] === 'group')
-    {
+    if ($laa['entity_type'] === 'group') {
       $devices = get_group_entities($laa['entity_id']);
-      foreach($devices as $dev_id)
-      {
+      foreach($devices as $dev_id) {
         $device_rules[$dev_id][$laa['la_id']] = TRUE;
       }
-    }
-    elseif ($laa['entity_type'] === 'device')
-    {
+    } elseif ($laa['entity_type'] === 'device') {
       $device_rules[$laa['entity_id']][$laa['la_id']] = TRUE;
     }
   }
+
   return $device_rules;
 }
 
-
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function process_syslog($line, $update)
-{
+function process_syslog($line, $update) {
   global $config;
   global $rules;
   global $device_rules;

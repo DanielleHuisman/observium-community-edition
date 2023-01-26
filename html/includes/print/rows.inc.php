@@ -226,7 +226,7 @@ function generate_graph_row($graph_array, $state_marker = FALSE) {
   } else {
     if ($config['graphs']['size'] === 'big') {
       if (!$graph_array['height']) { $graph_array['height'] = "100"; }
-      if (!$graph_array['width']) { $graph_array['width']  = "323"; }
+      if (!$graph_array['width']) { $graph_array['width']  = "330"; }
       $periods = array('day', 'week', '!month');
     } else {
       if (!$graph_array['height']) { $graph_array['height'] = "100"; }

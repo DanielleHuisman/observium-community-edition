@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -190,20 +190,6 @@ $config_variable[$setting]['subsection'] = 'Poller Wrapper';
 $config_variable[$setting]['name']       = 'Enable poller wrapper statistics';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Enable poller wrapper statistics in RRD (can be seen at ' . $config['web_url'] . 'pollerlog/).';
-
-$setting = 'cache|enable_cli';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Caching';
-$config_variable[$setting]['name']       = 'Enable/disable CLI caching';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Cache some data from the database for faster Polling/Discovery operations with distributed installs. Not recommended for small installs.';
-
-$setting = 'rrd|cache';
-$config_variable[$setting]['section']    = $section;
-$config_variable[$setting]['subsection'] = 'Caching';
-$config_variable[$setting]['name']       = 'Enable/disable RRDcacheD caching';
-$config_variable[$setting]['type']       = 'bool';
-$config_variable[$setting]['shortdesc']  = 'Enable additional caching for is rrd file exist for remote RRDcacheD. CLI caching must be enabled too.';
 
 $setting = 'poller_modules|system';
 $config_variable[$setting]['section']    = $section;
@@ -1553,6 +1539,15 @@ $config['autodiscovery']['ping_skip']      = FALSE; // Skip icmp echo checks dur
 $section = 'syslocation';
 $config_sections[$section]['text'] = 'Locations';
 
+$setting = 'location|rewrite_regexp';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Location Rewrite Reqular Expression';
+$config_variable[$setting]['type']       = 'enum-key-value';
+$config_variable[$setting]['params']['key']   = [ 'name' => 'Rewrite Regexp', 'type' => 'text' ];
+$config_variable[$setting]['params']['value'] = [ 'name' => 'Replace to', 'type' => 'text' ];
+$config_variable[$setting]['shortdesc']  = 'Use this feature for rewrite part of location string to reqired replacement by Reqular Expressions (ie: \'/C\$/\' -> \'ä\')';
+
 $setting = 'location|map';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'General';
@@ -1740,6 +1735,14 @@ $config_variable[$setting]['name']       = 'FIFO file';
 $config_variable[$setting]['type']       = 'string';
 $config_variable[$setting]['shortdesc']  = 'Set this to a FIFO to take input from FIFO. Default: php://stdin';
 $config_variable[$setting]['set_attrib'] = 'syslog_config_changed'; //set_obs_attrib('syslog_config_changed', time()); // Trigger reload syslog script
+
+$setting = 'syslog|use_ip';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Hosts & filters';
+$config_variable[$setting]['name']       = 'Associate hosts by Cached IP';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = "Allow associate syslog hosts with devices by Cached IP (resolved by DNS query)";
+$config_variable[$setting]['set_attrib'] = 'syslog_config_changed';
 
 $setting = 'syslog|unknown_hosts';
 $config_variable[$setting]['section']    = $section;

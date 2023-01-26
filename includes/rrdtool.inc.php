@@ -416,14 +416,11 @@ function rrdtool_create($device, $filename, $ds, $options = '') {
     return NULL;
   }
 
-  if (OBS_RRD_NOLOCAL && !$config['cache']['enable_cli']) {
-    // do not check remote without caching
+  if (OBS_RRD_NOLOCAL) {
+    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
   } elseif (rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename already exists - no need to create.");
     return FALSE; // Bail out if the file exists already
-  }
-  if (OBS_RRD_NOLOCAL) {
-    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
   }
 
   if (!$options) {
@@ -513,14 +510,11 @@ function rrdtool_create_ng($device, $type, $index = NULL, $options = []) {
     return NULL;
   }
 
-  if (OBS_RRD_NOLOCAL && !$config['cache']['enable_cli']) {
-    // do not check remote without caching
+  if (OBS_RRD_NOLOCAL) {
+    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
   } elseif (rrd_exists($device, $filename)) {
     print_debug("RRD $fsfilename already exists - no need to create.");
     return FALSE; // Bail out if the file exists already
-  }
-  if (OBS_RRD_NOLOCAL) {
-    print_debug("RRD create $fsfilename passed to remote rrdcached with --no-overwrite.");
   }
 
   // Set RRA option
@@ -734,7 +728,6 @@ function rrd_exists($device, $filename) {
 
   $fsfilename = get_rrd_path($device, $filename);
 
-  // Return cached variant of rrdfile is exist
   return rrd_is_file($fsfilename, TRUE);
 }
 
@@ -752,48 +745,18 @@ function rrd_is_file($filename, $remote_validate = FALSE) {
   if (OBS_RRD_NOLOCAL) {
     // NOTE. RRD last on remote daemon reduce polling times
     if ($remote_validate) {
-      if (!$GLOBALS['config']['rrd']['cache']) {
-        // Extra way for skip use phpFastCache in polling
-        // WARNING. Don't use this until you know what you are doing
-        print_debug("Remote RRDcacheD caching disabled for rrd_is_file('$filename', TRUE) call.");
-        $unixtime = rrdtool_last($filename);
-        if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
-          // Correct unixtime without errors
-          return TRUE;
-        }
-
-        //ERROR: realpath(hostname/status.rrd): No such file or directory
-        return strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
-        //return $GLOBALS['rrd_status'];
+      // Extra way for skip use phpFastCache in polling
+      // WARNING. Don't use this until you know what you are doing
+      print_debug("Requested rrd file exist on Remote RRDcacheD for rrd_is_file('$filename', TRUE) call.");
+      $unixtime = rrdtool_last($filename);
+      if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
+        // Correct unixtime without errors
+        return TRUE;
       }
 
-      $cache_key = 'rrd_is_file-' . str_replace($GLOBALS['config']['rrd_dir'].'/', '', $filename);
-      $cache_item = get_cache_item($cache_key);
-      if (!ishit_cache_item($cache_item)) {
-        $unixtime = rrdtool_last($filename);
-        if (is_numeric($unixtime) && $unixtime > OBS_MIN_UNIXTIME) {
-          // Correct unixtime without errors
-          $exist = TRUE;
-        } else {
-
-          //ERROR: realpath(hostname/status.rrd): No such file or directory
-          $exist = strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
-          //return $GLOBALS['rrd_status'];
-        }
-
-        // Store $cache in fast caching
-        set_cache_item($cache_item, $exist ? 1 : 0, [ 'ttl' => 3600 ]); // set valid for 1 hour
-        //print_debug_vars(get_cache_items('__cli'));
-        return $exist;
-      }
-
-      // Cached item
-      $exist = get_cache_data($cache_item);
-      if (OBS_DEBUG || (defined('OBS_CACHE_DEBUG') && OBS_CACHE_DEBUG)) {
-        print_message("RRD file '%W$filename%n' exist cached [".($exist ? '%gTRUE%n' : '%yFALSE%n')."].", 'console');
-        //print_vars($exist);
-      }
-      return (bool)$exist;
+      //ERROR: realpath(hostname/status.rrd): No such file or directory
+      return strpos($GLOBALS['exec_status']['stderr'], 'No such file') === FALSE;
+      //return $GLOBALS['rrd_status'];
     }
 
     // Probably for polling

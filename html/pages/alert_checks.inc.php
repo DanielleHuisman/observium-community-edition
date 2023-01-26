@@ -199,8 +199,39 @@ foreach ($alert_check as $check)
   {
     $text_block[] = escape_html($condition['metric'].' '.$condition['condition'].' '.$condition['value']);
   }
-  echo('<span class="label">'.($check['and'] ? 'ALL' : 'ANY').'</span><br />');
-  echo('<code>'.implode('<br />', $text_block).'</code>');
+  echo ($check['and'] ? '<i class="sprite-logic-and"></i> <span class="label label-primary">AND (ALL)</span>' : '<i class="sprite-logic-and"></i> <span class="label label-success">OR (ANY)</span>').'<br />';
+  echo '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">';
+
+  $allowed_metrics = array_keys($config['entities'][$check['entity_type']]['metrics']);
+
+  // FIXME. Currently hardcoded in check_entity(), need rewrite to timeranges.
+  $allowed_metrics[] = 'time';
+  $allowed_metrics[] = 'weekday';
+
+  foreach ($check['conditions'] as $condition)
+  {
+    // Detect incorrect metric used
+    if (!in_array($condition['metric'], $allowed_metrics, TRUE)) {
+      print_error("Unknown condition metric '".$condition['metric']."' for Entity type '".$check['entity_type']."'");
+
+      foreach (array_keys($config['entities']) as $suggest_entity)
+      {
+        if (isset($config['entities'][$suggest_entity]['metrics'][$condition['metric']]))
+        {
+          print_warning("Suggested Entity type: '$suggest_entity'. Change Entity in Edit Alert below.");
+          $suggest_entity_types[$suggest_entity] = [ 'name' => $config['entities'][$suggest_entity]['name'],
+                                                     'icon' => $config['entities'][$suggest_entity]['icon'] ];
+        }
+      }
+    }
+
+    echo '<tr><td>'.$condition['metric'].'</td><td>'.$condition['condition'].'</td><td>'.str_replace(",", ", ", $condition['value']).'</td></tr>';
+
+    $condition_text_block[] = $condition['metric'] .' '. $condition['condition'] .' ' . $condition['value'];
+    //str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
+  }
+
+  echo '</table>';
   echo('</td>');
 
   echo('<td>');

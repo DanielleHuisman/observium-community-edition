@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -381,6 +381,17 @@ function parse_bgp_peer_index(&$peer, $index, $mib = 'BGP4V2-MIB') {
       if ($peer_addr_type = get_ip_version($peer_ip)) {
         $peer['aristaBgp4V2PeerRemoteAddr']     = $peer_ip;
         $peer['aristaBgp4V2PeerRemoteAddrType'] = 'ipv' . $peer_addr_type; // FIXME. not sure, but seems as Arista use only ipv4/ipv6 for afi
+      }
+
+      // It seems as firmware issue, always report as halted
+      // See: https://jira.observium.org/browse/OBS-4382
+      if ($peer['aristaBgp4V2PeerAdminStatus'] === 'halted' && $peer['aristaBgp4V2PeerState'] !== 'idle') {
+        // running: established, connect, active (not sure about opensent, openconfirm)
+        print_debug("Fixed Arista issue, ARISTA-BGP4V2-MIB::aristaBgp4V2PeerAdminStatus always report halted");
+        $peer['aristaBgp4V2PeerAdminStatus'] = 'running';
+      } elseif ($peer['aristaBgp4V2PeerAdminStatus'] === 'running' && $peer['aristaBgp4V2PeerState'] === 'idle') {
+        print_debug("Fixed Arista issue, ARISTA-BGP4V2-MIB::aristaBgp4V2PeerAdminStatus report running for shutdown");
+        $peer['aristaBgp4V2PeerAdminStatus'] = 'halted';
       }
       break;
 

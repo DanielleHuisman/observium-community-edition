@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage cache
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -19,7 +19,6 @@
 if (PHP_VERSION_ID < 50600) {
   // Disable phpFastCache for PHP less than 5.6, since it unsupported
   $config['cache']['enable'] = FALSE;
-  $config['cache']['enable_cli'] = FALSE;
 }
 
 /**
@@ -446,33 +445,15 @@ function get_cache_stats() {
 
 define('OBS_CACHE_DEBUG', isset($_SERVER['PATH_INFO']) && str_contains($_SERVER['PATH_INFO'], 'cache_info'));
 
-if (is_cli()) {
-  if (!$config['cache']['enable_cli'] ||
-      !in_array(OBS_PROCESS_NAME, [ 'poller', 'discovery', 'syslog' ], TRUE)) {
-    // FIXME. Do not enable caching in cli when process run as root?
-    if (OBS_CACHE_DEBUG || (defined('OBS_DEBUG') && OBS_DEBUG)) {
-      print_cli('%RCACHE DISABLED.%n Disabled in config or not allowed for '.OBS_PROCESS_NAME.' process.');
-    }
-    return;
+// Do not load phpFastCache classes if caching mechanism not enabled or not supported
+if (!$config['cache']['enable']) {
+  if (OBS_CACHE_DEBUG || (defined('OBS_DEBUG') && OBS_DEBUG)) {
+    print_error('<span class="text-danger">CACHE DISABLED.</span> Disabled in config.');
   }
-
-  // Syslog have different dir permissions
-  $cache_key = OBS_PROCESS_NAME === 'syslog' ? 'syslog' : 'cli';
-} else {
-  // Do not load phpFastCache classes if caching mechanism not enabled or not supported
-  if (!$config['cache']['enable']) {
-    if (OBS_CACHE_DEBUG || (defined('OBS_DEBUG') && OBS_DEBUG)) {
-      if (PHP_VERSION_ID < 50600) {
-        print_error('<span class="text-danger">CACHE DISABLED.</span> You use too old php version, see <a href="' . OBSERVIUM_DOCS_URL . '/software_requirements/">minimum software requirements</a>.');
-      } else {
-        print_error('<span class="text-danger">CACHE DISABLED.</span> Disabled in config.');
-      }
-    }
-    return;
-  }
-
-  $cache_key = 'wui'; // do not use $_SERVER['hostname'] as key
+  return;
 }
+
+$cache_key = 'wui'; // do not use $_SERVER['hostname'] as key
 
 /**
  * Temporary hardcoded caching in files, will improve later with other providers

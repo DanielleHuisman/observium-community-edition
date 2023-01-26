@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -109,28 +109,8 @@ if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
     //get_timezone(TRUE);
   }
 
-  // Maybe better in another place, but at least here it runs always; keep track of what svn revision we last saw, and eventlog the upgrade versions.
-  // We have versions here from the includes above, and we just connected to the DB.
-  if (OBS_PROCESS_NAME === 'discovery') {
-    $rev_old = @get_obs_attrib('current_rev');
-    if (($rev_old < OBSERVIUM_REV || !is_numeric($rev_old)) && OBSERVIUM_VERSION_LONG !== '0.SVN.ERROR') {
-      // Ignore changes to not correctly detected version (0.SVN.ERROR)
-      // Version update detected, log it
-      $version_old = @get_obs_attrib('current_version');
-      if ($version_old !== OBSERVIUM_VERSION_LONG) {
-        // Prevent eventlog spamming on incorrect version detect
-        log_event("Observium updated: $version_old -> " . OBSERVIUM_VERSION_LONG, NULL, NULL, NULL, 5);
-
-        set_obs_attrib('current_rev', OBSERVIUM_REV);
-        set_obs_attrib('current_version', OBSERVIUM_VERSION_LONG);
-
-        // Set reset opcache (need split cli/web, because has a separate opcode)
-        if (function_exists('opcache_reset') && opcache_reset()) {
-          print_debug("PHP Opcache CLI was reset.");
-        }
-      }
-    }
-  } elseif (OBS_PROCESS_NAME === 'index' && @get_obs_attrib('opcache_reset')) {
+  // Reset Opcache in WUI
+  if (OBS_PROCESS_NAME === 'index' && @get_obs_attrib('opcache_reset')) {
     if (function_exists('opcache_reset') && opcache_reset()) {
       print_debug("PHP Opcache WUI was reset.");
     }
@@ -146,6 +126,11 @@ if (!isset($GLOBALS[OBS_DB_LINK]) || !$GLOBALS[OBS_DB_LINK]) {
 
 // Load SQL configuration into $config variable
 load_sqlconfig($config);
+
+// never store this option(s) in memory! Use get_defined_settings($key)
+foreach ($config['hide_config'] as $opt) {
+  if (array_get_nested($config, $opt)) { unset($config[$opt]); }
+}
 
 /**
  * OHMYGOD, this is very dangerous, because this is secure hole for override static definitions,
@@ -310,10 +295,7 @@ foreach ($config['ignore_common_subnet'] as $i => $content) {
   }
 }
 
-unset($i); unset($content);
-
-// Load phpFastCache (after load sql config!)
-include_once($config['install_dir'] . '/includes/cache.inc.php');
+unset($i, $content);
 
 // Set web_url/base_url setting to default, add trailing slash if not present
 
@@ -323,13 +305,6 @@ if (!isset($config['web_url'])) {
 if (!str_ends($config['web_url'], '/')) { $config['web_url'] .= '/'; }
 
 // Generate poller id if we're a partitioned poller and we don't yet have one.
-/*
-if (isset($config['poller_id']))
-{
-  // Use already configured poller_id
-}
-else
-*/
 if (OBSERVIUM_EDITION === 'community') {
   // Distributed pollers not available on community edition
   $config['poller_id'] = 0;
@@ -338,7 +313,7 @@ if (OBSERVIUM_EDITION === 'community') {
   define('OBS_DISTRIBUTED', FALSE);
 } elseif (isset($options['p']) && is_intnum($options['p']) && $options['p'] >= 0) {
   // Poller id passed in poller wrapper
-  $config['poller_id'] = (int) $options['p'];
+  $config['poller_id'] = (int)$options['p'];
   print_debug("Poller ID (".$config['poller_id'].") passed from command line arguments.");
   /* not sure when required
   if ($options['p'] > 0 && !dbExist('pollers', '`poller_id` = ?', [ $options['p'] ])) {
@@ -360,7 +335,7 @@ if (OBSERVIUM_EDITION === 'community') {
   // Definitely distributed
   define('OBS_DISTRIBUTED', TRUE);
 } elseif (isset($config['poller_name'])) {
-  $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `poller_name` = ?", array($GLOBALS['config']['poller_name']));
+  $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `poller_name` = ?", [ $GLOBALS['config']['poller_name'] ]);
 
   if (is_numeric($poller_id)) {
     $config['poller_id'] = (int) $poller_id;
@@ -378,12 +353,130 @@ if (OBSERVIUM_EDITION === 'community') {
 
   // Definitely distributed
   define('OBS_DISTRIBUTED', TRUE);
+} elseif (isset($config['poller_id']) && is_intnum($config['poller_id']) && $config['poller_id'] > 0) {
+  // Vice versa by poller_id
+
+  if ($poller_name = dbFetchCell("SELECT `poller_name` FROM `pollers` WHERE `poller_id` = ?", [ $GLOBALS['config']['poller_id'] ])) {
+    $config['poller_name'] = $poller_name;
+  } else {
+    // This poller not exist, create it
+    // I not sure that this should be in global sql-config include @mike
+    $poller = [
+      'poller_id' => $config['poller_id'],
+      'poller_name' => 'Poller '.$config['poller_id'],
+      'host_id'     => get_local_id(),
+      'host_uname'  => php_uname()
+    ];
+    dbInsert('pollers', $poller);
+    unset($poller);
+  }
+
+  // Definitely distributed
+  define('OBS_DISTRIBUTED', TRUE);
+} elseif (isset($config['poller_by_host']) && $config['poller_by_host'] && get_local_id()) {
+  // Associate poller by specific poller host_id
+  $poller_id = dbFetchCell("SELECT `poller_id` FROM `pollers` WHERE `host_id` = ?", [ get_local_id() ]);
+
+  if (is_numeric($poller_id)) {
+    $config['poller_id'] = (int) $poller_id;
+  } else {
+    // This poller not exist, create it
+    // I not sure that this should be in global sql-config include @mike
+    $poller = [
+      'poller_name' => 'Poller '.get_local_id(),
+      'host_id'     => get_local_id(),
+      'host_uname'  => php_uname()
+    ];
+    $config['poller_id'] = (int) dbInsert('pollers', $poller);
+  }
+  unset($poller_id, $poller);
+
+  // Definitely distributed
+  define('OBS_DISTRIBUTED', TRUE);
 } else {
   // Default poller
   $config['poller_id'] = 0;
 
   // Detect distributed
   define('OBS_DISTRIBUTED', dbExist('pollers'));
+}
+
+// Maybe better in another place, but at least here it runs always; keep track of what svn revision we last saw, and eventlog the upgrade versions.
+// We have versions here from the includes above, and we just connected to the DB.
+if (OBS_PROCESS_NAME === 'discovery') {
+  if ($config['poller_id'] > 0) {
+    // Remote poller, different place for version/revision
+    $version_updated = FALSE;
+    if ($poller_version = dbFetchCell("SELECT `poller_version` FROM `pollers` WHERE `poller_id` = ?", [ $config['poller_id'] ])) {
+      list($poller_version) = explode(' ', $poller_version); // remove train
+      list(,, $rev_old) = explode('.', $poller_version);
+      if (OBSERVIUM_VERSION_LONG !== 'Y.M.ERROR' && $poller_version !== OBSERVIUM_VERSION) {
+        $poller = dbFetchRow('SELECT * FROM `pollers` WHERE `poller_id` = ?', [ $config['poller_id'] ]);
+        // Prevent eventlog spamming on incorrect version detect
+        log_event("Poller (".$config['poller_id'].': '.$poller['poller_name'].") updated: $poller_version -> " . OBSERVIUM_VERSION_LONG, NULL, NULL, NULL, 5);
+
+        $poller = [
+          'poller_version' => OBSERVIUM_VERSION_LONG,
+          'host_id'        => get_local_id(),
+          'host_uname'     => php_uname()
+        ];
+        dbUpdate($poller, 'pollers', '`poller_id` = ?', [ $config['poller_id'] ]);
+
+        // Set reset opcache (need split cli/web, because has a separate opcode)
+        if (function_exists('opcache_reset') && opcache_reset()) {
+          print_debug("PHP Opcache CLI was reset.");
+        }
+      }
+    } elseif (OBSERVIUM_VERSION_LONG !== 'Y.M.ERROR' && get_db_version() > 477) {
+      // need update after db schema upgrade
+      $poller = [
+        'poller_version' => OBSERVIUM_VERSION_LONG,
+        'host_id'        => get_local_id(),
+        'host_uname'     => php_uname()
+      ];
+      dbUpdate($poller, 'pollers', '`poller_id` = ?', [ $config['poller_id'] ]);
+    }
+    unset($poller);
+  } else {
+    // Main poller/host
+    $rev_old = @get_obs_attrib('current_rev');
+    // Ignore changes to not correctly detected version (Y.M.ERROR)
+    if (OBSERVIUM_VERSION_LONG !== 'Y.M.ERROR' && ($rev_old < OBSERVIUM_REV)) {
+      $version_old = @get_obs_attrib('current_version');
+
+      if ($version_old !== OBSERVIUM_VERSION_LONG) {
+        // Prevent eventlog spamming on incorrect version detect
+        log_event("Observium updated: $version_old -> " . OBSERVIUM_VERSION_LONG, NULL, NULL, NULL, 5);
+
+        set_obs_attrib('current_rev', OBSERVIUM_REV);
+        set_obs_attrib('current_version', OBSERVIUM_VERSION_LONG);
+
+        // Set reset opcache (need split cli/web, because has a separate opcode)
+        if (function_exists('opcache_reset') && opcache_reset()) {
+          print_debug("PHP Opcache CLI was reset.");
+        }
+      }
+    }
+  }
+
+  // Detect if version updated
+  if ($version_updated) {
+    // Ignore changes to not correctly detected version (Y.M.ERROR)
+    // Version update detected, log it
+
+    if ($version_old !== OBSERVIUM_VERSION_LONG) {
+      // Prevent eventlog spamming on incorrect version detect
+      log_event("Observium updated: $version_old -> " . OBSERVIUM_VERSION_LONG, NULL, NULL, NULL, 5);
+
+      set_obs_attrib('current_rev', OBSERVIUM_REV);
+      set_obs_attrib('current_version', OBSERVIUM_VERSION_LONG);
+
+      // Set reset opcache (need split cli/web, because has a separate opcode)
+      if (function_exists('opcache_reset') && opcache_reset()) {
+        print_debug("PHP Opcache CLI was reset.");
+      }
+    }
+  }
 }
 
 // EOF

@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -30,8 +30,8 @@ if ($input_phases > 0) {
   $input_voltage = snmp_get_oid($device, 'upsESystemConfigInputVoltage.0', $mib) * $scale;
   if ($input_voltage > 0) {
     $voltage_limits = [
-      'limit_high' => $input_voltage * 1.03, 'limit_high_warn' => $input_voltage * 1.01,
-      'limit_low'  => $input_voltage * 0.97, 'limit_low_warn' => $input_voltage * 0.99
+      'limit_high' => sensor_limit_high('voltage', $input_voltage), 'limit_high_warn' => sensor_limit_high_warn('voltage', $input_voltage),
+      'limit_low'  => sensor_limit_low('voltage', $input_voltage),  'limit_low_warn'  => sensor_limit_low_warn('voltage', $input_voltage)
     ];
   } else {
     $voltage_limits = [];
@@ -39,8 +39,8 @@ if ($input_phases > 0) {
   $input_frequency = snmp_get_oid($device, 'upsESystemConfigInputFrequence.0', $mib) * $scale;
   if ($input_frequency > 0) {
     $frequency_limits = [
-      'limit_high' => $input_frequency * 1.10, 'limit_high_warn' => $input_frequency * 1.02,
-      'limit_low'  => $input_frequency * 0.90, 'limit_low_warn' => $input_frequency * 0.98
+      'limit_high' => sensor_limit_high('frequency', $input_frequency), 'limit_high_warn' => sensor_limit_high_warn('frequency', $input_frequency),
+      'limit_low'  => sensor_limit_low('frequency', $input_frequency),  'limit_low_warn'  => sensor_limit_low_warn('frequency', $input_frequency)
     ];
   } else {
     $frequency_limits = [];
@@ -112,8 +112,8 @@ if ($output_phases > 0) {
   $output_voltage = snmp_get_oid($device, 'upsESystemConfigOutputVoltage.0', $mib) * $scale;
   if ($output_voltage > 0) {
     $voltage_limits = [
-      'limit_high' => $output_voltage * 1.03, 'limit_high_warn' => $output_voltage * 1.01,
-      'limit_low'  => $output_voltage * 0.97, 'limit_low_warn' => $output_voltage * 0.99
+      'limit_high' => sensor_limit_high('voltage', $output_voltage), 'limit_high_warn' => sensor_limit_high_warn('voltage', $output_voltage),
+      'limit_low'  => sensor_limit_low('voltage', $output_voltage),  'limit_low_warn'  => sensor_limit_low_warn('voltage', $output_voltage)
     ];
   } else {
     // Keep input voltage limits
@@ -123,8 +123,8 @@ if ($output_phases > 0) {
   $output_frequency = snmp_get_oid($device, 'upsESystemConfigOutputFrequency.0', $mib) * $scale;
   if ($output_frequency > 0) {
     $frequency_limits = [
-      'limit_high' => $output_frequency * 1.10, 'limit_high_warn' => $output_frequency * 1.02,
-      'limit_low'  => $output_frequency * 0.90, 'limit_low_warn' => $output_frequency * 0.98
+      'limit_high' => sensor_limit_high('frequency', $output_frequency), 'limit_high_warn' => sensor_limit_high_warn('frequency', $output_frequency),
+      'limit_low'  => sensor_limit_low('frequency', $output_frequency),  'limit_low_warn'  => sensor_limit_low_warn('frequency', $output_frequency)
     ];
   } else {
     // Keep input frequency limits

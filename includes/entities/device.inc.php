@@ -710,13 +710,35 @@ function get_device_os($device) {
  */
 // TESTME needs unit testing
 function check_device_duplicated($device) {
-  // Hostname should be uniq
-  if ($device['hostname'] &&
-      //dbFetchCell("SELECT COUNT(*) FROM `devices` WHERE `hostname` = ?", array($device['hostname'])) != '0')
-      dbExist('devices', '`hostname` = ?', array($device['hostname']))) {
-    // Return TRUE if have device with same hostname in DB
-    print_error("Already got device with hostname (".$device['hostname'].").");
-    return TRUE;
+
+  switch (get_device_duplicated($device)) {
+    case 'hostname':
+      // Hostname should be uniq
+      // Return TRUE if we have device with same hostname in DB
+      print_error("Already got device with hostname (".$device['hostname'].").");
+      return TRUE;
+
+    case 'ip_snmp_v1':
+    case 'ip_snmp_v2c':
+      if (get_ip_version($device['hostname'])) {
+        $dns_ip = $device['hostname'];
+      } elseif (in_array($device['snmp_transport'], [ 'udp6', 'tcp6' ])) {
+        $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_AAAA); // IPv6
+      } else {
+        $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_A); // IPv4
+      }
+      print_error("Already got device with resolved IP ($dns_ip) and SNMP v1/v2c community.");
+      return TRUE;
+    case 'ip_snmp_v3':
+      if (get_ip_version($device['hostname'])) {
+        $dns_ip = $device['hostname'];
+      } elseif (in_array($device['snmp_transport'], [ 'udp6', 'tcp6' ])) {
+        $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_AAAA); // IPv6
+      } else {
+        $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_A); // IPv4
+      }
+      print_error("Already got device with resolved IP ($dns_ip) and SNMP v3 auth.");
+      return TRUE;
   }
 
   $snmpEngineID = snmp_cache_snmpEngineID($device);
@@ -801,7 +823,7 @@ function check_device_duplicated($device) {
     }
     // if (!$has_entPhysical)
     // {
-    //   // Return TRUE if have same sysName in DB
+    //   // Return TRUE if we have same sysName in DB
     //   print_error("Already got device with SNMP-read sysName ($sysName).");
     //   return TRUE;
     // }
@@ -810,6 +832,124 @@ function check_device_duplicated($device) {
 
   // In all other cases return FALSE
   return FALSE;
+}
+
+/**
+ * Get duplicated device from DB.
+ * Can return found devices as array(s):
+ *   $return['hostname']    - Same hostname in DB
+ *   $return['ip_snmp']     - Same DNS IP and SNMP port (but different SNMP auth, not exactly same!)
+ *   $return['ip_snmp_v1']  - Same DNS IP and SNMPv1 with same community
+ *   $return['ip_snmp_v2c'] - Same DNS IP and SNMPv2c with same community
+ *   $return['ip_snmp_v3']  - Same DNS IP and SNMPv3  with same v3 auth
+ *
+ * @param array $device Device array
+ * @param array $return Return found duplicate device array (if argument passed)
+ *
+ * @return string
+ */
+function get_device_duplicated($device, &$return = []) {
+  if (empty($device['hostname'])) { return NULL; }
+  // Check if we need return device
+  $return_devices = func_num_args() > 1;
+  $duplicate = NULL;
+
+  // Check by same hostname in DB
+  if ($device['device_id'] && $device['device_id'] > 0) {
+    // Exclude self device
+    $where  = '`hostname` = ? AND `device_id` != ?';
+    $params = [ $device['hostname'], $device['device_id'] ];
+  } else {
+    $where  = '`hostname` = ?';
+    $params = [ $device['hostname'] ];
+  }
+  if (dbExist('devices', $where, $params)) {
+    $duplicate = 'hostname';
+    if ($return_devices) {
+      $return[$duplicate][] = dbFetchRow("SELECT * FROM `devices` WHERE ".$where, $params);
+    }
+    return $duplicate;
+  }
+
+  // Check by network access and SNMP
+  if (get_ip_version($device['hostname'])) {
+    $dns_ip = $device['hostname'];
+  } elseif (in_array($device['snmp_transport'], [ 'udp6', 'tcp6' ])) {
+    $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_AAAA); // IPv6
+  } else {
+    $dns_ip = gethostbyname6($device['hostname'], OBS_DNS_A); // IPv4
+  }
+  $snmp_port = is_intnum($device['snmp_port']) ? $device['snmp_port'] : 161;
+  if ($device['snmp_context']) {
+    // Also check snmp context
+    $where = '`ip` = ? AND `snmp_port` = ? AND `snmp_context` = ?';
+    $params = [ ip_compress($dns_ip), $snmp_port, $device['snmp_context'] ];
+  } else {
+    $where = '`ip` = ? AND `snmp_port` = ? AND `snmp_context` IS NULL';
+    $params = [ ip_compress($dns_ip), $snmp_port ];
+  }
+  if ($device['device_id'] && $device['device_id'] > 0) {
+    // Exclude self device
+    $where  .= ' AND `device_id` != ?';
+    $params[] = $device['device_id'];
+  }
+  if ($dns_ip && dbExist('devices', $where, $params)) {
+    // Quick check if same Device IP and SNMP port already exist, when true check snmp auth
+    foreach (dbFetchRows('SELECT * FROM `devices` WHERE '.$where, $params) as $entry) {
+      if ($device['snmp_transport'] === 'v3') {
+        // SNMP v3 auth check
+        $device['snmp_authlevel'] = strtolower($device['snmp_authlevel']);
+        //$entry['snmp_authlevel']  = strtolower($entry['snmp_authlevel']);
+        if ($device['snmp_authlevel'] === 'noauthnopriv' && $device['snmp_authname'] === $entry['snmp_authname']) {
+          // Exactly same host, v3 noAuthNoPriv
+          $duplicate = 'ip_snmp_'.$entry['snmp_transport'];
+          if ($return_devices) {
+            $return[$duplicate][] = $entry;
+          }
+
+        } elseif ($device['snmp_authlevel'] === 'authnopriv' && $device['snmp_authname'] === $entry['snmp_authname'] &&
+                  $device['snmp_authpass'] === $entry['snmp_authpass'] && $device['snmp_authalgo'] === $entry['snmp_authalgo']) {
+          // Exactly same host, v3 authNoPriv
+          $duplicate = 'ip_snmp_'.$entry['snmp_transport'];
+          if ($return_devices) {
+            $return[$duplicate][] = $entry;
+          }
+
+        } elseif ($device['snmp_authlevel'] === 'authpriv' && $device['snmp_authname'] === $entry['snmp_authname'] &&
+                  $device['snmp_authpass'] === $entry['snmp_authpass'] && $device['snmp_authalgo'] === $entry['snmp_authalgo'] &&
+                  $device['snmp_cryptopass'] === $entry['snmp_cryptopass'] && $device['snmp_cryptoalgo'] === $entry['snmp_cryptoalgo']) {
+          // Exactly same host, v3 authNoPriv
+          $duplicate = 'ip_snmp_'.$entry['snmp_transport'];
+          if ($return_devices) {
+            $return[$duplicate][] = $entry;
+          }
+
+        } elseif ($return_devices) {
+          // Not exactly same, just return as array
+          $return['ip_snmp'][] = $entry;
+        }
+
+      } else {
+        // SNMP v1/v2c community check
+        if ($device['snmp_community'] === $entry['snmp_community']) {
+          // Exactly same host
+          $duplicate = 'ip_snmp_'.$entry['snmp_transport'];
+          if ($return_devices) {
+            $return[$duplicate][] = $entry;
+          }
+        } elseif ($return_devices) {
+          // Not exactly same, just return as array
+          $return['ip_snmp'][] = $entry;
+        }
+      }
+
+      // Stop loop if not required devices return
+      if (!$return_devices && $duplicate) { break; }
+    }
+    // FIXME. Probably need to check poller_id and private nets (can be same on different pollers?)
+  }
+
+  return $duplicate;
 }
 
 /**

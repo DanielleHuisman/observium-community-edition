@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -21,7 +21,10 @@ if (get_var_true($vars['submit'], 'save') && $vars['hostname']) {
   if (request_token_valid($vars) && $result = add_device_vars($vars)) {
     $device_url  = generate_device_url([ 'device_id' => $result ]);
     $device_link = '<a href="' . $device_url . '" class="entity-popup" data-eid="' . $result . '" data-etype="device">' . escape_html($vars['hostname']) . '</a>';
-    print_success("Device added (id = $result): $device_link");
+    if (!isset($vars['poller_id']) || $vars['poller_id'] == $config['poller_id']) {
+      // Do not show message for remote pollers (it's added to queue)
+      print_success("Device added (id = $result): $device_link");
+    }
   }
 } else {
   // Defaults

@@ -6,13 +6,16 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Notifications and alerts in bottom navbar
-$notifications = array();
-$alerts        = array();
+$notifications = [];
+$alerts        = [];
+
+// Load caching only for WUI (not used by default)
+include_once($config['install_dir'] .'/includes/cache.inc.php');
 
 include_once($config['html_dir'].'/includes/graphs/functions.inc.php');
 

@@ -113,7 +113,9 @@ function print_dash_mod ($mod)
     case "alert_table":
       echo '<div class="box box-solid" style="overflow: hidden; height: auto; max-height: 100%">';
       echo '  <div class="box-header" style="cursor: hand;"><h3 class="box-title">Alert Status</h3></div>';
-      echo '    <div class="box-content" style="overflow:auto;">';
+      echo '    <div class="box-content" style="height: ' . ($height - 40) .'px; overflow: auto;">';
+      //echo '    <div class="box-content" style="overflow: scroll; overflow-x:scroll;">';
+      //echo '    <div class="box-content" style="overflow:auto;">';
       print_alert_table(array('status'     => 'failed',
                               'pagination' => FALSE,
                               'short'      => TRUE)

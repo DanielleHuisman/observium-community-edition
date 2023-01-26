@@ -8,10 +8,11 @@ IMPORTS
     Counter64, Unsigned32              FROM SNMPv2-SMI
     MODULE-COMPLIANCE, OBJECT-GROUP    FROM SNMPv2-CONF
     InetAddress, InetAddressType       FROM INET-ADDRESS-MIB
+    InterfaceIndex                     FROM IF-MIB
     aristaMibs                         FROM ARISTA-SMI-MIB;
 
 aristaVxlanMIB MODULE-IDENTITY
-    LAST-UPDATED "202006010000Z"
+    LAST-UPDATED "202209150000Z"
     ORGANIZATION "Arista Networks, Inc."
     CONTACT-INFO
         "Arista Networks, Inc.
@@ -25,6 +26,10 @@ aristaVxlanMIB MODULE-IDENTITY
     DESCRIPTION
             "The MIB module for VXLAN counters and status information
             on Arista devices."
+
+    REVISION    "202209150000Z"
+    DESCRIPTION "Added support for exporting counters per VXLAN tunnel
+            interface."
     REVISION    "202006010000Z"
     DESCRIPTION "Initial version."
     ::= { aristaMibs 28 }
@@ -366,6 +371,89 @@ aristaVxlanVniEncapDropPkts OBJECT-TYPE
         VNI."
     ::= { aristaVxlanVniCountersEntry 14 }
 
+-- Per VTI, VNI counters table --
+
+aristaVxlanVtiVniCountersTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AristaVxlanVtiVniCountersEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "On specific EOS devices multiple VXLAN tunnel interfaces (VTI) can
+        be configured with unique VNI associations. If such a configuration
+        is supported and the device has the capability to maintain counters
+        for each unique VTI and VNI, then this table will contain the
+        relevant counter information."
+    ::= { aristaVxlanMibObjects 3 }
+
+aristaVxlanVtiVniCountersEntry OBJECT-TYPE
+    SYNTAX      AristaVxlanVtiVniCountersEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Decap (ingress) and encap (egress) counters for a given VNI unique
+        to a specific VTI.
+        Each conceptual row is uniquely identified by the ifIndex of the
+        VTI (aristaVxlanVtiIndex) and a single VNI associated with that
+        VTI (aristaVxlanVni)."
+    INDEX       { aristaVxlanVtiIndex, aristaVxlanVni }
+    ::= { aristaVxlanVtiVniCountersTable 1 }
+
+AristaVxlanVtiVniCountersEntry ::= SEQUENCE {
+    -- INDEX
+    aristaVxlanVtiIndex                InterfaceIndex,
+    -- Decap counters
+    aristaVxlanVtiVniDecapBytes        Counter64,
+    aristaVxlanVtiVniDecapPkts         Counter64,
+    -- Encap counters
+    aristaVxlanVtiVniEncapBytes        Counter64,
+    aristaVxlanVtiVniEncapPkts         Counter64
+}
+
+aristaVxlanVtiIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "The ifIndex of the VXLAN tunnel interface (VTI) that identififies
+        this entry."
+    ::= { aristaVxlanVtiVniCountersEntry 1 }
+
+aristaVxlanVtiVniDecapBytes OBJECT-TYPE
+    SYNTAX                  Counter64
+    MAX-ACCESS              read-only
+    STATUS                  current
+    DESCRIPTION
+        "The number of bytes decapsulated for this VNI unique to the given
+        VTI."
+    ::= { aristaVxlanVtiVniCountersEntry 2 }
+
+aristaVxlanVtiVniDecapPkts OBJECT-TYPE
+    SYNTAX                 Counter64
+    MAX-ACCESS             read-only
+    STATUS                 current
+    DESCRIPTION
+        "The number of packets decapsulated for this VNI unique to the given
+        VTI."
+    ::= { aristaVxlanVtiVniCountersEntry 3 }
+
+aristaVxlanVtiVniEncapBytes OBJECT-TYPE
+    SYNTAX                  Counter64
+    MAX-ACCESS              read-only
+    STATUS                  current
+    DESCRIPTION
+        "The number of bytes encapsulated for this VNI unique to the given
+        VTI."
+    ::= { aristaVxlanVtiVniCountersEntry 4 }
+
+aristaVxlanVtiVniEncapPkts OBJECT-TYPE
+    SYNTAX                 Counter64
+    MAX-ACCESS             read-only
+    STATUS                 current
+    DESCRIPTION
+        "The number of packets encapsulated for this VNI unique to the given
+        VTI."
+    ::= { aristaVxlanVtiVniCountersEntry 5 }
+
 -- Conformance and Compliance --
 
 aristaVxlanMibCompliances OBJECT IDENTIFIER
@@ -411,7 +499,12 @@ aristaVxlanMibCountersGroup OBJECT-GROUP
         aristaVxlanVniEncapPkts,
         aristaVxlanVniEncapBUMBytes,
         aristaVxlanVniEncapBUMPkts,
-        aristaVxlanVniEncapDropPkts
+        aristaVxlanVniEncapDropPkts,
+        aristaVxlanVtiVniDecapBytes,
+        aristaVxlanVtiVniDecapPkts,
+        aristaVxlanVtiVniEncapBytes,
+        aristaVxlanVtiVniEncapPkts
+
     }
     STATUS      current
     DESCRIPTION

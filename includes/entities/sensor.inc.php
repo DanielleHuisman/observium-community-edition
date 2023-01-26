@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -561,23 +561,19 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
  * @param bool $auto    Set to false to not set an automatic limit
  * @return string
  */
-function sensor_limit_low($class, $value, $auto = TRUE)
-{
+function sensor_limit_low($class, $value, $auto = TRUE) {
+
+  if (!$auto || $value == 0) { return NULL; } // Do not calculate limit
+
   $limit = NULL;
-
-  if (!$auto || $value == 0) { return $limit; } // Do not calculate limit
-
-  switch($class)
-  {
+  switch($class) {
     case 'temperature':
-      if ($value > 0)
-      {
+      if ($value > 0) {
         $limit = 0; // Freezing cold should be enough of a lower limit.
       }
       break;
     case 'voltage':
-      if ($value < 0)
-      {
+      if ($value < 0) {
         $limit = $value * (1 + (sgn($value) * 0.15));
       } else {
         $limit = $value * (1 - (sgn($value) * 0.15));
@@ -603,7 +599,42 @@ function sensor_limit_low($class, $value, $auto = TRUE)
   return $limit;
 }
 
-// TESTME needs unit testing
+function sensor_limit_low_warn($class, $value, $auto = TRUE) {
+
+  if (!$auto || $value == 0) { return NULL; } // Do not calculate limit
+
+  $limit = NULL;
+  switch($class) {
+    case 'temperature':
+      $limit = NULL;
+      break;
+    case 'voltage':
+      if ($value < 0) {
+        $limit = $value * (1 + (sgn($value) * 0.10));
+      } else {
+        $limit = $value * (1 - (sgn($value) * 0.10));
+      }
+      break;
+    case 'humidity':
+      $limit = 25;
+      break;
+    case 'frequency':
+      $limit = $value * 0.97;
+      break;
+    case 'current':
+      $limit = NULL;
+      break;
+    case 'fanspeed':
+      $limit = $value * 0.85;
+      break;
+    case 'power':
+      $limit = NULL;
+      break;
+  }
+
+  return $limit;
+}
+
 /**
  * Calculate upper limit on a sensor
  *
@@ -612,17 +643,14 @@ function sensor_limit_low($class, $value, $auto = TRUE)
  * @param bool $auto    Set to false to not set an automatic limit
  * @return string
  */
-function sensor_limit_high($class, $value, $auto = TRUE)
-{
+function sensor_limit_high($class, $value, $auto = TRUE) {
+
+  if (!$auto || $value == 0) { return NULL; } // Do not calculate limit
+
   $limit = NULL;
-
-  if (!$auto || $value == 0) { return $limit; } // Do not calculate limit
-
-  switch($class)
-  {
+  switch($class) {
     case 'temperature':
-      if ($value < 0)
-      {
+      if ($value < 0) {
         // Negative temperatures are usually used for "Thermal margins",
         // indicating how far from the critical point we are.
         $limit = 0;
@@ -631,8 +659,7 @@ function sensor_limit_high($class, $value, $auto = TRUE)
       }
       break;
     case 'voltage':
-      if ($value < 0)
-      {
+      if ($value < 0) {
         $limit = $value * (1 - (sgn($value) * 0.15));
       } else {
         $limit = $value * (1 + (sgn($value) * 0.15));
@@ -652,6 +679,48 @@ function sensor_limit_high($class, $value, $auto = TRUE)
       break;
     case 'power':
       $limit = $value * 1.50;
+      break;
+  }
+
+  return $limit;
+}
+
+function sensor_limit_high_warn($class, $value, $auto = TRUE) {
+
+  if (!$auto || $value == 0) { return NULL; } // Do not calculate limit
+
+  $limit = NULL;
+  switch($class) {
+    case 'temperature':
+      if ($value < 0) {
+        // Negative temperatures are usually used for "Thermal margins",
+        // indicating how far from the critical point we are.
+        //$limit = 0;
+      } else {
+        $limit = $value * 1.50;
+      }
+      break;
+    case 'voltage':
+      if ($value < 0) {
+        $limit = $value * (1 - (sgn($value) * 0.10));
+      } else {
+        $limit = $value * (1 + (sgn($value) * 0.10));
+      }
+      break;
+    case 'humidity':
+      $limit = 65;
+      break;
+    case 'frequency':
+      $limit = $value * 1.03;
+      break;
+    case 'current':
+      $limit = $value * 1.30;
+      break;
+    case 'fanspeed':
+      $limit = $value * 1.50;
+      break;
+    case 'power':
+      $limit = $value * 1.30;
       break;
   }
 

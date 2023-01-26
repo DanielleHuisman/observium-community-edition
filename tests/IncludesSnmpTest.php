@@ -254,6 +254,8 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       // UTF-8
       array("44 61 74 61 3A 20 41 20 41 64 64 72 65 73 73 3A 20 32 32 35 2E 35 2E 31 2E 36 20 41 6C 69 61 73 3A 20 D0 94 D1 80 D0 B0 D0 B9 D0 B2 20 62 75 66 66 65 72 20 61 64 64 72 65 73 73 20 63 68 61 6E 67 65 64 20 31 31 30 34", 'Data: A Address: 225.5.1.6 Alias: Драйв buffer address changed 1104'),
       array("C3 9C 62 65 72 74 72 61 67 75 6E 67 73 77 61 6C 7A 65 2C 20 50 4E 20 31 31 35 52 30 30 31 32 36", "Übertragungswalze, PN 115R00126"),
+      array("50 43 24 72 6E 75", 'PC$rnu'), // Incorrectly encoded UTF8, see: https://jira.observium.org/browse/OBS-4377
+      array("50 C3 A4 72 6E 75", "Pärnu"),
       // Multiline string
       array("67 6F 6F 67 6C 65 2E 73 65 00 6E 61 6D 65 2D 73 65 72 76 65 72 00 31 37 32 2E 31 37 2E 32 30 34 2E 31 30 00", "google.se\nname-server\n172.17.204.10"),
       //Incorrect HEX strings

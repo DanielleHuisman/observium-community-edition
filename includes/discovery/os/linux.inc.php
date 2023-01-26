@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -22,7 +22,7 @@ if (str_starts($sysObjectID, '.1.3.6.1.4.1.8072.3.2.10') ||
 
 if ($os === 'linux') {
   // Now network based checks
-  if (str_starts($sysObjectId, array('.1.3.6.1.4.1.10002.1', '.1.3.6.1.4.1.41112.1.4')) ||
+  if (str_starts($sysObjectId, [ '.1.3.6.1.4.1.10002.1', '.1.3.6.1.4.1.41112.1.4' ]) ||
       str_contains_array(snmp_getnext_oid($device, 'dot11manufacturerName', 'IEEE802dot11-MIB'), 'Ubiquiti')) {
     $os   = 'airos';
     $data = snmp_getnext_oid($device, 'dot11manufacturerProductName', 'IEEE802dot11-MIB');
@@ -31,8 +31,24 @@ if ($os === 'linux') {
     } elseif (snmp_get_oid($device, 'fwVersion.1', 'UBNT-AirFIBER-MIB') != '') {
       $os = 'airos-af';
     }
+    return;
+  }
+
+  $sysName = snmp_get_oid($device, 'sysName.0', 'SNMPv2-MIB');
+  if (str_contains($sysDescr, 'OpenWrt') || str_contains_array($sysName, [ 'OpenWrt', 'rt-is-prober', 'HeartOfGold' ])) {
+    $os = 'openwrt';
+    return;
   } elseif ($sysObjectID === '.1.3.6.1.4.1.8072.3.2.10' &&
-            snmp_get_oid($device, '.1.3.6.1.4.1.9839.1.2.0') > 0) {
+            preg_match('/^Linux (?!Solar)\S+ \d[\d\.]+ #\d+ .* (arm|mips|ppc|i586|i686|x86)/', $sysDescr) &&
+            snmp_get_oid($device, 'dot11ResourceTypeIDName.0', 'IEEE802dot11-MIB') === 'RTID') {
+    // Linux OpenWrt 3.10.14 #132 SMP Fri Dec 8 10:13:11 KST 2017 mips
+    // Linux hostname 4.14.221 #0 Mon Feb 15 15:22:37 2021 armv6l
+    $os = 'openwrt';
+    return;
+  }
+
+  if ($sysObjectID === '.1.3.6.1.4.1.8072.3.2.10' &&
+      snmp_get_oid($device, '.1.3.6.1.4.1.9839.1.2.0') > 0) {
     // NOTE! This is very hard hack for detect some devices connected to Carel pCOweb
     // carel-denco.snmprec:1.3.6.1.4.1.9839.2.1.2.6.0|2|0
     // carel-dimplex.snmprec:1.3.6.1.4.1.9839.2.1.2.6.0|2|-9999

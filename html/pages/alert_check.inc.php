@@ -191,7 +191,7 @@ humanize_alert_check($check);
             <!--<th style="width: 5%;">Test ID</th>-->
             <th style="width: 15%;">Name / Type</th>
             <th>Message</th>
-            <th style="width: 5%;">Test</th>
+            <th style="width: 5%;">Criteria</th>
             <th style="width: 25%;">Test Conditions</th>
             <th style="width: 7%;">Options</th>
             <th style="width: 10%;">Status / Contacts</th>
@@ -206,18 +206,15 @@ humanize_alert_check($check);
             <td><i><small>' . escape_html($check['alert_message']) . '</small></i></td>
             <td>');
 
-  if ($check['and'] == "1")
-  {
-    echo('<span class="label label-primary">ALL</span>');
-  } else {
-    echo('<span class="label">ANY</span>');
-  }
+
+  echo ($check['and'] ? '<i class="sprite-logic-and"></i> <span class="label label-primary">AND (ALL)</span>' : '<i class="sprite-logic-and"></i> <span class="label label-success">OR (ANY)</span>').'<br />';
 
   echo '</td>';
 
   //r($check);
   $conditions = safe_json_decode($check['conditions']);
   $allowed_metrics = array_keys($config['entities'][$check['entity_type']]['metrics']);
+
   // FIXME. Currently hardcoded in check_entity(), need rewrite to timeranges.
   $allowed_metrics[] = 'time';
   $allowed_metrics[] = 'weekday';
@@ -225,28 +222,37 @@ humanize_alert_check($check);
   $condition_text_block = array();
   $suggest_entity_types = [ $check['entity_type'] => [ 'name' => $config['entities'][$check['entity_type']]['name'],
                                                        'icon' => $config['entities'][$check['entity_type']]['icon'] ] ];
-  foreach ($conditions as $condition)
-  {
-    // Detect incorrect metric used
-    if (!in_array($condition['metric'], $allowed_metrics, TRUE)) {
-      print_error("Unknown condition metric '".$condition['metric']."' for Entity type '".$check['entity_type']."'");
 
-      foreach (array_keys($config['entities']) as $suggest_entity)
-      {
-        if (isset($config['entities'][$suggest_entity]['metrics'][$condition['metric']]))
-        {
-          print_warning("Suggested Entity type: '$suggest_entity'. Change Entity in Edit Alert below.");
-          $suggest_entity_types[$suggest_entity] = [ 'name' => $config['entities'][$suggest_entity]['name'],
-                                                     'icon' => $config['entities'][$suggest_entity]['icon'] ];
-        }
-      }
-    }
-    $condition_text_block[] = $condition['metric'] .' '. $condition['condition'] .' ' .
-                              str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
-  }
 
   echo '<td>';
-  echo '<code style="white-space: pre-wrap;">' . implode('<br />', array_map('escape_html', $condition_text_block)) . '</code>';
+  echo '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">';
+
+foreach ($conditions as $condition)
+{
+  // Detect incorrect metric used
+  if (!in_array($condition['metric'], $allowed_metrics, TRUE)) {
+    print_error("Unknown condition metric '".$condition['metric']."' for Entity type '".$check['entity_type']."'");
+
+    foreach (array_keys($config['entities']) as $suggest_entity)
+    {
+      if (isset($config['entities'][$suggest_entity]['metrics'][$condition['metric']]))
+      {
+        print_warning("Suggested Entity type: '$suggest_entity'. Change Entity in Edit Alert below.");
+        $suggest_entity_types[$suggest_entity] = [ 'name' => $config['entities'][$suggest_entity]['name'],
+                                                   'icon' => $config['entities'][$suggest_entity]['icon'] ];
+      }
+    }
+  }
+
+  echo '<tr><td>'.$condition['metric'].'</td><td>'.$condition['condition'].'</td><td>'.str_replace(",", ", ", $condition['value']).'</td></tr>';
+
+  $condition_text_block[] = $condition['metric'] .' '. $condition['condition'] .' ' . $condition['value'];
+  //str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
+}
+
+  echo '</table>';
+
+  //echo '<code style="white-space: pre-wrap; word-wrap: break-word;">' . implode('<br />', array_map('escape_html', $condition_text_block)) . '</code>';
   echo '</td>';
 
 
@@ -406,6 +412,8 @@ humanize_alert_check($check);
       'values' => [ 'escape' => FALSE ]
     ];
     $form_params['metrics'] = build_table($metrics_list, $metrics_opts);
+
+    //r($condition_text_block);
 
     $form['row'][5]['alert_and'] = array(
                                       'type'        => 'select',

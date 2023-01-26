@@ -1183,8 +1183,7 @@ function rewrite_entity_name($string, $entity_type = NULL, $escape = TRUE) {
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_storage($string)
-{
+function rewrite_storage($string) {
   $string = preg_replace('/.*mounted on: (.*)/', "\\1", $string);                 // JunOS
   $string = preg_replace("/(.*), type: (.*), dev: (.*)/", "\\1", $string);        // FreeBSD: '/mnt/Media, type: zfs, dev: Media'
   $string = preg_replace("/(.*) Label:(.*) Serial Number (.*)/", "\\1", $string); // Windows: E:\ Label:Large Space Serial Number 26ad0d98
@@ -1194,38 +1193,39 @@ function rewrite_storage($string)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_location($location)
-{
+function rewrite_location($location) {
   global $config, $attribs;
 
-  $location = str_replace(array('\"', '"'), '', $location);
-
   // Allow override sysLocation from DB.
-  if ($attribs['override_sysLocation_bool'])
-  {
+  if ($attribs['override_sysLocation_bool']) {
     $new_location = $attribs['override_sysLocation_string'];
     $by = 'DB override';
+  } else {
+    $location = str_replace([ '\"', '"' ], '', $location);
+
+    $new_location = array_preg_replace($config['location']['rewrite_regexp'], $location);
+    //$new_location = array_preg_replace($config['rewrites']['location_regexp'], $location);
+    if ($new_location !== $location) {
+      $location = $new_location;
+      print_debug("sysLocation rewritten from '$location' to '$new_location' by \$config['location']['rewrite_regexp'].");
+    }
+    unset($new_location); // Still allow location maps
   }
-  // This will call a user-defineable function to rewrite the location however the user wants.
-  if (!isset($new_location) && function_exists('custom_rewrite_location'))
-  {
+
+  // This will call a user-definable function to rewrite the location however the user wants.
+  // FIXME. Hard for use by users, better just use regexp
+  if (!isset($new_location) && function_exists('custom_rewrite_location')) {
     $new_location = custom_rewrite_location($location);
     $by = 'function custom_rewrite_location()';
   }
   // This uses a statically defined array to map locations.
-  if (!isset($new_location))
-  {
-    if (isset($config['location']['map'][$location]))
-    {
+  if (!isset($new_location)) {
+    if (isset($config['location']['map'][$location])) {
       $new_location = $config['location']['map'][$location];
       $by = '$config[\'location\'][\'map\']';
-    }
-    else if (isset($config['location']['map_regexp']))
-    {
-      foreach ($config['location']['map_regexp'] as $pattern => $entry)
-      {
-        if (preg_match($pattern, $location))
-        {
+    } elseif (isset($config['location']['map_regexp'])) {
+      foreach ($config['location']['map_regexp'] as $pattern => $entry) {
+        if (preg_match($pattern, $location)) {
           $new_location = $entry;
           $by = '$config[\'location\'][\'map_regexp\']';
           break; // stop foreach
@@ -1234,8 +1234,7 @@ function rewrite_location($location)
     }
   }
 
-  if (isset($new_location))
-  {
+  if (isset($new_location)) {
     print_debug("sysLocation rewritten from '$location' to '$new_location' by $by.");
     $location = $new_location;
   }
@@ -1337,10 +1336,8 @@ function rewrite_vendor($string)
  * @param string $string    String subject where replace
  * @return string           Result string with replaced strings
  */
-function array_key_replace($array, $string)
-{
-  if (array_key_exists($string, $array))
-  {
+function array_key_replace($array, $string) {
+  if (array_key_exists($string, (array)$array)) {
     $string = $array[$string];
   }
   return $string;
@@ -1356,19 +1353,16 @@ function array_key_replace($array, $string)
  *
  * @return string           Result string with replaced strings
  */
-function array_str_replace($array, $string, $case_sensitive = FALSE)
-{
-  $search = array();
-  $replace = array();
+function array_str_replace($array, $string, $case_sensitive = FALSE) {
+  $search = [];
+  $replace = [];
 
-  foreach ($array as $key => $entry)
-  {
+  foreach ((array)$array as $key => $entry) {
     $search[] = $key;
     $replace[] = $entry;
   }
 
-  if ($case_sensitive)
-  {
+  if ($case_sensitive) {
     $string = str_replace($search, $replace, $string);
   } else {
     $string = str_ireplace($search, $replace, $string);
@@ -1384,10 +1378,8 @@ function array_str_replace($array, $string, $case_sensitive = FALSE)
  * @param string $string    String subject where replace
  * @return string           Result string with replaced patterns
  */
-function array_preg_replace($array, $string)
-{
-  foreach ($array as $search => $replace)
-  {
+function array_preg_replace($array, $string) {
+  foreach ((array)$array as $search => $replace) {
     $string = preg_replace($search, $replace, $string);
   }
 

@@ -69,6 +69,7 @@ $tz = get_timezone(TRUE); // Refresh timezone, for get system TZ
     <div class="box-header with-border"><h3 class="box-title">Acknowledgements</h3></div>
     <div class="box-body no-padding">
         <dl class="dl-horizontal" style="margin: 0px; padding:5px;">
+          <dt style="text-align: left;"><i class="icon-user"></i> Maarten Moerman</dt><dd>Makes the magic happen</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Jonathan De Graeve</dt><dd>SNMP code improvements</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Xiaochi Jin</dt><dd>Logo design</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Akichi Ren</dt><dd>Post-steampunk observational hamster</dd>

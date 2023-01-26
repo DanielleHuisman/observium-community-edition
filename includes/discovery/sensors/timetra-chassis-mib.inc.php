@@ -99,12 +99,16 @@ foreach ($cache_discovery['timetra-chassis-state'] as $chassis => $entries)
     {
       if (isset($timetra_entity[$oid_name]) && $value != 'deviceNotEquipped')
       {
-        $index   = "$oid_name.$chassis.$tray";
+        $index   = $chassis . "." . $tray;
         $descr   = $timetra_entity[$oid_name]['name'].", Tray $tray".$chassis_name;
         $oid     = $timetra_entity[$oid_name]['oid'].".$chassis.$tray";
-        $options = array('entPhysicalClass' => $timetra_entity[$oid_name]['class']);
+        $options = [ 'entPhysicalClass' => $timetra_entity[$oid_name]['class'],
+                     'rename_rrd'       => "timetra-chassis-state-tmnxChassisPowerSupply1Status.%index%"];
 
-        discover_status($device, $oid, $index, 'timetra-chassis-state', $descr, $value, $options);
+        discover_status_ng($device, $mib, $oid_name, $oid, $index, 'timetra-chassis-state', $descr, $value, $options);
+
+        //status-timetra-chassis-state-tmnxChassisPowerSupply1Status.1.1.rrd
+        //discover_status($device, $oid, $index, 'timetra-chassis-state', $descr, $value, $options);
       }
     }
   }

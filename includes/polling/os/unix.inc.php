@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -108,7 +108,7 @@ switch ($device['os']) {
       $version = $matches[1];
     }
 
-    $data = snmp_get_multi_oid($device, 'ipsoChassisMBType.0 ipsoChassisMBRevNumber.0', array(), 'NOKIA-IPSO-SYSTEM-MIB');
+    $data = snmp_get_multi_oid($device, 'ipsoChassisMBType.0 ipsoChassisMBRevNumber.0', [], 'NOKIA-IPSO-SYSTEM-MIB');
     if (isset($data[0])) {
       $hw = $data[0]['ipsoChassisMBType'] . ' rev ' . $data[0]['ipsoChassisMBRevNumber'];
     }
@@ -120,7 +120,7 @@ switch ($device['os']) {
     // EMBEDDED-NGX-MIB::swHardwareType.0 = "SBox-200-B"
     // EMBEDDED-NGX-MIB::swLicenseProductName.0 = "Safe@Office 500, 25 nodes"
     // EMBEDDED-NGX-MIB::swFirmwareRunning.0 = "8.2.26x"
-    $data = snmp_get_multi_oid($device, 'swHardwareVersion.0 swHardwareType.0 swLicenseProductName.0 swFirmwareRunning.0', array(), 'EMBEDDED-NGX-MIB');
+    $data = snmp_get_multi_oid($device, 'swHardwareVersion.0 swHardwareType.0 swLicenseProductName.0 swFirmwareRunning.0', [], 'EMBEDDED-NGX-MIB');
     if (isset($data[0])) {
       list($hw) = explode(',', $data[0]['swLicenseProductName']);
       $hardware = $hw . ' ' . $data[0]['swHardwareType'] . ' ' . $data[0]['swHardwareVersion'];
@@ -345,71 +345,78 @@ if (isset($agent_data['distro']) && isset($agent_data['distro']['SCRIPTVER'])) {
 // Detect some distro by kernel strings
 if (!isset($distro)) {
   if ($poll_device['sysObjectID'] === '.1.3.6.1.4.1.8072.3.2.10' && str_starts($poll_device['sysDescr'], 'Linux ')) {
-    // * Ubuntu (old):
-    // Linux hostname 3.11.0-13-generic #20-Ubuntu SMP Wed Oct 23 07:38:26 UTC 2013 x86_64
-    // * Ubuntu 16.04:
-    // Linux hostname 4.4.0-77-generic #98-Ubuntu SMP Wed Apr 26 08:34:02 UTC 2017 x86_64
-    // Linux hostname 4.4.0-201-generic #233-Ubuntu SMP Thu Jan 14 06:10:28 UTC 2021 x86_64
-    // * Ubuntu 18.04:
-    // Linux hostname 4.15.0-96-generic #97-Ubuntu SMP Wed Apr 1 03:25:46 UTC 2020 x86_64
-    // Linux hostname 4.15.0-129-generic #132-Ubuntu SMP Thu Dec 10 14:02:26 UTC 2020 x86_64
-    // * Ubuntu 20.04
-    // Linux hostname 5.10.4-051004-generic #202012301142 SMP Wed Dec 30 11:44:55 UTC 2020 x86_64
-    // Linux hostname 5.4.0-42-generic #46-Ubuntu SMP Fri Jul 10 00:24:02 UTC 2020 x86_64
     if (preg_match('/ \d[\.\d]+(\-\d+)?(\-[a-z]+)? #(\d+\-Ubuntu|\d{12}) /', $poll_device['sysDescr'])) {
+      // * Ubuntu (old):
+      // Linux hostname 3.11.0-13-generic #20-Ubuntu SMP Wed Oct 23 07:38:26 UTC 2013 x86_64
+      // * Ubuntu 16.04:
+      // Linux hostname 4.4.0-77-generic #98-Ubuntu SMP Wed Apr 26 08:34:02 UTC 2017 x86_64
+      // Linux hostname 4.4.0-201-generic #233-Ubuntu SMP Thu Jan 14 06:10:28 UTC 2021 x86_64
+      // * Ubuntu 18.04:
+      // Linux hostname 4.15.0-96-generic #97-Ubuntu SMP Wed Apr 1 03:25:46 UTC 2020 x86_64
+      // Linux hostname 4.15.0-129-generic #132-Ubuntu SMP Thu Dec 10 14:02:26 UTC 2020 x86_64
+      // * Ubuntu 20.04
+      // Linux hostname 5.10.4-051004-generic #202012301142 SMP Wed Dec 30 11:44:55 UTC 2020 x86_64
+      // Linux hostname 5.4.0-42-generic #46-Ubuntu SMP Fri Jul 10 00:24:02 UTC 2020 x86_64
+
       $distro = 'Ubuntu';
-    }
-    // * Debian 9
-    // Linux hostname 4.9.0-6-amd64 #1 SMP Debian 4.9.88-1+deb9u1 (2018-05-07) x86_64
-    // Linux hostname 4.9.0-14-amd64 #1 SMP Debian 4.9.240-2 (2020-10-30) x86_64
-    elseif (preg_match('/ Debian \d[\.\d]+(\-\d+)?([\+\-]\w+)? /', $poll_device['sysDescr'])) {
+    } elseif (preg_match('/ Debian \d[\.\d]+(\-\d+)?([\+\-]\w+)? /', $poll_device['sysDescr'])) {
+      // * Debian 9
+      // Linux hostname 4.9.0-6-amd64 #1 SMP Debian 4.9.88-1+deb9u1 (2018-05-07) x86_64
+      // Linux hostname 4.9.0-14-amd64 #1 SMP Debian 4.9.240-2 (2020-10-30) x86_64
+
       $distro = 'Debian';
-    }
-    // * Proxmox (Debian)
-    // Linux hostname 5.11.22-2-pve #1 SMP PVE 5.11.22-4 (Tue, 20 Jul 2021 21:40:02 +0200) x86_64
-    // Linux hostname 5.4.78-2-pve #1 SMP PVE 5.4.78-2 (Thu, 03 Dec 2020 14:26:17 +0100) x86_64
-    // Linux hostname 5.4.44-1-pve #1 SMP PVE 5.4.44-1 (Fri, 12 Jun 2020 08:18:46 +0200) x86_64
-    // Linux hostname 5.0.21-5-pve #1 SMP PVE 5.0.21-10 (Wed, 13 Nov 2019 08:27:10 +0100) x86_64
-    // Linux hostname 4.4.128-1-pve #1 SMP PVE 4.4.128-111 (Wed, 23 May 2018 14:00:02 +0000) x86_64
-    // Linux hostname 4.4.8-1-pve #1 SMP Tue May 31 07:12:32 CEST 2016 x86_64
-    elseif (preg_match('/\d\-pve | PVE /', $poll_device['sysDescr'])) {
+    } elseif (preg_match('/\d\-pve | PVE /', $poll_device['sysDescr'])) {
+      // * Proxmox (Debian)
+      // Linux hostname 5.11.22-2-pve #1 SMP PVE 5.11.22-4 (Tue, 20 Jul 2021 21:40:02 +0200) x86_64
+      // Linux hostname 5.4.78-2-pve #1 SMP PVE 5.4.78-2 (Thu, 03 Dec 2020 14:26:17 +0100) x86_64
+      // Linux hostname 5.4.44-1-pve #1 SMP PVE 5.4.44-1 (Fri, 12 Jun 2020 08:18:46 +0200) x86_64
+      // Linux hostname 5.0.21-5-pve #1 SMP PVE 5.0.21-10 (Wed, 13 Nov 2019 08:27:10 +0100) x86_64
+      // Linux hostname 4.4.128-1-pve #1 SMP PVE 4.4.128-111 (Wed, 23 May 2018 14:00:02 +0000) x86_64
+      // Linux hostname 4.4.8-1-pve #1 SMP Tue May 31 07:12:32 CEST 2016 x86_64
+
       $distro = 'Debian';
-    }
-    // * Raspbian (Debian)
-    // Linux hostname 5.10.17-v7+ #1403 SMP Mon Feb 22 11:29:51 GMT 2021 armv7l
-    // Linux hostname 5.4.51-v7l+ #1333 SMP Mon Aug 10 16:51:40 BST 2020 armv7l
-    // Linux hostname 4.19.66-v7+ #1253 SMP Thu Aug 15 11:49:46 BST 2019 armv7l
-    // Linux hostname 4.14.43+ #1115 Fri May 25 13:54:20 BST 2018 armv6l
-    // Linux hostname 4.9.35-v7+ #1014 SMP Fri Jun 30 14:47:43 BST 2017 armv7l
-    // Linux hostname 3.12.33+ #724 PREEMPT Wed Nov 26 17:55:23 GMT 2014 armv6l
-    elseif (preg_match('/ \d[\.\d]+(\-v\d+\w*)?\+ #\d+ .* arm/', $poll_device['sysDescr'])) {
+    } elseif (preg_match('/ \d[\.\d]+(\-v\d+\w*)?\+ #\d+ .* arm/', $poll_device['sysDescr'])) {
+      // * Raspbian (Debian)
+      // Linux hostname 5.10.17-v7+ #1403 SMP Mon Feb 22 11:29:51 GMT 2021 armv7l
+      // Linux hostname 5.4.51-v7l+ #1333 SMP Mon Aug 10 16:51:40 BST 2020 armv7l
+      // Linux hostname 4.19.66-v7+ #1253 SMP Thu Aug 15 11:49:46 BST 2019 armv7l
+      // Linux hostname 4.14.43+ #1115 Fri May 25 13:54:20 BST 2018 armv6l
+      // Linux hostname 4.9.35-v7+ #1014 SMP Fri Jun 30 14:47:43 BST 2017 armv7l
+      // Linux hostname 3.12.33+ #724 PREEMPT Wed Nov 26 17:55:23 GMT 2014 armv6l
+
       $distro = 'Raspbian';
-    }
-    // * Armbian (Ubuntu)
-    // Linux hostname 5.10.60-sunxi #21.08.2 SMP Tue Sep 14 16:28:44 UTC 2021 armv7l
-    elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-sunxi #(?<distro_ver>\d+\.\d+(\.\d+)?) .* arm/', $poll_device['sysDescr'], $matches)) {
+    } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-sunxi #(?<distro_ver>\d+\.\d+(\.\d+)?) .* arm/', $poll_device['sysDescr'], $matches)) {
+      // * Armbian (Ubuntu)
+      // Linux hostname 5.10.60-sunxi #21.08.2 SMP Tue Sep 14 16:28:44 UTC 2021 armv7l
+
       $distro     = 'Armbian';
       $distro_ver = $matches['distro_ver'];
-    }
-    // * Arch Linux
-    // Linux hostname 2.6.37-ARCH #1 SMP PREEMPT Sat Jan 29 20:00:33 CET 2011 x86_64
-    // Linux hostname 4.19.86-1-ARCH #1 SMP PREEMPT Sat Nov 30 18:56:30 UTC 2019 armv6l
-    // Linux hostname 5.10.27-2-ARCH #1 SMP Fri Apr 9 21:08:37 UTC 2021 armv6l
-    // Linux hostname 5.10.79-2-raspberrypi-ARCH #1 SMP Tue Nov 16 20:32:00 UTC 2021 armv6l GNU/Linux
-    elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-ARCH #\d/', $poll_device['sysDescr'])) {
+    } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)? #\d+\-Alpine /', $poll_device['sysDescr'])) {
+      // * Alpine
+      // Linux hostname 5.15.86-0-virt #1-Alpine SMP Mon, 02 Jan 2023 09:28:30 +0000 x86_64 Linux
+
+      $distro = 'Alpine';
+    } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)?\-ARCH #\d/', $poll_device['sysDescr'])) {
+      // * Arch Linux
+      // Linux hostname 2.6.37-ARCH #1 SMP PREEMPT Sat Jan 29 20:00:33 CET 2011 x86_64
+      // Linux hostname 4.19.86-1-ARCH #1 SMP PREEMPT Sat Nov 30 18:56:30 UTC 2019 armv6l
+      // Linux hostname 5.10.27-2-ARCH #1 SMP Fri Apr 9 21:08:37 UTC 2021 armv6l
+      // Linux hostname 5.10.79-2-raspberrypi-ARCH #1 SMP Tue Nov 16 20:32:00 UTC 2021 armv6l GNU/Linux
+
       $distro = 'Arch Linux';
-    }
-    // * CentOS 5:
-    // Linux hostname 2.6.18-274.12.1.el5 #1 SMP Tue Nov 29 13:37:46 EST 2011 x86_64
-    // * OracleLinux 6:
-    // Linux hostname 2.6.32-131.0.15.el6.x86_64 #1 SMP Fri May 20 15:04:03 EDT 2011 x86_64
-    // * CentOS 7:
-    // Linux hostname 3.10.0-327.4.5.el7.x86_64 #1 SMP Mon Jan 25 22:07:14 UTC 2016 x86_64
-    // * RedHat EL:
-    // Linux hostname 3.10.0-327.el7.x86_64 #1 SMP Thu Oct 29 17:29:29 EDT 2015 x86_64
-    // Linux hostname 3.10.0-229.20.1.el7.x86_64 #1 SMP Thu Sep 24 12:23:56 EDT 2015 x86_64
-    // Linux hostname 4.18.0-240.22.1.el8_3.x86_64 #1 SMP Thu Mar 25 14:36:04 EDT 2021 x86_64
-    elseif (preg_match('/ \d[\.\d]+(\-\d+[\.\d]*\.el(?<distro_ver>\d+(_\d+)?))/', $poll_device['sysDescr'], $matches)) {
+
+    } elseif (preg_match('/ \d[\.\d]+(\-\d+[\.\d]*\.el(?<distro_ver>\d+(_\d+)?))/', $poll_device['sysDescr'], $matches)) {
+      // * CentOS 5:
+      // Linux hostname 2.6.18-274.12.1.el5 #1 SMP Tue Nov 29 13:37:46 EST 2011 x86_64
+      // * OracleLinux 6:
+      // Linux hostname 2.6.32-131.0.15.el6.x86_64 #1 SMP Fri May 20 15:04:03 EDT 2011 x86_64
+      // * CentOS 7:
+      // Linux hostname 3.10.0-327.4.5.el7.x86_64 #1 SMP Mon Jan 25 22:07:14 UTC 2016 x86_64
+      // * RedHat EL:
+      // Linux hostname 3.10.0-327.el7.x86_64 #1 SMP Thu Oct 29 17:29:29 EDT 2015 x86_64
+      // Linux hostname 3.10.0-229.20.1.el7.x86_64 #1 SMP Thu Sep 24 12:23:56 EDT 2015 x86_64
+      // Linux hostname 4.18.0-240.22.1.el8_3.x86_64 #1 SMP Thu Mar 25 14:36:04 EDT 2021 x86_64
+
       // Detect distro by packages
       $distro_def = [
         // redhat-release-server-6Server-6.7.0.3.el6
@@ -440,6 +447,25 @@ if (!isset($distro)) {
         $distro     = 'RedHat'; // FIXME. no way for correctly detect redhat or centos, probably by packages?..
         $distro_ver = str_replace('_', '.', $matches['distro_ver']);
       }
+    } elseif (preg_match('/^Linux \S+ \d\S+\d+(\-\w+)? #\d+\-photon /', $poll_device['sysDescr'], $matches)) {
+      // * Photon OS
+      $distro = 'Photon';
+      // Detect distro_ver by packages
+      $distro_def = [
+        // photon-release-4.0-2.ph4
+        [ 'name'      => 'photon-release', 'regex' => '/^photon\-release[\-_](?<version>\d.*)/', 'distro' => 'Photon',
+          'transform' => [ [ 'action' => 'preg_replace', 'from' => '/^(\d+[\.\-]\d+).*/', 'to' => '$1' ],
+                           [ 'action' => 'replace', 'from' => '-', 'to' => '.' ] ] ],
+      ];
+      $metatypes  = [ 'distro_ver' ];
+      foreach (poll_device_unix_packages($device, $metatypes, $distro_def) as $metatype => $value) {
+        $$metatype = $value;
+      }
+    } elseif (preg_match('/ \d[\.\d]+(\-\d+[\.\d]*\.fc(?<distro_ver>\d+(_\d+)?))/', $poll_device['sysDescr'], $matches)) {
+      // * Fedora
+      // Linux hostname 5.3.7-301.fc31.x86_64 #1 SMP Mon Oct 21 19:18:58 UTC 2019 x86_64 x86_64 x86_64 GNU/Linux
+      $distro     = 'Fedora';
+      $distro_ver = str_replace('_', '.', $matches['distro_ver']);
     }
     // * Slackware:
     // Linux hostname 2.6.21.5-smp #2 SMP Tue Jun 19 14:58:11 CDT 2007 i686

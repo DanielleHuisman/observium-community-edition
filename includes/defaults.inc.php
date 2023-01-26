@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage config
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -153,7 +153,6 @@ $config['rrd']['rra']  = $config['rrd']['rra_300']['default'];
 
 // RRDCacheD - Make sure it can write to your RRD dir!
 #$config['rrdcached']    = "unix:/var/run/rrdcached.sock";
-$config['rrd']['cache'] = TRUE;         // Use extra caching for remote RRDcacheD. WARNING. Don't change this until you know what you are doing
 
 $config['rrd_override'] = TRUE;         // Allow adding of devices if RRD directory already exists.
 
@@ -281,6 +280,7 @@ $config['autodiscovery']['ip_nets']        = [ "127.0.0.0/8", "192.168.0.0/16", 
 $config['autodiscovery']['ping_skip']      = FALSE;  // Skip icmp echo checks during autodiscovery (beware timeouts during discovery!)
 $config['autodiscovery']['recheck_interval'] = 86400; // If host is found, but it is not discovered by any reason, the interval, when you can try another check (default 24 hours)
 $config['autodiscovery']['require_hostname'] = TRUE; // If TRUE, devices must have valid resolvable hostname (in DNS or /etc/hosts)
+//$config['autodiscovery']['hostname_regex']['//'] = "";
 
 // Mailer backend Settings
 
@@ -349,7 +349,6 @@ $config['statsd']['port']                  = '8125';
 
 // Data caching
 $config['cache']['enable']                 = FALSE;     // Can enable/disable caching
-$config['cache']['enable_cli']             = TRUE;      // Can enable/disable caching in CLI (used for fast remote rrdcaching)
 $config['cache']['ttl']                    = 300;       // Default time to live for cache objects (5 min)
 $config['cache']['driver']                 = 'auto';    // Driver for use caching (auto, zendshm, apcu, sqlite, files)
 
@@ -399,6 +398,9 @@ $config['location']['menu']['type'] = 'geocoded'; // geocoded, nested, plain
 $config['location']['menu']['nested_reversed'] = FALSE; // set to TRUE if your locations are most-to-least significant
 $config['location']['menu']['nested_split_char'] = ','; // splitting character for nested location hierarchy
 $config['location']['menu']['nested_max_depth'] = 4; // maximum levels in nested location hierarchy
+
+// Location rewrites (rewrite part of location string
+//$config['location']['rewrite_regexp']['/C\$/'] = "ä"; // PC$rnu -> Pärnu
 
 // Location Mapping
 // Use this feature to map ugly locations to pretty locations
@@ -572,6 +574,10 @@ $config['billing']['base']              = 1000; // Set the base to divider bytes
 #$config['rancid_suffix']                = 'yourdomain.com'; // Domain suffix for non-FQDN device names
 $config['rancid_ignorecomments']        = 0; // Ignore lines starting with #
 $config['rancid_revisions']             = 10; // Show such last count revisions in device page
+
+// Oxidized
+$config['oxidized']['url']              = ''; // For WEB API access
+$config['oxidized']['configs'][]        = '/home/oxidized/oxidized/git'; // For local git access
 
 // Collectd
 #$config['collectd_dir']                 = '/var/lib/collectd/rrd';
@@ -908,7 +914,7 @@ $config['auth_radius_groupmemberattr'] = 'Filter-Id';  // Attribute number or na
 // Syslog Settings
 
 $config['syslog']['unknown_hosts']    = FALSE;       // Allow collect syslog messages from unknown hosts (Work in Progress)
-
+$config['syslog']['use_ip']           = FALSE;       // Allow associate syslog hosts by cached IP (from dns)
 $config['syslog']['timestamp']        = 'system';    // Use timestamp from Observium system or from syslog server.
                                                      // You can set this param to number of seconds,
                                                      // when diff timestams of system and syslog greater this use syslog (instead system)
@@ -962,6 +968,11 @@ $config['libvirt_protocols']    = [ "qemu+ssh","xen+ssh" ]; // Mechanisms used, 
 
 // Unix Agent settings
 $config['unix-agent']['port']       = 36602; // Default agent port
+#$config['unix-agent']['debug']     = TRUE;  // Store raw unix-agent output. See it on device showtech page
+// Unix Agent over SSH
+$config['unix-agent']['ssh']        = FALSE; // Set to true for use SSH by default
+$config['unix-agent']['ssh_sudo']   = FALSE; // Set to true for use sudo on SSH exec
+$config['unix-agent']['ssh_path']   = '/usr/bin/observium_agent';
 
 // WMI poller settings
 $config['wmi']['domain']    = "";             // Shorthand Domain/Workgroup (ie. NOT domain.local.com)
@@ -1038,6 +1049,8 @@ $config['poller_modules']['fdb-table']                    = 1;
 $config['poller_modules']['graphs']                       = 1;
 $config['poller_modules']['oids']                         = 1;
 $config['poller_modules']['cisco-vpdn']                   = 0;
+$config['poller_modules']['packages']                     = 0; // unix/linux packages, same as in unix-agent
+$config['poller_modules']['processes']                    = 1;
 $config['poller_modules']['probes']                       = 1;
 
 // List of discovery modules. Need to be in this array to be

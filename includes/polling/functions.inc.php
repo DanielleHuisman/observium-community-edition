@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -109,9 +109,9 @@ function poll_device($device, $options) {
 
   $device_start = utime();  // Start counting device poll time
 
-  $alert_metrics = array();
-  $oid_cache = array();
-  $device_state = array();
+  $alert_metrics = [];
+  $oid_cache     = [];
+  $device_state  = [];
   //$old_device_state = safe_unserialize($device['device_state']);
   $attribs = get_entity_attribs('device', $device['device_id']);
   $model = get_model_array($device);
@@ -148,12 +148,13 @@ function poll_device($device, $options) {
   print_cli_data("SNMP Version", $device['snmp_version'], 1);
 
   //unset($poll_update); unset($poll_update_query); unset($poll_separator);
-  $update_array = array();
+  $update_array = [];
 
   $host_rrd_dir = $config['rrd_dir'] . "/" . $device['hostname'];
-  if (!is_dir($host_rrd_dir)) {
+  // Create device RRD directory (without remote rrdcached)
+  if (!OBS_RRD_NOLOCAL && !is_dir($host_rrd_dir)) {
     mkdir($host_rrd_dir);
-    echo("Created directory : $host_rrd_dir\n");
+    print_cli("Created directory : $host_rrd_dir");
   }
 
   $device_status = device_status_array($device);

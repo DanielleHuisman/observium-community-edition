@@ -116,7 +116,7 @@ function check_entity($entity_type, $entity, $data) {
           print_debug(" (value: ".$data[$test['metric']].")");
           if (test_condition($data[$test['metric']], $test['condition'], $test['value'])) {
             // A test has failed. Set the alert variable and make a note of what failed.
-            //print_cli("%R[FAIL]%N");
+            print_debug("%R[FAIL]%N");
             $update_array['state']['failed'][] = $test;
 
             if ($alert_rules[$alert_test_id]['and']) {
@@ -131,7 +131,7 @@ function check_entity($entity_type, $entity, $data) {
             } else {
               $alert = ($alert || FALSE);
             }
-            //print_cli("%G[OK]%N");
+            print_debug("%G[OK]%N");
           }
         } else {
           print_debug("Metric '".$test['metric']."' is not present on entity ".$entity_type."=$entity_id.\n");
@@ -735,7 +735,8 @@ function cache_conditions()
  * @return boolean
  */
 function test_condition($value_a, $condition, $value_b) {
-    // Clean values
+
+  // Clean values
     if (is_string($value_a)) {
       $value_a = trim($value_a);
     }
@@ -756,56 +757,56 @@ function test_condition($value_a, $condition, $value_b) {
     switch ($condition) {
         case 'isnull':
         case 'null':
-            $alert = is_null($value_a);
+            $result = is_null($value_a);
             break;
         case 'notnull':
         case '!null':
-            $alert = !is_null($value_a);
+            $result = !is_null($value_a);
             break;
         case 'ge':
         case '>=':
             if ($is_numeric) {
-              $alert = $value_a >= unit_string_to_numeric($value_b);
+              $result = $value_a >= unit_string_to_numeric($value_b);
             } elseif ($is_numeric_a && safe_empty($value_b)) {
               // In case when use empty sensor_limit for compare, see: OBSENT-100
-              $alert = FALSE;
+              $result = FALSE;
             } else {
-              $alert = strnatcmp($value_a, unit_string_to_numeric($value_b)) >= 0;
+              $result = strnatcmp($value_a, unit_string_to_numeric($value_b)) >= 0;
             }
             break;
         case 'le':
         case '<=':
             if ($is_numeric) {
-              $alert = $value_a <= unit_string_to_numeric($value_b);
+              $result = $value_a <= unit_string_to_numeric($value_b);
             } elseif ($is_numeric_a && safe_empty($value_b)) {
               // In case when use empty sensor_limit for compare, see: OBSENT-100
-              $alert = FALSE;
+              $result = FALSE;
             } else {
-              $alert = strnatcmp($value_a, unit_string_to_numeric($value_b)) <= 0;
+              $result = strnatcmp($value_a, unit_string_to_numeric($value_b)) <= 0;
             }
             break;
         case 'gt':
         case 'greater':
         case '>':
             if ($is_numeric) {
-              $alert = $value_a > unit_string_to_numeric($value_b);
+              $result = $value_a > unit_string_to_numeric($value_b);
             } elseif ($is_numeric_a && safe_empty($value_b)) {
               // In case when use empty sensor_limit for compare, see: OBSENT-100
-              $alert = FALSE;
+              $result = FALSE;
             } else {
-              $alert = strnatcmp($value_a, unit_string_to_numeric($value_b)) > 0;
+              $result = strnatcmp($value_a, unit_string_to_numeric($value_b)) > 0;
             }
             break;
         case 'lt':
         case 'less':
         case '<':
             if ($is_numeric) {
-              $alert = $value_a < unit_string_to_numeric($value_b);
+              $result = $value_a < unit_string_to_numeric($value_b);
             } elseif ($is_numeric_a && safe_empty($value_b)) {
               // In case when use empty sensor_limit for compare, see: OBSENT-100
-              $alert = FALSE;
+              $result = FALSE;
             } else {
-              $alert = strnatcmp($value_a, unit_string_to_numeric($value_b)) < 0;
+              $result = strnatcmp($value_a, unit_string_to_numeric($value_b)) < 0;
             }
             break;
         case 'notequals':
@@ -813,13 +814,13 @@ function test_condition($value_a, $condition, $value_b) {
         case 'ne':
         case '!=':
             if ($is_numeric) {
-              $alert = $value_a != unit_string_to_numeric($value_b);
+              $result = $value_a != unit_string_to_numeric($value_b);
             } elseif ($is_numeric_a && safe_empty($value_b)) {
               // In case when use empty sensor_limit for compare, see: OBSENT-100
               // FIXME. Not sure, logically this correct
-              $alert = TRUE;
+              $result = TRUE;
             } else {
-              $alert = strnatcmp($value_a, unit_string_to_numeric($value_b)) != 0;
+              $result = strnatcmp($value_a, unit_string_to_numeric($value_b)) != 0;
             }
             break;
         case 'equals':
@@ -828,12 +829,12 @@ function test_condition($value_a, $condition, $value_b) {
         case '==':
         case '=':
             if ($is_numeric) {
-              $alert = $value_a == unit_string_to_numeric($value_b);
+              $result = $value_a == unit_string_to_numeric($value_b);
             } elseif ($is_numeric_a && safe_empty($value_b)) {
               // In case when use empty sensor_limit for compare, see: OBSENT-100
-              $alert = FALSE;
+              $result = FALSE;
             } else {
-              $alert = strnatcmp($value_a, unit_string_to_numeric($value_b)) == 0;
+              $result = strnatcmp($value_a, unit_string_to_numeric($value_b)) == 0;
             }
             break;
         case 'match':
@@ -846,7 +847,6 @@ function test_condition($value_a, $condition, $value_b) {
             }
 
             $value_b = str_replace([ '*', '?' ], [ '.*', '.' ], $value_b);
-            //$value_b = str_replace('?', '.', $value_b);
 
             foreach ($delimiters as $delimiter) {
                 if (!str_contains($value_b, $delimiter)) {
@@ -854,9 +854,9 @@ function test_condition($value_a, $condition, $value_b) {
                 }
             }
             if (preg_match($delimiter . '^' . $value_b . '$' . $delimiter, $value_a)) {
-                $alert = TRUE;
+                $result = TRUE;
             } else {
-                $alert = FALSE;
+                $result = FALSE;
             }
             break;
         case 'notmatches':
@@ -870,7 +870,6 @@ function test_condition($value_a, $condition, $value_b) {
             }
 
             $value_b = str_replace([ '*', '?' ], [ '.*', '.' ], $value_b);
-            //$value_b = str_replace('?', '.', $value_b);
 
             foreach ($delimiters as $delimiter) {
                 if (!str_contains($value_b, $delimiter)) {
@@ -878,9 +877,9 @@ function test_condition($value_a, $condition, $value_b) {
                 }
             }
             if (preg_match($delimiter . '^' . $value_b . '$' . $delimiter, $value_a)) {
-                $alert = FALSE;
+                $result = FALSE;
             } else {
-                $alert = TRUE;
+                $result = TRUE;
             }
             break;
         case 'regexp':
@@ -891,9 +890,9 @@ function test_condition($value_a, $condition, $value_b) {
                 }
             }
             if (preg_match($delimiter . $value_b . $delimiter, $value_a)) {
-                $alert = TRUE;
+                $result = TRUE;
             } else {
-                $alert = FALSE;
+                $result = FALSE;
             }
             break;
         case 'notregexp':
@@ -906,9 +905,9 @@ function test_condition($value_a, $condition, $value_b) {
                 }
             }
             if (preg_match($delimiter . $value_b . $delimiter, $value_a)) {
-                $alert = FALSE;
+                $result = FALSE;
             } else {
-                $alert = TRUE;
+                $result = TRUE;
             }
             break;
         case 'in':
@@ -918,13 +917,13 @@ function test_condition($value_a, $condition, $value_b) {
             }
             foreach($value_b as $value) {
                 if ($value == $value_a) {
-                    $alert = TRUE;
+                    $result = TRUE;
                     break 2;
                 }
             }
-            $alert = FALSE;
+            $result = FALSE;
             // in_array doesn't seem to behave how one would expect
-            //$alert = in_array($value_a, $value_b);
+            //$result = in_array($value_a, $value_b);
             break;
 
         case '!in':
@@ -936,29 +935,30 @@ function test_condition($value_a, $condition, $value_b) {
             }
             foreach($value_b as $value) {
                 if ($value == $value_a) {
-                    $alert = FALSE;
+                    $result = FALSE;
                     break 2; // break out of foreach loop and which
                 }
             }
-            $alert = TRUE;
+            $result = TRUE;
             // in_array doesn't seem to behave how one would expect
-            //$alert = !in_array($value_a, $value_b);
+            //$result = !in_array($value_a, $value_b);
             break;
 
       case 'between':
       case 'notbetween':
-          $alert = FALSE;
+      case '!between':
+          $result = FALSE;
 
           if (!is_array($value_b)) {
             $value_b = array_map('trim', explode(',', $value_b));
           } // perhaps extend to allow space-separated values
-          
+
           if(isset($value_b[0]) && is_numeric($value_b[0]) && isset($value_b[1]) && is_numeric($value_b[1]))
           {
             if($condition == "between") {
-              if ($value_a < $value_b[0] || $value_a > $value_b[1]) { $alert = TRUE; }
+              if ($value_a > $value_b[0] || $value_a < $value_b[1]) { $result = TRUE; }
             } else { // notbetween
-              if ($value_a > $value_b[0] && $value_a < $value_b[1]) { $alert = TRUE; }
+              if ($value_a < $value_b[0] && $value_a > $value_b[1]) { $result = TRUE; }
             }
           } else {
             print_debug("ERROR: Invalid values passed to 'between' operator in test_condition().");
@@ -968,11 +968,13 @@ function test_condition($value_a, $condition, $value_b) {
 
         default:
             print_debug("ERROR: Unknown condition '$condition' passed to test_condition().");
-            $alert = FALSE;
+            $result = FALSE;
             break;
     }
-    
-    return $alert;
+
+    if($result) { print_debug("TRUE"); } else { print_debug("NOT TRUE"); }
+
+    return $result;
 }
 
 /**

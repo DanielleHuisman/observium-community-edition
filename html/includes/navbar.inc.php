@@ -15,9 +15,11 @@
 // Time our menu filling.
 $menu_start = utime();
 
+if(OBS_DEBUG) { print_error("Navbar disabled for debugging.");}
+
 ?>
 
-<header class="navbar navbar-fixed-top">
+<header class="navbar navbar-fixed-top<?php if(OBS_DEBUG) { echo 'hidden';} ?>">
     <div class="navbar-inner">
         <div class="container">
             <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target="#main-nav">

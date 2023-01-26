@@ -11,19 +11,50 @@
  *
  */
 
-if (!is_array($vars['id'])) { $vars['id'] = array($vars['id']); }
+$is_permitted = FALSE;
 
-//r($vars);
-
-$auth = TRUE;
-
-foreach ($vars['id'] as $sensor_id)
+// Populate $vars['id'] with group entities if we got a group
+if(isset($vars['group_id']))
 {
-  if (!$auth && !is_sensor_permitted('sensor', $sensor_id))
-  $auth = FALSE;
+  if($group = get_group_by_id($vars['group_id']))
+  {
+    // Guard clause to bail if we've been given a non-sensor group.
+    if($group['entity_type'] == "sensor" ) { unset($vars['group_id']); unset($vars['id']); }
+
+    $vars['id'] = get_group_entities($group['group_id']);
+    $title_array[] = ['text' => 'Sensors Group'];
+    $title_array[] = ['text' => $group['group_name'], 'url' => generate_url(['page' => 'group', 'group_id' => $group['group_id']]) ];
+  }
+} else {
+
+  if (!is_array($vars['id'])) {
+    $vars['id'] = array($vars['id']);
+  }
+
+  $title_array   = array();
+  $title_array[] = array('text' => 'Multiple Sensors');
+
 }
 
-$title = "Multi Sensor :: ";
+if ($auth || $is_permitted || $_SESSION['userlevel'] >= 5)
+{
+  $auth = TRUE;
+
+  foreach ($vars['id'] as $sensor_id) {
+    if (is_numeric($sensor_id) && is_entity_permitted('sensor', $sensor_id)) {
+      $is_permitted = TRUE;
+    } else {
+      $is_permitted = FALSE;
+      // Bail on first reject.
+      break;
+    }
+  }
+
+  $title_array[] = ['text' => safe_count($vars['id']) . ' sensors'];
+
+}
+
+unset($is_permitted);
 
 // EOF
 

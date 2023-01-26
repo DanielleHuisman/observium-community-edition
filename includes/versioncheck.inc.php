@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage common
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -86,49 +86,51 @@ function get_instance_stats() {
   return $stats;
 }
 
-$last_checked = get_obs_attrib('last_versioncheck');
+$latest = [];
+if ($config['poller_id'] === 0) {
+  // On Remote pollers only show warning
 
-if (!is_numeric($last_checked) || $last_checked < time()-3600 || isset($options['u'])) {
-  //$stats = get_instance_stats();
-  $stats = array('version' => OBSERVIUM_VERSION);
+  $last_checked = get_obs_attrib('last_versioncheck');
 
-  // Serialize and base64 encode stats array for transportation
-  $stat_base64 = base64_encode(serialize($stats));
+  if (!is_numeric($last_checked) || $last_checked < time() - 3600 || isset($options['u'])) {
+    //$stats = get_instance_stats();
+    $stats = [ 'version' => OBSERVIUM_VERSION ];
 
-  $tags = [ 'stats' => $stat_base64 ];
+    // Serialize and base64 encode stats array for transportation
+    $stat_base64 = base64_encode(serialize($stats));
 
-  // Generate context/options with encoded data
-  $ver_options = generate_http_context($config['http_api']['observium_versions'], $tags);
+    $tags = [ 'stats' => $stat_base64 ];
 
-  // API URL
-  $url = generate_http_url($config['http_api']['observium_versions'], $tags);
+    // Generate context/options with encoded data
+    $ver_options = generate_http_context($config['http_api']['observium_versions'], $tags);
 
-  // Request
-  $response = get_http_request($url, $ver_options, 10); // Ratelimit 10/day
+    // API URL
+    $url = generate_http_url($config['http_api']['observium_versions'], $tags);
 
-  if (test_http_request($config['http_api']['observium_versions'], $response) &&
-      $versions = safe_json_decode($response)) {
+    // Request
+    $response = get_http_request($url, $ver_options, 10); // Ratelimit 10/day
 
-    print_debug_vars($versions);
-    if (OBSERVIUM_EDITION === "community")
-    {
-      $train = "ce";
+    if (test_http_request($config['http_api']['observium_versions'], $response) &&
+        $versions = safe_json_decode($response)) {
+
+      print_debug_vars($versions);
+      if (OBSERVIUM_EDITION === "community") {
+        $train = "ce";
+      } elseif (OBSERVIUM_TRAIN === "stable") {
+        $train = "stable";
+      } else {
+        $train = "current"; // this same as rolling
+      }
+
+      $latest = $versions[$train];
+
+      set_obs_attrib('latest_ver', preg_replace('/^0\./', '', $latest['version']));
+      set_obs_attrib('latest_rev', $latest['revision']);
+      set_obs_attrib('latest_rev_date', $latest['date']);
     }
-    elseif (OBSERVIUM_TRAIN === "stable")
-    {
-      $train = "stable";
-    } else {
-      $train = "current"; // this same as rolling
-    }
 
-    $latest = $versions[$train];
-
-    set_obs_attrib('latest_ver',      preg_replace('/^0\./', '', $latest['version']));
-    set_obs_attrib('latest_rev',      $latest['revision']);
-    set_obs_attrib('latest_rev_date', $latest['date']);
+    set_obs_attrib('last_versioncheck', time());
   }
-
-  set_obs_attrib('last_versioncheck', time());
 }
 
 $latest['revision'] = get_obs_attrib('latest_rev');

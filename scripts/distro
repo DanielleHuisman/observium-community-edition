@@ -46,7 +46,7 @@
 #
 #   URL: [https://www.observium.org/files/distro]
 
-DISTROSCRIPT="2.2.5"
+DISTROSCRIPT="2.2.7"
 
 if [ -z ${DISTROFORMAT} ]; then
     DISTROFORMAT="pipe"
@@ -92,6 +92,10 @@ getdistro() {
                 . /etc/os-release
                 #DISTRO=`echo ${NAME} | awk '{print $1}'`
                 DISTRO="${NAME% *}"
+                if [ "${DISTRO}" = "Linux" ]; then
+                    # ie: Linux Mint
+                    DISTRO="${NAME#Linux *}"
+                fi
             fi
         elif [ -x /usr/bin/lsb_release ]; then
             DISTRO=`/usr/bin/lsb_release -si 2>/dev/null`
@@ -181,10 +185,13 @@ getdistro() {
             DISTRO=
         fi
 
+        # Additional Distro fixes
         if [ "${DISTRO}" = "Debian GNU/Linux" ]; then
             DISTRO="Debian"
         elif [ "${DISTRO}" = "Red" -o "${DISTRO}" = "RedHatEnterpriseServer" ]; then
             DISTRO="RedHat"
+        elif [ "${DISTRO}" = "VMware Photon" ]; then
+            DISTRO="Photon"
         elif [ "${DISTRO}" = "Arch" ]; then
             DISTRO="ArchLinux"
         fi
@@ -194,6 +201,8 @@ getdistro() {
             DISTRO="pfSense"
         elif [ -f /etc/platform -a -f /etc/prd.name ]; then
             DISTRO=`cat /etc/prd.name`
+        elif [ -x /usr/local/sbin/opnsense-version ]; then
+            DISTRO="OPNsense"
         elif [ -f /usr/local/bin/pbreg ]; then
             DISTRO="PC-BSD"
         elif [ -f /usr/sbin/hbsd-update -o -f /etc/hbsd-update.conf ]; then
@@ -261,6 +270,8 @@ getversion() {
         #elif [ "${DISTRO}" = "HardenedBSD" ]; then
         #    tmp=`sysctl -n hardening.version 2>/dev/null`
         #    VERSION=``
+        elif [ "${DISTRO}" = "OPNsense" ]; then
+            VERSION=`/usr/local/sbin/opnsense-version | awk '{ print $2 }'`
         elif [ -f /etc/prd.version ]; then
             VERSION=`cat /etc/prd.version`
         elif [ -f /bin/freebsd-version ]; then
@@ -417,6 +428,14 @@ getvirt() {
     if [ "${OS}" = "Linux" ]; then
         if [ "${VIRT}" = "none" -a -f /usr/bin/systemd-detect-virt ]; then
             tmp=`/usr/bin/systemd-detect-virt -v`
+            # systemd-detect-virt falsely detects "Microsoft" virtualisation
+            # https://github.com/systemd/systemd/issues/21468
+            if [ "${tmp}" = "microsoft" -a -f /sys/devices/virtual/dmi/id/product_name ]; then
+                tmp2=`cat /sys/devices/virtual/dmi/id/product_name`
+                if [ "${tmp2}" = "KVM" ]; then
+                    tmp="${tmp2}"
+                fi
+            fi
             VIRT=`detectvirt "${tmp}"`
         fi
         if [ "${VIRT}" = "none" -a -f /sys/devices/virtual/dmi/id/product_name ]; then

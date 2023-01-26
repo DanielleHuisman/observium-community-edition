@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage common
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -412,25 +412,13 @@ function get_localhost() {
   global $cache;
 
   if (!isset($cache['localhost'])) {
-    // FastCache for less system exec
-    $cache_item = get_cache_item('own_hostname');
-    if (!ishit_cache_item($cache_item)) {
-
-      $cache['localhost'] = php_uname('n');
-      if (!str_contains($cache['localhost'], '.')) {
-        // try use hostname -f for get FQDN hostname
-        $localhost_t = external_exec('/bin/hostname -f');
-        if (str_contains($localhost_t, '.')) {
-          $cache['localhost'] = $localhost_t;
-        }
+    $cache['localhost'] = php_uname('n');
+    if (!str_contains($cache['localhost'], '.')) {
+      // try use hostname -f for get FQDN hostname
+      $localhost_t = external_exec('/bin/hostname -f');
+      if (str_contains($localhost_t, '.')) {
+        $cache['localhost'] = $localhost_t;
       }
-
-      // Store in fast caching (this value very rare changed (mostly - never)
-      set_cache_item($cache_item, $cache['localhost'], [ 'ttl' => 3600 ]); // set valid for 1 hour
-
-    } else {
-      // Cached item
-      $cache['localhost'] = get_cache_data($cache_item);
     }
   }
 
@@ -1077,15 +1065,6 @@ function print_versions() {
     print_cli_data("Date",    date("l, d-M-y H:i:s T"), 3);
     print_cli_data("PHP",     $timezone['php'], 3);
     print_cli_data($mysql_name, ($timezone['diff'] !== 0 ? '%r' : '') . $timezone['mysql'], 3);
-
-    if (OBS_DEBUG) {
-      $phpfastcache = get_cache_stats();
-      echo(PHP_EOL);
-      print_cli_heading("Fast Cache info", 3);
-      print_cli_data("Enabled", $phpfastcache['enabled'] ? '%gYes%n' : '%yNo%n', 3);
-      print_cli_data("Driver", $phpfastcache['driver'], 3);
-      print_cli_data("Total size", formatStorage($phpfastcache['size']), 3);
-    }
 
     if (OBS_DISTRIBUTED) {
       $id = $GLOBALS['config']['poller_id'];

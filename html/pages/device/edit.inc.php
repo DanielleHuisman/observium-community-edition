@@ -21,9 +21,9 @@ if ($_SESSION['userlevel'] < 7 && !is_entity_write_permitted($device['device_id'
 // Allow write for users with write permission to this entity
 $readonly = !is_entity_write_permitted($device['device_id'], 'device');
 
-$link_array = array('page'    => 'device',
-                    'device'  => $device['device_id'],
-                    'tab'     => 'edit');
+$link_array = [ 'page'    => 'device',
+                'device'  => $device['device_id'],
+                'tab'     => 'edit' ];
 
   $panes['device']   = 'Device Settings';
   $panes['snmp']     = 'SNMP';
@@ -40,8 +40,7 @@ $link_array = array('page'    => 'device',
   if ($health_exist['status']) {
     $panes['status'] = 'Statuses';
   }
-  if (safe_count($config['os'][$device['os']]['icons']))
-  {
+  if (safe_count($config['os'][$device['os']]['icons'])) {
     $panes['icon']   = 'Icon';
   }
 
@@ -68,20 +67,26 @@ $link_array = array('page'    => 'device',
       $device['os_group'] === 'unix' || is_module_enabled($device, 'unix-agent', 'poller')) { // unix-agent
     $panes['ssh']    = 'SSH';
   }
-  if ($device['os_group'] === 'unix' || $device['os'] === 'generic')
-  {
+  if ($device['os_group'] === 'unix' || $device['os'] === 'generic') {
     $panes['agent']  = 'Agent';
   }
-  if ($device['os_group'] === 'unix' || $device['os'] === 'windows')
-  {
+  if ($device['os_group'] === 'unix' || $device['os'] === 'windows') {
     $panes['apps']   = 'Applications'; /// FIXME. Deprecated?
+  }
+
+  if ($_SESSION['userlevel'] >= 9) {
+    // Detect (possible) duplicates
+    $duplicates = [];
+    get_device_duplicated($device, $duplicates);
+    if (count($duplicates)) {
+      $panes['duplicates'] = 'Duplicates';
+    }
   }
 
   $navbar['brand'] = "Edit";
   $navbar['class'] = "navbar-narrow";
 
-  foreach ($panes as $type => $text)
-  {
+  foreach ($panes as $type => $text) {
     if (!isset($vars['section'])) { $vars['section'] = $type; }
 
     if ($vars['section'] == $type) { $navbar['options'][$type]['class'] = "active"; }
@@ -95,8 +100,7 @@ $link_array = array('page'    => 'device',
   print_navbar($navbar);
 
   $filename = $config['html_dir'] . '/pages/device/edit/' . $vars['section'] . '.inc.php';
-  if (is_file($filename))
-  {
+  if (is_file($filename)) {
     $vars = get_vars('POST'); // Note, on edit pages use only method POST!
     $attribs = get_dev_attribs($device['device_id']);
     $model = get_model_array($device);

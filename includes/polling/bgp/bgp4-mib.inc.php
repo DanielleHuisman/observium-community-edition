@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -67,6 +67,19 @@ foreach ($bgp4_peers as $index => $bgp4_entry) {
     $peer_ip = implode('.', $index_parts);
   } else {
     $peer_ip = $index;
+  }
+
+  if ($device['os'] === 'arista_eos') {
+    // It seems as firmware issue, always report as halted
+    // See: https://jira.observium.org/browse/OBS-4382
+    if ($bgp4_entry['bgpPeerAdminStatus'] === 'stop' && $bgp4_entry['bgpPeerState'] !== 'idle') {
+      // running: established, connect, active (not sure about opensent, openconfirm)
+      print_debug("Fixed Arista issue, BGP4-MIB::bgpPeerAdminStatus always report halted");
+      $bgp4_entry['bgpPeerAdminStatus'] = 'start';
+    } elseif ($bgp4_entry['bgpPeerAdminStatus'] === 'start' && $bgp4_entry['bgpPeerState'] === 'idle') {
+      print_debug("Fixed Arista issue, BGP4-MIB::bgpPeerAdminStatus report running for shutdown");
+      $bgp4_entry['bgpPeerAdminStatus'] = 'stop';
+    }
   }
 
   $peer_as  = snmp_dewrap32bit($bgp4_entry['bgpPeerRemoteAs']); // Dewrap for 32bit ASN
