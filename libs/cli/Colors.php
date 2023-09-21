@@ -101,7 +101,7 @@ class Colors {
 			$colors[] = 0;
 		}
 
-		return "\033[" . join(';', $colors) . "m";
+		return "\033[" . implode(';', $colors) . "m";
 	}
 
 	/**

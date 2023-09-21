@@ -1,4 +1,4 @@
---- ArubaOS 8.8.0.1_80393
+-- ArubaOS 8.9.0.3_83448
 -- vim:set ts=4 sw=4:
    WLSX-SWITCH-MIB DEFINITIONS ::= BEGIN
 
@@ -83,9 +83,9 @@
 
    wlsxSwitchRole OBJECT-TYPE
         SYNTAX      INTEGER {
-						master(1),
+						conductor(1),
 						local(2),
-						standbymaster(3),
+						standbyconductor(3),
 						branch(4),
 						md(5)
 						}
@@ -98,16 +98,19 @@
    wlsxSwitchMasterIp OBJECT-TYPE
         SYNTAX       IpAddress
         MAX-ACCESS   read-only
-        STATUS       current
+        STATUS       deprecated
         DESCRIPTION
 			"
 			 Master IP of the switch
+			 **NOTE: this object is deprecated and replaced by
+               wlsxSwitchConductorIp from table wlsxSystemXGroup.
+
 			"
         ::= { wlsxSystemXGroup 5 }
 
 
 -- Switch List Table contains all the switches in the domain. This table is 
--- valid only when queried from the master switch.
+-- valid only when queried from the conductor switch.
 
    wlsxSwitchListTable  OBJECT-TYPE 
 	  SYNTAX       SEQUENCE OF MxSwitchListEntry 
@@ -115,7 +118,7 @@
       STATUS       current 
       DESCRIPTION 
 	  	"This Table will list all the switches in the Switch Domain.
-		 It will be populated only on the master switch. Local switches
+		 It will be populated only on the conductor switch. Local switches
 		 return empty table.
 		"
 	
@@ -148,9 +151,9 @@
 
      switchListSwitchRole OBJECT-TYPE
         SYNTAX      INTEGER {
-						master(1),
+						conductor(1),
 						local(2),
-						standbymaster(3),
+						standbyconductor(3),
 						branch(4),
 						md(5)
 					}
@@ -510,12 +513,34 @@
    wlsxSwitchMasterIpv6 OBJECT-TYPE
         SYNTAX       DisplayString(SIZE(0..45))
         MAX-ACCESS   read-only
+        STATUS       deprecated
+        DESCRIPTION
+            "
+             Master IPv6 address of the switch.
+             **NOTE: this object is deprecated and replaced by
+               wlsxSwitchConductorIpv6 from table wlsxSystemXGroup.
+            "
+        ::= { wlsxSystemXGroup 14 }
+
+   wlsxSwitchConductorIp OBJECT-TYPE
+        SYNTAX       IpAddress
+        MAX-ACCESS   read-only
         STATUS       current
         DESCRIPTION
             "
-             Master IPv6 address of the switch
+             Conductor IP of the switch
             "
-        ::= { wlsxSystemXGroup 14 }
+        ::= { wlsxSystemXGroup 15 }
+
+   wlsxSwitchConductorIpv6 OBJECT-TYPE
+        SYNTAX       DisplayString(SIZE(0..45))
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+            "
+             Conductor IPv6 address of the switch
+            "
+        ::= { wlsxSystemXGroup 16 }
 
 -- wlsxUserInfoGroup contains information about the users connected to the switch.
 
@@ -1012,7 +1037,7 @@
 -- wlsxAccessPointInfoGroup contains a Local Access Point Information Table.
 -- which lists all the AP's connected to this switch, a Global AP Info Table
 -- which lists all the AP's in the Domain. The Global table is valid only
--- on the Master switch. The Group also contains two scalar objects which 
+-- on the Conductor switch. The Group also contains two scalar objects which 
 -- indicate the total number of AP's and the total number of Clients connected.
 
 
@@ -1074,7 +1099,10 @@
 		 apChannelNoise			Integer32,
 		 apSignalToNoiseRatio	Integer32,
 		 apTransmitRate			INTEGER,
-		 apReceiveRate			INTEGER
+		 apReceiveRate			INTEGER,
+		 apCurrentChannelV2		Integer32,
+		 apSecChannelNum		Integer32,
+		 apHTMode				ArubaHTMode
    }
 
    	apBSSID OBJECT-TYPE
@@ -1131,7 +1159,8 @@
          SYNTAX       INTEGER{
 						dot11a(1),
 						dot11b(2),
-						dot11g(3)
+						dot11g(3),
+						dot11ax6ghz(4)
 					  }
          MAX-ACCESS   read-only
          STATUS       current
@@ -1157,7 +1186,7 @@
    	apCurrentChannel OBJECT-TYPE
          SYNTAX       INTEGER(1..165)
          MAX-ACCESS   read-only
-         STATUS       current
+         STATUS       deprecated
          DESCRIPTION
             "
 			The Current Operating frequency channel.
@@ -1270,6 +1299,35 @@
             "
         ::= { wlsxSwitchAccessPointEntry 16 }
 
+    apCurrentChannelV2 OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            The Current Operating frequency channel.
+            "
+        ::= { wlsxSwitchAccessPointEntry 17 }
+
+    apSecChannelNum OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            The secondary channel number for 80+80MHz operation.
+            "
+        ::= { wlsxSwitchAccessPointEntry 18 }
+
+    apHTMode OBJECT-TYPE
+         SYNTAX       ArubaHTMode
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            The HT Mode of the AP.
+            "
+        ::= { wlsxSwitchAccessPointEntry 19 }
 
  --Global AP Table
    wlsxSwitchGlobalAPTable  OBJECT-TYPE 
@@ -1426,13 +1484,17 @@
 		 apBSSFrameLowSpeedRate				Integer32,
 		 apBSSFrameNonUnicastRate			Integer32,
 		 apBSSFrameFragmentationRate		Integer32,
-		 apBSSFrameReceiveErrorRate			Integer32
+		 apBSSFrameReceiveErrorRate			Integer32,
+		 apStatsChannelV2					Integer32,
+		 apStatsSecChannel					Integer32,
+		 apStatsPhyType						ArubaPhyType,
+		 apStatsHTMode						ArubaHTMode
    }
 
    	apStatsChannel OBJECT-TYPE
          SYNTAX       INTEGER(1..165)
          MAX-ACCESS   read-only
-         STATUS       current
+         STATUS       deprecated
          DESCRIPTION
             "
 			Channel on which the ap is operating.
@@ -1599,6 +1661,47 @@
 			Frame Receive Error Rate on this BSSID.
             "
         ::= { wlsxSwitchAccessPointStatsEntry 17 }
+
+    apStatsChannelV2 OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            Channel on which the ap is operating.
+            "
+        ::= { wlsxSwitchAccessPointStatsEntry 18 }
+
+    apStatsSecChannel OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            The secondary channel when the ap is operating in 80+80MHz
+            "
+        ::= { wlsxSwitchAccessPointStatsEntry 19 }
+
+    apStatsPhyType OBJECT-TYPE
+         SYNTAX       ArubaPhyType
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            The phy type of the AP.
+            "
+        ::= { wlsxSwitchAccessPointStatsEntry 20 }
+
+    apStatsHTMode OBJECT-TYPE
+         SYNTAX       ArubaHTMode
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION
+            "
+            The HT Mode of the AP.
+            "
+        ::= { wlsxSwitchAccessPointStatsEntry 21 }
+
 
 -- New wlsxInstantAccessPointInfoGroup contains the information related to IAPs.
 -- This table is valid only, when queried from the controller.
@@ -1862,10 +1965,11 @@ wlsxStationBlackListReason OBJECT-TYPE
 						other(100)
 		 			  }
          MAX-ACCESS   read-only
-         STATUS       current
+         STATUS       deprecated
          DESCRIPTION
             "
 			The Reason for which a station is black listed. 
+			**NOTE: this object is deprecated
             "
 ::= { wlsxSwitchTrapObjectsGroup 11 }
 
@@ -2048,11 +2152,12 @@ wlsxSlotNumber OBJECT-TYPE
 wlsxStationBlackListReasonStr OBJECT-TYPE
         SYNTAX          DisplayString(SIZE(0..32))
         MAX-ACCESS      accessible-for-notify
-        STATUS          current
+        STATUS          deprecated
         DESCRIPTION
                     "
             This object is used in the traps to indicate the
             type of Blacklist reason.
+            **NOTE: this object is deprecated
                                 "
 ::= { wlsxSwitchTrapObjectsGroup 28 }
 
@@ -2366,22 +2471,26 @@ wlsxChannelChanged NOTIFICATION-TYPE
 
 wlsxStationAddedToBlackList NOTIFICATION-TYPE        
 	OBJECTS {wlsxStationMacAddress, wlsxStationBlackListReason, wlsxStationBlackListReasonStr}
-    STATUS  current
+    STATUS  deprecated
     DESCRIPTION
 			"
 			A trap which indicates that a station with address
 			wlsxStationMacAddress is black listed for 
 			wlsxStationBlackListReason reason.
+			**NOTE: this notification is deprecated and replaced by
+			wlsxNStationAddedToDenyList.
 			"
     ::= { wlsxSwitchTraps 1034}
 
 wlsxStationRemovedFromBlackList NOTIFICATION-TYPE        
 	OBJECTS {wlsxStationMacAddress}
-    STATUS  current
+    STATUS  deprecated
     DESCRIPTION
 			"
 			A trap which indicates that a station with address
 			wlsxStationMacAddress is removed from black list.
+			**NOTE: this notification is deprecated and replaced by
+			wlsxNStationRemovedFromDenyList.
 			"
     ::= { wlsxSwitchTraps 1035}
 

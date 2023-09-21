@@ -1,6 +1,6 @@
 TROPIC-SYNCE-MIB DEFINITIONS ::= BEGIN
 
--- (c) Copyright 2019 Nokia Networks.  All rights reserved.
+-- (c) Copyright 2021 Nokia Networks.  All rights reserved.
 -- This software is the confidential and proprietary property of
 -- Nokia and may only be used in accordance with the terms of the
 -- license agreement provided with this software.
@@ -13,15 +13,17 @@ IMPORTS
       ifIndex,
       InterfaceIndexOrZero                    FROM IF-MIB
       TropicStateQualifierType,
-      TropicOperationalCapabilityType         FROM TROPIC-TC
+      TropicOperationalCapabilityType,
+      NokiaSyncStatusMsgType                  FROM TROPIC-TC
       tnShelfIndex                            FROM TROPIC-SHELF-MIB
       tnSlotIndex                             FROM TROPIC-SLOT-MIB
       tnPortModules, tnSyncEMIB               FROM TROPIC-GLOBAL-REG
       tnSysSwitchId                           FROM TROPIC-SYSTEM-MIB
+      AluWdmPtpClockIdentifier                FROM TROPIC-PTP-MIB
       SnmpAdminString                         FROM SNMP-FRAMEWORK-MIB;
 
   tnSyncEMibModule MODULE-IDENTITY
-      LAST-UPDATED    "201809071200Z"
+      LAST-UPDATED    "202011201200Z"
       ORGANIZATION    "Nokia"
       CONTACT-INFO    "Nokia
                        Attn: Jeff Donnelly
@@ -32,6 +34,58 @@ IMPORTS
                        Email: jeff.donnelly@nokia.com"
 
       DESCRIPTION "Synchronous Ethernet MIB attributes."
+
+      REVISION    "202011201200Z"
+      DESCRIPTION "1) Added the following to tnSyncELineRefTable:
+                      tnSyncELineRefProvQLOfStationClock
+                      tnSyncELineRefIncSSMMsgOfStationClock
+                      tnSyncELineRefIncSSMStatusOfStationClock.
+                   2) Added the following to tnWanSyncEOutgoingForceSsmTrans:
+                      ePRTC(23)
+                      to
+                      eSEC(26).
+                   3) Updated DESCRIPTION of the following:
+                      tnWanSyncEOutgoingForceSsmTrans."
+
+      REVISION    "202011131200Z"
+      DESCRIPTION "1) Updated DESCRIPTION of the following:
+                      tnSyncESystemQL
+                      tnSyncEStationClockSystemQL
+                      tnSyncEStationClockSyncMsg
+                      tnSyncESyncMsg.
+                   2) Changed SYNTAX of the following from TruthValue to NokiaSyncStatusMsgType:
+                      tnSyncESyncMsg
+                      tnSyncEStationClockSyncMsg."
+
+      REVISION    "202011061200Z"
+      DESCRIPTION "1) Updated DESCRIPTION of the following:
+                      tnSyncEQLDegradeThreshold
+                      tnSyncEStationClockQLThreshold
+                      tnSyncELineRefProvQL
+                      tnSyncELineRefIncSSMMsg
+                      tnSyncEOutgoingForceSsmTrans.
+                   2) Added the following to tnSyncELineRefTable:
+                      tnSyncELineRefIncExtdQLTLVClockID
+                      tnSyncELineRefIncExtdQLTLVMixedClockType
+                      tnSyncELineRefIncExtdQLTLVPartialChain
+                      tnSyncELineRefIncExtdQLTLVNumeEEC
+                      tnSyncELineRefIncExtdQLTLVNumEEC.
+                   3) Added the following to tnSyncEOutgoingForceSsmTrans:
+                      ePRTC(23)
+                      to
+                      eSEC(26)."
+
+      REVISION    "202001101200Z"
+      DESCRIPTION "Added the following to tnSyncEBITSPortTable:
+                   tnSyncEBITSPortAlmProfName."
+
+      REVISION    "201909061200Z"
+      DESCRIPTION "1) Added the following to tnSyncETable:
+                      tnSyncEAlmProfName.
+                   2) Added the following to tnSyncELineRefTable:
+                      tnSyncELineRefAlmProfName.
+                   3) Added the following to tnSyncEStationClockTable:
+                      tnSyncEStationClockAlmProfName."
 
       REVISION    "201809071200Z"
       DESCRIPTION "Added the following to tnWanTable:
@@ -248,23 +302,24 @@ IMPORTS
 
     TnSyncEntry ::=
         SEQUENCE {
-            tnSyncESyncMsg                      TruthValue,
-            tnSyncEActiveRef                    INTEGER,
-            tnSyncEWTR                          Unsigned32,
-            tnSyncESwCmdLineRef                 Unsigned32,
-            tnSyncEClkModState                  INTEGER,
-            tnSyncESystemQL                     Integer32,
-            tnSyncEQLDegradeThreshold           Integer32,
-            tnSyncECurrentActiveLineRefFreqOff  Integer32
+            tnSyncESyncMsg                         NokiaSyncStatusMsgType,
+            tnSyncEActiveRef                       INTEGER,
+            tnSyncEWTR                             Unsigned32,
+            tnSyncESwCmdLineRef                    Unsigned32,
+            tnSyncEClkModState                     INTEGER,
+            tnSyncESystemQL                        Integer32,
+            tnSyncEQLDegradeThreshold              Integer32,
+            tnSyncECurrentActiveLineRefFreqOff     Integer32,
+            tnSyncEAlmProfName                     OCTET STRING
         }
 
     tnSyncESyncMsg OBJECT-TYPE
-        SYNTAX         TruthValue
+        SYNTAX         NokiaSyncStatusMsgType
         MAX-ACCESS     read-create
         STATUS         current
-        DESCRIPTION    "Determines if the timing reference selection for
-                        system timing uses sync status messaging (SSM
-                        Qualities)."
+        DESCRIPTION    "Determines if the timing reference selection for system
+                        timing uses Synchronization Status Message (SSM) Quality
+                        Levels or Enhanced Quality Levels."
         DEFVAL         { false }
         ::= { tnSyncEEntry 1 }
 
@@ -300,22 +355,22 @@ IMPORTS
         MAX-ACCESS     read-create
         STATUS         current
         DESCRIPTION    "The third byte represents the switch command:
-                        1 - nocmd
-                        2 - clear
-                        3 - lockout
-                        4 - forceswitch
-                        5 - mannual
-                        6 - auto
-                        7 - clearlockout.
+                          1 - nocmd
+                          2 - clear
+                          3 - lockout
+                          4 - forceswitch
+                          5 - mannual
+                          6 - auto
+                          7 - clearlockout.
 
                         The last byte represents the line reference switch to:
-                        0 - internal
-                        1 - lineref0
-                        2 - lineref1
-                        3 - lineref2
-                        4 - lineref3
-                        5 - lineref4
-                        6 - lineref5."
+                          0 - internal
+                          1 - lineref0
+                          2 - lineref1
+                          3 - lineref2
+                          4 - lineref3
+                          5 - lineref4
+                          6 - lineref5."
         ::= { tnSyncEEntry 4 }
 
     tnSyncEClkModState OBJECT-TYPE
@@ -340,12 +395,16 @@ IMPORTS
                           31 - not applicable
 
                         When the NE is in SDH mode:
-                           0 - quality unknown
-                           1 - PRC
-                           2 - SSU_A
-                           3 - SSU_B
-                           4 - SEC
-                           5 - DNU.
+                          0  - quality unknown
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC
+                          5  - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC.
 
                         When the NE is in SONET mode:
                           11 - PRS
@@ -357,7 +416,10 @@ IMPORTS
                           17 - SMC
                           18 - ST4
                           19 - DUS
-                          20 - PNO."
+                          20 - PNO
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC."
         ::= { tnSyncEEntry 6 }
 
     tnSyncEQLDegradeThreshold OBJECT-TYPE
@@ -368,10 +430,14 @@ IMPORTS
                         for systme timing reference.
 
                         When the NE is in SDH mode:
-                           1 - PRC
-                           2 - SSU_A
-                           3 - SSU_B
-                           4 - SEC - Default.
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC - Default
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC.
 
                         When the NE is in SONET mode:
                           11 - PRS
@@ -379,8 +445,10 @@ IMPORTS
                           13 - ST2
                           14 - TNC
                           15 - ST3E
-                          16 - ST3 - Default."
-
+                          16 - ST3 - Default
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC."
         ::= { tnSyncEEntry 7 }
 
     tnSyncECurrentActiveLineRefFreqOff OBJECT-TYPE
@@ -390,6 +458,13 @@ IMPORTS
         STATUS         current
         DESCRIPTION    "The current frequency offset of the active timing reference."
         ::= { tnSyncEEntry 8 }
+
+    tnSyncEAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSyncEEntry 9 }
 
 -------------------------------------------------------------------------------
 -- Synchronous Ethernet Timing Line Reference Map Table
@@ -413,23 +488,32 @@ IMPORTS
 
     TnSyncELineRefEntry ::=
         SEQUENCE {
-            tnSyncELineRefIndex                      Unsigned32,
-            tnSyncELineRefAssignedPort               INTEGER,
-            tnSyncELineRefPriority                   Unsigned32,
-            tnSyncELineRefAdminState                 INTEGER,
-            tnSyncELineRefOperState                  INTEGER,
-            tnSyncELineLockOut                       TruthValue,
-            tnSyncELineRefState                      INTEGER,
-            tnSyncELineRefSwState                    INTEGER,
-            tnSyncELineRefIncSSMMsg                  Integer32,
-            tnSyncELineRefIncSSMStatus               Integer32,
-            tnSyncELineRefIncSSMSupp                 INTEGER,
-            tnSyncELineRefProvQL                     Integer32,
-            tnSyncELineRefAssociatedPort             InterfaceIndexOrZero,
-            tnSyncELineRefPriorityOfStationClock     Unsigned32,
-            tnSyncELineRefLockOutOfStationClock      TruthValue,
-            tnSyncELineRefSwStateOfStationClock      INTEGER,
-            tnSyncELineRefCurrentFreqOff             Integer32
+            tnSyncELineRefIndex                        Unsigned32,
+            tnSyncELineRefAssignedPort                 INTEGER,
+            tnSyncELineRefPriority                     Unsigned32,
+            tnSyncELineRefAdminState                   INTEGER,
+            tnSyncELineRefOperState                    INTEGER,
+            tnSyncELineLockOut                         TruthValue,
+            tnSyncELineRefState                        INTEGER,
+            tnSyncELineRefSwState                      INTEGER,
+            tnSyncELineRefIncSSMMsg                    Integer32,
+            tnSyncELineRefIncSSMStatus                 Integer32,
+            tnSyncELineRefIncSSMSupp                   INTEGER,
+            tnSyncELineRefProvQL                       Integer32,
+            tnSyncELineRefAssociatedPort               InterfaceIndexOrZero,
+            tnSyncELineRefPriorityOfStationClock       Unsigned32,
+            tnSyncELineRefLockOutOfStationClock        TruthValue,
+            tnSyncELineRefSwStateOfStationClock        INTEGER,
+            tnSyncELineRefCurrentFreqOff               Integer32,
+            tnSyncELineRefAlmProfName                  OCTET STRING,
+            tnSyncELineRefIncExtdQLTLVClockID          AluWdmPtpClockIdentifier,
+            tnSyncELineRefIncExtdQLTLVMixedClockType   INTEGER,
+            tnSyncELineRefIncExtdQLTLVPartialChain     INTEGER,
+            tnSyncELineRefIncExtdQLTLVNumeEEC          Unsigned32,
+            tnSyncELineRefIncExtdQLTLVNumEEC           Unsigned32,
+            tnSyncELineRefProvQLOfStationClock         Integer32,
+            tnSyncELineRefIncSSMMsgOfStationClock      Integer32,
+            tnSyncELineRefIncSSMStatusOfStationClock   Integer32
         }
 
     tnSyncELineRefIndex OBJECT-TYPE
@@ -564,12 +648,16 @@ IMPORTS
                           31 - not applicable
 
                         When the NE works in SDH mode:
-                           0 - Unknown
-                           1 - PRC
-                           2 - SSU_A
-                           3 - SSU_B
-                           4 - SEC
-                           5 - DNU
+                          0  - Unknown
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC
+                          5  - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC
 
                         When the NE works in SONET mode:
                           11 - PRS
@@ -582,6 +670,9 @@ IMPORTS
                           18 - ST4
                           19 - DUS
                           20 - PNO
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
 
                         It's applicable only to the timing port with SSM
                         capabilities."
@@ -610,8 +701,7 @@ IMPORTS
                        }
         MAX-ACCESS     read-create
         STATUS         current
-        DESCRIPTION    "Enable or disable the line reference incoming QL
-                        processing."
+        DESCRIPTION    "Enable or disable the line reference incoming QL processing."
         DEFVAL         { disable }
         ::= { tnSyncELineRefEntry 11 }
 
@@ -622,14 +712,18 @@ IMPORTS
         DESCRIPTION    "Manually provisioned incoming SSM value for the line
                         reference.  The value can be:
 
-                           0 - AUTO
+                          0 - AUTO
 
                         When the NE is in SDH mode:
-                           1 - PRC
-                           2 - SSU_A
-                           3 - SSU_B
-                           4 - SEC
-                           5 - DNU
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC
+                          5  - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC
 
                         When the NE works in SONET mode:
                           11 - PRS
@@ -642,9 +736,12 @@ IMPORTS
                           18 - ST4
                           19 - DUS
                           20 - PNO
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
 
-                       Note:  The parameter can be provisioned only when
-                       SyncELineRefIncSSMSupp is enabled."
+                        Note:  The parameter can be provisioned only when
+                        SyncELineRefIncSSMSupp is enabled."
         DEFVAL         { 0 }
         ::= { tnSyncELineRefEntry 12 }
 
@@ -701,6 +798,151 @@ IMPORTS
         DESCRIPTION    "The current frequency offset of the timing reference."
         ::= { tnSyncELineRefEntry 17 }
 
+    tnSyncELineRefAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSyncELineRefEntry 18 }
+
+    tnSyncELineRefIncExtdQLTLVClockID OBJECT-TYPE
+        SYNTAX         AluWdmPtpClockIdentifier
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "Incoming Extended QL TLV Clock ID."
+        ::= { tnSyncELineRefEntry 19 }
+
+    tnSyncELineRefIncExtdQLTLVMixedClockType OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         eEECFull(1),
+                         eEECMixedEEC(2)
+                       }
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "Incoming Extended QL TLV Mixed Clock Type Flag."
+        ::= { tnSyncELineRefEntry 20 }
+
+    tnSyncELineRefIncExtdQLTLVPartialChain OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         completeChain(1),
+                         partialChain(2)
+                       }
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "Incoming Extended QL TLV Partial Chain Flag."
+        ::= { tnSyncELineRefEntry 21 }
+
+    tnSyncELineRefIncExtdQLTLVNumeEEC OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "Incoming Extended QL TLV Number of eEEC."
+        ::= { tnSyncELineRefEntry 22 }
+
+    tnSyncELineRefIncExtdQLTLVNumEEC OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "Incoming Extended QL TLV Number of EEC."
+        ::= { tnSyncELineRefEntry 23 }
+
+    tnSyncELineRefProvQLOfStationClock OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "Manually provisioned incoming SSM value
+                        of the line reference output timing.
+                        The value can be:
+
+                          0 - AUTO
+
+                        When the NE is in SDH mode:
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC
+                          5  - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC
+
+                        When the NE works in SONET mode:
+                          11 - PRS
+                          12 - STU
+                          13 - ST2
+                          14 - TNC
+                          15 - ST3E
+                          16 - ST3
+                          17 - SMC
+                          18 - ST4
+                          19 - DUS
+                          20 - PNO
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+
+                       Note:  The parameter can be provisioned only when
+                       SyncELineRefIncSSMSupp is enabled."
+        DEFVAL         { 0 }
+        ::= { tnSyncELineRefEntry 24 }
+
+    tnSyncELineRefIncSSMMsgOfStationClock OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "This object indicates the current value of incoming
+                        QL for output timing on that port.
+                          30 - unstable
+                          31 - not applicable
+
+                        When the NE works in SDH mode:
+                          0  - Unknown
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC
+                          5  - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC
+
+                        When the NE works in SONET mode:
+                          11 - PRS
+                          12 - STU
+                          13 - ST2
+                          14 - TNC
+                          15 - ST3E
+                          16 - ST3
+                          17 - SMC
+                          18 - ST4
+                          19 - DUS
+                          20 - PNO
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+
+                        It's applicable only to the timing port with SSM
+                        capabilities."
+        ::= { tnSyncELineRefEntry 25 }
+
+    tnSyncELineRefIncSSMStatusOfStationClock OBJECT-TYPE
+        SYNTAX         Integer32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "This object indicates the current status of incoming
+                        QL on that port for output timing.
+
+                          0: Valid
+                          1: Invalid
+                          2: Not Supported
+                          3: Not Applicable
+
+                        It's applicable only to the timing port with SSM
+                        capabilities."
+        ::= { tnSyncELineRefEntry 26 }
+
 --------------------------------------------------------------------------------
 -- Synchronous Ethernet Control Table
 --------------------------------------------------------------------------------
@@ -722,7 +964,7 @@ IMPORTS
 
     TnSyncControlEntry ::=
         SEQUENCE {
-            tnSyncEControlEECEnable     INTEGER
+            tnSyncEControlEECEnable             INTEGER
         }
 
     tnSyncEControlEECEnable OBJECT-TYPE
@@ -795,16 +1037,20 @@ IMPORTS
                          sts3e(10),
                          st3(11),
                          none(12),
-                         dus(13)
+                         dus(13),
+                         ePRTC(23),
+                         pRTC(24),
+                         ePRC(25),
+                         eSEC(26)
                        }
         MAX-ACCESS     read-create
         STATUS         current
         DESCRIPTION    "The port SSM/Quality Level Transmission value.
                         The value can be:
                         In SDH mode   - act, prc, ssua, ssub, sec, dnu,
-                                        none;
+                                        ePRTC, PRTC, ePRC, eSEC, none;
                         In sonet mode - act, stu, prs, st2, sts3e, st3,
-                                        dus, none."
+                                        ePRTC, PRTC, ePRC, dus, none."
         DEFVAL         { act }
         ::= { tnSyncEPortEntry 2 }
 
@@ -829,22 +1075,24 @@ IMPORTS
 
     TnSyncEStationClockEntry ::=
         SEQUENCE {
-            tnSyncEStationClockSyncMsg          TruthValue,
+            tnSyncEStationClockSyncMsg          NokiaSyncStatusMsgType,
             tnSyncEStationClockActiveRef        INTEGER,
             tnSyncEStationClockWTR              Unsigned32,
             tnSyncEStationClockSwCmdLineRef     Unsigned32,
             tnSyncEStationClockSystemQL         Integer32,
             tnSyncEStationClockQLThreshold      Integer32,
-            tnSyncEStationClockOutSel           INTEGER
+            tnSyncEStationClockOutSel           INTEGER,
+            tnSyncEStationClockAlmProfName      OCTET STRING
         }
 
     tnSyncEStationClockSyncMsg OBJECT-TYPE
-        SYNTAX         TruthValue
+        SYNTAX         NokiaSyncStatusMsgType
         MAX-ACCESS     read-create
         STATUS         current
         DESCRIPTION    "Determines if the timing reference selection for
-                        station clock timing uses sync status messaging
-                        (SSM Qualities)."
+                        station clock timing uses Synchronization Status Message
+                        (SSM) Quality Levels or Enhanced Quality Levels."
+        DEFVAL         { false }
         ::= { tnSyncEStationClockEntry 1 }
 
     tnSyncEStationClockActiveRef OBJECT-TYPE
@@ -905,12 +1153,16 @@ IMPORTS
                           31 - not applicable
 
                         When the NE is in SDH mode:
-                           0 - quality unknown
-                           1 - PRC
-                           2 - SSU_A
-                           3 - SSU_B
-                           4 - SEC
-                           5 - DNU.
+                          0  - quality unknown
+                          1  - PRC
+                          2  - SSU_A
+                          3  - SSU_B
+                          4  - SEC
+                          5  - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC.
 
                         When the NE is in SONET mode:
                           11 - PRS
@@ -922,7 +1174,10 @@ IMPORTS
                           17 - SMC
                           18 - ST4
                           19 - DUS
-                          20 - PNO."
+                          20 - PNO
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC."
         ::= { tnSyncEStationClockEntry 5}
 
     tnSyncEStationClockQLThreshold OBJECT-TYPE
@@ -938,11 +1193,15 @@ IMPORTS
                         means of using the value DNU or DUS.
 
                         When the NE is in SDH mode:
-                           1 - PRC
-                           2 - SSU_A
-                           3 - SSU_B
-                           4 - SEC
-                           5 - DNU.
+                          1 - PRC
+                          2 - SSU_A
+                          3 - SSU_B
+                          4 - SEC
+                          5 - DNU
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC
+                          26 - eSEC.
 
                         When the NE is in SONET mode:
                           11 - PRS
@@ -953,7 +1212,10 @@ IMPORTS
                           16 - ST3
                           17 - SMC
                           18 - ST4
-                          19 - DUS.
+                          19 - DUS
+                          23 - ePRTC
+                          24 - PRTC
+                          25 - ePRC.
 
                         Default value:
                           SEC - for node working in SDH mode
@@ -977,6 +1239,13 @@ IMPORTS
                                  reference."
         DEFVAL         { outtim }
         ::= { tnSyncEStationClockEntry 7 }
+
+    tnSyncEStationClockAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSyncEStationClockEntry 8 }
 
 --------------------------------------------------------------------------------
 -- Synchronous Ethernet BITS Port Table
@@ -1005,7 +1274,8 @@ IMPORTS
             tnSyncEBITSPortOutputAISMode      INTEGER,
             tnSyncEBITSPortLineImpedance      INTEGER,
             tnSyncEBITSPortLineCode           INTEGER,
-            tnSyncEBITSPortLbo                INTEGER
+            tnSyncEBITSPortLbo                INTEGER,
+            tnSyncEBITSPortAlmProfName        OCTET STRING
         }
 
     tnSyncEBITSPortDirection OBJECT-TYPE
@@ -1163,6 +1433,13 @@ IMPORTS
         DEFVAL         { lbo1 }
         ::= { tnSyncEBITSPortEntry 8 }
 
+    tnSyncEBITSPortAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "Alarm profile for BITs port"
+        ::= { tnSyncEBITSPortEntry 9}
+
 --------------------------------------------------------------------------------
 -- Wan Table
 --------------------------------------------------------------------------------
@@ -1230,14 +1507,20 @@ IMPORTS
                          sts3e(11),
                          st3(12),
                          none(13),
-                         dus(14)
+                         dus(14),
+                         ePRTC(23),
+                         pRTC(24),
+                         ePRC(25),
+                         eSEC(26)
                        }
         MAX-ACCESS     read-create
         STATUS         current
         DESCRIPTION    "The port SSM/Quality Level Transmission value.
                         The value can be:
-                        In SDH mode   - act, prc, ssua, ssub, sec, dnu, none.
-                        In SONET mode - act, prs, stu, st2, st3e, st3, dus, none."
+                        In SDH mode   - act, prc, ssua, ssub, sec, dnu,
+                                        ePRTC, PRTC, ePRC, eSEC, none.
+                        In SONET mode - act, prs, stu, st2, st3e, st3,
+                                        ePRTC, PRTC, ePRC, dus, none."
         DEFVAL         { act }
         ::= { tnWanEntry 3 }
 
@@ -1341,7 +1624,8 @@ IMPORTS
             tnSyncEClkModState,
             tnSyncESystemQL,
             tnSyncEQLDegradeThreshold,
-            tnSyncECurrentActiveLineRefFreqOff
+            tnSyncECurrentActiveLineRefFreqOff,
+            tnSyncEAlmProfName
         }
         STATUS         current
         DESCRIPTION    "."
@@ -1364,7 +1648,16 @@ IMPORTS
             tnSyncELineRefPriorityOfStationClock,
             tnSyncELineRefLockOutOfStationClock,
             tnSyncELineRefSwStateOfStationClock,
-            tnSyncELineRefCurrentFreqOff
+            tnSyncELineRefCurrentFreqOff,
+            tnSyncELineRefAlmProfName,
+            tnSyncELineRefIncExtdQLTLVClockID,
+            tnSyncELineRefIncExtdQLTLVMixedClockType,
+            tnSyncELineRefIncExtdQLTLVPartialChain,
+            tnSyncELineRefIncExtdQLTLVNumeEEC,
+            tnSyncELineRefIncExtdQLTLVNumEEC,
+            tnSyncELineRefProvQLOfStationClock,
+            tnSyncELineRefIncSSMMsgOfStationClock,
+            tnSyncELineRefIncSSMStatusOfStationClock
         }
         STATUS         current
         DESCRIPTION    "."
@@ -1395,7 +1688,8 @@ IMPORTS
             tnSyncEStationClockSwCmdLineRef,
             tnSyncEStationClockSystemQL,
             tnSyncEStationClockQLThreshold,
-            tnSyncEStationClockOutSel
+            tnSyncEStationClockOutSel,
+            tnSyncEStationClockAlmProfName
         }
         STATUS         current
         DESCRIPTION    "."
@@ -1410,7 +1704,8 @@ IMPORTS
             tnSyncEBITSPortOutputAISMode,
             tnSyncEBITSPortLineImpedance,
             tnSyncEBITSPortLineCode,
-            tnSyncEBITSPortLbo
+            tnSyncEBITSPortLbo,
+            tnSyncEBITSPortAlmProfName
         }
         STATUS         current
         DESCRIPTION    "."

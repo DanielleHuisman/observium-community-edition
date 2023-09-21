@@ -5,20 +5,22 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (!is_array($vars['id'])) { $vars['id'] = array($vars['id']); }
+if (!is_array($vars['id'])) {
+    $vars['id'] = [$vars['id']];
+}
 
 $auth = TRUE;
 
-foreach ($vars['id'] as $storage_id)
-{
-  if (!$auth && !is_entity_permitted('storage', $storage_id))
-  $auth = FALSE;
+foreach ($vars['id'] as $storage_id) {
+    if (!$auth && !is_entity_permitted('storage', $storage_id)) {
+        $auth = FALSE;
+    }
 }
 
 $title = "Multi Storage :: ";

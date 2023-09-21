@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,46 +15,43 @@
 
 $i = 0;
 
-foreach ($ports as $port)
-{
-  // $device and $port are retrieved from the same query
-  $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
+foreach ($ports as $port) {
+    // $device and $port are retrieved from the same query
+    $rrdfile = get_port_rrdfilename($port, NULL, TRUE);
 
-  if (rrd_is_file($rrdfile))
-  {
-    $rrd_list[$i]['filename'] = $rrdfile;
-    $rrd_list[$i]['descr'] = $port['hostname'];
-    $rrd_list[$i]['descr_out'] = $port['ifDescr'];
-    if (isset($port['ifAlias']) && $port['ifAlias'] != $port['ifDescr'])
-    {
-      $rrd_list[$i]['descr_out'] .= ' ('.$port['ifAlias'].')';
+    if (rrd_is_file($rrdfile)) {
+        $rrd_list[$i]['filename']  = $rrdfile;
+        $rrd_list[$i]['descr']     = $port['hostname'];
+        $rrd_list[$i]['descr_out'] = $port['ifDescr'];
+        if (isset($port['ifAlias']) && $port['ifAlias'] != $port['ifDescr']) {
+            $rrd_list[$i]['descr_out'] .= ' (' . $port['ifAlias'] . ')';
+        }
+        $i++;
     }
-    $i++;
-  }
 }
 
-$units='bps';
-$total_units='B';
-$colours_in='greens';
-$multiplier = "8";
+$units       = 'bps';
+$total_units = 'B';
+$colours_in  = 'greens';
+$multiplier  = "8";
 $colours_out = 'blues';
 
 $nototal = 1;
-$ds_in  = "INOCTETS";
-$ds_out = "OUTOCTETS";
+$ds_in   = "INOCTETS";
+$ds_out  = "OUTOCTETS";
 
 #print_vars($rates);
 
-if($bill['bill_type'] == "cdr") {
-   $custom_graph = " COMMENT:'\\r' ";
-   $custom_graph .= " HRULE:" . $rates['rate_95th'] . "#cc0000:'95th %ile \: ".formatRates($rates['rate_95th'])." (".$rates['dir_95th'].") (CDR\: ".formatRates($bill['bill_cdr']).")'";
-   $custom_graph .= " HRULE:" . $rates['rate_95th'] * -1 . "#cc0000";
-} elseif($bill['bill_type'] == "quota") {
-   $custom_graph = " COMMENT:'\\r' ";
-   $custom_graph .= " HRULE:" . $rates['rate_average'] . "#cc0000:'Usage \: ".format_bytes_billing($rates['total_data'])." (".formatRates($rates['rate_average']).")'";
-   $custom_graph .= " HRULE:" . $rates['rate_average'] * -1 . "#cc0000";
+if ($bill['bill_type'] == "cdr") {
+    $custom_graph = " COMMENT:'\\r' ";
+    $custom_graph .= " HRULE:" . $rates['rate_95th'] . "#cc0000:'95th %ile \: " . format_bps($rates['rate_95th']) . " (" . $rates['dir_95th'] . ") (CDR\: " . format_bps($bill['bill_cdr']) . ")'";
+    $custom_graph .= " HRULE:" . $rates['rate_95th'] * -1 . "#cc0000";
+} elseif ($bill['bill_type'] == "quota") {
+    $custom_graph = " COMMENT:'\\r' ";
+    $custom_graph .= " HRULE:" . $rates['rate_average'] . "#cc0000:'Usage \: " . format_bytes_billing($rates['total_data']) . " (" . format_bps($rates['rate_average']) . ")'";
+    $custom_graph .= " HRULE:" . $rates['rate_average'] * -1 . "#cc0000";
 }
 
-include($config['html_dir']."/includes/graphs/generic_multi_bits_separated.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi_bits_separated.inc.php");
 
 ?>

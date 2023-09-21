@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -35,26 +35,26 @@
 // .1.3.6.1.4.1.22610.2.4.3.1.3.1.0 = INTEGER: 90000
 // .1.3.6.1.4.1.22610.2.4.3.1.3.2.0 = INTEGER: 9849
 
-$table_defs['A10-AX-MIB']['axAppGlobalStats'] = array (
-  'table'      => 'axAppGlobals',
-  'numeric'    => '.1.3.6.1.4.1.22610.2.4.3.1.2',
-  'mib'        => 'A10-AX-MIB',
-  'mib_dir'    => 'a10',
-//  'file'       => 'axAppGlobalStats.rrd',
-  'descr'      => 'A10 Global Statistics',
-  'graphs'     => array('axAppGlobalCurConns', 'axAppGlobalTotConns', 'axAppTotL7Requests', 'axAppGlobalBuffers'),
-  'ds_rename'  => array('axAppGlobal' => '', 'Connections' => 'Conns'),
-  'oids'       => array(
-    'axAppGlobalTotalCurrentConnections'  =>  array('numeric' => '1',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'axAppGlobalTotalNewConnections'      =>  array('numeric' => '2',  'descr' => ''),
-    'axAppGlobalTotalNewL4Connections'    =>  array('numeric' => '3',  'descr' => ''),
-    'axAppGlobalTotalNewL7Connections'    =>  array('numeric' => '4',  'descr' => ''),
-    'axAppGlobalTotalNewIPNatConnections' =>  array('numeric' => '5',  'descr' => ''),
-    'axAppGlobalTotalSSLConnections'      =>  array('numeric' => '6',  'descr' => ''),
-    'axAppGlobalTotalL7Requests'          =>  array('numeric' => '7',  'descr' => ''),
-    'axAppGlobalBufferConfigLimit'        =>  array('numeric' => '6',  'descr' => '', 'ds_type' => 'GAUGE'),
-    'axAppGlobalBufferCurrentUsage'       =>  array('numeric' => '7',  'descr' => '', 'ds_type' => 'GAUGE'),
-  )
-);
+$table_defs['A10-AX-MIB']['axAppGlobalStats'] = [
+  'table'     => 'axAppGlobals',
+  'numeric'   => '.1.3.6.1.4.1.22610.2.4.3.1.2',
+  'mib'       => 'A10-AX-MIB',
+  'mib_dir'   => 'a10',
+  //  'file'       => 'axAppGlobalStats.rrd',
+  'descr'     => 'A10 Global Statistics',
+  'graphs'    => ['axAppGlobalCurConns', 'axAppGlobalTotConns', 'axAppTotL7Requests', 'axAppGlobalBuffers'],
+  'ds_rename' => ['axAppGlobal' => '', 'Connections' => 'Conns'],
+  'oids'      => [
+    'axAppGlobalTotalCurrentConnections'  => ['numeric' => '1', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'axAppGlobalTotalNewConnections'      => ['numeric' => '2', 'descr' => ''],
+    'axAppGlobalTotalNewL4Connections'    => ['numeric' => '3', 'descr' => ''],
+    'axAppGlobalTotalNewL7Connections'    => ['numeric' => '4', 'descr' => ''],
+    'axAppGlobalTotalNewIPNatConnections' => ['numeric' => '5', 'descr' => ''],
+    'axAppGlobalTotalSSLConnections'      => ['numeric' => '6', 'descr' => ''],
+    'axAppGlobalTotalL7Requests'          => ['numeric' => '7', 'descr' => ''],
+    'axAppGlobalBufferConfigLimit'        => ['numeric' => '6', 'descr' => '', 'ds_type' => 'GAUGE'],
+    'axAppGlobalBufferCurrentUsage'       => ['numeric' => '7', 'descr' => '', 'ds_type' => 'GAUGE'],
+  ]
+];
 
 ?>

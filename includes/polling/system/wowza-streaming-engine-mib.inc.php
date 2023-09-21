@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -20,19 +19,17 @@
 //WOWZA-STREAMING-ENGINE-MIB::serverCounterGetTimeRunning.1 = STRING: 4 days 0 hours 51 minutes 27 seconds
 //WOWZA-STREAMING-ENGINE-MIB::serverCounterGetVersion.1 = STRING: Wowza Streaming Engine 4 Monthly Edition 4.5.0.01 build18956
 
-$data   = snmp_get_multi_oid($device, 'serverCounterCreationTime.1', array(), 'WOWZA-STREAMING-ENGINE-MIB');
+$data = snmp_get_multi_oid($device, 'serverCounterCreationTime.1', [], 'WOWZA-STREAMING-ENGINE-MIB');
 
-if (is_array($data[1]))
-{
-  $polled = round($GLOBALS['exec_status']['endtime']);
+if (is_array($data[1])) {
+    $polled = round(snmp_endtime());
 
-  // Override sysDescr, since it empty for wowza
-  //$poll_device['sysDescr'] = $data[1]['serverCounterGetVersion'];
+    // Override sysDescr, since it empty for wowza
+    //$poll_device['sysDescr'] = $data[1]['serverCounterGetVersion'];
 
-  if ($data[1]['serverCounterCreationTime'] > 0)
-  {
-    $poll_device['device_uptime'] = $GLOBALS['exec_status']['endtime'] - ($data[1]['serverCounterCreationTime'] / 1000);
-  }
+    if ($data[1]['serverCounterCreationTime'] > 0) {
+        $poll_device['device_uptime'] = snmp_endtime() - ($data[1]['serverCounterCreationTime'] / 1000);
+    }
 }
 
 //EOF

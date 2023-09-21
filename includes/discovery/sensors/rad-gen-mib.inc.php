@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -68,81 +68,83 @@
 
 $physicalConnectorEntry = snmpwalk_multipart_oid($device, 'physicalConnectorEntry', [], 'RAD-GEN-MIB');
 print_debug_vars($physicalConnectorEntry);
-if (!snmp_status()) { return; }
+if (!snmp_status()) {
+    return;
+}
 
 $oids = snmpwalk_multipart_oid($device, 'optPrtMonitorEntry', [], 'RAD-GEN-MIB');
 print_debug_vars($oids);
 
-foreach ($physicalConnectorEntry as $ifIndex => $entry)
-{
-  if ($entry['portDdmSupport'] != 'yes' || !isset($oids[$ifIndex]['actual'])) { continue; }
+foreach ($physicalConnectorEntry as $ifIndex => $entry) {
+    if ($entry['portDdmSupport'] != 'yes' || !isset($oids[$ifIndex]['actual'])) {
+        continue;
+    }
 
-  $index = $ifIndex . '.1'
-  ;
-  $entry['ifIndex'] = $ifIndex;
-  $entry['index']   = $index;
-  if (isset($oids[$ifIndex]['actual'])) {
-    $entry = array_merge($entry, $oids[$ifIndex]['actual']);
-  }
-  print_debug_vars($entry);
+    $index            = $ifIndex . '.1';
+    $entry['ifIndex'] = $ifIndex;
+    $entry['index']   = $index;
+    if (isset($oids[$ifIndex]['actual'])) {
+        $entry = array_merge($entry, $oids[$ifIndex]['actual']);
+    }
+    print_debug_vars($entry);
 
-  $match = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%' ]];
-  $options = entity_measured_match_definition($device, $match, $entry);
-  //print_debug_vars($options);
+    $match   = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%']];
+    $options = entity_measured_match_definition($device, $match, $entry);
+    //print_debug_vars($options);
 
-  $name = $options['port_label'];
-  $name_ext = " ({$entry['portMfgName']} {$entry['portVendorPartNo']} {$entry['physicalConnectorString']})";
+    $name     = $options['port_label'];
+    $name_ext = " ({$entry['portMfgName']} {$entry['portVendorPartNo']} {$entry['physicalConnectorString']})";
 
-  // Temperature
-  $descr     = $name . ' Temperature' . $name_ext;
-  $class     = 'temperature';
-  $oid_name  = 'optPrtMonitorLaserTemp';
-  $oid_num   = '.1.3.6.1.4.1.164.6.2.15.8.1.1.5.'.$index;
-  $scale     = 0.01;
-  $value     = $entry[$oid_name];
+    // Temperature
+    $descr    = $name . ' Temperature' . $name_ext;
+    $class    = 'temperature';
+    $oid_name = 'optPrtMonitorLaserTemp';
+    $oid_num  = '.1.3.6.1.4.1.164.6.2.15.8.1.1.5.' . $index;
+    $scale    = 0.01;
+    $value    = $entry[$oid_name];
 
-  // Limits (actually this is min/max)
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    // Limits (actually this is min/max)
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 
-  // Tx Bias
-  $descr     = $name . ' Tx Bias' . $name_ext;
-  $class     = 'current';
-  $oid_name  = 'optPrtMonitorLaserBias';
-  $oid_num   = '.1.3.6.1.4.1.164.6.2.15.8.1.1.4.'.$index;
-  $scale     = 0.000001;
-  $value     = $entry[$oid_name];
+    // Tx Bias
+    $descr    = $name . ' Tx Bias' . $name_ext;
+    $class    = 'current';
+    $oid_name = 'optPrtMonitorLaserBias';
+    $oid_num  = '.1.3.6.1.4.1.164.6.2.15.8.1.1.4.' . $index;
+    $scale    = 0.000001;
+    $value    = $entry[$oid_name];
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 
-  // Tx Power
-  $descr     = $name . ' Tx Power' . $name_ext;
-  $class     = 'dbm';
-  $oid_name  = 'optPrtMonitorTxPower';
-  $oid_num   = '.1.3.6.1.4.1.164.6.2.15.8.1.1.3.'.$index;
-  $scale     = 0.01;
-  $value     = $entry[$oid_name];
+    // Tx Power
+    $descr    = $name . ' Tx Power' . $name_ext;
+    $class    = 'dbm';
+    $oid_name = 'optPrtMonitorTxPower';
+    $oid_num  = '.1.3.6.1.4.1.164.6.2.15.8.1.1.3.' . $index;
+    $scale    = 0.01;
+    $value    = $entry[$oid_name];
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 
-  // Rx Power
-  $descr     = $name . ' Rx Power' . $name_ext;
-  $class     = 'dbm';
-  $oid_name  = 'optPrtMonitorRxPower';
-  $oid_num   = '.1.3.6.1.4.1.164.6.2.15.8.1.1.6.'.$index;
-  $scale     = 0.01;
-  $value     = $entry[$oid_name];
+    // Rx Power
+    $descr    = $name . ' Rx Power' . $name_ext;
+    $class    = 'dbm';
+    $oid_name = 'optPrtMonitorRxPower';
+    $oid_num  = '.1.3.6.1.4.1.164.6.2.15.8.1.1.6.' . $index;
+    $scale    = 0.01;
+    $value    = $entry[$oid_name];
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 
-  // Voltage
-  $descr     = $name . ' Voltage' . $name_ext;
-  $class     = 'voltage';
-  $oid_name  = 'optPrtMonitorSupplyVoltage';
-  $oid_num   = '.1.3.6.1.4.1.164.6.2.15.8.1.1.7.'.$index;
-  $scale     = 0.01;
-  $value     = $entry[$oid_name];
+    // Voltage
+    $descr    = $name . ' Voltage' . $name_ext;
+    $class    = 'voltage';
+    $oid_name = 'optPrtMonitorSupplyVoltage';
+    $oid_num  = '.1.3.6.1.4.1.164.6.2.15.8.1.1.7.' . $index;
+    $scale    = 0.01;
+    $value    = $entry[$oid_name];
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 
 }
 

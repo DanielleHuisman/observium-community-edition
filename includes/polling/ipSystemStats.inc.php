@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -62,68 +62,76 @@
 // This code means you can't disable IP-MIB from the web interface and have it actually work.
 if (!in_array("IP-MIB", get_device_mibs_blacklist($device))) // Skip blacklisted MIB
 {
-  print_cli_data("Collecting", 'ipSystemStats', 2);
+    print_cli_data("Collecting", 'ipSystemStats', 2);
 
-  $ipSystemStats = snmpwalk_cache_oid($device, "ipSystemStats", NULL, "IP-MIB");
+    $ipSystemStats = snmpwalk_cache_oid($device, "ipSystemStats", NULL, "IP-MIB");
 
-  if ($ipSystemStats)
-  {
-    print_cli_data_field("Address Families", 2);
+    if ($ipSystemStats) {
+        print_cli_data_field("Address Families", 2);
 
-    foreach ($ipSystemStats as $af => $stats)
-    {
-      echo(" $af");
+        foreach ($ipSystemStats as $af => $stats) {
+            echo(" $af");
 
-      $oids = array('ipSystemStatsInReceives','ipSystemStatsInHdrErrors','ipSystemStatsInAddrErrors','ipSystemStatsInUnknownProtos','ipSystemStatsInForwDatagrams','ipSystemStatsReasmReqds',
-                    'ipSystemStatsReasmOKs','ipSystemStatsReasmFails','ipSystemStatsInDiscards','ipSystemStatsInDelivers','ipSystemStatsOutRequests','ipSystemStatsOutNoRoutes','ipSystemStatsOutDiscards',
-                    'ipSystemStatsOutFragFails','ipSystemStatsOutFragCreates','ipSystemStatsOutForwDatagrams');
+            $oids = ['ipSystemStatsInReceives', 'ipSystemStatsInHdrErrors', 'ipSystemStatsInAddrErrors', 'ipSystemStatsInUnknownProtos', 'ipSystemStatsInForwDatagrams', 'ipSystemStatsReasmReqds',
+                     'ipSystemStatsReasmOKs', 'ipSystemStatsReasmFails', 'ipSystemStatsInDiscards', 'ipSystemStatsInDelivers', 'ipSystemStatsOutRequests', 'ipSystemStatsOutNoRoutes', 'ipSystemStatsOutDiscards',
+                     'ipSystemStatsOutFragFails', 'ipSystemStatsOutFragCreates', 'ipSystemStatsOutForwDatagrams'];
 
-      // Use HC counters instead if they're available.
-      if (isset($stats['ipSystemStatsHCInReceives']))       { $stats['ipSystemStatsInReceives']       = $stats['ipSystemStatsHCInReceives']; }
-      if (isset($stats['ipSystemStatsHCInForwDatagrams']))  { $stats['ipSystemStatsInForwDatagrams']  = $stats['ipSystemStatsHCInForwDatagrams']; }
-      if (isset($stats['ipSystemStatsHCInDelivers']))       { $stats['ipSystemStatsInDelivers']       = $stats['ipSystemStatsHCInDelivers']; }
-      if (isset($stats['ipSystemStatsHCOutRequests']))      { $stats['ipSystemStatsOutRequests']      = $stats['ipSystemStatsHCOutRequests']; }
-      if (isset($stats['ipSystemStatsHCOutForwDatagrams'])) { $stats['ipSystemStatsOutForwDatagrams'] = $stats['ipSystemStatsHCOutForwDatagrams']; }
+            // Use HC counters instead if they're available.
+            if (isset($stats['ipSystemStatsHCInReceives'])) {
+                $stats['ipSystemStatsInReceives'] = $stats['ipSystemStatsHCInReceives'];
+            }
+            if (isset($stats['ipSystemStatsHCInForwDatagrams'])) {
+                $stats['ipSystemStatsInForwDatagrams'] = $stats['ipSystemStatsHCInForwDatagrams'];
+            }
+            if (isset($stats['ipSystemStatsHCInDelivers'])) {
+                $stats['ipSystemStatsInDelivers'] = $stats['ipSystemStatsHCInDelivers'];
+            }
+            if (isset($stats['ipSystemStatsHCOutRequests'])) {
+                $stats['ipSystemStatsOutRequests'] = $stats['ipSystemStatsHCOutRequests'];
+            }
+            if (isset($stats['ipSystemStatsHCOutForwDatagrams'])) {
+                $stats['ipSystemStatsOutForwDatagrams'] = $stats['ipSystemStatsHCOutForwDatagrams'];
+            }
 
-      unset($snmpstring, $rrdupdate, $snmpdata, $snmpdata_cmd, $rrd_create);
+            unset($snmpstring, $rrdupdate, $snmpdata, $snmpdata_cmd, $rrd_create);
 
-      $rrdfile = "ipSystemStats-$af.rrd";
+            $rrdfile = "ipSystemStats-$af.rrd";
 
-      $rrdupdate = "N";
+            $rrdupdate = "N";
 
-      foreach ($oids as $oid)
-      {
-        $oid_ds = str_replace("ipSystemStats", "", $oid);
-        $oid_ds = truncate($oid_ds, 19, '');
-        $rrd_create .= " DS:$oid_ds:COUNTER:600:U:100000000000";
-        if (strstr($stats[$oid], "No") || strstr($stats[$oid], "d") || strstr($stats[$oid], "s")) { $stats[$oid] = "0"; }
-        $rrdupdate  .= ":".$stats[$oid];
+            foreach ($oids as $oid) {
+                $oid_ds     = str_replace("ipSystemStats", "", $oid);
+                $oid_ds     = truncate($oid_ds, 19, '');
+                $rrd_create .= " DS:$oid_ds:COUNTER:600:U:100000000000";
+                if (strstr($stats[$oid], "No") || strstr($stats[$oid], "d") || strstr($stats[$oid], "s")) {
+                    $stats[$oid] = "0";
+                }
+                $rrdupdate .= ":" . $stats[$oid];
 
-        // Update StatsD/Carbon
-        if ($config['statsd']['enable'] == TRUE && !strpos($oid, "HC"))
-        {
-          StatsD::gauge(str_replace(".", "_", $device['hostname']).'.'.'system'.'.'.$oid, $stats[$oid]);
+                // Update StatsD/Carbon
+                if ($config['statsd']['enable'] == TRUE && !strpos($oid, "HC")) {
+                    StatsD ::gauge(str_replace(".", "_", $device['hostname']) . '.' . 'system' . '.' . $oid, $stats[$oid]);
+                }
+            }
+
+            rrdtool_create($device, $rrdfile, $rrd_create);
+            rrdtool_update($device, $rrdfile, $rrdupdate);
+
+            unset($rrdupdate, $rrd_create);
+
+            // FIXME per-AF?
+
+            $graphs['ipsystemstats_' . $af]           = TRUE;
+            $graphs['ipsystemstats_' . $af . '_frag'] = TRUE;
+
+            $show_graphs[] = 'ipsystemstats_' . $af;
+            $show_graphs[] = 'ipsystemstats_' . $af . '_frag';
         }
-      }
 
-      rrdtool_create($device,$rrdfile,$rrd_create);
-      rrdtool_update($device, $rrdfile, $rrdupdate);
+        echo(PHP_EOL);
 
-      unset($rrdupdate, $rrd_create);
-
-      // FIXME per-AF?
-
-      $graphs['ipsystemstats_'.$af] = TRUE;
-      $graphs['ipsystemstats_'.$af.'_frag'] = TRUE;
-
-      $show_graphs[] = 'ipsystemstats_'.$af;
-      $show_graphs[] = 'ipsystemstats_'.$af.'_frag';
+        print_cli_data("Graphs", implode(" ", $show_graphs), 2);
     }
-
-    echo(PHP_EOL);
-
-    print_cli_data("Graphs",  implode(" ", $show_graphs), 2);
-  }
 }
 unset($show_graphs);
 

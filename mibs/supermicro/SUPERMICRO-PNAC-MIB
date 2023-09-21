@@ -1,0 +1,809 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fspnac.mib,v 1.15 2012/09/07 09:52:05 siva Exp $
+
+-- PNAC Proprietary MIB Definition 
+ 
+-- This document explains the proprietary MIB implemented 
+-- for PNAC product. 
+ 
+-- This proprietary MIB definition, supplements the standard IEEE802.1X  
+-- MIB and also provides management of certain proprietary features of 
+-- PNAC.  
+ 
+-- This MIB contains tables used to configure the ports of host running 
+-- PNAC, for its MAC based Authentication operation. Such a 
+-- Authenticaion method permits the authenticated operation of hosts in  
+-- shared media LANs. 
+ 
+-- The proprietary MIB definitions follows: 
+ 
+ 
+   SUPERMICRO-PNAC-MIB DEFINITIONS ::= BEGIN 
+ 
+   IMPORTS 
+      MODULE-IDENTITY, OBJECT-TYPE, Counter32, Unsigned32, 
+      enterprises, Integer32, TimeTicks, Counter64,
+      NOTIFICATION-TYPE                        FROM SNMPv2-SMI
+      RowStatus, TruthValue, MacAddress, 
+      TEXTUAL-CONVENTION, DisplayString        FROM SNMPv2-TC 
+      SnmpAdminString                          FROM SNMP-FRAMEWORK-MIB 
+      PortList                                 FROM Q-BRIDGE-MIB 
+      dot1xAuthOperControlledDirections, PaeControlledPortStatus FROM IEEE8021-PAE-MIB
+      InterfaceIndex                           FROM IF-MIB; 
+ 
+      fspnac MODULE-IDENTITY 
+         LAST-UPDATED "201209050000Z" 
+         ORGANIZATION "Super Micro Computer Inc." 
+         CONTACT-INFO "support@Supermicro.com" 
+         DESCRIPTION 
+            " The proprietary MIB module for PNAC. " 
+	 REVISION "201209050000Z"
+         DESCRIPTION 
+            " The proprietary MIB module for PNAC. " 
+      ::=  { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 64 } 
+ 
+-- ---------------------------------------------------------- -- 
+-- Textual Conventions 
+-- ---------------------------------------------------------- -- 
+ 
+ 
+       AuthenticMethod ::= TEXTUAL-CONVENTION 
+          STATUS      current 
+          DESCRIPTION 
+             "The Authentication method is using Remote Authentication 
+             Server or Local Authentication Server." 
+          SYNTAX      INTEGER { 
+                          remoteServer(1), 
+                          localServer(2) 
+                      } 
+ 
+       RemoteAuthServerType ::= TEXTUAL-CONVENTION 
+          STATUS      current 
+          DESCRIPTION 
+             "This indicates which Remote Server is to provide the 
+              authentication. Currently supported servers are RADIUS
+              Server and Terminal Access Controller Access-Control 
+              System Plus (TACACS+) Server." 
+          SYNTAX      INTEGER {                           
+                          radiusServer(1), 
+                          tacacsplusServer(2) 
+                      } 
+
+       PermissionType ::= TEXTUAL-CONVENTION 
+          STATUS      current 
+          DESCRIPTION 
+             "The permission values." 
+          SYNTAX       INTEGER { 
+                           allow(1), 
+                           deny(2) 
+                       } 
+ 
+-- ------------------------------------------------------------  
+-- groups in the MIB  
+-- ------------------------------------------------------------ 
+ 
+      fsPnacPaeSystem         OBJECT IDENTIFIER ::= { fspnac 1 } 
+      fsPnacPaeAuthenticator  OBJECT IDENTIFIER ::= { fspnac 2 } 
+      fsPnacAuthServer        OBJECT IDENTIFIER ::= { fspnac 3 } 
+      fsPnacTrapObjects       OBJECT IDENTIFIER ::= { fspnac 4 }
+      fsPnacNotifications     OBJECT IDENTIFIER ::= { fspnac 5 }
+ 
+-- ------------------------------------------------------------------ 
+ 
+ 
+-- ------------------------------------------------------------------ 
+-- The Pae System Group 
+-- ------------------------------------------------------------------ 
+ 
+      fsPnacSystemControl OBJECT-TYPE 
+          SYNTAX      INTEGER { 
+                        start (1),    
+                        shutdown (2)  
+                     } 
+          MAX-ACCESS  read-write 
+          STATUS      current 
+          DESCRIPTION  
+               "Starts or shutdowns PNAC Module in the system. 
+ 
+                When set as 'start',resources required by PNAC 
+                module are allocated & PNAC module starts running. 
+ 
+                When shutdown, all resources used by PNAC module 
+                will be released to the system." 
+           ::= { fsPnacPaeSystem 1 } 
+
+      fsPnacTraceOption OBJECT-TYPE 
+           SYNTAX      Integer32 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "This object is used to enable Trace Statements in  
+                Network Access Control Module. 
+ 
+                A FOUR BYTE integer is used for enabling the level of tracing.  
+                Each BIT in the four byte integer, represents a particular  
+                level of Trace.  
+                  
+                The maping between the bit positions & the level of trace is  
+                as follows:  
+                        0 - Init and Shutdown Traces 
+                        1 - Management Traces 
+                        2 - Data Path Traces 
+                        3 - Control Plane Traces 
+                        4 - Packet Dump Traces 
+                        5 - Traces related to All Resources except Buffers 
+                        6 - All Failure Traces 
+                        7 - Buffer Traces 
+ 
+                The remaining bits are unused. Combination of levels are  
+                also allowed. 
+ 
+                For example if the bits 0 and 1 are set, then the Trace 
+                statements related to Init-Shutdown and management  
+                will be printed. 
+ 
+              The user has to enter the corresponding INTEGER VALUE for the 
+                bits set. For example if bits 0 and 1 are set then user has to  
+                give the value 3." 
+        DEFVAL  { 0 } 
+        ::= { fsPnacPaeSystem 2 } 
+ 
+      fsPnacAuthenticServer OBJECT-TYPE 
+          SYNTAX      AuthenticMethod 
+          MAX-ACCESS  read-write 
+          STATUS      current 
+          DESCRIPTION 
+              "This object is used to configure for the choice of  
+              local or remote Authentication Server to be used by 
+              the Authenticator for its authentication services." 
+           ::= { fsPnacPaeSystem 3 } 
+            
+      fsPnacNasId OBJECT-TYPE 
+          SYNTAX      DisplayString(SIZE(0..16)) 
+          MAX-ACCESS  read-write 
+          STATUS      current 
+          DESCRIPTION  
+              "This object is the Network Access Server Identifier 
+              to be presented before the remote Authentication 
+              Server." 
+          ::= { fsPnacPaeSystem 4 } 
+ 
+ 
+-- Pae Port Table extensions 
+ 
+ 
+      fsPnacPaePortTable OBJECT-TYPE 
+          SYNTAX      SEQUENCE OF FsPnacPaePortEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "A table of system level information for each port 
+             supported by the PNAC. An entry appears in this 
+             table for each port of this system. This table is an 
+             extension of dot1xPaePortTable of IEEE 802.1x MIB." 
+          ::= { fsPnacPaeSystem 5 } 
+ 
+ 
+      fsPnacPaePortEntry OBJECT-TYPE 
+          SYNTAX      FsPnacPaePortEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "Configuration as port based or MAC based authentication 
+             and Supplicant count on a port. Index to this table is 
+             same as that of the dot1xPaePortTable, which is the 
+             InterfaceIndex." 
+          INDEX { fsPnacPaePortNumber } 
+          ::= { fsPnacPaePortTable 1 } 
+ 
+ 
+      FsPnacPaePortEntry ::= 
+          SEQUENCE { 
+             fsPnacPaePortNumber 
+                 InterfaceIndex, 
+             fsPnacPaePortAuthMode 
+                 INTEGER, 
+             fsPnacPaePortSupplicantCount 
+                 Counter32, 
+             fsPnacPaePortUserName 
+                 DisplayString, 
+             fsPnacPaePortPassword 
+                 DisplayString, 
+             fsPnacPaePortStatus    
+                 INTEGER 
+          } 
+ 
+ 
+      fsPnacPaePortNumber OBJECT-TYPE 
+           SYNTAX      InterfaceIndex 
+           MAX-ACCESS  not-accessible 
+           STATUS      current 
+           DESCRIPTION 
+               "The port number associated with this port." 
+           ::= { fsPnacPaePortEntry 1 } 
+ 
+ 
+      fsPnacPaePortAuthMode OBJECT-TYPE 
+           SYNTAX      INTEGER { 
+                           portBased(1), 
+                           macBased(2) 
+                       } 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "Configuration of the port, for Port Based  
+               Authentication or MAC Based Authentication." 
+           ::= { fsPnacPaePortEntry 2 } 
+ 
+ 
+      fsPnacPaePortSupplicantCount OBJECT-TYPE 
+           SYNTAX      Counter32 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Number of Supplicants connected in the port." 
+           ::= { fsPnacPaePortEntry 3 } 
+ 
+ 
+      fsPnacPaePortUserName OBJECT-TYPE 
+           SYNTAX      DisplayString (SIZE(4..63)) 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "User name to be used in this port, while operating 
+               as a Supplicant." 
+           ::= { fsPnacPaePortEntry 4 } 
+ 
+ 
+      fsPnacPaePortPassword OBJECT-TYPE 
+           SYNTAX      DisplayString (SIZE(4..20)) 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "User password to be used in this port, while 
+               operating as a Supplicant." 
+           ::= { fsPnacPaePortEntry 5 } 
+ 
+      fsPnacPaePortStatus OBJECT-TYPE 
+           SYNTAX      PaeControlledPortStatus 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "The value of the combined Port status." 
+           ::= { fsPnacPaePortEntry 6 } 
+ 
+-- ------------------------------------------------------------------ 
+-- The Pae System Group again 
+-- ------------------------------------------------------------------ 
+      fsPnacModuleOperStatus OBJECT-TYPE 
+            SYNTAX       INTEGER { 
+                             enabled(1),  
+                             disabled(2)   
+                          } 
+            MAX-ACCESS    read-only 
+            STATUS        current 
+            DESCRIPTION 
+            "This read only objects gives actual status of the PNAC Module 
+            (Operational status of module). When Module is enabled 
+            PNAC protocol starts functioning. When the module is disabled 
+            all the dynamically allocated memory will be freed and PNAC 
+            protocol stops functioning."
+            ::= { fsPnacPaeSystem 6 } 
+
+      fsPnacRemoteAuthServerType OBJECT-TYPE 
+          SYNTAX      RemoteAuthServerType 
+          MAX-ACCESS  read-write 
+          STATUS      current 
+          DESCRIPTION 
+              "This object is used by the Authenticator for its 
+              authentication services, to configure the choice of  
+              RADIUS or TACACS+ remote authentication servers when
+              the authentication method is through a remote server,
+              that is, this object can be configured only if 
+              fsPnacAuthenticServer is set to remoteServer." 
+        DEFVAL  { 1 } 
+        ::= { fsPnacPaeSystem 7 } 
+-- ------------------------------------------------------------------ 
+-- The Pae Authenticator Group  
+-- ------------------------------------------------------------------ 
+ 
+-- Authenticator Session Table 
+ 
+      fsPnacAuthSessionTable OBJECT-TYPE 
+          SYNTAX      SEQUENCE OF FsPnacAuthSessionEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "This table contains authentication session information 
+             associated with each Supplicant while Authenticator 
+             operates in MAC based authentication mode." 
+          ::= { fsPnacPaeAuthenticator 1 } 
+ 
+ 
+      fsPnacAuthSessionEntry OBJECT-TYPE 
+          SYNTAX      FsPnacAuthSessionEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "Supplicant's MAC address and session ID, states of 
+             Authenticator state machine and Backend state machine 
+             for the session." 
+          INDEX { fsPnacAuthSessionSuppAddress } 
+          ::= { fsPnacAuthSessionTable 1 } 
+ 
+ 
+      FsPnacAuthSessionEntry ::= 
+          SEQUENCE { 
+             fsPnacAuthSessionSuppAddress 
+                 MacAddress, 
+             fsPnacAuthSessionIdentifier 
+                 Integer32, 
+             fsPnacAuthSessionAuthPaeState 
+                 INTEGER, 
+             fsPnacAuthSessionBackendAuthState 
+                 INTEGER, 
+             fsPnacAuthSessionPortStatus 
+                 INTEGER, 
+             fsPnacAuthSessionPortNumber 
+                 InterfaceIndex, 
+             fsPnacAuthSessionInitialize 
+                 TruthValue, 
+             fsPnacAuthSessionReauthenticate 
+                 TruthValue 
+          } 
+ 
+      fsPnacAuthSessionSuppAddress OBJECT-TYPE 
+           SYNTAX      MacAddress 
+           MAX-ACCESS  not-accessible 
+           STATUS      current 
+           DESCRIPTION 
+               "MAC address of the supplicant for this session." 
+           ::= { fsPnacAuthSessionEntry 1 } 
+ 
+ 
+      fsPnacAuthSessionIdentifier OBJECT-TYPE 
+           SYNTAX      Integer32 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Session identifier of the supplicant for this  
+               session." 
+           ::= { fsPnacAuthSessionEntry 2 } 
+ 
+ 
+      fsPnacAuthSessionAuthPaeState OBJECT-TYPE 
+           SYNTAX      INTEGER { 
+                           initialize(1), 
+                           disconnected(2), 
+                           connecting(3), 
+                           authenticating(4), 
+                           authenticated(5), 
+                           aborting(6), 
+                           held(7), 
+                           forceAuth(8), 
+                           forceUnauth(9) 
+                       } 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Authenticator state machine's state for this  
+               session." 
+           ::= { fsPnacAuthSessionEntry 3 } 
+ 
+ 
+      fsPnacAuthSessionBackendAuthState OBJECT-TYPE 
+           SYNTAX      INTEGER { 
+                           request(1), 
+                           response(2), 
+                           success(3), 
+                           fail(4), 
+                           timeout(5), 
+                           idle(6), 
+                           initialize(7) 
+                       } 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Backend state machine's state for this session." 
+           ::= { fsPnacAuthSessionEntry 4 } 
+ 
+ 
+      fsPnacAuthSessionPortStatus OBJECT-TYPE 
+           SYNTAX      PaeControlledPortStatus 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "The current value of the controlled Port status 
+               parameter for this session." 
+           ::= { fsPnacAuthSessionEntry 5 } 
+ 
+ 
+      fsPnacAuthSessionPortNumber OBJECT-TYPE 
+           SYNTAX      InterfaceIndex 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "The Port in which this session is proceeding." 
+           ::= { fsPnacAuthSessionEntry 6 } 
+ 
+ 
+      fsPnacAuthSessionInitialize OBJECT-TYPE 
+           SYNTAX      TruthValue 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "The initialization control for this Supplicant MAC 
+               address. Setting this attribute TRUE causes the 
+               Supplicant session with this MAC address, to be  
+               initialized. The attribute value reverts to FALSE  
+               once initialization has completed." 
+           ::= { fsPnacAuthSessionEntry 7 } 
+ 
+ 
+      fsPnacAuthSessionReauthenticate OBJECT-TYPE 
+           SYNTAX      TruthValue 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "The reauthentication control for this Supplicant MAC 
+               address. Setting this attribute TRUE causes the  
+               Authenticator PAE state machine for this MAC address 
+               to reauthenticate the Supplicant. Setting this  
+               attribute FALSE has no effect.  
+               This attribute always returns FALSE when it is read." 
+           ::= { fsPnacAuthSessionEntry 8 } 
+ 
+ 
+ 
+-- Authenticator Session Statistics Table 
+ 
+      fsPnacAuthSessionStatsTable OBJECT-TYPE 
+          SYNTAX      SEQUENCE OF FsPnacAuthSessionStatsEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "This table contains the session statistics  
+             for the Authenticator PAE associated with each  
+             Supplicant,while Authenticator operates in  MAC 
+             based authentication mode." 
+          ::= { fsPnacPaeAuthenticator 2 } 
+ 
+ 
+      fsPnacAuthSessionStatsEntry OBJECT-TYPE 
+          SYNTAX      FsPnacAuthSessionStatsEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "The session statistics information for an 
+             Authenticator PAE. This shows the current values being 
+             collected for each session that is still in progress, 
+             or the final values for the last valid session on each 
+             port where there is no session currently active." 
+          INDEX { fsPnacAuthSessionSuppAddress } 
+          ::= { fsPnacAuthSessionStatsTable 1 } 
+ 
+ 
+      FsPnacAuthSessionStatsEntry ::= 
+          SEQUENCE { 
+             fsPnacAuthSessionOctetsRx 
+                 Counter64, 
+             fsPnacAuthSessionOctetsTx 
+                 Counter64, 
+             fsPnacAuthSessionFramesRx 
+                 Counter32, 
+             fsPnacAuthSessionFramesTx 
+                 Counter32, 
+             fsPnacAuthSessionId 
+                 SnmpAdminString, 
+             fsPnacAuthSessionAuthenticMethod 
+                 INTEGER, 
+             fsPnacAuthSessionTime 
+                 TimeTicks, 
+             fsPnacAuthSessionTerminateCause 
+                 INTEGER, 
+             fsPnacAuthSessionUserName 
+                 SnmpAdminString 
+          } 
+ 
+ 
+      fsPnacAuthSessionOctetsRx OBJECT-TYPE 
+           SYNTAX      Counter64 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Counts number of session octets received." 
+           ::= { fsPnacAuthSessionStatsEntry 1 } 
+ 
+ 
+      fsPnacAuthSessionOctetsTx OBJECT-TYPE 
+           SYNTAX      Counter64 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Counts number of session octets transmitted." 
+           ::= { fsPnacAuthSessionStatsEntry 2 } 
+ 
+ 
+      fsPnacAuthSessionFramesRx OBJECT-TYPE 
+           SYNTAX      Counter32 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Counts number of session frames received." 
+           ::= { fsPnacAuthSessionStatsEntry 3 } 
+ 
+ 
+      fsPnacAuthSessionFramesTx OBJECT-TYPE 
+           SYNTAX      Counter32 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Counts number of session frames transmitted." 
+           ::= { fsPnacAuthSessionStatsEntry 4 } 
+ 
+ 
+      fsPnacAuthSessionId OBJECT-TYPE 
+           SYNTAX      SnmpAdminString 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "A unique Session identifier, in the form of a 
+               printable ASCII string of at least three characters." 
+           ::= { fsPnacAuthSessionStatsEntry 5 } 
+ 
+ 
+      fsPnacAuthSessionAuthenticMethod OBJECT-TYPE 
+           SYNTAX      INTEGER { 
+                           remoteAuthServer(1), 
+                           localAuthServer(2) 
+                       } 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Authentication method used to establish the  
+               session." 
+           ::= { fsPnacAuthSessionStatsEntry 6 } 
+ 
+ 
+      fsPnacAuthSessionTime OBJECT-TYPE 
+           SYNTAX      TimeTicks 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Duration of the session in seconds." 
+           ::= { fsPnacAuthSessionStatsEntry 7 } 
+ 
+ 
+      fsPnacAuthSessionTerminateCause OBJECT-TYPE 
+           SYNTAX      INTEGER { 
+                           supplicantLogoff(1), 
+                           portFailure(2), 
+                           supplicantRestart(3), 
+                           reauthFailed(4), 
+                           authControlForceUnauth(5), 
+                           portReInit(6), 
+                           portAdminDisabled(7), 
+                           notTerminatedYet(999) 
+                       } 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Reason for the session termination." 
+           ::= { fsPnacAuthSessionStatsEntry 8 } 
+ 
+ 
+      fsPnacAuthSessionUserName OBJECT-TYPE 
+           SYNTAX      SnmpAdminString 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "User name representing the identity of the  
+               Supplicant PAE." 
+           ::= { fsPnacAuthSessionStatsEntry 9 } 
+ 
+-- ------------------------------------------------------------------ 
+-- The Authentication Server Group  
+-- ------------------------------------------------------------------ 
+ 
+-- PNAC Local Authentication Server User Configuration Table 
+ 
+      fsPnacASUserConfigTable OBJECT-TYPE 
+          SYNTAX      SEQUENCE OF FsPnacASUserConfigEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "This table contains authentication related User 
+             configuration information maintained by PNAC 
+             local Authentication Server." 
+          ::= { fsPnacAuthServer 1 } 
+ 
+ 
+      fsPnacASUserConfigEntry OBJECT-TYPE 
+          SYNTAX      FsPnacASUserConfigEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "Each entry contains User name, Password, Authentication  
+             protocol used, Authenticated session timeout and Access 
+             ports list of the User seeking authentication." 
+          INDEX { fsPnacASUserConfigUserName } 
+          ::= { fsPnacASUserConfigTable 1 } 
+ 
+ 
+      FsPnacASUserConfigEntry ::= 
+          SEQUENCE { 
+             fsPnacASUserConfigUserName 
+                 OCTET STRING, 
+             fsPnacASUserConfigPassword 
+                 DisplayString, 
+             fsPnacASUserConfigAuthProtocol 
+                 Unsigned32, 
+             fsPnacASUserConfigAuthTimeout 
+                 Unsigned32, 
+             fsPnacASUserConfigPortList 
+                 PortList, 
+             fsPnacASUserConfigPermission 
+                 PermissionType, 
+             fsPnacASUserConfigRowStatus 
+                 RowStatus 
+          } 
+ 
+ 
+      fsPnacASUserConfigUserName OBJECT-TYPE 
+           SYNTAX      OCTET STRING (SIZE(0..115))
+           MAX-ACCESS  not-accessible 
+           STATUS      current 
+           DESCRIPTION 
+               "Identity of the User seeking authentication. A string 
+               of not more than 20 printable characters." 
+           ::= { fsPnacASUserConfigEntry 1 } 
+ 
+ 
+      fsPnacASUserConfigPassword OBJECT-TYPE 
+           SYNTAX      DisplayString (SIZE(1..20)) 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "The secret Password of the User. A string of not 
+               more than 20 printable characters.
+           
+               When read, this always returns a String 
+               of length zero."
+           ::= { fsPnacASUserConfigEntry 2 } 
+ 
+            
+      fsPnacASUserConfigAuthProtocol OBJECT-TYPE 
+           SYNTAX      Unsigned32 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "The Authentication protocol supported for the User." 
+           ::= { fsPnacASUserConfigEntry 3 } 
+ 
+  
+      fsPnacASUserConfigAuthTimeout OBJECT-TYPE 
+           SYNTAX      Unsigned32 
+           MAX-ACCESS  read-write 
+           STATUS      current 
+           DESCRIPTION 
+               "The time in seconds after which the Authentication  
+               offerred to the User ceases. Maximum value of the 
+               object can be 7200 seconds. When the object value 
+               is 0, the ReAuthPeriod of the Authenticator port is 
+               used by Authenticator." 
+           ::= { fsPnacASUserConfigEntry 4 } 
+ 
+ 
+      fsPnacASUserConfigPortList OBJECT-TYPE 
+            SYNTAX     PortList 
+            MAX-ACCESS read-write 
+            STATUS     current 
+            DESCRIPTION 
+                "The complete set of ports of Authenticator to 
+                which the User is allowed or denied access, on the 
+                basis of setting of 'fsPnacASUserConfigPermission'  
+                object." 
+            ::= { fsPnacASUserConfigEntry 5 } 
+ 
+ 
+       fsPnacASUserConfigPermission OBJECT-TYPE 
+            SYNTAX      PermissionType 
+            MAX-ACCESS  read-write 
+            STATUS      current 
+            DESCRIPTION 
+                "For the set of ports indicated by  
+                'fsPnacASUserConfigPortList' object, the User is 
+                allowed access when this object is set 'allow' and  
+                is denied access when this object is set 'deny'." 
+            ::= { fsPnacASUserConfigEntry 6 } 
+      
+ 
+      fsPnacASUserConfigRowStatus OBJECT-TYPE 
+           SYNTAX      RowStatus 
+           MAX-ACCESS  read-create 
+           STATUS      current 
+           DESCRIPTION 
+               "The Row status of this entry." 
+           ::= { fsPnacASUserConfigEntry 7 } 
+ 
+-- ------------------------------------------------------------------ 
+-- Trap objects Group  
+-- ------------------------------------------------------------------ 
+ 
+-- PNAC MAC session trap object table 
+ 
+      fsPnacTrapAuthSessionTable OBJECT-TYPE 
+          SYNTAX      SEQUENCE OF FsPnacTrapAuthSessionEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "This table contains auth session status information
+             to be sent in trap notifications."
+          ::= { fsPnacTrapObjects 1 } 
+ 
+      fsPnacTrapAuthSessionEntry OBJECT-TYPE 
+          SYNTAX      FsPnacTrapAuthSessionEntry 
+          MAX-ACCESS  not-accessible 
+          STATUS      current 
+          DESCRIPTION 
+             "The session statistics information for an 
+             Authenticator PAE. This shows the current values being 
+             collected for each session that is still in progress, 
+             or the final values for the last valid session on each 
+             port where there is no session currently active." 
+          AUGMENTS { fsPnacAuthSessionEntry } 
+          ::= { fsPnacTrapAuthSessionTable 1 } 
+ 
+      FsPnacTrapAuthSessionEntry ::= 
+          SEQUENCE { 
+             fsPnacTrapAuthSessionStatus 
+                 INTEGER
+	  } 
+  
+      fsPnacTrapAuthSessionStatus OBJECT-TYPE 
+           SYNTAX      INTEGER { 
+                           createFailed(1), 
+                           deleteFailed(2), 
+                           entryPresent(3) 
+                       } 
+           MAX-ACCESS  read-only 
+           STATUS      current 
+           DESCRIPTION 
+               "Status of the MAC Auth session." 
+           ::= { fsPnacTrapAuthSessionEntry 1 } 
+ 
+ 
+-- ------------------------------------------------- 
+ 
+-- Notifications
+
+    fsPnacHwFailureTrap OBJECT IDENTIFIER ::= { fsPnacNotifications 0 }
+
+    fsPnacPortBasedHwFailureTrap NOTIFICATION-TYPE
+        OBJECTS { 
+                  fsPnacPaePortStatus,
+                  dot1xAuthOperControlledDirections 
+                }
+        STATUS      current
+        DESCRIPTION
+             "This notification is generated whenever a Hardware Operation for
+              based authentication is  failed. The information that are returned 
+              are 1. Port Authorization Status, 2. Port Oper Control Direction."
+           ::= { fsPnacHwFailureTrap 1 }
+
+    fsPnacMacBasedHwFailureTrap NOTIFICATION-TYPE
+        OBJECTS { 
+                  fsPnacAuthSessionPortNumber,
+                  fsPnacAuthSessionPortStatus,
+                  fsPnacTrapAuthSessionStatus
+                }
+        STATUS      current
+        DESCRIPTION
+             "This notification is generated whenever a Hardware Operation for
+              Port based authentication is failed. The information that are 
+              returned are 1. Port Number, 2. MAC Authorization Status, 
+              3. MAC entry status"
+           ::= { fsPnacHwFailureTrap 2 }
+
+ END 

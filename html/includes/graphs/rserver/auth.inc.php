@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,29 +6,28 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (is_numeric($vars['id']))
-{
-#  $auth= TRUE;
-  $rserver = dbFetchRow("SELECT * FROM `loadbalancer_rservers` WHERE `rserver_id` = ?", array($vars['id']));
+if (!is_intnum($vars['id'])) {
+    return;
+}
 
-  if (is_numeric($rserver['device_id']) && ($auth || device_permitted($rserver['device_id'])))
-  {
-    if ($rserver['state'])
-    {
-      $rserver = array_merge($rserver, json_decode($rserver['state'], TRUE));
-    }
+$rserver = dbFetchRow("SELECT * FROM `loadbalancer_rservers` WHERE `rserver_id` = ?", [$vars['id']]);
+
+if (is_numeric($rserver['device_id']) && ($auth || device_permitted($rserver['device_id']))) {
     $device = device_by_id_cache($rserver['device_id']);
+    if ($rserver['state']) {
+        $rserver = array_merge($rserver, safe_json_decode($rserver['state']));
+    }
 
-    $rrd_filename = get_rrd_path($device, "rserver-".$rserver['rserver_id'].".rrd");
+    $rrd_filename = get_rrd_path($device, "rserver-" . $rserver['rserver_id'] . ".rrd");
 
-    $title  = generate_device_link($device);
-    $title .= " :: Rserver :: " . escape_html($rserver['ServerFarmName'] . ' - ' . $rserver['Name']);
-    $auth = TRUE;
-  }
+    $auth  = TRUE;
+
+    $graph_title   = device_name($device, TRUE);
+    $graph_title   .= " :: Rserver :: " . $rserver['ServerFarmName'] . ' - ' . $rserver['Name'];
 }
 
 // EOF

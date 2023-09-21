@@ -4,13 +4,13 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
+ * @package        observium
+ * @subpackage     poller
  * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-  // this is eth100g only, note that fc8gTable, fc16gTable, eth10gTable, eth40gTable, eth400gtable all exist too! 
+// this is eth100g only, note that fc8gTable, fc16gTable, eth10gTable, eth40gTable, eth400gtable all exist too!
 
 /*
 .1.3.6.1.4.1.42229.1.2.4.1.9 - eth100gTable for a single port (1/1/6)
@@ -80,60 +80,60 @@ CORIANT-GROOVE-MIB::eth100gStatisticsEntryOutPackets1024to1518octets.1.1.0.6.0 =
 
 */
 
-  $mib = 'CORIANT-GROOVE-MIB';
+$mib = 'CORIANT-GROOVE-MIB';
 
-  // eth100gTable
-  $entries = [];
-  $entries = snmpwalk_cache_oid($device, 'eth100gTable',            $entries, $mib);
-  $entries = snmpwalk_cache_oid($device, 'eth100gStatisticsTable',  $entries, $mib);
+// eth100gTable
+$entries = [];
+$entries = snmpwalk_cache_oid($device, 'eth100gTable', $entries, $mib);
+$entries = snmpwalk_cache_oid($device, 'eth100gStatisticsTable', $entries, $mib);
 
-  print_debug_vars($entries);
+print_debug_vars($entries);
 
-  foreach ($entries as $port_oid_suffix => $port) {
+foreach ($entries as $port_oid_suffix => $port) {
     $ifIndex = $port_oid_suffix;
-    $entry = isset($entries[$ifIndex]) ? $entries[$ifIndex] : []; // FIXME. WTF?
+    $entry   = isset($entries[$ifIndex]) ? $entries[$ifIndex] : []; // FIXME. WTF?
 
     // basics
-    $port_stats[$ifIndex]['ifDescr']	     = $entry['eth100gAliasName'];
-    $port_stats[$ifIndex]['ifName']		     = $entry['eth100gAliasName'];
+    $port_stats[$ifIndex]['ifDescr']       = $entry['eth100gAliasName'];
+    $port_stats[$ifIndex]['ifName']        = $entry['eth100gAliasName'];
     $port_stats[$ifIndex]['ifSpeed']       = '100000000000';
-    $port_stats[$ifIndex]['ifAlias']		   = $entry['eth100gServiceLabel'];
-    $port_stats[$ifIndex]['ifOperStatus']	 = $entry['eth100gOperStatus'];
+    $port_stats[$ifIndex]['ifAlias']       = $entry['eth100gServiceLabel'];
+    $port_stats[$ifIndex]['ifOperStatus']  = $entry['eth100gOperStatus'];
     $port_stats[$ifIndex]['ifAdminStatus'] = $entry['eth100gAdminStatus'];
-    $port_stats[$ifIndex]['ifType']		     = 'ethernetCsmacd';		// can we do better than hard coding?
+    $port_stats[$ifIndex]['ifType']        = 'ethernetCsmacd';        // can we do better than hard coding?
 
     // stats
-    $port_stats[$ifIndex]['ifInOctets']		      = $entry['eth100gStatisticsEntryInOctets'];
-    $port_stats[$ifIndex]['ifOutOctets']	      = $entry['eth100gStatisticsEntryOutOctets'];
+    $port_stats[$ifIndex]['ifInOctets']  = $entry['eth100gStatisticsEntryInOctets'];
+    $port_stats[$ifIndex]['ifOutOctets'] = $entry['eth100gStatisticsEntryOutOctets'];
 
-    $port_stats[$ifIndex]['ifInUcastPkts']      = $entry['eth100gStatisticsEntryInPackets'];
-    $port_stats[$ifIndex]['ifOutUcastPkts']     = $entry['eth100gStatisticsEntryOutPackets'];
+    $port_stats[$ifIndex]['ifInUcastPkts']  = $entry['eth100gStatisticsEntryInPackets'];
+    $port_stats[$ifIndex]['ifOutUcastPkts'] = $entry['eth100gStatisticsEntryOutPackets'];
 
-    $port_stats[$ifIndex]['ifInBroadcastPkts']	= $entry['eth100gStatisticsEntryInBroadcastPackets'];
-    $port_stats[$ifIndex]['ifOutBroadcastPkts']	= $entry['eth100gStatisticsEntryOutBroadcastPackets'];
+    $port_stats[$ifIndex]['ifInBroadcastPkts']  = $entry['eth100gStatisticsEntryInBroadcastPackets'];
+    $port_stats[$ifIndex]['ifOutBroadcastPkts'] = $entry['eth100gStatisticsEntryOutBroadcastPackets'];
 
-    $port_stats[$ifIndex]['ifInMulticastPkts']	= $entry['eth100gStatisticsEntryInMulticastPackets'];
+    $port_stats[$ifIndex]['ifInMulticastPkts']  = $entry['eth100gStatisticsEntryInMulticastPackets'];
     $port_stats[$ifIndex]['ifOutMulticastPkts'] = $entry['eth100gStatisticsEntryOutMulticastPackets'];
 
-    $port_stats[$ifIndex]['ifInDiscards']       = $entry['eth100gStatisticsEntryInDropEvents'];
-    $port_stats[$ifIndex]['ifOutDiscards']      = $entry['eth100gStatisticsEntryOutDropEvents'];
+    $port_stats[$ifIndex]['ifInDiscards']  = $entry['eth100gStatisticsEntryInDropEvents'];
+    $port_stats[$ifIndex]['ifOutDiscards'] = $entry['eth100gStatisticsEntryOutDropEvents'];
 
-    $port_stats[$ifIndex]['ifInErrors']         = $entry['eth100gStatisticsEntryInCrcAlignErrors'];
-    $port_stats[$ifIndex]['ifOutErrors']        = $entry['eth100gStatisticsEntryOutCrcAlignErrors'];
+    $port_stats[$ifIndex]['ifInErrors']  = $entry['eth100gStatisticsEntryInCrcAlignErrors'];
+    $port_stats[$ifIndex]['ifOutErrors'] = $entry['eth100gStatisticsEntryOutCrcAlignErrors'];
 
-  }
+}
 
 
-  // eth400gTable
-  $entries = [];
-  $entries = snmpwalk_cache_oid($device, 'eth400gTable',            $entries, $mib);
-  $entries = snmpwalk_cache_oid($device, 'eth400gStatisticsTable',  $entries, $mib);
+// eth400gTable
+$entries = [];
+$entries = snmpwalk_cache_oid($device, 'eth400gTable', $entries, $mib);
+$entries = snmpwalk_cache_oid($device, 'eth400gStatisticsTable', $entries, $mib);
 
-  print_debug_vars($entries);
+print_debug_vars($entries);
 
-  foreach ($entries as $port_oid_suffix => $port) {
+foreach ($entries as $port_oid_suffix => $port) {
     $ifIndex = $port_oid_suffix;
-    $entry = isset($entries[$ifIndex]) ? $entries[$ifIndex] : []; // FIXME. WTF?
+    $entry   = isset($entries[$ifIndex]) ? $entries[$ifIndex] : []; // FIXME. WTF?
 
     // basics
     $port_stats[$ifIndex]['ifDescr']       = $entry['eth400gAliasName'];
@@ -142,14 +142,14 @@ CORIANT-GROOVE-MIB::eth100gStatisticsEntryOutPackets1024to1518octets.1.1.0.6.0 =
     $port_stats[$ifIndex]['ifAlias']       = $entry['eth400gServiceLabel'];
     $port_stats[$ifIndex]['ifOperStatus']  = $entry['eth400gOperStatus'];
     $port_stats[$ifIndex]['ifAdminStatus'] = $entry['eth400gAdminStatus'];
-    $port_stats[$ifIndex]['ifType']        = 'ethernetCsmacd';		// can we do better than hard coding?
+    $port_stats[$ifIndex]['ifType']        = 'ethernetCsmacd';        // can we do better than hard coding?
 
     // stats
-    $port_stats[$ifIndex]['ifInOctets']         = $entry['eth400gStatisticsEntryInOctets'];
-    $port_stats[$ifIndex]['ifOutOctets']        = $entry['eth400gStatisticsEntryOutOctets'];
+    $port_stats[$ifIndex]['ifInOctets']  = $entry['eth400gStatisticsEntryInOctets'];
+    $port_stats[$ifIndex]['ifOutOctets'] = $entry['eth400gStatisticsEntryOutOctets'];
 
-    $port_stats[$ifIndex]['ifInUcastPkts']      = $entry['eth400gStatisticsEntryInPackets'];
-    $port_stats[$ifIndex]['ifOutUcastPkts']     = $entry['eth400gStatisticsEntryOutPackets'];
+    $port_stats[$ifIndex]['ifInUcastPkts']  = $entry['eth400gStatisticsEntryInPackets'];
+    $port_stats[$ifIndex]['ifOutUcastPkts'] = $entry['eth400gStatisticsEntryOutPackets'];
 
     $port_stats[$ifIndex]['ifInBroadcastPkts']  = $entry['eth400gStatisticsEntryInBroadcastPackets'];
     $port_stats[$ifIndex]['ifOutBroadcastPkts'] = $entry['eth400gStatisticsEntryOutBroadcastPackets'];
@@ -157,12 +157,12 @@ CORIANT-GROOVE-MIB::eth100gStatisticsEntryOutPackets1024to1518octets.1.1.0.6.0 =
     $port_stats[$ifIndex]['ifInMulticastPkts']  = $entry['eth400gStatisticsEntryInMulticastPackets'];
     $port_stats[$ifIndex]['ifOutMulticastPkts'] = $entry['eth400gStatisticsEntryOutMulticastPackets'];
 
-    $port_stats[$ifIndex]['ifInDiscards']       = $entry['eth400gStatisticsEntryInDropEvents'];
-    $port_stats[$ifIndex]['ifOutDiscards']      = $entry['eth400gStatisticsEntryOutDropEvents'];
+    $port_stats[$ifIndex]['ifInDiscards']  = $entry['eth400gStatisticsEntryInDropEvents'];
+    $port_stats[$ifIndex]['ifOutDiscards'] = $entry['eth400gStatisticsEntryOutDropEvents'];
 
-    $port_stats[$ifIndex]['ifInErrors']         = $entry['eth400gStatisticsEntryInCrcAlignErrors'];
-    $port_stats[$ifIndex]['ifOutErrors']        = $entry['eth400gStatisticsEntryOutCrcAlignErrors'];
+    $port_stats[$ifIndex]['ifInErrors']  = $entry['eth400gStatisticsEntryInCrcAlignErrors'];
+    $port_stats[$ifIndex]['ifOutErrors'] = $entry['eth400gStatisticsEntryOutCrcAlignErrors'];
 
-  }
+}
 
 // EOF

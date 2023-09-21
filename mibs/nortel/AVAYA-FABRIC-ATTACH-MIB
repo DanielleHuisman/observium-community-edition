@@ -11,14 +11,36 @@ IMPORTS
     bayStackMibs
             FROM SYNOPTICS-ROOT-MIB
     RowStatus, TruthValue
-            FROM SNMPv2-TC;
+            FROM SNMPv2-TC
+   DisplayString
+            FROM RFC1213-MIB;
+
 
 avayaFabricAttachMib MODULE-IDENTITY
-    LAST-UPDATED "201611210000Z"     -- November 21, 2016
+    LAST-UPDATED "202009040000Z"     -- August 3, 2020
     ORGANIZATION "Avaya Networks, Inc."
     CONTACT-INFO "avaya.com"
     DESCRIPTION
         "This MIB module contains objects related to the Fabric Attach support."
+
+
+    REVISION    "202009040000Z" -- Sept 04, 2020
+    DESCRIPTION "Ver 31: Added avFabricAttachPortOrigin. Request by A Rebega(Oana)"
+
+
+
+    REVISION    "202008030000Z" -- August 3, 2020
+    DESCRIPTION "Ver 30: Defined avFabricAttachIsidVlanAsgnsIsidName and
+                             avFabricAttachZeroTouchClientAttachIsidName to show the
+                             Isid Name on the server if it exists.  This isid is not part of
+                             the FA TLVs, rather it is manually configured on the server."
+
+
+    REVISION    "201801250000Z" -- January 25, 2018
+    DESCRIPTION "Ver 29: Defined avFabricAttachZeroTouchMgmtVlanDist attribute. 
+                         Added autoMgmtVlanFaClient enumeration support for
+                         the avFabricAttachZeroTouchOptionFlags and the    
+                         avFabricAttachZeroTouchClientOptionFlags attributes."
 
     REVISION    "201611210000Z" -- November 21, 2016
     DESCRIPTION "Ver 28: Defined avFabricAttachDiscoveredElement and 
@@ -279,7 +301,8 @@ AvFabricAttachIsidVlanAsgnsEntry ::= SEQUENCE {
     avFabricAttachIsidVlanAsgnsVlan       Integer32,
     avFabricAttachIsidVlanAsgnsState      INTEGER,
     avFabricAttachIsidVlanAsgnsRowStatus  RowStatus,
-    avFabricAttachIsidVlanAsgnsOrigin     INTEGER
+    avFabricAttachIsidVlanAsgnsOrigin     INTEGER,
+    avFabricAttachIsidVlanAsgnsIsidName  DisplayString 
 }
 
 avFabricAttachIsidVlanAsgnsIfIndex OBJECT-TYPE
@@ -353,6 +376,16 @@ avFabricAttachIsidVlanAsgnsOrigin OBJECT-TYPE
 
     ::= { avFabricAttachIsidVlanAsgnsEntry 6 }
 
+avFabricAttachIsidVlanAsgnsIsidName OBJECT-TYPE
+    SYNTAX             DisplayString (SIZE (0..64))
+    MAX-ACCESS    read-only
+    STATUS             current
+    DESCRIPTION   "The administratively-assigned name for the I-SID.
+                               This name is configured on the device and is not
+                               learned via the FA TLVs."
+     ::= { avFabricAttachIsidVlanAsgnsEntry 7 } 
+
+
 --
 -- Fabric Attach Port Table support
 --
@@ -387,7 +420,8 @@ AvFabricAttachPortEntry ::= SEQUENCE {
     avFabricAttachPortMsgAuthKey     OCTET STRING,
     avFabricAttachPortMgmtIsid       Integer32,
     avFabricAttachPortMgmtCvid       Integer32,
-    avFabricAttachPortMsgAuthKeymode INTEGER
+    avFabricAttachPortMsgAuthKeymode INTEGER,
+    avFabricAttachPortOrigin         INTEGER
 }
 
 avFabricAttachPortIfIndex OBJECT-TYPE
@@ -499,6 +533,24 @@ avFabricAttachPortMsgAuthKeymode OBJECT-TYPE
         authentication key should be performed."
 
     ::= { avFabricAttachPortEntry 8 }
+
+
+
+avFabricAttachPortOrigin OBJECT-TYPE
+    SYNTAX         INTEGER {
+                        config(1),
+                        autoSense(2)
+                   }
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+        "Fabric Attach Origin indicates how the FA 
+        interface was created: manual (CLI/SNMP), 
+        ZTF (Auto-Sense) or other."
+    DEFVAL         { 1 }
+
+    ::= { avFabricAttachPortEntry 9 }
+
 
 avFabricAttachZeroTouchService OBJECT-TYPE
     SYNTAX         INTEGER {
@@ -778,7 +830,8 @@ avFabricAttachZeroTouchOptionFlags OBJECT-TYPE
                        nsv(4),
                        autoTrustedModeFaClient(5),
                        autoPvidModeFaClient(6),
-                       autoClientAttach(7)
+                       autoClientAttach(7),
+                       autoMgmtVlanFaClient(8)
                    }
     MAX-ACCESS     read-write
     STATUS         current
@@ -1323,7 +1376,8 @@ avFabricAttachZeroTouchClientOptionFlags OBJECT-TYPE
                        nsv(4),
                        autoTrustedModeFaClient(5),
                        autoPvidModeFaClient(6),
-                       autoClientAttach(7)
+                       autoClientAttach(7),
+                       autoMgmtVlanFaClient(8)
                    }
     MAX-ACCESS     read-create
     STATUS         current
@@ -1443,7 +1497,8 @@ AvFabricAttachZeroTouchClientAttachEntry ::= SEQUENCE {
     avFabricAttachZeroTouchClientAttachPortPriority   Integer32,
     avFabricAttachZeroTouchClientAttachIsid           Integer32,
     avFabricAttachZeroTouchClientAttachRowStatus      RowStatus,
-    avFabricAttachZeroTouchClientAttachExcludeStatic  INTEGER
+    avFabricAttachZeroTouchClientAttachExcludeStatic  INTEGER,
+	avFabricAttachZeroTouchClientAttachIsidName  DisplayString 
 }
 
 avFabricAttachZeroTouchClientAttachType OBJECT-TYPE
@@ -1517,6 +1572,15 @@ avFabricAttachZeroTouchClientAttachExcludeStatic OBJECT-TYPE
     DEFVAL	   { removeStaticVlans }
 
     ::= { avFabricAttachZeroTouchClientAttachEntry 6 }
+
+avFabricAttachZeroTouchClientAttachIsidName OBJECT-TYPE
+    SYNTAX             DisplayString (SIZE (0..64))
+    MAX-ACCESS    read-only
+    STATUS             current
+    DESCRIPTION   "The administratively-assigned name for the I-SID.
+                               This name is configured on the device."
+   ::= { avFabricAttachZeroTouchClientAttachEntry 7 }
+
 
 --
 -- Fabric Attach Zero Touch Client Detect Table support        
@@ -1629,6 +1693,19 @@ avFabricAttachZeroTouchClientDetectRowStatus OBJECT-TYPE
         in the avFabricAttachZeroTouchClientDetectTable."
 
     ::= { avFabricAttachZeroTouchClientDetectEntry 6 }
+
+avFabricAttachZeroTouchMgmtVlanDist OBJECT-TYPE
+    SYNTAX         INTEGER {
+                       enabled(1),
+                       disabled(2)
+                   }
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION
+        "Controls the inclusion of management VLAN data
+        in the Fabric Attach LLDP frames."
+
+    ::= { avFabricAttachObjects 31 }
 
 --
 -- Fabric Attach notification objects

@@ -1,0 +1,407 @@
+--    SyncE Proprietary MIB Definition
+
+--    This file explains the proprietary MIB implemented
+--    for SyncE (Synchronous Ethernet) that conforms to ITU-T G.8264
+--    and ITU-T G.781
+
+SyncE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32,
+    Unsigned32, enterprises
+        FROM SNMPv2-SMI
+    TruthValue , RowStatus
+        FROM SNMPv2-TC
+    InterfaceIndex
+        FROM IF-MIB;
+
+fsSynceMIB MODULE-IDENTITY
+    LAST-UPDATED "201302150000Z"
+    -- February 15, 2013
+
+    ORGANIZATION "Super Micro Computer Inc."
+
+    CONTACT-INFO "support@Supermicro.com"
+
+    DESCRIPTION
+       "This file is proprietary MIB for SyncE (Synchronous Ethernet)
+       implementation that confirms to standard ITU-T G.8264"
+
+    REVISION "201302150000Z"
+
+    DESCRIPTION
+       "This file is proprietary MIB for SyncE (Synchronous Ethernet)
+       implementation that confirms to standard ITU-T G.8264"
+
+
+   ::= { enterprises supermicro-computer-inc(10876) super-switch(101) extended(2) 79 }
+
+fsSynceObjects          OBJECT IDENTIFIER ::= { fsSynceMIB 1 }
+fsSynceNotifications    OBJECT IDENTIFIER ::= { fsSynceMIB 2 }
+
+--
+-- FS SyncE MIB Objects
+--
+
+fsSynceGeneralGroup             OBJECT IDENTIFIER ::= { fsSynceObjects 1 }
+fsSynceInterfaceConfiguration   OBJECT IDENTIFIER ::= { fsSynceObjects 2 }
+
+-- Scalar objects
+
+fsSynceGlobalSysCtrl OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        start(1),
+                        shutdown(2)
+                      }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to initialise/de-initialise the module"
+   DEFVAL  { start }
+   ::= { fsSynceGeneralGroup 1 }
+
+
+-- SyncE Table
+-- It is used to store SyncE module related information.
+-- Implements multiple instance feature in SyncE Module
+
+fsSynceTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF FsSynceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains information about SyncE module
+        at global level"
+    ::= { fsSynceGeneralGroup 2 }
+
+fsSynceEntry OBJECT-TYPE
+    SYNTAX      FsSynceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Contains information about parameters of a switch/router
+        instance. The entry in this table is created using the
+        fsSynceContextRowStatus object only if the virtual context is
+        existing in the system and deleted using fsSynceContextRowStatus
+        when the virtual context is deleted from the system"
+    INDEX { fsSynceContextId }
+    ::= { fsSynceTable 1 }
+
+FsSynceEntry ::=
+    SEQUENCE {
+        fsSynceContextId Integer32,
+        fsSynceTraceOption Unsigned32,
+        fsSynceQLMode INTEGER,
+        fsSynceQLValue Unsigned32,
+        fsSynceSSMOptionMode INTEGER,
+        fsSynceSelectedInterface InterfaceIndex,
+        fsSynceContextRowStatus RowStatus
+    }
+
+fsSynceContextId OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object is a unique context identifier for each entry.
+        Each virtual context will be able to run SyncE protocol individually
+        and will be distinguished by this object."
+    ::= { fsSynceEntry 1 }
+
+fsSynceTraceOption OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This variable governs the trace levels in the SyncE module.
+
+        A four byte integer is used for enabling the trace level.
+        Each bit in the four byte integer represents a particular
+        trace level.
+        The mapping between the bit positions & the trace level is
+        as follows:
+          Bit 0 - Init and Shutdown traces
+          Bit 1 - Management traces
+          Bit 2 - Data Path traces [NOT REQUIRED IN SYNCE]
+          Bit 3 - Control Plane traces
+          Bit 4 - Packet Dump traces
+          Bit 5 - Traces related to all resources except buffers
+          Bit 6 - All Failure traces
+          Bit 7 - Buffer allocation/release traces
+
+          Bit 16 - SYNCE Function Entry traces
+          Bit 17 - SYNCE Function Exit traces
+          Bit 18 - SYNCE Critical traces
+
+        The remaining bits are unused. Combination of levels are
+        also allowed.
+
+        For example if the bits 19 and 20 are set, then the trace
+        statement related to discovery and remote loopback related
+        messages will be printed.
+
+        The user has to enter the corresponding integer value for the
+        bits set. For example if bits 8 and 9 are to be set ,then user
+        has to give the value 0x300."
+    DEFVAL  { '00000040'H }
+   ::= { fsSynceEntry 2 }
+
+fsSynceQLMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    disabled(0),
+                    enabled(1)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to configure QL Enable/Disable mode for
+        the selection process in SyncE module.
+        The default value of this object is Enabled.
+        In the disabled state the quality level of the source will not
+        be considered as a parameter for selecting the source among other
+        sources for synchronizing the clock; Instead of QL, priority of
+        the interface will be used in selecting the best source among
+        SyncE sources."
+    DEFVAL  { 1 }
+    ::= { fsSynceEntry 3 }
+
+fsSynceQLValue OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the QL value selected through the clock selection
+        process. The value of this object shall be used while transmitting the
+        SSM packets.
+        If this value is set by user then automatic selection of clock source
+        will be disabled. It is assumed in this case that some external source
+        is used to synchronize the system clock.
+        The default value of this object is do not use DNU(15)."
+    DEFVAL { 15 }
+    ::= { fsSynceEntry 4 }
+
+fsSynceSSMOptionMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    option1(1),
+                    option2Gen1(2),
+                    option2Gen2(3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to select Option 1(Europe) or Option 2(America)
+        clocks in SyncE."
+    DEFVAL { 1 }
+    ::= { fsSynceEntry 5 }
+
+fsSynceSelectedInterface OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object represent the currently selected interface which QL value
+        is being used for transmitting QL in SSM packets."
+    ::= { fsSynceEntry 6 }
+
+fsSynceContextRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used for creation/deletion of enteries in the table"
+    ::= { fsSynceEntry 7 }
+
+--SyncE Interface table
+
+fsSynceIfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsSynceIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Table containing configuration information on SyncE interfaces."
+    ::= { fsSynceInterfaceConfiguration 1 }
+
+fsSynceIfEntry OBJECT-TYPE
+    SYNTAX      FsSynceIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object contains SyncE configuration information of an interface."
+    INDEX { fsSynceIfIndex }
+    ::= { fsSynceIfTable 1 }
+
+FsSynceIfEntry ::=
+        SEQUENCE {
+            fsSynceIfIndex InterfaceIndex,
+            fsSynceIfSynceMode TruthValue,
+            fsSynceIfEsmcMode INTEGER,
+            fsSynceIfPriority Integer32,
+            fsSynceIfQLValue INTEGER,
+            fsSynceIfIsRxQLForced TruthValue,
+            fsSynceIfLockoutStatus INTEGER,
+            fsSynceIfSignalFail TruthValue,
+            fsSynceIfPktsTx Unsigned32,
+            fsSynceIfPktsRx Unsigned32,
+            fsSynceIfPktsRxDropped Unsigned32,
+            fsSynceIfPktsRxErrored Unsigned32,
+            fsSynceIfRowStatus RowStatus
+        }
+
+fsSynceIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Uniquely identifies an interface in the system."
+    ::= { fsSynceIfEntry 1 }
+
+fsSynceIfSynceMode OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object controls enabling/disabling of Synchronous Ethernet
+        feature on an interface. In the disabled state, SyncE
+        packets will not considered for synchronizing the system clock.
+        The default value of this object is disabled."
+    DEFVAL  { false }
+    ::= { fsSynceIfEntry 2 }
+
+fsSynceIfEsmcMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    none(0),
+                    rx(1),
+                    tx(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represent the ESMC mode i.e. whether SSM is expected
+        to be received on this interface or SSM are to be tranmissted on this
+        interface.
+        rx : SSM is expected to be received on this interface.
+        tx : SSM is expected to be transmitted on this interface
+        none : the SyncE interface doesn't support ESMC."
+    DEFVAL  { 0 }
+    ::= { fsSynceIfEntry 3 }
+
+fsSynceIfPriority OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object contains the priority value of an interface. It is used
+        by the selection algorithm in order to select the best QL value
+        among all the interfaces. In the disabled mode, the port QL value will
+        not be a candidate QL for the selection of the best QL value i.e. SyncE
+        feature will be non-operational on that particular interface.
+        The default value of this object is undefined or disabled"
+    DEFVAL { 0 }
+    ::= { fsSynceIfEntry 4 }
+
+fsSynceIfQLValue OBJECT-TYPE
+    SYNTAX      INTEGER {
+                            qlPRC(1),
+                            qlSSUA(2),
+                            qlSSUB(3),
+                            qlSEC(4),
+                            qlDNU(5),
+                            qlPRS(6),
+                            qlSTU(7),
+                            qlST2(8),
+                            qlTNC(9),
+                            qlST3E(10),
+                            qlST3(11),
+                            qlSMC(12),
+                            qlRES(13),
+                            qlPROV(14),
+                            qlDUS(15)
+                        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object contains the QL value for a SyncE interface.
+        The value of this object is not considered in QL disabled mode.
+        The default value on this object is DNU(5)"
+    DEFVAL { qlDNU }
+    ::= { fsSynceIfEntry 5 }
+
+fsSynceIfIsRxQLForced OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object will be true if operator manually assign the QL value to an
+        interface."
+    ::= { fsSynceIfEntry 6 }
+
+fsSynceIfLockoutStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object contains the lockout status for SyncE interface.
+        Lockout temporarily removes a timing source as available synchronization
+        source for the selection process.As defined in ITU-T G.781i, lockout
+        commands are accepted for nominated synchronization sources
+        (synchronization sources that are not disabled) of each selection process.
+        By default Lockout status of an interface is disabled."
+    DEFVAL  { false }
+    ::= { fsSynceIfEntry 7 }
+
+fsSynceIfSignalFail OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "If the hold off timer expires and no SyncE packet was received till
+        then by the port then the status of the port changes to signal fail
+        status. As defined in ITU-T standard G.781 Signal fail for a
+        synchronization source is activated in case of defects detected in the
+        server layers."
+    ::= { fsSynceIfEntry 8 }
+
+fsSynceIfPktsTx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the total number of transmitted SyncE packets on
+        an interface."
+    ::= { fsSynceIfEntry 9 }
+
+fsSynceIfPktsRx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the total number of received SyncE packets on an
+        interface."
+    ::= { fsSynceIfEntry 10 }
+
+fsSynceIfPktsRxDropped OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the total number of dropped SyncE packets on an
+        interface."
+    ::= { fsSynceIfEntry 11 }
+
+fsSynceIfPktsRxErrored OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object contains the total number of SyncE packets whose
+        processing(decoding) resulted into error."
+    ::= { fsSynceIfEntry 12 }
+
+fsSynceIfRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used for creation/deletion of enteries in the SyncE interface table"
+    ::= { fsSynceIfEntry 13 }
+END

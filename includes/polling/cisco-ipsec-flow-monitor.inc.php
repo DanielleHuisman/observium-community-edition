@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -44,52 +44,58 @@
 #CISCO-IPSEC-FLOW-MONITOR-MIB::cipSecGlobalSysCapFails.0 = Counter32: 0 Failures
 
 // FIXME. Candidate for migrate to graphs module with table_collect()
-if (is_device_mib($device, 'CISCO-IPSEC-FLOW-MONITOR-MIB'))
-{
-  $data = snmpwalk_cache_oid($device, "cipSecGlobalStats", NULL, "CISCO-IPSEC-FLOW-MONITOR-MIB");
-  $data = $data[0];
+if (is_device_mib($device, 'CISCO-IPSEC-FLOW-MONITOR-MIB')) {
+    $data = snmpwalk_cache_oid($device, "cipSecGlobalStats", NULL, "CISCO-IPSEC-FLOW-MONITOR-MIB");
+    $data = $data[0];
 
-  // Use HC Counters if they exist
-  if (is_numeric($data['cipSecGlobalHcInOctets'])) { $data['cipSecGlobalInOctets'] = $data['cipSecGlobalHcInOctets']; }
-  if (is_numeric($data['cipSecGlobalHcOutOctets'])) { $data['cipSecGlobalOutOctets'] = $data['cipSecGlobalHcOutOctets']; }
-  if (is_numeric($data['cipSecGlobalHcInDecompOctets'])) { $data['cipSecGlobalInDecompOctets'] = $data['cipSecGlobalHcInDecompOctets']; }
-  if (is_numeric($data['cipSecGlobalHcOutUncompOctets'])) { $data['cipSecGlobalOutUncompOctets'] = $data['cipSecGlobalHcOutUncompOctets']; }
+    // Use HC Counters if they exist
+    if (is_numeric($data['cipSecGlobalHcInOctets'])) {
+        $data['cipSecGlobalInOctets'] = $data['cipSecGlobalHcInOctets'];
+    }
+    if (is_numeric($data['cipSecGlobalHcOutOctets'])) {
+        $data['cipSecGlobalOutOctets'] = $data['cipSecGlobalHcOutOctets'];
+    }
+    if (is_numeric($data['cipSecGlobalHcInDecompOctets'])) {
+        $data['cipSecGlobalInDecompOctets'] = $data['cipSecGlobalHcInDecompOctets'];
+    }
+    if (is_numeric($data['cipSecGlobalHcOutUncompOctets'])) {
+        $data['cipSecGlobalOutUncompOctets'] = $data['cipSecGlobalHcOutUncompOctets'];
+    }
 
-  if ($data['cipSecGlobalActiveTunnels'])
-  {
-    rrdtool_update_ng($device, 'cipsec-flow', array(
-      'Tunnels'          => $data['cipSecGlobalActiveTunnels'],
-      'InOctets'         => $data['cipSecGlobalInOctets'],
-      'OutOctets'        => $data['cipSecGlobalOutOctets'],
-      'InDecompOctets'   => $data['cipSecGlobalInDecompOctets'],
-      'OutUncompOctets'  => $data['cipSecGlobalOutUncompOctets'],
-      'InPkts'           => $data['cipSecGlobalInPkts'],
-      'OutPkts'          => $data['cipSecGlobalOutPkts'],
-      'InDrops'          => $data['cipSecGlobalInDrops'],
-      'InReplayDrops'    => $data['cipSecGlobalInReplayDrops'],
-      'OutDrops'         => $data['cipSecGlobalOutDrops'],
-      'InAuths'          => $data['cipSecGlobalInAuths'],
-      'OutAuths'         => $data['cipSecGlobalOutAuths'],
-      'InAuthFails'      => $data['cipSecGlobalInAuthFails'],
-      'OutAuthFails'     => $data['cipSecGlobalOutAuthFails'],
-      'InDecrypts'       => $data['cipSecGlobalInDecrypts'],
-      'OutEncrypts'      => $data['cipSecGlobalOutEncrypts'],
-      'InDecryptFails'   => $data['cipSecGlobalInDecryptFails'],
-      'OutEncryptFails'  => $data['cipSecGlobalOutEncryptFails'],
-      'ProtocolUseFails' => $data['cipSecGlobalProtocolUseFails'],
-      'NoSaFails'        => $data['cipSecGlobalNoSaFails'],
-      'SysCapFails'      => $data['cipSecGlobalSysCapFails'],
-    ));
+    if ($data['cipSecGlobalActiveTunnels']) {
+        rrdtool_update_ng($device, 'cipsec-flow', [
+          'Tunnels'          => $data['cipSecGlobalActiveTunnels'],
+          'InOctets'         => $data['cipSecGlobalInOctets'],
+          'OutOctets'        => $data['cipSecGlobalOutOctets'],
+          'InDecompOctets'   => $data['cipSecGlobalInDecompOctets'],
+          'OutUncompOctets'  => $data['cipSecGlobalOutUncompOctets'],
+          'InPkts'           => $data['cipSecGlobalInPkts'],
+          'OutPkts'          => $data['cipSecGlobalOutPkts'],
+          'InDrops'          => $data['cipSecGlobalInDrops'],
+          'InReplayDrops'    => $data['cipSecGlobalInReplayDrops'],
+          'OutDrops'         => $data['cipSecGlobalOutDrops'],
+          'InAuths'          => $data['cipSecGlobalInAuths'],
+          'OutAuths'         => $data['cipSecGlobalOutAuths'],
+          'InAuthFails'      => $data['cipSecGlobalInAuthFails'],
+          'OutAuthFails'     => $data['cipSecGlobalOutAuthFails'],
+          'InDecrypts'       => $data['cipSecGlobalInDecrypts'],
+          'OutEncrypts'      => $data['cipSecGlobalOutEncrypts'],
+          'InDecryptFails'   => $data['cipSecGlobalInDecryptFails'],
+          'OutEncryptFails'  => $data['cipSecGlobalOutEncryptFails'],
+          'ProtocolUseFails' => $data['cipSecGlobalProtocolUseFails'],
+          'NoSaFails'        => $data['cipSecGlobalNoSaFails'],
+          'SysCapFails'      => $data['cipSecGlobalSysCapFails'],
+        ]);
 
-    $graphs['cipsec_flow_tunnels'] = TRUE;
-    $graphs['cipsec_flow_pkts']    = TRUE;
-    $graphs['cipsec_flow_bits']    = TRUE;
-    $graphs['cipsec_flow_stats']   = TRUE;
+        $graphs['cipsec_flow_tunnels'] = TRUE;
+        $graphs['cipsec_flow_pkts']    = TRUE;
+        $graphs['cipsec_flow_bits']    = TRUE;
+        $graphs['cipsec_flow_stats']   = TRUE;
 
-    echo(" cipsec_flow");
-  }
+        echo(" cipsec_flow");
+    }
 
-  unset($data);
+    unset($data);
 }
 
 // EOF

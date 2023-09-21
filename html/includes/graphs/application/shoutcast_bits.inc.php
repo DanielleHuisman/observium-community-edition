@@ -5,33 +5,33 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$units           = "b";
-$total_units     = "B";
-$colours_in      = "greens";
+$units       = "b";
+$total_units = "B";
+$colours_in  = "greens";
 //$multiplier      = "0";
-$colours_out     = "blues";
+$colours_out = "blues";
 
-$nototal         = 1;
+$nototal = 1;
 
-$ds_in           = "traf_in";
-$ds_out          = "traf_out";
+$ds_in  = "traf_in";
+$ds_out = "traf_out";
 
-$graph_title    .= "::bits";
+$graph_title .= "::bits";
 
 $colour_line_in  = "006600";
 $colour_line_out = "000099";
 $colour_area_in  = "CDEB8B";
 $colour_area_out = "C3D9FF";
 
-$hostname        = (isset($vars['hostname']) ? $vars['hostname'] : "unknown");
-$rrd_filename    = get_rrd_path($device, "app-shoutcast-".$app['app_id']."-".$hostname.".rrd");
+$hostname     = (isset($vars['hostname']) ? $vars['hostname'] : "unknown");
+$rrd_filename = get_rrd_path($device, "app-shoutcast-" . $app['app_id'] . "-" . $hostname . ".rrd");
 
-include($config['html_dir']."/includes/graphs/generic_data.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_data.inc.php");
 
 // EOF

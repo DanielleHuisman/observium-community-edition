@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,7 +15,7 @@ $scale_min = '0';
 
 $rrd_filename = get_rrd_path($device, "ucd_cpu.rrd");
 
-include($config['html_dir']."/includes/graphs/common.inc.php");
+include($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $rrd_options .= " DEF:user=$rrd_filename_escape:user:AVERAGE";
 $rrd_options .= " DEF:nice=$rrd_filename_escape:nice:AVERAGE";

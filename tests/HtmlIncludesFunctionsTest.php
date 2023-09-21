@@ -1,6 +1,6 @@
 <?php
 
-include(__DIR__ . '/../includes/sql-config.inc.php'); // Here required DB connect
+include(__DIR__ . '/../includes/observium.inc.php'); // Here required DB connect
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');
@@ -102,6 +102,86 @@ class HtmlIncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       array(array('os' => 'ios'), FALSE, '<img src="http://localhost/images/os/cisco.png" srcset="http://localhost/images/os/cisco_2x.png 2x" alt="" />'),
     );
   }
+
+    protected function setUp(): void
+    {
+        // Start the session before each test
+        @session_start();
+    }
+
+    protected function tearDown(): void
+    {
+        // Clean up the session after each test
+        session_unset();
+        session_destroy();
+    }
+
+    public function test_single_key()
+    {
+        session_set_var('key', 'value');
+        $this->assertEquals('value', $_SESSION['key']);
+    }
+
+    public function test_nested_keys()
+    {
+        session_set_var('key1->key2->key3', 'value');
+        $this->assertEquals('value', $_SESSION['key1']['key2']['key3']);
+    }
+
+    public function test_unset_single_key()
+    {
+        $_SESSION['key'] = 'value';
+        session_set_var('key', null);
+        $this->assertArrayNotHasKey('key', $_SESSION);
+    }
+
+    public function test_unset_nested_keys()
+    {
+        $_SESSION['key1']['key2']['key3'] = 'value';
+        session_set_var('key1->key2->key3', null);
+        $this->assertArrayNotHasKey('key3', $_SESSION['key1']['key2']);
+    }
+
+    public function test_no_change_single_key()
+    {
+        $_SESSION['key'] = 'value';
+        session_set_var('key', 'value');
+        $this->assertEquals('value', $_SESSION['key']);
+    }
+
+    public function test_no_change_nested_keys()
+    {
+        $_SESSION['key1']['key2']['key3'] = 'value';
+        session_set_var('key1->key2->key3', 'value');
+        $this->assertEquals('value', $_SESSION['key1']['key2']['key3']);
+    }
+
+    public function test_single_key_array()
+    {
+        session_set_var(['key'], 'value');
+        $this->assertEquals('value', $_SESSION['key']);
+    }
+
+    public function test_nested_keys_array()
+    {
+        session_set_var(['key1', 'key2', 'key3'], 'value');
+        $this->assertEquals('value', $_SESSION['key1']['key2']['key3']);
+    }
+
+    public function test_unset_single_key_array()
+    {
+        $_SESSION['key'] = 'value';
+        session_set_var(['key'], null);
+        $this->assertArrayNotHasKey('key', $_SESSION);
+    }
+
+    public function test_unset_nested_keys_array()
+    {
+        $_SESSION['key1']['key2']['key3'] = 'value';
+        session_set_var(['key1', 'key2', 'key3'], null);
+        $this->assertArrayNotHasKey('key3', $_SESSION['key1']['key2']);
+    }
+
 }
 
 // EOF

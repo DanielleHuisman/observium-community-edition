@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,9 +15,8 @@
 
 $data = snmp_get_oid($device, 'agentSwitchCpuProcessTotalUtilization.0', $mib);
 
-if (preg_match('/300 Secs \(\s*(?<proc>[\d\.]+)%\)/', $data, $matches))
-{
-  discover_processor($valid['processor'], $device, '.1.3.6.1.4.1.4413.1.1.1.1.4.9.0', '0', 'edgeswitch-switching-mib', 'Processor', 1, $matches['proc']);
+if (preg_match('/300 Secs \(\s*(?<proc>[\d\.]+)%\)/', $data, $matches)) {
+    discover_processor($valid['processor'], $device, '.1.3.6.1.4.1.4413.1.1.1.1.4.9.0', '0', 'edgeswitch-switching-mib', 'Processor', 1, $matches['proc']);
 }
 
 unset($data, $matches);

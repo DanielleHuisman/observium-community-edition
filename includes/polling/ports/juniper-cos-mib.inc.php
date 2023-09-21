@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,48 +15,47 @@
 
 $port_module = 'jnx_cos_qstat';
 
-if ($ports_modules[$port_module] && $port_stats_count)
-{
+if ($ports_modules[$port_module] && $port_stats_count) {
 
     echo("JUNIPER-COS-MIB Queue Stats ");
-    $qstat_oids  = array('jnxCosQstatQedPkts', 'jnxCosQstatQedBytes', 'jnxCosQstatTxedPkts', 'jnxCosQstatTxedBytes', 'jnxCosQstatTailDropPkts', 'jnxCosQstatTotalRedDropPkts', 'jnxCosQstatTotalRedDropBytes');
+    $qstat_oids = ['jnxCosQstatQedPkts', 'jnxCosQstatQedBytes', 'jnxCosQstatTxedPkts', 'jnxCosQstatTxedBytes', 'jnxCosQstatTailDropPkts', 'jnxCosQstatTotalRedDropPkts', 'jnxCosQstatTotalRedDropBytes'];
 
-    $q_names = snmpwalk_cache_oid($device, 'jnxCosFcIdToFcName', array(), "JUNIPER-COS-MIB");
-    $q_numbers = snmpwalk_cache_oid($device, 'jnxCosFcQueueNr', array(), "JUNIPER-COS-MIB");
+    $q_names   = snmpwalk_cache_oid($device, 'jnxCosFcIdToFcName', [], "JUNIPER-COS-MIB");
+    $q_numbers = snmpwalk_cache_oid($device, 'jnxCosFcQueueNr', [], "JUNIPER-COS-MIB");
 
     //$qstats = snmpwalk_cache_oid($device, array_shift($qstat_oids), array(), "JUNIPER-COS-MIB");
 
     $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
 
-    if ($GLOBALS['snmp_status'])
-    {
+    if ($GLOBALS['snmp_status']) {
 
-      $q_names = snmpwalk_cache_oid($device, 'jnxCosFcFabricPriority', $q_names, "JUNIPER-COS-MIB");
+        $q_names = snmpwalk_cache_oid($device, 'jnxCosFcFabricPriority', $q_names, "JUNIPER-COS-MIB");
 
-      $queues = array();
-      foreach($q_names AS $index => $data)
-      {
-        $queues[$index]['queue'] = $q_numbers[$data['jnxCosFcIdToFcName']]['jnxCosFcQueueNr'];
-        if(isset($data['jnxCosFcIdToFcName']))     { $queues[$index]['name'] = $data['jnxCosFcIdToFcName']; }
-        if(isset($data['jnxCosFcFabricPriority'])) { $queues[$index]['prio'] = $data['jnxCosFcFabricPriority']; }
-      }
-      set_entity_attrib('device', $device['device_id'], 'jnx_cos_queues', json_encode($queues));
+        $queues = [];
+        foreach ($q_names as $index => $data) {
+            $queues[$index]['queue'] = $q_numbers[$data['jnxCosFcIdToFcName']]['jnxCosFcQueueNr'];
+            if (isset($data['jnxCosFcIdToFcName'])) {
+                $queues[$index]['name'] = $data['jnxCosFcIdToFcName'];
+            }
+            if (isset($data['jnxCosFcFabricPriority'])) {
+                $queues[$index]['prio'] = $data['jnxCosFcFabricPriority'];
+            }
+        }
+        set_entity_attrib('device', $device['device_id'], 'jnx_cos_queues', json_encode($queues));
 
 
-      foreach ($qstat_oids as $oid)
-      {
-        $qstats = snmpwalk_cache_oid($device, $oid, $qstats, "JUNIPER-COS-MIB");
-      }
+        foreach ($qstat_oids as $oid) {
+            $qstats = snmpwalk_cache_oid($device, $oid, $qstats, "JUNIPER-COS-MIB");
+        }
 
-      foreach($qstats as $qstat_index => $qstat)
-      {
-        list($qstat_ifindex, $qstat_queue) = explode('.', $qstat_index);
+        foreach ($qstats as $qstat_index => $qstat) {
+            [$qstat_ifindex, $qstat_queue] = explode('.', $qstat_index);
 
-        $port_stats[$qstat_ifindex]['jnx_cos_qstat'][$qstat_queue] = $qstat;
+            $port_stats[$qstat_ifindex]['jnx_cos_qstat'][$qstat_queue] = $qstat;
 
-      }
-      unset($qstats);
-      unset($queues);
+        }
+        unset($qstats);
+        unset($queues);
 
     }
 

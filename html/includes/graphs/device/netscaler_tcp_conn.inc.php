@@ -5,18 +5,18 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 $rrd_filename = get_rrd_path($device, "netscaler-stats-tcp.rrd");
 
-$ds_in = "CurClientConn";
+$ds_in  = "CurClientConn";
 $ds_out = "CurServerConn";
 
-$in_text = "Client";
+$in_text  = "Client";
 $out_text = "Server";
 
 $colour_area_in = "78c7eb";
@@ -31,6 +31,6 @@ $colour_area_out_max = "AAAAAA";
 $graph_max = 1;
 $unit_text = "Connections";
 
-include($config['html_dir']."/includes/graphs/generic_duplex.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_duplex.inc.php");
 
 // EOF

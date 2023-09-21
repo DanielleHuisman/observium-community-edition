@@ -1536,7 +1536,7 @@ vRtrLdpNgTargPeerTunnelLspTable  OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "The vRtrLdpNgTargPeerTunnelLspTable keeps the list of LDP-over-RSVP
-         LSP ids which are currently supported by the application.
+         LSP ids which are used for the tunneling of unicast FECs.
 
          Each LSP ID in the list corresponds to the vRtrMplsLspIndex of the
          given MPLS LSP."
@@ -6215,10 +6215,10 @@ vRtrLdpNgTargPeerTunneling       OBJECT-TYPE
     MAX-ACCESS  read-create
     STATUS      current
     DESCRIPTION
-        "The value of vRtrLdpNgTargPeerTunneling specifies whether tunneling
-         of LDP over tunnels is enabled.  When this object has a value of
-         'true', tunneling is enabled.  When its value is 'false', tunneling is
-         disabled."
+        "The value of vRtrLdpNgTargPeerTunneling specifies whether tunneling of
+         unicast LDP FECs over tunnels is enabled. When this object has a value
+         of 'true', tunneling is enabled. When its value is 'false', tunneling
+         is disabled."
     DEFVAL      { false }
     ::= { vRtrLdpNgTargPeerEntry 19 }
 
@@ -6258,7 +6258,9 @@ vRtrLdpNgTargPeerCreator         OBJECT-TYPE
     SYNTAX      INTEGER {
         manual   (1),
         template (2),
-        sdp      (3)
+        sdp      (3),
+        autotx   (4),
+        autorx   (5)
     }
     MAX-ACCESS  read-only
     STATUS      current
@@ -6273,7 +6275,13 @@ vRtrLdpNgTargPeerCreator         OBJECT-TYPE
          template configuration.
 
          A value of 'sdp(3)' indicates the entry is auto created by service
-         manager."
+         manager.
+
+         A value of 'autotx(4)' indicates the entry is auto created for remote
+         LFA.
+
+         A value of 'autorx(5)' indicates the entry is auto created upon
+         reception of a targeted Hello message."
     ::= { vRtrLdpNgTargPeerEntry 23 }
 
 vRtrLdpNgTargPeerTemplName       OBJECT-TYPE
@@ -9328,7 +9336,11 @@ VRtrLdpNgTargEntry               ::= SEQUENCE
     vRtrLdpNgTargIPv4HelloReduction  TruthValue,
     vRtrLdpNgTargIPv6HelloReduction  TruthValue,
     vRtrLdpNgTargIPv4HelloReduceFctr Unsigned32,
-    vRtrLdpNgTargIPv6HelloReduceFctr Unsigned32
+    vRtrLdpNgTargIPv6HelloReduceFctr Unsigned32,
+    vRtrLdpNgTargAutoTxV4AdminState  TmnxAdminState,
+    vRtrLdpNgTargAutoTxV4Tunneling   TruthValue,
+    vRtrLdpNgTargAutoRxV4AdminState  TmnxAdminState,
+    vRtrLdpNgTargAutoRxV4Tunneling   TruthValue
 }
 
 vRtrLdpNgTargRowLastCh           OBJECT-TYPE
@@ -9668,6 +9680,61 @@ vRtrLdpNgTargIPv6HelloReduceFctr OBJECT-TYPE
          vRtrLdpNgTargIPv6HelloReduction is disabled."
     DEFVAL      { 3 }
     ::= { vRtrLdpNgTargEntry 25 }
+
+vRtrLdpNgTargAutoTxV4AdminState  OBJECT-TYPE
+    SYNTAX      TmnxAdminState
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrLdpNgTargAutoTxV4AdminState specifies whether
+         automatic IPv4 TX targeted sessions are created or not. When this
+         object is administratively up, automatic targeted sessions are created
+         to the PQ router ID of each route that contains remote LFA
+         information. When this object is administratively down, automatic
+         targeted sessions are not created to the PQ router IDs."
+    DEFVAL      { outOfService }
+    ::= { vRtrLdpNgTargEntry 27 }
+
+vRtrLdpNgTargAutoTxV4Tunneling   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrLdpNgTargAutoTxV4Tunneling specifies whether
+         tunneling of unicast LDP FECs over tunnels is enabled for the
+         automatic IPv4 TX targeted sessions. When this object has a value of
+         'true', tunneling is enabled. When its value is 'false', tunneling is
+         disabled."
+    DEFVAL      { false }
+    ::= { vRtrLdpNgTargEntry 28 }
+
+vRtrLdpNgTargAutoRxV4AdminState  OBJECT-TYPE
+    SYNTAX      TmnxAdminState
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrLdpNgTargAutoRxV4AdminState specifies whether
+         automatic IPv4 RX targeted sessions are created or not. When this
+         object is administratively up, the reception of an unhandled IPv4
+         targeted hello message causes the creation of automatic targeted
+         session to the source peer of the hello message. When this object is
+         administratively down, automatic targeted sessions are not created for
+         unhandled IPv4 targeted hello messages."
+    DEFVAL      { outOfService }
+    ::= { vRtrLdpNgTargEntry 29 }
+
+vRtrLdpNgTargAutoRxV4Tunneling   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrLdpNgTargAutoRxV4Tunneling specifies whether
+         tunneling of unicast LDP FECs over tunnels is enabled for the
+         automatic IPv4 RX targeted sessions. When this object has a value of
+         'true', tunneling is enabled. When its value is 'false', tunneling is
+         disabled."
+    DEFVAL      { false }
+    ::= { vRtrLdpNgTargEntry 30 }
 
 vRtrLdpNgAggrPreMatchTableLstCh  OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -10675,6 +10742,17 @@ tmnxLdpNgV19v0Compliance         MODULE-COMPLIANCE
             tmnxLdpNgEcmpGroup
         }
     ::= { tmnxLdpNgCompliances 6 }
+
+tmnxLdpNgV20v0Compliance         MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for management of extended LDP on Nokia SROS
+         series systems release 20.0."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxLdpTargAutoTldpV20v0Group
+        }
+    ::= { tmnxLdpNgCompliances 7 }
 
 tmnxLdpNgGroups                  OBJECT IDENTIFIER ::= { tmnxLdpNgConformance 2 }
 
@@ -11837,6 +11915,20 @@ tmnxLdpNgEcmpGroup               OBJECT-GROUP
         "The group of objects supporting the LDP ECMP on Nokia SROS series
          systems release 19.0."
     ::= { tmnxLdpNgGroups 59 }
+
+tmnxLdpTargAutoTldpV20v0Group    OBJECT-GROUP
+    OBJECTS     {
+        vRtrLdpNgTargAutoTxV4AdminState,
+        vRtrLdpNgTargAutoTxV4Tunneling,
+        vRtrLdpNgTargAutoRxV4AdminState,
+        vRtrLdpNgTargAutoRxV4Tunneling
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of automatic T-LDP
+         (Targeted Label Distribution Protocol) on Nokia SROS series systems
+         20.0 release."
+    ::= { tmnxLdpNgGroups 64 }
 
 tmnxLdpNgNotifyPrefix            OBJECT IDENTIFIER ::= { tmnxSRNotifyPrefix 91 }
 

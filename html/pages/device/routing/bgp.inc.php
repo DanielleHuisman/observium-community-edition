@@ -4,10 +4,10 @@
  * Observium Network Management and Monitoring System
  * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
  *
- * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     webui
+ * @author         Adam Armstrong <adama@observium.org>
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,126 +15,129 @@ echo generate_box_open();
 
 ?>
 
-<table class="table table-hover table-striped vertical-align">
-  <tbody>
-    <tr class="up">
-      <td class="state-marker"></td>
-      <td style="padding: 10px 14px;"><span style="font-size: 20px; color: #193d7f;">BGP AS<?php echo($device['human_local_as']); ?></span>
-      </td>
-      <td>
+    <table class="table table-hover table-striped vertical-align">
+        <tbody>
+        <tr class="up">
+            <td class="state-marker"></td>
+            <td style="padding: 10px 14px;"><span style="font-size: 20px; color: #193d7f;">BGP AS<?php echo($device['human_local_as']); ?></span>
+            </td>
+            <td>
 
-<?php
+                <?php
 
-    $sessions = array();
-    foreach (dbFetchRows('SELECT `bgpPeer_id`,`local_as`,`bgpPeerState`,`bgpPeerAdminStatus`,`bgpPeerRemoteAs` FROM `bgpPeers` WHERE `device_id` = ?;', array($device['device_id'])) as $bgp)
-    {
-      $sessions['count']++;
-      if ($bgp['bgpPeerAdminStatus'] === 'start' || $bgp['bgpPeerAdminStatus'] === 'running')
-      {
-        $sessions['enabled']++;
-        if ($bgp['bgpPeerState'] !== 'established')
-        {
-          $sessions['alerts']++;
-        } else {
-          $sessions['connected']++;
-        }
-      } else {
-        $sessions['shutdown']++;
-      }
-      if ($bgp['bgpPeerRemoteAs'] == $bgp['local_as'])
-      {
-        $sessions['internal']++;
-      } else {
-        $sessions['external']++;
-      }
-    }
+                $sessions = [];
+                foreach (dbFetchRows('SELECT `bgpPeer_id`,`local_as`,`bgpPeerState`,`bgpPeerAdminStatus`,`bgpPeerRemoteAs` FROM `bgpPeers` WHERE `device_id` = ?;', [$device['device_id']]) as $bgp) {
+                    $sessions['count']++;
+                    if ($bgp['bgpPeerAdminStatus'] === 'start' || $bgp['bgpPeerAdminStatus'] === 'running') {
+                        $sessions['enabled']++;
+                        if ($bgp['bgpPeerState'] !== 'established') {
+                            $sessions['alerts']++;
+                        } else {
+                            $sessions['connected']++;
+                        }
+                    } else {
+                        $sessions['shutdown']++;
+                    }
+                    if ($bgp['bgpPeerRemoteAs'] == $bgp['local_as']) {
+                        $sessions['internal']++;
+                    } else {
+                        $sessions['external']++;
+                    }
+                }
 
-?>
-      </td>
+                ?>
+            </td>
 
-      <td style="text-align: right;">
+            <td style="text-align: right;">
 
-        <div class="btn-group" style="margin: 5px;">
-          <div class="btn btn-sm btn-default"><strong>Total Sessions</strong></div>
-          <div class="btn btn-sm btn-default"> <?php echo $sessions['count']+0; ?></div>
-        </div>
+                <div class="btn-group" style="margin: 5px;">
+                    <div class="btn btn-sm btn-default"><strong>Total Sessions</strong></div>
+                    <div class="btn btn-sm btn-default"> <?php echo $sessions['count'] + 0; ?></div>
+                </div>
 
-        <div class="btn-group" style="margin: 5px;">
-          <div class="btn btn-sm btn-default"><strong>Errored Sessions</strong></div>
-          <div class="btn btn-sm btn-danger"> <?php echo $sessions['alerts']+0; ?></div>
-        </div>
+                <div class="btn-group" style="margin: 5px;">
+                    <div class="btn btn-sm btn-default"><strong>Errored Sessions</strong></div>
+                    <div class="btn btn-sm btn-danger"> <?php echo $sessions['alerts'] + 0; ?></div>
+                </div>
 
-        <div class="btn-group" style="margin: 5px;">
-          <div class="btn btn-sm btn-default"><strong>iBGP</strong></div>
-          <div class="btn btn-sm btn-info"> <?php echo $sessions['internal']+0; ?></div>
-        </div>
+                <div class="btn-group" style="margin: 5px;">
+                    <div class="btn btn-sm btn-default"><strong>iBGP</strong></div>
+                    <div class="btn btn-sm btn-info"> <?php echo $sessions['internal'] + 0; ?></div>
+                </div>
 
-        <div class="btn-group" style="margin: 5px;">
-          <div class="btn btn-sm btn-default"><strong>eBGP</strong></div>
-          <div class="btn btn-sm btn-primary"> <?php echo $sessions['external']+0; ?></div>
-        </div>
-      </td>
+                <div class="btn-group" style="margin: 5px;">
+                    <div class="btn btn-sm btn-default"><strong>eBGP</strong></div>
+                    <div class="btn btn-sm btn-primary"> <?php echo $sessions['external'] + 0; ?></div>
+                </div>
+            </td>
 
-     </tr>
-   </tbody>
-</table>
+        </tr>
+        </tbody>
+    </table>
 
 <?php
 
 echo generate_box_close();
 
-if (!isset($vars['view'])) { $vars['view'] = 'details'; }
-
-unset($navbar);
-$link_array = array('page'    => 'device',
-                    'device'  => $device['device_id'],
-                    'tab'     => 'routing',
-                    'proto'   => 'bgp');
-
-$types = array('all'      => 'All',
-               'internal' => 'iBGP',
-               'external' => 'eBGP');
-
-foreach ($types as $option => $text)
-{
-  $navbar['options'][$option]['text'] = $text;
-  if ($vars['type'] == $option || (empty($vars['type']) && $option == 'all'))
-  {
-    $navbar['options'][$option]['class'] .= " active";
-    $bgp_options = array('type' => NULL);
-  } else {
-    $bgp_options = array('type' => $option);
-  }
-  if ($vars['adminstatus']) { $bgp_options['adminstatus'] = $vars['adminstatus']; }
-  elseif ($vars['state']) { $bgp_options['state'] = $vars['state']; }
-  $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
+if (!isset($vars['view'])) {
+    $vars['view'] = 'details';
 }
 
-$statuses = array('stop'  => 'Shutdown',
-                  'start' => 'Enabled',
-                  'down'  => 'Down');
-foreach ($statuses as $option => $text)
-{
-  $status = ($option == 'down') ? 'state' : 'adminstatus';
-  $navbar['options'][$option]['text'] = $text;
-  if ($vars[$status] == $option)
-  {
-    $navbar['options'][$option]['class'] .= " active";
-    $bgp_options = array($status => NULL);
-  } else {
-    $bgp_options = array($status => $option);
-  }
-  if ($vars['type']) { $bgp_options['type'] = $vars['type']; }
-  $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
+unset($navbar);
+$link_array = ['page'   => 'device',
+               'device' => $device['device_id'],
+               'tab'    => 'routing',
+               'proto'  => 'bgp'];
+
+$types = ['all'      => 'All',
+          'internal' => 'iBGP',
+          'external' => 'eBGP'];
+
+foreach ($types as $option => $text) {
+    $navbar['options'][$option]['text'] = $text;
+    if ($vars['type'] == $option || (empty($vars['type']) && $option == 'all')) {
+        $navbar['options'][$option]['class'] .= " active";
+        $bgp_options                         = ['type' => NULL];
+    } else {
+        $bgp_options = ['type' => $option];
+    }
+    if ($vars['adminstatus']) {
+        $bgp_options['adminstatus'] = $vars['adminstatus'];
+    } elseif ($vars['state']) {
+        $bgp_options['state'] = $vars['state'];
+    }
+    $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
+}
+
+$statuses = ['stop'  => 'Shutdown',
+             'start' => 'Enabled',
+             'down'  => 'Down'];
+foreach ($statuses as $option => $text) {
+    $status                             = ($option == 'down') ? 'state' : 'adminstatus';
+    $navbar['options'][$option]['text'] = $text;
+    if ($vars[$status] == $option) {
+        $navbar['options'][$option]['class'] .= " active";
+        $bgp_options                         = [$status => NULL];
+    } else {
+        $bgp_options = [$status => $option];
+    }
+    if ($vars['type']) {
+        $bgp_options['type'] = $vars['type'];
+    }
+    $navbar['options'][$option]['url'] = generate_url($link_array, $bgp_options);
 }
 
 $navbar['options_right']['details']['text'] = 'No Graphs';
-if ($vars['view'] === 'details') { $navbar['options_right']['details']['class'] .= ' active'; }
-$navbar['options_right']['details']['url'] = generate_url($vars, array('view' => 'details', 'graph' => 'NULL'));
+if ($vars['view'] === 'details') {
+    $navbar['options_right']['details']['class'] .= ' active';
+}
+$navbar['options_right']['details']['url'] = generate_url($vars, ['view' => 'details', 'graph' => 'NULL']);
 
 $navbar['options_right']['updates']['text'] = 'Updates';
-if ($vars['graph'] === 'updates') { $navbar['options_right']['updates']['class'] .= ' active'; }
-$navbar['options_right']['updates']['url'] = generate_url($vars, array('view' => 'graphs', 'graph' => 'updates'));
+if ($vars['graph'] === 'updates') {
+    $navbar['options_right']['updates']['class'] .= ' active';
+}
+$navbar['options_right']['updates']['url'] = generate_url($vars, ['view' => 'graphs', 'graph' => 'updates']);
 
 /*
 $bgp_graphs = array();
@@ -151,12 +154,12 @@ foreach ($device['graphs'] as $entry)
 }
 */
 
-$bgp_graphs = [
-  'unicast'   => array('text' => 'Unicast'),
-  'multicast' => array('text' => 'Multicast'),
-  'mac'       => array('text' => 'MAC Accounting')
+$bgp_graphs                       = [
+  'unicast'   => ['text' => 'Unicast'],
+  'multicast' => ['text' => 'Multicast'],
+  'mac'       => ['text' => 'MAC Accounting']
 ];
-$bgp_graphs['unicast']['types'] = [
+$bgp_graphs['unicast']['types']   = [
   'prefixes_ipv4unicast' => 'IPv4 Ucast Prefixes',
   'prefixes_ipv6unicast' => 'IPv6 Ucast Prefixes',
   'prefixes_ipv4vpn'     => 'VPNv4 Prefixes'
@@ -165,23 +168,20 @@ $bgp_graphs['multicast']['types'] = [
   'prefixes_ipv4multicast' => 'IPv4 Mcast Prefixes',
   'prefixes_ipv6multicast' => 'IPv6 Mcast Prefixes'
 ];
-$bgp_graphs['mac']['types'] = [
+$bgp_graphs['mac']['types']       = [
   'macaccounting_bits' => 'MAC Bits',
   'macaccounting_pkts' => 'MAC Pkts'
 ];
-foreach ($bgp_graphs as $bgp_graph => $bgp_options)
-{
-  $navbar['options_right'][$bgp_graph]['text'] = $bgp_options['text'];
-  foreach ($bgp_options['types'] as $option => $text)
-  {
-    if ($vars['graph'] == $option)
-    {
-      $navbar['options_right'][$bgp_graph]['class'] .= ' active';
-      $navbar['options_right'][$bgp_graph]['suboptions'][$option]['class'] = 'active';
+foreach ($bgp_graphs as $bgp_graph => $bgp_options) {
+    $navbar['options_right'][$bgp_graph]['text'] = $bgp_options['text'];
+    foreach ($bgp_options['types'] as $option => $text) {
+        if ($vars['graph'] == $option) {
+            $navbar['options_right'][$bgp_graph]['class']                        .= ' active';
+            $navbar['options_right'][$bgp_graph]['suboptions'][$option]['class'] = 'active';
+        }
+        $navbar['options_right'][$bgp_graph]['suboptions'][$option]['text'] = $text;
+        $navbar['options_right'][$bgp_graph]['suboptions'][$option]['url']  = generate_url($vars, ['view' => 'graphs', 'graph' => $option]);
     }
-    $navbar['options_right'][$bgp_graph]['suboptions'][$option]['text'] = $text;
-    $navbar['options_right'][$bgp_graph]['suboptions'][$option]['url'] = generate_url($vars, array('view' => 'graphs', 'graph' => $option));
-  }
 }
 
 $navbar['class'] = "navbar-narrow";

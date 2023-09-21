@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -17,8 +17,10 @@
 
 $hardware = snmp_get($device, '.1.3.6.1.4.1.32050.2.1.25.2.0', '-Oqvn', 'SNMPv2-SMI');
 $hardware = "SiteMonitor $hardware";
-$version = snmp_get($device, '.1.3.6.1.4.1.32050.2.1.25.3.0', '-Oqvn', 'SNMPv2-SMI');
-$serial = snmp_get($device, '.1.3.6.1.4.1.32050.2.1.25.4.0', '-Oqvn', 'SNMPv2-SMI');
-if (!$serial) { unset($serial); }
+$version  = snmp_get($device, '.1.3.6.1.4.1.32050.2.1.25.3.0', '-Oqvn', 'SNMPv2-SMI');
+$serial   = snmp_get($device, '.1.3.6.1.4.1.32050.2.1.25.4.0', '-Oqvn', 'SNMPv2-SMI');
+if (!$serial) {
+    unset($serial);
+}
 
 // EOF

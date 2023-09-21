@@ -4,14 +4,14 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 if ($readonly && $vars['ignoreport']) {
-  print_error_permission('You have insufficient permissions to edit settings.');
+    print_error_permission('You have insufficient permissions to edit settings.');
 }
 
 ?>
@@ -26,27 +26,27 @@ if ($readonly && $vars['ignoreport']) {
 
                 // Add CSRF Token
                 if (isset($_SESSION['requesttoken'])) {
-                  echo generate_form_element([ 'type' => 'hidden', 'id' => 'requesttoken', 'value' => $_SESSION['requesttoken'] ]) . PHP_EOL;
+                    echo generate_form_element(['type' => 'hidden', 'id' => 'requesttoken', 'value' => $_SESSION['requesttoken']]) . PHP_EOL;
                 }
 
                 $item = [
-                  'id' => 'action',
+                  'id'    => 'action',
                   //'readonly' => $readonly,
                   'value' => 'ports_update'
                 ];
                 echo(generate_form_element($item, 'hidden'));
 
                 $item = [
-                  'id' => 'ignoreport',
+                  'id'       => 'ignoreport',
                   'readonly' => $readonly,
-                  'value' => 'yes'
+                  'value'    => 'yes'
                 ];
                 echo(generate_form_element($item, 'hidden'));
 
                 $item = [
-                  'id' => 'device',
+                  'id'       => 'device',
                   'readonly' => $readonly,
-                  'value' => $device['device_id']
+                  'value'    => $device['device_id']
                 ];
                 echo(generate_form_element($item, 'hidden'));
 
@@ -117,7 +117,7 @@ if ($readonly && $vars['ignoreport']) {
 
                     $ports_attribs = get_device_entities_attribs($device['device_id'], 'port'); // Get all attribs
 
-                    foreach (dbFetchRows("SELECT * FROM `ports` WHERE `deleted` = '0' AND `device_id` = ? ORDER BY `ifIndex` ", array($device['device_id'])) as $port) {
+                    foreach (dbFetchRows("SELECT * FROM `ports` WHERE `deleted` = '0' AND `device_id` = ? ORDER BY CAST(`ifIndex` as SIGNED INTEGER) ", [$device['device_id']]) as $port) {
                         humanize_port($port);
 
                         if (isset($ports_attribs['port'][$port['port_id']])) {
@@ -128,41 +128,41 @@ if ($readonly && $vars['ignoreport']) {
                         echo('<td class="state-marker"></td>');
                         echo("<td>" . $port['ifIndex'] . "</td>");
                         echo('<td style="vertical-align: top;"><span class="entity">' . generate_entity_link('port', $port) . '</span><br />' . escape_html($port['ifAlias']) . '</td>');
-                        echo '<td><span class="label label-'.get_type_class($port['ifType']).'">' . $port['human_type'] . '</span><br />';
+                        echo '<td><span class="label label-' . get_type_class($port['ifType']) . '">' . $port['human_type'] . '</span><br />';
 
                         //r($port);
 
-                        echo ('<span class="label label-'.$port['admin_class'].'">' . $port['admin_status'] . '</span> 
+                        echo('<span class="label label-' . $port['admin_class'] . '">' . $port['admin_status'] . '</span> 
                                <span data-name="operstatus_' . $port['port_id'] . '" class="label label-' . $port['oper_class'] . '">' . escape_html($port['ifOperStatus']) . '</span></td>');
 
                         echo('<td class="text-center">');
-                        $item = array('id' => 'port['.$port['port_id'].']',
-                            'readonly' => $readonly,
-                            'value' => $port['port_id']);
+                        $item = ['id'       => 'port[' . $port['port_id'] . ']',
+                                 'readonly' => $readonly,
+                                 'value'    => $port['port_id']];
                         echo(generate_form_element($item, 'hidden'));
 
-                        $item = array('id' => 'port[' . $port['port_id'] . '][disabled]',
-                            'size' => 'mini',
-                            'on-text' => 'Disable',
-                            'on-color' => 'danger',
-                            'off-text' => 'Poll',
-                            'off-color' => 'success',
-                            'width' => '58px',
-                            'readonly' => $readonly,
-                            'value' => $port['disabled']);
+                        $item = ['id'        => 'port[' . $port['port_id'] . '][disabled]',
+                                 'size'      => 'mini',
+                                 'on-text'   => 'Disable',
+                                 'on-color'  => 'danger',
+                                 'off-text'  => 'Poll',
+                                 'off-color' => 'success',
+                                 'width'     => '58px',
+                                 'readonly'  => $readonly,
+                                 'value'     => $port['disabled']];
                         echo(generate_form_element($item, 'switch-ng'));
                         echo("</td>");
 
                         echo('<td class="text-center">');
-                        $item = array('id' => 'port[' . $port['port_id'] . '][ignore]',
-                            'size' => 'mini',
-                            'on-text' => 'Ignore',
-                            'on-color' => 'danger',
-                            'off-text' => 'Alerts',
-                            'off-color' => 'success',
-                            'width' => '58px',
-                            'readonly' => $readonly,
-                            'value' => $port['ignore']);
+                        $item = ['id'        => 'port[' . $port['port_id'] . '][ignore]',
+                                 'size'      => 'mini',
+                                 'on-text'   => 'Ignore',
+                                 'on-color'  => 'danger',
+                                 'off-text'  => 'Alerts',
+                                 'off-color' => 'success',
+                                 'width'     => '58px',
+                                 'readonly'  => $readonly,
+                                 'value'     => $port['ignore']];
                         echo(generate_form_element($item, 'switch-ng'));
                         echo("</td>");
 
@@ -176,27 +176,27 @@ if ($readonly && $vars['ignoreport']) {
                         // Custom port speed
                         echo '<td class="text-nowrap">';
                         $ifSpeed_custom_bool = isset($port['ifSpeed_custom']);
-                        $ifSpeed = $ifSpeed_custom_bool ? $port['ifSpeed_custom'] : $port['ifSpeed'];
-                        $item = array('id' => 'port[' . $port['port_id'] . '][ifSpeed_custom]',
-                            //'name'        => 'Group name',
-                            'placeholder' => formatRates($port['ifSpeed'], 4, 4),
-                            'disabled' => !$ifSpeed_custom_bool,
-                            'width' => '75px',
-                            'readonly' => $readonly,
-                            //'ajax'        => TRUE,
-                            //'ajax_vars'   => array('field' => 'ifspeed'),
-                            'value' => formatRates($ifSpeed, 4, 4));
+                        $ifSpeed             = $ifSpeed_custom_bool ? $port['ifSpeed_custom'] : $port['ifSpeed'];
+                        $item                = ['id'          => 'port[' . $port['port_id'] . '][ifSpeed_custom]',
+                                                //'name'        => 'Group name',
+                                                'placeholder' => format_bps($port['ifSpeed'], 4, 4),
+                                                'disabled'    => !$ifSpeed_custom_bool,
+                                                'width'       => '75px',
+                                                'readonly'    => $readonly,
+                                                //'ajax'        => TRUE,
+                                                //'ajax_vars'   => array('field' => 'ifspeed'),
+                                                'value'       => format_bps($ifSpeed, 4, 4)];
                         echo(generate_form_element($item, 'text'));
                         echo('</td>');
 
                         echo '<td>';
                         // Custom port speed toggle switch
-                        $item = array('id' => 'port[' . $port['port_id'] . '][ifSpeed_custom_bool]',
-                            'size' => 'large',
-                            'view' => $locked ? 'lock' : 'square', // note this is data-tt-type, but 'type' key reserved for element type
-                            'onchange' => "toggleAttrib('disabled', obj.attr('data-onchange-id'));",
-                            'onchange-id' => 'port[' . $port['port_id'] . '][ifSpeed_custom]', // target id for onchange, set attrib: data-onchange-id
-                            'value' => (bool)$ifSpeed_custom_bool);
+                        $item = ['id'          => 'port[' . $port['port_id'] . '][ifSpeed_custom_bool]',
+                                 'size'        => 'large',
+                                 'view'        => $locked ? 'lock' : 'square', // note this is data-tt-type, but 'type' key reserved for element type
+                                 'onchange'    => "toggleAttrib('disabled', obj.attr('data-onchange-id'));",
+                                 'onchange-id' => 'port[' . $port['port_id'] . '][ifSpeed_custom]', // target id for onchange, set attrib: data-onchange-id
+                                 'value'       => (bool)$ifSpeed_custom_bool];
                         echo(generate_form_element($item, 'toggle'));
 
                         echo '</span>';
@@ -206,7 +206,7 @@ if ($readonly && $vars['ignoreport']) {
                         echo '<td>';
                         if ($port['port_64bit'] == 1) {
                             echo '<span class="label label-success">64bit</span>';
-                        } else if ($port['port_64bit'] == 0) {
+                        } elseif ($port['port_64bit'] == 0) {
                             echo '<span class="label label-warning">32bit</span>';
                         } else {
                             echo '<span class="label">Unchecked</span>';
@@ -214,7 +214,7 @@ if ($readonly && $vars['ignoreport']) {
 
                         echo '</td></tr>' . PHP_EOL;
 
-                        $row++;
+                        //$row++;
                     }
                     ?>
                 </table>
@@ -222,12 +222,12 @@ if ($readonly && $vars['ignoreport']) {
 
             <div id="submit" class="box-footer">
                 <?php
-                $item = array('id' => 'submit',
-                    'name' => 'Save Changes',
-                    'class' => 'btn-primary pull-right',
-                    'icon' => 'icon-ok icon-white',
-                    'readonly' => $readonly,
-                    'value' => 'save');
+                $item = ['id'       => 'submit',
+                         'name'     => 'Save Changes',
+                         'class'    => 'btn-primary pull-right',
+                         'icon'     => 'icon-ok icon-white',
+                         'readonly' => $readonly,
+                         'value'    => 'save'];
                 echo(generate_form_element($item, 'submit'));
                 ?>
             </div>

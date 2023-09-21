@@ -7,6 +7,10 @@ $config['install_dir'] = $base_dir;
 
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/../includes/definitions.inc.php');
 //include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
@@ -73,19 +77,23 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
     return $array;
   }
 
-  /**
-   * @dataProvider providerDefinitionPatterns
-   * @group constants
-   */
-  public function testDefinitionPatterns($pattern, $string, $result, $match = NULL) {
-    $test = preg_match($pattern, $string, $matches);
-    //var_dump($matches);
-    $this->assertSame($result, (bool)$test);
-    if ($test && !is_null($match)) {
-      // Validate $match
-      $this->assertSame($match, $matches[1]);
+    /**
+    * @dataProvider providerDefinitionPatterns
+    * @group constants
+    */
+    public function testDefinitionPatterns($pattern, $string, $result, $match = NULL) {
+        $test = preg_match($pattern, $string, $matches);
+        //var_dump($matches);
+        $this->assertSame($result, (bool)$test);
+        if ($test) {
+            if (is_array($match)) {
+                $this->assertSame($match, $matches);
+            } elseif (!is_null($match)) {
+                // Validate $match
+                $this->assertSame($match, $matches[1]);
+            }
+        }
     }
-  }
 
   public function providerDefinitionPatterns() {
     $array = array();
@@ -326,6 +334,26 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
     $array[] = array($pattern, '<a href="https://www.get.no/v3/bredb%C3%A5nd/tr%C3%A5dl%C3%B8st-modem" rel="nofollow">https://www.get.no/v3/bredbånd/trådløst-modem</a>', TRUE,
                                'https://www.get.no/v3/bredb%C3%A5nd/tr%C3%A5dl%C3%B8st-modem');
     */
+
+      $pattern = OBS_PATTERN_LATLON;
+      $array[] = [ $pattern, 'Some location [33.234, -56.22]', TRUE,
+                   [ 0 => '[33.234, -56.22]', 'lat' => '33.234', 1 => '33.234', 'lon' => '-56.22', 2 => '-56.22' ] ];
+      $array[] = [ $pattern, 'Some location (33.234 -56.22)', TRUE,
+                   [ 0 => '(33.234 -56.22)',  'lat' => '33.234', 1 => '33.234', 'lon' => '-56.22', 2 => '-56.22' ] ];
+      $array[] = [ $pattern, ' Some location [33.234;-56.22]', TRUE,
+                   [ 0 => '[33.234;-56.22]',  'lat' => '33.234', 1 => '33.234', 'lon' => '-56.22', 2 => '-56.22' ] ];
+      $array[] = [ $pattern, '33.234,-56.22', TRUE,
+                   [ 0 => '33.234,-56.22',    'lat' => '33.234', 1 => '33.234', 'lon' => '-56.22', 2 => '-56.22' ] ];
+      $array[] = [ $pattern, "'33.234','-56.22'", TRUE,
+                   [ 0 => "'33.234','-56.22'", 'lat' => '33.234', 1 => '33.234', 'lon' => '-56.22', 2 => '-56.22' ] ];
+      $array[] = [ $pattern, 'Some location|47.616380|-122.341673', FALSE ];
+
+      $pattern = OBS_PATTERN_LATLON_ALT;
+      $array[] = [ $pattern, 'Some location|47.616380|-122.341673', TRUE,
+                   [ 0 => '|47.616380|-122.341673', 'lat' => '47.616380', 1 => '47.616380', 'lon' => '-122.341673', 2 => '-122.341673' ] ];
+      $array[] = [ $pattern, "Some location|'47.616380'|'-122.341673'", TRUE,
+                   [ 0 => "|'47.616380'|'-122.341673'", 'lat' => '47.616380', 1 => '47.616380', 'lon' => '-122.341673', 2 => '-122.341673' ] ];
+      $array[] = [ $pattern, 'Some location [33.234, -56.22]', FALSE ];
 
     $pattern = OBS_PATTERN_NOPRINT;
     // Not printable chars

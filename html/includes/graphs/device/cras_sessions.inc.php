@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,7 +15,7 @@ $scale_min = "0";
 
 $rrd_filename = get_rrd_path($device, "cras_sessions.rrd");
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $rrd_options .= " DEF:email=$rrd_filename_escape:email:AVERAGE";
 $rrd_options .= " DEF:ipsec=$rrd_filename_escape:ipsec:AVERAGE";

@@ -1,35 +1,34 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $rrd_filename = get_rrd_path($device, "vpdn-l2tp.rrd");
 
-$stats = array('sessions');
+$stats = ['sessions'];
 
-$i=0;
-foreach ($stats as $stat)
-{
-  $i++;
-  $rrd_list[$i]['filename'] = $rrd_filename;
-  $rrd_list[$i]['ds'] = $stat;
+$i = 0;
+foreach ($stats as $stat) {
+    $i++;
+    $rrd_list[$i]['filename'] = $rrd_filename;
+    $rrd_list[$i]['ds']       = $stat;
 }
 
-$colours='mixed';
+$colours = 'mixed';
 
-$nototal = 1;
+$nototal    = 1;
 $simple_rrd = 1;
+$unit_text  = "Sessions";
 
-include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi_line.inc.php");
 
 // EOF

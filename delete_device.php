@@ -5,41 +5,40 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
 $options = getopt("d");
-if (isset($options['d'])) { array_shift($argv); } // for compatibility
+if (isset($options['d'])) {
+    array_shift($argv);
+} // for compatibility
 
-include("includes/sql-config.inc.php");
+include("includes/observium.inc.php");
 
-print_message("%g".OBSERVIUM_PRODUCT." ".OBSERVIUM_VERSION."\n%WRemove Device%n\n", 'color');
+print_message("%g" . OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION . "\n%WRemove Device%n\n", 'color');
 
 // Remove a host and all related data from the system
-if ($argv[1])
-{
-  $host = strtolower($argv[1]);
-  if (is_numeric($host))
-  {
-    $id = $host;
-  } else {
-    $id = get_device_id_by_hostname($host);
-  }
-  $delete_rrd = isset($argv[2]) && strtolower($argv[2]) === 'rrd';
+if ($argv[1]) {
+    $host = strtolower($argv[1]);
+    if (is_numeric($host)) {
+        $id = $host;
+    } else {
+        $id = get_device_id_by_hostname($host);
+    }
+    $delete_rrd = isset($argv[2]) && strtolower($argv[2]) === 'rrd';
 
-  // Test if a valid id was fetched from get_device_id_by_hostname()
-  if (isset($id) && is_numeric($id))
-  {
-    print_warning(delete_device($id, $delete_rrd));
-    print_success("Device $host removed.");
-  } else {
-    print_error("Device $host doesn't exist!");
-  }
+    // Test if a valid id was fetched from get_device_id_by_hostname()
+    if (isset($id) && is_numeric($id)) {
+        print_warning(delete_device($id, $delete_rrd));
+        print_success("Device $host removed.");
+    } else {
+        print_error("Device $host doesn't exist!");
+    }
 
 } else {
     print_message("%n

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -37,95 +37,87 @@ $mib = 'LIEBERT-GP-POWER-MIB';
 //LIEBERT-GP-POWER-MIB::lgpPwrLineMeasurementVolts.2.1 = INTEGER: 228 Volt
 //LIEBERT-GP-POWER-MIB::lgpPwrLineMeasurementVolts.3.1 = INTEGER: 231 Volt
 
-$oids  = snmpwalk_cache_twopart_oid($device, 'lgpPwrLineMeasurementEntry', array(), $mib);
+$oids = snmpwalk_cache_twopart_oid($device, 'lgpPwrLineMeasurementEntry', [], $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $id => $entry1)
-{
-  $phase_count = count($entry1);
-  foreach ($entry1 as $phase => $entry)
-  {
-    $index = $id . '.' . $phase;
-    switch ($entry['lgpPwrMeasurementPoint'])
-    {
-      case 'lgpPwrSource1Input':
-      case 'lgpPwrSourcePdu1Input':
-        $descr = 'Input';
-        break;
-      case 'lgpPwrSource2Input':
-      case 'lgpPwrSourcePdu2Input':
-        $descr = 'Input2';
-        break;
-      case 'lgpPwrOutputToLoad':
-        $descr = 'Output';
-        break;
-      case 'lgpPwrMeasBattery':
-        $descr = 'Battery';
-        break;
-      case 'lgpPwrMeasBypass':
-        $descr = 'Bypass';
-        break;
-      //case 'lgpPwrMeasDcBus':
-      //  $descr = 'DC Bus';
-      //  break;
-      //case 'lgpPwrMeasSystemOutput':
-      //  $descr = 'System';
-      //  break;
-      //case 'lgpPwrMeasBatteryCabinet':
-      //  $descr = 'Battery Cabinet';
-      //  break;
-      default:
-        continue 2;
+foreach ($oids as $id => $entry1) {
+    $phase_count = count($entry1);
+    foreach ($entry1 as $phase => $entry) {
+        $index = $id . '.' . $phase;
+        switch ($entry['lgpPwrMeasurementPoint']) {
+            case 'lgpPwrSource1Input':
+            case 'lgpPwrSourcePdu1Input':
+                $descr = 'Input';
+                break;
+            case 'lgpPwrSource2Input':
+            case 'lgpPwrSourcePdu2Input':
+                $descr = 'Input2';
+                break;
+            case 'lgpPwrOutputToLoad':
+                $descr = 'Output';
+                break;
+            case 'lgpPwrMeasBattery':
+                $descr = 'Battery';
+                break;
+            case 'lgpPwrMeasBypass':
+                $descr = 'Bypass';
+                break;
+            //case 'lgpPwrMeasDcBus':
+            //  $descr = 'DC Bus';
+            //  break;
+            //case 'lgpPwrMeasSystemOutput':
+            //  $descr = 'System';
+            //  break;
+            //case 'lgpPwrMeasBatteryCabinet':
+            //  $descr = 'Battery Cabinet';
+            //  break;
+            default:
+                continue 2;
+        }
+        if ($phase_count > 1 || $phase > 1) {
+            $descr .= ' Phase ' . $phase;
+        }
+
+        $scale    = 1;
+        $oid_name = 'lgpPwrLineMeasurementVA';
+        $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.8.' . $index;
+        $type     = $mib . '-' . $oid_name;
+        $value    = $entry[$oid_name];
+
+        if (isset($entry[$oid_name])) {
+            discover_sensor('apower', $device, $oid_num, $index, $type, $descr, $scale, $value);
+        }
+
+        $scale    = 1;
+        $oid_name = 'lgpPwrLineMeasurementVAR';
+        $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.18.' . $index;
+        $type     = $mib . '-' . $oid_name;
+        $value    = $entry[$oid_name];
+
+        if (isset($entry[$oid_name])) {
+            discover_sensor('rpower', $device, $oid_num, $index, $type, $descr, $scale, $value);
+        }
+
+        $scale    = 0.1;
+        $oid_name = 'lgpPwrLineMeasurementCrestFactorCurrent';
+        $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.13.' . $index;
+        $type     = $mib . '-' . $oid_name;
+        $value    = $entry[$oid_name];
+
+        if (isset($entry[$oid_name])) {
+            discover_sensor('crestfactor', $device, $oid_num, $index, $type, $descr, $scale, $value);
+        }
+
+        $scale    = 0.01;
+        $oid_name = 'lgpPwrLineMeasurementPowerFactor';
+        $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.14.' . $index;
+        $type     = $mib . '-' . $oid_name;
+        $value    = $entry[$oid_name];
+
+        if (isset($entry[$oid_name])) {
+            discover_sensor('powerfactor', $device, $oid_num, $index, $type, $descr, $scale, $value);
+        }
     }
-    if ($phase_count > 1 || $phase > 1)
-    {
-      $descr .= ' Phase ' . $phase;
-    }
-
-    $scale    = 1;
-    $oid_name = 'lgpPwrLineMeasurementVA';
-    $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.8.' . $index;
-    $type     = $mib . '-' . $oid_name;
-    $value    = $entry[$oid_name];
-
-    if (isset($entry[$oid_name]))
-    {
-      discover_sensor('apower', $device, $oid_num, $index, $type, $descr, $scale, $value);
-    }
-
-    $scale    = 1;
-    $oid_name = 'lgpPwrLineMeasurementVAR';
-    $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.18.' . $index;
-    $type     = $mib . '-' . $oid_name;
-    $value    = $entry[$oid_name];
-
-    if (isset($entry[$oid_name]))
-    {
-      discover_sensor('rpower', $device, $oid_num, $index, $type, $descr, $scale, $value);
-    }
-
-    $scale    = 0.1;
-    $oid_name = 'lgpPwrLineMeasurementCrestFactorCurrent';
-    $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.13.' . $index;
-    $type     = $mib . '-' . $oid_name;
-    $value    = $entry[$oid_name];
-
-    if (isset($entry[$oid_name]))
-    {
-      discover_sensor('crestfactor', $device, $oid_num, $index, $type, $descr, $scale, $value);
-    }
-
-    $scale    = 0.01;
-    $oid_name = 'lgpPwrLineMeasurementPowerFactor';
-    $oid_num  = '.1.3.6.1.4.1.476.1.42.3.5.2.3.1.14.' . $index;
-    $type     = $mib . '-' . $oid_name;
-    $value    = $entry[$oid_name];
-
-    if (isset($entry[$oid_name]))
-    {
-      discover_sensor('powerfactor', $device, $oid_num, $index, $type, $descr, $scale, $value);
-    }
-  }
 }
 
 // EOF

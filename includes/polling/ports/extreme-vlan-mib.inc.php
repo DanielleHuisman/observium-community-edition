@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,8 +15,8 @@
 $port_module = 'vlan';
 
 if (!$ports_modules[$port_module]) {
-  // Module disabled
-  return FALSE;  // False for do not collect stats
+    // Module disabled
+    return FALSE;  // False for do not collect stats
 }
 
 //EXTREME-VLAN-MIB::extremeVlanIfVlanId.1000004 = INTEGER: 1
@@ -31,57 +31,50 @@ if (!$ports_modules[$port_module]) {
 //00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
 // Base vlan IDs
-$vlan_oids = snmpwalk_cache_oid($device, 'extremeVlanIfVlanId', array(), 'EXTREME-VLAN-MIB');
+$vlan_oids = snmpwalk_cache_oid($device, 'extremeVlanIfVlanId', [], 'EXTREME-VLAN-MIB');
 
-if (snmp_status())
-{
-  echo("extremeVlanOpaqueUntaggedPorts ");
+if (snmp_status()) {
+    echo("extremeVlanOpaqueUntaggedPorts ");
 
-  $ports_vlans_oids = snmpwalk_cache_twopart_oid($device, 'extremeVlanOpaqueUntaggedPorts', array(), 'EXTREME-VLAN-MIB', NULL, OBS_SNMP_ALL_MULTILINE | OBS_SNMP_HEX);
+    $ports_vlans_oids = snmpwalk_cache_twopart_oid($device, 'extremeVlanOpaqueUntaggedPorts', [], 'EXTREME-VLAN-MIB', NULL, OBS_SNMP_ALL_MULTILINE | OBS_SNMP_HEX);
 
-  print_debug_vars($ports_vlans_oids);
+    print_debug_vars($ports_vlans_oids);
 
-  $vlan_rows = array();
-  foreach ($ports_vlans_oids as $index => $tmp)
-  {
-    $vlan_num = $vlan_oids[$index]['extremeVlanIfVlanId'];
-    foreach ($tmp as $slot => $vlan)
-    {
-      $binary = hex2binmap($vlan['extremeVlanOpaqueUntaggedPorts']);
+    $vlan_rows = [];
+    foreach ($ports_vlans_oids as $index => $tmp) {
+        $vlan_num = $vlan_oids[$index]['extremeVlanIfVlanId'];
+        foreach ($tmp as $slot => $vlan) {
+            $binary = hex2binmap($vlan['extremeVlanOpaqueUntaggedPorts']);
 
-      // Assign binary vlans map to ports
-      $length = strlen($binary);
-      for ($i = 0; $i < $length; $i++)
-      {
-        if ($binary[$i] && $i > 0)
-        {
-          $trunk    = 'dot1Q'; // Hardcode all detected ports as trunk, since no way for detect it correctly
+            // Assign binary vlans map to ports
+            $length = strlen($binary);
+            for ($i = 0; $i < $length; $i++) {
+                if ($binary[$i] && $i > 0) {
+                    $trunk = 'dot1Q'; // Hardcode all detected ports as trunk, since no way for detect it correctly
 
-          $port_map = $slot.':'.($i + 1);
-          //$ifIndex = dbFetchCell("SELECT `ifIndex` FROM `ports` WHERE `device_id` = ? AND (`ifDescr` LIKE ? OR `ifName` = ?) AND `deleted` = ? LIMIT 1", array($device['device_id'], '% '.$port_map, $port_map, 0));
-          foreach ($port_stats as $ifIndex => $entry)
-          {
-            if ($entry['ifName'] == $port_map || str_ends($entry['ifDescr'], ' '.$port_map))
-            {
-              $vlan_rows[] = array($ifIndex, $vlan_num, $trunk);
+                    $port_map = $slot . ':' . ($i + 1);
+                    //$ifIndex = dbFetchCell("SELECT `ifIndex` FROM `ports` WHERE `device_id` = ? AND (`ifDescr` LIKE ? OR `ifName` = ?) AND `deleted` = ? LIMIT 1", array($device['device_id'], '% '.$port_map, $port_map, 0));
+                    foreach ($port_stats as $ifIndex => $entry) {
+                        if ($entry['ifName'] == $port_map || str_ends($entry['ifDescr'], ' ' . $port_map)) {
+                            $vlan_rows[] = [$ifIndex, $vlan_num, $trunk];
 
-              // Set Vlan and Trunk
-              $port_stats[$ifIndex]['ifVlan']  = $vlan_num;
-              $port_stats[$ifIndex]['ifTrunk'] = $trunk;
+                            // Set Vlan and Trunk
+                            $port_stats[$ifIndex]['ifVlan']  = $vlan_num;
+                            $port_stats[$ifIndex]['ifTrunk'] = $trunk;
 
-              break; // Stop ports loop
+                            break; // Stop ports loop
+                        }
+                    }
+
+                }
             }
-          }
-
         }
-      }
-    }
 
-  }
+    }
 
 }
 
-$headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
+$headers = ['%WifIndex%n', '%WVlan%n', '%WTrunk%n'];
 print_cli_table($vlan_rows, $headers);
 
 //$process_port_functions[$port_module] = $GLOBALS['snmp_status'];

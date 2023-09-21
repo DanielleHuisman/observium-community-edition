@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,8 +15,8 @@
 
 $version = snmp_get($device, 'sysBuildVersion.0', '-Osqv', 'SNMPv2-MIB:NS-ROOT-MIB');
 
-list($version,$features) = explode(':', $version);
-list(,$version) = explode(' ', $version);
-list($features) = explode(',', trim($features));
+[$version, $features] = explode(':', $version);
+[, $version] = explode(' ', $version);
+[$features] = explode(',', trim($features));
 
 // EOF

@@ -5,24 +5,23 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$mysql_rrd = get_rrd_path($device, "app-mysql-".$app['app_id'].".rrd");
+$mysql_rrd = get_rrd_path($device, "app-mysql-" . $app['app_id'] . ".rrd");
 
-if (rrd_is_file($mysql_rrd))
-{
-  $rrd_filename = $mysql_rrd;
+if (rrd_is_file($mysql_rrd)) {
+    $rrd_filename = $mysql_rrd;
 }
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$rrd_options .= ' DEF:a='.$rrd_filename_escape.':IDBLBSe:AVERAGE ';
-$rrd_options .= ' DEF:b='.$rrd_filename_escape.':IBLFh:AVERAGE ';
-$rrd_options .= ' DEF:c='.$rrd_filename_escape.':IBLWn:AVERAGE ';
+$rrd_options .= ' DEF:a=' . $rrd_filename_escape . ':IDBLBSe:AVERAGE ';
+$rrd_options .= ' DEF:b=' . $rrd_filename_escape . ':IBLFh:AVERAGE ';
+$rrd_options .= ' DEF:c=' . $rrd_filename_escape . ':IBLWn:AVERAGE ';
 
 $rrd_options .= 'COMMENT:"            Current    Average   Maximum\n" ';
 

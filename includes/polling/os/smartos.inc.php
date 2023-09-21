@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -36,38 +36,30 @@ $mfeatures = [
 ];
 
 # SmartOptics, M-Series M-1601-D1A30C1 R1B, SmartOS v2.3.9 (Compiled on Tue Oct 14 09:40:33 CEST 2014)
-if (preg_match('/^SmartOptics, \S+Series (?<hardware>.+), SmartOS v(?<version>\S+) /', $poll_device['sysDescr'], $matches))
-{
-  $hardware = $matches['hardware']; // -> M-1601-D1A30C1 R1B
-  $version  = $matches['version'];  // -> 2.3.9
+if (preg_match('/^SmartOptics, \S+Series (?<hardware>.+), SmartOS v(?<version>\S+) /', $poll_device['sysDescr'], $matches)) {
+    $hardware = $matches['hardware']; // -> M-1601-D1A30C1 R1B
+    $version  = $matches['version'];  // -> 2.3.9
 
-  // Features
-  $fa = array();
-  if (preg_match('/^(M-1601-[A-Z0-9]+)(C0|C1) /', $hardware, $matches))
-  {
-    # An M-1601 ending in "C1" has an optical supervisory channel feature.
-    if ($matches[2] == 'C1')
-    {
-      $fa[] = 'OSC';
+    // Features
+    $fa = [];
+    if (preg_match('/^(M-1601-[A-Z0-9]+)(C0|C1) /', $hardware, $matches)) {
+        # An M-1601 ending in "C1" has an optical supervisory channel feature.
+        if ($matches[2] == 'C1') {
+            $fa[] = 'OSC';
+        }
+        if (isset($mfeatures[$matches[1] . 'C0'])) {
+            $fa[] = $mfeatures[$matches[1] . 'C0'];
+        }
+    } elseif (preg_match('/^(M-\d+-[A-Z\d]+) /', $hardware, $matches)) {
+        # all other M-series
+        if (isset($mfeatures[$matches[1]])) {
+            $fa[] = $mfeatures[$matches[1]];
+        }
     }
-    if (isset($mfeatures[$matches[1] . 'C0']))
-    {
-      $fa[] = $mfeatures[$matches[1] . 'C0'];
-    }
-  }
-  elseif (preg_match('/^(M-\d+-[A-Z\d]+) /', $hardware, $matches))
-  {
-    # all other M-series
-    if (isset($mfeatures[$matches[1]]))
-    {
-      $fa[] = $mfeatures[$matches[1]];
-    }
-  }
 
-  if (count($fa))
-  {
-    $features = implode(', ', $fa);
-  }
+    if (count($fa)) {
+        $features = implode(', ', $fa);
+    }
 }
 
 // EOF

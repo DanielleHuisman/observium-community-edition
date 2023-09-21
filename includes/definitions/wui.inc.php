@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,25 +15,25 @@
 // WUI specific definitions, but can used in other code, like alert notifications
 
 // Specific string for detect empty variable in web queries
-define('OBS_VAR_UNSET', '[UNSET]');
+const OBS_VAR_UNSET = '[EMPTY]';
 
 // Default classes
-define('OBS_CLASS_BOX',                'box box-solid');
-define('OBS_CLASS_TABLE',              'table table-condensed');
+const OBS_CLASS_BOX = 'box box-solid';
+const OBS_CLASS_TABLE = 'table table-condensed';
 // Combination of classes
-define('OBS_CLASS_TABLE_BOX',          OBS_CLASS_BOX . ' ' . OBS_CLASS_TABLE);
-define('OBS_CLASS_TABLE_STRIPED',      OBS_CLASS_TABLE . ' table-striped');
-define('OBS_CLASS_TABLE_STRIPED_TWO',  OBS_CLASS_TABLE . ' table-striped-two');
-define('OBS_CLASS_TABLE_STRIPED_MORE', OBS_CLASS_TABLE . ' table-condensed-more table-striped');
+const OBS_CLASS_TABLE_BOX = OBS_CLASS_BOX . ' ' . OBS_CLASS_TABLE;
+const OBS_CLASS_TABLE_STRIPED = OBS_CLASS_TABLE . ' table-striped';
+const OBS_CLASS_TABLE_STRIPED_TWO = OBS_CLASS_TABLE . ' table-striped-two';
+const OBS_CLASS_TABLE_STRIPED_MORE = OBS_CLASS_TABLE . ' table-condensed-more table-striped';
 
 // Colours
 // FIXME, we still use this somewhere? :O
-define('OBS_COLOUR_LIST_A',         '#ffffff'); //$list_colour_a   = "#ffffff";
-define('OBS_COLOUR_LIST_B',         '#eeeeee'); //$list_colour_b   = "#eeeeee";
-define('OBS_COLOUR_LIST_B_B',       '#e3e3e3'); //$list_colour_b_b = "#e3e3e3";
-define('OBS_COLOUR_LIST_HIGHLIGHT', '#ffcccc'); //$list_highlight  = "#ffcccc";
-define('OBS_COLOUR_WARN_A',         '#ffeeee'); //$warn_colour_a   = "#ffeeee";
-define('OBS_COLOUR_WARN_B',         '#ffcccc'); //$warn_colour_b   = "#ffcccc";
+const OBS_COLOUR_LIST_A = '#ffffff'; //$list_colour_a   = "#ffffff";
+const OBS_COLOUR_LIST_B = '#eeeeee'; //$list_colour_b   = "#eeeeee";
+const OBS_COLOUR_LIST_B_B = '#e3e3e3'; //$list_colour_b_b = "#e3e3e3";
+const OBS_COLOUR_LIST_HIGHLIGHT = '#ffcccc'; //$list_highlight  = "#ffcccc";
+const OBS_COLOUR_WARN_A = '#ffeeee'; //$warn_colour_a   = "#ffeeee";
+const OBS_COLOUR_WARN_B = '#ffcccc'; //$warn_colour_b   = "#ffcccc";
 
 /* After this line keep only WUI specific definitions, not required in cli! */
 //if (is_cli()) { return; }
@@ -64,59 +64,59 @@ $config['escape_html']['entities'][]      = '#8203';  // &#x200B; U+200B ZERO WI
 $config['pages']['gridstack']['no_panel'] = TRUE;
 $config['pages']['dashboard']['no_panel'] = TRUE;
 $config['pages']['map']['no_panel']       = TRUE;
-$config['pages']['map-traffic']['no_panel']       = TRUE;
+$config['pages']['map_traffic']['no_panel'] = TRUE;
 
 // Refresh pages definitions
-$config['wui']['refresh_times']       = array(0, 60, 120, 300, 900, 1800); // Allowed refresh times in seconds
+$config['wui']['refresh_times']       = [ 0, 60, 120, 300, 900, 1800 ]; // Allowed refresh times in seconds
 // $vars array combination where auto-refresh page disabled by default
-$config['wui']['refresh_disabled'][]  = array('page' => 'dashboard');
-$config['wui']['refresh_disabled'][]  = array('page' => 'map');
-$config['wui']['refresh_disabled'][]  = array('page' => 'add_alert_check');
-$config['wui']['refresh_disabled'][]  = array('page' => 'alert_check');
-$config['wui']['refresh_disabled'][]  = array('page' => 'alert_regenerate');
-$config['wui']['refresh_disabled'][]  = array('page' => 'alert_maintenance_add');
-$config['wui']['refresh_disabled'][]  = array('page' => 'group_add');
-$config['wui']['refresh_disabled'][]  = array('page' => 'groups_regenerate');
-$config['wui']['refresh_disabled'][]  = array('page' => 'group', 'view' => 'edit');
-$config['wui']['refresh_disabled'][]  = array('page' => 'add_alertlog_rule');
-$config['wui']['refresh_disabled'][]  = array('page' => 'syslog_rules');
-$config['wui']['refresh_disabled'][]  = array('page' => 'add_syslog_rule');
-$config['wui']['refresh_disabled'][]  = array('page' => 'contact');
-$config['wui']['refresh_disabled'][]  = array('page' => 'contacts');
-$config['wui']['refresh_disabled'][]  = array('page' => 'bills', 'view' => 'add');
-$config['wui']['refresh_disabled'][]  = array('page' => 'bill', 'view' => 'edit');
-$config['wui']['refresh_disabled'][]  = array('page' => 'bill', 'view' => 'delete');
-$config['wui']['refresh_disabled'][]  = array('page' => 'device', 'tab' => 'data');
-$config['wui']['refresh_disabled'][]  = array('page' => 'device', 'tab' => 'edit');
-$config['wui']['refresh_disabled'][]  = array('page' => 'device', 'tab' => 'port', 'view' => 'realtime');
-$config['wui']['refresh_disabled'][]  = array('page' => 'device', 'tab' => 'showconfig');
-$config['wui']['refresh_disabled'][]  = array('page' => 'device', 'tab' => 'entphysical'); // Inventory
-$config['wui']['refresh_disabled'][]  = array('page' => 'addhost');
-$config['wui']['refresh_disabled'][]  = array('page' => 'delhost');
-$config['wui']['refresh_disabled'][]  = array('page' => 'delsrv');
-$config['wui']['refresh_disabled'][]  = array('page' => 'deleted-ports');
-$config['wui']['refresh_disabled'][]  = array('page' => 'adduser');
-$config['wui']['refresh_disabled'][]  = array('page' => 'edituser');
-$config['wui']['refresh_disabled'][]  = array('page' => 'settings');
-$config['wui']['refresh_disabled'][]  = array('page' => 'preferences');
-$config['wui']['refresh_disabled'][]  = array('page' => 'logout');
-$config['wui']['refresh_disabled'][]  = array('page' => 'customoids');
-$config['wui']['refresh_disabled'][]  = array('page' => 'log');
-$config['wui']['refresh_disabled'][]  = array('page' => 'pollers');
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'dashboard' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'map' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'add_alert_check' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_check' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_regenerate' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'alert_maintenance_add' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'group_add' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'groups_regenerate' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'group', 'view' => 'edit' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'add_alertlog_rule' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'syslog_rules' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'add_syslog_rule' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'contact' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'contacts' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'bills', 'view' => 'add' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'bill', 'view' => 'edit' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'bill', 'view' => 'delete' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'device', 'tab' => 'data' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'device', 'tab' => 'edit' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'device', 'tab' => 'port', 'view' => 'realtime' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'device', 'tab' => 'showconfig' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'device', 'tab' => 'entphysical' ]; // Inventory
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'addhost' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'delhost' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'delsrv' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'deleted-ports' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'user_add' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'user_edit' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'settings' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'preferences' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'logout' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'customoids' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'log' ];
+$config['wui']['refresh_disabled'][]  = [ 'page' => 'pollers' ];
 
 // Search modules used by the ajax search, in order.
-$config['wui']['search_modules'] = [ 'groups', 'devices', 'accesspoints', 'ports', 'slas', 'sensors', 'status', 'neighbours',
-                                     'ip-addresses', 'inventory', 'loadbalancers' ];
+$config['wui']['search_modules'] = [ 'groups', 'devices', 'accesspoints', 'ports', 'slas', 'sensors', 'status',
+                                     'neighbours', 'ip-addresses', 'inventory', 'loadbalancers' ];
 
 // Default groups list (on status page and default panel)
-//$config['wui']['groups_list'] = array('device', 'port', 'processor', 'mempool', 'sensor', 'bgp_peer');
-$config['wui']['groups_list'] = array('device', 'port', 'processor', 'mempool', 'sensor');
+//$config['wui']['groups_list'] = [ 'device', 'port', 'processor', 'mempool', 'sensor', 'bgp_peer' ];
+$config['wui']['groups_list'] = [ 'device', 'port', 'processor', 'mempool', 'sensor' ];
 
-// Themes (dark not exist in community edition)
+// Themes (dark not exist in CE)
 
-$config['themes']['light']    = array('name' => "Light Mode",     'type' => 'light',  'css' => 'observium.css',          'icon' => 'sprite-sun');
-$config['themes']['dark']     = array('name' => "Dark Mode",      'type' => 'dark',   'css' => 'observium-dark.css',     'icon' => 'sprite-moon');
-$config['themes']['darkblue'] = array('name' => "Dark Blue Mode", 'type' => 'dark',   'css' => 'observium-darkblue.css', 'icon' => 'sprite-moon');
+$config['themes']['light']    = [ 'name' => "Light Mode",     'type' => 'light',  'css' => 'observium.css',          'icon' => 'sprite-sun' ];
+$config['themes']['dark']     = [ 'name' => "Dark Mode",      'type' => 'dark',   'css' => 'observium-dark.css',     'icon' => 'sprite-moon' ];
+$config['themes']['darkblue'] = [ 'name' => "Dark Blue Mode", 'type' => 'dark',   'css' => 'observium-darkblue.css', 'icon' => 'sprite-moon' ];
 
 // Define Icons used by the user interface, emoji icons see in emoji.inc.php
 
@@ -348,11 +348,7 @@ $config['icon']['lock']              = "sprite-lock";
 //$config['icon']['database']          = "sprite-storage-test2";
 $config['icon']['databases']         = "sprite-databases";
 $config['icon']['database']          = "sprite-database";
-
 $config['icon']['mibs']              = "sprite-map-2";
-
-
-
 $config['icon']['notes']             = "sprite-note";
 
 // Font icons
@@ -368,7 +364,5 @@ $config['icon']['arrow-right']       = "icon-circle-arrow-right";
 $config['icon']['arrow-left']        = "icon-circle-arrow-left";
 
 $config['icons'] = [ 'sprite-device', 'sprite-network', 'sprite-virtual-machine' ];
-
-
 
 // EOF

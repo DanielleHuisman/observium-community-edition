@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -31,28 +30,25 @@
  *   - URL to redirect users when they click the logout button. If this is not specified, no logout button
  *     will be available.
  *
- * @package    observium
- * @subpackage authentication
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     authentication
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (!$_SESSION['authenticated'] && !is_cli())
-{
-  $var = isset($config['auth_remote_variable']) ? $config['auth_remote_variable']: 'REMOTE_USER';
+if (!$_SESSION['authenticated'] && !is_cli()) {
+    $var = isset($config['auth_remote_variable']) ? $config['auth_remote_variable'] : 'REMOTE_USER';
 
-  if (isset($_SERVER[$var]) && !empty($_SERVER[$var]))
-  {
-    $username = $_SERVER[$var];
-    session_set_var('username', $username);
-    session_set_var('authenticated', true);
-  }
-  else {
-    header('HTTP/1.1 401 Unauthorized');
+    if (isset($_SERVER[$var]) && !empty($_SERVER[$var])) {
+        $username = $_SERVER[$var];
+        session_set_var('username', $username);
+        session_set_var('authenticated', TRUE);
+    } else {
+        header('HTTP/1.1 401 Unauthorized');
 
-    print_error_permission();
-    die();
-  }
+        print_error_permission();
+        die();
+    }
 }
 
 /**
@@ -62,8 +58,8 @@ if (!$_SESSION['authenticated'] && !is_cli())
  */
 function remote_auth_can_logout()
 {
-  global $config;
-  return isset($config['auth_remote_logout_url']);
+    global $config;
+    return isset($config['auth_remote_logout_url']);
 }
 
 /**
@@ -73,8 +69,8 @@ function remote_auth_can_logout()
  */
 function remote_auth_logout_url()
 {
-  global $config;
-  return isset($config['auth_remote_logout_url']) ? $config['auth_remote_logout_url'] : null;
+    global $config;
+    return isset($config['auth_remote_logout_url']) ? $config['auth_remote_logout_url'] : NULL;
 }
 
 /**
@@ -82,11 +78,12 @@ function remote_auth_logout_url()
  * This is not possible using the remote backend.
  *
  * @param string $username Username to check
+ *
  * @return bool TRUE if password change is possible, FALSE if it is not
  */
 function remote_auth_can_change_password($username = "")
 {
-  return 0;
+    return 0;
 }
 
 /**
@@ -95,12 +92,13 @@ function remote_auth_can_change_password($username = "")
  *
  * @param string $username Username to modify the password for
  * @param string $password New password
+ *
  * @return bool TRUE if password change is successful, FALSE if it is not
  */
 function remote_auth_change_password($username, $newpassword)
 {
-  # Not supported
-  return FALSE;
+    # Not supported
+    return FALSE;
 }
 
 /**
@@ -111,7 +109,7 @@ function remote_auth_change_password($username, $newpassword)
  */
 function remote_auth_usermanagement()
 {
-  return 0;
+    return 0;
 }
 
 /**
@@ -119,24 +117,26 @@ function remote_auth_usermanagement()
  * This is not possible using the remote backend.
  *
  * @param string $username Username to check
+ *
  * @return bool TRUE if the user exists, FALSE if they do not
  */
 function remote_auth_user_exists($username)
 {
-  return FALSE;
+    return FALSE;
 }
 
 /**
  * Retrieve user auth level for specified user.
  *
  * @param string $username Username to retrieve the auth level for
+ *
  * @return int User's auth level
  */
 function remote_auth_user_level($username)
 {
-  global $config;
+    global $config;
 
-  return isset($config['auth_remote_userlevel']) ? $config['auth_remote_userlevel'] : 1;
+    return isset($config['auth_remote_userlevel']) ? $config['auth_remote_userlevel'] : 1;
 }
 
 /**
@@ -144,12 +144,13 @@ function remote_auth_user_level($username)
  * Returns a hash of the username.
  *
  * @param string $username Username to retrieve the ID for
+ *
  * @return int User's ID
  */
 function remote_auth_user_id($username)
 {
-  //return -1;
-  return string_to_id('remote|' . $username);
+    //return -1;
+    return string_to_id('remote|' . $username);
 }
 
 /**
@@ -157,12 +158,13 @@ function remote_auth_user_id($username)
  * This is not possible using the remote backend.
  *
  * @param string $username Username to delete
+ *
  * @return bool TRUE if user deletion is successful, FALSE if it is not
  */
 function remote_deluser($username)
 {
-  // Not supported
-  return FALSE;
+    // Not supported
+    return FALSE;
 }
 
 /**
@@ -173,8 +175,7 @@ function remote_deluser($username)
  */
 function remote_auth_user_list()
 {
-  $userlist = array();
-  return $userlist;
+    return [];
 }
 
 // EOF

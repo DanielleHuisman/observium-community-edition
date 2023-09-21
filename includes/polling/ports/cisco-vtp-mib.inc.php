@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,7 +15,7 @@
 $port_module = 'vlan';
 
 if (!$ports_modules[$port_module]) {
-  return FALSE; // False for do not collect stats
+    return FALSE; // False for do not collect stats
 }
 
 //CISCO-VLAN-MEMBERSHIP-MIB::vmVlan.35 = INTEGER: 15
@@ -27,46 +27,41 @@ if (!$ports_modules[$port_module]) {
 //CISCO-VTP-MIB::vlanTrunkPortNativeVlan.36 = INTEGER: 1
 //CISCO-VTP-MIB::vlanTrunkPortNativeVlan.37 = INTEGER: 15
 
-$vlan_oids = snmpwalk_cache_oid($device, "vmVlan", array(), "CISCO-VLAN-MEMBERSHIP-MIB"); // Non trunk ports only
+$vlan_oids = snmpwalk_cache_oid($device, "vmVlan", [], "CISCO-VLAN-MEMBERSHIP-MIB"); // Non trunk ports only
 
 if (snmp_status()) {
-  echo("vmVlan ");
-  $vlan_oids = snmpwalk_cache_oid($device, "vlanTrunkPortEncapsulationOperType", $vlan_oids, "CISCO-VTP-MIB");
-  $vlan_oids = snmpwalk_cache_oid($device, "vlanTrunkPortNativeVlan",            $vlan_oids, "CISCO-VTP-MIB"); // Trunk ports only
-  print_debug_vars($vlan_oids);
+    echo("vmVlan ");
+    $vlan_oids = snmpwalk_cache_oid($device, "vlanTrunkPortEncapsulationOperType", $vlan_oids, "CISCO-VTP-MIB");
+    $vlan_oids = snmpwalk_cache_oid($device, "vlanTrunkPortNativeVlan", $vlan_oids, "CISCO-VTP-MIB"); // Trunk ports only
+    print_debug_vars($vlan_oids);
 
-  $vlan_rows = array();
-  foreach ($vlan_oids as $ifIndex => $entry)
-  {
+    $vlan_rows = [];
+    foreach ($vlan_oids as $ifIndex => $entry) {
 
-    $trunk = '';
+        $trunk = '';
 
-    if (isset($entry['vlanTrunkPortEncapsulationOperType']) && $entry['vlanTrunkPortEncapsulationOperType'] != "notApplicable")
-    {
-      $trunk = $entry['vlanTrunkPortEncapsulationOperType'];
-      if (isset($entry['vlanTrunkPortNativeVlan']))
-      {
-        $vlan_num = $entry['vlanTrunkPortNativeVlan'];
-      }
+        if (isset($entry['vlanTrunkPortEncapsulationOperType']) && $entry['vlanTrunkPortEncapsulationOperType'] != "notApplicable") {
+            $trunk = $entry['vlanTrunkPortEncapsulationOperType'];
+            if (isset($entry['vlanTrunkPortNativeVlan'])) {
+                $vlan_num = $entry['vlanTrunkPortNativeVlan'];
+            }
+        }
+
+        if (isset($entry['vmVlan'])) {
+            $vlan_num = $entry['vmVlan'];
+        }
+        $vlan_rows[] = [$ifIndex, $vlan_num, $trunk];
+
+        // Set Vlan and Trunk
+        if (isset($port_stats[$ifIndex])) {
+            $port_stats[$ifIndex]['ifVlan']  = $vlan_num;
+            $port_stats[$ifIndex]['ifTrunk'] = $trunk;
+        }
     }
-
-    if (isset($entry['vmVlan']))
-    {
-      $vlan_num = $entry['vmVlan'];
-    }
-    $vlan_rows[] = array($ifIndex, $vlan_num, $trunk);
-
-    // Set Vlan and Trunk
-    if (isset($port_stats[$ifIndex]))
-    {
-      $port_stats[$ifIndex]['ifVlan']  = $vlan_num;
-      $port_stats[$ifIndex]['ifTrunk'] = $trunk;
-    }
-  }
 
 }
 
-$headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
+$headers = ['%WifIndex%n', '%WVlan%n', '%WTrunk%n'];
 print_cli_table($vlan_rows, $headers);
 
 //$process_port_functions[$port_module] = $GLOBALS['snmp_status'];

@@ -121,12 +121,12 @@ class Console_Color2
     {
         $colors = $this->getColorCodes();
         if (is_array($color)) {
-            $style      = isset($color['style']) ? $color['style'] : null;
-            $background = isset($color['background']) ? $color['background'] : null;
-            $color      = isset($color['color']) ? $color['color'] : null;
+            $style      = $color['style'] ?? NULL;
+            $background = $color['background'] ?? NULL;
+            $color      = $color['color'] ?? NULL;
         }
 
-        if ($color == 'reset') {
+        if ($color === 'reset') {
             return "\033[0m";
         }
 

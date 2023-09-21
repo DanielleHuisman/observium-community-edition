@@ -4,99 +4,97 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage alerting
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     alerting
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Find local hostname
 $localhost = get_localhost();
 
-$emails = [];
+$emails      = [];
 $mail_params = [];
 
 $emails[$endpoint['email']] = $endpoint['contact_descr'];
 
 // Mail backend params
 $backend = strtolower(trim($config['email']['backend']));
-switch ($backend)
-{
-  case 'sendmail':
-    $mail_params['sendmail_path'] = $config['email']['sendmail_path'];
-    break;
-  case 'smtp':
-    $mail_params['host']      = $config['email']['smtp_host'];
-    $mail_params['port']      = $config['email']['smtp_port'];
-    if ($config['email']['smtp_secure'] === 'ssl')
-    {
-      $mail_params['host']    = 'ssl://'.$config['email']['smtp_host'];
-      if ($config['email']['smtp_port'] == 25)
-      {
-        $mail_params['port']  = 465; // Default port for SSL
-      }
-    }
-    $mail_params['timeout']   = $config['email']['smtp_timeout'];
-    $mail_params['auth']      = $config['email']['smtp_auth'];
-    $mail_params['username']  = $config['email']['smtp_username'];
-    $mail_params['password']  = $config['email']['smtp_password'];
-    $mail_params['localhost'] = $localhost;
-    if (OBS_DEBUG) { $mail_params['debug'] = TRUE; }
-    break;
-  case 'smtpmx':
-  case 'mx':
-    $mail_params['mailname']  = $localhost;
-    $mail_params['netdns']    = FALSE;
+switch ($backend) {
+    case 'sendmail':
+        $mail_params['sendmail_path'] = $config['email']['sendmail_path'];
+        break;
+    case 'smtp':
+        $mail_params['host'] = $config['email']['smtp_host'];
+        $mail_params['port'] = $config['email']['smtp_port'];
+        if ($config['email']['smtp_secure'] === 'ssl') {
+            $mail_params['host'] = 'ssl://' . $config['email']['smtp_host'];
+            if ($config['email']['smtp_port'] == 25) {
+                $mail_params['port'] = 465; // Default port for SSL
+            }
+        }
+        $mail_params['timeout']   = $config['email']['smtp_timeout'];
+        $mail_params['auth']      = $config['email']['smtp_auth'];
+        $mail_params['username']  = $config['email']['smtp_username'];
+        $mail_params['password']  = $config['email']['smtp_password'];
+        $mail_params['localhost'] = $localhost;
+        if (OBS_DEBUG) {
+            $mail_params['debug'] = TRUE;
+        }
+        break;
+    case 'smtpmx':
+    case 'mx':
+        $mail_params['mailname'] = $localhost;
+        $mail_params['netdns']   = FALSE;
 
-    $mail_params['timeout']   = $config['email']['smtp_timeout'];
-    if (OBS_DEBUG) { $mail_params['debug'] = TRUE; }
+        $mail_params['timeout'] = $config['email']['smtp_timeout'];
+        if (OBS_DEBUG) {
+            $mail_params['debug'] = TRUE;
+        }
 
-    $backend = 'smtpmx';
-    break;
-  case 'mail':
-  default:
-    $backend = 'mail'; // Default mailer backend
+        $backend = 'smtpmx';
+        break;
+    case 'mail':
+    default:
+        $backend = 'mail'; // Default mailer backend
 }
 
 // Time sent RFC 2822
 $time_rfc = date('r', time());
 
 // Mail headers
-$headers = array();
-if (empty($config['email']['from']))
-{
-  // Default "From:"
-  $headers['From'] = 'Observium <observium@'.$localhost.'>';
-  $headers['Return-Path'] = 'observium@'.$localhost;
+$headers = [];
+if (empty($config['email']['from'])) {
+    // Default "From:"
+    $headers['From']        = 'Observium <observium@' . $localhost . '>';
+    $headers['Return-Path'] = 'observium@' . $localhost;
 } else {
-  // Validate configured mail from
-  foreach (parse_email($config['email']['from']) as $from => $from_name)
-  {
-    $headers['From'] = (empty($from_name) ? $from : '"' . $from_name . '" <' . $from . '>'); // From:
-    $headers['Return-Path'] = $from;
-    break; // use only first entry
-  }
+    // Validate configured mail from
+    foreach (parse_email($config['email']['from']) as $from => $from_name) {
+        $headers['From']        = (empty($from_name) ? $from : '"' . $from_name . '" <' . $from . '>'); // From:
+        $headers['Return-Path'] = $from;
+        break; // use only first entry
+    }
 }
 
-$rcpts = array();
-$rcpts_full = array();
-foreach ($emails as $to => $to_name)
-{
-  $rcpts_full[] = (empty($to_name) ? $to : '"'.trim($to_name).'" <'.$to.'>');
-  $rcpts[]      = $to;
+$rcpts      = [];
+$rcpts_full = [];
+foreach ($emails as $to => $to_name) {
+    $rcpts_full[] = (empty($to_name) ? $to : '"' . trim($to_name) . '" <' . $to . '>');
+    $rcpts[]      = $to;
 }
 
 $rcpts_full = implode(', ', $rcpts_full);
 $rcpts      = implode(', ', $rcpts);
 
-$headers['To']           = $rcpts_full;            // To:
-$headers['Subject']      = $message_tags['TITLE']; // Subject:
+$headers['To']      = $rcpts_full;            // To:
+$headers['Subject'] = $message_tags['TITLE']; // Subject:
 // ID and Date, leave it before X- headers
-$headers['Message-ID']   = '<' . md5(uniqid(time())) . '@' . $localhost . '>';
-$headers['Date']         = $time_rfc;
+$headers['Message-ID'] = '<' . md5(uniqid(time())) . '@' . $localhost . '>';
+$headers['Date']       = $time_rfc;
 
-$headers['X-Priority']   = 3;             // Mail priority
-$headers['X-Mailer']     = OBSERVIUM_PRODUCT.' '.OBSERVIUM_VERSION; // X-Mailer:
+$headers['X-Priority'] = 3;                                           // Mail priority
+$headers['X-Mailer']   = OBSERVIUM_PRODUCT . ' ' . OBSERVIUM_VERSION; // X-Mailer:
 
 // Mail autogenerated, suppress autorespond by any issue system
 $headers['Precedence']               = 'bulk';
@@ -106,15 +104,15 @@ $headers['X-Auto-Response-Suppress'] = 'All';
 $time_sent = $time_rfc;
 
 // Creating the Mime message
-$mime = new Mail_mime(array('head_charset' => 'utf-8',
-                            'text_charset' => 'utf-8',
-                            'html_charset' => 'utf-8',
-                            'eol' => PHP_EOL));
+$mime = new Mail_mime(['head_charset' => 'utf-8',
+                       'text_charset' => 'utf-8',
+                       'html_charset' => 'utf-8',
+                       'eol'          => PHP_EOL]);
 
 // Generate Mail text in both plain text and html
-$message['text'] = simple_template('email_text', $message_tags, array('is_file' => TRUE));
+$message['text'] = simple_template('email_text', $message_tags, ['is_file' => TRUE]);
 
-$message_tags_html = $message_tags;
+$message_tags_html               = $message_tags;
 $message_tags_html['CONDITIONS'] = nl2br(escape_html($message_tags['CONDITIONS']));
 $message_tags_html['METRICS']    = nl2br(escape_html($message_tags['METRICS']));
 
@@ -122,82 +120,76 @@ $message_tags_html['METRICS']    = nl2br(escape_html($message_tags['METRICS']));
 //$graphs = json_decode($message_tags_html['ENTITY_GRAPHS_ARRAY'], TRUE);
 $graphs = $message_tags_html['ENTITY_GRAPHS_ARRAY'];
 
-if (is_array($graphs) && count($graphs))
-{
-  $message_tags_html['ENTITY_GRAPHS'] = ''; // Reinit graphs html
-  foreach ($graphs as $key => $graph)
-  {
-    $cid = generate_random_string(16);
-    // Unencode data uri tag to file content
-    list($gmime, $base64) = explode(';', $graph['data'], 2);
-    $gmime  = substr($gmime, 5);
-    $base64 = substr($base64, 7);
-    //print_vars(substr($graph['data'], 0, 20));
-    //print_vars($gmime);
-    //print_vars(substr($base64, 0, 20));
-    $mime->addHTMLImage(base64_decode($base64), $gmime, $cid.'.png', FALSE, $cid);
+if (is_array($graphs) && count($graphs)) {
+    $message_tags_html['ENTITY_GRAPHS'] = ''; // Reinit graphs html
+    foreach ($graphs as $key => $graph) {
+        $cid = random_string(16);
+        // Unencode data uri tag to file content
+        [$gmime, $base64] = explode(';', $graph['data'], 2);
+        $gmime  = substr($gmime, 5);
+        $base64 = substr($base64, 7);
+        //print_vars(substr($graph['data'], 0, 20));
+        //print_vars($gmime);
+        //print_vars(substr($base64, 0, 20));
+        $mime -> addHTMLImage(base64_decode($base64), $gmime, $cid . '.png', FALSE, $cid);
 
-    $message_tags_html['ENTITY_GRAPHS'] .= '<h4>'.$graph['type'].'</h4>';
-    $message_tags_html['ENTITY_GRAPHS'] .= '<a href="'.$graph['url'].'"><img src="cid:'.$cid.'"></a><br />';
-  }
+        $message_tags_html['ENTITY_GRAPHS'] .= '<h4>' . $graph['type'] . '</h4>';
+        $message_tags_html['ENTITY_GRAPHS'] .= '<a href="' . $graph['url'] . '"><img src="cid:' . $cid . '"></a><br />';
+    }
 }
 //print_vars($message_tags_html);
 
 
-
-$message['html'] = simple_template('email_html', $message_tags_html, array('is_file' => TRUE));
+$message['html'] = simple_template('email_html', $message_tags_html, ['is_file' => TRUE]);
 unset($message_tags_html);
 
-foreach ($message as $part => $part_body)
-{
-  switch ($part)
-  {
-    case 'text':
-    case 'txt':
-    case 'plain':
-      $part_body .= "\n\nE-mail sent to: $rcpts\n";
-      $part_body .= "E-mail sent at: $time_sent\n\n";
-      $part_body .= "-- \n" . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "\n" . OBSERVIUM_URL . "\n";
-      $mime->setTXTBody($part_body);
-      break;
-    case 'html':
-      $part_footer = "\n<br /><p style=\"font-size: 11px;\">E-mail sent to: $rcpts<br />\n";
-      $part_footer .= "E-mail sent at: $time_sent</p>\n";
-      $part_footer .= '<div style="font-size: 11px; color: #999;">-- <br /><a href="'.OBSERVIUM_URL.'">'.OBSERVIUM_PRODUCT_LONG.' '.OBSERVIUM_VERSION."</a></div>\n";
-      if (stripos($part_body, '</body>'))
-      {
-        $part_body = str_ireplace('</body>', $part_footer.'</body>', $part_body);
-      } else {
-        $part_body .= $part_footer;
-      }
-      $mime->setHTMLBody($part_body);
-      break;
-    //case 'image':
-    //  break;
-    //case 'attachment':
-    //  break;
-  }
+foreach ($message as $part => $part_body) {
+    switch ($part) {
+        case 'text':
+        case 'txt':
+        case 'plain':
+            $part_body .= "\n\nE-mail sent to: $rcpts\n";
+            $part_body .= "E-mail sent at: $time_sent\n\n";
+            $part_body .= "-- \n" . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "\n" . OBSERVIUM_URL . "\n";
+            $mime -> setTXTBody($part_body);
+            break;
+        case 'html':
+            $part_footer = "\n<br /><p style=\"font-size: 11px;\">E-mail sent to: $rcpts<br />\n";
+            $part_footer .= "E-mail sent at: $time_sent</p>\n";
+            $part_footer .= '<div style="font-size: 11px; color: #999;">-- <br /><a href="' . OBSERVIUM_URL . '">' . OBSERVIUM_PRODUCT_LONG . ' ' . OBSERVIUM_VERSION . "</a></div>\n";
+            if (stripos($part_body, '</body>')) {
+                $part_body = str_ireplace('</body>', $part_footer . '</body>', $part_body);
+            } else {
+                $part_body .= $part_footer;
+            }
+            $mime -> setHTMLBody($part_body);
+            break;
+        //case 'image':
+        //  break;
+        //case 'attachment':
+        //  break;
+    }
 }
-$body = $mime->get();
+$body = $mime -> get();
 
 // Prepare headers
 foreach ($headers as $name => $value) {
-  $headers[$name] = $mime->encodeHeader($name, $value, 'utf-8', 'quoted-printable');
+    $headers[$name] = $mime -> encodeHeader($name, $value, 'utf-8', 'quoted-printable');
 }
-$headers = $mime->headers($headers);
+$headers = $mime -> headers($headers);
 //var_dump($headers);
 
 // Create mailer instance
-$mail = Mail::factory($backend, $mail_params);
+$mail = Mail ::factory($backend, $mail_params);
 // Sending email
-$status = $mail->send($rcpts, $headers, $body);
+$status = $mail -> send($rcpts, $headers, $body);
 
-if (PEAR::isError($status)) {
-  //print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
-  $notify_status['success'] = FALSE;
-  $notify_status['error']   = $status->getMessage();
+if (PEAR ::isError($status)) {
+    //print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
+    $notify_status['success'] = FALSE;
+    $notify_status['error']   = $status -> getMessage();
 } else {
-  $notify_status['success'] = TRUE;
+    $notify_status['success'] = TRUE;
 }
 
 unset($message);

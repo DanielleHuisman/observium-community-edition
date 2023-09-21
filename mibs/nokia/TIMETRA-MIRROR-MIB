@@ -185,8 +185,9 @@ TmnxMirrorDestinationHeaderType  ::= TEXTUAL-CONVENTION
          that describes the header encapsulation supported by a mirror
          destination."
     SYNTAX      INTEGER {
-        ipUdpShim (1),
-        ipGre     (2)
+        ipUdpShim        (1),
+        ipGre            (2),
+        ipUdpShimSampled (4)
     }
 
 TmnxMirrorGatewayRole            ::= TEXTUAL-CONVENTION
@@ -275,7 +276,8 @@ TMirrorDestinationEntry          ::= SEQUENCE
     tMirrorDestSapEgrPortQGrpInstId  TQosQGrpInstanceIDorZero,
     tMirrorDestCreationOrigin        TmnxCreateOrigin,
     tMirrorDestinationName           TLNamedItemOrEmpty,
-    tMirrorDestPcapSessionName       TNamedItemOrEmpty
+    tMirrorDestPcapSessionName       TNamedItemOrEmpty,
+    tMirrorDestSamplingRate          Unsigned32
 }
 
 tMirrorDestinationIndex          OBJECT-TYPE
@@ -627,6 +629,17 @@ tMirrorDestPcapSessionName       OBJECT-TYPE
          (PCAP) session name for the PCAP session that is currently configured
          on this mirror destination service."
     ::= { tMirrorDestinationEntry 30 }
+
+tMirrorDestSamplingRate          OBJECT-TYPE
+    SYNTAX      Unsigned32 (0 | 256..10000)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tMirrorDestSamplingRate is used by the collector to
+         determine the rate at which traffic information is checked for the
+         purposes of analytics."
+    DEFVAL      { 0 }
+    ::= { tMirrorDestinationEntry 31 }
 
 tMirrorDestinationRemoteSourceTable OBJECT-TYPE
     SYNTAX      SEQUENCE OF TMirrorDestinationRemoteSourceEntry
@@ -1489,7 +1502,8 @@ TMirrorSourcePortEntry           ::= SEQUENCE
     tMirrorSourcePortRowStatus       RowStatus,
     tMirrorSourcePortEgressEnabled   TruthValue,
     tMirrorSourcePortIngressEnabled  TruthValue,
-    tMirrorSourcePortLastChgd        TimeStamp
+    tMirrorSourcePortLastChgd        TimeStamp,
+    tMirrorSourcePortLicenseState    INTEGER
 }
 
 tMirrorSourcePortIndex           OBJECT-TYPE
@@ -1543,6 +1557,22 @@ tMirrorSourcePortLastChgd        OBJECT-TYPE
          of the local network management subsystem, then this object contains a
          zero value."
     ::= { tMirrorSourcePortEntry 5 }
+
+tMirrorSourcePortLicenseState    OBJECT-TYPE
+    SYNTAX      INTEGER {
+        unknown      (0),
+        ok           (1),
+        insufficient (2),
+        violation    (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tMirrorSourcePortLicenseState indicates the state of the
+         li-source port license configured for this system. This field is only
+         relevant for lawful intercept configuration."
+    DEFVAL      { unknown }
+    ::= { tMirrorSourcePortEntry 6 }
 
 tMirrorSourceSapTable            OBJECT-TYPE
     SYNTAX      SEQUENCE OF TMirrorSourceSapEntry
@@ -2336,6 +2366,73 @@ tMirrorSrcPortVlanTblLastChgd    OBJECT-TYPE
          the value zero."
     ::= { tMirrorSourceObjects 20 }
 
+tMirrorSourceSapShimTable        OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TMirrorSourceSapShimEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table tMirrorSourceSapShimTable contains information used by the
+         collector for the purposes of analytics."
+    ::= { tMirrorSourceObjects 21 }
+
+tMirrorSourceSapShimEntry        OBJECT-TYPE
+    SYNTAX      TMirrorSourceSapShimEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row of tMirrorSourceSapShimEntry represents information about a
+         mirror-source SAP used by the collector for the  purposes of
+         analytics.
+
+         Entries are created by the agent when the associated
+         tMirrorSourceSapEntry is created. Entries are deleted by the agent
+         when the associated tMirrorSourceSapEntry is destroyed.
+
+         Entries in this table have an implied StorageType of 'volatile'. That
+         is, configured mirror source information is not persistent across
+         system restarts."
+    INDEX       {
+        tMirrorSourceSapShimPortId,
+        tMirrorSourceSapShimEncapValue
+    }
+    ::= { tMirrorSourceSapShimTable 1 }
+
+TMirrorSourceSapShimEntry        ::= SEQUENCE
+{
+    tMirrorSourceSapShimPortId       TmnxPortID,
+    tMirrorSourceSapShimEncapValue   TmnxEncapVal,
+    tMirrorSourceSapShimId           Unsigned32
+}
+
+tMirrorSourceSapShimPortId       OBJECT-TYPE
+    SYNTAX      TmnxPortID
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The object tMirrorSourceSapShimPortId indicates the ID of the access
+         port for the mirror-source Service Access Point (SAP)."
+    ::= { tMirrorSourceSapShimEntry 1 }
+
+tMirrorSourceSapShimEncapValue   OBJECT-TYPE
+    SYNTAX      TmnxEncapVal
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The object tMirrorSourceSapShimEncapValue indicates the value of the
+         label used to identify the mirror-source  Service Access Point (SAP)."
+    ::= { tMirrorSourceSapShimEntry 2 }
+
+tMirrorSourceSapShimId           OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The object tMirrorSourceSapShimId indicates the shim ID corresponding
+         to the mirror source Service Access Point (SAP). The ID is used by the
+         collector for analytics."
+    DEFVAL      { 0 }
+    ::= { tMirrorSourceSapShimEntry 3 }
+
 tMirrorSourceNotifyObjects       OBJECT IDENTIFIER ::= { tMirrorObjects 3 }
 
 tMirrorSourceChangeType          OBJECT-TYPE
@@ -2779,8 +2876,7 @@ tMirrorLiDestTmplL3EncRouter     OBJECT-TYPE
          the router instance to be used with routed encapsulation, by default
          of a Radius attribute that specifies it. Use only in classic
          configuration mode; otherwise, use tMirrorLiDestTmplL3EncRouterName,
-         and ignore the value of this object.
-                    "
+         and ignore the value of this object."
     DEFVAL      { 1 }
     ::= { tMirrorLiDestTmplEntry 7 }
 
@@ -5655,6 +5751,47 @@ tMirrorV19v0Compliance           MODULE-COMPLIANCE
         }
     ::= { tMirrorCompliances 12 }
 
+tMirrorV20v0Compliance           MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for management of extended Mirror features on
+         Nokia SROS series systems release 20."
+    MODULE
+        MANDATORY-GROUPS {
+            tMirrorDestinationV8v0Group,
+            tMirrorDestinationR2r1RemoteSourceGroup,
+            tMirrorSourceV10v0Group,
+            tMirrorBsxV6v0Group,
+            tMirrorNotificationsGroup,
+            tMirrorNotifV10v0Group,
+            tMirrorSourceNotificationsV6v0Group,
+            tMirrorDestV8v0Group,
+            tMirrorObsoletedV8v0Group,
+            tMirrorRadiusLiV8v0Group,
+            tMirrorSourceNotifGroup,
+            tMirrorLiGroup,
+            tMirrorEncapV10v0Group,
+            tMirrorLiSourceV12v0Group,
+            tMirrorDestinationV11v0Group,
+            tMirrorLiSourceV13v0Group,
+            tMirrorNotifV13v0Group,
+            tMirrorLiV14v0Group,
+            tMirrorSourceSubHostTypeGroup,
+            tMirrorSourceStatsV15v0Group,
+            tMirrorNotifV15v0Group,
+            tMirrorServiceNameV15v1Group,
+            tMirrorLicV16v0Group,
+            tMirrorDestPcapV16v0Group,
+            tMirrorSourceV19v0Group,
+            tMirrorLicV19v0Group,
+            tMirrorLiV19v0Group,
+            tMirrorDestV20v0Group,
+            tMirrorSourceV20v0Group,
+            tMirrorLiSourcePortLicV20v0Group,
+            tMirrorLiPrtLicNotifV20v0Group
+        }
+    ::= { tMirrorCompliances 13 }
+
 tMirrorGroups                    OBJECT IDENTIFIER ::= { tMirrorConformance 2 }
 
 tMirrorSourceGroup               OBJECT-GROUP
@@ -6528,6 +6665,47 @@ tMirrorLiV19v0Group              OBJECT-GROUP
          in release 19 of the Nokia SROS series systems."
     ::= { tMirrorGroups 45 }
 
+tMirrorDestV20v0Group            OBJECT-GROUP
+    OBJECTS     {
+        tMirrorDestSamplingRate
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of mirror destinations
+         added in release 20 of the Nokia SROS series systems."
+    ::= { tMirrorGroups 46 }
+
+tMirrorSourceV20v0Group          OBJECT-GROUP
+    OBJECTS     {
+        tMirrorSourceSapShimId
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of mirror sources on Nokia
+         SROS series R20.0 systems."
+    ::= { tMirrorGroups 47 }
+
+tMirrorLiSourcePortLicV20v0Group OBJECT-GROUP
+    OBJECTS     {
+        tMirrorSourcePortLicenseState
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of Lawful Intercept mirror
+         source port license information in release 19 of the Nokia SROS series
+         systems."
+    ::= { tMirrorGroups 49 }
+
+tMirrorLiPrtLicNotifV20v0Group   NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tMirrorLiSrcPortLicInvalid
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notification objects added in support of Lawful Intercept
+         release 20 of the Nokia SROS series systems."
+    ::= { tMirrorGroups 50 }
+
 tMirrorNotifyPrefix              OBJECT IDENTIFIER ::= { tmnxSRNotifyPrefix 18 }
 
 tMirrorNotifications             OBJECT IDENTIFIER ::= { tMirrorNotifyPrefix 0 }
@@ -6953,5 +7131,16 @@ radiusFailed                     NOTIFICATION-TYPE
 
          [RECOVERY] Recovery, if required, depends on the alarm cause."
     ::= { tMirrorNotifications 28 }
+
+tMirrorLiSrcPortLicInvalid       NOTIFICATION-TYPE
+    OBJECTS     {
+        tMirrorSourcePortLicenseState
+    }
+    STATUS      current
+    DESCRIPTION
+        "The tMirrorLiSrcPortLicInvalid notification is generated when the
+         system license no longer supports the use of port mirroring on LI
+         Source elements."
+    ::= { tMirrorNotifications 29 }
 
 END

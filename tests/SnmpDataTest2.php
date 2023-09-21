@@ -4,7 +4,7 @@
 //define('OBS_QUIET', TRUE); // Disable any additional output from tests
 ini_set('opcache.enable', 0);
 
-include(dirname(__FILE__) . '/../includes/sql-config.inc.php');
+include(dirname(__FILE__) . '/../includes/observium.inc.php');
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');

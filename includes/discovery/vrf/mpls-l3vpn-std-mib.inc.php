@@ -4,15 +4,15 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 if (snmp_get_oid($device, 'mplsL3VpnConfiguredVrfs.0', 'MPLS-L3VPN-STD-MIB') <= 0) {
-  print_debug("Not found VRFs by MPLS-L3VPN-STD-MIB.");
-  return;
+    print_debug("Not found VRFs by MPLS-L3VPN-STD-MIB.");
+    return;
 }
 
 // MPLS-L3VPN-STD-MIB::mplsL3VpnVrfDescription."SA_MPLS" = STRING:
@@ -90,34 +90,36 @@ $vrf_discovered = snmp_endtime();
 // MPLS-L3VPN-STD-MIB::mplsL3VpnVrfPerfDiscTime."INTERNET" = Timeticks: (0) 0:00:00.00
 // MPLS-L3VPN-STD-MIB::mplsL3VpnVrfPerfDiscTime."ELEC_MPLS" = Timeticks: (0) 0:00:00.00
 // MPLS-L3VPN-STD-MIB::mplsL3VpnVrfPerfDiscTime."SAPAT_MPLS" = Timeticks: (0) 0:00:00.00
-$mpls_vpn_vrf = snmpwalk_cache_oid($device, 'mplsL3VpnVrfPerfEntry',    $mpls_vpn_vrf, 'MPLS-L3VPN-STD-MIB');
+$mpls_vpn_vrf = snmpwalk_cache_oid($device, 'mplsL3VpnVrfPerfEntry', $mpls_vpn_vrf, 'MPLS-L3VPN-STD-MIB');
 print_debug_vars($mpls_vpn_vrf);
 
 foreach ($mpls_vpn_vrf as $vrf_name => $entry) {
-  if ($entry['mplsL3VpnVrfConfRowStatus'] !== 'active') { continue; } // Skip inactive
+    if ($entry['mplsL3VpnVrfConfRowStatus'] !== 'active') {
+        continue;
+    } // Skip inactive
 
-  /* Juniper specific case:
-  mplsL3VpnVrfRD."BeamMGMT" = "10.51.0.236:666"
-  mplsL3VpnVrfRD."CUST_ALX" = "134743L:12007"
-  mplsL3VpnVrfRD."Mgmt-intf" = "10.51.0.236:667"
-  */
-  $discovery_vrf[$vrf_name] = [
-    'vrf_mib'            => $mib,
-    'vrf_name'           => $vrf_name,
-    'vrf_descr'          => $entry['mplsL3VpnVrfDescription'],
-    'vrf_rd'             => str_replace('L', '', $entry['mplsL3VpnVrfRD']),
+    /* Juniper specific case:
+    mplsL3VpnVrfRD."BeamMGMT" = "10.51.0.236:666"
+    mplsL3VpnVrfRD."CUST_ALX" = "134743L:12007"
+    mplsL3VpnVrfRD."Mgmt-intf" = "10.51.0.236:667"
+    */
+    $discovery_vrf[$vrf_name] = [
+      'vrf_mib'   => $mib,
+      'vrf_name'  => $vrf_name,
+      'vrf_descr' => $entry['mplsL3VpnVrfDescription'],
+      'vrf_rd'    => str_replace('L', '', $entry['mplsL3VpnVrfRD']),
 
-    'vrf_admin_status'   => $entry['mplsL3VpnVrfConfAdminStatus'],
-    'vrf_oper_status'    => $entry['mplsL3VpnVrfOperStatus'],
-    'vrf_active_ports'   => $entry['mplsL3VpnVrfActiveInterfaces'],
-    'vrf_total_ports'    => $entry['mplsL3VpnVrfAssociatedInterfaces'],
-    'vrf_added_routes'   => $entry['mplsL3VpnVrfPerfRoutesAdded'],
-    'vrf_deleted_routes' => $entry['mplsL3VpnVrfPerfRoutesDeleted'],
-    'vrf_total_routes'   => $entry['mplsL3VpnVrfPerfCurrNumRoutes'],
-    //'vrf_added'          => $vrf_discovered - timeticks_to_sec($entry['mplsL3VpnVrfCreationTime']),
-    'vrf_added'          => $device['last_rebooted'] + timeticks_to_sec($entry['mplsL3VpnVrfCreationTime']),
-    'vrf_last_change'    => $device['last_rebooted'] + timeticks_to_sec($entry['mplsL3VpnVrfConfLastChanged']),
-  ];
+      'vrf_admin_status'   => $entry['mplsL3VpnVrfConfAdminStatus'],
+      'vrf_oper_status'    => $entry['mplsL3VpnVrfOperStatus'],
+      'vrf_active_ports'   => $entry['mplsL3VpnVrfActiveInterfaces'],
+      'vrf_total_ports'    => $entry['mplsL3VpnVrfAssociatedInterfaces'],
+      'vrf_added_routes'   => $entry['mplsL3VpnVrfPerfRoutesAdded'],
+      'vrf_deleted_routes' => $entry['mplsL3VpnVrfPerfRoutesDeleted'],
+      'vrf_total_routes'   => $entry['mplsL3VpnVrfPerfCurrNumRoutes'],
+      //'vrf_added'          => $vrf_discovered - timeticks_to_sec($entry['mplsL3VpnVrfCreationTime']),
+      'vrf_added'          => $device['last_rebooted'] + timeticks_to_sec($entry['mplsL3VpnVrfCreationTime']),
+      'vrf_last_change'    => $device['last_rebooted'] + timeticks_to_sec($entry['mplsL3VpnVrfConfLastChanged']),
+    ];
 }
 
 // MPLS-L3VPN-STD-MIB::mplsL3VpnIfConfRowStatus."SA_MPLS".32 = INTEGER: active(1)
@@ -130,15 +132,17 @@ foreach ($mpls_vpn_vrf as $vrf_name => $entry) {
 $mpls_vpn_if = snmpwalk_cache_twopart_oid($device, 'mplsL3VpnIfConfRowStatus', [], 'MPLS-L3VPN-STD-MIB');
 print_debug_vars($mpls_vpn_if);
 foreach ($mpls_vpn_if as $vrf_name => $entry) {
-  if (!isset($discovery_vrf[$vrf_name])) {
-    print_debug("Unknown VRF name '$vrf_name'.");
-    continue;
-  }
+    if (!isset($discovery_vrf[$vrf_name])) {
+        print_debug("Unknown VRF name '$vrf_name'.");
+        continue;
+    }
 
-  foreach ($entry as $vrf_ifIndex => $entry2) {
-    if ($entry2['mplsL3VpnIfConfRowStatus'] !== 'active') { continue; } // Skip inactive interfaces
-    $discovery_vrf[$vrf_name]['ifIndex'][] = $vrf_ifIndex;
-  }
+    foreach ($entry as $vrf_ifIndex => $entry2) {
+        if ($entry2['mplsL3VpnIfConfRowStatus'] !== 'active') {
+            continue;
+        } // Skip inactive interfaces
+        $discovery_vrf[$vrf_name]['ifIndex'][] = $vrf_ifIndex;
+    }
 }
 
 // EOF

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -34,64 +34,50 @@
 #   The return from this structure is Integer.
 
 
-
 #BUILT-IN Sensors
-$cache['itwatchdogs']['climateTable'] = snmpwalk_cache_oid($device, 'climateTable', array(), 'IT-WATCHDOGS-MIB');
+$cache['itwatchdogs']['climateTable'] = snmpwalk_cache_oid($device, 'climateTable', [], 'IT-WATCHDOGS-MIB');
 
-foreach ($cache['itwatchdogs']['climateTable'] as $index => $entry)
-{
-  if ($entry['climateAvail'])
-  {
-    $descr = $entry['climateName'] . ' Temperature';
-    $oid = ".1.3.6.1.4.1.17373.2.2.1.5.$index";
-    $value = $entry['climateTempC'];
+foreach ($cache['itwatchdogs']['climateTable'] as $index => $entry) {
+    if ($entry['climateAvail']) {
+        $descr = $entry['climateName'] . ' Temperature';
+        $oid   = ".1.3.6.1.4.1.17373.2.2.1.5.$index";
+        $value = $entry['climateTempC'];
 
-    if (is_numeric($value))
-    {
-      discover_sensor ($valid['sensor'], 'temperature', $device, $oid, 'climateTempC.'.$index, 'it-watchdogs-mib', $descr, $scale, $value);
+        if (is_numeric($value)) {
+            discover_sensor($valid['sensor'], 'temperature', $device, $oid, 'climateTempC.' . $index, 'it-watchdogs-mib', $descr, $scale, $value);
+        } else {
+            print_debug("Sensor data '$value' not-numeric.");
+        }
+
+
+        $descr = $entry['climateName'] . ' Humidity';
+        $oid   = ".1.3.6.1.4.1.17373.2.2.1.6.$index";
+        $value = $entry['climateHumidity'];
+
+        if (is_numeric($value)) {
+            discover_sensor($valid['sensor'], 'humidity', $device, $oid, 'climateHumidity.' . $index, 'it-watchdogs-mib', $descr, $scale, $value);
+        } else {
+            print_debug("Sensor data '$value' not-numeric.");
+        }
     }
-    else
-    {
-      print_debug("Sensor data '$value' not-numeric.");
-    }
-
-
-    $descr = $entry['climateName'] . ' Humidity';
-    $oid = ".1.3.6.1.4.1.17373.2.2.1.6.$index";
-    $value = $entry['climateHumidity'];
-
-    if (is_numeric($value))
-    {
-      discover_sensor ($valid['sensor'], 'humidity', $device, $oid, 'climateHumidity.'.$index, 'it-watchdogs-mib', $descr, $scale, $value);
-    }
-    else
-    {
-      print_debug("Sensor data '$value' not-numeric.");
-    }
-  }
 }
 
 #Add-on sensors
 
-$cache['itwatchdogs']['tempSensorTable'] = snmpwalk_cache_oid($device, 'tempSensorTable', array(), 'IT-WATCHDOGS-MIB');
+$cache['itwatchdogs']['tempSensorTable'] = snmpwalk_cache_oid($device, 'tempSensorTable', [], 'IT-WATCHDOGS-MIB');
 
-foreach ($cache['itwatchdogs']['tempSensorTable'] as $index => $entry)
-{
-  if ($entry['tempSensorAvail'])
-  {
-    $descr = $entry['tempSensorName'];
-    $oid = ".1.3.6.1.4.1.17373.2.4.1.5.$index";
-    $value = $entry['tempSensorTempC'];
+foreach ($cache['itwatchdogs']['tempSensorTable'] as $index => $entry) {
+    if ($entry['tempSensorAvail']) {
+        $descr = $entry['tempSensorName'];
+        $oid   = ".1.3.6.1.4.1.17373.2.4.1.5.$index";
+        $value = $entry['tempSensorTempC'];
 
-    if (is_numeric($value))
-    {
-      discover_sensor ($valid['sensor'], 'temperature', $device, $oid, 'tempSensorTempC'.$index, 'it-watchdogs-mib', $descr, $scale, $value);
+        if (is_numeric($value)) {
+            discover_sensor($valid['sensor'], 'temperature', $device, $oid, 'tempSensorTempC' . $index, 'it-watchdogs-mib', $descr, $scale, $value);
+        } else {
+            print_debug("Sensor data '$value' not-numeric for oid $oid Sensor: $index");
+        }
     }
-    else
-    {
-      print_debug("Sensor data '$value' not-numeric for oid $oid Sensor: $index");
-    }
-  }
 }
 
 // EOF

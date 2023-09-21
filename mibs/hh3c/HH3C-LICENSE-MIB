@@ -1,17 +1,32 @@
 -- =================================================================
--- Copyright (c) 2004-2014 New H3C Tech. Co., Ltd. All rights reserved.
+-- Copyright (c) 2004-2021 New H3C Tech. Co., Ltd. All rights reserved.
 --
 -- Description: License management
 -- Reference:
--- Version: V1.0
+-- Version: V1.4
 -- History:
 --   V1.0 2013-09-18 Initial version by Song Hao and Deng Kai.
+--   V1.1 2019-01-14 Modified version by Song Hao and Deng Shuhua.
+--      Add hh3cLicenseServerIp and hh3cLicenseServerPort to Hh3cLicenseDevInfoEntry
+--      Add notification objects:
+--          hh3cLicenseReconnectWithServer
+--          hh3cLicenseDisconnectWithServer
+--   V1.2 2019-11-07 Modified version by Deng Shuhua.
+--      Add serverLicense to hh3cLicenseFeatureState
+--   V1.3 2020-07-27 Modified version by Lu Xiang.
+--      Add Add hh3cLicenseLowerUsageThreshold, hh3cLicenseUpperUsageThreshold
+--          and hh3cLicenseCurrentUsageRate to hh3cLicenseNotificationBindings
+--      Add notification objects:
+--          hh3cLicenseBelowUsageThreshold
+--          hh3cLicenseOverUsageThreshold
+--   V1.4 2021-01-13 Modified version by Liu Xiaohong.
+--      Add preLicense to hh3cLicenseFeatureState
 -- =================================================================
 HH3C-LICENSE-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     hh3cCommon
         FROM HH3C-OID-MIB
-    OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE, Unsigned32, TimeTicks
+    OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE, IpAddress, Unsigned32, TimeTicks
         FROM SNMPv2-SMI
     RowStatus, DateAndTime, TruthValue
         FROM SNMPv2-TC
@@ -21,7 +36,7 @@ IMPORTS
         FROM ENTITY-MIB;
 
 hh3cLicense MODULE-IDENTITY
-    LAST-UPDATED "201309181000Z"
+    LAST-UPDATED "202101131000Z"
     ORGANIZATION
         "New H3C Technologies Co., Ltd."
     CONTACT-INFO
@@ -32,6 +47,23 @@ hh3cLicense MODULE-IDENTITY
     DESCRIPTION
         "This MIB is used to manage license, including license key,
         activation key and activation file."
+    REVISION "202101131000Z"
+    DESCRIPTION
+        "Add preLicense to hh3cLicenseFeatureState."
+    REVISION "202007271000Z"
+    DESCRIPTION
+        "Add Add hh3cLicenseLowerUsageThreshold, hh3cLicenseUpperUsageThreshold
+         and hh3cLicenseCurrentUsageRate to hh3cLicenseNotificationBindings
+         Add notification objects:
+         hh3cLicenseBelowUsageThreshold and hh3cLicenseOverUsageThreshold."
+    REVISION "201911121000Z"
+    DESCRIPTION
+        "Add serverLicense to hh3cLicenseFeatureState."
+    REVISION "201901141000Z"
+    DESCRIPTION
+        "Add hh3cLicenseServerIp and hh3cLicenseServerPort to
+         Hh3cLicenseDevInfoEntry.  Add notification objects:
+         hh3cLicenseReconnectWithServer and hh3cLicenseDisconnectWithServer."
     REVISION "201309181000Z"
     DESCRIPTION
         "Initial version of this MIB module."
@@ -109,7 +141,9 @@ Hh3cLicenseDevInfoEntry ::= SEQUENCE
         hh3cLicenseUsedNum             Unsigned32,
         hh3cLicenseRecyclableNum       Unsigned32,
         hh3cLicenseInstallType         INTEGER,
-        hh3cLicenseFileStoragePath     SnmpAdminString
+        hh3cLicenseFileStoragePath     SnmpAdminString,
+        hh3cLicenseServerIp            IpAddress,
+        hh3cLicenseServerPort          Unsigned32
     }
 
 hh3cLicensePhysicalIndex OBJECT-TYPE
@@ -237,6 +271,22 @@ hh3cLicenseFileStoragePath   OBJECT-TYPE
     DESCRIPTION
         "The storage path of the installed license files."
     ::= { hh3cLicenseDevInfoEntry 10 }
+
+hh3cLicenseServerIp OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the license server."
+    ::= { hh3cLicenseDevInfoEntry 11 }
+
+hh3cLicenseServerPort OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The port number of the license server."
+    ::= { hh3cLicenseDevInfoEntry 12 }
 -- End of device information
 
 -- Begin of general information
@@ -556,7 +606,9 @@ hh3cLicenseFeatureState OBJECT-TYPE
     SYNTAX      INTEGER {
                   notLicensed(1),
                   trialLicense(2),
-                  formalLicense(3)
+                  formalLicense(3),
+                  serverLicense(4),
+                  preLicense(5)
                 }
     MAX-ACCESS  read-only
     STATUS      current
@@ -565,7 +617,9 @@ hh3cLicenseFeatureState OBJECT-TYPE
 
         notLicensed - The feature is not licensed.
         trialLicense - The feature is using trial license.
-        formalLicense - The feature is using purchased license."
+        formalLicense - The feature is using purchased license.
+        serverLicense - The feature is using license authorized by license server.
+        preLicense - The feature is using pre-installed license."
     ::= { hh3cLicenseFeatureEntry 2 }
 -- End of feature information
 
@@ -828,6 +882,56 @@ hh3cLicenseExpireWarning NOTIFICATION-TYPE
     DESCRIPTION
         "This notification is generated when is about to expire."
     ::= { hh3cLicenseNotificationPrefix 5 }
+
+hh3cLicenseReconnectWithServer NOTIFICATION-TYPE
+    OBJECTS
+        {
+            hh3cLicensePhysicalIndex,
+            hh3cLicenseServerIp,
+            hh3cLicenseServerPort
+        }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when the license client is reconnected to the license server."
+    ::= { hh3cLicenseNotificationPrefix 6 }
+
+hh3cLicenseDisconnectWithServer NOTIFICATION-TYPE
+    OBJECTS
+        {
+            hh3cLicensePhysicalIndex,
+            hh3cLicenseServerIp,
+            hh3cLicenseServerPort
+        }
+    STATUS      current
+    DESCRIPTION
+        " This notification is generated when the license client is disconnected from the license server."
+    ::= { hh3cLicenseNotificationPrefix 7 }
+
+hh3cLicenseBelowUsageThreshold NOTIFICATION-TYPE
+    OBJECTS
+        {
+            hh3cLicenseFeatureName,
+            hh3cLicenseLowerUsageThreshold,
+            hh3cLicenseUpperUsageThreshold,
+            hh3cLicenseCurrentUsageRate
+        }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when the license usage drops below warning threshold."
+    ::= { hh3cLicenseNotificationPrefix 8 }
+
+hh3cLicenseOverUsageThreshold NOTIFICATION-TYPE
+    OBJECTS
+        {
+            hh3cLicenseFeatureName,
+            hh3cLicenseLowerUsageThreshold,
+            hh3cLicenseUpperUsageThreshold,
+            hh3cLicenseCurrentUsageRate
+        }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when the license usage is over warning threshold."
+    ::= { hh3cLicenseNotificationPrefix 9 }
 -- End of notifications
 
 -- Begin of notification bindings
@@ -842,6 +946,27 @@ hh3cLicenseBindValidityPeriodRemaining OBJECT-TYPE
         "This object indicates the remaining days before
         the feature's license expires."
     ::= { hh3cLicenseNotificationBindings 1 }
+hh3cLicenseLowerUsageThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the lower warning threshold of usage."
+    ::= { hh3cLicenseNotificationBindings 2 }
+hh3cLicenseUpperUsageThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the upper warning threshold of usage."
+    ::= { hh3cLicenseNotificationBindings 3 }
+hh3cLicenseCurrentUsageRate OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the license current usage rate."
+    ::= { hh3cLicenseNotificationBindings 4 }
 -- End of notification bindings
 
 END

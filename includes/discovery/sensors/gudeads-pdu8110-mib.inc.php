@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -16,45 +16,40 @@
 // GUDEADS-PDU8110-MIB::pdu8110HygroSensor.1 = INTEGER: -9999 0.1 percent humidity
 // GUDEADS-PDU8110-MIB::pdu8110HygroSensor.2 = INTEGER: -9999 0.1 percent humidity
 
-$cache['pdu8110x'] = snmpwalk_cache_oid($device, 'pdu8110SensorTable', array(), 'GUDEADS-PDU8110-MIB');
+$cache['pdu8110x'] = snmpwalk_cache_oid($device, 'pdu8110SensorTable', [], 'GUDEADS-PDU8110-MIB');
 
 $scale = 0.1;
-foreach ($cache['pdu8110x'] as $index => $entry)
-{
-  $oid   = ".1.3.6.1.4.1.28507.23.1.6.1.1.2.$index";
-  $descr = "Temp Sensor $index";
-  $value = $entry['pdu8110TempSensor'];
+foreach ($cache['pdu8110x'] as $index => $entry) {
+    $oid   = ".1.3.6.1.4.1.28507.23.1.6.1.1.2.$index";
+    $descr = "Temp Sensor $index";
+    $value = $entry['pdu8110TempSensor'];
 
-  if ($value != '' && $value != -9999)
-  {
-    discover_sensor('temperature', $device, $oid, 'pdu8110TempSensor.'.$index, 'pdu8110', $descr, $scale, $value);
-  }
+    if ($value != '' && $value != -9999) {
+        discover_sensor('temperature', $device, $oid, 'pdu8110TempSensor.' . $index, 'pdu8110', $descr, $scale, $value);
+    }
 
-  $oid   = ".1.3.6.1.4.1.28507.23.1.6.1.1.3.$index";
-  $descr = "Hygro Sensor $index";
-  $value = $entry['pdu8110HygroSensor'];
+    $oid   = ".1.3.6.1.4.1.28507.23.1.6.1.1.3.$index";
+    $descr = "Hygro Sensor $index";
+    $value = $entry['pdu8110HygroSensor'];
 
-  if ($value != '' && $value != -9999)
-  {
-    discover_sensor('humidity', $device, $oid, 'pdu8110HygroSensor.'.$index, 'pdu8110', $descr, $scale, $value);
-  }
+    if ($value != '' && $value != -9999) {
+        discover_sensor('humidity', $device, $oid, 'pdu8110HygroSensor.' . $index, 'pdu8110', $descr, $scale, $value);
+    }
 }
 
-$channels = snmp_get($device, 'pdu8110ActivePowerChan.0','-Oqv', 'GUDEADS-PDU8110-MIB');
+$channels = snmp_get($device, 'pdu8110ActivePowerChan.0', '-Oqv', 'GUDEADS-PDU8110-MIB');
 
 $scale = 0.001;
-for ($index = 1;$index <= $channels;$index++)
-{
-  // GUDEADS-PDU8110-MIB::pdu8110Current.1 = Gauge32: 933 mA
+for ($index = 1; $index <= $channels; $index++) {
+    // GUDEADS-PDU8110-MIB::pdu8110Current.1 = Gauge32: 933 mA
 
-  $oid   = ".1.3.6.1.4.1.28507.23.1.5.1.2.1.5.$index";
-  $descr = 'Output';
-  $value = snmp_get($device, "pdu8110Current.$index",'-Oqv', 'GUDEADS-PDU8110-MIB');
+    $oid   = ".1.3.6.1.4.1.28507.23.1.5.1.2.1.5.$index";
+    $descr = 'Output';
+    $value = snmp_get($device, "pdu8110Current.$index", '-Oqv', 'GUDEADS-PDU8110-MIB');
 
-  if ($value != '' && $value != -9999)
-  {
-    discover_sensor('current', $device, $oid, "pdu8110Current.$index", 'pdu8110', $descr, $scale, $value);
-  }
+    if ($value != '' && $value != -9999) {
+        discover_sensor('current', $device, $oid, "pdu8110Current.$index", 'pdu8110', $descr, $scale, $value);
+    }
 }
 
 // EOF

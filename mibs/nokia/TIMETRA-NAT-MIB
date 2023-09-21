@@ -29,6 +29,8 @@ IMPORTS
     timetraSRMIBModules, tmnxSRConfs,
     tmnxSRNotifyPrefix, tmnxSRObjs
                                                          FROM TIMETRA-GLOBAL-MIB
+    svcOperGrpName
+                                                         FROM TIMETRA-SERV-MIB
     tmnxSubInfoSubIdent
                                                          FROM TIMETRA-SUBSCRIBER-MGMT-MIB
     ServiceOperStatus, TFCSet, TIpProtocol,
@@ -40,11 +42,11 @@ IMPORTS
     TmnxAddressAndPrefixType,
     TmnxAdminState, TmnxCreateOrigin,
     TmnxDisplayStringURL,
-    TmnxEnabledDisabled,
-    TmnxIsaScalingProfile, TmnxNatIsaGrpId,
-    TmnxNatIsaGrpIdOrZero,
+    TmnxEnabledDisabled, TmnxEsaNum,
+    TmnxEsaVappNum, TmnxIsaScalingProfile,
+    TmnxNatIsaGrpId, TmnxNatIsaGrpIdOrZero,
     TmnxNatSubscriberType, TmnxNatWaterMark,
-    TmnxOperState, TmnxServId,
+    TmnxOperState, TmnxPortID, TmnxServId,
     TmnxSubIdentString,
     TmnxSubIdentStringOrEmpty,
     TmnxSubRadServAlgorithm,
@@ -58,7 +60,7 @@ IMPORTS
     ;
 
 timetraNatMIBModule              MODULE-IDENTITY
-    LAST-UPDATED "201003150000Z"
+    LAST-UPDATED "202103150000Z"
     ORGANIZATION "Nokia"
     CONTACT-INFO
         "Nokia SROS Support
@@ -83,6 +85,11 @@ timetraNatMIBModule              MODULE-IDENTITY
          This Specification is supplied 'as is', and Nokia makes no warranty,
          either express or implied, as to the use, operation, condition, or
          performance of the Specification."
+
+    REVISION    "202103150000Z"
+    DESCRIPTION
+        "Rev 21             15 March 2021 00:00
+         21 release of the TIMETRA-NAT-MIB."
 
     REVISION    "201003150000Z"
     DESCRIPTION
@@ -265,7 +272,8 @@ TmnxNatPolicyPurpose             ::= TEXTUAL-CONVENTION
          purpose of a policy that can be associated with an ISA group."
     SYNTAX      INTEGER {
         nat      (1),
-        firewall (2)
+        firewall (2),
+        cups     (3)
     }
 
 TmnxNatSubscriberIdString        ::= TEXTUAL-CONVENTION
@@ -362,7 +370,18 @@ TmnxNatIsaGrpEntry               ::= SEQUENCE
     tmnxNatIsaGrpFailedMdaLimit      Unsigned32,
     tmnxNatIsaGrpOperState           TmnxOperState,
     tmnxNatIsaGrpDegraded            TruthValue,
-    tmnxNatIsaGrpScalingProfile      TmnxIsaScalingProfile
+    tmnxNatIsaGrpScalingProfile      TmnxIsaScalingProfile,
+    tmnxNatIsaGrpSicrReplThreshold   Unsigned32,
+    tmnxNatIsaGrpSicrToAfterSwitch   Unsigned32,
+    tmnxNatIsaGrpSicrRouter          TmnxVRtrIDOrZero,
+    tmnxNatIsaGrpSicrLocAddrType     InetAddressType,
+    tmnxNatIsaGrpSicrLocAddrStart    InetAddress,
+    tmnxNatIsaGrpSicrRemAddrType     InetAddressType,
+    tmnxNatIsaGrpSicrRemAddrStart    InetAddress,
+    tmnxNatIsaGrpSicrIpMtu           Unsigned32,
+    tmnxNatIsaGrpSicrPreferred       TruthValue,
+    tmnxNatIsaGrpSicrKaInterval      Unsigned32,
+    tmnxNatIsaGrpSicrKaDropcount     Unsigned32
 }
 
 tmnxNatIsaGrpId                  OBJECT-TYPE
@@ -464,7 +483,7 @@ tmnxNatIsaGrpRedundancy          OBJECT-TYPE
         activeStandby (0),
         activeActive  (1),
         l2awareBypass (2),
-        reserved3     (3)
+        interChassis  (3)
     }
     MAX-ACCESS  read-create
     STATUS      current
@@ -543,6 +562,125 @@ tmnxNatIsaGrpScalingProfile      OBJECT-TYPE
          implementation."
     DEFVAL      { profile1 }
     ::= { tmnxNatIsaGrpEntry 53 }
+
+tmnxNatIsaGrpSicrReplThreshold   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..300)
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrReplThreshold specifies the minimum time
+         before a NAT traffic flow is synchronized with the Stateful Inter
+         Chassis Resilience (SICR) peer."
+    DEFVAL      { 20 }
+    ::= { tmnxNatIsaGrpEntry 54 }
+
+tmnxNatIsaGrpSicrToAfterSwitch   OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..50)
+    UNITS       "percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrToAfterSwitch specifies how much of the
+         flow timeout is taken into consideration after a switchover.
+
+         The flow timeout values are configured in the NAT policy, for example:
+         tmnxNatPlcyToTcpEstab for TCP flows in established state."
+    DEFVAL      { 50 }
+    ::= { tmnxNatIsaGrpEntry 55 }
+
+tmnxNatIsaGrpSicrRouter          OBJECT-TYPE
+    SYNTAX      TmnxVRtrIDOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrRouter specifies the virtual router
+         instance to be used for the SICR ISA-to-ISA traffic."
+    DEFVAL      { 0 }
+    ::= { tmnxNatIsaGrpEntry 56 }
+
+tmnxNatIsaGrpSicrLocAddrType     OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrLocAddrType specifies the address type
+         of tmnxNatIsaGrpSicrLocAddrStart."
+    DEFVAL      { unknown }
+    ::= { tmnxNatIsaGrpEntry 57 }
+
+tmnxNatIsaGrpSicrLocAddrStart    OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrLocAddrStart specifies the start of the
+         SICR IP address range of this NAT group."
+    DEFVAL      { ''H }
+    ::= { tmnxNatIsaGrpEntry 58 }
+
+tmnxNatIsaGrpSicrRemAddrType     OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrRemAddrType specifies the address type
+         of tmnxNatIsaGrpSicrRemAddrStart."
+    DEFVAL      { unknown }
+    ::= { tmnxNatIsaGrpEntry 59 }
+
+tmnxNatIsaGrpSicrRemAddrStart    OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrRemAddrStart specifies the start of the
+         SICR IP address range of the peer."
+    DEFVAL      { ''H }
+    ::= { tmnxNatIsaGrpEntry 60 }
+
+tmnxNatIsaGrpSicrIpMtu           OBJECT-TYPE
+    SYNTAX      Unsigned32 (512..9000)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatIsaGrpSicrIpMtu specifies the IP MTU
+         for the ISA-to-ISA SICR communication."
+    DEFVAL      { 1500 }
+    ::= { tmnxNatIsaGrpEntry 61 }
+
+tmnxNatIsaGrpSicrPreferred       OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrPreferred specifies if this system is
+         the preferred system to perform the NAT if both systems have equal
+         health values."
+    DEFVAL      { false }
+    ::= { tmnxNatIsaGrpEntry 62 }
+
+tmnxNatIsaGrpSicrKaInterval      OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..250)
+    UNITS       "deciseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrKaInterval specifies the time interval
+         between two consecutive keepalive messages."
+    DEFVAL      { 30 }
+    ::= { tmnxNatIsaGrpEntry 63 }
+
+tmnxNatIsaGrpSicrKaDropcount     OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..20)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaGrpSicrKaDropcount specifies the number of
+         keepalive messages without timely response after which this system
+         considers the peer down."
+    DEFVAL      { 2 }
+    ::= { tmnxNatIsaGrpEntry 64 }
 
 tmnxNatGrpCfgTable               OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxNatGrpCfgEntry
@@ -812,6 +950,155 @@ tmnxNatIsaRecovActActionResult   OBJECT-TYPE
          not in bypass mode."
     ::= { tmnxNatIsaRecoveryAction 4 }
 
+tmnxNatGrpMonOperGrpTable        OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatGrpMonOperGrpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatGrpMonOperGrpTable contains objects to configure the NAT
+         ISA Group multi-chassis redundancy monitor Operational-Groups."
+    ::= { tmnxNatIsaGrpObjs 5 }
+
+tmnxNatGrpMonOperGrpEntry        OBJECT-TYPE
+    SYNTAX      TmnxNatGrpMonOperGrpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row represents an Operational-Group associated with a
+         NAT ISA Group.
+
+         Entries in this table can be created or deleted via SNMP operations."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        svcOperGrpName
+    }
+    ::= { tmnxNatGrpMonOperGrpTable 1 }
+
+TmnxNatGrpMonOperGrpEntry        ::= SEQUENCE
+{
+    tmnxNatGrpMonOperGrpRowStatus    RowStatus,
+    tmnxNatGrpMonOperGrpLastCh       TimeStamp,
+    tmnxNatGrpMonOperGrpHlthDrop     Unsigned32,
+    tmnxNatGrpMonOperGrpActHlthDrop  Unsigned32
+}
+
+tmnxNatGrpMonOperGrpRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonOperGrpRowStatus specifies the row status of
+         this row."
+    ::= { tmnxNatGrpMonOperGrpEntry 1 }
+
+tmnxNatGrpMonOperGrpLastCh       OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonOperGrpLastCh indicates the sysUpTime at the
+         time of the most recent management-initiated change to this table row."
+    ::= { tmnxNatGrpMonOperGrpEntry 2 }
+
+tmnxNatGrpMonOperGrpHlthDrop     OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonOperGrpHlthDrop specifies the value by which
+         the health is decremented whenever a member of the monitoring
+         operational-group goes down."
+    DEFVAL      { 1 }
+    ::= { tmnxNatGrpMonOperGrpEntry 3 }
+
+tmnxNatGrpMonOperGrpActHlthDrop  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonOperGrpActHlthDrop indicates the actual
+         health drop."
+    ::= { tmnxNatGrpMonOperGrpEntry 4 }
+
+tmnxNatGrpMonPortTable           OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatGrpMonPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatGrpMonPortTable contains objects to configure the NAT ISA
+         Group multi-chassis redundancy monitor ports."
+    ::= { tmnxNatIsaGrpObjs 6 }
+
+tmnxNatGrpMonPortEntry           OBJECT-TYPE
+    SYNTAX      TmnxNatGrpMonPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row represents a monitor port associated with a NAT
+         ISA Group.
+
+         Entries in this table can be created or deleted via SNMP operations."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatGrpMonPortId
+    }
+    ::= { tmnxNatGrpMonPortTable 1 }
+
+TmnxNatGrpMonPortEntry           ::= SEQUENCE
+{
+    tmnxNatGrpMonPortId              TmnxPortID,
+    tmnxNatGrpMonPortRowStatus       RowStatus,
+    tmnxNatGrpMonPortLastCh          TimeStamp,
+    tmnxNatGrpMonPortHealthDrop      Unsigned32,
+    tmnxNatGrpMonPortActHealthDrop   Unsigned32
+}
+
+tmnxNatGrpMonPortId              OBJECT-TYPE
+    SYNTAX      TmnxPortID
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonPortId indicates the port to be synchronized
+         with the multi-chassis peer."
+    ::= { tmnxNatGrpMonPortEntry 1 }
+
+tmnxNatGrpMonPortRowStatus       OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonPortRowStatus specifies the row status of
+         this row."
+    ::= { tmnxNatGrpMonPortEntry 2 }
+
+tmnxNatGrpMonPortLastCh          OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonPortLastCh indicates the sysUpTime at the
+         time of the most recent management-initiated change to this table row."
+    ::= { tmnxNatGrpMonPortEntry 3 }
+
+tmnxNatGrpMonPortHealthDrop      OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonPortHealthDrop specifies the value by which
+         the health is decremented when the monitor port goes down."
+    DEFVAL      { 1 }
+    ::= { tmnxNatGrpMonPortEntry 4 }
+
+tmnxNatGrpMonPortActHealthDrop   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpMonPortActHealthDrop indicates the actual
+         health drop."
+    ::= { tmnxNatGrpMonPortEntry 5 }
+
 tmnxNatIsaMdaObjs                OBJECT IDENTIFIER ::= { tmnxNatIsaObjs 2 }
 
 tmnxNatIsaMdaTable               OBJECT-TYPE
@@ -970,7 +1257,9 @@ TmnxNatIsaMemberEntry            ::= SEQUENCE
     tmnxNatIsaMemberBlocksReserved   Gauge32,
     tmnxNatIsaMemberSessionUsage     TmnxNatUsageLevel,
     tmnxNatIsaMemberSessionUsageHi   TruthValue,
-    tmnxNatIsaMemberSessionsPrio     Gauge32
+    tmnxNatIsaMemberSessionsPrio     Gauge32,
+    tmnxNatIsaMemberEsaNum           TmnxEsaNum,
+    tmnxNatIsaMemberEsaVappNum       TmnxEsaVappNum
 }
 
 tmnxNatIsaMemberId               OBJECT-TYPE
@@ -1084,6 +1373,25 @@ tmnxNatIsaMemberSessionsPrio     OBJECT-TYPE
         "The value of tmnxNatIsaMemberSessionsPrio indicates the current number
          of active prioritized sessions of the MDA associated with this member."
     ::= { tmnxNatIsaMemberEntry 10 }
+
+tmnxNatIsaMemberEsaNum           OBJECT-TYPE
+    SYNTAX      TmnxEsaNum
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaMemberEsaNum indicates the number of the
+         Extended Service Appliance where the member is located."
+    ::= { tmnxNatIsaMemberEntry 11 }
+
+tmnxNatIsaMemberEsaVappNum       OBJECT-TYPE
+    SYNTAX      TmnxEsaVappNum
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatIsaMemberEsaVappNum indicates the number of the
+         Virtual Machine within an Extended Service Appliance where the member
+         is located."
+    ::= { tmnxNatIsaMemberEntry 12 }
 
 tmnxNatIsaMemberStatsTable       OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxNatIsaMemberStatsEntry
@@ -1735,7 +2043,7 @@ tmnxNatIsaMdaStatsDayEntry       OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "Each conceptual row contains historical performance statistics
-         information about a NAT ISA MDA, collected during the last hour.
+         information about a NAT ISA MDA, collected during the last 24 hours.
 
          Entries in this table are created and removed automatically by the
          system."
@@ -1841,7 +2149,7 @@ tmnxNatIsaMdaStatsMonthEntry     OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "Each conceptual row contains historical performance statistics
-         information about a NAT ISA MDA, collected during the last hour.
+         information about a NAT ISA MDA, collected during the last 30 days.
 
          Entries in this table are created and removed automatically by the
          system."
@@ -1930,6 +2238,1330 @@ tmnxNatIsaMdaStatsMonthThroughp  OBJECT-TYPE
         "The value of the object tmnxNatIsaMdaStatsMonthThroughp indicates the
          number of bytes this MDA has internally processed during this period."
     ::= { tmnxNatIsaMdaStatsMonthEntry 7 }
+
+tmnxNatMemSicrStateTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatMemSicrStateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatMemSicrStateTable contains SICR state information about the
+         members of a NAT-capable ISA Group.
+
+         A member of a NAT ISA Group can be mapped to a physical NAT ISA MDA."
+    ::= { tmnxNatIsaMdaStatObjs 11 }
+
+tmnxNatMemSicrStateEntry         OBJECT-TYPE
+    SYNTAX      TmnxNatMemSicrStateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains SICR state information about a member of
+         a NAT ISA Group.
+
+         Entries in this table are created and removed automatically by the
+         system.
+
+         A member has a row in this table when the following conditions are met:
+         - the value of TIMETRA-MC-REDUNDANCY-MIB::tmnxMcPeerAdminState is 'inService' for its peer;
+         - the value of TIMETRA-MC-REDUNDANCY-MIB::tmnxMcPeerSyncAdminState is 'inService' for its peer;
+         - a row in TIMETRA-MC-REDUNDANCY-MIB::tmnxMcRedNatGrpTable exists for its group;
+         - the value of tmnxNatIsaGrpRedundancy is equal to 'interChassis' for its group;
+         - the value of tmnxNatIsaGrpAdminState is equal to 'inService' for its group."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatIsaMemberId
+    }
+    ::= { tmnxNatMemSicrStateTable 1 }
+
+TmnxNatMemSicrStateEntry         ::= SEQUENCE
+{
+    tmnxNatMemSicrState              INTEGER,
+    tmnxNatMemSicrPeerState          INTEGER,
+    tmnxNatMemSicrLocAddrType        InetAddressType,
+    tmnxNatMemSicrLocAddr            InetAddress,
+    tmnxNatMemSicrRemAddrType        InetAddressType,
+    tmnxNatMemSicrRemAddr            InetAddress,
+    tmnxNatMemSicrStateLastFailed    TimeStamp,
+    tmnxNatMemSicrStateFailReason    DisplayString,
+    tmnxNatMemSicrStateUnsupp        CounterBasedGauge64,
+    tmnxNatMemSicrStateTracked       CounterBasedGauge64,
+    tmnxNatMemSicrStateNotSync       CounterBasedGauge64,
+    tmnxNatMemSicrStateCreatePending CounterBasedGauge64,
+    tmnxNatMemSicrStateCreateSync    CounterBasedGauge64,
+    tmnxNatMemSicrStateDeleteMarked  CounterBasedGauge64,
+    tmnxNatMemSicrStateDeletePending CounterBasedGauge64
+}
+
+tmnxNatMemSicrState              OBJECT-TYPE
+    SYNTAX      INTEGER {
+        disabled         (0),
+        waitingSelection (1),
+        cleaningUp       (2),
+        negotiating      (3),
+        active           (4),
+        standby          (5)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrState indicates the inter-chassis
+         redundancy state of this member."
+    ::= { tmnxNatMemSicrStateEntry 1 }
+
+tmnxNatMemSicrPeerState          OBJECT-TYPE
+    SYNTAX      INTEGER {
+        active  (1),
+        standby (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrPeerState indicates the inter-chassis
+         redundancy state of the peer of this member."
+    ::= { tmnxNatMemSicrStateEntry 2 }
+
+tmnxNatMemSicrLocAddrType        OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrLocAddrType indicates the address type of
+         tmnxNatMemSicrLocAddr."
+    ::= { tmnxNatMemSicrStateEntry 3 }
+
+tmnxNatMemSicrLocAddr            OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrLocAddr indicates the IP address used for
+         Stateful Inter-Chassis Redundancy on this member."
+    ::= { tmnxNatMemSicrStateEntry 4 }
+
+tmnxNatMemSicrRemAddrType        OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrRemAddrType indicates the address type of
+         tmnxNatMemSicrRemAddr."
+    ::= { tmnxNatMemSicrStateEntry 5 }
+
+tmnxNatMemSicrRemAddr            OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrRemAddr indicates the IP address of the
+         SICR peer of this member."
+    ::= { tmnxNatMemSicrStateEntry 6 }
+
+tmnxNatMemSicrStateLastFailed    OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatMemSicrStateLastFailed indicates the sysUpTime at
+         the time of the most recent SICR failure.
+
+         The value zero indicates that no such failure has occurred yet."
+    ::= { tmnxNatMemSicrStateEntry 7 }
+
+tmnxNatMemSicrStateFailReason    OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateFailReason indicates the
+         reason of the most recent SICR failure."
+    ::= { tmnxNatMemSicrStateEntry 8 }
+
+tmnxNatMemSicrStateUnsupp        OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateUnsupp indicates the number
+         of unsupported flows (e.g. ALG pinholes)."
+    ::= { tmnxNatMemSicrStateEntry 21 }
+
+tmnxNatMemSicrStateTracked       OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateTracked indicates the
+         number of flows tracked for synchronization."
+    ::= { tmnxNatMemSicrStateEntry 22 }
+
+tmnxNatMemSicrStateNotSync       OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateNotSync indicates the
+         number of tracked flows not yet synchronized."
+    ::= { tmnxNatMemSicrStateEntry 23 }
+
+tmnxNatMemSicrStateCreatePending OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateCreatePending indicates the
+         number of tracked flows for which synchronization is requested but not
+         yet confirmed."
+    ::= { tmnxNatMemSicrStateEntry 24 }
+
+tmnxNatMemSicrStateCreateSync    OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateCreateSync indicates the
+         number of tracked flows for which synchronization is confirmed."
+    ::= { tmnxNatMemSicrStateEntry 25 }
+
+tmnxNatMemSicrStateDeleteMarked  OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateDeleteMarked indicates the
+         number of flows that are deleted on the active node and
+         synchronization not yet requested."
+    ::= { tmnxNatMemSicrStateEntry 26 }
+
+tmnxNatMemSicrStateDeletePending OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStateDeletePending indicates the
+         number of flows that are deleted on the active node for which
+         synchronization is requested but not yet confirmed."
+    ::= { tmnxNatMemSicrStateEntry 27 }
+
+tmnxNatMemSicrStatsTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatMemSicrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatMemSicrStatsTable contains SICR statistics information
+         about the members of a NAT-capable ISA Group.
+
+         A member of a NAT ISA Group can be mapped to a physical NAT ISA MDA."
+    ::= { tmnxNatIsaMdaStatObjs 12 }
+
+tmnxNatMemSicrStatsEntry         OBJECT-TYPE
+    SYNTAX      TmnxNatMemSicrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains SICR state information about a member of
+         a NAT ISA Group.
+
+         Entries in this table are created and removed automatically by the
+         system, along with the corresponding rows in the
+         tmnxNatMemSicrStateTable."
+    AUGMENTS    { tmnxNatMemSicrStateEntry }
+    ::= { tmnxNatMemSicrStatsTable 1 }
+
+TmnxNatMemSicrStatsEntry         ::= SEQUENCE
+{
+    tmnxNatMemSicrStatsTx            Counter64,
+    tmnxNatMemSicrStatsTxRetransmit  Counter64,
+    tmnxNatMemSicrStatsTxFlowCreate  Counter64,
+    tmnxNatMemSicrStatsTxFlowDelete  Counter64,
+    tmnxNatMemSicrStatsRx            Counter64,
+    tmnxNatMemSicrStatsRxFlowCreate  Counter64,
+    tmnxNatMemSicrStatsRxFlowDelete  Counter64,
+    tmnxNatMemSicrStatsErrNoPolicy   Counter64,
+    tmnxNatMemSicrStatsErrNoBlk      Counter64,
+    tmnxNatMemSicrStatsErrFrag       Counter64,
+    tmnxNatMemSicrStatsTxAlg         Counter64,
+    tmnxNatMemSicrStatsRxAlg         Counter64
+}
+
+tmnxNatMemSicrStatsTx            OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsTx indicates the number of
+         frames transmitted."
+    ::= { tmnxNatMemSicrStatsEntry 1 }
+
+tmnxNatMemSicrStatsTxRetransmit  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsTxRetransmit indicates the
+         number of frames retransmitted."
+    ::= { tmnxNatMemSicrStatsEntry 2 }
+
+tmnxNatMemSicrStatsTxFlowCreate  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsTxFlowCreate indicates the
+         number of flow create messages transmitted."
+    ::= { tmnxNatMemSicrStatsEntry 3 }
+
+tmnxNatMemSicrStatsTxFlowDelete  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsTxFlowDelete indicates the
+         number of flow delete messages transmitted."
+    ::= { tmnxNatMemSicrStatsEntry 4 }
+
+tmnxNatMemSicrStatsRx            OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsRx indicates the number of
+         frames received."
+    ::= { tmnxNatMemSicrStatsEntry 5 }
+
+tmnxNatMemSicrStatsRxFlowCreate  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsRxFlowCreate indicates the
+         number of flow create messages received."
+    ::= { tmnxNatMemSicrStatsEntry 6 }
+
+tmnxNatMemSicrStatsRxFlowDelete  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsRxFlowDelete indicates the
+         number of flow delete messages received."
+    ::= { tmnxNatMemSicrStatsEntry 7 }
+
+tmnxNatMemSicrStatsErrNoPolicy   OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsErrNoPolicy indicates the
+         number of times a flow create message was received but the NAT policy
+         could not be found."
+    ::= { tmnxNatMemSicrStatsEntry 8 }
+
+tmnxNatMemSicrStatsErrNoBlk      OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsErrNoBlk indicates the
+         number of times a flow create message was received but the NAT port
+         block could not be found."
+    ::= { tmnxNatMemSicrStatsEntry 9 }
+
+tmnxNatMemSicrStatsErrFrag       OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsErrFrag indicates the
+         number of fragments received."
+    ::= { tmnxNatMemSicrStatsEntry 10 }
+
+tmnxNatMemSicrStatsTxAlg         OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsTxAlg indicates the number
+         of Application Level Gateway (ALG) flow packets transmitted."
+    ::= { tmnxNatMemSicrStatsEntry 11 }
+
+tmnxNatMemSicrStatsRxAlg         OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatMemSicrStatsRxAlg indicates the number
+         of ALG flow packets received."
+    ::= { tmnxNatMemSicrStatsEntry 12 }
+
+tmnxNatEsaObjs                   OBJECT IDENTIFIER ::= { tmnxNatIsaObjs 4 }
+
+tmnxNatVappTable                 OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappTable contains objects to configure the NAT ISA Group
+         Virtual Application."
+    ::= { tmnxNatEsaObjs 1 }
+
+tmnxNatVappEntry                 OBJECT-TYPE
+    SYNTAX      TmnxNatVappEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row represents a NAT ISA Group Member of a NAT ISA
+         Group.
+
+         Entries in this table can be created or deleted via SNMP operations."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum
+    }
+    ::= { tmnxNatVappTable 1 }
+
+TmnxNatVappEntry                 ::= SEQUENCE
+{
+    tmnxNatEsaNum                    TmnxEsaNum,
+    tmnxNatEsaVappNum                TmnxEsaVappNum,
+    tmnxNatVappRowStatus             RowStatus,
+    tmnxNatVappLastMgmtChange        TimeStamp
+}
+
+tmnxNatEsaNum                    OBJECT-TYPE
+    SYNTAX      TmnxEsaNum (1..16)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatEsaNum indicates the number of the Extended
+         Service Appliance where the member is located."
+    ::= { tmnxNatVappEntry 1 }
+
+tmnxNatEsaVappNum                OBJECT-TYPE
+    SYNTAX      TmnxEsaVappNum (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatEsaVappNum indicates the number of the Virtual
+         Machine within an Extended Service Appliance where the member is
+         located."
+    ::= { tmnxNatVappEntry 2 }
+
+tmnxNatVappRowStatus             OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappRowStatus specifies the row status of this
+         row."
+    ::= { tmnxNatVappEntry 3 }
+
+tmnxNatVappLastMgmtChange        OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappLastMgmtChange indicates the sysUpTime at the
+         time of the most recent management-initiated change to this table row."
+    ::= { tmnxNatVappEntry 4 }
+
+tmnxNatVappStatTable             OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappStatTable contains status and statistics information
+         about the Virtual Machine within an Extended Service Appliance."
+    ::= { tmnxNatEsaObjs 2 }
+
+tmnxNatVappStatEntry             OBJECT-TYPE
+    SYNTAX      TmnxNatVappStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains status and basic statistics information
+         about a Virtual Application of a NAT ISA Group.
+
+         Entries in this table are created and removed automatically by the
+         system."
+    AUGMENTS    { tmnxNatVappEntry }
+    ::= { tmnxNatVappStatTable 1 }
+
+TmnxNatVappStatEntry             ::= SEQUENCE
+{
+    tmnxNatVappStatOperState         TmnxNatIsaMdaOperState,
+    tmnxNatVappStatResrcAllocated    Unsigned32,
+    tmnxNatVappStatBypassL2AwHost    Unsigned32
+}
+
+tmnxNatVappStatOperState         OBJECT-TYPE
+    SYNTAX      TmnxNatIsaMdaOperState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappStatOperState indicates the operational state
+         of this Virtual NAT Application."
+    ::= { tmnxNatVappStatEntry 1 }
+
+tmnxNatVappStatResrcAllocated    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappStatResrcAllocated indicates the ratio of
+         allocated resources to total resources on this Virtual NAT
+         Application."
+    ::= { tmnxNatVappStatEntry 2 }
+
+tmnxNatVappStatBypassL2AwHost    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappStatBypassL2AwHost indicates the number of
+         Layer-2 aware NAT hosts being bypassed for this Virtual NAT
+         Application."
+    ::= { tmnxNatVappStatEntry 3 }
+
+tmnxNatVappResrcStatsTable       OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappResrcStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappResrcStatsTable contains detailed statistics
+         information about the resources of the NAT Virtual Machine within an
+         Extended Service Appliance.
+
+         The typical usage of this table is to fill in the part of the index
+         that identifies an ISA NAT VM, and perform a partial walk to get all
+         the resources statistics applicable to that VM."
+    ::= { tmnxNatEsaObjs 3 }
+
+tmnxNatVappResrcStatsEntry       OBJECT-TYPE
+    SYNTAX      TmnxNatVappResrcStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains the name and statistics value of a
+         particular resource of a NAT VM.
+
+         Entries in this table are created and removed automatically by the
+         system."
+    INDEX       {
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum,
+        tmnxNatVappResrcStatsId
+    }
+    ::= { tmnxNatVappResrcStatsTable 1 }
+
+TmnxNatVappResrcStatsEntry       ::= SEQUENCE
+{
+    tmnxNatVappResrcStatsId          Unsigned32,
+    tmnxNatVappResrcStatsName        DisplayString,
+    tmnxNatVappResrcStatsValMax      CounterBasedGauge64,
+    tmnxNatVappResrcStatsValMaxLw    Gauge32,
+    tmnxNatVappResrcStatsValMaxHw    Gauge32,
+    tmnxNatVappResrcStatsVal         CounterBasedGauge64,
+    tmnxNatVappResrcStatsValLw       Gauge32,
+    tmnxNatVappResrcStatsValHw       Gauge32,
+    tmnxNatVappResrcStatsLimited     TruthValue,
+    tmnxNatVappResrcStatsValPeak     CounterBasedGauge64,
+    tmnxNatVappResrcStatsValPeakLw   Gauge32,
+    tmnxNatVappResrcStatsValPeakHw   Gauge32,
+    tmnxNatVappResrcStatsPeakTime    DateAndTime
+}
+
+tmnxNatVappResrcStatsId          OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..49)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappResrcStatsId indicates the identifier of this
+         conceptual row.
+
+         It is a meaningless number generated by the system as identifier of
+         this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 1 }
+
+tmnxNatVappResrcStatsName        OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsName indicates the
+         human-readable identifier of the statistics contained in this
+         conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 2 }
+
+tmnxNatVappResrcStatsValMax      OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValMax indicates the
+         maximum available value of the resource statistics contained in this
+         conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 3 }
+
+tmnxNatVappResrcStatsValMaxLw    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValMaxLw indicates the
+         lower 32 bits of the maximum available value of the resource
+         statistics contained in this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 4 }
+
+tmnxNatVappResrcStatsValMaxHw    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValMaxHw indicates the
+         higher 32 bits of the maximum available value of the resource
+         statistics contained in this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 5 }
+
+tmnxNatVappResrcStatsVal         OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsVal indicates the actual
+         value of the resource statistics contained in this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 6 }
+
+tmnxNatVappResrcStatsValLw       OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValLw indicates the lower
+         32 bits of the actual value of the resource statistics contained in
+         this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 7 }
+
+tmnxNatVappResrcStatsValHw       OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValHw indicates the
+         higher 32 bits of the actual value of the resource statistics
+         contained in this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 8 }
+
+tmnxNatVappResrcStatsLimited     OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsLimited indicates if the
+         value of tmnxNatVappResrcStatsValMax is actually limited to the
+         fraction indicated for this Virtual NAT Application by the value of
+         tmnxNatVappStatResrcAllocated."
+    ::= { tmnxNatVappResrcStatsEntry 9 }
+
+tmnxNatVappResrcStatsValPeak     OBJECT-TYPE
+    SYNTAX      CounterBasedGauge64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValPeak indicates the
+         peak value of the resource statistics contained in this  conceptual
+         row."
+    ::= { tmnxNatVappResrcStatsEntry 10 }
+
+tmnxNatVappResrcStatsValPeakLw   OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValPeakLw indicates the
+         lower 32 bits of the peak value of the resource statistics  contained
+         in this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 11 }
+
+tmnxNatVappResrcStatsValPeakHw   OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappResrcStatsValPeakHw indicates the
+         higher 32 bits of the peak value of the resource statistics  contained
+         in this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 12 }
+
+tmnxNatVappResrcStatsPeakTime    OBJECT-TYPE
+    SYNTAX      DateAndTime (SIZE (11))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappResrcStatsPeakTime indicates the time the
+         system reached the peak value of the resource statistics contained in
+         this conceptual row."
+    ::= { tmnxNatVappResrcStatsEntry 13 }
+
+tmnxNatVappRecoveryAction        OBJECT IDENTIFIER ::= { tmnxNatEsaObjs 4 }
+
+tmnxNatVappRecovActEsaNum        OBJECT-TYPE
+    SYNTAX      TmnxEsaNum
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappRecovActEsaNum indicates the number of the
+         Extended Service Appliance where the member is located."
+    ::= { tmnxNatVappRecoveryAction 1 }
+
+tmnxNatVappRecovActEsaVappNum    OBJECT-TYPE
+    SYNTAX      TmnxEsaVappNum
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappRecovActEsaVappNum indicates the number of the
+         Virtual Machine within an Extended Service Appliance where the member
+         is located."
+    ::= { tmnxNatVappRecoveryAction 2 }
+
+tmnxNatVappRecovActActionGo      OBJECT-TYPE
+    SYNTAX      TmnxActionType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting object tmnxNatVappRecovActActionGo to 'doAction' triggers an
+         attempt to execute the recovery of a Layer 2 Aware bypass. The objects
+         tmnxNatVappRecovActEsaNum and tmnxNatVappRecovActEsaVappNum need to be
+         set within the same request.
+
+         Reading this object returns the value 'notApplicable'."
+    ::= { tmnxNatVappRecoveryAction 3 }
+
+tmnxNatVappRecovActActionResult  OBJECT-TYPE
+    SYNTAX      INTEGER {
+        ack         (0),
+        nak         (1),
+        notUsed     (2),
+        notActive   (3),
+        notInBypass (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of object tmnxNatVappRecovActActionResult indicates the
+         result of the performed recovery request.
+
+         Value 'ack' is returned in case the request was successful.
+
+         Value 'nak' is returned in case the request was unsuccessful and does
+         not fit the other descriptions (generic error).
+
+         Value 'notUsed' is returned in case the provided ESA and ESA VM is not
+         in use.
+
+         Value 'notActive' is returned in case the provided ESA and VM is not
+         active.
+
+         Value 'notInBypass' is returned in case the provided ESA and VM is not
+         in bypass mode."
+    ::= { tmnxNatVappRecoveryAction 4 }
+
+tmnxNatVappPlcyStatsTable        OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappPlcyStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappPlcyStatsTable contains detailed usage statistics of
+         the NAT policies of this system."
+    ::= { tmnxNatEsaObjs 5 }
+
+tmnxNatVappPlcyStatsEntry        OBJECT-TYPE
+    SYNTAX      TmnxNatVappPlcyStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains detailed usage statistics information
+         about a particular NAT policy and a particular NAT Virtual Machine
+         within an Extended Service Appliance."
+    INDEX       {
+        tmnxNatPlcyName,
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum,
+        tmnxNatVappPlcyStatsType
+    }
+    ::= { tmnxNatVappPlcyStatsTable 1 }
+
+TmnxNatVappPlcyStatsEntry        ::= SEQUENCE
+{
+    tmnxNatVappPlcyStatsType         TmnxNatUsageStatsType,
+    tmnxNatVappPlcyStatsName         DisplayString,
+    tmnxNatVappPlcyStatsVal          Gauge32
+}
+
+tmnxNatVappPlcyStatsType         OBJECT-TYPE
+    SYNTAX      TmnxNatUsageStatsType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappPlcyStatsType indicates the type of NAT usage
+         statistics contained in this conceptual row."
+    ::= { tmnxNatVappPlcyStatsEntry 1 }
+
+tmnxNatVappPlcyStatsName         OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..64))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappPlcyStatsName indicates the
+         human-readable identifier of the statistics contained in this
+         conceptual row."
+    ::= { tmnxNatVappPlcyStatsEntry 2 }
+
+tmnxNatVappPlcyStatsVal          OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappPlcyStatsVal indicates the value of
+         the statistics contained in this conceptual row."
+    ::= { tmnxNatVappPlcyStatsEntry 3 }
+
+tmnxNatVappStatsHrTable          OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappStatsHrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappStatsHrTable contains historical performance statistics
+         information about per NAT Virtual Machine within an Extended Service
+         Appliance, collected periodically during the last hour."
+    ::= { tmnxNatEsaObjs 6 }
+
+tmnxNatVappStatsHrEntry          OBJECT-TYPE
+    SYNTAX      TmnxNatVappStatsHrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains historical performance statistics
+         information about a NAT Virtual Machine within an Extended Service
+         Appliance, collected during the last hour.
+
+         Entries in this table are created and removed automatically by the
+         system."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum,
+        tmnxNatVappStatsHrIndex
+    }
+    ::= { tmnxNatVappStatsHrTable 1 }
+
+TmnxNatVappStatsHrEntry          ::= SEQUENCE
+{
+    tmnxNatVappStatsHrIndex          Unsigned32,
+    tmnxNatVappStatsHrTime           DateAndTime,
+    tmnxNatVappStatsHrWaiting        TmnxPerTenThousand,
+    tmnxNatVappStatsHrIdle           TmnxPerTenThousand,
+    tmnxNatVappStatsHrWorking        TmnxPerTenThousand,
+    tmnxNatVappStatsHrJobs           Unsigned32,
+    tmnxNatVappStatsHrThroughput     Counter64
+}
+
+tmnxNatVappStatsHrIndex          OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappStatsHrIndex is a numerical index value
+         generated by this system."
+    ::= { tmnxNatVappStatsHrEntry 1 }
+
+tmnxNatVappStatsHrTime           OBJECT-TYPE
+    SYNTAX      DateAndTime (SIZE (11))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsHrTime indicates the time when
+         the system measured the value of the objects in this conceptual row."
+    ::= { tmnxNatVappStatsHrEntry 2 }
+
+tmnxNatVappStatsHrWaiting        OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsHrWaiting indicates the
+         relative amount of time this Virtual Machine was waiting during this
+         period."
+    ::= { tmnxNatVappStatsHrEntry 3 }
+
+tmnxNatVappStatsHrIdle           OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsHrIdle indicates the relative
+         amount of time this Virtual Machine was idle during this period."
+    ::= { tmnxNatVappStatsHrEntry 4 }
+
+tmnxNatVappStatsHrWorking        OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsHrWorking indicates the
+         relative amount of time this Virtual Machine was working during this
+         period."
+    ::= { tmnxNatVappStatsHrEntry 5 }
+
+tmnxNatVappStatsHrJobs           OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsHrJobs indicates the number of
+         internal jobs this Virtual Machine performed during this period.
+
+         A single data packet may require multiple jobs to process."
+    ::= { tmnxNatVappStatsHrEntry 6 }
+
+tmnxNatVappStatsHrThroughput     OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsHrThroughput indicates the
+         number of bytes this Virtual Machine has internally processed during
+         this period."
+    ::= { tmnxNatVappStatsHrEntry 7 }
+
+tmnxNatVappStatsDayTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappStatsDayEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappStatsDayTable contains historical performance
+         statistics information about per NAT Virtual Machine within an
+         Extended Service Appliance, collected periodically during the last 24
+         hours."
+    ::= { tmnxNatEsaObjs 7 }
+
+tmnxNatVappStatsDayEntry         OBJECT-TYPE
+    SYNTAX      TmnxNatVappStatsDayEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains historical performance statistics
+         information about a NAT Virtual Machine within an Extended Service
+         Appliance, collected during the last 24 hours.
+
+         Entries in this table are created and removed automatically by the
+         system."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum,
+        tmnxNatVappStatsDayIndex
+    }
+    ::= { tmnxNatVappStatsDayTable 1 }
+
+TmnxNatVappStatsDayEntry         ::= SEQUENCE
+{
+    tmnxNatVappStatsDayIndex         Unsigned32,
+    tmnxNatVappStatsDayTime          DateAndTime,
+    tmnxNatVappStatsDayWaiting       TmnxPerTenThousand,
+    tmnxNatVappStatsDayIdle          TmnxPerTenThousand,
+    tmnxNatVappStatsDayWorking       TmnxPerTenThousand,
+    tmnxNatVappStatsDayJobs          Unsigned32,
+    tmnxNatVappStatsDayThroughput    Counter64
+}
+
+tmnxNatVappStatsDayIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappStatsDayIndex is a numerical index value
+         generated by this system."
+    ::= { tmnxNatVappStatsDayEntry 1 }
+
+tmnxNatVappStatsDayTime          OBJECT-TYPE
+    SYNTAX      DateAndTime (SIZE (11))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsDayTime indicates the time
+         when the system measured the value of the objects in this conceptual
+         row."
+    ::= { tmnxNatVappStatsDayEntry 2 }
+
+tmnxNatVappStatsDayWaiting       OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsDayWaiting indicates the
+         relative amount of time this Virtual Machine was waiting during this
+         period."
+    ::= { tmnxNatVappStatsDayEntry 3 }
+
+tmnxNatVappStatsDayIdle          OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsDayIdle indicates the relative
+         amount of time this Virtual Machine was idle during this period."
+    ::= { tmnxNatVappStatsDayEntry 4 }
+
+tmnxNatVappStatsDayWorking       OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsDayWorking indicates the
+         relative amount of time this Virtual Machine was working during this
+         period."
+    ::= { tmnxNatVappStatsDayEntry 5 }
+
+tmnxNatVappStatsDayJobs          OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsDayJobs indicates the number
+         of internal jobs this Virtual Machine performed during this period.
+
+         A single data packet may require multiple jobs to process."
+    ::= { tmnxNatVappStatsDayEntry 6 }
+
+tmnxNatVappStatsDayThroughput    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsDayThroughput indicates the
+         number of bytes this Virtual Machine has internally processed during
+         this period."
+    ::= { tmnxNatVappStatsDayEntry 7 }
+
+tmnxNatVappStatsMonthTable       OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatVappStatsMonthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappStatsMonthTable contains historical performance
+         statistics information about per NAT Virtual Machine within an
+         Extended Service Appliance, collected periodically during the last 30
+         days."
+    ::= { tmnxNatEsaObjs 8 }
+
+tmnxNatVappStatsMonthEntry       OBJECT-TYPE
+    SYNTAX      TmnxNatVappStatsMonthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains historical performance statistics
+         information about a NAT Virtual Machine within an Extended Service
+         Appliance, collected during the last 30 days.
+
+         Entries in this table are created and removed automatically by the
+         system."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum,
+        tmnxNatVappStatsMonthIndex
+    }
+    ::= { tmnxNatVappStatsMonthTable 1 }
+
+TmnxNatVappStatsMonthEntry       ::= SEQUENCE
+{
+    tmnxNatVappStatsMonthIndex       Unsigned32,
+    tmnxNatVappStatsMonthTime        DateAndTime,
+    tmnxNatVappStatsMonthWaiting     TmnxPerTenThousand,
+    tmnxNatVappStatsMonthIdle        TmnxPerTenThousand,
+    tmnxNatVappStatsMonthWorking     TmnxPerTenThousand,
+    tmnxNatVappStatsMonthJobs        Unsigned32,
+    tmnxNatVappStatsMonthThroughp    Counter64
+}
+
+tmnxNatVappStatsMonthIndex       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatVappStatsMonthIndex is a numerical index value
+         generated by this system."
+    ::= { tmnxNatVappStatsMonthEntry 1 }
+
+tmnxNatVappStatsMonthTime        OBJECT-TYPE
+    SYNTAX      DateAndTime (SIZE (11))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsMonthTime indicates the time
+         when the system measured the value of the objects in this conceptual
+         row."
+    ::= { tmnxNatVappStatsMonthEntry 2 }
+
+tmnxNatVappStatsMonthWaiting     OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsMonthWaiting indicates the
+         relative amount of time this Virtual Machine was waiting during this
+         period."
+    ::= { tmnxNatVappStatsMonthEntry 3 }
+
+tmnxNatVappStatsMonthIdle        OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsMonthIdle indicates the
+         relative amount of time this Virtual Machine was idle during this
+         period."
+    ::= { tmnxNatVappStatsMonthEntry 4 }
+
+tmnxNatVappStatsMonthWorking     OBJECT-TYPE
+    SYNTAX      TmnxPerTenThousand
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsMonthWorking indicates the
+         relative amount of time this Virtual Machine was working during this
+         period."
+    ::= { tmnxNatVappStatsMonthEntry 5 }
+
+tmnxNatVappStatsMonthJobs        OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsMonthJobs indicates the number
+         of internal jobs this Virtual Machine performed during this period.
+
+         A single data packet may require multiple jobs to process."
+    ::= { tmnxNatVappStatsMonthEntry 6 }
+
+tmnxNatVappStatsMonthThroughp    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappStatsMonthThroughp indicates the
+         number of bytes this Virtual Machine has internally processed during
+         this period."
+    ::= { tmnxNatVappStatsMonthEntry 7 }
+
+tmnxNatIsaGrpStatObjs            OBJECT IDENTIFIER ::= { tmnxNatIsaObjs 5 }
+
+tmnxNatGrpSicrStateTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatGrpSicrStateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatGrpSicrStateTable contains SICR state information about a
+         NAT-capable ISA Group.
+
+         A member of a NAT ISA Group can be mapped to a physical NAT ISA MDA."
+    ::= { tmnxNatIsaGrpStatObjs 1 }
+
+tmnxNatGrpSicrStateEntry         OBJECT-TYPE
+    SYNTAX      TmnxNatGrpSicrStateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains SICR state information about a member of
+         a NAT ISA Group.
+
+         Entries in this table are created and removed automatically by the
+         system.
+
+         A member has a row in this table when the following conditions are met:
+         - the value of TIMETRA-MC-REDUNDANCY-MIB::tmnxMcPeerAdminState is 'inService' for its peer;
+         - the value of TIMETRA-MC-REDUNDANCY-MIB::tmnxMcPeerSyncAdminState is 'inService' for its peer;
+         - a row in TIMETRA-MC-REDUNDANCY-MIB::tmnxMcRedNatGrpTable exists for this group;
+         - the value of tmnxNatIsaGrpRedundancy is equal to 'interChassis';
+         - the value of tmnxNatIsaGrpAdminState is equal to 'inService'."
+    INDEX       { tmnxNatIsaGrpId }
+    ::= { tmnxNatGrpSicrStateTable 1 }
+
+TmnxNatGrpSicrStateEntry         ::= SEQUENCE
+{
+    tmnxNatGrpSicrState              INTEGER,
+    tmnxNatGrpSicrStateChanges       Counter32,
+    tmnxNatGrpSicrStateLastCh        TimeStamp,
+    tmnxNatGrpSicrInControl          TruthValue,
+    tmnxNatGrpSicrHealth             Unsigned32,
+    tmnxNatGrpSicrPeerHealth         Unsigned32,
+    tmnxNatGrpSicrPeerPreferred      INTEGER
+}
+
+tmnxNatGrpSicrState              OBJECT-TYPE
+    SYNTAX      INTEGER {
+        disabled           (0),
+        initialWaitForPeer (2),
+        waitForPeer        (3),
+        peerTimedOut       (4),
+        active             (5),
+        standby            (6),
+        cleaningUp         (7)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpSicrState indicates the inter-chassis
+         redundancy state of this NAT ISA group."
+    ::= { tmnxNatGrpSicrStateEntry 1 }
+
+tmnxNatGrpSicrStateChanges       OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrStateChanges indicates the
+         number of times the value of the object tmnxNatGrpSicrState changed
+         since the system started up."
+    ::= { tmnxNatGrpSicrStateEntry 2 }
+
+tmnxNatGrpSicrStateLastCh        OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpSicrStateLastCh indicates the sysUpTime at the
+         time of the most recent change of the value of tmnxNatGrpSicrState.
+
+         The value zero indicates that no such change has occurred yet."
+    ::= { tmnxNatGrpSicrStateEntry 3 }
+
+tmnxNatGrpSicrInControl          OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrInControl indicates if this
+         system is in control of the synchronization (as opposed to its peer
+         being in control)."
+    ::= { tmnxNatGrpSicrStateEntry 4 }
+
+tmnxNatGrpSicrHealth             OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpSicrHealth indicates the health of this NAT ISA
+         group."
+    ::= { tmnxNatGrpSicrStateEntry 5 }
+
+tmnxNatGrpSicrPeerHealth         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatGrpSicrPeerHealth indicates the health of the
+         redundancy peer of this NAT ISA group."
+    ::= { tmnxNatGrpSicrStateEntry 6 }
+
+tmnxNatGrpSicrPeerPreferred      OBJECT-TYPE
+    SYNTAX      INTEGER {
+        unknown (0),
+        true    (1),
+        false   (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrPeerPreferred indicates the
+         value of tmnxNatIsaGrpSicrPreferred configured in the peer system.
+
+         A value of zero indicates that the system did not yet receive this
+         information from its peer."
+    ::= { tmnxNatGrpSicrStateEntry 7 }
+
+tmnxNatGrpSicrStatsTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatGrpSicrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatGrpSicrStatsTable contains SICR statistics information
+         about the members of a NAT-capable ISA Group.
+
+         A member of a NAT ISA Group can be mapped to a physical NAT ISA MDA."
+    ::= { tmnxNatIsaGrpStatObjs 2 }
+
+tmnxNatGrpSicrStatsEntry         OBJECT-TYPE
+    SYNTAX      TmnxNatGrpSicrStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains SICR statistics information about a
+         member of a NAT ISA Group.
+
+         Entries in this table are created and removed automatically by the
+         system, along with the corresponding rows in the
+         tmnxNatGrpSicrStateTable."
+    AUGMENTS    { tmnxNatGrpSicrStateEntry }
+    ::= { tmnxNatGrpSicrStatsTable 1 }
+
+TmnxNatGrpSicrStatsEntry         ::= SEQUENCE
+{
+    tmnxNatGrpSicrTx                 Counter64,
+    tmnxNatGrpSicrTxFailures         Counter64,
+    tmnxNatGrpSicrRx                 Counter64,
+    tmnxNatGrpSicrRxDropWrongPeer    Counter64,
+    tmnxNatGrpSicrKaTimeout          Counter64
+}
+
+tmnxNatGrpSicrTx                 OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrTx indicates the number of
+         frames transmitted."
+    ::= { tmnxNatGrpSicrStatsEntry 1 }
+
+tmnxNatGrpSicrTxFailures         OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrTxFailures indicates the number
+         of times a frame could not be transmitted."
+    ::= { tmnxNatGrpSicrStatsEntry 2 }
+
+tmnxNatGrpSicrRx                 OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrRx indicates the number of
+         frames received."
+    ::= { tmnxNatGrpSicrStatsEntry 3 }
+
+tmnxNatGrpSicrRxDropWrongPeer    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrRxDropWrongPeer indicates the
+         number of times a received frame was dropped because it was not sent
+         by the configured peer system."
+    ::= { tmnxNatGrpSicrStatsEntry 4 }
+
+tmnxNatGrpSicrKaTimeout          OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpSicrKaTimeout indicates the number
+         of times a keepalive timeout occurred, as defined by the values of
+         tmnxNatIsaGrpSicrKaInterval and tmnxNatIsaGrpSicrKaDropcount."
+    ::= { tmnxNatGrpSicrStatsEntry 5 }
 
 tmnxNatPlcyObjs                  OBJECT IDENTIFIER ::= { tmnxNatObjs 2 }
 
@@ -8816,7 +10448,8 @@ tmnxNatPcpPlcyOptions            OBJECT-TYPE
         next            (1),
         portReservation (2),
         thirdParty      (3),
-        preferFailure   (4)
+        preferFailure   (4),
+        portSet         (5)
     }
     MAX-ACCESS  read-create
     STATUS      current
@@ -10100,7 +11733,7 @@ tmnxNatUpnpPlcyStrictMode        OBJECT-TYPE
     ::= { tmnxNatUpnpPlcyEntry 6 }
 
 tmnxNatUpnpPlcyListeningPort     OBJECT-TYPE
-    SYNTAX      InetPortNumber
+    SYNTAX      InetPortNumber (1..65535)
     MAX-ACCESS  read-create
     STATUS      current
     DESCRIPTION
@@ -11301,7 +12934,7 @@ tmnxNatPolicyEntry               OBJECT-TYPE
     MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION
-        "Each conceptual row represents a particular firewall policy.
+        "Each conceptual row represents a particular NAT policy.
 
          Rows in this table can be created and deleted via SNMP SET operations
          to tmnxNatPolicyRowStatus."
@@ -11985,6 +13618,62 @@ tmnxNatSyslogColDestPort         OBJECT-TYPE
     DEFVAL      { 514 }
     ::= { tmnxNatSyslogColEntry 8 }
 
+tmnxNatCupsObjs                  OBJECT IDENTIFIER ::= { tmnxNatObjs 19 }
+
+tmnxNatUpPlcyTable               OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxNatUpPlcyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatUpPlcyTable allows creation and destruction of  NAT
+         policies for use in Control and User Plane Separation (CUPS) mode of
+         operation. These policies can be used when this system operates as
+         User Plane (UP).
+
+         Creation of a row in this table automatically results in the creation
+         of a table in the tmnxNatPlcyTable, with the same name.
+
+         The same applies to the removal of a conceptual row in this table: the
+         corresponding row in the tmnxNatPlcyTable is automatically removed."
+    ::= { tmnxNatCupsObjs 1 }
+
+tmnxNatUpPlcyEntry               OBJECT-TYPE
+    SYNTAX      TmnxNatUpPlcyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row represents a particular CUPS user plane NAT
+         policy.
+
+         Rows in this table can be created and deleted via SNMP SET operations
+         to tmnxNatUpPlcyRowStatus."
+    INDEX       { IMPLIED tmnxNatUpPlcyName }
+    ::= { tmnxNatUpPlcyTable 1 }
+
+TmnxNatUpPlcyEntry               ::= SEQUENCE
+{
+    tmnxNatUpPlcyName                TNamedItem,
+    tmnxNatUpPlcyRowStatus           RowStatus
+}
+
+tmnxNatUpPlcyName                OBJECT-TYPE
+    SYNTAX      TNamedItem
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatUpPlcyName specifies the identifier of  this
+         firewall policy."
+    ::= { tmnxNatUpPlcyEntry 1 }
+
+tmnxNatUpPlcyRowStatus           OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatUpPlcyRowStatus controls the creation and deletion
+         of rows in the table."
+    ::= { tmnxNatUpPlcyEntry 2 }
+
 tmnxNatIsaGrpTableLastCh         OBJECT-TYPE
     SYNTAX      TimeStamp
     MAX-ACCESS  read-only
@@ -12345,6 +14034,36 @@ tmnxNatSyslogColTableLastCh      OBJECT-TYPE
          an entry in the tmnxNatSyslogColTable."
     ::= { tmnxNatObjs 142 }
 
+tmnxNatGrpMonOperGrpTableLastCh  OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatSyslogColTableLastCh indicates the
+         value of sysUpTime at the time of the last creation or destruction of
+         an entry in the tmnxNatGrpMonOperGrpTable."
+    ::= { tmnxNatObjs 143 }
+
+tmnxNatGrpMonPortTableLastCh     OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatGrpMonPortTableLastCh indicates the
+         value of sysUpTime at the time of the last creation or destruction of
+         an entry in the tmnxNatGrpMonPortTable."
+    ::= { tmnxNatObjs 144 }
+
+tmnxNatVappTableLastCh           OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxNatVappTableLastCh indicates the value of
+         sysUpTime at the time of the last modification of an entry in the
+         tmnxNatVappTable."
+    ::= { tmnxNatObjs 145 }
+
 tmnxNatResourceProblem           OBJECT-TYPE
     SYNTAX      TruthValue
     MAX-ACCESS  read-only
@@ -12663,6 +14382,25 @@ tmnxNatNotifyMemberSubOrHostDesc OBJECT-TYPE
          or host type in text format used for the notifications
          tmnxNatMaxNbrSubsOrHostsExceeded and tmnxNatNbrSubsOrHostsBelowThrsh."
     ::= { tmnxNatNotificationObjs 31 }
+
+tmnxNatNotifyIsaMemberEsaNum     OBJECT-TYPE
+    SYNTAX      TmnxEsaNum
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatNotifyIsaMemberEsaNum indicates the number of the
+         Extended Service Appliance where the member is located."
+    ::= { tmnxNatNotificationObjs 32 }
+
+tmnxNatNotifyIsaMemberEsaVappNum OBJECT-TYPE
+    SYNTAX      TmnxEsaVappNum
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxNatNotifyIsaMemberEsaVappNum indicates the number of
+         the Virtual Machine within an Extended Service Appliance where the
+         member is located."
+    ::= { tmnxNatNotificationObjs 33 }
 
 tmnxNatConformance               OBJECT IDENTIFIER ::= { tmnxSRConfs 65 }
 
@@ -13189,12 +14927,82 @@ tmnxNatV19v0Compliance           MODULE-COMPLIANCE
             tmnxNatFwdV15v0Group,
             tmnxNatSyslogGroup,
             tmnxNatDsliteReassemblyGroup,
+            tmnxNatSicrGroup,
             tmnxNatDestinationNatV19v0Group,
-            tmnxNatLsnV19v0Group
+            tmnxNatLsnV19v0Group,
+            tmnxNatEsaV19v0Group,
+            tmnxNatNotifyV19v0Group
         }
     ::= { tmnxNatCompliances 19 }
 
 tmnxNatV20v0Compliance           MODULE-COMPLIANCE
+    STATUS      obsolete
+    DESCRIPTION
+        "The compliance statement for management of NAT on Nokia SROS series
+         systems."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxNatIsaV12v0Group,
+            tmnxNatIsaStatGroup,
+            tmnxNatIsaStatV10v0Group,
+            tmnxNatIsaStatV11v0Group,
+            tmnxNatIsaStatV16v0Group,
+            tmnxNatIsaScalingGroup,
+            tmnxNatPlcyGroup,
+            tmnxNatPlcyV9v0Group,
+            tmnxNatPlcyV10v0Group,
+            tmnxNatPlcyV14v0Group,
+            tmnxNatPlcyV15v0Group,
+            tmnxNatPlcyStatGroup,
+            tmnxNatVrtrGroup,
+            tmnxNatVrtrV9v0Group,
+            tmnxNatVrtrIPFilterGroup,
+            tmnxNatRedGroup,
+            tmnxNatPlV11v0Group,
+            tmnxNatDestGroup,
+            tmnxNatL2AwV14v0Group,
+            tmnxNatL2AwV15v0Group,
+            tmnxNatAccV11v0Group,
+            tmnxNatWlanGwGroup,
+            tmnxNatLsnSubIdentV12v0Group,
+            tmnxNatPcpGroup,
+            tmnxNatPcp2Group,
+            tmnxNatDeterministicGroup,
+            tmnxNatFragmentIpGroup,
+            tmnxNatFwd2Group,
+            tmnxNatMultiPlcyGroup,
+            tmnxNatQryGroup,
+            tmnxNatIsa2Group,
+            tmnxNatVrtrIPFilterV12v0Group,
+            tmnxNatUpnpV14v0Group,
+            tmnxNatActiveActiveRedGroup,
+            tmnxNatPlV13v0Group,
+            tmnxNatVrtrIPv6FilterV13v0Group,
+            tmnxNatNoLsnSubBlksFreeGroup,
+            tmnxNatPlcyXmppEnhGroup,
+            tmnxNatWlanGwV14v0Group,
+            tmnxNatWlanGwV15v0Group,
+            tmnxNatFwdCfgGroup,
+            tmnxNatDestinationNatGroup,
+            tmnxNatVrtrIPFilterV14v0Group,
+            tmnxNatMappingGroup,
+            tmnxNatL2AwExternalAssignGroup,
+            tmnxNatFirewallGroup,
+            tmnxNatFwdV15v0Group,
+            tmnxNatSyslogGroup,
+            tmnxNatDsliteReassemblyGroup,
+            tmnxNatSicrGroup,
+            tmnxNatDestinationNatV19v0Group,
+            tmnxNatLsnV19v0Group,
+            tmnxNatEsaV19v0Group,
+            tmnxNatFwdL2AwGroup,
+            tmnxNatNotifyV19v0Group,
+            tmnxNatPcpExt1Group,
+            tmnxNatCupsGroup
+        }
+    ::= { tmnxNatCompliances 20 }
+
+tmnxNatV21v0Compliance           MODULE-COMPLIANCE
     STATUS      current
     DESCRIPTION
         "The compliance statement for management of NAT on Nokia SROS series
@@ -13250,12 +15058,16 @@ tmnxNatV20v0Compliance           MODULE-COMPLIANCE
             tmnxNatFwdV15v0Group,
             tmnxNatSyslogGroup,
             tmnxNatDsliteReassemblyGroup,
+            tmnxNatSicrGroup,
             tmnxNatDestinationNatV19v0Group,
             tmnxNatLsnV19v0Group,
+            tmnxNatEsaV19v0Group,
             tmnxNatFwdL2AwGroup,
-            tmnxNatPcpExt1Group
+            tmnxNatNotifyV19v0Group,
+            tmnxNatPcpExt1Group,
+            tmnxNatCupsGroup
         }
-    ::= { tmnxNatCompliances 20 }
+    ::= { tmnxNatCompliances 21 }
 
 tmnxNatGroups                    OBJECT IDENTIFIER ::= { tmnxNatConformance 2 }
 
@@ -14449,7 +16261,9 @@ tmnxNatNotifyObjsGroup           OBJECT-GROUP
         tmnxNatNotifyIsaGrpId,
         tmnxNatNotifyIsaMemberId,
         tmnxNatNotifyMemberSubOrHostType,
-        tmnxNatNotifyMemberSubOrHostDesc
+        tmnxNatNotifyMemberSubOrHostDesc,
+        tmnxNatNotifyIsaMemberEsaNum,
+        tmnxNatNotifyIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -14901,6 +16715,16 @@ tmnxNatSyslogGroup               OBJECT-GROUP
          16.0 of the Nokia SROS series systems."
     ::= { tmnxNatGroups 116 }
 
+tmnxNatCupsGroup                 OBJECT-GROUP
+    OBJECTS     {
+        tmnxNatUpPlcyRowStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting the NAT CUPS function in release 20 of
+         the Nokia SROS series systems."
+    ::= { tmnxNatGroups 117 }
+
 tmnxNatObsoletedNotifyGroup      NOTIFICATION-GROUP
     NOTIFICATIONS {
         tmnxNatFwdEntryAdded,
@@ -14966,6 +16790,75 @@ tmnxNatDsliteReassemblyGroup     OBJECT-GROUP
         "The group of objects needed to support NAT Dual-Stack Lite reassembly."
     ::= { tmnxNatGroups 153 }
 
+tmnxNatSicrGroup                 OBJECT-GROUP
+    OBJECTS     {
+        tmnxNatIsaGrpSicrReplThreshold,
+        tmnxNatIsaGrpSicrToAfterSwitch,
+        tmnxNatIsaGrpSicrRouter,
+        tmnxNatIsaGrpSicrLocAddrType,
+        tmnxNatIsaGrpSicrLocAddrStart,
+        tmnxNatIsaGrpSicrRemAddrType,
+        tmnxNatIsaGrpSicrRemAddrStart,
+        tmnxNatIsaGrpSicrIpMtu,
+        tmnxNatIsaGrpSicrPreferred,
+        tmnxNatIsaGrpSicrKaInterval,
+        tmnxNatIsaGrpSicrKaDropcount,
+        tmnxNatGrpMonOperGrpRowStatus,
+        tmnxNatGrpMonOperGrpLastCh,
+        tmnxNatGrpMonOperGrpHlthDrop,
+        tmnxNatGrpMonPortRowStatus,
+        tmnxNatGrpMonPortLastCh,
+        tmnxNatGrpMonPortHealthDrop,
+        tmnxNatGrpMonOperGrpTableLastCh,
+        tmnxNatGrpMonPortTableLastCh,
+        tmnxNatGrpMonOperGrpActHlthDrop,
+        tmnxNatGrpMonPortActHealthDrop,
+        tmnxNatMemSicrPeerState,
+        tmnxNatMemSicrState,
+        tmnxNatMemSicrLocAddrType,
+        tmnxNatMemSicrLocAddr,
+        tmnxNatMemSicrRemAddrType,
+        tmnxNatMemSicrRemAddr,
+        tmnxNatMemSicrStateLastFailed,
+        tmnxNatMemSicrStateFailReason,
+        tmnxNatMemSicrStateUnsupp,
+        tmnxNatMemSicrStateTracked,
+        tmnxNatMemSicrStateNotSync,
+        tmnxNatMemSicrStateCreatePending,
+        tmnxNatMemSicrStateCreateSync,
+        tmnxNatMemSicrStateDeleteMarked,
+        tmnxNatMemSicrStateDeletePending,
+        tmnxNatMemSicrStatsErrFrag,
+        tmnxNatMemSicrStatsErrNoBlk,
+        tmnxNatMemSicrStatsErrNoPolicy,
+        tmnxNatMemSicrStatsRx,
+        tmnxNatMemSicrStatsRxFlowCreate,
+        tmnxNatMemSicrStatsRxFlowDelete,
+        tmnxNatMemSicrStatsTx,
+        tmnxNatMemSicrStatsTxFlowCreate,
+        tmnxNatMemSicrStatsTxFlowDelete,
+        tmnxNatMemSicrStatsTxRetransmit,
+        tmnxNatMemSicrStatsRxAlg,
+        tmnxNatMemSicrStatsTxAlg,
+        tmnxNatGrpSicrHealth,
+        tmnxNatGrpSicrInControl,
+        tmnxNatGrpSicrKaTimeout,
+        tmnxNatGrpSicrPeerHealth,
+        tmnxNatGrpSicrPeerPreferred,
+        tmnxNatGrpSicrRx,
+        tmnxNatGrpSicrRxDropWrongPeer,
+        tmnxNatGrpSicrState,
+        tmnxNatGrpSicrStateChanges,
+        tmnxNatGrpSicrStateLastCh,
+        tmnxNatGrpSicrTx,
+        tmnxNatGrpSicrTxFailures
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects needed to support NAT Stateful Inter Chassis
+         Resilience (SICR)."
+    ::= { tmnxNatGroups 154 }
+
 tmnxNatDestinationNatV19v0Group  OBJECT-GROUP
     OBJECTS     {
         tmnxNatClsfrN3ForeignAddrType,
@@ -15013,6 +16906,70 @@ tmnxNatLsnV19v0Group             OBJECT-GROUP
          systems."
     ::= { tmnxNatGroups 156 }
 
+tmnxNatEsaV19v0Group             OBJECT-GROUP
+    OBJECTS     {
+        tmnxNatVappTableLastCh,
+        tmnxNatVappRowStatus,
+        tmnxNatVappLastMgmtChange,
+        tmnxNatIsaMemberEsaNum,
+        tmnxNatIsaMemberEsaVappNum,
+        tmnxNatVappStatOperState,
+        tmnxNatVappStatResrcAllocated,
+        tmnxNatVappStatBypassL2AwHost,
+        tmnxNatVappResrcStatsLimited,
+        tmnxNatVappResrcStatsName,
+        tmnxNatVappResrcStatsPeakTime,
+        tmnxNatVappResrcStatsVal,
+        tmnxNatVappResrcStatsValHw,
+        tmnxNatVappResrcStatsValLw,
+        tmnxNatVappResrcStatsValMax,
+        tmnxNatVappResrcStatsValMaxHw,
+        tmnxNatVappResrcStatsValMaxLw,
+        tmnxNatVappResrcStatsValPeak,
+        tmnxNatVappResrcStatsValPeakHw,
+        tmnxNatVappResrcStatsValPeakLw,
+        tmnxNatVappRecovActEsaNum,
+        tmnxNatVappRecovActEsaVappNum,
+        tmnxNatVappRecovActActionGo,
+        tmnxNatVappRecovActActionResult,
+        tmnxNatVappPlcyStatsName,
+        tmnxNatVappPlcyStatsVal,
+        tmnxNatVappStatsHrTime,
+        tmnxNatVappStatsHrWaiting,
+        tmnxNatVappStatsHrIdle,
+        tmnxNatVappStatsHrWorking,
+        tmnxNatVappStatsHrJobs,
+        tmnxNatVappStatsHrThroughput,
+        tmnxNatVappStatsDayTime,
+        tmnxNatVappStatsDayWaiting,
+        tmnxNatVappStatsDayIdle,
+        tmnxNatVappStatsDayWorking,
+        tmnxNatVappStatsDayJobs,
+        tmnxNatVappStatsDayThroughput,
+        tmnxNatVappStatsMonthTime,
+        tmnxNatVappStatsMonthWaiting,
+        tmnxNatVappStatsMonthIdle,
+        tmnxNatVappStatsMonthWorking,
+        tmnxNatVappStatsMonthJobs,
+        tmnxNatVappStatsMonthThroughp
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing configuration of NAT Integrated Service
+         Adaptors (ISA) on Nokia SROS series systems release 19.0 or higher."
+    ::= { tmnxNatGroups 157 }
+
+tmnxNatNotifyV19v0Group          NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxNatVappActive,
+        tmnxNatVappDetectsLoadSharingErr
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications supporting NAT in release 19.0 of Nokia
+         SROS series systems."
+    ::= { tmnxNatGroups 158 }
+
 tmnxNatMGCompliances             OBJECT IDENTIFIER ::= { tmnxNatConformance 3 }
 
 tmnxNatMGGroups                  OBJECT IDENTIFIER ::= { tmnxNatConformance 4 }
@@ -15037,7 +16994,9 @@ tmnxNatIsaMemberSessionUsageHigh NOTIFICATION-TYPE
         tmnxNatIsaMemberSessionUsageHi,
         tmnxNatIsaMemberMdaChassisIndex,
         tmnxNatIsaMemberMdaCardSlotNum,
-        tmnxNatIsaMemberMdaSlotNum
+        tmnxNatIsaMemberMdaSlotNum,
+        tmnxNatIsaMemberEsaNum,
+        tmnxNatIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15051,7 +17010,9 @@ tmnxNatPlLsnMemberBlockUsageHigh NOTIFICATION-TYPE
         tmnxNatPlLsnMemberBlockUsageHi,
         tmnxNatIsaMemberMdaChassisIndex,
         tmnxNatIsaMemberMdaCardSlotNum,
-        tmnxNatIsaMemberMdaSlotNum
+        tmnxNatIsaMemberMdaSlotNum,
+        tmnxNatIsaMemberEsaNum,
+        tmnxNatIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15179,7 +17140,9 @@ tmnxNatPlBlockAllocationLsn      NOTIFICATION-TYPE
         tmnxNatNotifyMdaChassisIndex,
         tmnxNatNotifyMdaCardSlotNum,
         tmnxNatNotifyMdaSlotNum,
-        tmnxNatNotifyNumber
+        tmnxNatNotifyNumber,
+        tmnxNatNotifyIsaMemberEsaNum,
+        tmnxNatNotifyIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15321,7 +17284,7 @@ tmnxNatPlLsnRedActiveChanged     NOTIFICATION-TYPE
          explained in the tmnxNatNotifyDescription.
 
          [EFFECT] While the value of the object tmnxNatPlLsnRedActive is equal
-         to 'false', ...
+         to 'false':
          - this system is not performing Large Scale NAT in the realm
          of the virtual router instance associated with this pool; the Large
          Scale NAT is supposed to be performed by its redundant peer.
@@ -15406,7 +17369,9 @@ tmnxNatLsnSubBlksFree            NOTIFICATION-TYPE
         tmnxNatNotifyMdaCardSlotNum,
         tmnxNatNotifyMdaSlotNum,
         tmnxNatNotifyDateAndTime,
-        tmnxNatNotifyNumber
+        tmnxNatNotifyNumber,
+        tmnxNatNotifyIsaMemberEsaNum,
+        tmnxNatNotifyIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15580,7 +17545,9 @@ tmnxNatInAddrPrefixBlksFree      NOTIFICATION-TYPE
         tmnxNatNotifyMdaCardSlotNum,
         tmnxNatNotifyMdaSlotNum,
         tmnxNatNotifyDateAndTime,
-        tmnxNatNotifyDescription
+        tmnxNatNotifyDescription,
+        tmnxNatNotifyIsaMemberEsaNum,
+        tmnxNatNotifyIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15769,7 +17736,9 @@ tmnxNatMaxNbrSubsOrHostsExceeded NOTIFICATION-TYPE
         tmnxNatNotifyMdaChassisIndex,
         tmnxNatNotifyMdaCardSlotNum,
         tmnxNatNotifyMdaSlotNum,
-        tmnxNatNotifyDateAndTime
+        tmnxNatNotifyDateAndTime,
+        tmnxNatNotifyIsaMemberEsaNum,
+        tmnxNatNotifyIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15793,7 +17762,9 @@ tmnxNatNbrSubsOrHostsBelowThrsh  NOTIFICATION-TYPE
         tmnxNatNotifyMdaChassisIndex,
         tmnxNatNotifyMdaCardSlotNum,
         tmnxNatNotifyMdaSlotNum,
-        tmnxNatNotifyDateAndTime
+        tmnxNatNotifyDateAndTime,
+        tmnxNatNotifyIsaMemberEsaNum,
+        tmnxNatNotifyIsaMemberEsaVappNum
     }
     STATUS      current
     DESCRIPTION
@@ -15806,5 +17777,46 @@ tmnxNatNbrSubsOrHostsBelowThrsh  NOTIFICATION-TYPE
 
          [RECOVERY] There is no recovery required for this notification."
     ::= { tmnxNatNotifications 38 }
+
+tmnxNatVappActive                NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxNatVappRowStatus,
+        tmnxNatNotifyTruthValue
+    }
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappActive notification is sent when the value of the
+         object tmnxNatVappStatOperState changes from 'primary' to any other
+         value, or the other way around.
+
+         The value 'primary' means that the Virtual NAT Application is active
+         in the group."
+    ::= { tmnxNatNotifications 39 }
+
+tmnxNatVappDetectsLoadSharingErr NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxNatVappRowStatus,
+        tmnxNatNotifyCounter
+    }
+    STATUS      current
+    DESCRIPTION
+        "The tmnxNatVappDetectsLoadSharingErr notification is sent periodically
+         at most every 10 seconds while a Virtual NAT Application detects that
+         it is receiving packets erroneously, due to incorrect load-balancing
+         by the ingress IOM.
+
+         The value of tmnxNatNotifyCounter is the incremental count of dropped
+         packets since the previous notification sent by the same Virtual NAT
+         Application.
+
+         [CAUSE] The ingress IOM hardware does not support a particular NAT
+         function's load-balancing, for example an IOM-2 does not support
+         deterministic NAT.
+
+         [EFFECT] The Virtual NAT Application drops all incorrectly
+         load-balanced traffic.
+
+         [RECOVERY] Upgrade the ingress IOM, or change the configuration."
+    ::= { tmnxNatNotifications 40 }
 
 END

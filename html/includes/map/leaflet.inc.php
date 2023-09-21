@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     map
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage ajax
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -36,6 +35,7 @@ register_html_resource('css', 'MarkerCluster.Default.css');
 
 */
 
+/* old
 // [lat, lng], zoom
 if (is_numeric($config['frontpage']['map']['zoom']) &&
     is_numeric($config['frontpage']['map']['center']['lat']) &&
@@ -51,7 +51,7 @@ else
 {
   // Auto zoom
   $leaflet_init   = '[0, -0], 2';
-  $leaflet_bounds = 'map'.$vars['widget_id'].'.fitBounds(realtime.getBounds(), { padding: [30, 30] });';
+  $leaflet_bounds = 'map'.$mod['widget_id'].'.fitBounds(realtime.getBounds(), { padding: [30, 30] });';
 }
 
 switch ($config['frontpage']['map']['tiles'])
@@ -110,7 +110,6 @@ switch ($config['frontpage']['map']['tiles'])
 
 ?>
 
-
     <script type="text/javascript">
         var icons = {
             ok: L.icon({
@@ -126,9 +125,12 @@ switch ($config['frontpage']['map']['tiles'])
             })
         };
 
-        var map<?php echo $vars['widget_id']; ?> = L.map('map<?php echo $vars['widget_id']; ?>'),
+        var url = 'geojson.php?<?php http_build_query($vars['geojson_query']); ?>';
+
+        var map<?php echo $mod['widget_id']; ?> = L.map('map<?php echo $mod['widget_id']; ?>'),
             realtime = L.realtime({
-                url: 'geojson.php',
+                url: url,
+                method: 'POST',
                 crossOrigin: true,
                 type: 'json',
                 getFeatureId: function (feature) {
@@ -193,31 +195,27 @@ switch ($config['frontpage']['map']['tiles'])
                     return layer;
                 }
 
-            }).addTo(map<?php echo $vars['widget_id']; ?>);
+            }).addTo(map<?php echo $mod['widget_id']; ?>);
 
-        map<?php echo $vars['widget_id']; ?>.setView(<?php echo $leaflet_init; ?>);
+        map<?php echo $mod['widget_id']; ?>.setView(<?php echo $leaflet_init; ?>);
 
-<?php
-//  echo $leaflet_bounds;
- ?>
-
-        /* disable scroll wheel by default, toggle by click on map */
-        map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.disable();
-        map<?php echo $vars['widget_id']; ?>.on('click', function () {
-            if (map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.enabled()) {
-                map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.disable();
+        // disable scroll wheel by default, toggle by click on map
+        map<?php echo $mod['widget_id']; ?>.scrollWheelZoom.disable();
+        map<?php echo $mod['widget_id']; ?>.on('click', function () {
+            if (map<?php echo $mod['widget_id']; ?>.scrollWheelZoom.enabled()) {
+                map<?php echo $mod['widget_id']; ?>.scrollWheelZoom.disable();
             } else {
-                map<?php echo $vars['widget_id']; ?>.scrollWheelZoom.enable();
+                map<?php echo $mod['widget_id']; ?>.scrollWheelZoom.enable();
             }
         });
 
-        map<?php echo $vars['widget_id']; ?>.on('mouseover', function () {
+        map<?php echo $mod['widget_id']; ?>.on('mouseover', function () {
             //console.log('STOPPING');
             realtime.stop();
             //console.log(realtime.isRunning());
         });
 
-        map<?php echo $vars['widget_id']; ?>.on('mouseout', function () {
+        map<?php echo $mod['widget_id']; ?>.on('mouseout', function () {
             //console.log('STARTING');
             realtime.start();
             //console.log(realtime.isRunning());
@@ -238,7 +236,7 @@ switch ($config['frontpage']['map']['tiles'])
             echo "format: '" . $leaflet_format . "',";
           } ?>
             attribution: '<?php echo $leaflet_copy; ?>'
-        }).addTo(map<?php echo $vars['widget_id']; ?>);
+        }).addTo(map<?php echo $mod['widget_id']; ?>);
 
 
         realtime.on('update', function () {
@@ -256,4 +254,218 @@ switch ($config['frontpage']['map']['tiles'])
 
 <?php
 
-// EOF
+*/
+
+function get_leaflet_init_and_bounds($config)
+{
+    if (is_numeric($config['frontpage']['map']['zoom']) &&
+        is_numeric($config['frontpage']['map']['center']['lat']) &&
+        is_numeric($config['frontpage']['map']['center']['lng'])) {
+        $leaflet_init   = '[' . $config['frontpage']['map']['center']['lat'] . ', ' . $config['frontpage']['map']['center']['lng'] . '], ' . $config['frontpage']['map']['zoom'];
+        $leaflet_bounds = '';
+    } else {
+        $leaflet_init   = '[0, -0], 2';
+        $leaflet_bounds = 'map' . $mod['widget_id'] . '.fitBounds(realtime.getBounds(), { padding: [30, 30] });';
+    }
+    return [$leaflet_init, $leaflet_bounds];
+}
+
+
+function get_ssl_prefixed_url($url)
+{
+    return is_ssl() ? str_replace('http://', 'https://', $url) : $url;
+}
+
+function get_map_tiles_config($config)
+{
+    $tile_configs = [
+      'esri-worldgraycanvas' => [
+        'url'         => 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        'attribution' => 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+      ],
+      'opentopomap'          => [
+        'url'         => 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        'attribution' => 'Map data: &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+      ],
+      'osm-mapnik'           => [
+        'url'         => 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'attribution' => '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      ],
+      'nasa-night'           => [
+        'url'         => 'https://map1.vis.earthdata.nasa.gov/wmts-webmerc/VIIRS_CityLights_2012/default//GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg',
+        'attribution' => 'Imagery provided by GIBS, operated by <a href="https://earthdata.nasa.gov">ESDIS</a>, funding by NASA/HQ.',
+        'format'      => 'jpg',
+      ],
+      'wikimedia'            => [
+        'url'         => 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}{r}.png',
+        'attribution' => '<a href="https://wikimediafoundation.org/wiki/Maps_Terms_of_Use">Wikimedia</a>',
+      ]
+    ];
+
+    $tiles = $config['frontpage']['map']['tiles'];
+    if (!isset($tile_configs[$tiles])) {
+        $tiles = 'carto-base-auto';
+    }
+
+    if ($tiles === 'carto-base-auto') {
+        $tiles = ($config['themes'][$_SESSION['theme']]['type'] === 'dark') ? "carto-base-dark" : "carto-base-light";
+    }
+
+    if (isset($tile_configs[$tiles])) {
+        return $tile_configs[$tiles];
+    }
+
+    // Fallback to carto-base-dark or carto-base-light
+    $leaflet_variant = ($tiles === "carto-base-dark") ? "dark_all" : "light_all";
+    $url_base        = 'http://{s}.basemaps.cartocdn.com/' . $leaflet_variant . '/{z}/{x}/{y}';
+    $url             = get_ssl_prefixed_url($url_base . '.png');
+    $hqurl           = get_ssl_prefixed_url($url_base . '@2x.png');
+
+    return [
+      'url'         => $url,
+      'hqurl'       => $hqurl,
+      'attribution' => 'Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    ];
+}
+
+[$leaflet_init, $leaflet_bounds] = get_leaflet_init_and_bounds($config);
+$map_tiles = get_map_tiles_config($config);
+
+//FIXME. Urgent! need escaping!
+$vars['geojson_query_str'] = isset($vars['geojson_query']) ? http_build_query($vars['geojson_query']) : '';
+
+?>
+
+<script type="text/javascript">
+    function initMap(widgetId) {
+        const icons = {
+            ok: L.icon({
+                iconUrl: 'images/svg/ok.svg',
+                popupAnchor: [0, 16],
+                iconSize: [<?php echo $config['frontpage']['map']['okmarkersize']; ?>, <?php echo $config['frontpage']['map']['okmarkersize']; ?>]
+            }),
+            alert: L.icon({
+                iconUrl: 'images/svg/high_priority.svg',
+                popupAnchor: [0, 12],
+                iconSize: [<?php echo $config['frontpage']['map']['alertmarkersize']; ?>, <?php echo $config['frontpage']['map']['alertmarkersize']; ?>]
+            })
+        };
+
+        const url = 'ajax/geojson.php?<?php echo $vars['geojson_query_str']; ?>';
+
+        const map = L.map(`map${widgetId}`);
+        const realtime = createRealtimeLayer(url).addTo(map);
+
+        map.setView(<?php echo $leaflet_init; ?>);
+        map.scrollWheelZoom.disable();
+        map.on('click', () => map.scrollWheelZoom.toggle());
+
+        map.on('mouseover', () => realtime.stop());
+        map.on('mouseout', () => realtime.start());
+
+        const tileUrl = <?php echo(isset($map_tiles['hqurl']) ? "L.Browser.retina ? '{$map_tiles['hqurl']}' : '{$map_tiles['url']}'" : "'{$map_tiles['url']}'"); ?>;
+        L.tileLayer(tileUrl, {
+            detectRetina: true,
+            tilematrixset: 'GoogleMapsCompatible_Level',
+            attribution: '<?php echo $map_tiles['attribution']; ?>'
+        }).addTo(map);
+
+        realtime.on('update', () => {
+            if (realtime.isRunning()) {
+                <?php echo $leaflet_bounds; ?>
+            }
+        });
+
+        function createRealtimeLayer(url) {
+            const onEachFeature = (feature, layer) => {
+                layer.on({
+                    mouseover: showTooltip,
+                    mouseout: hideTooltip
+                });
+                layer.on('click', () => window.open(feature.properties.url, "_self"));
+                layer.setIcon(icons[feature.properties.state === "up" ? 'ok' : 'alert']);
+            };
+
+            const updateFeature = (feature, layer) => {
+                if (!layer) {
+                    return;
+                }
+                onEachFeature(feature, layer);
+                return layer;
+            };
+
+            return L.realtime({
+                url: url,
+                method: 'POST',
+                crossOrigin: true,
+                type: 'json',
+                getFeatureId: feature => feature.properties.id + feature.properties.state
+            }, {
+                interval: 10 * 1000,
+                onEachFeature: onEachFeature,
+                updateFeature: updateFeature
+            });
+        }
+    }
+
+    // Function to show the tooltip on 'mouseover'
+    function showTooltip(e) {
+        var layer = e.target;
+        var lat = layer.feature.geometry.coordinates[1]; // Get latitude from GeoJSON
+        var lon = layer.feature.geometry.coordinates[0]; // Get longitude from GeoJSON
+
+        // Fetch the external HTML content using AJAX
+        $.ajax({
+            url: 'ajax/entity_popup.php', // Replace with your AJAX endpoint
+            data: {
+                entity_type: 'latlon',
+                lat: lat,
+                lon: lon
+            },
+            success: function (response) {
+                // Create and show the qTip2 tooltip with the fetched HTML content
+                $('body').qtip({
+                    content: {
+                        text: response
+                    },
+                    show: {
+                        event: false, // Don't show on a regular event
+                        ready: true // Show immediately upon creation
+                    },
+                    hide: {
+                        event: 'mouseout'
+                    },
+                    style: {
+                        classes: 'qtip-bootstrap',
+                    },
+                    position: {
+                        target: [e.originalEvent.pageX, e.originalEvent.pageY],
+                        adjust: {
+                            x: 10, // Horizontal offset
+                            y: 10 // Vertical offset
+                        }
+                    },
+                    events: {
+                        hidden: function (event, api) {
+                            api.destroy(true); // Destroy the tooltip when hidden
+                        }
+                    }
+                });
+            },
+            error: function (xhr, status, error) {
+                console.log('Error fetching tooltip content:', error);
+            }
+        });
+    }
+
+    // Function to hide the tooltip on 'mouseout'
+    function hideTooltip(e) {
+        var layer = e.target;
+
+        // Hide the qTip2 tooltip
+        $(layer).qtip('hide');
+    }
+
+    initMap('<?php echo $mod['widget_id']; ?>');
+</script>
+

@@ -314,6 +314,21 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array(FALSE, $test3, '!in',          $list1);
     $array[] = array(FALSE, $test3, '!in',          $list2);
 
+    $list1 = '0900,1800';
+    $list2 = array('0900', '1800');
+
+    // between
+    $array[] = array( TRUE, '1055', 'between',      $list1);
+    $array[] = array( TRUE, '1055', 'between',      $list2);
+    $array[] = array(FALSE, '0855', 'between',      $list1);
+    $array[] = array(FALSE, '1955', 'between',      $list2);
+
+    // notbetween
+    $array[] = array(FALSE, '1055', 'notbetween',   $list1);
+    $array[] = array(FALSE, '1055', 'notbetween',   $list2);
+    $array[] = array( TRUE, '0855', '!between',     $list1);
+    $array[] = array( TRUE, '1955', '!between',     $list2);
+
     // isnull (second param not used)
     $array[] = array(TRUE,     NULL, 'isnull',      NULL);
     $array[] = array(TRUE,     NULL, 'null',        NULL);

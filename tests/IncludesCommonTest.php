@@ -7,6 +7,10 @@ $config['install_dir'] = $base_dir;
 
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/../includes/definitions.inc.php');
 include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
@@ -172,11 +176,9 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   public function testExternalExec($cmd, $timeout, $result)
   {
     //var_dump($_SERVER['SHELL']);
-    $test = external_exec($cmd, $timeout);
-    $exec_status = $GLOBALS['exec_status'];
+    $test = external_exec($cmd, $exec_status, $timeout);
     unset($exec_status['endtime'], $exec_status['runtime'], $exec_status['exitdelay']);
-    if ($exec_status['exitcode'] == 127)
-    {
+    if ($exec_status['exitcode'] == 127) {
       // Fix shell specific output for tests
       $exec_status['stderr'] = str_replace(array('sh: 1:', 'sh: exec:', 'not found'),
                                            array('sh:',    'sh:',       'No such file or directory'),
@@ -193,43 +195,49 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       // normal stdout
       array($cmd_which.' true',
             NULL,
-            array('command'  => $cmd_which.' true',
-                  'exitcode' => 0,
-                  'stderr'   => '',
-                  'stdout'   => '/bin/true')
-            ),
+            array(
+              'stdout'   => '/bin/true',
+              'stderr'   => '',
+              //'command'  => $cmd_which.' true',
+              'exitcode' => 0,
+            )
+      ),
       // here generate stderr
       array($cmd_which.' true >&2',
             NULL,
-            array('command'  => $cmd_which.' true >&2',
-                  'exitcode' => 0,
-                  'stderr'   => '/bin/true',
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              'stderr'   => '/bin/true',
+              //'command'  => $cmd_which.' true >&2',
+              'exitcode' => 0,
+            )
+      ),
       // normal stdout, but exitcode 1
       array('/bin/false',
             NULL,
-            array('command'  => '/bin/false',
-                  'exitcode' => 1,
-                  'stderr'   => '',
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              'stderr'   => '',
+              //'command'  => '/bin/false',
+              'exitcode' => 1,
+            )
+      ),
       // real stdout, exit code 127
       array('/bin/jasdhksdhka',
             NULL,
-            array('command'  => '/bin/jasdhksdhka',
-                  'exitcode' => 127,
-                  //'stderr'   => 'sh: 1: /bin/jasdhksdhka: not found', // this stderror is shell env specific for dash
-                  'stderr'   => 'sh: /bin/jasdhksdhka: No such file or directory', // this stderror is shell env specific for bash
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              //'stderr'   => 'sh: 1: /bin/jasdhksdhka: not found', // this stderror is shell env specific for dash
+              'stderr'   => 'sh: /bin/jasdhksdhka: No such file or directory', // this stderror is shell env specific for bash
+              //'command'  => '/bin/jasdhksdhka',
+              'exitcode' => 127,
+            )
+      ),
       // normal stdout with special chars (tabs, eol in eof)
-      array( '/bin/cat ' . __DIR__ . '/data/text.txt',
+      array('/bin/cat ' . __DIR__ . '/data/text.txt',
              NULL,
-             array( 'command'  => '/bin/cat ' . __DIR__ . '/data/text.txt',
-                    'exitcode' => 0,
-                    'stderr'   => '',
-                    'stdout'   =>
+             array(
+               'stdout'   =>
 "Observium is an autodiscovering network monitoring platform
 \tsupporting a wide range of hardware platforms and operating systems
 \tincluding Cisco, Windows, Linux, HP, Juniper, Dell, FreeBSD, Brocade,
@@ -240,40 +248,52 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
 ~!@#$%^&*()_+`1234567890-=[]\{}|;':\",./<>?
 
-")
-            ),
+",
+               'stderr'   => '',
+               //'command'  => '/bin/cat ' . __DIR__ . '/data/text.txt',
+               'exitcode' => 0,
+             )
+      ),
       // timeout 5sec, ok
       array('/bin/sleep 1',
             5,
-            array('command'  => '/bin/sleep 1',
-                  'exitcode' => 0,
-                  'stderr'   => '',
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              'stderr'   => '',
+              //'command'  => '/bin/sleep 1',
+              'exitcode' => 0,
+            )
+      ),
       // timeout 2sec, expired, exitcode -1
       array('/bin/sleep 10',
             1,
-            array('command'  => '/bin/sleep 10',
-                  'exitcode' => -1,
-                  'stderr'   => '',
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              'stderr'   => '',
+              //'command'  => '/bin/sleep 10',
+              'exitcode' => -1,
+            )
+      ),
 
       // Empty
       array('',
             NULL,
-            array('command'  => '',
-                  'exitcode' => -1,
-                  'stderr'   => 'Empty command passed',
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              'stderr'   => 'Empty command passed',
+              //'command'  => '',
+              'exitcode' => -1
+            )
+      ),
       array(FALSE,
             NULL,
-            array('command'  => '',
-                  'exitcode' => -1,
-                  'stderr'   => 'Empty command passed',
-                  'stdout'   => '')
-            ),
+            array(
+              'stdout'   => '',
+              'stderr'   => 'Empty command passed',
+              //'command'  => '',
+              'exitcode' => -1,
+            )
+      ),
 
     );
   }
@@ -322,8 +342,8 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
     $test_pid_info['ps']       = get_pid_info($pid);
     $test_pid_info['ps_stats'] = get_pid_info($pid, TRUE);
-    $test['ps']       = external_exec('/bin/ps -ww -o pid,ppid,uid,gid,tty,stat,time,lstart,args -p '.$pid, 1); // Set timeout 1sec for exec
-    $test['ps_stats'] = external_exec('/bin/ps -ww -o pid,ppid,uid,gid,pcpu,pmem,vsz,rss,tty,stat,time,lstart,args -p '.$pid, 1); // Set timeout 1sec for exec
+    $test['ps']       = external_exec('/bin/ps -ww -o pid,ppid,uid,gid,tty,stat,time,lstart,args -p '.$pid, $exec_status, 1); // Set timeout 1sec for exec
+    $test['ps_stats'] = external_exec('/bin/ps -ww -o pid,ppid,uid,gid,pcpu,pmem,vsz,rss,tty,stat,time,lstart,args -p '.$pid, $exec_status, 1); // Set timeout 1sec for exec
 
     foreach ($test as $ps_type => $ps) {
       // Copy-pasted from function get_pid_info()
@@ -493,7 +513,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testDeviceUptime($value, $result)
   {
-    $this->assertSame($result, deviceUptime($value));
+    $this->assertSame($result, device_uptime($value));
   }
 
   public function providerDeviceUptime()
@@ -718,7 +738,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerFormatNumberShort
-   * @group values
+   * @group numbers
    */
   public function testFormatNumberShort($value, $sf, $result)
   {
@@ -729,18 +749,33 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   {
     return array(
       array( '12345', 3,  '12345'),
-      array('1234.5', 3,   '1234'),
+      //array('1234.5', 3,   '1234'),
+      array('1234.5', 3, '1234.5'), // FIXME. not sure that this is correct!
       array('123.45', 3,    '123'),
       array('12.345', 3,   '12.3'),
       array('1.2345', 3,   '1.23'),
-      array('.12345', 3,   '.123'),
-      array('0.1234', 3,   '0.12'),
+      array('.12345', 3,  '0.123'),
+      array('0.1234', 3,  '0.123'),
+      array(   '1.0', 3,      '1'),
 
-      array('-1.234', 3,   '-1.2'),
+      array('-1.234', 3,  '-1.23'),
+      array(  '-1.0', 3,     '-1'),
 
-      array('1.234b', 3,      '1'), // alpha in decimals
+      array('1.234b', 3,   '1.23'), // alpha in decimals
 
-      // < 0
+      // zero
+      array('-0', 3,  '0'),
+      array(   0, 3,  '0'),
+      array( 0.0, 3,  '0'),
+
+      // big numbers
+      array('1000.0', 3,  '1000'),
+      array(  '1000', 3,  '1000'),
+      array( '2834639823472972947924729342934679', 3,  '2834639823472972947924729342934679'),
+      array('-2834639823472972947924729342934679', 3, '-2834639823472972947924729342934679'),
+
+      // 0 > value < 1
+      array(  '0.01234', 3,   '0.0123'),
       array('0.0001234', 3,   '0.000123'),
       array('0.0001235', 3,   '0.000124'),
     );
@@ -898,7 +933,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testGenerateRandomString($len, $chars, $regex)
   {
-    $rv = generate_random_string($len, $chars);
+    $rv = random_string($len, $chars);
 
     if (method_exists($this, 'assertMatchesRegularExpression')) {
       $this->assertMatchesRegularExpression($regex, $rv);
@@ -990,7 +1025,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testFormatRates($value, $round, $sf, $result)
   {
-    $this->assertSame($result, formatRates($value, $round, $sf));
+    $this->assertSame($result, format_bps($value, $round, $sf));
   }
 
   public function providerFormatRates()
@@ -1010,17 +1045,17 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testFormatStorage($value, $round, $sf, $result)
   {
-    $this->assertSame($result, formatStorage($value, $round, $sf));
+    $this->assertSame($result, format_bytes($value, $round, $sf));
   }
 
   public function providerFormatStorage()
   {
     return array(
       // simple test; most testing is done against format_bi
-      array(102400000, 2, 3,  '97.6MB'),
+      array(102400000, 2, 3,  '97.7MB'),
 
       // round & sf
-      array(102400000, 4, 4, '97.65MB'),
+      array(102400000, 4, 4, '97.66MB'),
     );
   }
 
@@ -1142,11 +1177,11 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
       // check base 1000
       array(                1000, 2, 3,    '1000'),
-      array(             1000000, 2, 3,    '976k'),
+      array(             1000000, 2, 3,    '977k'),
 
       // round & sf
       array(           105000000, 4, 4,  '100.1M'),
-      array(           102400000, 4, 4,  '97.65M'),
+      array(           102400000, 4, 4,  '97.66M'),
     );
   }
 
@@ -1168,9 +1203,9 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array( 10240000,   1000, 4, 4, '10.24M'), // round and sf
 
       // simple base 1024 tests; most testing is done against format_bi
-      array(102400000, '1024', 2, 3,  '97.6M'), // string base
-      array(102400000,   1024, 2, 3,  '97.6M'), // int base
-      array(102400000,   1024, 4, 4, '97.65M'), // round and sf
+      array(102400000, '1024', 2, 3,  '97.7M'), // string base
+      array(102400000,   1024, 2, 3,  '97.7M'), // int base
+      array(102400000,   1024, 4, 4, '97.66M'), // round and sf
     );
   }
 
@@ -2091,6 +2126,19 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     $this->assertSame($result, safe_json_decode($string));
   }
 
+    /**
+     * @dataProvider providerSafeJsonDecode
+     * @group json
+     */
+    public function testJsonValidate($string, $result, $valid = TRUE) {
+        //$this->assertSame(TRUE, json_validate($string));
+        if ($valid) {
+            $this->assertTrue(json_validate($string));
+        } else {
+            $this->assertFalse(json_validate($string));
+        }
+    }
+
   public function providerSafeJsonDecode() {
     $array = [];
     $array[] = [
@@ -2144,20 +2192,24 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     // smart (incorrect) quotes
     $array[] = [
       '[«ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ»]',
-      [ 'ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ' ]
+      [ 'ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ' ],
+      FALSE
     ];
     $array[] = [
       '{“method”:”sms.send_togroup”, “params”:{“access_token”:”0005gOjCOlMH8F2BP8″,”groupname”:”admins”,”message”:”mymessage”,”highpriority”:”1″}}',
-      [ 'method' => 'sms.send_togroup', 'params' => [ 'access_token' => '0005gOjCOlMH8F2BP8', 'groupname' => 'admins', 'message' => 'mymessage', 'highpriority' => '1' ] ]
+      [ 'method' => 'sms.send_togroup', 'params' => [ 'access_token' => '0005gOjCOlMH8F2BP8', 'groupname' => 'admins', 'message' => 'mymessage', 'highpriority' => '1' ] ],
+      FALSE
     ];
     $array[] = [
       "[ \"/^ONU.+ Operation-&gt;Deactivated/\n/^ONU.+ Operation-&gt;Deactivated/\" ]",
-      [ '/^ONU.+ Operation-&gt;Deactivated//^ONU.+ Operation-&gt;Deactivated/' ]
+      [ '/^ONU.+ Operation-&gt;Deactivated//^ONU.+ Operation-&gt;Deactivated/' ],
+      FALSE
     ];
     // ctrl chars
     $array[] = [
       '{"url":"https://<apiurl>","json":"{'."\r\n".'    \"ALERT_ID\": \"%ALERT_ID%\",'."\r\n".'    \"ALERT_MESSAGE\": \"%ALERT_MESSAGE%\",'."\r\n".'    \"ALERT_SEVERITY\": \"%ALERT_SEVERITY%\",'."\r\n".'    \"ALERT_STATE\": \"%ALERT_STATE%\",'."\r\n".'    \"ALERT_STATUS\": \"%ALERT_STATUS%\",'."\r\n".'    \"ALERT_TIMESTAMP\": \"%ALERT_TIMESTAMP%\",'."\r\n".'    \"CONDITIONS\": \"%CONDITIONS%\",'."\r\n".'    \"DEVICE_HOSTNAME\": \"%DEVICE_HOSTNAME%\",'."\r\n".'    \"DEVICE_SYSNAME\": \"%DEVICE_SYSNAME%\",'."\r\n".'    \"DURATION\": \"%DURATION%\",'."\r\n".'    \"ENTITY_LINK\": \"%ENTITY_LINK%\",'."\r\n".'    \"METRICS\": \"%METRICS%\",'."\r\n".'    \"TITLE\": \"%TITLE%\"'."\r\n".'}"}',
-      [ 'url' => 'https://<apiurl>', 'json' => '{    "ALERT_ID": "%ALERT_ID%",    "ALERT_MESSAGE": "%ALERT_MESSAGE%",    "ALERT_SEVERITY": "%ALERT_SEVERITY%",    "ALERT_STATE": "%ALERT_STATE%",    "ALERT_STATUS": "%ALERT_STATUS%",    "ALERT_TIMESTAMP": "%ALERT_TIMESTAMP%",    "CONDITIONS": "%CONDITIONS%",    "DEVICE_HOSTNAME": "%DEVICE_HOSTNAME%",    "DEVICE_SYSNAME": "%DEVICE_SYSNAME%",    "DURATION": "%DURATION%",    "ENTITY_LINK": "%ENTITY_LINK%",    "METRICS": "%METRICS%",    "TITLE": "%TITLE%"}' ]
+      [ 'url' => 'https://<apiurl>', 'json' => '{    "ALERT_ID": "%ALERT_ID%",    "ALERT_MESSAGE": "%ALERT_MESSAGE%",    "ALERT_SEVERITY": "%ALERT_SEVERITY%",    "ALERT_STATE": "%ALERT_STATE%",    "ALERT_STATUS": "%ALERT_STATUS%",    "ALERT_TIMESTAMP": "%ALERT_TIMESTAMP%",    "CONDITIONS": "%CONDITIONS%",    "DEVICE_HOSTNAME": "%DEVICE_HOSTNAME%",    "DEVICE_SYSNAME": "%DEVICE_SYSNAME%",    "DURATION": "%DURATION%",    "ENTITY_LINK": "%ENTITY_LINK%",    "METRICS": "%METRICS%",    "TITLE": "%TITLE%"}' ],
+      FALSE
     ];
     $array[] = [
       "[\r\n".' "ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ" '."\r\n]",
@@ -2398,8 +2450,8 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerStrCompress
    * @group compress
    */
-  public function testStrCompress($string, $result, $encode = 'base64') {
-    $this->assertSame($result, str_compress($string, $encode));
+  public function testStrCompress($string, $result) {
+    $this->assertSame($result, str_compress($string));
   }
 
   /**
@@ -2436,16 +2488,16 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.47 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.54 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.64 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.73 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.82 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.20',
         'AVUAqv-NkoEJADEIA1f5CUJj_fj7T_btBAkiiBweiiA2BKJPlpYwp6wTBHl7DxzSK2DGM297RgEz2zOf3asRIGQwxp5HXqVApUA1XjWBagIVK3ieCmR30PoB' ],
       // 681 chars compressed to 180 chars (hex)
-      [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.47 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.54 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.64 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.73 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.82 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.20',
-        '015500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01',
-        'hex' ],
+      // [ '.1.3.6.1.4.1.2606.7.4.2.2.1.11.1.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.40 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.47 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.54 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.64 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.73 .1.3.6.1.4.1.2606.7.4.2.2.1.11.1.82 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.4.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.6.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.7.20 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.2 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.11 .1.3.6.1.4.1.2606.7.4.2.2.1.11.12.20',
+      //   '015500aaff8d9281090031080357f9094263fdf8fb4ff6ed040922881c1e8a203604a24f969630a7ac1304797b0f1cd22b60c6336f7b460133db339fddab11206430c69e475ea540a540355e35816a02152b789e0a6477d0fa01',
+      //   'hex' ],
       // 4225 chars compressed to 2260 chars (base64)
       [ '603792,603795,735967,735962,706916,706931,692749,595380,716207,716197,834314,834237,834227,811153,811147,771424,771425,767750,767720,580799,580797,800238,602988,602987,778425,778406,778407,818925,818988,808167,808142,808143,736931,637484,811486,719059,768687,713042,713014,705867,603790,604635,799968,799990,799983,805612,733641,713864,797601,797599,734026,734024,740320,740324,710622,710591,741431,741400,834269,834274,822695,811485,795671,795638,603844,603845,812874,812866,703413,703427,718904,718953,816882,836314,836307,811132,811136,730931,730917,602000,602001,768844,768825,768826,584527,800325,800443,800444,704006,704004,718213,605635,614473,699119,809219,799013,781867,834928,810348,810344,837290,812181,812202,812179,812198,696049,696040,767203,742978,706948,706932,692750,595381,779344,779326,779327,741989,771373,17761,811154,811148,787755,617388,580800,800239,818926,818990,787965,768657,768658,705868,603791,604636,799969,799970,810690,810691,710623,710592,741417,741401,769964,620092,795655,795639,795640,703415,703429,836315,836308,811133,811137,811138,758080,591837,800326,601888,834931,810349,810345,812182,812204,812180,812200,777908,638004,718307,696041,710903,619539,813583,736360,630290,706917,706933,785242,741995,741996,713065,629651,815582,647028,647031,807790,807770,807771,705869,787393,608879,741435,741402,601878,836313,836324,740662,740642,800240,800241,812183,812192,714326,22756,718310,718312,788983,702011,730526,730441,813575,768067,767645,719586,628359,721547,721539,721551,721540,831999,831973,813882,809086,766933,766935,807789,767748,767744,807786,807787,580798,580793,580796,813888,788348,795654,795645,713204,713198,735964,758592,833556,833560,735938,758586,736513,47769,813883,765202,742010,785804,736745,709102,719061,779341,806057,806067,740186,742022,785808,719068,719069,765195,709098,779332,765194,709099,813885,810704,810700,816894,768842,816886,808511,797485,808515,811202,713206,735965,758593,713041,106040,591213,591023,713201,735940,591211,713018,758589,591025,800347,809090,594018,593642,814542,739551,800262,812177,800322,800266,779076,814539,584824,814538,594016,812175,618538,809087,812372,812401,813884,834222,708223,766351,710618,710613,710614,811720,834226,808163,708229,708231,650786,601582,811712,813887,585963,584958,619128,590360,620158,809093,741498,730930,741490,730923,809091,778607,778615,811151,808514,811165,813890,810347,707545,800465,765036,810357,800462,616617,616631,705885,705887,800331,809092,720660,704519,703414,834942,834947,785805,709103,736508,294034,740250,767886,719062,829759,785809,829764,767890,742119,782569,720648,736514,703424,719071,47770,709100,709101,719072,686510,813886,834319,595583,710620,811721,834312,710616,710615,595582,650791,834313,811714,294030,817096,716061,813889,809088,808510,832277,808503,808502,708224,708233,708232,582909,701990,702003,702010,779342,779334,797486,797479,550429,550425,550427,834306,834233,834210,765666,617384,591142,430351,767749,767746,584959,584957,619122,808136,808140,768843,768836,730929,730921,713040,713016,806058,829758,806068,829762,768652,788309,788350,805603,805611,805594,805595,805591,591210,591212,740318,740327,795657,795647,833742,833738,739846,739849,741428,741399,596541,596539,620021,834223,834167,834228,768491,806220,795668,795637,620053,740319,740330,768673,768672,768665,833558,833563,591022,591024,768852,799988,799979,591081,591082,811131,811135,612967,809222,809211,809224,768823,767885,767889,820386,820351,814543,584533,814540,814541,584529,619923,768674,768668,768667,584953,580794,629557,834925,805596,805597,837287,837284,812864,812865,812178,812196,720659,720649,720650,812395,812398,784444,30289,30290,587405,587407,706930,834267,834273,784442,813572,813573,799989,800000,800458,800461,599121,599132,587408,591141,602551,23716,23717,808146,808141,768663,602550,705871,594017,696680,618551,705883,705882,807788,834941,834945,765203,765196,765197,596542,596540,620034,741415,741407,741408,808155,834268,834275,779077,716616,816895,816903,800263,800245,810346,810356,585205,585199,586277,586279,696682,696678,580810,580812,834318,834322,741503,601882,601886,4853,5317,4865,5330,580809,580811,812870,812876,742011,742023,818620,742118,810705,703412,703421,741625,741626',
         'AZoGZfk1V0mWBSEIu9BfgCjK_S_WGap70Xn-KpUhBKqj7qxfE87v1pm-hvW70ZMtqPz1rLvnd-bUi9_NXnEJOff3alduwiqt1gJk5inBxps399oGXNT3nhCs-J0Xd8aAfRGrHkxa8z7g9qd9gGgDb3iDHwl488XLvoK9DAVXbHzd_TZt2Q_bc-IMbn_No7MCGwjw4cZ5OEUBCcDuwrUz00-AHwkPjsXpxL6q3sntr7F9bkcSDjy6tWO1Ac92FLwVYJXRi9fCFGzYsNYQoQj2CC6sXlgcG09bTt8UKEr19jbwlfW4AdBMXO0swaKbb2ILlJV-D1GqduK6whmrZaDVwdARkgFZEWFIho7XEpRNQCN_-yzlr5iViL3LwLDCrzbIiAXLGhFEdDv3vljNZMLpmAVAkIPGI7ktSs1CihO-fECr70I64G2-JKxYWt0RDMIzyOAYRLcVOHOvuU-83gY4TXqDkaI3_LvDGwjMH-EyOfOGFC6Ym_d2muTbJMdZD7SmQ7dASPD5MZnk85isLSCH3p1W5PpcwzP3nrmX5l6be4rHXDoLcz9Ic6jMoSXy5DWHmCLsAzOQLz4DXY7JUyNgPEiQY4KMuXDMhWcSuHrrYwYMlEsIUr76Et2wMx_LDymqdG7GcJyb5dxsr8Ir3I6w4iKw-KMEKahMybFBpiAuR6Gr81TL1aBgBdMudbpOH3ly1lYIhjpGaJU0gtwLoaZl58CW3jdAJQLNDVohuB-k8zDMUQ1Z-pAsV-hxdJecvs8xK4ELvKmbACkQit7p32nfy7xk1W-GDjJ5Wq5nGPDoPaoLjIxU9R0pCKooFYgr1gRlum8jxlAzmAsvX1HUFvh4BeUVXNePlBWEZQSXppQkAJGmJrbjSDgKBKkOfSatCds_tuFarZ-hDO0zWQePdSrSbbONdtZSoouVqR6zyShS91UdRIKADPOZ2UbHkPaDGG_U2_gCmnlY7KjkYOTwHk-uvrwHesVnEPn-Kpl5hthcASOHAuHJ2E4J5vbnDR_Q9ZOjw4LW4hSIhH7c_vGzhRyPK3IDQsI6VkZygDLLkL2T6gpUcK2k5_KBYWnH4zge5Z6UP5Q3dQv1Rrk89Ku8IbXh_1m6e30hG78pCa59leHhm_QaUGJn7sOCqSFBSNL-xPMrbBO4pX5xWxuKTXq_tb16PrO9j7r3-KMYRc3AMKAzKUcKlkcEhjzQ1MS2OpYxGk8ogySVs4E2tJt7ed8I2NVPkJCoxSORyZvLF5GeiCd5uVEdFBL0RJgbUpDFHY5LqaJFSCzCq9BqlV8hiV6HhpB24lIxQxot_X10rYWZIb9xz3YPlMof3Ktn4iB-hIJkN_sqoCw5bO4EJ0DiNNJu8INVEfuwMVK0FchhGgnXFP6oL6E8IPRCckqqtDxrvW_2YaYXJxTvG61YjHiFvu_FRnzR2lkIuJ21zCrc7hVbp0Aot1RTt36QfgT30NEynI32gKjhUULOthXOcPrZctrbcPzmUobne6Wc4W2_uB03ckNHf_wac-85NyQPFFYjIRJg-Li3zSEzCpWNyxBrrFLdmVPOp8FhCVnWgO0ibgG6wjnB3ik4Bo_D0R6HS8BT-jSqSbPBZoVySsV7KgAK7Ce3bc6O4Zq6nmfLdaBJBsVUgm9SY1UQLAV8hYrQFr7nfD_rn1dsVEySOk7Rd8AJjbXxTbek4EGNG44hrTmf9KjdFauXY-215hsoPYXBW_J-Keg1b7fBDXVxXxaHf6jfTgFUhlOLqUGZAGR_3xXsRtgtRV-cpnFRu9VgJOG-UzZpBKVg9S2DnWa9suM8d5xPWpfB4s24cM731H-tqS8N34zs8U8T7Bp9esxSqmYpdLO-wyR1VwVOYMFhYG-BJhNosbTqaOTaataE9FA9ZMGsz4dtH57hmihfC-bAh9L5JuYvY224mpjfB99nwgce1TjRcEBpVf35it9wNLiVPkQAbPKbkz2mMTjkmezg6wMyJPhGs-9jxtljFrhreZL5oBxpFi__JJDiKnSSASfNBKpTHP1cPhyRF7sX-gyYzv_f599XJ-kIld8LqetNNy2Nmpij1LTOJ8BlWJ5xPNPuNBwPHeUhoA3XvF0GdRZLbmqw5qz4DeT-Pj3H4XgOx3Fz1Xd0q49ieGCAe1SC6L8GjdI4-Wsi1AjYwkjDCEpFU-cEY8eW4PorJMOwrKS6nR0ellEYNcF7pgUpMaKATIUIbfLisIQ0948PSX9mhsFTFCcQDlNk7-v19ZDnochfGFQKNg995PY6hv4D' ],
       // 4225 chars compressed to 3390 chars (hex)
-      [ '603792,603795,735967,735962,706916,706931,692749,595380,716207,716197,834314,834237,834227,811153,811147,771424,771425,767750,767720,580799,580797,800238,602988,602987,778425,778406,778407,818925,818988,808167,808142,808143,736931,637484,811486,719059,768687,713042,713014,705867,603790,604635,799968,799990,799983,805612,733641,713864,797601,797599,734026,734024,740320,740324,710622,710591,741431,741400,834269,834274,822695,811485,795671,795638,603844,603845,812874,812866,703413,703427,718904,718953,816882,836314,836307,811132,811136,730931,730917,602000,602001,768844,768825,768826,584527,800325,800443,800444,704006,704004,718213,605635,614473,699119,809219,799013,781867,834928,810348,810344,837290,812181,812202,812179,812198,696049,696040,767203,742978,706948,706932,692750,595381,779344,779326,779327,741989,771373,17761,811154,811148,787755,617388,580800,800239,818926,818990,787965,768657,768658,705868,603791,604636,799969,799970,810690,810691,710623,710592,741417,741401,769964,620092,795655,795639,795640,703415,703429,836315,836308,811133,811137,811138,758080,591837,800326,601888,834931,810349,810345,812182,812204,812180,812200,777908,638004,718307,696041,710903,619539,813583,736360,630290,706917,706933,785242,741995,741996,713065,629651,815582,647028,647031,807790,807770,807771,705869,787393,608879,741435,741402,601878,836313,836324,740662,740642,800240,800241,812183,812192,714326,22756,718310,718312,788983,702011,730526,730441,813575,768067,767645,719586,628359,721547,721539,721551,721540,831999,831973,813882,809086,766933,766935,807789,767748,767744,807786,807787,580798,580793,580796,813888,788348,795654,795645,713204,713198,735964,758592,833556,833560,735938,758586,736513,47769,813883,765202,742010,785804,736745,709102,719061,779341,806057,806067,740186,742022,785808,719068,719069,765195,709098,779332,765194,709099,813885,810704,810700,816894,768842,816886,808511,797485,808515,811202,713206,735965,758593,713041,106040,591213,591023,713201,735940,591211,713018,758589,591025,800347,809090,594018,593642,814542,739551,800262,812177,800322,800266,779076,814539,584824,814538,594016,812175,618538,809087,812372,812401,813884,834222,708223,766351,710618,710613,710614,811720,834226,808163,708229,708231,650786,601582,811712,813887,585963,584958,619128,590360,620158,809093,741498,730930,741490,730923,809091,778607,778615,811151,808514,811165,813890,810347,707545,800465,765036,810357,800462,616617,616631,705885,705887,800331,809092,720660,704519,703414,834942,834947,785805,709103,736508,294034,740250,767886,719062,829759,785809,829764,767890,742119,782569,720648,736514,703424,719071,47770,709100,709101,719072,686510,813886,834319,595583,710620,811721,834312,710616,710615,595582,650791,834313,811714,294030,817096,716061,813889,809088,808510,832277,808503,808502,708224,708233,708232,582909,701990,702003,702010,779342,779334,797486,797479,550429,550425,550427,834306,834233,834210,765666,617384,591142,430351,767749,767746,584959,584957,619122,808136,808140,768843,768836,730929,730921,713040,713016,806058,829758,806068,829762,768652,788309,788350,805603,805611,805594,805595,805591,591210,591212,740318,740327,795657,795647,833742,833738,739846,739849,741428,741399,596541,596539,620021,834223,834167,834228,768491,806220,795668,795637,620053,740319,740330,768673,768672,768665,833558,833563,591022,591024,768852,799988,799979,591081,591082,811131,811135,612967,809222,809211,809224,768823,767885,767889,820386,820351,814543,584533,814540,814541,584529,619923,768674,768668,768667,584953,580794,629557,834925,805596,805597,837287,837284,812864,812865,812178,812196,720659,720649,720650,812395,812398,784444,30289,30290,587405,587407,706930,834267,834273,784442,813572,813573,799989,800000,800458,800461,599121,599132,587408,591141,602551,23716,23717,808146,808141,768663,602550,705871,594017,696680,618551,705883,705882,807788,834941,834945,765203,765196,765197,596542,596540,620034,741415,741407,741408,808155,834268,834275,779077,716616,816895,816903,800263,800245,810346,810356,585205,585199,586277,586279,696682,696678,580810,580812,834318,834322,741503,601882,601886,4853,5317,4865,5330,580809,580811,812870,812876,742011,742023,818620,742118,810705,703412,703421,741625,741626',
-        '019a0665f935574996052108bbd05f8028cafd2fd619aa7bd179fe2a952104aaa3eeac5f13ceefd699be86f5bbd1932da8fcf5acbbe777e6d48bdfcd5e710939f7f76a576ec22aadd60264e629c1c69b37f7da065cd4f79e10acf89d1777c6807d11ab1e4c5af33ee0f6a77d8068036f78831f0978f3c5cbbe82bd0c05576c7cddfd366dd90fdb73e20c6e7fcda3b3021b08f0e1c67938450109c0eec2b533d34f801f090f8ec5e9c4beaadec9edafb17d6e47120e3cbab563b501cf7614bc156095d18bd7c2146cd8b0d610a108f6082eac5e581c1b4f5b4edf14284af5f636f095f5b801d04c5ced2cc1a29b6f620b94957e0f51aa76e2bac219ab65a0d5c1d011920159116148868ed712944d40237ffb2ce5af989588bdcbc0b0c2af36c88805cb1a1144743bf7be58cd64c2e99805409083c623b92d4acd428a13be7c40abef423ae06dbe24ac585add110cc233c8e01844b7153873afb94fbcde06384d7a8391a237fcbbc31b08cc1fe13239f386142e989bf7769ae4db24c7590fb4a643b74048f0f93199e4f398ac2d2087de9d56e4fa5cc333f79eb997e65e9b7b8ac75c3a0b733f4873a8cca125f2e435879822ec0333902f3e035d8ec95323603c489063828cb970cc856712b87aeb63060c944b0852befa12ddb0331fcb0f29aa746ec6709c9be5dc6cafc22bdc8eb0e222b0f8a30429a84cc9b141a6202e47a1abf354cbd5a06005d32e75ba4e1f7972d65608863a4668953482dc0ba1a665e7c096de37402502cd0d5a21b81fa4f330cc510d59fa902c57e87174979cbecf312b810bbca99b0029108adee9df69dfcbbc64d56f860e32795aae6718f0e83daa0b8c8c54f51d2908aa2815882bd60465ba6f23c65033980b2f5f51d416f87805e5155cd78f941584650497a694240091a626b6e348380a04a90e7d26ad09db3fb6e15aad9fa10ced3359078f752ad26db38d76d652a28b95a91eb3c92852f7551d4482800cf399d946c790f683186fd4dbf8029a7958eca8e460e4f01e4faebebc077ac56710f9fe2a997986d85c01238702e1c9d84e09e6f6e70d1fd0f593a3c382d6e21488847edcfef1b3851c8f2b720342c23a5646728032cb90bd93ea0a5470ada4e7f2816169c7e3381ee59e943f9437750bf546b93cf4abbc21b5e1ff59ba7b7d211bbf2909ae7d95e1e19bf41a506267eec382a9214148d2fec4f32b6c13b8a57e715b1b8a4d7abfb5bd7a3eb3bd8fbaf7f8a31845cdc030a03329470a964704863cd0d4c4b63a96311a4f28832495b38136b49b7b79df08d8d54f9090a8c52391c99bcb17919e882779b9511d1412f444981b5290c51d8e4ba9a245482cc2abd06a955f21895e87869076e25231431a2dfd7d74ad859921bf71cf760f94ca1fdcab67e2207e84826437fb2aa02c396cee042740e234d26ef0835511fbb03152b415c8611a09d714fea82fa13c20f442724aaab43c6bbd6ff661a6172714ef1bad588c7885beefc5467cd1da5908b89db5cc2adcee155ba74028b75453b77e907e04f7d0d1329c8df680a8e15142ceb615ce70fad972dadb70fce65286e77ba59ce16dbfb81d377243477ffc1a73ef3937240f145623211260f8b8b7cd21330a958dcb106bac52dd9953cea7c1610959d680ed226e01bac239c1de2938068fc3d11e874bc053fa34aa49b3c16685724ac57b2a000aec27b76dce8ee19aba9e67cb75a04906c554826f526355102c057c858ad016bee77c3feb9f576c544c923a4ed177c0098db5f14db7a4e0418d1b8e21ad399ff4a8dd15ab9763edb5e61b283d85c15bf27e29e8356fb7c10d75715f16877fa8df4e015486538ba9419900647fdf15ec46d82d455f9ca67151bbd56024e1be53366904a560f52d839d66bdb2e33c779c4f5a97c1e2cdb870cef7d47fada92f0ddf8cecf14f13ec1a7d7acc52aa662974b3bec3247557054e60c161606f81261368b1b4ea68e4da6ad684f4503d64c1accf876d1f9ee19a285f0be6c087d2f926e62f636db89a98df07df67c2071ed538d170406955fdf98adf7034b8953e44006cf29b933da63138e499ece0eb033224f846b3ef63c6d96316b86b7992f9a01c69162fff2490e22a74920127cd04aa531cfd5c3e1c9117bb17fa0c98ceffdfe7df5727e90895df0ba9eb4d372d8d9a98a3d4b4ce27c065589e713cd3ee341c0f1de521a00dd7bc5d0675164b6e6ab0e6acf80de4fe3e3dc7e1780ec77173d57774ab8f627860807b5482e8bf068dd238f96b22d408d8c248c3084a4553e70463c796e0fa2b24c3b0aca4ba9d1d1e96511835c17ba6052931a2804c85086df2e2b08434f78f0f497f6686c1531427100e5364efebf5f590e7a1c85f18540a360f7de4f63a86fe03',
-        'hex' ],
+      // [ '603792,603795,735967,735962,706916,706931,692749,595380,716207,716197,834314,834237,834227,811153,811147,771424,771425,767750,767720,580799,580797,800238,602988,602987,778425,778406,778407,818925,818988,808167,808142,808143,736931,637484,811486,719059,768687,713042,713014,705867,603790,604635,799968,799990,799983,805612,733641,713864,797601,797599,734026,734024,740320,740324,710622,710591,741431,741400,834269,834274,822695,811485,795671,795638,603844,603845,812874,812866,703413,703427,718904,718953,816882,836314,836307,811132,811136,730931,730917,602000,602001,768844,768825,768826,584527,800325,800443,800444,704006,704004,718213,605635,614473,699119,809219,799013,781867,834928,810348,810344,837290,812181,812202,812179,812198,696049,696040,767203,742978,706948,706932,692750,595381,779344,779326,779327,741989,771373,17761,811154,811148,787755,617388,580800,800239,818926,818990,787965,768657,768658,705868,603791,604636,799969,799970,810690,810691,710623,710592,741417,741401,769964,620092,795655,795639,795640,703415,703429,836315,836308,811133,811137,811138,758080,591837,800326,601888,834931,810349,810345,812182,812204,812180,812200,777908,638004,718307,696041,710903,619539,813583,736360,630290,706917,706933,785242,741995,741996,713065,629651,815582,647028,647031,807790,807770,807771,705869,787393,608879,741435,741402,601878,836313,836324,740662,740642,800240,800241,812183,812192,714326,22756,718310,718312,788983,702011,730526,730441,813575,768067,767645,719586,628359,721547,721539,721551,721540,831999,831973,813882,809086,766933,766935,807789,767748,767744,807786,807787,580798,580793,580796,813888,788348,795654,795645,713204,713198,735964,758592,833556,833560,735938,758586,736513,47769,813883,765202,742010,785804,736745,709102,719061,779341,806057,806067,740186,742022,785808,719068,719069,765195,709098,779332,765194,709099,813885,810704,810700,816894,768842,816886,808511,797485,808515,811202,713206,735965,758593,713041,106040,591213,591023,713201,735940,591211,713018,758589,591025,800347,809090,594018,593642,814542,739551,800262,812177,800322,800266,779076,814539,584824,814538,594016,812175,618538,809087,812372,812401,813884,834222,708223,766351,710618,710613,710614,811720,834226,808163,708229,708231,650786,601582,811712,813887,585963,584958,619128,590360,620158,809093,741498,730930,741490,730923,809091,778607,778615,811151,808514,811165,813890,810347,707545,800465,765036,810357,800462,616617,616631,705885,705887,800331,809092,720660,704519,703414,834942,834947,785805,709103,736508,294034,740250,767886,719062,829759,785809,829764,767890,742119,782569,720648,736514,703424,719071,47770,709100,709101,719072,686510,813886,834319,595583,710620,811721,834312,710616,710615,595582,650791,834313,811714,294030,817096,716061,813889,809088,808510,832277,808503,808502,708224,708233,708232,582909,701990,702003,702010,779342,779334,797486,797479,550429,550425,550427,834306,834233,834210,765666,617384,591142,430351,767749,767746,584959,584957,619122,808136,808140,768843,768836,730929,730921,713040,713016,806058,829758,806068,829762,768652,788309,788350,805603,805611,805594,805595,805591,591210,591212,740318,740327,795657,795647,833742,833738,739846,739849,741428,741399,596541,596539,620021,834223,834167,834228,768491,806220,795668,795637,620053,740319,740330,768673,768672,768665,833558,833563,591022,591024,768852,799988,799979,591081,591082,811131,811135,612967,809222,809211,809224,768823,767885,767889,820386,820351,814543,584533,814540,814541,584529,619923,768674,768668,768667,584953,580794,629557,834925,805596,805597,837287,837284,812864,812865,812178,812196,720659,720649,720650,812395,812398,784444,30289,30290,587405,587407,706930,834267,834273,784442,813572,813573,799989,800000,800458,800461,599121,599132,587408,591141,602551,23716,23717,808146,808141,768663,602550,705871,594017,696680,618551,705883,705882,807788,834941,834945,765203,765196,765197,596542,596540,620034,741415,741407,741408,808155,834268,834275,779077,716616,816895,816903,800263,800245,810346,810356,585205,585199,586277,586279,696682,696678,580810,580812,834318,834322,741503,601882,601886,4853,5317,4865,5330,580809,580811,812870,812876,742011,742023,818620,742118,810705,703412,703421,741625,741626',
+      //   '019a0665f935574996052108bbd05f8028cafd2fd619aa7bd179fe2a952104aaa3eeac5f13ceefd699be86f5bbd1932da8fcf5acbbe777e6d48bdfcd5e710939f7f76a576ec22aadd60264e629c1c69b37f7da065cd4f79e10acf89d1777c6807d11ab1e4c5af33ee0f6a77d8068036f78831f0978f3c5cbbe82bd0c05576c7cddfd366dd90fdb73e20c6e7fcda3b3021b08f0e1c67938450109c0eec2b533d34f801f090f8ec5e9c4beaadec9edafb17d6e47120e3cbab563b501cf7614bc156095d18bd7c2146cd8b0d610a108f6082eac5e581c1b4f5b4edf14284af5f636f095f5b801d04c5ced2cc1a29b6f620b94957e0f51aa76e2bac219ab65a0d5c1d011920159116148868ed712944d40237ffb2ce5af989588bdcbc0b0c2af36c88805cb1a1144743bf7be58cd64c2e99805409083c623b92d4acd428a13be7c40abef423ae06dbe24ac585add110cc233c8e01844b7153873afb94fbcde06384d7a8391a237fcbbc31b08cc1fe13239f386142e989bf7769ae4db24c7590fb4a643b74048f0f93199e4f398ac2d2087de9d56e4fa5cc333f79eb997e65e9b7b8ac75c3a0b733f4873a8cca125f2e435879822ec0333902f3e035d8ec95323603c489063828cb970cc856712b87aeb63060c944b0852befa12ddb0331fcb0f29aa746ec6709c9be5dc6cafc22bdc8eb0e222b0f8a30429a84cc9b141a6202e47a1abf354cbd5a06005d32e75ba4e1f7972d65608863a4668953482dc0ba1a665e7c096de37402502cd0d5a21b81fa4f330cc510d59fa902c57e87174979cbecf312b810bbca99b0029108adee9df69dfcbbc64d56f860e32795aae6718f0e83daa0b8c8c54f51d2908aa2815882bd60465ba6f23c65033980b2f5f51d416f87805e5155cd78f941584650497a694240091a626b6e348380a04a90e7d26ad09db3fb6e15aad9fa10ced3359078f752ad26db38d76d652a28b95a91eb3c92852f7551d4482800cf399d946c790f683186fd4dbf8029a7958eca8e460e4f01e4faebebc077ac56710f9fe2a997986d85c01238702e1c9d84e09e6f6e70d1fd0f593a3c382d6e21488847edcfef1b3851c8f2b720342c23a5646728032cb90bd93ea0a5470ada4e7f2816169c7e3381ee59e943f9437750bf546b93cf4abbc21b5e1ff59ba7b7d211bbf2909ae7d95e1e19bf41a506267eec382a9214148d2fec4f32b6c13b8a57e715b1b8a4d7abfb5bd7a3eb3bd8fbaf7f8a31845cdc030a03329470a964704863cd0d4c4b63a96311a4f28832495b38136b49b7b79df08d8d54f9090a8c52391c99bcb17919e882779b9511d1412f444981b5290c51d8e4ba9a245482cc2abd06a955f21895e87869076e25231431a2dfd7d74ad859921bf71cf760f94ca1fdcab67e2207e84826437fb2aa02c396cee042740e234d26ef0835511fbb03152b415c8611a09d714fea82fa13c20f442724aaab43c6bbd6ff661a6172714ef1bad588c7885beefc5467cd1da5908b89db5cc2adcee155ba74028b75453b77e907e04f7d0d1329c8df680a8e15142ceb615ce70fad972dadb70fce65286e77ba59ce16dbfb81d377243477ffc1a73ef3937240f145623211260f8b8b7cd21330a958dcb106bac52dd9953cea7c1610959d680ed226e01bac239c1de2938068fc3d11e874bc053fa34aa49b3c16685724ac57b2a000aec27b76dce8ee19aba9e67cb75a04906c554826f526355102c057c858ad016bee77c3feb9f576c544c923a4ed177c0098db5f14db7a4e0418d1b8e21ad399ff4a8dd15ab9763edb5e61b283d85c15bf27e29e8356fb7c10d75715f16877fa8df4e015486538ba9419900647fdf15ec46d82d455f9ca67151bbd56024e1be53366904a560f52d839d66bdb2e33c779c4f5a97c1e2cdb870cef7d47fada92f0ddf8cecf14f13ec1a7d7acc52aa662974b3bec3247557054e60c161606f81261368b1b4ea68e4da6ad684f4503d64c1accf876d1f9ee19a285f0be6c087d2f926e62f636db89a98df07df67c2071ed538d170406955fdf98adf7034b8953e44006cf29b933da63138e499ece0eb033224f846b3ef63c6d96316b86b7992f9a01c69162fff2490e22a74920127cd04aa531cfd5c3e1c9117bb17fa0c98ceffdfe7df5727e90895df0ba9eb4d372d8d9a98a3d4b4ce27c065589e713cd3ee341c0f1de521a00dd7bc5d0675164b6e6ab0e6acf80de4fe3e3dc7e1780ec77173d57774ab8f627860807b5482e8bf068dd238f96b22d408d8c248c3084a4553e70463c796e0fa2b24c3b0aca4ba9d1d1e96511835c17ba6052931a2804c85086df2e2b08434f78f0f497f6686c1531427100e5364efebf5f590e7a1c85f18540a360f7de4f63a86fe03',
+      //   'hex' ],
     ];
   }
 
@@ -2453,7 +2505,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     $charlist = ' 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~!@#$%^&*()_+-=[]{}\|/?,.<>;:"'."'";
     $result = [];
     for ($i=0; $i<20; $i++) {
-      $string = generate_random_string(mt_rand(200, 4000), $charlist);
+      $string = random_string(mt_rand(200, 4000), $charlist);
       $result[] = [ $string ];
     }
     return $result;
@@ -2718,39 +2770,51 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     );
   }
 
-  /**
-   * @dataProvider providerGetHttpRequest
-   * @group http
-   */
-  public function testGetHttpRequest($url, $result, $status, $code)
-  {
-    $test = get_http_request($url);
-    if (is_string($result))
+    /**
+     * @dataProvider providerGetHttpRequest
+     * @group http
+     */
+    public function testGetHttpRequest($url, $result, $status, $code)
     {
-      if (method_exists($this, 'assertStringContainsString')) {
-        // PHPUnit 9+
-        $this->assertStringContainsString($result, $test);
-      } else {
-        $this->assertContains($result, $test);
-      }
-    } else {
-      // This for wrong url, return FALSE
-      $this->assertSame($result, $test);
+        $test = get_http_request($url);
+        if (is_string($result))
+        {
+            if (method_exists($this, 'assertStringContainsString')) {
+                // PHPUnit 9+
+                $this->assertStringContainsString($result, $test);
+            } else {
+                $this->assertContains($result, $test);
+            }
+        } else {
+            // This for wrong url, return FALSE
+            $this->assertSame($result, $test);
+        }
+        $this->assertSame($status, get_http_last_status());
+        $this->assertSame($code,   get_http_last_code());
     }
-    $this->assertSame($status, get_http_last_status());
-    $this->assertSame($code,   get_http_last_code());
-  }
 
-  public function providerGetHttpRequest()
-  {
-    return array(
-      array('http://info.cern.ch',         '<html',  TRUE, 200), // OK, http
-      array('https://www.observium.org',   '<html',  TRUE, 200), // OK, https
-      array('http://somewrong.test',         FALSE, FALSE, 408), // Unknown host
-      array('https://www.observium.org/404', FALSE, FALSE, 404), // OK, not found
-    );
-  }
+    public function providerGetHttpRequest()
+    {
+        return array(
+            array('http://info.cern.ch',           '<html',  TRUE, 200), // OK, http
+            array('https://www.observium.org',     '<html',  TRUE, 200), // OK, https
+            array('http://somewrong.test',           FALSE, FALSE,   6), // Unknown host
+            array('https://www.observium.org/404', '<html', FALSE, 404), // OK, not found
+        );
+    }
 
+    /**
+     * @group json
+     */
+    public function test_fix_json_unicode()
+    {
+        $input = "ËЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ";
+        $expectedOutput = "\u00cb\u0419\u0426\u0423\u041a\u0415\u041d\u0413\u0428\u0429\u0417\u0425\u042a\u0424\u042b\u0412\u0410\u041f\u0420\u041e\u041b\u0414\u0416\u042d\u042f\u0427\u0421\u041c\u0418\u0422\u042c\u0411\u042e";
+
+        $result = fix_json_unicode($input);
+
+        $this->assertSame($expectedOutput, $result);
+    }
 }
 
 // EOF

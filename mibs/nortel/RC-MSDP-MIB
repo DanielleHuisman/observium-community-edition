@@ -1,0 +1,728 @@
+RC-MSDP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, TimeTicks, 
+    NOTIFICATION-TYPE, Unsigned32, Counter32, Integer32, IpAddress
+        FROM SNMPv2-SMI    
+    TruthValue   
+        FROM SNMPv2-TC
+    rcMsdp
+        FROM RAPID-CITY      
+    VrfIdentifier
+        FROM RC-VRF-MIB
+    SnmpAdminString     
+        FROM SNMP-FRAMEWORK-MIB
+    InetAutonomousSystemNumber
+        FROM INET-ADDRESS-MIB
+    msdpPeerFsmEstablishedTransitions, msdpPeerState, msdpPeerEntry
+        FROM MSDP-MIB;
+
+rcMsdpMib MODULE-IDENTITY
+   LAST-UPDATED "201609130000Z"
+   ORGANIZATION "Nortel"
+   CONTACT-INFO
+          " Alka Malik
+        Postal:        Nortel Networks, Inc.
+                       600 Technology Park Drive
+                       Billerica, MA 02478
+
+        Tel:           978-288-7051
+        Fax:           978-288-0620
+        E-mail:        alka@nortel.com"
+
+   DESCRIPTION    "This MIB is used for extending the rfc4624.mib."
+       
+   REVISION "201609130000Z" -- 13 Sep. 2016
+   DESCRIPTION    "Version 13:   Added rcMsdpPeer4ByteAsNumber in 
+       				 rcMsdpPeerTable.
+				 Requested by Ada Moldovan (submit 30509) (prempa)"
+       
+   REVISION "201608310000Z" -- 31 Aug. 2016
+   DESCRIPTION    "Version 12:   Added isis(5) and none(6) values for 
+       				 rcMsdpSACacheRecordsRouteType.
+				 Requested by Ada Moldovan (submit 30470) (prempa)"
+       
+   REVISION "201608240000Z" -- 24 Aug. 2016
+   DESCRIPTION    "Version 11:   Added rcMsdpPeerClearPeer"
+       
+   REVISION "201607270000Z" -- 27 July 2016
+   DESCRIPTION    "Version 10: Corrected/change the rcMsdpPeerTable objects which is read-create
+                               to read-write"
+       
+   REVISION "201607220000Z" -- 22 July 2016
+   DESCRIPTION    "Version 9: added rcMsdpSACacheRecordsRouteType"
+       
+   REVISION "201607180000Z" -- 18 July 2016
+   DESCRIPTION    "Version 8: Modified rcMsdpPeerMd5AuthPassword (SIZE(0..80)) 
+                  to (SIZE(0..161))" 
+    
+   REVISION "201607050000Z" -- 05 July 2016
+   DESCRIPTION    "Version 7: Added rcMsdpStatsClear" 
+   
+   REVISION "201606290000Z" -- 29 June 2016
+   DESCRIPTION    "Version 6: Added rcMsdpSACacheClear"
+       
+   REVISION "201606280000Z" -- 28 June 2016
+   DESCRIPTION    "Version 5:  Added option 'none(5)' to object rcMsdpSACacheRecordsRouteType"
+       
+   REVISION "201605310000Z" -- 31 May 2016
+   DESCRIPTION    "Version 4: rcMsdpSACacheRecordsTable has been introduced
+                              to deprecate rcMsdpSACacheTable"
+       
+   REVISION "201605180000Z" -- 18 May 2016
+   DESCRIPTION    "Version 3: - Added rcMsdpSACacheRecordsTable
+       				Requested by Oana Cristea (prempa)"
+
+   REVISION "200903100000Z" -- 10 Mar 2009
+   DESCRIPTION    "Version 2: - Added rcMsdpSACacheStatsClear
+                              - Modified rcMsdpSACacheTable
+                              - Modified SYNTAX and DESCRIPTION of rcMsdpPeerAsNumber"
+
+   REVISION "200803100000Z" 
+   DESCRIPTION    "Version 1: Initial version."
+   ::= { rcMsdp 1 } 
+--
+-- MSDP Node definitions
+--
+rcMsdpNotifications       OBJECT IDENTIFIER ::= {rcMsdpMib 0}
+rcMsdpObjects             OBJECT IDENTIFIER ::= {rcMsdpMib 1}
+rcMsdpNotificationObjects OBJECT IDENTIFIER ::= {rcMsdpMib 2}
+
+--
+-- Scalar objects
+--
+
+rcMsdpScalars             OBJECT IDENTIFIER ::= {rcMsdpObjects 1}
+   
+rcMsdpRouteMapName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..64))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "Route map name. 
+           Transmit only the SA messages that meet the 
+           match criteria in the route map name with a permit keyword.
+           It is used as the policy of the redistribute filter. 
+           It can not be set when redistribute filter is disabled."
+    ::= { rcMsdpScalars 1 }
+    
+rcMsdpRedistributeFilterEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "To enable or disable the redistribute filter.
+                    This filter is used to filter the 
+                    (S,G,RP) entries provided by PIM to MSDP."
+    DEFVAL     { false }    
+    ::= { rcMsdpScalars 2 }
+    
+rcMsdpRedistributeFilterApply OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "Each time when making changes to the redistribute filter, it 
+                    will not take effect until it is applied."
+    DEFVAL     { false }                    
+    ::= { rcMsdpScalars 3 }   
+
+rcMsdpImplicitDefaultPeerEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "To enable or disable the implicit default peer of MSDP.
+                    If enabled,it will accept SA messages even if the Peer 
+                    RPF(Reverse Path Forwarding) rules fails, condition is 
+                    that there should be only one peer configured."
+    DEFVAL     { false }                    
+    ::= { rcMsdpScalars 4 }  
+
+rcMsdpSACacheStatsClear OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     obsolete
+    DESCRIPTION    "Clear foreign SA-Cache entries. It has been
+	            obsolete by rcMsdpSACacheClear "
+    DEFVAL     {false}
+    ::= { rcMsdpScalars 5 }
+
+rcMsdpSACacheClear OBJECT-TYPE
+    SYNTAX   	TruthValue
+    MAX-ACCESS	read-write
+    STATUS	current
+    DESCRIPTION "Clear foreign SA-Cache entries. This object
+	         obsolete the rcMsdpSACacheStatsClear"
+    DEFVAL	{false}
+    ::= { rcMsdpScalars 6 }
+   
+rcMsdpStatsClear OBJECT-TYPE
+        SYNTAX           TruthValue
+        MAX-ACCESS       read-write
+        STATUS           current
+        DESCRIPTION      "Clear msdp statistics."
+        DEFVAL           {false}
+    ::= { rcMsdpScalars 7 }
+ 
+--
+-- The MSDP Peer table
+--
+
+rcMsdpPeerTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF RcMsdpPeerEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION    "A table that augments the management information in the 
+                    standard IETF msdpPeerTable."
+    ::= { rcMsdpObjects 2 }
+
+rcMsdpPeerEntry OBJECT-TYPE
+    SYNTAX     RcMsdpPeerEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION    "A set of additional management information augmenting that of 
+                    the standard IETF msdpPeerEntry."
+	AUGMENTS      { msdpPeerEntry }
+    ::= { rcMsdpPeerTable 1 }            
+
+RcMsdpPeerEntry ::= SEQUENCE {
+	rcMsdpPeerAsNumber			Integer32,
+	rcMsdpPeerTooShortMessages		Counter32,
+	rcMsdpPeerInBadMessages			Counter32,
+	rcMsdpPeerInKeepAliveMessages		Counter32,
+	rcMsdpPeerOutKeepAliveMessages		Counter32,
+	rcMsdpPeerInSAFilterEnabled             TruthValue,	
+	rcMsdpPeerInSAFilterRouteMapName	SnmpAdminString,
+	rcMsdpPeerOutSAFilterEnabled            TruthValue,
+	rcMsdpPeerOutSAFilterRouteMapName	SnmpAdminString,
+	rcMsdpPeerDescription			SnmpAdminString,
+	rcMsdpPeerSALimit			Unsigned32,
+	rcMsdpPeerMd5AuthEnabled		TruthValue,
+	rcMsdpPeerMd5AuthPassword		SnmpAdminString,
+	rcMsdpPeerSAsLearnedFromThisPeer	Counter32,
+	rcMsdpPeerSAsAdvertisedToThisPeer 	Counter32,
+	rcMsdpPeerUpOrDownTime			TimeTicks,
+	rcMsdpPeerConnAndStatsClearedTime	TimeTicks,
+	rcMsdpPeerRouteMapName			SnmpAdminString,
+	rcMsdpPeerAdminEnabled 			TruthValue,
+	rcMsdpPeerOperEnabled			TruthValue,
+	rcMsdpPeerDefaultPeerState		INTEGER,
+	rcMsdpPeerDefaultPeer			TruthValue,
+	rcMsdpPeerClearPeer                     TruthValue,
+	rcMsdpPeer4ByteAsNumber                 InetAutonomousSystemNumber
+	}
+
+rcMsdpPeerAsNumber OBJECT-TYPE
+    SYNTAX      Integer32 (-1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION    "The AS number of the remote Peer.
+                    Value -1 indicates that AS number is not configured."
+    ::= { rcMsdpPeerEntry 1 }
+    
+ rcMsdpPeerTooShortMessages OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION   "The number of Short messages received from this peer."
+    ::= { rcMsdpPeerEntry 2 }
+    
+ rcMsdpPeerInBadMessages OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION   "The number of Bad MSDP messages received from this peer."
+    ::= { rcMsdpPeerEntry 3 }    
+ 
+  rcMsdpPeerInKeepAliveMessages OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION   "The number of keep alive messages received from this peer."
+    ::= { rcMsdpPeerEntry 4 } 
+ 
+rcMsdpPeerOutKeepAliveMessages OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION   "The number of keep alive messages transmitted to this peer."
+    ::= { rcMsdpPeerEntry 5 } 
+
+rcMsdpPeerInSAFilterEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION   "To enable or disable the in SA filter of a peer."
+    DEFVAL     { false }    
+    ::= { rcMsdpPeerEntry 6 } 
+  
+rcMsdpPeerInSAFilterRouteMapName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..64))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "The route Map name of IN SA Filter. 
+           If route map name is configured, 
+           it Accepts only the SA messages that meet the match criteria in the route 
+           map map-name with a permit keyword. 
+           If access route map name is not configured, 
+           all inbound SA messages from this peer will be blocked."
+    ::= { rcMsdpPeerEntry 7 }    
+
+rcMsdpPeerOutSAFilterEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION   "To enable or disable the out SA filter of a peer."
+    DEFVAL     { false }    
+    ::= { rcMsdpPeerEntry 8 } 
+    
+rcMsdpPeerOutSAFilterRouteMapName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..64))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "The route Map name of OUT SA Filter. 
+           If route map name is configured,
+           it sends only the SA messages that meet the match criteria 
+           in the route map map-name with a permit keyword. 
+           If access route map name is not configured, 
+           all outbound SA messages sent to this peer will be blocked"
+    ::= { rcMsdpPeerEntry 9 }   
+    
+rcMsdpPeerDescription OBJECT-TYPE
+    SYNTAX     SnmpAdminString
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "Peer specific description. It is used to make the peer 
+                    easier to be identified."
+    ::= { rcMsdpPeerEntry 10 }
+    
+rcMsdpPeerSALimit OBJECT-TYPE
+    SYNTAX     Unsigned32(0..6144)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "The SA Cache limit for this peer."
+    ::= { rcMsdpPeerEntry 11 }
+
+rcMsdpPeerMd5AuthEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "The MD5 Authentication status of this peer."
+    DEFVAL     { false }    
+    ::= { rcMsdpPeerEntry 12 }
+    
+rcMsdpPeerMd5AuthPassword OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..161))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "The MD5 Authentication password of this peer."
+    ::= { rcMsdpPeerEntry 13 }
+    
+rcMsdpPeerSAsLearnedFromThisPeer  OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The total number of SAs learned from this peer."
+    ::= { rcMsdpPeerEntry 14 }
+    
+rcMsdpPeerSAsAdvertisedToThisPeer  OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The total number of SAs advertised to this peer."
+    ::= { rcMsdpPeerEntry 15 }
+
+rcMsdpPeerUpOrDownTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "MSDP Peer Up or Down duration."
+    ::= { rcMsdpPeerEntry 16 }
+
+rcMsdpPeerConnAndStatsClearedTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The duration of connection and statistics cleared ago."
+    ::= { rcMsdpPeerEntry 17 }
+
+rcMsdpPeerRouteMapName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..64))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "Route map name for default peer."
+    ::= { rcMsdpPeerEntry 18 }
+ 
+rcMsdpPeerAdminEnabled OBJECT-TYPE
+    SYNTAX    TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "The admin status of this peer."
+    DEFVAL     { false }    
+    ::= { rcMsdpPeerEntry 19 } 
+    
+rcMsdpPeerOperEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The operational status of this peer."
+    ::= { rcMsdpPeerEntry 20 }         
+     
+rcMsdpPeerDefaultPeerState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                             configured(1), 
+                             operational(2) 
+                             }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The default peer has two state: Configured and Operational. 
+          MSDP node only accept SA messages from the Operational default peer.
+          These is only one default peer can become Operational, all the Configured
+          default peers are for redundancy."
+    ::= { rcMsdpPeerEntry 21 }
+     
+rcMsdpPeerDefaultPeer OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION    "It is used to indicate whether a peer is a default peer or not."
+    DEFVAL     { false }    
+    ::= { rcMsdpPeerEntry 22 }
+
+rcMsdpPeerClearPeer OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "It is used to determine whether the TCP connection for the specified peer
+	         will be cleared or not. It is an operational object. The returned value will
+		 be always false for query"
+    DEFVAL      { false }
+    ::= { rcMsdpPeerEntry 23 }    
+
+rcMsdpPeer4ByteAsNumber OBJECT-TYPE
+    SYNTAX      InetAutonomousSystemNumber
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION   "The AS number of the remote Peer.
+                   The value of the default AS number is 0.
+                   This object replaces rcMsdpPeerAsNumber."
+    ::= { rcMsdpPeerEntry 24 }
+--
+-- The MSDP Source-Active Cache table
+--
+
+rcMsdpSACacheTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF RcMsdpSACacheEntry
+    MAX-ACCESS not-accessible
+    STATUS      deprecated
+    DESCRIPTION    "SA (Source Active) - Cache Table. This table contains
+                    foreign as well as local SA Cache entries.  Foreign SA Cache
+                    entries from this table will have corresponding entries in 
+                    the standard table msdpSACacheTable.
+                    VOSS: this table is deprecated and a new table 
+		    rcMsdpSACacheRecordsTable has been definied with 
+		    a new Index definition to fix mib walk error because
+		    of OID not in an increasing order"
+    ::= { rcMsdpObjects 3 }
+    
+rcMsdpSACacheEntry OBJECT-TYPE
+    SYNTAX     RcMsdpSACacheEntry
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION    "SA Cache Entry."
+    INDEX      { rcMsdpSACacheGroupAddr, 
+                 rcMsdpSACacheSourceAddr,
+                 rcMsdpSACacheOriginRP, 
+                 rcMsdpSACacheTypeInformation
+    }
+    ::= { rcMsdpSACacheTable 1 }           
+
+RcMsdpSACacheEntry ::= SEQUENCE { 
+     rcMsdpSACacheGroupAddr           IpAddress,
+     rcMsdpSACacheSourceAddr          IpAddress,
+     rcMsdpSACacheOriginRP            IpAddress,
+     rcMsdpSACacheTypeInformation     INTEGER,
+     rcMsdpSACacheOriginatorAsNumber  Unsigned32,
+     rcMsdpSACacheRouteType           INTEGER
+}
+
+rcMsdpSACacheGroupAddr OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+           "The group address of the SA Cache entry."
+    ::= { rcMsdpSACacheEntry 1 }
+
+rcMsdpSACacheSourceAddr OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+           "The source address of the SA Cache entry."
+    ::= { rcMsdpSACacheEntry 2 }
+
+rcMsdpSACacheOriginRP OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+           "The RP of the SA Cache entry.  This field is in the INDEX
+            in order to catch multiple RP's advertising the same
+            source and group."
+    ::= { rcMsdpSACacheEntry 3 }
+
+rcMsdpSACacheTypeInformation OBJECT-TYPE
+    SYNTAX     INTEGER {
+                         local(1),
+                         foreign(2)
+                       }
+    MAX-ACCESS not-accessible
+    STATUS     deprecated
+    DESCRIPTION
+           "This object describes the SA cache type.
+            It can be either local cache or foreign cache."
+    ::= { rcMsdpSACacheEntry 4 }
+
+rcMsdpSACacheOriginatorAsNumber  OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    MAX-ACCESS read-only
+    STATUS     deprecated
+    DESCRIPTION    "The AS number of the originator."
+    ::= { rcMsdpSACacheEntry 5 }
+
+rcMsdpSACacheRouteType  OBJECT-TYPE
+    SYNTAX     INTEGER {
+                 rip(1),
+	         ospf(2),
+                 static(3),
+                 bgp(4),
+		 none(5)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The owner of the route that is used for rpf checking."
+    ::= { rcMsdpSACacheEntry 6 }
+
+--
+-- The MSDP Source-Active Cache Records table
+--
+
+rcMsdpSACacheRecordsTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF RcMsdpSACacheRecordsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION    "SA (Source Active) - Cache Records Table. This table contains
+                    foreign as well as local SA Cache entries.  Foreign SA Cache
+                    entries from this table will have corresponding entries in
+                    the standard table msdpSACacheTable.
+		    This table deprecates rcMsdpSACacheTable."
+    ::= { rcMsdpObjects 4 }
+
+rcMsdpSACacheRecordsEntry OBJECT-TYPE
+    SYNTAX     RcMsdpSACacheRecordsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION    "SA Cache Entry."
+
+    INDEX      { rcMsdpSACacheRecordsTypeInformation, rcMsdpSACacheRecordsGroupAddr,
+                 rcMsdpSACacheRecordsSourceAddr, rcMsdpSACacheRecordsOriginRP }
+
+    ::= { rcMsdpSACacheRecordsTable 1 }
+
+RcMsdpSACacheRecordsEntry ::= SEQUENCE {
+     rcMsdpSACacheRecordsTypeInformation     INTEGER,
+     rcMsdpSACacheRecordsGroupAddr           IpAddress,
+     rcMsdpSACacheRecordsSourceAddr          IpAddress,
+     rcMsdpSACacheRecordsOriginRP            IpAddress,
+     rcMsdpSACacheRecordsOriginatorAsNumber  Unsigned32,
+     rcMsdpSACacheRecordsRouteType           INTEGER,
+     rcMsdpSACacheRecordsOriginatorAsNum     Integer32
+}
+
+rcMsdpSACacheRecordsTypeInformation OBJECT-TYPE
+    SYNTAX     INTEGER {
+                         local(1),
+                         foreign(2)
+               }
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This object describes the SA cache type.
+            It can be either local cache or foreign cache."
+    ::= { rcMsdpSACacheRecordsEntry 1 }
+
+
+rcMsdpSACacheRecordsGroupAddr OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The group address of the SA Cache entry."
+    ::= { rcMsdpSACacheRecordsEntry 2 }
+
+rcMsdpSACacheRecordsSourceAddr OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The source address of the SA Cache entry."
+    ::= { rcMsdpSACacheRecordsEntry 3 }
+	
+rcMsdpSACacheRecordsOriginRP OBJECT-TYPE
+    SYNTAX     IpAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The RP of the SA Cache entry.  This field is in the INDEX
+            in order to catch multiple RP's advertising the same
+            source and group."
+    ::= { rcMsdpSACacheRecordsEntry 4 }
+
+rcMsdpSACacheRecordsOriginatorAsNumber  OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    MAX-ACCESS read-only
+    STATUS     obsolete
+    DESCRIPTION    "The AS number of the originator."
+    ::= { rcMsdpSACacheRecordsEntry 5 }
+
+rcMsdpSACacheRecordsRouteType  OBJECT-TYPE
+    SYNTAX     INTEGER {
+                 rip(1),
+                 ospf(2),
+                 static(3),
+                 bgp(4),
+		 isis(5),
+		 none(6)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION    "The owner of the route that is used for rpf checking."
+    ::= { rcMsdpSACacheRecordsEntry 6 }
+   
+rcMsdpSACacheRecordsOriginatorAsNum  OBJECT-TYPE
+
+    SYNTAX                   Integer32 (-1..65535)
+
+    MAX-ACCESS          read-only
+
+    STATUS                    current
+
+    DESCRIPTION          "The AS number of the originator. Value -1 indicates
+	                  that AS number is not configured. This object is used
+			  to obsolete rcMsdpSACacheRecordsOriginatorAsNumber"
+    ::= { rcMsdpSACacheRecordsEntry 7 }
+
+-- 
+-- Notifications 
+-- 
+
+rcnMsdpMaxSACacheWarnSet    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId,
+                 rcMsdpSACacheType                            
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries in the cache database 
+   		exceeds 85 % of maximum value (6K) in local cache or in foreign cache."
+   	::= {rcMsdpNotifications 1}
+
+rcnMsdpMaxSACacheWarnClear    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId,
+                 rcMsdpSACacheType
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the Sa entries in the cache database 
+   		drops to 80 % of the maximum value (6K)."
+   	::= {rcMsdpNotifications 2}
+
+rcnMsdpMaxSACacheErrorSet    NOTIFICATION-TYPE
+   OBJECTS     {  rcMsdpVrfId,
+                  rcMsdpSACacheType                            
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries in the cache database
+   		 hits 100 % of the maximum value (6K)."
+   	::= {rcMsdpNotifications 3}
+
+rcnMsdpMaxSACacheErrorClear    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId,
+                 rcMsdpSACacheType                            
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries in the cache database 
+   		drops to 95% of the maximum value."
+   	::= {rcMsdpNotifications 4}
+   	
+rcnMsdpMaxPeerSACacheWarnSet    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId,                 
+                 rcMsdpPeerSALimit                             
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries for this peer exceeds 
+   		85 % of maximum value configured for this peer."
+   	::= {rcMsdpNotifications 5}  
+   	 	
+rcnMsdpMaxPeerSACacheWarnClear    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId,                 
+                 rcMsdpPeerSALimit                             
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries for this peer drops to 
+   		80 % of the maximum value configured for this peer."
+   	::= {rcMsdpNotifications 6}  
+
+rcnMsdpMaxPeerSACacheErrorSet    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId, 
+                 rcMsdpPeerSALimit                             
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries for this peer hits 100 % 
+   		of the peer SA limit."
+   	::= {rcMsdpNotifications 7} 
+
+rcnMsdpMaxPeerSACacheErrorClear    NOTIFICATION-TYPE
+   OBJECTS     { rcMsdpVrfId, 
+                 rcMsdpPeerSALimit                             
+               }
+   STATUS      current
+   DESCRIPTION    "This event is generated when the SA entries for this peer drops to 95% 
+   		of the peer SA limit."
+   	::= {rcMsdpNotifications 8} 
+   	
+rcnMsdpEstablished NOTIFICATION-TYPE
+    OBJECTS { rcMsdpVrfId,
+              msdpPeerFsmEstablishedTransitions
+    				}
+    STATUS     current
+    DESCRIPTION    "The MSDP Established event is generated when the MSDP FSM
+            enters the ESTABLISHED state."
+    ::= { rcMsdpNotifications 9 }
+
+rcnMsdpBackwardTransition NOTIFICATION-TYPE
+    OBJECTS { rcMsdpVrfId,
+              msdpPeerState 
+             }
+    STATUS     current
+    DESCRIPTION    "The MSDPBackwardTransition Event is generated when the
+            MSDP FSM moves from a higher-numbered state to a
+            lower-numbered state."
+    ::= { rcMsdpNotifications 10 }   	
+
+-- 
+-- Notification Objects 
+--
+   	   	
+rcMsdpSACacheType OBJECT-TYPE
+   SYNTAX      INTEGER { local(1),
+                         foreign(2)
+                        }
+   MAX-ACCESS  accessible-for-notify
+   STATUS      current
+   DESCRIPTION    "This object describes the SA cache type."
+   ::= { rcMsdpNotificationObjects 1 }      	
+   
+rcMsdpVrfId OBJECT-TYPE
+   SYNTAX     VrfIdentifier
+   MAX-ACCESS  accessible-for-notify
+   STATUS      current
+   DESCRIPTION    "VRF ID for the MSDP."
+   ::= { rcMsdpNotificationObjects 2 } 
+   
+END

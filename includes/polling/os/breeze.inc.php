@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -16,7 +16,7 @@
 // ALVARION-DOT11-WLAN-TST-MIB::brzLighteOemProjectNameString.0 = STRING: "BreezeACCESS VL"
 
 if ($unit_type = snmp_get_oid($device, 'brzaccVLUnitType.0', 'ALVARION-DOT11-WLAN-MIB')) {
-  $features = rewrite_breeze_type($unit_type);
+    $features = rewrite_breeze_type($unit_type);
 }
 
 unset($unit_type);

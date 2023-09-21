@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -44,45 +44,40 @@ $innerregex = '~
                 oos:(?P<oos>\S+)\R
                ~xm';
 
-$outerkeys = array("version", "api", "proto", "srcversion");
-$innerkeys = array("devno", "cs", "ro", "ds", "rep", "io", 'ns', 'nr', 'dw', 'dr', 'al', 'bm', 'lo', 'pe', 'ua', 'ap', 'ep', 'wo','oos');
+$outerkeys = ["version", "api", "proto", "srcversion"];
+$innerkeys = ["devno", "cs", "ro", "ds", "rep", "io", 'ns', 'nr', 'dw', 'dr', 'al', 'bm', 'lo', 'pe', 'ua', 'ap', 'ep', 'wo', 'oos'];
 
-$output = array();
-preg_match_all($outerregex, $agent_data['app']['drbd'].PHP_EOL, $matches, PREG_SET_ORDER);
+$output = [];
+preg_match_all($outerregex, $agent_data['app']['drbd'] . PHP_EOL, $matches, PREG_SET_ORDER);
 
-foreach ($matches as $match)
-{
-  foreach ($outerkeys as $key)
-  {
-    $arr[$key] = $match[$key];
-  }
-
-  preg_match_all($innerregex, $match["devices"], $innermatches, PREG_SET_ORDER);
-  $arr["devices"] = array();
-
-  foreach ($innermatches as $innermatch)
-  {
-    $tmp = array();
-    foreach ($innerkeys as $key)
-    {
-      $tmp[$key] = $innermatch[$key];
+foreach ($matches as $match) {
+    foreach ($outerkeys as $key) {
+        $arr[$key] = $match[$key];
     }
-    $arr["devices"][] = $tmp;
-  }
 
-  $output = $arr;
+    preg_match_all($innerregex, $match["devices"], $innermatches, PREG_SET_ORDER);
+    $arr["devices"] = [];
+
+    foreach ($innermatches as $innermatch) {
+        $tmp = [];
+        foreach ($innerkeys as $key) {
+            $tmp[$key] = $innermatch[$key];
+        }
+        $arr["devices"][] = $tmp;
+    }
+
+    $output = $arr;
 }
 
-foreach ($output['devices'] as $drbd_dev)
-{
-  $app_instance = "drbd".$drbd_dev['devno'];
-  $app_id = discover_app($device, 'drbd', $app_instance);
+foreach ($output['devices'] as $drbd_dev) {
+    $app_instance = "drbd" . $drbd_dev['devno'];
+    $app_id       = discover_app($device, 'drbd', $app_instance);
 
-  update_application($app_id, $drbd_dev);
+    update_application($app_id, $drbd_dev);
 
-  rrdtool_update_ng($device, 'drbd', $drbd_dev, $app_instance);
+    rrdtool_update_ng($device, 'drbd', $drbd_dev, $app_instance);
 
-  unset($drbd_dev);
+    unset($drbd_dev);
 }
 
 // EOF

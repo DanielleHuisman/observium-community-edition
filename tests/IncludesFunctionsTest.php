@@ -1,16 +1,23 @@
 <?php
 
-//define('OBS_DEBUG', 1);
+//define('OBS_DEBUG', 2);
 
 $base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
 
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
 include(__DIR__ . '/../includes/definitions.inc.php');
 include(__DIR__ . '/../includes/functions.inc.php');
+if (is_file(__DIR__ . '/data/config.php')) {
+    include(__DIR__ . '/data/config.php'); // I.e. for API keys
+}
 
 /**
  * @backupGlobals disabled
@@ -236,25 +243,18 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
   {
       // $a = "18446742978492891134"; $b = "0"; $sum = gmp_add($a, $b); echo gmp_strval($sum) . "\n"; // Result: 18446742978492891134
       // $a = "18446742978492891134"; $b = "0"; $sum = $a + $b; printf("%.0f\n", $sum);               // Result: 18446742978492891136
-    if (OBS_MATH === 'php')
-    {
-      // Fallback (inaccurate math)
-      $array = array(
-        array( '18446742978492891134', '0',  '18446742978492891136'),
-        array('-18446742978492891134', '0', '-18446742978492891136'),
-        array( '18446742978492891134', '18446742978492891134', '36893485956985782272'),
-        array('-18446742978492891134', '18446742978492891134', '0'),
-
-      );
-    } else {
       // Accurate math
       $array = array(
         array( '18446742978492891134', '0',  '18446742978492891134'),
         array('-18446742978492891134', '0', '-18446742978492891134'),
         array( '18446742978492891134', '18446742978492891134', '36893485956985782268'),
         array('-18446742978492891134', '18446742978492891134', '0'),
+
+        // Floats
+        [ '1111111111111111111111111.6', 0, '1111111111111111111111112' ],
+        [ 0, '1111111111111111111111111.6', '1111111111111111111111112' ],
+        [ '18446742978492891134.3', '18446742978492891134.6', '36893485956985782269' ],
       );
-    }
     return $array;
   }
 
@@ -269,25 +269,20 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
 
   public function providerIntSub()
   {
-    if (OBS_MATH === 'php')
-    {
-      // Fallback (inaccurate math)
-      $array = array(
-        array( '18446742978492891134', '0',  '18446742978492891136'),
-        array('-18446742978492891134', '0', '-18446742978492891136'),
-        array( '18446742978492891134', '18446742978492891134', '0'),
-        array('-18446742978492891134', '18446742978492891134', '-36893485956985782272'),
-
-      );
-    } else {
       // Accurate math
       $array = array(
         array( '18446742978492891134', '0',  '18446742978492891134'),
         array('-18446742978492891134', '0', '-18446742978492891134'),
         array( '18446742978492891134', '18446742978492891134', '0'),
         array('-18446742978492891134', '18446742978492891134', '-36893485956985782268'),
+
+        // Floats
+        [ '1111111111111111111111111.6', 0, '1111111111111111111111112' ],
+        [ 0, '1111111111111111111111111.6', '-1111111111111111111111112' ],
+        [ '-18446742978492891134.3', '18446742978492891134.6', '-36893485956985782269' ],
+
       );
-    }
+
     return $array;
   }
 
@@ -297,7 +292,7 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
    */
   public function testIsHexString($string, $result)
   {
-    $this->assertSame($result, isHexString($string));
+    $this->assertSame($result, is_hex_string($string));
   }
 
   public function providerIsHexString()
@@ -329,6 +324,8 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       array('Input 1',        '496e7075742031'),
       array('J}4=',           '4a7d343d'),
       array('Simple String',  '53696d706c6520537472696e67'),
+      array('PC$rnu',  '504324726e75'),
+      array('Pärnu',   '50c3a4726e75'),
     );
     return $results;
   }
@@ -583,6 +580,44 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     $results[] = [ 'status',   'Checking (0%)',   NULL, $mib, [ 'value' => 2, 'name' => 'Checking (0%)', 'event' => 'warning', 'mib' => 'QSAN-SNMP-MIB' ] ];
     return $results;
   }
+
+  /**
+  * @dataProvider providerGetBitsStateArray
+  * @group states_bits
+  */
+  /* WiP
+  public function testGetBitsStateArray($hex, $mib, $object, $result)
+  {
+    $this->assertSame($result, get_bits_state_array($hex, $mib, $object));
+  }
+
+  public function providerGetBitsStateArray()
+  {
+    $results = array(
+      array('40 00', 'CISCO-STACK-MIB', 'portAdditionalOperStatus', [ 1 => 'connected' ]), // CISCO-STACK-MIB::portAdditionalOperStatus.1.1 = BITS: 40 00 connected(1)
+    );
+    return $results;
+  }
+  */
+
+  /**
+  * @dataProvider providerGetBitsStateArray2
+  * @group states_bits
+  */
+  /* WiP
+  public function testGetBitsStateArray2($hex, $def, $result)
+  {
+    $this->assertSame($result, get_bits_state_array($hex, NULL, NULL, $def));
+  }
+
+  public function providerGetBitsStateArray2()
+  {
+    $results = array(
+      array('40 00', [], [ 1 => 'connected' ]), // CISCO-STACK-MIB::portAdditionalOperStatus.1.1 = BITS: 40 00 connected(1)
+    );
+    return $results;
+  }
+  */
 
   /**
   * @dataProvider providerPriorityStringToNumeric
@@ -971,7 +1006,7 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
                    "10.11.30.0/23", "10.11.32.0/24", "10.11.33.0/24", "10.11.34.0/24", "10.11.41.0/24", "10.11.42.0/24",
                    "10.11.43.0/24", "10.11.51.0/24", "10.11.52.0/24", "10.11.53.0/24", "10.11.61.0/24", "10.11.62.0/24");
 
-    $results = array(
+    return array(
       // Only IPv4 nets
       array(TRUE,  '127.0.0.1',  $nets1),
       array(FALSE, '1.1.1.1',    $nets1),       // not in ranges
@@ -1006,11 +1041,50 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
       // Are you stupid? YES :)
       array(FALSE, '172.16.6.6', $nets6),
       array(FALSE, 'FE80:FFFF:0:FFFF:129:144:52:38', $nets6),
-      // Issue test
+      // Issues test
       array(FALSE, '10.52.25.254', $nets8),
+      array(TRUE,  '10.52.25.254',  [ '!217.66.159.18' ]),
+      array(FALSE, '217.66.159.18', [ '!217.66.159.18' ]),
+      array(TRUE,  '217.66.159.18', [ '217.66.159.18' ]),
     );
-    return $results;
   }
+
+  /**
+   * @dataProvider providerStringQuoted
+   * @group string
+   */
+  /* WIP
+  public function testStringQuoted($string, $result)
+  {
+    $this->assertSame($result, is_string_quoted($string));
+  }
+
+  public function providerStringQuoted()
+  {
+    return array(
+      array('\"sdfslfkm s\'fdsf" a;lm aamjn ',          FALSE),
+      array('sdfslfkm s\'fdsf" a;lm aamjn \"',          FALSE),
+      array('sdfslfkm s\'fdsf" a;lm aamjn ',            FALSE),
+      array('\"sdfslfkm s\'fdsf" a;lm aamjn \"',        TRUE),
+      array('"sdfslfkm s\'fdsf" a;lm aamjn "',          TRUE),
+      array('"\"sdfslfkm s\'fdsf" a;lm aamjn \""',      TRUE),
+      array('\'\"sdfslfkm s\'fdsf" a;lm aamjn \"\'',    TRUE),
+      array('  \'\"sdfslfkm s\'fdsf" a;lm aamjn \"\' ', TRUE),
+      array('"""sdfslfkm s\'fdsf" a;lm aamjn """',      TRUE),
+      array('"""sdfslfkm s\'fdsf" a;lm aamjn """"""""', TRUE),
+      array('"""""""sdfslfkm s\'fdsf" a;lm aamjn """',  TRUE),
+      // escaped quotes
+      array('\"Mike Stupalov\" <mike@observium.org>',   FALSE),
+      // utf-8
+      array('Avenue Léon, België ',                     FALSE),
+      array('\"Avenue Léon, België \"',                 TRUE),
+      array('"Винни пух и все-все-все "',               TRUE),
+      // multilined
+      array('  \'\"\"sdfslfkm s\'fdsf"
+            a;lm aamjn \"\"\' ',                        TRUE),
+    );
+  }
+  */
 
   /**
   * @dataProvider providerStringTransform
@@ -1237,7 +1311,7 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     $flags = OBS_DNS_ALL;
     if (!$try_a) { $flags ^= OBS_DNS_A; }
     $ping = is_pingable($hostname, $flags);
-    $ping = is_numeric($ping) && $ping > 0; // Function return random float number
+    $ping = is_numeric($ping) && $ping > 0; // Function returns random float number
     $this->assertSame($result, $ping);
   }
 
@@ -1341,6 +1415,194 @@ class IncludesFunctionsTest extends \PHPUnit\Framework\TestCase
     );
     return $results;
   }
+
+    /**
+     * @dataProvider providerGetGeolocation
+     * @group geo
+     */
+    public function testGetGeolocation($address, $result, $api = 'geocodefarm', $geo_db = [], $dns_only = FALSE)
+    {
+        if ($api === 'geocodefarm' || $api === 'openstreetmap' ||
+            !empty($GLOBALS['config']['geo_api'][$api]['key'])) {
+            $GLOBALS['config']['geocoding']['dns'] = $dns_only;
+            $GLOBALS['config']['geocoding']['api'] = $api;
+
+            $test = get_geolocation($address, $geo_db, $dns_only);
+            unset($test['location_updated'], $test['location_status']);
+            $this->assertSame($result, $test);
+        }
+    }
+
+    public function providerGetGeolocation()
+    {
+        $array = [];
+
+        // DNS LOC (reverse)
+        $location = 'qwerty';
+        $api = 'openstreetmap';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.7749289, 'location_lon' => -122.4194178,
+                    'location_city' => 'San Francisco', 'location_county' => 'Unknown', 'location_state' => 'California', 'location_country' => 'United States' ];
+        $array[] = [ $location, $result, $api, [ 'hostname' => 'loc-degree.observium.dev' ], TRUE ]; // reverse, dns only
+        $api = 'geocodefarm';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.7749289, 'location_lon' => -122.4194178,
+                    'location_city' => 'Mission District', 'location_county' => 'San Francisco', 'location_state' => 'CA', 'location_country' => 'United States' ];
+        $array[] = [ $location, $result, $api, [ 'hostname' => 'loc-degree.observium.dev' ], TRUE ]; // reverse, dns only
+        $api = 'yandex';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.7749289, 'location_lon' => -122.4194178,
+                    'location_country' => 'United States', 'location_state' => 'California', 'location_county' => 'San Francisco', 'location_city' => 'SoMa' ];
+        $array[] = [ $location, $result, $api, [ 'hostname' => 'loc-degree.observium.dev' ], TRUE ]; // reverse, dns only
+        $api = 'mapquest';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.7749289, 'location_lon' => -122.4194178,
+                    'location_city' => 'San Francisco', 'location_county' => 'San Francisco', 'location_state' => 'CA', 'location_country' => 'United States' ];
+        $array[] = [ $location, $result, $api, [ 'hostname' => 'loc-degree.observium.dev' ], TRUE ]; // reverse, dns only
+        $api = 'bing';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.7749289, 'location_lon' => -122.4194178,
+                    'location_city' => 'Mission District', 'location_county' => 'San Francisco', 'location_state' => 'California', 'location_country' => 'United States' ];
+        $array[] = [ $location, $result, $api, [ 'hostname' => 'loc-degree.observium.dev' ], TRUE ]; // reverse, dns only
+
+        // Location (reverse)
+        $location = 'Some location [47.616380;-122.341673]';
+        $api = 'openstreetmap';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 47.61638, 'location_lon' => -122.341673,
+                    'location_city' => 'Seattle', 'location_county' => 'King', 'location_state' => 'Washington', 'location_country' => 'United States' ];
+        $array[] = [ $location, $result, $api ];
+        $location = 'Some location|\'47.616380\'|\'-122.341673\'';
+        $api = 'openstreetmap';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 47.61638, 'location_lon' => -122.341673,
+                    'location_city' => 'Seattle', 'location_county' => 'King', 'location_state' => 'Washington', 'location_country' => 'United States' ];
+        $array[] = [ $location, $result, $api ];
+
+        // First request (forward)
+        $location = 'Badenerstrasse 569, Zurich, Switzerland';
+        $api = 'openstreetmap';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 47.3832766, 'location_lon' => 8.4955511,
+                    'location_city' => 'Zurich', 'location_county' => 'District Zurich', 'location_state' => 'Zurich', 'location_country' => 'Switzerland' ];
+        $array[] = [ $location, $result, $api ];
+        $location = 'Nikhef, Amsterdam, NL';
+        $api = 'yandex';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lon' => 4.892557, 'location_lat' => 52.373057,
+                    'location_country' => 'Netherlands', 'location_state' => 'North Holland', 'location_county' => 'North Holland', 'location_city' => 'Amsterdam' ];
+        $array[] = [ $location, $result, $api ];
+        $location = 'Korea_Seoul';
+        $api = 'mapquest';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.55886, 'location_lon' => 126.99989,
+                    'location_city' => 'Seoul', 'location_county' => 'South Korea', 'location_state' => 'Unknown', 'location_country' => 'South Korea' ];
+        $array[] = [ $location, $result, $api ];
+
+        // Second request (forward)
+        $location = 'ZRH2, Badenerstrasse 569, Zurich, Switzerland';
+        $api = 'openstreetmap';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 47.3832766, 'location_lon' => 8.4955511,
+                    'location_city' => 'Zurich', 'location_county' => 'District Zurich', 'location_state' => 'Zurich', 'location_country' => 'Switzerland' ];
+        $array[] = [ $location, $result, $api ];
+        $location = 'Rack: NK-76 - Nikhef, Amsterdam, NL';
+        $api = 'yandex';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lon' => 4.892557, 'location_lat' => 52.373057,
+                    'location_country' => 'Netherlands', 'location_state' => 'North Holland', 'location_county' => 'North Holland', 'location_city' => 'Amsterdam' ];
+        $array[] = [ $location, $result, $api ];
+        $location = 'Korea_Seoul';
+        $api = 'bing';
+        $result = [ 'location' => $location, 'location_geoapi' => $api,
+                    'location_lat' => 37.5682945, 'location_lon' => 126.9977875,
+                    'location_city' => 'Seoul', 'location_county' => 'Unknown', 'location_state' => 'Seoul', 'location_country' => 'South Korea' ];
+        $array[] = [ $location, $result, $api ];
+
+        return $array;
+    }
+
+    /**
+     * @group sql
+     */
+    public function testGenerateWhereClauseWithValidConditions()
+    {
+        $conditions = [
+            'column1 = "value1"',
+            '',
+            '  ',
+            'column2 > 10'
+        ];
+        $additional_conditions = [
+            'column3 < 50',
+            'column4 LIKE "%example%"'
+        ];
+
+        $expected = ' WHERE column1 = "value1" AND column2 > 10 AND column3 < 50 AND column4 LIKE "%example%"';
+        $result = generate_where_clause($conditions, $additional_conditions);
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
+     * @group sql
+     */
+    public function testGenerateWhereClauseWithOnlyEmptyConditions()
+    {
+        $conditions = [
+            '',
+            '  ',
+            "\t",
+            "\n"
+        ];
+
+        $result = generate_where_clause($conditions);
+        //$this->assertNull($result);
+        $this->assertEquals('', $result);
+    }
+
+    /**
+     * @group sql
+     */
+    public function testGenerateWhereClauseWithSingleCondition()
+    {
+        $conditions = [
+            'column1 = "value1"'
+        ];
+
+        $expected = ' WHERE column1 = "value1"';
+        $result = generate_where_clause($conditions);
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
+     * @group sql
+     */
+    public function testGenerateWhereClauseWithNoConditions()
+    {
+        $conditions = [];
+
+        $result = generate_where_clause($conditions);
+        //$this->assertNull($result);
+        $this->assertEquals('', $result);
+    }
+
+    /**
+     * @group sql
+     */
+    public function testGenerateWhereClauseWithOnlyAdditionalConditions()
+    {
+        $conditions = [];
+        $additional_conditions = [
+            'column1 = "value1"',
+            'column2 > 10'
+        ];
+
+        $expected = ' WHERE column1 = "value1" AND column2 > 10';
+        $result = generate_where_clause($conditions, $additional_conditions);
+        $this->assertEquals($expected, $result);
+    }
 }
+
+
 
 // EOF

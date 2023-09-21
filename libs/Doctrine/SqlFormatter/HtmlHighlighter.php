@@ -36,11 +36,11 @@ final class HtmlHighlighter implements Highlighter
             self::HIGHLIGHT_RESERVED => 'style="font-weight:bold;"',
             self::HIGHLIGHT_BOUNDARY => '',
             self::HIGHLIGHT_NUMBER => 'style="color: green;"',
-            self::HIGHLIGHT_WORD => 'style="color: #333;"',
+            self::HIGHLIGHT_WORD => 'class="grey"',
             self::HIGHLIGHT_ERROR => 'style="background-color: red;"',
             self::HIGHLIGHT_COMMENT => 'style="color: #aaa;"',
             self::HIGHLIGHT_VARIABLE => 'style="color: orange;"',
-            self::HIGHLIGHT_PRE => 'style="color: black; background-color: white;"',
+            self::HIGHLIGHT_PRE => 'style=""',
         ];
         $this->usePre         = $usePre;
     }

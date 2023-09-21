@@ -27,88 +27,88 @@
   </div>
 */
 
-if($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
+if ($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
 
-  $navbar['class'] = 'navbar-narrow';
-  $navbar['brand'] = 'Weathermaps';
+    $navbar['class'] = 'navbar-narrow';
+    $navbar['brand'] = 'Weathermaps';
 
-  // Allow use of wmap_id as well as mapname
-  if (isset($vars['wmap_id'])) {
-    $vars['mapname'] = dbFetchCell("SELECT `wmap_name` FROM `weathermaps` WHERE `wmap_id` = ?", array($vars['wmap_id']));
-  }
-  if (isset($vars['mapname']) && dbExist("weathermaps", "`wmap_name` = ?", array($vars['mapname']))) {
-    if ($_SESSION['userlevel'] > 7) {
-      $editing = TRUE;
+    // Allow use of wmap_id as well as mapname
+    if (isset($vars['wmap_id'])) {
+        $vars['mapname'] = dbFetchCell("SELECT `wmap_name` FROM `weathermaps` WHERE `wmap_id` = ?", [$vars['wmap_id']]);
     }
-  } else {
-    unset($vars['mapname']);
-  }
+    if (isset($vars['mapname']) && dbExist("weathermaps", "`wmap_name` = ?", [$vars['mapname']])) {
+        if ($_SESSION['userlevel'] > 7) {
+            $editing = TRUE;
+        }
+    } else {
+        unset($vars['mapname']);
+    }
 
-  //$editing = TRUE;
-
-  if ($editing === TRUE) {
-    $navbar['options']['add_node']['text'] = 'Add Node';
-    $navbar['options']['add_node']['id']   = 'tb_addnode';
-    $navbar['options']['add_link']['text'] = 'Add Link';
-    $navbar['options']['add_link']['id']   = 'tb_addlink';
-
-    /* Disabled for space reasons. Can move these by clicking the elements directly.
-    $navbar['options']['tb_poslegend']['text'] = 'Move Legend';
-    $navbar['options']['tb_poslegend']['id']   = 'tb_poslegend';
-    $navbar['options']['tb_postime']['text'] = 'Move Time';
-    $navbar['options']['tb_postime']['id']   = 'tb_postime';
-    */
-
-    $navbar['options']['tb_mapprops']['text'] = 'Map Properties';
-    $navbar['options']['tb_mapprops']['id']   = 'tb_mapprops';
-    $navbar['options']['tb_mapstyle']['text'] = 'Map Style';
-    $navbar['options']['tb_mapstyle']['id']   = 'tb_mapstyle';
-    $navbar['options']['tb_prefs']['text']    = 'Settings';
-    $navbar['options']['tb_prefs']['id']      = 'tb_prefs';
-
-    $navbar['options_right']['help']['id']        = 'tb_help';
-    $navbar['options_right']['help']['text']      = '';
-    $navbar['options_right']['tb_coords']['text'] = 'Return to List';
-    $navbar['options_right']['tb_coords']['icon'] = 'sprite-return';
-    $navbar['options_right']['tb_coords']['url']  = generate_url(array('page' => "wmap"));
-    $navbar['options_right']['tb_coords']['id']   = 'tb_coords';
-  } else if (isset($vars['mapname'])) {
-
-    //  $navbar['options_right']['edit']['text'] = 'Edit Map';
-    //  $navbar['options_right']['edit']['icon'] = 'sprite-cog';
-    //  $navbar['options_right']['edit']['url']  = generate_url(array('page' => "wmap", 'mapname' => $vars['mapname'], 'edit' => TRUE));
-
-  }
-
-  // Print out the navbar defined above
-  print_navbar($navbar);
-  unset($navbar);
-
-  if (isset($vars['mapname'])) {
+    //$editing = TRUE;
 
     if ($editing === TRUE) {
-      include($config['install_dir'] . "/includes/weathermap/editor.php");
-    } else {
-      echo '<div class="box box-solid">';
-      echo '<img src="/weathermap.php?mapname=' . htmlentities($vars['mapname']) . '&action=draw&unique=' . time() . '">';
-      echo '</div>';
+        $navbar['options']['add_node']['text'] = 'Add Node';
+        $navbar['options']['add_node']['id']   = 'tb_addnode';
+        $navbar['options']['add_link']['text'] = 'Add Link';
+        $navbar['options']['add_link']['id']   = 'tb_addlink';
+
+        /* Disabled for space reasons. Can move these by clicking the elements directly.
+        $navbar['options']['tb_poslegend']['text'] = 'Move Legend';
+        $navbar['options']['tb_poslegend']['id']   = 'tb_poslegend';
+        $navbar['options']['tb_postime']['text'] = 'Move Time';
+        $navbar['options']['tb_postime']['id']   = 'tb_postime';
+        */
+
+        $navbar['options']['tb_mapprops']['text'] = 'Map Properties';
+        $navbar['options']['tb_mapprops']['id']   = 'tb_mapprops';
+        $navbar['options']['tb_mapstyle']['text'] = 'Map Style';
+        $navbar['options']['tb_mapstyle']['id']   = 'tb_mapstyle';
+        $navbar['options']['tb_prefs']['text']    = 'Settings';
+        $navbar['options']['tb_prefs']['id']      = 'tb_prefs';
+
+        $navbar['options_right']['help']['id']        = 'tb_help';
+        $navbar['options_right']['help']['text']      = '';
+        $navbar['options_right']['tb_coords']['text'] = 'Return to List';
+        $navbar['options_right']['tb_coords']['icon'] = 'sprite-return';
+        $navbar['options_right']['tb_coords']['url']  = generate_url(['page' => "wmap"]);
+        $navbar['options_right']['tb_coords']['id']   = 'tb_coords';
+    } elseif (isset($vars['mapname'])) {
+
+        //  $navbar['options_right']['edit']['text'] = 'Edit Map';
+        //  $navbar['options_right']['edit']['icon'] = 'sprite-cog';
+        //  $navbar['options_right']['edit']['url']  = generate_url(array('page' => "wmap", 'mapname' => $vars['mapname'], 'edit' => TRUE));
+
     }
 
-  } else {
+    // Print out the navbar defined above
+    print_navbar($navbar);
+    unset($navbar);
 
-    echo '<div class="row">';
+    if (isset($vars['mapname'])) {
 
-    foreach (dbFetchRows("SELECT * FROM `weathermaps`") as $wmap) {
+        if ($editing === TRUE) {
+            include($config['install_dir'] . "/includes/weathermap/editor.php");
+        } else {
+            echo '<div class="box box-solid">';
+            echo '<img src="/weathermap.php?mapname=' . htmlentities($vars['mapname']) . '&action=draw&unique=' . time() . '">';
+            echo '</div>';
+        }
 
-      echo '
+    } else {
+
+        echo '<div class="row">';
+
+        foreach (dbFetchRows("SELECT * FROM `weathermaps`") as $wmap) {
+
+            echo '
     <div class="box box-solid" style="float: left; margin-left: 10px; margin-bottom: 10px;  width:612px; min-width: 612px; max-width:612px; min-height:500px; max-height:500px;">
       <div class="box-header with-border">
-        <a href="' . generate_url(array('page' => "wmap", 'mapname' => $wmap['wmap_name'])) . '"><h3 class="box-title">' . htmlentities($wmap['wmap_name']) . '</h3>
+        <a href="' . generate_url(['page' => "wmap", 'mapname' => $wmap['wmap_name']]) . '"><h3 class="box-title">' . htmlentities($wmap['wmap_name']) . '</h3>
         </a>
       </div>
       <div class="box-body">
        <div style="position:absolute; width:100%; height:100%">
-        <a href="' . generate_url(array('page' => "wmap", 'mapname' => $wmap['wmap_name'])) . '">
+        <a href="' . generate_url(['page' => "wmap", 'mapname' => $wmap['wmap_name']]) . '">
           <img src="/weathermap.php?mapname=' . htmlentities($wmap['wmap_name']) . '&action=draw&unique=' . time() . '&width=590&height=490">
         </a>
         </div>
@@ -116,17 +116,16 @@ if($_SESSION['userlevel'] > 5 && $config['weathermap']['enable']) {
     </div>
     ';
 
+        }
+
+        echo '</div>';
+
     }
-
-    echo '</div>';
-
-  }
 } else {
 
-  print_error("Not Permitted");
+    print_error("Not Permitted");
 
 }
-
 
 
 ?>

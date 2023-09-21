@@ -5,36 +5,34 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Cycle through dot3stats OIDs and build list of RRAs to pass to multi simplex grapher
 
-$oids = array('drop', 'punt', 'hostpunt');
-$i = 0;
+$oids = ['drop', 'punt', 'hostpunt'];
+$i    = 0;
 
-if (rrd_is_file($rrd_filename))
-{
-  foreach ($oids as $oid)
-  {
-    $oid = str_replace("dot3Stats", "", $oid);
-    $oid_ds = truncate($oid, 19, '');
-    $rrd_list[$i]['filename'] = $rrd_filename;
-    $rrd_list[$i]['descr'] = $oid;
-    $rrd_list[$i]['ds'] = $oid_ds;
-    $i++;
-  }
+if (rrd_is_file($rrd_filename)) {
+    foreach ($oids as $oid) {
+        $oid                      = str_replace("dot3Stats", "", $oid);
+        $oid_ds                   = truncate($oid, 19, '');
+        $rrd_list[$i]['filename'] = $rrd_filename;
+        $rrd_list[$i]['descr']    = $oid;
+        $rrd_list[$i]['ds']       = $oid_ds;
+        $i++;
+    }
 
-  $colours   = "mixed";
-  $nototal   = 1;
-  $unit_text = "Errors";
+    $colours   = "mixed";
+    $nototal   = 1;
+    $unit_text = "Errors";
 
-  include($config['html_dir']."/includes/graphs/generic_multi_simplex_separated.inc.php");
+    include($config['html_dir'] . "/includes/graphs/generic_multi_simplex_separated.inc.php");
 } else {
-  graph_error($type.'_'.$subtype); // Graph Template Missing;
+    graph_error($type . '_' . $subtype); // Graph Template Missing;
 }
 
 // EOF

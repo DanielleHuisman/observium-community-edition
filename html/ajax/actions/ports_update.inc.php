@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage ajax
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     ajax
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,15 +15,14 @@ $update_ports = [];
 //r($vars);
 //$ports_attribs = get_device_entities_attribs($device_id, 'port'); // Get all attribs
 
-foreach($vars['port'] as $port_id => $port_data)
-{
+foreach ($vars['port'] as $port_id => $port_data) {
 
     if (is_entity_write_permitted('port', $port_id)) {
-        $port = get_port_by_id_cache($port_id);
+        $port   = get_port_by_id_cache($port_id);
         $device = device_by_id_cache($port['device_id']);
 
-        $updated = FALSE;
-        $update_array = array();
+        $updated      = FALSE;
+        $update_array = [];
 
         $port_attribs = get_entity_attribs('port', $port['port_id']);
 
@@ -32,7 +31,7 @@ foreach($vars['port'] as $port_id => $port_data)
         }
 
         // Check ignored and disabled port
-        foreach (array('ignore', 'disabled') as $param) {
+        foreach (['ignore', 'disabled'] as $param) {
             $old_param = $port[$param] ? 1 : 0;
             $new_param = (isset($port_data[$param]) && $port_data[$param]) ? 1 : 0;
             if ($old_param != $new_param) {
@@ -41,7 +40,7 @@ foreach($vars['port'] as $port_id => $port_data)
         }
 
         if (count($update_array)) {
-            dbUpdate($update_array, 'ports', '`port_id` = ?', array($port_id));
+            dbUpdate($update_array, 'ports', '`port_id` = ?', [$port_id]);
             $updated = TRUE;
         }
 
@@ -50,7 +49,7 @@ foreach($vars['port'] as $port_id => $port_data)
         $old_ifSpeed_bool = isset($port['ifSpeed_custom']);
         $new_ifSpeed_bool = isset($port_data['ifSpeed_custom_bool']) && $port_data['ifSpeed_custom_bool'];
         if ($new_ifSpeed_bool) {
-            $port_data['ifSpeed_custom'] = (int) unit_string_to_numeric($port_data['ifSpeed_custom'], 1000);
+            $port_data['ifSpeed_custom'] = (int)unit_string_to_numeric($port_data['ifSpeed_custom'], 1000);
             if ($port_data['ifSpeed_custom'] <= 0) {
                 // Wrong ifSpeed, skip
                 //print_warning("Passed incorrect value for port speed: ".unit_string_to_numeric($port_data['ifSpeed_custom'], 1000));
@@ -65,7 +64,7 @@ foreach($vars['port'] as $port_id => $port_data)
                 //r($vars['ifSpeed_custom_' . $port_id]); r($port['ifSpeed_custom']);
                 set_entity_attrib('port', $port_id, 'ifSpeed_custom', $port_data['ifSpeed_custom'], $device['device_id']);
                 $update_array['ifSpeed_custom'] = $port_data['ifSpeed_custom'];
-                $updated = TRUE;
+                $updated                        = TRUE;
             }
         } elseif ($old_ifSpeed_bool !== $new_ifSpeed_bool) {
             // Added or removed
@@ -88,9 +87,9 @@ foreach($vars['port'] as $port_id => $port_data)
 }
 // Query updated sensors array
 if ($rows_updated) {
-  print_json_status('ok', $rows_updated.' port(s) updated.', [ 'update_array' => $update_ports ]);
+    print_json_status('ok', $rows_updated . ' port(s) updated.', ['update_array' => $update_ports]);
 } else {
-  print_json_status('failed', 'No update performed.');
+    print_json_status('failed', 'No update performed.');
 }
 
 unset($ports_attribs);

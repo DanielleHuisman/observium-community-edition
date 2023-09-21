@@ -4,20 +4,20 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Global read only because no permissions checking right now
 if ($_SESSION['userlevel'] < 5) {
-  print_error_permission();
-  return;
+    print_error_permission();
+    return;
 }
 
-  $vlans = [];
-  if (!isset($vars['vlan_id'])) {
+$vlans = [];
+if (!isset($vars['vlan_id'])) {
 
 
     $vlans = get_vlans($vars);
@@ -33,28 +33,28 @@ if ($_SESSION['userlevel'] < 5) {
 
     foreach ($vlans as $vlan_id => $vlan) {
 
-      if ($vlan_id === '') {
-        continue;
-      }
+        if ($vlan_id === '') {
+            continue;
+        }
 
-      if (is_array($vlan['names'])) {
-        ksort($vlan['names']);
-        $first_vlan = array_keys($vlan['names'])[0];
-      } else {
-        $first_vlan = "VLAN $vlan_id";
-      }
+        if (is_array($vlan['names'])) {
+            ksort($vlan['names']);
+            $first_vlan = array_keys($vlan['names'])[0];
+        } else {
+            $first_vlan = "VLAN $vlan_id";
+        }
 
-      // Fixme - improve method of choosing which name to use.
-      //r($vlan['names']);
+        // Fixme - improve method of choosing which name to use.
+        //r($vlan['names']);
 
-      echo '<tr>';
-      echo '<td>' . $vlan_id . '</td>';
-      echo '<td>' . generate_link($first_vlan, array('page' => 'vlan', 'vlan_id' => $vlan_id)) . '</td>';
-      echo '<td><span class="label label-primary">' . $vlan['counts']['devices'] . '</span></td>';
-      echo '<td><span class="label label-suppressed">' . $vlan['counts']['ports_tagged'] . '</span>
+        echo '<tr>';
+        echo '<td>' . $vlan_id . '</td>';
+        echo '<td>' . generate_link($first_vlan, ['page' => 'vlan', 'vlan_id' => $vlan_id]) . '</td>';
+        echo '<td><span class="label label-primary">' . $vlan['counts']['devices'] . '</span></td>';
+        echo '<td><span class="label label-suppressed">' . $vlan['counts']['ports_tagged'] . '</span>
                 <span class="label label-success">' . $vlan['counts']['ports_untagged'] . '</span></td>';
-      echo '<td><span class="label label-warning">' . $vlan['counts']['macs'] . '</span></td>';
-      echo '</tr>';
+        echo '<td><span class="label label-warning">' . $vlan['counts']['macs'] . '</span></td>';
+        echo '</tr>';
 
     }
 
@@ -63,13 +63,13 @@ if ($_SESSION['userlevel'] < 5) {
 
     //r($vlans);
 
-  } else {
+} else {
 
     // Per-VLAN page
 
     $vls = dbFetchRows("SELECT * FROM `vlans`");
     foreach ($vls as $vlan) {
-      $vlans[$vlan['vlan_vlan']]['names'][$vlan['vlan_name']]++;
+        $vlans[$vlan['vlan_vlan']]['names'][$vlan['vlan_name']]++;
     }
 
     $count_untagged = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `ifVlan` = ?", [$vars['vlan_id']]);
@@ -118,26 +118,26 @@ if ($_SESSION['userlevel'] < 5) {
 
     echo generate_box_close();
 
-    $navbar = array('brand' => "VLAN " . $vars['vlan_id'], 'class' => "navbar-narrow");
+    $navbar = ['brand' => "VLAN " . $vars['vlan_id'], 'class' => "navbar-narrow"];
 
-    $navbar['options']['devices']['text']  = 'Devices';
+    $navbar['options']['devices']['text'] = 'Devices';
     //$navbar['options']['untagged']['text'] = 'Untagged Ports';
     //$navbar['options']['tagged']['text']   = 'Tagged Ports';
-    $navbar['options']['macs']['text']     = 'MAC Addresses';
+    $navbar['options']['macs']['text'] = 'MAC Addresses';
 
     foreach ($navbar['options'] as $option => $array) {
-      if (!isset($vars['view'])) {
-        $vars['view'] = "devices";
-      }
-      if ($vars['view'] == $option) {
-        $navbar['options'][$option]['class'] .= " active";
-      }
-      $navbar['options'][$option]['url'] = generate_url($vars, array('view' => $option));
+        if (!isset($vars['view'])) {
+            $vars['view'] = "devices";
+        }
+        if ($vars['view'] == $option) {
+            $navbar['options'][$option]['class'] .= " active";
+        }
+        $navbar['options'][$option]['url'] = generate_url($vars, ['view' => $option]);
     }
 
-    $navbar['options']['vlans']['text'] = "Back to VLANs";
-    $navbar['options']['vlans']['icon'] = "icon-angle-left";
-    $navbar['options']['vlans']['url'] = generate_url(['page' => 'vlan']);
+    $navbar['options']['vlans']['text']  = "Back to VLANs";
+    $navbar['options']['vlans']['icon']  = "icon-angle-left";
+    $navbar['options']['vlans']['url']   = generate_url(['page' => 'vlan']);
     $navbar['options']['vlans']['right'] = TRUE;
 
 
@@ -146,83 +146,83 @@ if ($_SESSION['userlevel'] < 5) {
 
     switch ($vars['view']) {
 
-      case "tagged":
+        case "tagged":
 
 
+            break;
 
-        break;
+        case "untagged":
 
-      case "untagged":
+            break;
 
-        break;
+        case "macs":
 
-      case "macs":
+            echo generate_box_open();
+            echo '<table class="table table-striped table-hover">';
+            echo '<tr>';
+            echo '<th width="200">MAC Address</th>';
+            echo '<th width="80">Devices</th>';
+            echo '<th width="80">Entries</th>';
+            echo '<th>Device</th>';
+            echo '<th>Port</th>';
 
-        echo generate_box_open();
-        echo '<table class="table table-striped table-hover">';
-        echo '<tr>';
-        echo '<th width="200">MAC Address</th>';
-        echo '<th width="80">Devices</th>';
-        echo '<th width="80">Entries</th>';
-        echo '<th>Device</th>';
-        echo '<th>Port</th>';
+            echo '</tr>';
 
-        echo '</tr>';
+            $macs = dbFetchRows("SELECT *, COUNT(DISTINCT(`mac_address`)) AS `count`, COUNT(DISTINCT(`device_id`)) AS `device_count` FROM `vlans_fdb` WHERE `vlan_id` = ? GROUP BY `mac_address`", [$vars['vlan_id']]);
 
-        $macs = dbFetchRows("SELECT *, COUNT(DISTINCT(`mac_address`)) AS `count`, COUNT(DISTINCT(`device_id`)) AS `device_count` FROM `vlans_fdb` WHERE `vlan_id` = ? GROUP BY `mac_address`", [ $vars['vlan_id'] ]);
+            $mac_list = array_column($macs, 'mac_address');
+            $sql      = "SELECT * FROM ports, devices WHERE 1 ";
+            $sql      .= generate_query_values_and($mac_list, 'ifPhysAddress');
+            $sql      .= " AND ports.device_id = devices.device_id";
 
-        $mac_list = array_column($macs, 'mac_address');
-        $sql = "SELECT * FROM ports, devices WHERE 1 ";
-        $sql .= generate_query_values_and($mac_list, 'ifPhysAddress');
-        $sql .= " AND ports.device_id = devices.device_id";
+            $ports = [];
+            foreach (dbFetchRows($sql) as $p) {
+                $ports[$p['ifPhysAddress']] = $p;
+            }
 
-        $ports = [];
-        foreach(dbFetchRows($sql) as $p) { $ports[$p['ifPhysAddress']] = $p; }
+            foreach ($macs as $mac) {
 
-        foreach ($macs as $mac) {
+                echo '<tr>';
+                echo '<td>' . format_mac($mac['mac_address']) . '</td>';
+                echo '<td><span class="label label-warning">' . $mac['device_count'] . '</span></td>';
+                echo '<td><span class="label label-success">' . $mac['count'] . '</span></td>';
+                echo '<td>' . (isset($ports[$mac['mac_address']]) ? generate_device_link($ports[$mac['mac_address']]) : '') . '</td>';
+                echo '<td>' . (isset($ports[$mac['mac_address']]) ? generate_port_link($ports[$mac['mac_address']]) : '') . '</td>';
+                echo '<td>' . ((isset($ports[$mac['mac_address']]) && strlen($ports[$mac['mac_address']]['ifAlias'])) ? '<small>' . $ports[$mac['mac_address']]['ifAlias'] . '</small>' : '') . '</td>';
+                echo '</tr>';
+            }
 
-          echo '<tr>';
-          echo '<td>' . format_mac($mac['mac_address']) . '</td>';
-          echo '<td><span class="label label-warning">' . $mac['device_count'] . '</span></td>';
-          echo '<td><span class="label label-success">' . $mac['count'] . '</span></td>';
-          echo '<td>'.(isset($ports[$mac['mac_address']]) ? generate_device_link($ports[$mac['mac_address']]) : '').'</td>';
-          echo '<td>'.(isset($ports[$mac['mac_address']]) ?  generate_port_link($ports[$mac['mac_address']]) : '').'</td>';
-          echo '<td>'.( (isset($ports[$mac['mac_address']]) && strlen($ports[$mac['mac_address']]['ifAlias'])) ?  '<small>'.$ports[$mac['mac_address']]['ifAlias'].'</small>' : '').'</td>';
-          echo '</tr>';
-        }
+            echo '</table>';
 
-        echo '</table>';
+            break;
 
-        break;
+        case "devices":
+        default:
+            $devices = dbFetchRows("SELECT * FROM `vlans` LEFT JOIN `devices` ON vlans.device_id = devices.device_id WHERE `vlan_vlan` = ? ORDER BY devices.hostname", [$vars['vlan_id']]);
 
-      case "devices":
-      default:
-      $devices = dbFetchRows("SELECT * FROM `vlans` LEFT JOIN `devices` ON vlans.device_id = devices.device_id WHERE `vlan_vlan` = ? ORDER BY devices.hostname", [$vars['vlan_id']]);
-
-      echo generate_box_open();
-      echo '<table class="table table-striped table-hover">';
-      echo '<tr>';
-      echo '<th class="state-marker"></th>';
-      echo '<th></th>';
-      echo '<th width="80">Device</th>';
-      echo '<th width="80">Hardware</th>';
-      echo '<th>OS</th>';
-      echo '<th>Uptime</th>';
-      echo '</tr>';
-
-
-      foreach ($devices AS $device)
-      {
-        //$device = device_by_id_cache($device_id);
-        print_device_row($device, [], ['tab' => 'vlans']);
-
-      }
+            echo generate_box_open();
+            echo '<table class="table table-striped table-hover">';
+            echo '<tr>';
+            echo '<th class="state-marker"></th>';
+            echo '<th></th>';
+            echo '<th width="80">Device</th>';
+            echo '<th width="80">Hardware</th>';
+            echo '<th>OS</th>';
+            echo '<th>Uptime</th>';
+            echo '</tr>';
 
 
-      echo '</table>';
+            foreach ($devices as $device) {
+                //$device = device_by_id_cache($device_id);
+                print_device_row($device, [], ['tab' => 'vlans']);
+
+            }
+
+
+            echo '</table>';
 
     }
 
-  }
+}
 
 // EOF

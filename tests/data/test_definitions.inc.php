@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage tests
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2016 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -20,7 +20,7 @@
 $GLOBALS['cache']['db_version'] = 999; // Set fake DB version
 setlocale(LC_ALL, 'C');
 putenv('LC_ALL=C');
-define('OBS_DEBUG', 0);
+if (!defined('OBS_DEBUG')) { define('OBS_DEBUG', 0); }
 
 /*
 set_include_path(dirname(__FILE__) . "/../../includes/pear" . PATH_SEPARATOR . get_include_path());
@@ -36,6 +36,8 @@ $config['os_group']['default']['graphs'][]                = "device_bits";
 $config['os_group']['default']['graphs'][]                = "device_uptime";
 $config['os_group']['default']['graphs'][]                = "device_ping";
 $config['os_group']['default']['comments']                = "/^\s*#/";
+$config['os_group']['default']['modules']['unix-agent']   = 0; // unix agent enabled by default only for unix group
+$config['os_group']['default']['modules']['applications'] = 0;
 // MIBs enabled for any os (except blacklisted mibs)
 $config['os_group']['default']['mibs'][]                  = "EtherLike-MIB"; // in ports module
 $config['os_group']['default']['mibs'][]                  = "ENTITY-MIB";
@@ -48,6 +50,7 @@ $config['os_group']['default']['mibs'][]                  = "CISCO-CDP-MIB";
 $config['os_group']['default']['mibs'][]                  = "PW-STD-MIB";     // Pseudowires. FIXME, possible more os specific?
 $config['os_group']['default']['mibs'][]                  = "DISMAN-PING-MIB";// RFC4560, SLA
 $config['os_group']['default']['mibs'][]                  = "BGP4-MIB";
+$config['os_group']['default']['vendortype_mib']          = "CISCO-ENTITY-VENDORTYPE-OID-MIB";
 
 $os_group = "test_unix";
 $config['os_group'][$os_group]['type']              = "server";

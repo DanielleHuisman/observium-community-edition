@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -26,37 +26,37 @@
 */
 
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$rrd_filename = get_rrd_path($device, "app-kamailio-".$app['app_id'].".rrd");
+$rrd_filename = get_rrd_path($device, "app-kamailio-" . $app['app_id'] . ".rrd");
 
-$array = array('tcpconreset'          => array('descr' => 'Connection Reset'),
-               'tcpcontimeout'        => array('descr' => 'Connection Timeout'),
-               'tcpconnectfailed'     => array('descr' => 'Connection Failed'),
-               'tcpconnectsuccess'    => array('descr' => 'Connection Success'),
-               'tcpcurrentopenedcon'  => array('descr' => 'Open Connections'),
-               'tcpcurrentwrqsize'    => array('descr' => 'Write Queue Size'),
-               'tcpestablished'       => array('descr' => 'Establiched'),
-               'tcplocalreject'       => array('descr' => 'Local Rejected'),
-               'tcppassiveopen'       => array('descr' => 'Passiive Open'),
-               'tcpsendtimeout'       => array('descr' => 'Send Timeout'),
-               'tcpsendqfull'         => array('descr' => 'Send Queue Full'),
-              );
+$array = ['tcpconreset'         => ['descr' => 'Connection Reset'],
+          'tcpcontimeout'       => ['descr' => 'Connection Timeout'],
+          'tcpconnectfailed'    => ['descr' => 'Connection Failed'],
+          'tcpconnectsuccess'   => ['descr' => 'Connection Success'],
+          'tcpcurrentopenedcon' => ['descr' => 'Open Connections'],
+          'tcpcurrentwrqsize'   => ['descr' => 'Write Queue Size'],
+          'tcpestablished'      => ['descr' => 'Establiched'],
+          'tcplocalreject'      => ['descr' => 'Local Rejected'],
+          'tcppassiveopen'      => ['descr' => 'Passiive Open'],
+          'tcpsendtimeout'      => ['descr' => 'Send Timeout'],
+          'tcpsendqfull'        => ['descr' => 'Send Queue Full'],
+];
 
 $i = 0;
-if (rrd_is_file($rrd_filename))
-{
-  foreach ($array as $ds => $data)
-  {
-    $rrd_list[$i]['filename'] = $rrd_filename;
-    $rrd_list[$i]['descr'] = $data['descr'];
-    $rrd_list[$i]['ds'] = $ds;
-    $i++;
-  }
-} else { echo("file missing: $rrd_filename");  }
+if (rrd_is_file($rrd_filename)) {
+    foreach ($array as $ds => $data) {
+        $rrd_list[$i]['filename'] = $rrd_filename;
+        $rrd_list[$i]['descr']    = $data['descr'];
+        $rrd_list[$i]['ds']       = $ds;
+        $i++;
+    }
+} else {
+    echo("file missing: $rrd_filename");
+}
 
-$colours   = "mixed";
+$colours = "mixed";
 
-include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi_line.inc.php");
 
 // EOF

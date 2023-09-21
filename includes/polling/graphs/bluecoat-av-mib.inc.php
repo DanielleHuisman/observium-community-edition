@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -28,25 +28,25 @@
 // BLUECOAT-AV-MIB::avSecureICAPFilesScanned.0 = Counter64: 0
 // BLUECOAT-AV-MIB::avSecureICAPVirusesDetected.0 = Counter32: 0
 
-$table_defs['BLUECOAT-AV-MIB']['blueCoatAvMibObjects'] = array(
+$table_defs['BLUECOAT-AV-MIB']['blueCoatAvMibObjects'] = [
   'file'          => 'proxyav.rrd',
   'call_function' => 'snmp_get',
   'mib'           => 'BLUECOAT-AV-MIB',
   'mib_dir'       => 'bluecoat',
   'table'         => 'blueCoatAvMibObjects',
-  'ds_rename'     => array(
-     'av' => '',
-  ),
-  'graphs'        => array('files_scanned', 'virus_detected', 'slow_icap', 'icap_scanned', 'icap_virus', 'sicap_scanned', 'sicap_virus'),
-  'oids'          => array(
-     'avFilesScanned'              => array('descr' => 'Files Scanned', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-     'avVirusesDetected'           => array('descr' => 'Viruses Detected', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-     'avSlowICAPConnections'       => array('descr' => 'Slow ICAP Connections', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-     'avICAPFilesScanned'          => array('descr' => 'ICAP Files Scanned', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-     'avICAPVirusesDetected'       => array('descr' => 'ICAP Viruses Detected', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-     'avSecureICAPFilesScanned'    => array('descr' => 'Secure ICAP Files Scanned', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-     'avSecureICAPVirusesDetected' => array('descr' => 'Secure ICAP Viruses Detected', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-  )
-);
+  'ds_rename'     => [
+    'av' => '',
+  ],
+  'graphs'        => ['files_scanned', 'virus_detected', 'slow_icap', 'icap_scanned', 'icap_virus', 'sicap_scanned', 'sicap_virus'],
+  'oids'          => [
+    'avFilesScanned'              => ['descr' => 'Files Scanned', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'avVirusesDetected'           => ['descr' => 'Viruses Detected', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'avSlowICAPConnections'       => ['descr' => 'Slow ICAP Connections', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'avICAPFilesScanned'          => ['descr' => 'ICAP Files Scanned', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'avICAPVirusesDetected'       => ['descr' => 'ICAP Viruses Detected', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'avSecureICAPFilesScanned'    => ['descr' => 'Secure ICAP Files Scanned', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'avSecureICAPVirusesDetected' => ['descr' => 'Secure ICAP Viruses Detected', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+  ]
+];
 
 // EOF

@@ -6,7 +6,7 @@
  *
  * LICENSE:
  *
- * Copyright (c) 2010-2017, Chuck Hagenbuch & Jon Parise
+ * Copyright (c) 2010-2021, Chuck Hagenbuch & Jon Parise
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,9 +38,9 @@
  *
  * @category    HTTP
  * @package     HTTP_Request
- * @author      Jon Parise <jon@php.net> 
+ * @author      Jon Parise <jon@php.net>
  * @author      Chuck Hagenbuch <chuck@horde.org>
- * @copyright   2010-2017 Chuck Hagenbuch
+ * @copyright   2010-2021 Chuck Hagenbuch
  * @license     http://opensource.org/licenses/BSD-3-Clause New BSD License
  * @version     CVS: $Id$
  * @link        http://pear.php.net/package/Mail/
@@ -106,6 +106,25 @@ class Mail_smtp extends Mail {
     var $port = 25;
 
     /**
+     * Should STARTTLS connection be used?
+     *
+     * This value may be set to true or false.
+     *
+     * If the value is set to true, the Net_SMTP package will attempt to use
+     * a STARTTLS encrypted connection.
+     *
+     * If the value is set to false, the Net_SMTP package will avoid
+     * a STARTTLS encrypted connection.
+     *
+     * NULL indicates only STARTTLS if $auth is set.
+     *
+     * PEAR/Net_SMTP >= 1.10.0 required.
+     *
+     * @var boolean
+     */
+    var $starttls = null;
+
+    /**
      * Should SMTP authentication be used?
      *
      * This value may be set to true, false or the name of a specific
@@ -155,6 +174,15 @@ class Mail_smtp extends Mail {
     var $debug = false;
 
     /**
+     * we need the greeting; from it we can extract the authorative name of the mail
+     * server we've really connected to. ideal if we're connecting to a round-robin
+     * of relay servers and need to track which exact one took the email
+     *
+     * @var string
+     */
+    var $greeting = null;
+
+    /**
      * Indicates whether or not the SMTP connection should persist over
      * multiple calls to the send() method.
      *
@@ -179,13 +207,35 @@ class Mail_smtp extends Mail {
     var $socket_options = array();
 
     /**
+     * SMTP response message
+     *
+     * @var string
+     * @since 1.6.0
+     */
+    var $response = null;
+
+    /**
+     * If the message ends up in the queue, on the recipient server,
+     * the response will be saved here.
+     * Some successfully delivered emails will include a “queued”
+     * notation in the SMTP response, such as "250 OK; queued as 12345".
+     * This indicates that the email was delivered to the recipient
+     * as expected, but may require additional processing before it
+     * lands in the recipient’s inbox.
+     *
+     * @var string
+     */
+    var $queued_as = null;
+
+    /**
      * Constructor.
      *
      * Instantiates a new Mail_smtp:: object based on the parameters
      * passed in. It looks for the following parameters:
      *     host        The server to connect to. Defaults to localhost.
      *     port        The port to connect to. Defaults to 25.
-     *     auth        SMTP authentication.  Defaults to none.
+     *     auth        SMTP authentication. Defaults to none.
+     *     starttls    Should STARTTLS connection be used? No default. PEAR/Net_SMTP >= 1.10.0 required.
      *     username    The username to use for SMTP auth. No default.
      *     password    The password to use for SMTP auth. No default.
      *     localhost   The local hostname / domain. Defaults to localhost.
@@ -207,6 +257,7 @@ class Mail_smtp extends Mail {
         if (isset($params['host'])) $this->host = $params['host'];
         if (isset($params['port'])) $this->port = $params['port'];
         if (isset($params['auth'])) $this->auth = $params['auth'];
+        if (isset($params['starttls'])) $this->starttls = $params['starttls'];
         if (isset($params['username'])) $this->username = $params['username'];
         if (isset($params['password'])) $this->password = $params['password'];
         if (isset($params['localhost'])) $this->localhost = $params['localhost'];
@@ -299,7 +350,7 @@ class Mail_smtp extends Mail {
                                     PEAR_MAIL_SMTP_ERROR_FROM);
         }
 
-        $params = null;
+        $params = '';
         if (!empty($this->_extparams)) {
             foreach ($this->_extparams as $key => $val) {
                 $params .= ' ' . $key . (is_null($val) ? '' : '=' . $val);
@@ -328,9 +379,12 @@ class Mail_smtp extends Mail {
 
         /* Send the message's headers and the body as SMTP data. */
         $res = $this->_smtp->data($body, $textHeaders);
-        list(,$args) = $this->_smtp->getResponse();
 
-        if (preg_match("/ queued as (.*)/", $args, $queued)) {
+        list($code,$args) = $this->_smtp->getResponse();
+
+        $this->response = $code . ' ' . $args;
+
+        if (preg_match("/ queue (.*)| queued (.*)/i", $args, $queued)) {
             $this->queued_as = $queued[1];
         }
 
@@ -393,13 +447,26 @@ class Mail_smtp extends Mail {
         if ($this->auth) {
             $method = is_string($this->auth) ? $this->auth : '';
 
+            $tls = $this->starttls === false ? false : true;
+
             if (PEAR::isError($res = $this->_smtp->auth($this->username,
                                                         $this->password,
-                                                        $method))) {
+                                                        $method,
+                                                        $tls))) {
                 $error = $this->_error("$method authentication failure",
                                        $res);
                 $this->_smtp->rset();
                 return PEAR::raiseError($error, PEAR_MAIL_SMTP_ERROR_AUTH);
+            }
+        }
+
+        /* Attempt to establish a TLS encrypted connection. PEAR/Net_SMTP >= 1.10.0 required. */
+        if ($this->starttls && !$this->auth) {
+            $starttls = $this->_smtp->starttls();
+            if (PEAR::isError($starttls)) {
+                return PEAR::raiseError($starttls);
+            } elseif ($starttls === false) {
+                return PEAR::raiseError('STARTTLS failed');
             }
         }
 
@@ -435,6 +502,28 @@ class Mail_smtp extends Mail {
 
         /* We are disconnected if we no longer have an SMTP object. */
         return ($this->_smtp === null);
+    }
+
+    /**
+     * Returns the SMTP response message after sending.
+     *
+     * @return string SMTP response message or NULL.
+     *
+     * @since  1.11.0
+     */
+    public function getResponse(){
+        return $this->response;
+    }
+
+    /**
+     * Returns the SMTP response message if includes "queue" after sending.
+     *
+     * @return string SMTP queue message or NULL.
+     *
+     * @since  1.11.0
+     */
+    public function getQueuedAs(){
+        return $this->queued_as;
     }
 
     /**

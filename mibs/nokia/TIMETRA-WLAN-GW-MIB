@@ -37,8 +37,9 @@ IMPORTS
     TmnxMobApn, TmnxMobApnDomainName,
     TmnxMobApnOrZero, TmnxMobArp,
     TmnxMobArpValue, TmnxMobBearerId,
-    TmnxMobImsiStr, TmnxMobMccOrEmpty,
-    TmnxMobMncOrEmpty, TmnxMobPathMgmtState,
+    TmnxMobExtQci, TmnxMobImsiStr,
+    TmnxMobMccOrEmpty, TmnxMobMncOrEmpty,
+    TmnxMobPathMgmtState,
     TmnxMobProfGbrRate, TmnxMobProfIpTtl,
     TmnxMobProfKeepAliveResponse,
     TmnxMobProfKeepAliveRetryCount,
@@ -63,6 +64,7 @@ IMPORTS
     TmnxEnabledDisabledOrNA, TmnxEncapVal,
     TmnxEsaNum, TmnxEsaVappNum,
     TmnxHttpRedirectUrl,
+    TmnxIsaScalingProfile,
     TmnxMacSpecification, TmnxNatWaterMark,
     TmnxOperState, TmnxPortID, TmnxServId,
     TmnxVPNRouteDistinguisher, TmnxVRtrID,
@@ -199,13 +201,14 @@ TmnxWlanGwDsmFilterAction        ::= TEXTUAL-CONVENTION
          criteria.
 
          - drop        : packets matching the filter entry are dropped.
-         - forward     : packets matching the filter entry are forwarded."
+         - forward     : packets matching the filter entry are forwarded.
+         - httpRedirect: packets matching the filter entry are redirected."
     SYNTAX      INTEGER {
-        none      (0),
-        drop      (1),
-        forward   (2),
-        reserved3 (3),
-        reserved4 (4)
+        none         (0),
+        drop         (1),
+        forward      (2),
+        httpRedirect (3),
+        reserved4    (4)
     }
 
 TmnxWlanGwQoSOperState           ::= TEXTUAL-CONVENTION
@@ -404,6 +407,7 @@ TmnxWlanGwGrpEntry               ::= SEQUENCE
     tmnxWlanGwGrpDegraded            TruthValue,
     tmnxWlanGwGrpRedundancyUnit      INTEGER,
     tmnxWlanGwGrpActiveMdaLimit      Unsigned32,
+    tmnxWlanGwGrpScalingProfile      TmnxIsaScalingProfile,
     tmnxWlanGwGrpIsaAaOversub        Unsigned32
 }
 
@@ -578,6 +582,19 @@ tmnxWlanGwGrpActiveMdaLimit      OBJECT-TYPE
     DEFVAL      { 0 }
     ::= { tmnxWlanGwGrpEntry 55 }
 
+tmnxWlanGwGrpScalingProfile      OBJECT-TYPE
+    SYNTAX      TmnxIsaScalingProfile
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwGrpScalingProfile specifies the scaling profile
+         of this WLAN Gateway ISA group.
+
+         ISA scaling profiles are only used in a virtual machine
+         implementation."
+    DEFVAL      { profile1 }
+    ::= { tmnxWlanGwGrpEntry 56 }
+
 tmnxWlanGwGrpIsaAaOversub        OBJECT-TYPE
     SYNTAX      Unsigned32 (1..10)
     MAX-ACCESS  read-create
@@ -713,7 +730,9 @@ TmnxWlanGwIsaMemberEntry         ::= SEQUENCE
     tmnxWlanGwIsaMemberNumUe         Gauge32,
     tmnxWlanGwIsaMemberEegMemberAct  Gauge32,
     tmnxWlanGwIsaMemberEegMemberPend Gauge32,
-    tmnxWlanGwIsaMemberTuQosProblem  Gauge32
+    tmnxWlanGwIsaMemberTuQosProblem  Gauge32,
+    tmnxWlanGwIsaMemberEsaNum        TmnxEsaNum,
+    tmnxWlanGwIsaMemberEsaVappNum    TmnxEsaVappNum
 }
 
 tmnxWlanGwIsaMemberId            OBJECT-TYPE
@@ -808,6 +827,25 @@ tmnxWlanGwIsaMemberTuQosProblem  OBJECT-TYPE
          tunnel Qos infrastructure configuration instances on the MDA
          associated with this ISA group member that have a resource issue."
     ::= { tmnxWlanGwIsaMemberEntry 9 }
+
+tmnxWlanGwIsaMemberEsaNum        OBJECT-TYPE
+    SYNTAX      TmnxEsaNum
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwIsaMemberEsaNum indicates the number of the
+         Extended Service Appliance where the member is located."
+    ::= { tmnxWlanGwIsaMemberEntry 10 }
+
+tmnxWlanGwIsaMemberEsaVappNum    OBJECT-TYPE
+    SYNTAX      TmnxEsaVappNum
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwIsaMemberEsaVappNum indicates the number of the
+         Virtual Machine within an Extended Service Appliance where the member
+         is located."
+    ::= { tmnxWlanGwIsaMemberEntry 11 }
 
 tmnxWlanGwIsaMemberStatsTable    OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxWlanGwIsaMemberStatsEntry
@@ -1229,6 +1267,79 @@ tmnxWlanGwIsaResrcStatsPeakTime  OBJECT-TYPE
          system reached the peak value of the resource statistics contained in
          this conceptual row."
     ::= { tmnxWlanGwIsaResrcStatsEntry 6 }
+
+tmnxWlanGwEsaObjs                OBJECT IDENTIFIER ::= { tmnxWlanGwIsaObjs 11 }
+
+tmnxWlanGwVappTable              OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxWlanGwVappEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxWlanGwVappTable contains objects to configure the WLAN Gateway
+         ISA Group Virtual Application.."
+    ::= { tmnxWlanGwEsaObjs 1 }
+
+tmnxWlanGwVappEntry              OBJECT-TYPE
+    SYNTAX      TmnxWlanGwVappEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row represents a WLAN Gateway ISA Group Member of a
+         WLAN Gateway ISA Group.
+
+         Entries in this table can be created or deleted via SNMP operations."
+    INDEX       {
+        tmnxWlanGwGrpId,
+        tmnxWlanGwEsaNum,
+        tmnxWlanGwEsaVappNum
+    }
+    ::= { tmnxWlanGwVappTable 1 }
+
+TmnxWlanGwVappEntry              ::= SEQUENCE
+{
+    tmnxWlanGwEsaNum                 TmnxEsaNum,
+    tmnxWlanGwEsaVappNum             TmnxEsaVappNum,
+    tmnxWlanGwVappRowStatus          RowStatus,
+    tmnxWlanGwVappLastMgmtChange     TimeStamp
+}
+
+tmnxWlanGwEsaNum                 OBJECT-TYPE
+    SYNTAX      TmnxEsaNum (1..16)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwEsaNum indicates the number of the Extended
+         Service Appliance where the member is located."
+    ::= { tmnxWlanGwVappEntry 1 }
+
+tmnxWlanGwEsaVappNum             OBJECT-TYPE
+    SYNTAX      TmnxEsaVappNum (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwEsaVappNum indicates the number of the Virtual
+         Machine within an Extended Service Appliance where the member is
+         located"
+    ::= { tmnxWlanGwVappEntry 2 }
+
+tmnxWlanGwVappRowStatus          OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwVappRowStatus specifies the row status of this
+         row."
+    ::= { tmnxWlanGwVappEntry 3 }
+
+tmnxWlanGwVappLastMgmtChange     OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwVappLastMgmtChange indicates the sysUpTime at
+         the time of the most recent management-initiated change to this table
+         row."
+    ::= { tmnxWlanGwVappEntry 4 }
 
 tmnxWlanGwSoftGreObjs            OBJECT IDENTIFIER ::= { tmnxWlanGwObjs 2 }
 
@@ -7032,7 +7143,9 @@ TmnxWlanGwDsmIpFilN3Entry        ::= SEQUENCE
     tmnxWlanGwDsmIpFilN3DestAddr     InetAddress,
     tmnxWlanGwDsmIpFilN3DestPrefLen  InetAddressPrefixLength,
     tmnxWlanGwDsmIpFilN3DestPortOp   INTEGER,
-    tmnxWlanGwDsmIpFilN3DestPort1    InetPortNumber
+    tmnxWlanGwDsmIpFilN3DestPort1    InetPortNumber,
+    tmnxWlanGwDsmIpFilN3IngHitCount  Counter64,
+    tmnxWlanGwDsmIpFilN3RedirectURL  TmnxHttpRedirectUrl
 }
 
 tmnxWlanGwDsmIpFilN3Index        OBJECT-TYPE
@@ -7150,6 +7263,42 @@ tmnxWlanGwDsmIpFilN3DestPort1    OBJECT-TYPE
          tmnxWlanGwDsmIpFilN3DestPortOp."
     DEFVAL      { 0 }
     ::= { tmnxWlanGwDsmIpFilN3Entry 11 }
+
+tmnxWlanGwDsmIpFilN3IngHitCount  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of times an ingress packet matched
+         this entry."
+    ::= { tmnxWlanGwDsmIpFilN3Entry 17 }
+
+tmnxWlanGwDsmIpFilN3RedirectURL  OBJECT-TYPE
+    SYNTAX      TmnxHttpRedirectUrl
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwDsmIpFilN3RedirectURL specifies the URL to
+         redirect to, when the value of tmnxWlanGwDsmIpFilN3Action is
+         'httpRedirect'.
+
+         This string may contain a number of substitution macro's:
+         - $URL: specifies that '$URL' must be substituted with the content of the
+                 Request-URI in the HTTP GET Request received.
+
+         - $MAC: specifies that '$MAC' must be replaced with a string that
+                 represents the MAC address of the subscriber host;
+                 the MAC address is formatted in Nokia SROS style,
+                 like 00:0c:f1:99:85:b8.
+
+         - $IP:  specifies that '$IP' must be replaced with a string that represents
+                 the IP address of the subscriber host.
+
+         Note that the value of tmnxWlanGwDsmIpFilN3RedirectURL is silently
+         cleared by the system if tmnxWlanGwDsmIpFilN3Action is set to any
+         value other than httpRedirect."
+    DEFVAL      { ''H }
+    ::= { tmnxWlanGwDsmIpFilN3Entry 18 }
 
 tmnxWlanGwPolicerTable           OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxWlanGwPolicerEntry
@@ -7367,7 +7516,9 @@ TmnxWlanGwDsmIpFil6N3Entry       ::= SEQUENCE
     tmnxWlanGwDsmIpFil6N3DestAddr    InetAddress,
     tmnxWlanGwDsmIpFil6N3DestPrefLen InetAddressPrefixLength,
     tmnxWlanGwDsmIpFil6N3DestPortOp  INTEGER,
-    tmnxWlanGwDsmIpFil6N3DestPort1   InetPortNumber
+    tmnxWlanGwDsmIpFil6N3DestPort1   InetPortNumber,
+    tmnxWlanGwDsmIpFil6N3IngHitCount Counter64,
+    tmnxWlanGwDsmIpFil6N3RedirectURL TmnxHttpRedirectUrl
 }
 
 tmnxWlanGwDsmIpFil6N3Index       OBJECT-TYPE
@@ -7485,6 +7636,42 @@ tmnxWlanGwDsmIpFil6N3DestPort1   OBJECT-TYPE
          tmnxWlanGwDsmIpFil6N3DestPortOp."
     DEFVAL      { 0 }
     ::= { tmnxWlanGwDsmIpFil6N3Entry 11 }
+
+tmnxWlanGwDsmIpFil6N3IngHitCount OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of times an ingress packet matched
+         this entry."
+    ::= { tmnxWlanGwDsmIpFil6N3Entry 17 }
+
+tmnxWlanGwDsmIpFil6N3RedirectURL OBJECT-TYPE
+    SYNTAX      TmnxHttpRedirectUrl
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxWlanGwDsmIpFil6N3RedirectURL specifies the URL to
+         redirect to, when the value of tmnxWlanGwDsmIpFil6N3Action is
+         'httpRedirect'.
+
+         This string may contain a number of substitution macro's:
+         - $URL: specifies that '$URL' must be substituted with the content of the
+                 Request-URI in the HTTP GET Request received.
+
+         - $MAC: specifies that '$MAC' must be replaced with a string that
+                 represents the MAC address of the subscriber host;
+                 the MAC address is formatted in Nokia SROS style,
+                 like 00:0c:f1:99:85:b8.
+
+         - $IP:  specifies that '$IP' must be replaced with a string that represents
+                 the IP address of the subscriber host.
+
+         Note that the value of tmnxWlanGwDsmIpFil6N3RedirectURL is silently
+         cleared by the system if tmnxWlanGwDsmIpFil6N3Action is set to any
+         value other than httpRedirect."
+    DEFVAL      { ''H }
+    ::= { tmnxWlanGwDsmIpFil6N3Entry 18 }
 
 tmnxWlanGwDsmTable               OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxWlanGwDsmEntry
@@ -11020,6 +11207,16 @@ tmnxGtpNumS11IdleSessions        OBJECT-TYPE
          of GTP S11 sessions in idle state."
     ::= { tmnxWlanGwObjs 215 }
 
+tmnxWlanGwVappTableLastCh        OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxWlanGwVappTableLastCh indicates the value
+         of sysUpTime at the time of the last modification of an entry in the
+         tmnxWlanGwVappTable."
+    ::= { tmnxWlanGwObjs 216 }
+
 tmnxWlanGwNotificationObjs       OBJECT IDENTIFIER ::= { tmnxWlanGw 2 }
 
 tmnxWlanGwNotifyDescription      OBJECT-TYPE
@@ -11728,7 +11925,7 @@ TmnxGtpS11BcEntry                ::= SEQUENCE
     tmnxGtpS11BcQosUlMbr             Unsigned32,
     tmnxGtpS11BcQosDlGbr             Unsigned32,
     tmnxGtpS11BcQosDlMbr             Unsigned32,
-    tmnxGtpS11BcQosQci               TmnxMobQci,
+    tmnxGtpS11BcQosQci               TmnxMobExtQci,
     tmnxGtpS11BcQosArp               TmnxMobArp,
     tmnxGtpS11BcRemoteAddrType       InetAddressType,
     tmnxGtpS11BcRemoteAddr           InetAddress
@@ -11802,7 +11999,7 @@ tmnxGtpS11BcQosDlMbr             OBJECT-TYPE
     ::= { tmnxGtpS11BcEntry 13 }
 
 tmnxGtpS11BcQosQci               OBJECT-TYPE
-    SYNTAX      TmnxMobQci
+    SYNTAX      TmnxMobExtQci
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -12148,6 +12345,7 @@ tmnxWlanGwV16Compliance          MODULE-COMPLIANCE
             tmnxWlanGwLeV15v0Group,
             tmnxWlanGwDsmV15v0Group,
             tmnxWlanGwIsaV16v0Group,
+            tmnxWlanGwIsaScalingGroup,
             tmnxWlanGwUeQryV16v0Group,
             tmnxWlanGwGrpIfGwAddrV16v0Group,
             tmnxWlanGwLePolicerV16v0Group,
@@ -12202,11 +12400,14 @@ tmnxWlanGwV17Compliance          MODULE-COMPLIANCE
             tmnxWlanGwXconnectGroup,
             tmnxWlanGwLeV15v0Group,
             tmnxWlanGwDsmV15v0Group,
+            tmnxWlanGwIsaScalingGroup,
             tmnxWlanGwUeQryV16v0Group,
             tmnxWlanGwGrpIfGwAddrV16v0Group,
             tmnxWlanGwLePolicerV16v0Group,
             tmnxWlanGwQryNameGroup,
-            tmnxWlanGwIsaV19v0Group
+            tmnxWlanGwIsaV19v0Group,
+            tmnxWlanGwDsmV19v0Group,
+            tmnxWlanGwEsaV19v0Group
         }
     ::= { tmnxWlanGwCompliances 12 }
 
@@ -13168,6 +13369,16 @@ tmnxWlanGwIsaV16v0Group          OBJECT-GROUP
          groups on Nokia SROS series systems added in release 16.0."
     ::= { tmnxWlanGwGroups 41 }
 
+tmnxWlanGwIsaScalingGroup        OBJECT-GROUP
+    OBJECTS     {
+        tmnxWlanGwGrpScalingProfile
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing configuration of WLAN Gateway  ISA
+         scaling profiles on Nokia SROS series systems."
+    ::= { tmnxWlanGwGroups 42 }
+
 tmnxWlanGwUeQryV16v0Group        OBJECT-GROUP
     OBJECTS     {
         tmnxWlanGwUeQryWhereAddrFamily,
@@ -13256,6 +13467,35 @@ tmnxWlanGwIsaV19v0Group          OBJECT-GROUP
         "The group of objects providing configuration of WLAN Gateway ISA
          groups on Nokia SROS series systems."
     ::= { tmnxWlanGwGroups 49 }
+
+tmnxWlanGwDsmV19v0Group          OBJECT-GROUP
+    OBJECTS     {
+        tmnxWlanGwDsmIpFilN3IngHitCount,
+        tmnxWlanGwDsmIpFilN3RedirectURL,
+        tmnxWlanGwDsmIpFil6N3IngHitCount,
+        tmnxWlanGwDsmIpFil6N3RedirectURL
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing configuration of WLAN Gateway
+         Distributed subscriber management on Nokia SROS release 19.0  series
+         systems."
+    ::= { tmnxWlanGwGroups 50 }
+
+tmnxWlanGwEsaV19v0Group          OBJECT-GROUP
+    OBJECTS     {
+        tmnxWlanGwVappLastMgmtChange,
+        tmnxWlanGwVappRowStatus,
+        tmnxWlanGwVappTableLastCh,
+        tmnxWlanGwIsaMemberEsaNum,
+        tmnxWlanGwIsaMemberEsaVappNum
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing configuration of WLAN Gateway
+         Distributed subscriber management on Nokia SROS release 19.0  series
+         systems."
+    ::= { tmnxWlanGwGroups 51 }
 
 tmnxWlanGwObsoletedGroup         OBJECT-GROUP
     OBJECTS     {

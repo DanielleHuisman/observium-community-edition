@@ -7,8 +7,9 @@ IMPORTS
     MODULE-COMPLIANCE, NOTIFICATION-GROUP,
     OBJECT-GROUP
                                                          FROM SNMPv2-CONF
-    MODULE-IDENTITY, NOTIFICATION-TYPE,
-    OBJECT-TYPE, Unsigned32
+    Integer32, MODULE-IDENTITY,
+    NOTIFICATION-TYPE, OBJECT-TYPE,
+    Unsigned32
                                                          FROM SNMPv2-SMI
     DisplayString, MacAddress, RowStatus,
     TEXTUAL-CONVENTION, TimeStamp,
@@ -160,7 +161,7 @@ TmnxLocUsrDbMatchTypePppoe       ::= TEXTUAL-CONVENTION
          matching done to identify a PPPoE user.
 
          The match type refers to one of these objects in the
-         tmnxLocUsrDbPppoeTable:
+         tmnxLocUsrDbPppoeTable or tmnxLudbPpp2Table:
 
          match type     | object
          ---------------------------------------------
@@ -171,18 +172,22 @@ TmnxLocUsrDbMatchTypePppoe       ::= TEXTUAL-CONVENTION
          serviceName    | tmnxLocUsrDbPppoeServiceName
          sapId          | tmnxLocUsrDbPppoeSapId
          derivedId      | tmnxLocUsrDbPppoeDerivedId
-         encTagRange    | tmnxLocUsrDbPppoeEncTagRangeType"
+         encTagRange    | tmnxLocUsrDbPppoeEncTagRangeType
+         encTagSepRange | tmnxLudbPpp2EncTagRgOuterStart
+                          tmnxLudbPpp2EncTagRgOuterEnd
+                          tmnxLudbPpp2EncTagRgInnerStart
+                          tmnxLudbPpp2EncTagRgInnerEnd"
     SYNTAX      INTEGER {
-        none        (0),
-        circuitId   (1),
-        macAddr     (2),
-        remoteId    (3),
-        userName    (4),
-        serviceName (5),
-        sapId       (6),
-        encTagRange (7),
-        derivedId   (8),
-        reserved9   (9)
+        none           (0),
+        circuitId      (1),
+        macAddr        (2),
+        remoteId       (3),
+        userName       (4),
+        serviceName    (5),
+        sapId          (6),
+        encTagRange    (7),
+        derivedId      (8),
+        encTagSepRange (9)
     }
 
 TmnxLocUsrDbMatchTypeDhcp        ::= TEXTUAL-CONVENTION
@@ -192,7 +197,7 @@ TmnxLocUsrDbMatchTypeDhcp        ::= TEXTUAL-CONVENTION
          matching done to identify a DHCP host.
 
          The match type refers to one of these objects in the
-         tmnxLocUsrDbDhcpTable:
+         tmnxLocUsrDbDhcpTable or tmnxLudbDhcp2Table:
 
          match type        | object
          ------------------------------------------------
@@ -209,7 +214,11 @@ TmnxLocUsrDbMatchTypeDhcp        ::= TEXTUAL-CONVENTION
          derivedId         | ASCII string that uniquely identifies a host, and is
                              derived by a Python script from packet content
                              available during a DHCP transaction
-         ip                | 'tmnxLocUsrDbDhcpIpPrefixAddr' and related objects"
+         ip                | tmnxLocUsrDbDhcpIpPrefixAddr and related objects
+         encTagSepRange    | tmnxLudbDhcp2EncTagRgOuterStart
+                             tmnxLudbDhcp2EncTagRgOuterEnd
+                             tmnxLudbDhcp2EncTagRgInnerStart
+                             tmnxLudbDhcp2EncTagRgInnerEnd"
     SYNTAX      INTEGER {
         none              (0),
         circuitId         (1),
@@ -224,7 +233,7 @@ TmnxLocUsrDbMatchTypeDhcp        ::= TEXTUAL-CONVENTION
         dualStackRemoteId (10),
         derivedId         (11),
         ip                (12),
-        reserved13        (13)
+        encTagSepRange    (13)
     }
 
 TmnxLocUsrDbHostType             ::= TEXTUAL-CONVENTION
@@ -1682,7 +1691,15 @@ TmnxLocUsrDbPppoeUnmatchedEntry  ::= SEQUENCE
     tmnxLocUsrDbPppoeUnmatchedReason TmnxLocUsrDbUnmatchedReason,
     tmnxLocUsrDbPppoeUnDuplicateHost DisplayString,
     tmnxLocUsrDbPppoeUnServiceName   DisplayString,
-    tmnxLocUsrDbPppoeUnSapId         DisplayString
+    tmnxLocUsrDbPppoeUnSapId         DisplayString,
+    tmnxLocUsrDbPppoeUnDerivedId     DisplayString,
+    tmnxLocUsrDbPppoeUnEncTgRgType   TmnxPortEncapType,
+    tmnxLocUsrDbPppoeUnEncTgRgStart  TmnxEncapVal,
+    tmnxLocUsrDbPppoeUnEncTgRgEnd    TmnxEncapVal,
+    tmnxLocUsrDbPppoeUnEncTgRgOutSta Integer32,
+    tmnxLocUsrDbPppoeUnEncTgRgOutEnd Integer32,
+    tmnxLocUsrDbPppoeUnEncTgRgInnSta Integer32,
+    tmnxLocUsrDbPppoeUnEncTgRgInnEnd Integer32
 }
 
 tmnxLocUsrDbPppoeUnMacAddress    OBJECT-TYPE
@@ -1770,6 +1787,97 @@ tmnxLocUsrDbPppoeUnSapId         OBJECT-TYPE
         "The value of the object tmnxLocUsrDbPppoeUnSapId indicates the sapId
          of the unmatched host."
     ::= { tmnxLocUsrDbPppoeUnmatchedEntry 9 }
+
+tmnxLocUsrDbPppoeUnDerivedId     OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnDerivedId indicates the
+         string to be matched with a string that uniquely identifies a host and
+         is derived by a Python script from packet content available during a
+         PPP setup.
+
+         If the value of this object is the empty string, it is not used."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 10 }
+
+tmnxLocUsrDbPppoeUnEncTgRgType   OBJECT-TYPE
+    SYNTAX      TmnxPortEncapType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgType indicates the
+         type of encapsulation protocol configured for the SAP encap tag range
+         start and end values.
+
+         Can either be unknown, qEncap, qinqEncap or atmEncap."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 11 }
+
+tmnxLocUsrDbPppoeUnEncTgRgStart  OBJECT-TYPE
+    SYNTAX      TmnxEncapVal
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgStart indicates the
+         start label in the range of SAPs allowed on this host.
+
+         A value of 0 iso 1 is used when vci=*."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 12 }
+
+tmnxLocUsrDbPppoeUnEncTgRgEnd    OBJECT-TYPE
+    SYNTAX      TmnxEncapVal
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgEnd indicates the
+         end label in the range of SAPs allowed on this host.
+
+         A value of 0 iso 1 is used when vci=*."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 13 }
+
+tmnxLocUsrDbPppoeUnEncTgRgOutSta OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgOutSta indicates the
+         left bound (i.e. minimum value) of a range of outer VLANs allowed on
+         this PPP host. Value -1 indicates tmnxLocUsrDbPppoeUnEncTgRgOutSta is
+         not applicable."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 14 }
+
+tmnxLocUsrDbPppoeUnEncTgRgOutEnd OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgOutEnd indicates the
+         right bound (i.e. maximum value) of a range of outer VLANs allowed on
+         this PPP host. Value -1 indicates tmnxLocUsrDbPppoeUnEncTgRgOutEnd is
+         not applicable."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 15 }
+
+tmnxLocUsrDbPppoeUnEncTgRgInnSta OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgInnSta indicates the
+         left bound (i.e. minimum value) of a range of inner VLANs allowed on
+         this PPP host. Value -1 indicates tmnxLocUsrDbPppoeUnEncTgRgInnSta is
+         not applicable."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 16 }
+
+tmnxLocUsrDbPppoeUnEncTgRgInnEnd OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbPppoeUnEncTgRgInnEnd indicates the
+         right bound (i.e. maximum value) of a range of inner VLANs allowed on
+         this PPP host. Value -1 indicates tmnxLocUsrDbPppoeUnEncTgRgInnEnd is
+         not applicable."
+    ::= { tmnxLocUsrDbPppoeUnmatchedEntry 17 }
 
 tmnxLocUsrDbPppoeOptionTbleLstCh OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -2847,7 +2955,18 @@ TmnxLocUsrDbDhcpUnmatchedEntry   ::= SEQUENCE
     tmnxLocUsrDbDhcpUnString         DisplayString,
     tmnxLocUsrDbDhcpUnOption60       OCTET STRING,
     tmnxLocUsrDbDhcpUnmatchedReason  TmnxLocUsrDbUnmatchedReason,
-    tmnxLocUsrDbDhcpUnDuplicateHost  DisplayString
+    tmnxLocUsrDbDhcpUnDuplicateHost  DisplayString,
+    tmnxLocUsrDbDhcpUnDerivedId      DisplayString,
+    tmnxLocUsrDbDhcpUnEncTagRgType   TmnxPortEncapType,
+    tmnxLocUsrDbDhcpUnEncTagRgStart  TmnxEncapVal,
+    tmnxLocUsrDbDhcpUnEncTagRgEnd    TmnxEncapVal,
+    tmnxLocUsrDbDhcpUnIpPrefAddrType InetAddressType,
+    tmnxLocUsrDbDhcpUnIpPrefAddr     InetAddress,
+    tmnxLocUsrDbDhcpUnIpPrefLength   InetAddressPrefixLength,
+    tmnxLocUsrDbDhcpUnEncTagRgOutSta Integer32,
+    tmnxLocUsrDbDhcpUnEncTagRgOutEnd Integer32,
+    tmnxLocUsrDbDhcpUnEncTagRgInnSta Integer32,
+    tmnxLocUsrDbDhcpUnEncTagRgInnEnd Integer32
 }
 
 tmnxLocUsrDbDhcpUnMacAddress     OBJECT-TYPE
@@ -2948,6 +3067,124 @@ tmnxLocUsrDbDhcpUnDuplicateHost  OBJECT-TYPE
          This value of this object is the empty string, unless the value of
          tmnxLocUsrDbDhcpUnmatchedReason is 'duplicate (2)'."
     ::= { tmnxLocUsrDbDhcpUnmatchedEntry 10 }
+
+tmnxLocUsrDbDhcpUnDerivedId      OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnDerivedId indicates the
+         string to be matched with a string that uniquely identifies a host and
+         is derived by a Python script from packet content available during a
+         DHCP transaction.
+
+         If the value of this object is the empty string, it is not used."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 11 }
+
+tmnxLocUsrDbDhcpUnEncTagRgType   OBJECT-TYPE
+    SYNTAX      TmnxPortEncapType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgType indicates the
+         type of encapsulation protocol configured for the SAP encap tag range
+         start and end values.
+
+         Can either be unknown, qEncap or qinqEncap."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 12 }
+
+tmnxLocUsrDbDhcpUnEncTagRgStart  OBJECT-TYPE
+    SYNTAX      TmnxEncapVal
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgStart indicates the
+         start label in the range of SAPs allowed on this host.
+
+         A value of 0 iso 1 is used when vci=*."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 13 }
+
+tmnxLocUsrDbDhcpUnEncTagRgEnd    OBJECT-TYPE
+    SYNTAX      TmnxEncapVal
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgEnd indicates the
+         end label in the range of SAPs allowed on this host.
+
+         A value of 0 iso 1 is used when vci=*."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 14 }
+
+tmnxLocUsrDbDhcpUnIpPrefAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLocUsrDbDhcpUnIpPrefAddrType indicates the type of
+         address stored in tmnxLocUsrDbDhcpIpPrefixAddr."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 15 }
+
+tmnxLocUsrDbDhcpUnIpPrefAddr     OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLocUsrDbDhcpUnIpPrefAddr indicates the IP prefix
+         address used as match in host identification."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 16 }
+
+tmnxLocUsrDbDhcpUnIpPrefLength   OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength (0..128)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLocUsrDbDhcpUnIpPrefLength indicates the prefix
+         length of the IP prefix."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 17 }
+
+tmnxLocUsrDbDhcpUnEncTagRgOutSta OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgOutSta indicates the
+         left bound (i.e. minimum value) of a range of outer VLANs allowed on
+         this DHCP host. Value -1 indicates tmnxLocUsrDbDhcpUnEncTagRgOutSta is
+         not applicable."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 18 }
+
+tmnxLocUsrDbDhcpUnEncTagRgOutEnd OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgOutEnd indicates the
+         right bound (i.e. maximum value) of a range of outer VLANs allowed on
+         this DHCP host. Value -1 indicates tmnxLocUsrDbDhcpUnEncTagRgOutEnd is
+         not applicable."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 19 }
+
+tmnxLocUsrDbDhcpUnEncTagRgInnSta OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgInnSta indicates the
+         left bound (i.e. minimum value) of a range of inner VLANs allowed on
+         this DHCP host. Value -1 indicates tmnxLocUsrDbDhcpUnEncTagRgInnSta is
+         not applicable."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 20 }
+
+tmnxLocUsrDbDhcpUnEncTagRgInnEnd OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxLocUsrDbDhcpUnEncTagRgInnEnd indicates the
+         right bound (i.e. maximum value) of a range of inner VLANs allowed on
+         this DHCP host. Value -1 indicates tmnxLocUsrDbDhcpUnEncTagRgInnEnd is
+         not applicable."
+    ::= { tmnxLocUsrDbDhcpUnmatchedEntry 21 }
 
 tmnxLocUsrDbDhcpOptionTableLstCh OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -4970,7 +5207,11 @@ TmnxLudbDhcp2Entry               ::= SEQUENCE
     tmnxLudbDhcp2Interface           TNamedItemOrEmpty,
     tmnxLudbDhcp2GrpIfServiceName    TLNamedItemOrEmpty,
     tmnxLudbDhcp2RetailerServiceName TLNamedItemOrEmpty,
-    tmnxLudbDhcp2IdentServiceName    TLNamedItemOrEmpty
+    tmnxLudbDhcp2IdentServiceName    TLNamedItemOrEmpty,
+    tmnxLudbDhcp2EncTagRgOuterStart  Integer32,
+    tmnxLudbDhcp2EncTagRgOuterEnd    Integer32,
+    tmnxLudbDhcp2EncTagRgInnerStart  Integer32,
+    tmnxLudbDhcp2EncTagRgInnerEnd    Integer32
 }
 
 tmnxLudbDhcp2LastChangeTime      OBJECT-TYPE
@@ -5312,6 +5553,54 @@ tmnxLudbDhcp2IdentServiceName    OBJECT-TYPE
     DEFVAL      { "" }
     ::= { tmnxLudbDhcp2Entry 29 }
 
+tmnxLudbDhcp2EncTagRgOuterStart  OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbDhcp2EncTagRgOuterStart specifies the left bound
+         (i.e. minimum value) of a range of outer VLANs allowed on this DHCP
+         host. Value -1 indicates tmnxLudbDhcp2EncTagRgOuterStart is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbDhcp2Entry 30 }
+
+tmnxLudbDhcp2EncTagRgOuterEnd    OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbDhcp2EncTagRgOuterEnd specifies the right bound
+         (i.e. maximum value) of a range of outer VLANs allowed on this DHCP
+         host. Value -1 indicates tmnxLudbDhcp2EncTagRgOuterEnd is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbDhcp2Entry 31 }
+
+tmnxLudbDhcp2EncTagRgInnerStart  OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbDhcp2EncTagRgInnerStart specifies the left bound
+         (i.e. minimum value) of a range of inner VLANs allowed on this DHCP
+         host. Value -1 indicates tmnxLudbDhcp2EncTagRgInnerStart is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbDhcp2Entry 32 }
+
+tmnxLudbDhcp2EncTagRgInnerEnd    OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbDhcp2EncTagRgInnerEnd specifies the right bound
+         (i.e. maximum value) of a range of inner VLANs allowed on this DHCP
+         host. Value -1 indicates tmnxLudbDhcp2EncTagRgInnerEnd is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbDhcp2Entry 33 }
+
 tmnxLudbPpp2TableLastChange      OBJECT-TYPE
     SYNTAX      TimeStamp
     MAX-ACCESS  read-only
@@ -5361,7 +5650,11 @@ TmnxLudbPpp2Entry                ::= SEQUENCE
     tmnxLudbPpp2SpiGroupId           TmnxSubSpiGroupId,
     tmnxLudbPpp2RetailerServiceName  TLNamedItemOrEmpty,
     tmnxLudbPpp2GrpIfServiceName     TLNamedItemOrEmpty,
-    tmnxLudbPpp2L2tpGroupServiceName TLNamedItemOrEmpty
+    tmnxLudbPpp2L2tpGroupServiceName TLNamedItemOrEmpty,
+    tmnxLudbPpp2EncTagRgOuterStart   Integer32,
+    tmnxLudbPpp2EncTagRgOuterEnd     Integer32,
+    tmnxLudbPpp2EncTagRgInnerStart   Integer32,
+    tmnxLudbPpp2EncTagRgInnerEnd     Integer32
 }
 
 tmnxLudbPpp2LastChangeTime       OBJECT-TYPE
@@ -5590,6 +5883,54 @@ tmnxLudbPpp2L2tpGroupServiceName OBJECT-TYPE
          from the base router context"
     DEFVAL      { "" }
     ::= { tmnxLudbPpp2Entry 17 }
+
+tmnxLudbPpp2EncTagRgOuterStart   OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbPpp2EncTagRgOuterStart specifies the left bound
+         (i.e. minimum value) of a range of outer VLANs allowed on this PPP
+         host. Value -1 indicates tmnxLudbPpp2EncTagRgOuterStart is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbPpp2Entry 18 }
+
+tmnxLudbPpp2EncTagRgOuterEnd     OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbPpp2EncTagRgOuterEnd specifies the right bound
+         (i.e. maximum value) of a range of outer VLANs allowed on this PPP
+         host. Value -1 indicates tmnxLudbPpp2EncTagRgOuterEnd is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbPpp2Entry 19 }
+
+tmnxLudbPpp2EncTagRgInnerStart   OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbPpp2EncTagRgInnerStart specifies the left bound
+         (i.e. minimum value) of a range of inner VLANs allowed on this PPP
+         host. Value -1 indicates tmnxLudbPpp2EncTagRgInnerStart is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbPpp2Entry 20 }
+
+tmnxLudbPpp2EncTagRgInnerEnd     OBJECT-TYPE
+    SYNTAX      Integer32 (-1 | 0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxLudbPpp2EncTagRgInnerEnd specifies the right bound
+         (i.e. maximum value) of a range of inner VLANs allowed on this PPP
+         host. Value -1 indicates tmnxLudbPpp2EncTagRgInnerEnd is not
+         applicable and should not be used."
+    DEFVAL      { -1 }
+    ::= { tmnxLudbPpp2Entry 21 }
 
 tmnxLudbToClntOptTableLstCh      OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -6208,6 +6549,17 @@ tmnxLocalUserDbV16v0Compliance   MODULE-COMPLIANCE
             tmnxLocalUserDbV16v0Group
         }
     ::= { tmnxLocalUserDbCompliances 12 }
+
+tmnxLocalUserDbV20v0Compliance   MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for management of local user database on
+         Nokia SROS series systems."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxLocalUserDbV20v0Group
+        }
+    ::= { tmnxLocalUserDbCompliances 13 }
 
 tmnxLocalUserDbGroups            OBJECT IDENTIFIER ::= { tmnxLocalUserDbConformance 2 }
 
@@ -7157,6 +7509,42 @@ tmnxLocalUserDbV16v0Group        OBJECT-GROUP
         "The group of objects supporting local user database capability on
          Nokia SROS series systems added in release 16.0."
     ::= { tmnxLocalUserDbGroups 42 }
+
+tmnxLocalUserDbV20v0Group        OBJECT-GROUP
+    OBJECTS     {
+        tmnxLudbDhcp2EncTagRgOuterStart,
+        tmnxLudbDhcp2EncTagRgOuterEnd,
+        tmnxLudbDhcp2EncTagRgInnerStart,
+        tmnxLudbDhcp2EncTagRgInnerEnd,
+        tmnxLudbPpp2EncTagRgOuterStart,
+        tmnxLudbPpp2EncTagRgOuterEnd,
+        tmnxLudbPpp2EncTagRgInnerStart,
+        tmnxLudbPpp2EncTagRgInnerEnd,
+        tmnxLocUsrDbDhcpUnDerivedId,
+        tmnxLocUsrDbDhcpUnEncTagRgType,
+        tmnxLocUsrDbDhcpUnEncTagRgStart,
+        tmnxLocUsrDbDhcpUnEncTagRgEnd,
+        tmnxLocUsrDbDhcpUnEncTagRgOutSta,
+        tmnxLocUsrDbDhcpUnEncTagRgOutEnd,
+        tmnxLocUsrDbDhcpUnEncTagRgInnSta,
+        tmnxLocUsrDbDhcpUnEncTagRgInnEnd,
+        tmnxLocUsrDbDhcpUnIpPrefAddrType,
+        tmnxLocUsrDbDhcpUnIpPrefAddr,
+        tmnxLocUsrDbDhcpUnIpPrefLength,
+        tmnxLocUsrDbPppoeUnDerivedId,
+        tmnxLocUsrDbPppoeUnEncTgRgType,
+        tmnxLocUsrDbPppoeUnEncTgRgStart,
+        tmnxLocUsrDbPppoeUnEncTgRgEnd,
+        tmnxLocUsrDbPppoeUnEncTgRgOutSta,
+        tmnxLocUsrDbPppoeUnEncTgRgOutEnd,
+        tmnxLocUsrDbPppoeUnEncTgRgInnSta,
+        tmnxLocUsrDbPppoeUnEncTgRgInnEnd
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of new objects supporting local user databases for PPPoE
+         hosts on Nokia SROS series systems release 20.0."
+    ::= { tmnxLocalUserDbGroups 43 }
 
 tmnxLocalUserDbNotifGroups       OBJECT IDENTIFIER ::= { tmnxLocalUserDbConformance 3 }
 

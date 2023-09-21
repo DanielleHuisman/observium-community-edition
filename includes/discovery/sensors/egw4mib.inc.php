@@ -4,16 +4,16 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // EGW4MIB::EGW4GatewaySensorDeviceCount.0 = INTEGER: 2
 
 if (!snmp_get_oid($device, 'EGW4GatewaySensorDeviceCount.0', $mib)) {
-  return;
+    return;
 }
 
 // EGW4MIB::EGW4SensorInfoTranslatedFormatSensorDeviceID.856694 = Gauge32: 856694
@@ -58,39 +58,39 @@ if (!snmp_get_oid($device, 'EGW4GatewaySensorDeviceCount.0', $mib)) {
 $egw4 = snmpwalk_cache_oid($device, 'EGW4SensorInfoTranslatedFormatEntry', [], $mib);
 $oids = snmpwalk_cache_twopart_oid($device, 'EGW4SensorInfoTranslatedFormatByDatumNumberEntry', [], $mib);
 foreach ($oids as $egw4deviceid => $egw4device) {
-  if ($egw4[$egw4deviceid]['EGW4SensorInfoTranslatedFormatSensorDeviceActive'] !== 'Active') {
-    continue;
-  }
-
-  $name = $egw4[$egw4deviceid]['EGW4SensorInfoTranslatedFormatSensorDeviceType'];
-  $egw4count = count($egw4device);
-  foreach ($egw4device as $sensorid => $entry) {
-    //$entry = array_merge($entry, (array)$egw4[$egw4deviceid]);
-    $descr = $name;
-    if ($egw4count > 1) {
-      $descr .= " #$sensorid";
+    if ($egw4[$egw4deviceid]['EGW4SensorInfoTranslatedFormatSensorDeviceActive'] !== 'Active') {
+        continue;
     }
-    $index    = "$egw4deviceid.$sensorid";
-    $oid_name = 'EGW4SensorInfoTranslatedFormatByDatumNumberReadingValue';
-    $oid_num  = '.1.3.6.1.4.1.41542.2.2.2.3.'.$index;
-    $value    = $entry[$oid_name];
 
-    switch (strtolower($entry['EGW4SensorInfoTranslatedFormatByDatumNumberReadingUnits'])) {
-      case 'deg. c':
-        discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value);
-        break;
-      case 'ph':
-        discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value);
-        break;
-      case 'detected':
-        discover_status_ng($device, $mib, $oid_name, $oid_num, $index, 'EGW4SensorDetected', $descr, $value, [ 'entPhysicalClass' => 'sensor' ]);
-        break;
-      default:
-        print_warning("Unknown sensor Unit: ".$entry['EGW4SensorInfoTranslatedFormatByDatumNumberReadingUnits']);
-        print_debug_vars($egw4[$egw4deviceid]);
-        print_debug_vars($entry);
+    $name      = $egw4[$egw4deviceid]['EGW4SensorInfoTranslatedFormatSensorDeviceType'];
+    $egw4count = count($egw4device);
+    foreach ($egw4device as $sensorid => $entry) {
+        //$entry = array_merge($entry, (array)$egw4[$egw4deviceid]);
+        $descr = $name;
+        if ($egw4count > 1) {
+            $descr .= " #$sensorid";
+        }
+        $index    = "$egw4deviceid.$sensorid";
+        $oid_name = 'EGW4SensorInfoTranslatedFormatByDatumNumberReadingValue';
+        $oid_num  = '.1.3.6.1.4.1.41542.2.2.2.3.' . $index;
+        $value    = $entry[$oid_name];
+
+        switch (strtolower($entry['EGW4SensorInfoTranslatedFormatByDatumNumberReadingUnits'])) {
+            case 'deg. c':
+                discover_sensor_ng($device, 'temperature', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value);
+                break;
+            case 'ph':
+                discover_sensor_ng($device, 'humidity', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value);
+                break;
+            case 'detected':
+                discover_status_ng($device, $mib, $oid_name, $oid_num, $index, 'EGW4SensorDetected', $descr, $value, ['entPhysicalClass' => 'sensor']);
+                break;
+            default:
+                print_warning("Unknown sensor Unit: " . $entry['EGW4SensorInfoTranslatedFormatByDatumNumberReadingUnits']);
+                print_debug_vars($egw4[$egw4deviceid]);
+                print_debug_vars($entry);
+        }
     }
-  }
 }
 
 // EOF

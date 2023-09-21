@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -92,9 +92,8 @@
 
 $jnxVirtualChassisMember = snmp_cache_table($device, 'jnxVirtualChassisMemberTable', [], 'JUNIPER-VIRTUALCHASSIS-MIB');
 print_debug_vars($jnxVirtualChassisMember);
-if (!snmp_status() || count($jnxVirtualChassisMember) < 1)
-{
-  return;
+if (!snmp_status() || count($jnxVirtualChassisMember) < 1) {
+    return;
 }
 
 //$jnxVirtualChassisPort = snmpwalk_cache_twopart_oid($device, 'jnxVirtualChassisPortTable', [], 'JUNIPER-VIRTUALCHASSIS-MIB', NULL, OBS_SNMP_ALL_MULTILINE);
@@ -103,32 +102,29 @@ if (!snmp_status() || count($jnxVirtualChassisMember) < 1)
 //$mib_config = &$config['mibs'][$mib]['ports']['oids']; // Attach MIB options/translations
 //print_debug_vars($mib_config);
 
-foreach ($jnxVirtualChassisMember as $member => $chassis)
-{
-  if ($chassis['jnxVirtualChassisMemberRole'] === 'master')
-  {
-    // Skip master chassis (which already polled by IF-MIB)
-    print_debug("Skip JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisPortTable for master");
-    continue;
-  }
+foreach ($jnxVirtualChassisMember as $member => $chassis) {
+    if ($chassis['jnxVirtualChassisMemberRole'] === 'master') {
+        // Skip master chassis (which already polled by IF-MIB)
+        print_debug("Skip JUNIPER-VIRTUALCHASSIS-MIB::jnxVirtualChassisPortTable for master");
+        continue;
+    }
 
-  $jnxVirtualChassisPort = snmpwalk_cache_twopart_oid($device, 'jnxVirtualChassisPortOperStatus.'.$member, [], 'JUNIPER-VIRTUALCHASSIS-MIB', NULL, OBS_SNMP_ALL_MULTILINE);
-  print_debug_vars($jnxVirtualChassisPort);
+    $jnxVirtualChassisPort = snmpwalk_cache_twopart_oid($device, 'jnxVirtualChassisPortOperStatus.' . $member, [], 'JUNIPER-VIRTUALCHASSIS-MIB', NULL, OBS_SNMP_ALL_MULTILINE);
+    print_debug_vars($jnxVirtualChassisPort);
 
-  foreach ($jnxVirtualChassisPort[$member] as $jnxVirtualChassisPortName => $port)
-  {
-    $ifDescr = $jnxVirtualChassisPortName . ":vc$member";
-    // Generate numeric ifIndex based on port name
-    $ifIndex = string_to_id($ifDescr);
+    foreach ($jnxVirtualChassisPort[$member] as $jnxVirtualChassisPortName => $port) {
+        $ifDescr = $jnxVirtualChassisPortName . ":vc$member";
+        // Generate numeric ifIndex based on port name
+        $ifIndex = string_to_id($ifDescr);
 
-    // Append member options
-    $port = array_merge($port, $chassis);
+        // Append member options
+        $port = array_merge($port, $chassis);
 
-    $port_stats[$ifIndex]['ifDescr'] = $ifDescr;
-    $port_stats[$ifIndex]['ifName']  = $ifDescr;
-    $port_stats[$ifIndex]['ifOperStatus'] = $port['jnxVirtualChassisPortOperStatus'];
-    $port_stats[$ifIndex]['ifType'] = str_contains($ifDescr, '.') ? 'propVirtual' : 'other';
-  }
+        $port_stats[$ifIndex]['ifDescr']      = $ifDescr;
+        $port_stats[$ifIndex]['ifName']       = $ifDescr;
+        $port_stats[$ifIndex]['ifOperStatus'] = $port['jnxVirtualChassisPortOperStatus'];
+        $port_stats[$ifIndex]['ifType']       = str_contains($ifDescr, '.') ? 'propVirtual' : 'other';
+    }
 }
 
 // EOF

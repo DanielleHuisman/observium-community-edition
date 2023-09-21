@@ -3,9 +3,10 @@ TIMETRA-MLD-SNOOPING-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     eMplsTEPLblTEPAddrType,
     eMplsTEPLblTEPAddress,
-    eMplsTEPLblTEPLabel, vxlanVNI,
-    vxlanVTEPAddr, vxlanVTEPAddrType,
-    vxlanVTEPAddress
+    eMplsTEPLblTEPLabel, eVxlanVNI,
+    eVxlanVTEPAddr, eVxlanVTEPAddrType,
+    vxlanVNI, vxlanVTEPAddr,
+    vxlanVTEPAddrType, vxlanVTEPAddress
                                                          FROM ALCATEL-IGMP-SNOOPING-MIB
     InterfaceIndexOrZero
                                                          FROM IF-MIB
@@ -157,7 +158,8 @@ TlsMldSnpgConfigEntry            ::= SEQUENCE
     tlsMldSnpgCfgMvrPolicy           TPolicyStatementNameOrEmpty,
     tlsMldSnpgCfgFwdIpv6McastToInt   TruthValue,
     tlsMldSnpgCfgRvplsMrouter        TruthValue,
-    tlsMldSnpgCfgTxSmetRoutes        Unsigned32
+    tlsMldSnpgCfgTxSmetRoutes        Unsigned32,
+    tlsMldSnpgCfgEvpnProxy           TmnxAdminState
 }
 
 tlsMldSnpgCfgLastChangeTime      OBJECT-TYPE
@@ -331,6 +333,16 @@ tlsMldSnpgCfgTxSmetRoutes        OBJECT-TYPE
         "tlsMldSnpgCfgTxSmetRoutes is the number of advertised BGP Smet routes
          on this service."
     ::= { tlsMldSnpgConfigEntry 14 }
+
+tlsMldSnpgCfgEvpnProxy           OBJECT-TYPE
+    SYNTAX      TmnxAdminState
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "tlsMldSnpgCfgEvpnProxy specifies whether evpn-proxy  mode is enabled
+         on this service."
+    DEFVAL      { outOfService }
+    ::= { tlsMldSnpgConfigEntry 15 }
 
 tlsMldSnpgQuerierTable           OBJECT-TYPE
     SYNTAX      SEQUENCE OF TlsMldSnpgQuerierEntry
@@ -955,6 +967,165 @@ tlsMldSnpgMRouterVNI             OBJECT-TYPE
          tlsMldSnpgMRouterLocale is 'vxlan(4)'."
     ::= { tlsMldSnpgMRouterEntry 17 }
 
+tlsMldSnpgEvpnProxyGroupTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TlsMldSnpgEvpnProxyGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table tlsMldSnpgEvpnProxyGroupTable contains, together with the
+         table tlsMldSnpgEvpnProxyGrpSrcTable, multicast group address
+         information collected by MLD snooping for this Tls.
+
+         The content of this table is used by the system to 'proxy-report'
+         towards Bgp IMET destinations supporting evpn-proxy."
+    ::= { tmnxMldSnoopingTlsObjs 7 }
+
+tlsMldSnpgEvpnProxyGroupEntry    OBJECT-TYPE
+    SYNTAX      TlsMldSnpgEvpnProxyGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table contains information about a multicast group
+         address known in this Tls.
+
+         If a group source list is present, it is described in the
+         corresponding entries of the tlsMldSnpgEvpnProxyGrpSrcTable table."
+    INDEX       {
+        svcId,
+        tlsMldSnpgEvpnProxyGrpAddressTp,
+        tlsMldSnpgEvpnProxyGrpAddress
+    }
+    ::= { tlsMldSnpgEvpnProxyGroupTable 1 }
+
+TlsMldSnpgEvpnProxyGroupEntry    ::= SEQUENCE
+{
+    tlsMldSnpgEvpnProxyGrpAddressTp  InetAddressType,
+    tlsMldSnpgEvpnProxyGrpAddress    InetAddress,
+    tlsMldSnpgEvpnProxyGrpFilterMode TmnxMldGroupFilterMode,
+    tlsMldSnpgEvpnProxyGrpUpTime     TimeTicks,
+    tlsMldSnpgEvpnProxyGrpV1Support  TruthValue,
+    tlsMldSnpgEvpnProxyGrpV2Support  TruthValue
+}
+
+tlsMldSnpgEvpnProxyGrpAddressTp  OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpAddressTp indicates the
+         type of tlsMldSnpgEvpnProxyGrpAddress."
+    ::= { tlsMldSnpgEvpnProxyGroupEntry 1 }
+
+tlsMldSnpgEvpnProxyGrpAddress    OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpAddress indicates the IP
+         multicast group address for which this entry contains information."
+    ::= { tlsMldSnpgEvpnProxyGroupEntry 2 }
+
+tlsMldSnpgEvpnProxyGrpFilterMode OBJECT-TYPE
+    SYNTAX      TmnxMldGroupFilterMode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpFilterMode indicates the
+         filter-mode for this group."
+    ::= { tlsMldSnpgEvpnProxyGroupEntry 3 }
+
+tlsMldSnpgEvpnProxyGrpUpTime     OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpUpTime indicates how
+         long (in centiseconds) that the group address already exists in the
+         database."
+    ::= { tlsMldSnpgEvpnProxyGroupEntry 4 }
+
+tlsMldSnpgEvpnProxyGrpV1Support  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpV1Support indicates
+         whether MLD Version 1 is supported for this group address."
+    ::= { tlsMldSnpgEvpnProxyGroupEntry 5 }
+
+tlsMldSnpgEvpnProxyGrpV2Support  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpV2Support indicates
+         whether MLD Version 2 is supported for this group address."
+    ::= { tlsMldSnpgEvpnProxyGroupEntry 6 }
+
+tlsMldSnpgEvpnProxyGrpSrcTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TlsMldSnpgEvpnProxyGrpSrcEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table tlsMldSnpgEvpnProxyGrpSrcTable lists the IPv6 multicast
+         sources corresponding to the IPv6 multicast groups listed in the
+         tlsMldSnpgEvpnProxyGroupTable."
+    ::= { tmnxMldSnoopingTlsObjs 8 }
+
+tlsMldSnpgEvpnProxyGrpSrcEntry   OBJECT-TYPE
+    SYNTAX      TlsMldSnpgEvpnProxyGrpSrcEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "tlsMldSnpgEvpnProxyGrpSrcEntry describes an entry in the
+         tlsMldSnpgEvpnProxyGrpSrcTable.
+
+         Each entry represents an IPv6 multicast source for which the system is
+         interested/not interested in receiving multicast traffic from."
+    INDEX       {
+        svcId,
+        tlsMldSnpgEvpnProxyGrpAddressTp,
+        tlsMldSnpgEvpnProxyGrpAddress,
+        tlsMldSnpgEvpnProxyGrpSrcAddrTp,
+        tlsMldSnpgEvpnProxyGrpSrcAddr
+    }
+    ::= { tlsMldSnpgEvpnProxyGrpSrcTable 1 }
+
+TlsMldSnpgEvpnProxyGrpSrcEntry   ::= SEQUENCE
+{
+    tlsMldSnpgEvpnProxyGrpSrcAddrTp  InetAddressType,
+    tlsMldSnpgEvpnProxyGrpSrcAddr    InetAddress,
+    tlsMldSnpgEvpnProxyGrpSrcUpTime  TimeTicks
+}
+
+tlsMldSnpgEvpnProxyGrpSrcAddrTp  OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpSrcAddrTp indicates the
+         type of tlsMldSnpgEvpnProxyGrpSrcAddr."
+    ::= { tlsMldSnpgEvpnProxyGrpSrcEntry 1 }
+
+tlsMldSnpgEvpnProxyGrpSrcAddr    OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpSrcAddr indicates the
+         IPv6 multicast source address."
+    ::= { tlsMldSnpgEvpnProxyGrpSrcEntry 2 }
+
+tlsMldSnpgEvpnProxyGrpSrcUpTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tlsMldSnpgEvpnProxyGrpSrcUpTime indicates how
+         long (in centiseconds) that the source address already exists in the
+         database."
+    ::= { tlsMldSnpgEvpnProxyGrpSrcEntry 3 }
+
 tmnxMldSnoopingSapObjs           OBJECT IDENTIFIER ::= { tmnxMldSnoopingObjs 2 }
 
 sapMldSnpgConfigTableLastChange  OBJECT-TYPE
@@ -1574,7 +1745,8 @@ SapMldSnpgGrpSrcEntry            ::= SEQUENCE
     sapMldSnpgGrpSrcAddr             InetAddress,
     sapMldSnpgGrpSrcType             TmnxMldGroupType,
     sapMldSnpgGrpSrcUpTime           TimeTicks,
-    sapMldSnpgGrpSrcExpiryTime       Unsigned32
+    sapMldSnpgGrpSrcExpiryTime       Unsigned32,
+    sapMldSnpgGrpSrcFwdOrBlk         INTEGER
 }
 
 sapMldSnpgGrpSrcAddrType         OBJECT-TYPE
@@ -1653,6 +1825,18 @@ sapMldSnpgGrpSrcExpiryTime       OBJECT-TYPE
          for the group is 'exclude(2)', it means that no system desires to
          receive multicast traffic from this source."
     ::= { sapMldSnpgGrpSrcEntry 5 }
+
+sapMldSnpgGrpSrcFwdOrBlk         OBJECT-TYPE
+    SYNTAX      INTEGER {
+        forward (1),
+        block   (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgGrpSrcFwdOrBlk indicates whether this entry is on the
+         forward list or block list."
+    ::= { sapMldSnpgGrpSrcEntry 6 }
 
 sapMldSnpgStaticGrpSrcTableLstCh OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -1765,7 +1949,11 @@ sapMldSnpgStatsTable             OBJECT-TYPE
     MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION
-        "sapMldSnpgStatsTable contains statistics on MLD snooping per SAP."
+        "sapMldSnpgStatsTable contains statistics on MLD snooping per SAP.
+
+         Conceptual rows in this table are created and deleted automatically by
+         the system when MLD snooping is enabled and disabled in the interface
+         containing the SAP."
     ::= { tmnxMldSnoopingSapObjs 7 }
 
 sapMldSnpgStatsEntry             OBJECT-TYPE
@@ -1818,7 +2006,13 @@ SapMldSnpgStatsEntry             ::= SEQUENCE
     sapMldSnpgMcsFailures            Counter32,
     sapMldSnpgRxLocalScopePkts       Counter32,
     sapMldSnpgRxRsvdScopePkts        Counter32,
-    sapMldSnpgMcacPolicyDrops        Counter32
+    sapMldSnpgMcacPolicyDrops        Counter32,
+    sapMldSnpgRxJoinSyncRtes         Unsigned32,
+    sapMldSnpgDropJoinSyncRtes       Unsigned32,
+    sapMldSnpgTxJoinSyncRtes         Unsigned32,
+    sapMldSnpgRxLeaveSyncRtes        Unsigned32,
+    sapMldSnpgDropLeaveSyncRtes      Unsigned32,
+    sapMldSnpgTxLeaveSyncRtes        Unsigned32
 }
 
 sapMldSnpgTxGenQueries           OBJECT-TYPE
@@ -2148,6 +2342,60 @@ sapMldSnpgMcacPolicyDrops        OBJECT-TYPE
          of times an MLD Group is dropped because of applying a multicast CAC
          policy on this SAP."
     ::= { sapMldSnpgStatsEntry 35 }
+
+sapMldSnpgRxJoinSyncRtes         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgRxJoinSyncRtes is the number of received Bgp Multicast Join
+         Sync routes fort this SAP."
+    ::= { sapMldSnpgStatsEntry 36 }
+
+sapMldSnpgDropJoinSyncRtes       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgDropJoinSyncRtes is the number of dropped Bgp Multicast Join
+         Sync routes for this SAP."
+    ::= { sapMldSnpgStatsEntry 37 }
+
+sapMldSnpgTxJoinSyncRtes         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgTxJoinSyncRtes is the number of transmitted Smet Bgp
+         Multicast Join Sync from this SAP."
+    ::= { sapMldSnpgStatsEntry 38 }
+
+sapMldSnpgRxLeaveSyncRtes        OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgRxLeaveSyncRtes is the number of received Bgp Multicast
+         Leave Sync routes for this SAP."
+    ::= { sapMldSnpgStatsEntry 39 }
+
+sapMldSnpgDropLeaveSyncRtes      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgDropLeaveSyncRtes is the number of dropped Bgp Multicast
+         Leave Sync routes for this SAP."
+    ::= { sapMldSnpgStatsEntry 40 }
+
+sapMldSnpgTxLeaveSyncRtes        OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sapMldSnpgTxLeaveSyncRtes is the number of transmitted Smet Bgp
+         Multicast Leave Sync from this SAP."
+    ::= { sapMldSnpgStatsEntry 41 }
 
 sapMldSnpgMcacLevelTable         OBJECT-TYPE
     SYNTAX      SEQUENCE OF SapMldSnpgMcacLevelEntry
@@ -2782,7 +3030,8 @@ SdpBindMldSnpgGrpSrcEntry        ::= SEQUENCE
     sdpBndMldSnpgGrpSrcAddr          InetAddress,
     sdpBndMldSnpgGrpSrcType          TmnxMldGroupType,
     sdpBndMldSnpgGrpSrcUpTime        TimeTicks,
-    sdpBndMldSnpgGrpSrcExpiryTime    Unsigned32
+    sdpBndMldSnpgGrpSrcExpiryTime    Unsigned32,
+    sdpBndMldSnpgGrpSrcFwdOrBlk      INTEGER
 }
 
 sdpBndMldSnpgGrpSrcAddrType      OBJECT-TYPE
@@ -2861,6 +3110,18 @@ sdpBndMldSnpgGrpSrcExpiryTime    OBJECT-TYPE
          filter-mode for the group is 'exclude(2)', it means that no system
          desires to receive multicast traffic from this source."
     ::= { sdpBindMldSnpgGrpSrcEntry 5 }
+
+sdpBndMldSnpgGrpSrcFwdOrBlk      OBJECT-TYPE
+    SYNTAX      INTEGER {
+        forward (1),
+        block   (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgGrpSrcFwdOrBlk indicates whether this entry is on the
+         forward list or block list."
+    ::= { sdpBindMldSnpgGrpSrcEntry 6 }
 
 sdpBindMldSnpgStatGrpSrcTblLstCh OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -2971,7 +3232,11 @@ sdpBindMldSnpgStatsTable         OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "sdpBindMldSnpgStatsTable contains statistics on MLD snooping per SDP
-         Bind."
+         Bind.
+
+         Conceptual rows in this table are created and deleted automatically by
+         the system when MLD snooping is enabled and disabled in the interface
+         containing the SDP bind."
     ::= { tmnxMldSnoopingSdpBindObjs 7 }
 
 sdpBindMldSnpgStatsEntry         OBJECT-TYPE
@@ -3020,7 +3285,13 @@ SdpBindMldSnpgStatsEntry         ::= SEQUENCE
     sdpBndMldSnpgRxWrongVersionPkts  Counter32,
     sdpBndMldSnpgRxLocalScopePkts    Counter32,
     sdpBndMldSnpgRxRsvdScopePkts     Counter32,
-    sdpBndMldSnpgMcacPolicyDrops     Counter32
+    sdpBndMldSnpgMcacPolicyDrops     Counter32,
+    sdpBndMldSnpgRxJoinSyncRtes      Unsigned32,
+    sdpBndMldSnpgDropJoinSyncRtes    Unsigned32,
+    sdpBndMldSnpgTxJoinSyncRtes      Unsigned32,
+    sdpBndMldSnpgRxLeaveSyncRtes     Unsigned32,
+    sdpBndMldSnpgDropLeaveSyncRtes   Unsigned32,
+    sdpBndMldSnpgTxLeaveSyncRtes     Unsigned32
 }
 
 sdpBndMldSnpgTxGenQueries        OBJECT-TYPE
@@ -3326,6 +3597,60 @@ sdpBndMldSnpgMcacPolicyDrops     OBJECT-TYPE
          multicast CAC policy on this SDP Bind."
     ::= { sdpBindMldSnpgStatsEntry 32 }
 
+sdpBndMldSnpgRxJoinSyncRtes      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgRxJoinSyncRtes is the number of received Bgp Multicast
+         Join Sync routes fort this SDP Bind."
+    ::= { sdpBindMldSnpgStatsEntry 33 }
+
+sdpBndMldSnpgDropJoinSyncRtes    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgDropJoinSyncRtes is the number of dropped Bgp Multicast
+         Join Sync routes for this SDP Bind."
+    ::= { sdpBindMldSnpgStatsEntry 34 }
+
+sdpBndMldSnpgTxJoinSyncRtes      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgTxJoinSyncRtes is the number of transmitted Smet Bgp
+         Multicast Join Sync from this SDP Bind."
+    ::= { sdpBindMldSnpgStatsEntry 35 }
+
+sdpBndMldSnpgRxLeaveSyncRtes     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgRxLeaveSyncRtes is the number of received Bgp Multicast
+         Leave Sync routes for this SDP Bind."
+    ::= { sdpBindMldSnpgStatsEntry 36 }
+
+sdpBndMldSnpgDropLeaveSyncRtes   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgDropLeaveSyncRtes is the number of dropped Bgp Multicast
+         Leave Sync routes for this SDP Bind."
+    ::= { sdpBindMldSnpgStatsEntry 37 }
+
+sdpBndMldSnpgTxLeaveSyncRtes     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "sdpBndMldSnpgTxLeaveSyncRtes is the number of transmitted Smet Bgp
+         Multicast Leave Sync from this SDP Bind."
+    ::= { sdpBindMldSnpgStatsEntry 38 }
+
 tmnxMldSnoopingNotificationObjs  OBJECT IDENTIFIER ::= { tmnxMldSnoopingObjs 4 }
 
 tmnxMldSnpgGroupAddressType      OBJECT-TYPE
@@ -3364,7 +3689,10 @@ vxlanMldSnpgGroupTable           OBJECT-TYPE
     DESCRIPTION
         "vxlanMldSnpgGroupTable together with the table vxlanMldSnpgGrpSrcTable
          contains multicast group address information collected by MLD snooping
-         for each VXLAN."
+         for each VXLAN.
+
+         Support for this table will be discontinued. Please use
+         eVxlanMldSnpgGroupTable instead."
     ::= { tmnxMldSnoopingVxlanObjs 1 }
 
 vxlanMldSnpgGroupEntry           OBJECT-TYPE
@@ -3375,7 +3703,10 @@ vxlanMldSnpgGroupEntry           OBJECT-TYPE
         "Each entry in this table indicates a multicast group address learned
          by MLD snooping on this VXLAN. If a Source list is present it is
          described in the corresponding entries of the vxlanMldSnpgGrpSrcTable
-         table."
+         table.
+
+         Support for this entry will be discontinued. Please use
+         eVxlanMldSnpgGroupEntry instead."
     INDEX       {
         svcId,
         vxlanVTEPAddr,
@@ -3486,7 +3817,10 @@ vxlanMldSnpgGrpSrcTable          OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "vxlanMldSnpgGrpSrcTable lists the IPv4 multicast Sources corresponding
-         to the IPv4 multicast groups listed in the vxlanMldSnpgGroupTable."
+         to the IPv4 multicast groups listed in the vxlanMldSnpgGroupTable.
+
+         Support for this table will be discontinued. Please use
+         eVxlanMldSnpgGrpSrcTable instead."
     ::= { tmnxMldSnoopingVxlanObjs 2 }
 
 vxlanMldSnpgGrpSrcEntry          OBJECT-TYPE
@@ -3496,7 +3830,10 @@ vxlanMldSnpgGrpSrcEntry          OBJECT-TYPE
     DESCRIPTION
         "An entry in the vxlanMldSnpgGrpSrcTable. Each entry represents a
          Source address from which receivers are interested/not interested in
-         receiving multicast traffic from."
+         receiving multicast traffic from.
+
+         Support for this entry will be discontinued. Please use
+         eVxlanMldSnpgGrpSrcEntry instead."
     INDEX       {
         svcId,
         vxlanVTEPAddr,
@@ -3514,7 +3851,8 @@ VxlanMldSnpgGrpSrcEntry          ::= SEQUENCE
     vxlanMldSnpgGrpSrcAddr           InetAddress,
     vxlanMldSnpgGrpSrcType           TmnxIgmpSnpgGroupType,
     vxlanMldSnpgGrpSrcUpTime         TimeTicks,
-    vxlanMldSnpgGrpSrcExpiryTime     Unsigned32
+    vxlanMldSnpgGrpSrcExpiryTime     Unsigned32,
+    vxlanMldSnpgGrpSrcFwdOrBlk       INTEGER
 }
 
 vxlanMldSnpgGrpSrcAddrType       OBJECT-TYPE
@@ -3594,12 +3932,27 @@ vxlanMldSnpgGrpSrcExpiryTime     OBJECT-TYPE
          desires to receive multicast traffic from this Source."
     ::= { vxlanMldSnpgGrpSrcEntry 5 }
 
+vxlanMldSnpgGrpSrcFwdOrBlk       OBJECT-TYPE
+    SYNTAX      INTEGER {
+        forward (1),
+        block   (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "vxlanMldSnpgGrpSrcFwdOrBlk indicates whether this entry is on the
+         forward list or block list."
+    ::= { vxlanMldSnpgGrpSrcEntry 6 }
+
 vxlanMldSnpgStatsTable           OBJECT-TYPE
     SYNTAX      SEQUENCE OF VxlanMldSnpgStatsEntry
     MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION
-        "vxlanMldSnpgStatsTable contains statistics on MLD snooping per VXLAN."
+        "vxlanMldSnpgStatsTable contains statistics on MLD snooping per VXLAN.
+
+         Support for this table will be discontinued. Please use
+         eVxlanMldSnpgStatsTable instead."
     ::= { tmnxMldSnoopingVxlanObjs 3 }
 
 vxlanMldSnpgStatsEntry           OBJECT-TYPE
@@ -3608,7 +3961,10 @@ vxlanMldSnpgStatsEntry           OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "vxlanMldSnpgStatsEntry is an entry in the vxlanMldSnpgStatsTable. Each
-         entry contains MLD snooping statics for a VXLAN in a Tls."
+         entry contains MLD snooping statics for a VXLAN in a Tls.
+
+         Support for this entry will be discontinued. Please use
+         eVxlanMldSnpgStatsEntry instead."
     INDEX       {
         svcId,
         vxlanVTEPAddr,
@@ -3983,7 +4339,8 @@ VxlanMldSnpgStateEntry           ::= SEQUENCE
     vxlanMldRxSmetRoutes             Unsigned32,
     vxlanMldDroppedSmetRoutes        Unsigned32,
     vxlanMldOrigAddrType             InetAddressType,
-    vxlanMldOrigAddress              InetAddress
+    vxlanMldOrigAddress              InetAddress,
+    vxlanMldEvpnProxySupport         TruthValue
 }
 
 vxlanMldSnpgOperState            OBJECT-TYPE
@@ -4046,6 +4403,628 @@ vxlanMldOrigAddress              OBJECT-TYPE
     DESCRIPTION
         ""
     ::= { vxlanMldSnpgStateEntry 7 }
+
+vxlanMldEvpnProxySupport         OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "vxlanMldEvpnProxySupport indicates whether Mld Proxy  is supported on
+         this VXLAN."
+    ::= { vxlanMldSnpgStateEntry 8 }
+
+eVxlanMldSnpgGroupTable          OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EVxlanMldSnpgGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "eVxlanMldSnpgGroupTable together with the table
+         eVxlanMldSnpgGrpSrcTable contains multicast group address information
+         collected by MLD snooping for each VXLAN."
+    ::= { tmnxMldSnoopingVxlanObjs 5 }
+
+eVxlanMldSnpgGroupEntry          OBJECT-TYPE
+    SYNTAX      EVxlanMldSnpgGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table indicates a multicast group address learned
+         by MLD snooping on this VXLAN. If a Source list is present it is
+         described in the corresponding entries of the eVxlanMldSnpgGrpSrcTable
+         table."
+    INDEX       {
+        svcId,
+        eVxlanVTEPAddrType,
+        eVxlanVTEPAddr,
+        eVxlanVNI,
+        eVxlanMldSnpgGrpAddressType,
+        eVxlanMldSnpgGrpAddress
+    }
+    ::= { eVxlanMldSnpgGroupTable 1 }
+
+EVxlanMldSnpgGroupEntry          ::= SEQUENCE
+{
+    eVxlanMldSnpgGrpAddressType      InetAddressType,
+    eVxlanMldSnpgGrpAddress          InetAddress,
+    eVxlanMldSnpgGrpType             TmnxIgmpSnpgGroupType,
+    eVxlanMldSnpgGrpFilterMode       TmnxMldGroupFilterMode,
+    eVxlanMldSnpgGrpUpTime           TimeTicks,
+    eVxlanMldSnpgGrpExpiryTime       Unsigned32,
+    eVxlanMldSnpgGrpCompatMode       Unsigned32,
+    eVxlanMldSnpgGrpV1HostExpTime    Unsigned32
+}
+
+eVxlanMldSnpgGrpAddressType      OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpAddressType indicates the type
+         of eVxlanMldSnpgGrpAddress."
+    ::= { eVxlanMldSnpgGroupEntry 1 }
+
+eVxlanMldSnpgGrpAddress          OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpAddress indicates the IPv6
+         multicast group address for which this entry contains information."
+    ::= { eVxlanMldSnpgGroupEntry 2 }
+
+eVxlanMldSnpgGrpType             OBJECT-TYPE
+    SYNTAX      TmnxIgmpSnpgGroupType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpType indicates whether this
+         entry was learned dynamically or was statically configured."
+    ::= { eVxlanMldSnpgGroupEntry 3 }
+
+eVxlanMldSnpgGrpFilterMode       OBJECT-TYPE
+    SYNTAX      TmnxMldGroupFilterMode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpFilterMode indicates the
+         filter-mode for this group."
+    ::= { eVxlanMldSnpgGroupEntry 5 }
+
+eVxlanMldSnpgGrpUpTime           OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpUpTime indicates how long (in
+         centiseconds) that the group address already exists in the database
+         for this VXLAN."
+    ::= { eVxlanMldSnpgGroupEntry 6 }
+
+eVxlanMldSnpgGrpExpiryTime       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpExpiryTime indicates the
+         amount of time remaining before this entry will be aged out."
+    ::= { eVxlanMldSnpgGroupEntry 7 }
+
+eVxlanMldSnpgGrpCompatMode       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpCompatMode indicates the MLD
+         version applicable on this VXLAN for this multicast group address.
+         This corresponds to the lowest version seen for this group address on
+         this VXLAN."
+    ::= { eVxlanMldSnpgGroupEntry 8 }
+
+eVxlanMldSnpgGrpV1HostExpTime    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpV1HostExpTime indicates the
+         time remaining until the system will assume that there are no longer
+         any MLDv1 members on this SAP.
+
+         Upon hearing any MLDv1 Membership Report, this value is reset to the
+         group membership interval. While this time remaining is non-zero, the
+         system ignores any MLDv2 'leave' messages for this group that it
+         receives on this VXLAN."
+    ::= { eVxlanMldSnpgGroupEntry 9 }
+
+eVxlanMldSnpgGrpSrcTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EVxlanMldSnpgGrpSrcEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "eVxlanMldSnpgGrpSrcTable lists the IPv4 multicast Sources
+         corresponding to the IPv4 multicast groups listed in the
+         eVxlanMldSnpgGroupTable."
+    ::= { tmnxMldSnoopingVxlanObjs 6 }
+
+eVxlanMldSnpgGrpSrcEntry         OBJECT-TYPE
+    SYNTAX      EVxlanMldSnpgGrpSrcEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the eVxlanMldSnpgGrpSrcTable. Each entry represents a
+         Source address from which receivers are interested/not interested in
+         receiving multicast traffic from."
+    INDEX       {
+        svcId,
+        eVxlanVTEPAddrType,
+        eVxlanVTEPAddr,
+        eVxlanVNI,
+        eVxlanMldSnpgGrpAddressType,
+        eVxlanMldSnpgGrpAddress,
+        eVxlanMldSnpgGrpSrcAddrType,
+        eVxlanMldSnpgGrpSrcAddr
+    }
+    ::= { eVxlanMldSnpgGrpSrcTable 1 }
+
+EVxlanMldSnpgGrpSrcEntry         ::= SEQUENCE
+{
+    eVxlanMldSnpgGrpSrcAddrType      InetAddressType,
+    eVxlanMldSnpgGrpSrcAddr          InetAddress,
+    eVxlanMldSnpgGrpSrcType          TmnxIgmpSnpgGroupType,
+    eVxlanMldSnpgGrpSrcUpTime        TimeTicks,
+    eVxlanMldSnpgGrpSrcExpiryTime    Unsigned32,
+    eVxlanMldSnpgGrpSrcFwdOrBlk      INTEGER
+}
+
+eVxlanMldSnpgGrpSrcAddrType      OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpSrcAddrType indicates the type
+         of eVxlanMldSnpgGrpSrcAddr."
+    ::= { eVxlanMldSnpgGrpSrcEntry 1 }
+
+eVxlanMldSnpgGrpSrcAddr          OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpSrcAddr indicates the address
+         of the source sending multicast traffic to the group identified by
+         eVxlanMldSnpgGrpAddress.
+
+         If the value of eVxlanMldSnpgGrpFilterMode corresponding to this entry
+         is 'include(1)', the receivers are interested in receiving traffic
+         from this source.
+
+         If the value of eVxlanMldSnpgGrpFilterMode corresponding to this entry
+         is 'exclude(2)' the receivers, are not interested in receiving traffic
+         from this source."
+    ::= { eVxlanMldSnpgGrpSrcEntry 2 }
+
+eVxlanMldSnpgGrpSrcType          OBJECT-TYPE
+    SYNTAX      TmnxIgmpSnpgGroupType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpSrcType indicates how this
+         source entry was learned.
+
+         If this source entry was learned, this object is set to 'dynamic(2)'.
+         For statically configured sources, this object is set to 'static(1)'."
+    ::= { eVxlanMldSnpgGrpSrcEntry 3 }
+
+eVxlanMldSnpgGrpSrcUpTime        OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpSrcUpTime indicates how long
+         (in centiseconds) that the Source address already exists in the
+         database for this VXLAN."
+    ::= { eVxlanMldSnpgGrpSrcEntry 4 }
+
+eVxlanMldSnpgGrpSrcExpiryTime    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgGrpSrcExpiryTime indicates the
+         minimum amount of time remaining before this entry will be aged out.
+
+         If the value of eVxlanMldSnpgGrpSrcExpiryTime is non-zero and the
+         value of eVxlanMldSnpgGrpFilterMode corresponding to this entry is
+         'include(1)', it means that there are currently one or more systems
+         which desire to receive multicast traffic for this Source.
+
+         If this timer expires and the value of eVxlanMldSnpgGrpFilterMode is
+         'include(1)', the system concludes that traffic from this particular
+         Source is no longer desired on the attached network, and deletes this
+         entry.
+
+         If the value of eVxlanMldSnpgGrpSrcExpiryTime is non-zero and the
+         filter-mode for the group is 'exclude(2)', it means that at least one
+         system desires to receive multicast traffic from this source.
+
+         If the value of eVxlanMldSnpgGrpSrcExpiryTime is zero and the
+         filter-mode for the group is 'exclude(2)', it means that no system
+         desires to receive multicast traffic from this Source."
+    ::= { eVxlanMldSnpgGrpSrcEntry 5 }
+
+eVxlanMldSnpgGrpSrcFwdOrBlk      OBJECT-TYPE
+    SYNTAX      INTEGER {
+        forward (1),
+        block   (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "eVxlanMldSnpgGrpSrcFwdOrBlk indicates whether this entry is on the
+         forward list or block list."
+    ::= { eVxlanMldSnpgGrpSrcEntry 6 }
+
+eVxlanMldSnpgStatsTable          OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EVxlanMldSnpgStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "eVxlanMldSnpgStatsTable contains statistics on MLD snooping per VXLAN."
+    ::= { tmnxMldSnoopingVxlanObjs 7 }
+
+eVxlanMldSnpgStatsEntry          OBJECT-TYPE
+    SYNTAX      EVxlanMldSnpgStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "eVxlanMldSnpgStatsEntry is an entry in the eVxlanMldSnpgStatsTable.
+         Each entry contains MLD snooping statics for a VXLAN in a Tls."
+    INDEX       {
+        svcId,
+        eVxlanVTEPAddrType,
+        eVxlanVTEPAddr,
+        eVxlanVNI
+    }
+    ::= { eVxlanMldSnpgStatsTable 1 }
+
+EVxlanMldSnpgStatsEntry          ::= SEQUENCE
+{
+    eVxlanMldSnpgTxGenQueries        Counter32,
+    eVxlanMldSnpgTxGrpSpecQueries    Counter32,
+    eVxlanMldSnpgTxSrcSpecQueries    Counter32,
+    eVxlanMldSnpgTxV1Reports         Counter32,
+    eVxlanMldSnpgTxV2Reports         Counter32,
+    eVxlanMldSnpgTxV1Leaves          Counter32,
+    eVxlanMldSnpgRxGenQueries        Counter32,
+    eVxlanMldSnpgRxGrpSpecQueries    Counter32,
+    eVxlanMldSnpgRxSrcSpecQueries    Counter32,
+    eVxlanMldSnpgRxV1Reports         Counter32,
+    eVxlanMldSnpgRxV2Reports         Counter32,
+    eVxlanMldSnpgRxV1Leaves          Counter32,
+    eVxlanMldSnpgRxUnknownType       Counter32,
+    eVxlanMldSnpgFwdGenQueries       Counter32,
+    eVxlanMldSnpgFwdGrpSpecQueries   Counter32,
+    eVxlanMldSnpgFwdSrcSpecQueries   Counter32,
+    eVxlanMldSnpgFwdV1Reports        Counter32,
+    eVxlanMldSnpgFwdV2Reports        Counter32,
+    eVxlanMldSnpgFwdV1Leaves         Counter32,
+    eVxlanMldSnpgFwdUnknownType      Counter32,
+    eVxlanMldSnpgRxBadLenPkts        Counter32,
+    eVxlanMldSnpgRxBadMldChksmPkts   Counter32,
+    eVxlanMldSnpgRxBadEncodedPkts    Counter32,
+    eVxlanMldSnpgRxNoRtrAlertPkts    Counter32,
+    eVxlanMldSnpgRxZeroSrcAdrPkts    Counter32,
+    eVxlanMldSnpgSendQueryCfgDrops   Counter32,
+    eVxlanMldSnpgImportPolicyDrops   Counter32,
+    eVxlanMldSnpgMaxNumGroupsDrops   Counter32,
+    eVxlanMldSnpgRxWrongVersionPkts  Counter32,
+    eVxlanMldSnpgRxLocalScopePkts    Counter32,
+    eVxlanMldSnpgRxRsvdScopePkts     Counter32,
+    eVxlanMldSnpgMcacPolicyDrops     Counter32
+}
+
+eVxlanMldSnpgTxGenQueries        OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgTxGenQueries indicates the number
+         of MLD General Queries transmitted on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 1 }
+
+eVxlanMldSnpgTxGrpSpecQueries    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgTxGrpSpecQueries indicates the
+         number of MLD Group-Specific Queries transmitted on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 2 }
+
+eVxlanMldSnpgTxSrcSpecQueries    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgTxSrcSpecQueries indicates the
+         number of MLD Group-And-Source-Specific Queries transmitted on this
+         VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 3 }
+
+eVxlanMldSnpgTxV1Reports         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgTxV1Reports indicates the number
+         of MLDv1 Reports transmitted on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 4 }
+
+eVxlanMldSnpgTxV2Reports         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgTxV2Reports indicates the number
+         of MLDv2 Reports transmitted on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 5 }
+
+eVxlanMldSnpgTxV1Leaves          OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgTxV1Leaves indicates the number
+         of MLDv1 Leaves transmitted on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 6 }
+
+eVxlanMldSnpgRxGenQueries        OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxGenQueries indicates the number
+         of MLD General Queries received on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 7 }
+
+eVxlanMldSnpgRxGrpSpecQueries    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxGrpSpecQueries indicates the
+         number of MLD Group-Specific Queries received on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 8 }
+
+eVxlanMldSnpgRxSrcSpecQueries    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxSrcSpecQueries indicates the
+         number of MLD Group-And-Source-Specific Queries received on this
+         VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 9 }
+
+eVxlanMldSnpgRxV1Reports         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxV1Reports indicates the number
+         of MLDv1 Reports received on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 10 }
+
+eVxlanMldSnpgRxV2Reports         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxV2Reports indicates the number
+         of MLDv2 Reports received on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 11 }
+
+eVxlanMldSnpgRxV1Leaves          OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxV1Leaves indicates the number
+         of MLDv1 Leaves received on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 12 }
+
+eVxlanMldSnpgRxUnknownType       OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxUnknownType indicates the
+         number of MLD unknown type packets received on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 13 }
+
+eVxlanMldSnpgFwdGenQueries       OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdGenQueries indicates the
+         number of MLD General Queries forwarded on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 14 }
+
+eVxlanMldSnpgFwdGrpSpecQueries   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdGrpSpecQueries indicates the
+         number of MLD Group-Specific Queries forwarded on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 15 }
+
+eVxlanMldSnpgFwdSrcSpecQueries   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdSrcSpecQueries indicates the
+         number of MLD Group-And-Source-Specific Queries forwarded on this
+         VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 16 }
+
+eVxlanMldSnpgFwdV1Reports        OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdV1Reports indicates the number
+         of MLDv1 Reports forwarded on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 17 }
+
+eVxlanMldSnpgFwdV2Reports        OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdV2Reports indicates the number
+         of MLDv2 Reports forwarded on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 18 }
+
+eVxlanMldSnpgFwdV1Leaves         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdV1Leaves indicates the number
+         of MLDv1 Leaves forwarded on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 19 }
+
+eVxlanMldSnpgFwdUnknownType      OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgFwdUnknownType indicates the
+         number of MLD unknown type packets forwarded on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 20 }
+
+eVxlanMldSnpgRxBadLenPkts        OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxBadLenPkts indicates the number
+         of MLD packets dropped on this VXLAN because of a bad length."
+    ::= { eVxlanMldSnpgStatsEntry 21 }
+
+eVxlanMldSnpgRxBadMldChksmPkts   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxBadMldChksmPkts indicates the
+         number of dropped MLD packets on this VXLAN because of a bad MLD
+         header checksum."
+    ::= { eVxlanMldSnpgStatsEntry 22 }
+
+eVxlanMldSnpgRxBadEncodedPkts    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxBadEncodedPkts indicates the
+         number of MLD packets dropped on this VXLAN because of a bad encoding."
+    ::= { eVxlanMldSnpgStatsEntry 23 }
+
+eVxlanMldSnpgRxNoRtrAlertPkts    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxNoRtrAlertPkts indicates the
+         number of MLD packets dropped on this VXLAN because the Router Alert
+         Option in the IP packet is not set."
+    ::= { eVxlanMldSnpgStatsEntry 24 }
+
+eVxlanMldSnpgRxZeroSrcAdrPkts    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxZeroSrcAdrPkts indicates the
+         number of MLD packets dropped on this VXLAN because they contain a
+         zero source IPv6 address."
+    ::= { eVxlanMldSnpgStatsEntry 25 }
+
+eVxlanMldSnpgSendQueryCfgDrops   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgSendQueryCfgDrops indicates the
+         number of times an MLD Query is dropped because the object
+         sapMldSnpgCfgSendQueries for this VXLAN is set to 'enabled(1)'."
+    ::= { eVxlanMldSnpgStatsEntry 26 }
+
+eVxlanMldSnpgImportPolicyDrops   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgImportPolicyDrops indicates the
+         number of times an MLD Group or Source is dropped because of applying
+         an import policy on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 27 }
+
+eVxlanMldSnpgMaxNumGroupsDrops   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgMaxNumGroupsDrops indicates the
+         number of times an MLD Group is dropped because of exceeding the
+         configured maximum number of groups on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 28 }
+
+eVxlanMldSnpgRxWrongVersionPkts  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxWrongVersionPkts indicates the
+         total number of MLD packets with a wrong version received on this
+         VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 29 }
+
+eVxlanMldSnpgRxLocalScopePkts    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxLocalScopePkts indicates the
+         number of MLD packets received on the link-local scope IPv6 multicast
+         address."
+    ::= { eVxlanMldSnpgStatsEntry 30 }
+
+eVxlanMldSnpgRxRsvdScopePkts     OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgRxRsvdScopePkts indicates the
+         number of MLD packets received on the reserved scope IPv6 multicast
+         address."
+    ::= { eVxlanMldSnpgStatsEntry 31 }
+
+eVxlanMldSnpgMcacPolicyDrops     OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object eVxlanMldSnpgMcacPolicyDrops indicates the
+         number of times an MLD Group is dropped because of applying a
+         multicast CAC policy on this VXLAN."
+    ::= { eVxlanMldSnpgStatsEntry 32 }
 
 tmnxMldSnoopingEMplsObjs         OBJECT IDENTIFIER ::= { tmnxMldSnoopingObjs 6 }
 
@@ -4569,7 +5548,8 @@ EMplsTEPLblMldSnpgGrpSrcEntry    ::= SEQUENCE
     eMplsTEPLblMldSnpgGrpSrcAddr     InetAddress,
     eMplsTEPLblMldSnpgGrpSrcType     TmnxIgmpSnpgGroupType,
     eMplsTEPLblMldSnpgGrpSrcUpTime   TimeTicks,
-    eMplsTEPLblMldSnpgGrpSrcExpTime  Unsigned32
+    eMplsTEPLblMldSnpgGrpSrcExpTime  Unsigned32,
+    eMplsTEPLblMldSnpgGrpSrcFwdOrBlk INTEGER
 }
 
 eMplsTEPLblMldSnpgGrpSrcAddrType OBJECT-TYPE
@@ -4646,6 +5626,18 @@ eMplsTEPLblMldSnpgGrpSrcExpTime  OBJECT-TYPE
          desires to receive multicast traffic from this Source."
     ::= { eMplsTEPLblMldSnpgGrpSrcEntry 5 }
 
+eMplsTEPLblMldSnpgGrpSrcFwdOrBlk OBJECT-TYPE
+    SYNTAX      INTEGER {
+        forward (1),
+        block   (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "eMplsTEPLblMldSnpgGrpSrcFwdOrBlk indicates whether this entry is on
+         the forward list or block list."
+    ::= { eMplsTEPLblMldSnpgGrpSrcEntry 6 }
+
 eMplsTEPLblMldSnpgStateTable     OBJECT-TYPE
     SYNTAX      SEQUENCE OF EMplsTEPLblMldSnpgStateEntry
     MAX-ACCESS  not-accessible
@@ -4679,7 +5671,8 @@ EMplsTEPLblMldSnpgStateEntry     ::= SEQUENCE
     eMplsTEPLblMldRxSmetRoutes       Unsigned32,
     eMplsTEPLblMldDroppedSmetRoutes  Unsigned32,
     eMplsTEPLblMldOrigAddrType       InetAddressType,
-    eMplsTEPLblMldOrigAddress        InetAddress
+    eMplsTEPLblMldOrigAddress        InetAddress,
+    eMplsTEPLblMldEvpnProxySupport   TruthValue
 }
 
 eMplsTEPLblMldSnpgOperState      OBJECT-TYPE
@@ -4743,6 +5736,15 @@ eMplsTEPLblMldOrigAddress        OBJECT-TYPE
     DESCRIPTION
         ""
     ::= { eMplsTEPLblMldSnpgStateEntry 7 }
+
+eMplsTEPLblMldEvpnProxySupport   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "eMplsTEPLblMldEvpnProxySupport indicates whether Mld Proxy  is
+         supported on this BGP EVPN-MPLS TEP and egress label pair."
+    ::= { eMplsTEPLblMldSnpgStateEntry 8 }
 
 tmnxMldSnoopingConformance       OBJECT IDENTIFIER ::= { tmnxSRConfs 45 }
 
@@ -4903,7 +5905,13 @@ tmnxMldSnoopingV20v0Compliance   MODULE-COMPLIANCE
          SR release 20.0 series systems."
     MODULE
         MANDATORY-GROUPS {
-            tmnxVxlanMldSnpgStateV20v0Grp
+            tmnxVxlanMldSnpgStateV20v0Grp,
+            tmnxMldSnpgStatsV20v0Group,
+            tmnxTlsMldSnpgConfigV20v0Group,
+            tmnxEMplsMldSnpgStatsV20v0Grp,
+            tmnxMldSnpgProxyV20v0Group,
+            tmnxVxlanMldSnpgGroupV20v0Grp,
+            tmnxVxlanMldSnpgStatsV20v0Grp
         }
     ::= { tmnxMldSnoopingCompliances 8 }
 
@@ -5383,13 +6391,135 @@ tmnxVxlanMldSnpgStateV20v0Grp    OBJECT-GROUP
         vxlanMldSnpgGroupCount,
         vxlanMldSnpgOperState,
         vxlanMldOrigAddrType,
-        vxlanMldOrigAddress
+        vxlanMldOrigAddress,
+        vxlanMldEvpnProxySupport,
+        vxlanMldSnpgGrpSrcFwdOrBlk
     }
     STATUS      current
     DESCRIPTION
         "The group of objects that allow to view statistics for MLD snooping on
          a VXLAN on Nokia 7x50 SR series release 20.0 systems."
     ::= { tmnxMldSnoopingGroups 20 }
+
+tmnxMldSnpgStatsV20v0Group       OBJECT-GROUP
+    OBJECTS     {
+        sapMldSnpgRxJoinSyncRtes,
+        sapMldSnpgDropJoinSyncRtes,
+        sapMldSnpgTxJoinSyncRtes,
+        sapMldSnpgRxLeaveSyncRtes,
+        sapMldSnpgDropLeaveSyncRtes,
+        sapMldSnpgTxLeaveSyncRtes,
+        sapMldSnpgGrpSrcFwdOrBlk,
+        sdpBndMldSnpgRxJoinSyncRtes,
+        sdpBndMldSnpgDropJoinSyncRtes,
+        sdpBndMldSnpgTxJoinSyncRtes,
+        sdpBndMldSnpgRxLeaveSyncRtes,
+        sdpBndMldSnpgDropLeaveSyncRtes,
+        sdpBndMldSnpgTxLeaveSyncRtes,
+        sdpBndMldSnpgGrpSrcFwdOrBlk
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects that allow to view statistics for MLD snooping on
+         release 20.0 Nokia 7xxx SR series systems."
+    ::= { tmnxMldSnoopingGroups 21 }
+
+tmnxTlsMldSnpgConfigV20v0Group   OBJECT-GROUP
+    OBJECTS     {
+        tlsMldSnpgCfgEvpnProxy
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of MLD-Snooping on TLS
+         level on Nokia 7x50 SR release 20.0 series systems."
+    ::= { tmnxMldSnoopingGroups 22 }
+
+tmnxEMplsMldSnpgStatsV20v0Grp    OBJECT-GROUP
+    OBJECTS     {
+        eMplsTEPLblMldEvpnProxySupport,
+        eMplsTEPLblMldSnpgGrpSrcFwdOrBlk
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects that allow to view statistics for MLD snooping on
+         an evpn-mpls on Nokia 7x50 SR series release 20.0 systems."
+    ::= { tmnxMldSnoopingGroups 23 }
+
+tmnxMldSnpgProxyV20v0Group       OBJECT-GROUP
+    OBJECTS     {
+        tlsMldSnpgEvpnProxyGrpFilterMode,
+        tlsMldSnpgEvpnProxyGrpUpTime,
+        tlsMldSnpgEvpnProxyGrpSrcUpTime,
+        tlsMldSnpgEvpnProxyGrpV1Support,
+        tlsMldSnpgEvpnProxyGrpV2Support
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects that allow to monitor the MLD snooping
+         information used to proxy report to Bgp IMET destinations on Nokia
+         7xxx SR series systems."
+    ::= { tmnxMldSnoopingGroups 24 }
+
+tmnxVxlanMldSnpgGroupV20v0Grp    OBJECT-GROUP
+    OBJECTS     {
+        eVxlanMldSnpgGrpType,
+        eVxlanMldSnpgGrpFilterMode,
+        eVxlanMldSnpgGrpUpTime,
+        eVxlanMldSnpgGrpExpiryTime,
+        eVxlanMldSnpgGrpCompatMode,
+        eVxlanMldSnpgGrpV1HostExpTime,
+        eVxlanMldSnpgGrpSrcType,
+        eVxlanMldSnpgGrpSrcUpTime,
+        eVxlanMldSnpgGrpSrcExpiryTime,
+        eVxlanMldSnpgGrpSrcFwdOrBlk
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects that allow to monitor the MLD snooping
+         information that is collected for a given VXLAN on Nokia 7x50 SR
+         series release 20.0 systems."
+    ::= { tmnxMldSnoopingGroups 25 }
+
+tmnxVxlanMldSnpgStatsV20v0Grp    OBJECT-GROUP
+    OBJECTS     {
+        eVxlanMldSnpgTxGenQueries,
+        eVxlanMldSnpgTxGrpSpecQueries,
+        eVxlanMldSnpgTxSrcSpecQueries,
+        eVxlanMldSnpgTxV1Reports,
+        eVxlanMldSnpgTxV2Reports,
+        eVxlanMldSnpgTxV1Leaves,
+        eVxlanMldSnpgRxGenQueries,
+        eVxlanMldSnpgRxGrpSpecQueries,
+        eVxlanMldSnpgRxSrcSpecQueries,
+        eVxlanMldSnpgRxV1Reports,
+        eVxlanMldSnpgRxV2Reports,
+        eVxlanMldSnpgRxV1Leaves,
+        eVxlanMldSnpgRxUnknownType,
+        eVxlanMldSnpgFwdGenQueries,
+        eVxlanMldSnpgFwdGrpSpecQueries,
+        eVxlanMldSnpgFwdSrcSpecQueries,
+        eVxlanMldSnpgFwdV1Reports,
+        eVxlanMldSnpgFwdV2Reports,
+        eVxlanMldSnpgFwdV1Leaves,
+        eVxlanMldSnpgFwdUnknownType,
+        eVxlanMldSnpgRxBadLenPkts,
+        eVxlanMldSnpgRxBadMldChksmPkts,
+        eVxlanMldSnpgRxBadEncodedPkts,
+        eVxlanMldSnpgRxNoRtrAlertPkts,
+        eVxlanMldSnpgRxZeroSrcAdrPkts,
+        eVxlanMldSnpgSendQueryCfgDrops,
+        eVxlanMldSnpgImportPolicyDrops,
+        eVxlanMldSnpgMaxNumGroupsDrops,
+        eVxlanMldSnpgRxWrongVersionPkts,
+        eVxlanMldSnpgRxLocalScopePkts,
+        eVxlanMldSnpgRxRsvdScopePkts,
+        eVxlanMldSnpgMcacPolicyDrops
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects that allow to view statistics for MLD snooping on
+         a VXLAN on Nokia 7x50 SR series release 20.0 systems."
+    ::= { tmnxMldSnoopingGroups 26 }
 
 tmnxMldSnoopingNotifyPrefix      OBJECT IDENTIFIER ::= { tmnxSRNotifyPrefix 45 }
 

@@ -484,7 +484,7 @@ class ref {
       // expecting 3 components on the 'param' tag: type varName varDescription
       if ($tag === 'param') {
         $lastIdx = 2;
-        if (in_array($parts[1][0], array('&', '$'), true)) {
+        if ($parts[1][0] === '&' || $parts[1][0] === '$') {
           $line     = ltrim(array_pop($parts));
           $parts    = array_merge($parts, explode(' ', $line, 2));
           $parts[2] = isset($parts[2]) ? ltrim($parts[2]) : null;
@@ -718,10 +718,10 @@ class ref {
       } elseif ($m[0] === '\\') {
         if (isset($m[1]) && preg_match('/^[1-9]/', $m[1])) {
           $nonBackrefDigits = '';
-          $num = substr(+$m, 1);
+          $num = substr((int)$m, 1);
 
           while ($num > $capturingGroupCount) {
-            preg_match('/[0-9]$/', $num, $digits);
+            preg_match('/\d$/', $num, $digits);
             $nonBackrefDigits = $digits[0] . $nonBackrefDigits;
             $num = floor($num / 10);
           }
@@ -730,7 +730,7 @@ class ref {
             $output[] = array('meta' =>  "\\{$num}", 'text' => $nonBackrefDigits);
 
           } else {
-            preg_match('/^\\\\([0-3][0-7]{0,2}|[4-7][0-7]?|[89])([0-9]*)/', $m, $pts);
+            preg_match('/^\\\\([0-3][0-7]{0,2}|[4-7][0-7]?|[89])(\d*)/', $m, $pts);
             $output[] = array('meta' => '\\' . $pts[1], 'text' => $pts[2]);
           }
 
@@ -758,13 +758,13 @@ class ref {
           throw new \Exception('Quantifiers must be preceded by a token that can be repeated');
         }
 
-        preg_match('/^\{([0-9]+)(?:,([0-9]*))?/', $m, $interval);
+        preg_match('/^\{(\d+)(?:,(\d*))?/', $m, $interval);
 
-        if ($interval && (+$interval[1] > 65535 || (isset($interval[2]) && (+$interval[2] > 65535)))) {
+        if ($interval && ((int)$interval[1] > 65535 || (isset($interval[2]) && ((int)$interval[2] > 65535)))) {
           throw new \Exception('Interval quantifier cannot use value over 65,535');
         }
 
-        if ($interval && isset($interval[2]) && (+$interval[1] > +$interval[2])) {
+        if ($interval && isset($interval[2]) && ((int)$interval[1] > (int)$interval[2])) {
           throw new \Exception('Interval quantifier range is reversed');
         }
 
@@ -1622,7 +1622,8 @@ class ref {
                 $date   = new \DateTime($subject);
                 $errors = \DateTime::getLastErrors();
 
-                if (($errors['warning_count'] < 1) && ($errors['error_count'] < 1)) {
+                if (is_array($errors) &&
+                    ($errors['warning_count'] < 1) && ($errors['error_count'] < 1)) {
                   $now    = new \Datetime('now');
                   $nowUtc = new \Datetime('now', new \DateTimeZone('UTC'));
                   $diff   = $now->diff($date);

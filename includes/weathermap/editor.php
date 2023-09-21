@@ -8,7 +8,7 @@ require_once 'lib/WMVector.class.php';
 require_once 'lib/WMLine.class.php';
 
 if(!isset($config)) {
-    require_once '../../includes/sql-config.inc.php';
+    require_once '../../includes/observium.inc.php';
     include_once($config['html_dir'] . "/includes/functions.inc.php");
     $vars = get_vars(); // Parse vars from GET/POST/URI
 }

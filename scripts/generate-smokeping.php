@@ -5,18 +5,20 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage scripts
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     scripts
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-chdir(dirname($argv[0]).'/..');
+chdir(dirname($argv[0]) . '/..');
 
 $options = getopt("d");
-if (isset($options['d'])) { array_shift($argv); } // for compatibility
+if (isset($options['d'])) {
+    array_shift($argv);
+} // for compatibility
 
-include_once("includes/sql-config.inc.php");
+include_once("includes/observium.inc.php");
 
 ?>
 *** Targets ***
@@ -28,9 +30,8 @@ title = Network Latency Grapher
 remark = Welcome to Observium SmokePing
 <?php
 
-if (is_array($config['smokeping']['slaves']))
-{
-  echo('slaves = ' . implode(' ', $config['smokeping']['slaves']) . PHP_EOL);
+if (is_array($config['smokeping']['slaves'])) {
+    echo('slaves = ' . implode(' ', $config['smokeping']['slaves']) . PHP_EOL);
 }
 
 ?>
@@ -40,10 +41,9 @@ menu = Observium
 
 <?php
 
-foreach (dbFetchRows("SELECT hostname FROM `devices` WHERE `ignore` = 0 AND `disabled` = 0 ORDER BY hostname") as $device)
-{
-  echo("++ " . str_replace('.', $config['smokeping']['split_char'], $device['hostname']) . PHP_EOL);
-  echo("host = " . $device['hostname'] . PHP_EOL . PHP_EOL);
+foreach (dbFetchRows("SELECT hostname FROM `devices` WHERE `ignore` = 0 AND `disabled` = 0 ORDER BY hostname") as $device) {
+    echo("++ " . str_replace('.', $config['smokeping']['split_char'], $device['hostname']) . PHP_EOL);
+    echo("host = " . $device['hostname'] . PHP_EOL . PHP_EOL);
 }
 
 // EOF

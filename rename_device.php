@@ -5,49 +5,48 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]));
 
 $options = getopt("dp");
-if (isset($options['d'])) { array_shift($argv); } // for compatibility
+if (isset($options['d'])) {
+    array_shift($argv);
+} // for compatibility
 
-include("includes/sql-config.inc.php");
+include("includes/observium.inc.php");
 
-print_message("%g".OBSERVIUM_PRODUCT." ".OBSERVIUM_VERSION."\n%WRename Device%n\n", 'color');
-if (OBS_DEBUG) { print_versions(); }
+print_message("%g" . OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION . "\n%WRename Device%n\n", 'color');
+if (OBS_DEBUG) {
+    print_versions();
+}
 
-if (isset($options['p']))
-{
-  $options['ping_skip'] = 1;
-  array_shift($argv);
+if (isset($options['p'])) {
+    $options['ping_skip'] = 1;
+    array_shift($argv);
 }
 
 // Remove a host and all related data from the system
-if ($argv[1] && $argv[2])
-{
-  $host = strtolower($argv[1]);
-  $id = get_device_id_by_hostname($host);
-  if ($id)
-  {
-    $tohost = strtolower($argv[2]);
-    $toid = get_device_id_by_hostname($tohost);
-    if ($toid)
-    {
-      print_error("NOT renamed. New hostname $tohost already exists.");
+if ($argv[1] && $argv[2]) {
+    $host = strtolower($argv[1]);
+    $id   = get_device_id_by_hostname($host);
+    if ($id) {
+        $tohost = strtolower($argv[2]);
+        $toid   = get_device_id_by_hostname($tohost);
+        if ($toid) {
+            print_error("NOT renamed. New hostname $tohost already exists.");
+        } else {
+            if (renamehost($id, $tohost, 'console', $options)) {
+                print_message("Host $host renamed to $tohost.");
+            }
+        }
     } else {
-      if (renamehost($id, $tohost, 'console', $options))
-      {
-        print_message("Host $host renamed to $tohost.");
-      }
+        print_error("Host $host doesn't exist.");
     }
-  } else {
-    print_error("Host $host doesn't exist.");
-  }
 } else {
     print_message("%n
 USAGE:

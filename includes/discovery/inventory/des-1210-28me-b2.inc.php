@@ -1,32 +1,32 @@
 <?php
 if (is_device_mib($device, 'DES-1210-28ME-B2')) {
-  $vendor_mib = 'DES-1210-28ME-B2';
-  $vendor_oids = snmpwalk_cache_oid($device, "sfpVendorInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
-  print_debug_vars($vendor_oids);
+    $vendor_mib  = 'DES-1210-28ME-B2';
+    $vendor_oids = snmpwalk_cache_oid($device, "sfpVendorInfoTable", $vendor_oids, $vendor_mib, NULL, $snmp_flags);
+    print_debug_vars($vendor_oids);
 
-  $copperports = 24;
-  $comboports = 2;
-  $fiberports = 2;
+    $copperports = 24;
+    $comboports  = 2;
+    $fiberports  = 2;
 } else {
-  return;
+    return;
 }
 
 echo($vendor_mib);
-$revision                    = snmp_get_oid($device, 'probeHardwareRev.0',  'RMON2-MIB');
+$revision = snmp_get_oid($device, 'probeHardwareRev.0', 'RMON2-MIB');
 
-$system_index = 1;
+$system_index             = 1;
 $inventory[$system_index] = [
-    'entPhysicalDescr'        => $device['sysDescr'],
-    'entPhysicalClass'        => 'chassis',
-    'entPhysicalName'         => $device['hardware'],
-    'entPhysicalHardwareRev'  => $revision,
-    'entPhysicalSoftwareRev'  => $device['version'],
-    'entPhysicalIsFRU'        => 'true',
-    'entPhysicalModelName'    => $device['hardware'],
-    'entPhysicalSerialNum'    => $device['serial'],
-    'entPhysicalContainedIn'  => 0,
-    'entPhysicalParentRelPos' => 1,
-    'entPhysicalMfgName'      => 'D-Link',
+  'entPhysicalDescr'        => $device['sysDescr'],
+  'entPhysicalClass'        => 'chassis',
+  'entPhysicalName'         => $device['hardware'],
+  'entPhysicalHardwareRev'  => $revision,
+  'entPhysicalSoftwareRev'  => $device['version'],
+  'entPhysicalIsFRU'        => 'true',
+  'entPhysicalModelName'    => $device['hardware'],
+  'entPhysicalSerialNum'    => $device['serial'],
+  'entPhysicalContainedIn'  => 0,
+  'entPhysicalParentRelPos' => 1,
+  'entPhysicalMfgName'      => 'D-Link',
 ];
 discover_inventory($device, $system_index, $inventory[$system_index], $vendor_mib);
 
@@ -93,41 +93,41 @@ DES-1210-28ME-B2::sfpDateCode.28 = STRING: "120224  "
 
 $totalports = $copperports + $comboports + $fiberports;
 for ($i = 1; $i <= $totalports; $i++) {
-  $system_index = 100 + $i;
-  if ($i <= $copperports) {
-    $inventory[$system_index] = [
-      'entPhysicalDescr'        => '100Base-T Copper Port',
-      'entPhysicalClass'        => 'port',
-      'entPhysicalName'         => 'Port '.$i,
-      'entPhysicalIsFRU'        => 'false',
-      'entPhysicalModelName'    => 'Copper Port',
-      'entPhysicalContainedIn'  => 1,
-      'entPhysicalParentRelPos' => $i,
-      'ifIndex'                 => $i,
-    ];
-  } else {
-    if ($i <= $copperports + $comboports) {
-      $portdescr = 'Combo Port';
+    $system_index = 100 + $i;
+    if ($i <= $copperports) {
+        $inventory[$system_index] = [
+          'entPhysicalDescr'        => '100Base-T Copper Port',
+          'entPhysicalClass'        => 'port',
+          'entPhysicalName'         => 'Port ' . $i,
+          'entPhysicalIsFRU'        => 'false',
+          'entPhysicalModelName'    => 'Copper Port',
+          'entPhysicalContainedIn'  => 1,
+          'entPhysicalParentRelPos' => $i,
+          'ifIndex'                 => $i,
+        ];
     } else {
-      $portdescr = 'SFP Port';
+        if ($i <= $copperports + $comboports) {
+            $portdescr = 'Combo Port';
+        } else {
+            $portdescr = 'SFP Port';
+        }
+        $inventory[$system_index] = [
+          'entPhysicalDescr'        => $portdescr,
+          'entPhysicalClass'        => 'port',
+          'entPhysicalName'         => 'Port ' . $i,
+          'entPhysicalIsFRU'        => 'false',
+          'entPhysicalModelName'    => trim($vendor_oids[$i]['sfpTranceiverCode']),
+          'entPhysicalContainedIn'  => 1,
+          'entPhysicalParentRelPos' => $i,
+          'ifIndex'                 => $i,
+          'entPhysicalVendorType'   => trim($vendor_oids[$i]['sfpConnectorType']),
+          'entPhysicalSerialNum'    => trim($vendor_oids[$i]['sfpVendorSn']),
+          'entPhysicalHardwareRev'  => trim($vendor_oids[$i]['sfpVendorPn']),
+          'entPhysicalFirmwareRev'  => trim($vendor_oids[$i]['sfpVendorRev']),
+          'entPhysicalMfgName'      => trim($vendor_oids[$i]['sfpVendorName']),
+        ];
     }
-    $inventory[$system_index] = [
-      'entPhysicalDescr'        => $portdescr,
-      'entPhysicalClass'        => 'port',
-      'entPhysicalName'         => 'Port '.$i,
-      'entPhysicalIsFRU'        => 'false',
-      'entPhysicalModelName'    => trim($vendor_oids[$i]['sfpTranceiverCode']),
-      'entPhysicalContainedIn'  => 1,
-      'entPhysicalParentRelPos' => $i,
-      'ifIndex'                 => $i,
-      'entPhysicalVendorType'   => trim($vendor_oids[$i]['sfpConnectorType']),
-      'entPhysicalSerialNum'    => trim($vendor_oids[$i]['sfpVendorSn']),
-      'entPhysicalHardwareRev'  => trim($vendor_oids[$i]['sfpVendorPn']),
-      'entPhysicalFirmwareRev'  => trim($vendor_oids[$i]['sfpVendorRev']),
-      'entPhysicalMfgName'      => trim($vendor_oids[$i]['sfpVendorName']),
-    ];
-  }
-  discover_inventory($device, $system_index, $inventory[$system_index], $vendor_mib);
+    discover_inventory($device, $system_index, $inventory[$system_index], $vendor_mib);
 }
 print_debug_vars($inventory);
 

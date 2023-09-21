@@ -4,49 +4,50 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (!is_device_mib($device, 'UCD-SNMP-MIB')) { return; }
+if (!is_device_mib($device, 'UCD-SNMP-MIB')) {
+    return;
+}
 
-  $load_rrd  = "ucd_load.rrd";
-  $cpu_rrd   = "ucd_cpu.rrd";
-  $mem_rrd   = "ucd_mem.rrd";
+$load_rrd = "ucd_load.rrd";
+$cpu_rrd  = "ucd_cpu.rrd";
+$mem_rrd  = "ucd_mem.rrd";
 
-  // Poll systemStats from UNIX-like hosts running UCD/Net-SNMPd
+// Poll systemStats from UNIX-like hosts running UCD/Net-SNMPd
 
-  #UCD-SNMP-MIB::ssIndex.0 = INTEGER: 1
-  #UCD-SNMP-MIB::ssErrorName.0 = STRING: systemStats
-  #UCD-SNMP-MIB::ssSwapIn.0 = INTEGER: 0 kB
-  #UCD-SNMP-MIB::ssSwapOut.0 = INTEGER: 0 kB
-  #UCD-SNMP-MIB::ssIOSent.0 = INTEGER: 1864 blocks/s
-  #UCD-SNMP-MIB::ssIOReceive.0 = INTEGER: 7 blocks/s
-  #UCD-SNMP-MIB::ssSysInterrupts.0 = INTEGER: 7572 interrupts/s
-  #UCD-SNMP-MIB::ssSysContext.0 = INTEGER: 10254 switches/s
-  #UCD-SNMP-MIB::ssCpuUser.0 = INTEGER: 4
-  #UCD-SNMP-MIB::ssCpuSystem.0 = INTEGER: 3
-  #UCD-SNMP-MIB::ssCpuIdle.0 = INTEGER: 77
-  #UCD-SNMP-MIB::ssCpuRawUser.0 = Counter32: 194386556
-  #UCD-SNMP-MIB::ssCpuRawNice.0 = Counter32: 15673
-  #UCD-SNMP-MIB::ssCpuRawSystem.0 = Counter32: 65382910
-  #UCD-SNMP-MIB::ssCpuRawIdle.0 = Counter32: 1655192684
-  #UCD-SNMP-MIB::ssCpuRawWait.0 = Counter32: 205336019
-  #UCD-SNMP-MIB::ssCpuRawKernel.0 = Counter32: 0
-  #UCD-SNMP-MIB::ssCpuRawInterrupt.0 = Counter32: 1128048
-  #UCD-SNMP-MIB::ssIORawSent.0 = Counter32: 2353983704
-  #UCD-SNMP-MIB::ssIORawReceived.0 = Counter32: 3172182750
-  #UCD-SNMP-MIB::ssRawInterrupts.0 = Counter32: 427446276
-  #UCD-SNMP-MIB::ssRawContexts.0 = Counter32: 4161026807
-  #UCD-SNMP-MIB::ssCpuRawSoftIRQ.0 = Counter32: 2605010
-  #UCD-SNMP-MIB::ssRawSwapIn.0 = Counter32: 602002
-  #UCD-SNMP-MIB::ssRawSwapOut.0 = Counter32: 937422
+#UCD-SNMP-MIB::ssIndex.0 = INTEGER: 1
+#UCD-SNMP-MIB::ssErrorName.0 = STRING: systemStats
+#UCD-SNMP-MIB::ssSwapIn.0 = INTEGER: 0 kB
+#UCD-SNMP-MIB::ssSwapOut.0 = INTEGER: 0 kB
+#UCD-SNMP-MIB::ssIOSent.0 = INTEGER: 1864 blocks/s
+#UCD-SNMP-MIB::ssIOReceive.0 = INTEGER: 7 blocks/s
+#UCD-SNMP-MIB::ssSysInterrupts.0 = INTEGER: 7572 interrupts/s
+#UCD-SNMP-MIB::ssSysContext.0 = INTEGER: 10254 switches/s
+#UCD-SNMP-MIB::ssCpuUser.0 = INTEGER: 4
+#UCD-SNMP-MIB::ssCpuSystem.0 = INTEGER: 3
+#UCD-SNMP-MIB::ssCpuIdle.0 = INTEGER: 77
+#UCD-SNMP-MIB::ssCpuRawUser.0 = Counter32: 194386556
+#UCD-SNMP-MIB::ssCpuRawNice.0 = Counter32: 15673
+#UCD-SNMP-MIB::ssCpuRawSystem.0 = Counter32: 65382910
+#UCD-SNMP-MIB::ssCpuRawIdle.0 = Counter32: 1655192684
+#UCD-SNMP-MIB::ssCpuRawWait.0 = Counter32: 205336019
+#UCD-SNMP-MIB::ssCpuRawKernel.0 = Counter32: 0
+#UCD-SNMP-MIB::ssCpuRawInterrupt.0 = Counter32: 1128048
+#UCD-SNMP-MIB::ssIORawSent.0 = Counter32: 2353983704
+#UCD-SNMP-MIB::ssIORawReceived.0 = Counter32: 3172182750
+#UCD-SNMP-MIB::ssRawInterrupts.0 = Counter32: 427446276
+#UCD-SNMP-MIB::ssRawContexts.0 = Counter32: 4161026807
+#UCD-SNMP-MIB::ssCpuRawSoftIRQ.0 = Counter32: 2605010
+#UCD-SNMP-MIB::ssRawSwapIn.0 = Counter32: 602002
+#UCD-SNMP-MIB::ssRawSwapOut.0 = Counter32: 937422
 
-  $ss = snmpwalk_cache_oid($device, "systemStats", array(), "UCD-SNMP-MIB");
-  if ($GLOBALS['snmp_status'])
-  {
+$ss = snmpwalk_cache_oid($device, "systemStats", [], "UCD-SNMP-MIB");
+if ($GLOBALS['snmp_status']) {
     $ss = $ss[0]; // Insert Nazi joke here.
 
     // Create CPU RRD if it doesn't already exist
@@ -60,67 +61,70 @@ if (!is_device_mib($device, 'UCD-SNMP-MIB')) { return; }
     // and because it is per-host and no big performance hit. See new format below
     // FIXME REMOVE
 
-    if (is_numeric($ss['ssCpuRawUser']) && is_numeric($ss['ssCpuRawNice']) && is_numeric($ss['ssCpuRawSystem']) && is_numeric($ss['ssCpuRawIdle']))
-    {
-      rrdtool_create($device, $cpu_rrd, $cpu_rrd_create);
-      rrdtool_update($device, $cpu_rrd, array($ss['ssCpuRawUser'],$ss['ssCpuRawSystem'],$ss['ssCpuRawNice'],$ss['ssCpuRawIdle']));
-      $graphs['ucd_cpu'] = TRUE;
+    if (is_numeric($ss['ssCpuRawUser']) && is_numeric($ss['ssCpuRawNice']) && is_numeric($ss['ssCpuRawSystem']) && is_numeric($ss['ssCpuRawIdle'])) {
+        rrdtool_create($device, $cpu_rrd, $cpu_rrd_create);
+        rrdtool_update($device, $cpu_rrd, [$ss['ssCpuRawUser'], $ss['ssCpuRawSystem'], $ss['ssCpuRawNice'], $ss['ssCpuRawIdle']]);
+        $graphs['ucd_cpu'] = TRUE;
     }
 
     // This is how we'll collect in the future, start now so people don't have zero data.
 
-    $collect_oids = array('ssIORawSent', 'ssIORawReceived', 'ssRawInterrupts', 'ssRawContexts', 'ssRawSwapIn', 'ssRawSwapOut');
+    $collect_oids = ['ssIORawSent', 'ssIORawReceived', 'ssRawInterrupts', 'ssRawContexts', 'ssRawSwapIn', 'ssRawSwapOut'];
 
-    foreach ($collect_oids as $oid)
-    {
-      if (is_numeric($ss[$oid]))
-      {
-        $value = $ss[$oid];
-        $filename = "ucd_".$oid.".rrd";
-        rrdtool_create($device, $filename, " DS:value:COUNTER:600:0:U ");
-        rrdtool_update($device, $filename, "N:".$value);
-        $graphs['ucd_cpu'] = TRUE;
+    foreach ($collect_oids as $oid) {
+        if (is_numeric($ss[$oid])) {
+            $value    = $ss[$oid];
+            $filename = "ucd_" . $oid . ".rrd";
+            rrdtool_create($device, $filename, " DS:value:COUNTER:600:0:U ");
+            rrdtool_update($device, $filename, "N:" . $value);
+            $graphs['ucd_cpu'] = TRUE;
 
-      }
+        }
     }
 
-    $cpu_oids = array('ssCpuRawUser','ssCpuRawNice','ssCpuRawSystem','ssCpuRawIdle','ssCpuRawInterrupt', 'ssCpuRawSoftIRQ', 'ssCpuRawKernel', 'ssCpuRawWait');
+    $cpu_oids = ['ssCpuRawUser', 'ssCpuRawNice', 'ssCpuRawSystem', 'ssCpuRawIdle', 'ssCpuRawInterrupt', 'ssCpuRawSoftIRQ', 'ssCpuRawKernel', 'ssCpuRawWait'];
 
     $ss_cpu_total = 0;
-    foreach ($cpu_oids as $oid)
-    {
-      if (is_numeric($ss[$oid]))
-      {
-        $ss_cpu_valid[$oid] = TRUE;
-        $ss_cpu_total += $ss[$oid];
-      }
+    foreach ($cpu_oids as $oid) {
+        if (is_numeric($ss[$oid])) {
+            $ss_cpu_valid[$oid] = TRUE;
+            $ss_cpu_total       += $ss[$oid];
+        }
     }
 
     $ucd_ss_cpu = [];
     foreach ($cpu_oids as $oid) {
-      if ($ss_cpu_valid[$oid]) {
-        $value = $ss[$oid];
-        $filename = "ucd_".$oid.".rrd";
-        rrdtool_create($device, $filename, " DS:value:COUNTER:600:0:U");
-        rrdtool_update($device, $filename, "N:".$value);
-        $graphs['ucd_ss_cpu'] = TRUE;
-        // Perc unused, only set graph ucd_ss_cpu
-        $perc = fdiv($ss[$oid], $ss_cpu_total) * 100;
-        $ucd_ss_cpu[$oid]['perc'] = $perc;
-      }
+        if ($ss_cpu_valid[$oid]) {
+            $value    = $ss[$oid];
+            $filename = "ucd_" . $oid . ".rrd";
+            rrdtool_create($device, $filename, " DS:value:COUNTER:600:0:U");
+            rrdtool_update($device, $filename, "N:" . $value);
+            $graphs['ucd_ss_cpu'] = TRUE;
+            // Perc unused, only set graph ucd_ss_cpu
+            $perc                     = float_div($ss[$oid], $ss_cpu_total) * 100;
+            $ucd_ss_cpu[$oid]['perc'] = $perc;
+        }
     }
 
     // WHY
     if (safe_count($ucd_ss_cpu)) {
-      $device_state['ucd_ss_cpu']  = $ucd_ss_cpu;
+        $device_state['ucd_ss_cpu'] = $ucd_ss_cpu;
     }
 
     // Set various graphs if we've seen the right OIDs.
 
-    if (is_numeric($ss['ssRawSwapIn'])) { $graphs['ucd_swap_io'] = TRUE; }
-    if (is_numeric($ss['ssIORawSent'])) { $graphs['ucd_io'] = TRUE; }
-    if (is_numeric($ss['ssRawContexts'])) { $graphs['ucd_contexts'] = TRUE; }
-    if (is_numeric($ss['ssRawInterrupts'])) { $graphs['ucd_interrupts'] = TRUE; }
+    if (is_numeric($ss['ssRawSwapIn'])) {
+        $graphs['ucd_swap_io'] = TRUE;
+    }
+    if (is_numeric($ss['ssIORawSent'])) {
+        $graphs['ucd_io'] = TRUE;
+    }
+    if (is_numeric($ss['ssRawContexts'])) {
+        $graphs['ucd_contexts'] = TRUE;
+    }
+    if (is_numeric($ss['ssRawInterrupts'])) {
+        $graphs['ucd_interrupts'] = TRUE;
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////#
     // FIXME. Convert this to definitions.
@@ -150,52 +154,50 @@ if (!is_device_mib($device, 'UCD-SNMP-MIB')) { return; }
     //     DS:buffered:GAUGE:600:0:10000000000 \
     //     DS:cached:GAUGE:600:0:10000000000 ";
 
-    $mem_oids = array('totalswap' => 'memTotalSwap.0', 'availswap' => 'memAvailSwap.0',
-                      'totalreal' => 'memTotalReal.0', 'availreal' => 'memAvailReal.0',
-                      'totalfree' => 'memTotalFree.0', 'shared'    => 'memShared.0',
-                      'buffered'  => 'memBuffer.0',    'cached'    => 'memCached.0');
-    $mem_array = array();
+    $mem_oids  = ['totalswap' => 'memTotalSwap.0', 'availswap' => 'memAvailSwap.0',
+                  'totalreal' => 'memTotalReal.0', 'availreal' => 'memAvailReal.0',
+                  'totalfree' => 'memTotalFree.0', 'shared' => 'memShared.0',
+                  'buffered'  => 'memBuffer.0', 'cached' => 'memCached.0'];
+    $mem_array = [];
     //$snmpdata = snmpwalk_cache_oid($device, "mem", array(), "UCD-SNMP-MIB");
-    $snmpdata = snmp_get_multi_oid($device, $mem_oids, array(), 'UCD-SNMP-MIB');
-    if (is_array($snmpdata[0]))
-    {
-      $snmpdata = $snmpdata[0];
-      foreach ($mem_oids as $ds => $oid)
-      {
-        $oid = str_replace('.0', '', $oid);
-        // Fix for some systems (who report negative values)
-        //memShared.0 = 28292
-        //memBuffer.0 = -3762592
-        //memCached.0 = 203892
-        $mem_array[$ds] = ($snmpdata[$oid] < 0) ? 0 : $snmpdata[$oid];
-        //$mem_array[$ds] = snmp_dewrap32bit($snmpdata[$oid]);
-        //$$key = $snmpdata[$key];
-        //if (is_numeric($$key) && $$key < 0) { $$key = 0; }
-      }
-      print_debug_vars($mem_array);
+    $snmpdata = snmp_get_multi_oid($device, $mem_oids, [], 'UCD-SNMP-MIB');
+    if (is_array($snmpdata[0])) {
+        $snmpdata = $snmpdata[0];
+        foreach ($mem_oids as $ds => $oid) {
+            $oid = str_replace('.0', '', $oid);
+            // Fix for some systems (who report negative values)
+            //memShared.0 = 28292
+            //memBuffer.0 = -3762592
+            //memCached.0 = 203892
+            $mem_array[$ds] = ($snmpdata[$oid] < 0) ? 0 : $snmpdata[$oid];
+            //$mem_array[$ds] = snmp_dewrap32bit($snmpdata[$oid]);
+            //$$key = $snmpdata[$key];
+            //if (is_numeric($$key) && $$key < 0) { $$key = 0; }
+        }
+        print_debug_vars($mem_array);
     }
 
     // Check to see that the OIDs are actually populated before we make the rrd
     if (is_numeric($mem_array['totalreal']) && is_numeric($mem_array['availreal']) && is_numeric($mem_array['totalfree'])) {
-      //rrdtool_create($device, $mem_rrd, $mem_rrd_create);
-      //rrdtool_update($device, $mem_rrd,  array($memTotalSwap, $memAvailSwap, $memTotalReal, $memAvailReal, $memTotalFree, $memShared, $memBuffer, $memCached));
-      rrdtool_update_ng($device, 'ucd_memory', $mem_array);
-      $graphs['ucd_memory'] = TRUE;
+        //rrdtool_create($device, $mem_rrd, $mem_rrd_create);
+        //rrdtool_update($device, $mem_rrd,  array($memTotalSwap, $memAvailSwap, $memTotalReal, $memAvailReal, $memTotalFree, $memShared, $memBuffer, $memCached));
+        rrdtool_update_ng($device, 'ucd_memory', $mem_array);
+        $graphs['ucd_memory'] = TRUE;
 
-      $device_state['ucd_mem']['swap_total'] = $mem_array['totalswap']; //$memTotalSwap;
-      $device_state['ucd_mem']['swap_avail'] = $mem_array['availswap']; //$memAvailSwap;
+        $device_state['ucd_mem']['swap_total'] = $mem_array['totalswap']; //$memTotalSwap;
+        $device_state['ucd_mem']['swap_avail'] = $mem_array['availswap']; //$memAvailSwap;
 
-      $device_state['ucd_mem']['mem_total']  = $mem_array['totalreal']; //$memTotalReal;
-      $device_state['ucd_mem']['mem_avail']  = $mem_array['availreal']; //$memAvailReal;
-      $device_state['ucd_mem']['mem_shared'] = $mem_array['shared']; //$memShared;
-      $device_state['ucd_mem']['mem_buffer'] = $mem_array['buffered']; //$memBuffer;
-      $device_state['ucd_mem']['mem_cached'] = $mem_array['cached']; //$memCached;
+        $device_state['ucd_mem']['mem_total']  = $mem_array['totalreal']; //$memTotalReal;
+        $device_state['ucd_mem']['mem_avail']  = $mem_array['availreal']; //$memAvailReal;
+        $device_state['ucd_mem']['mem_shared'] = $mem_array['shared'];    //$memShared;
+        $device_state['ucd_mem']['mem_buffer'] = $mem_array['buffered'];  //$memBuffer;
+        $device_state['ucd_mem']['mem_cached'] = $mem_array['cached'];    //$memCached;
 
-      if (isset($attribs['ucd_memory_bad']) && $attribs['ucd_memory_bad']) {
-        $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'];
-      } else {
-        $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'] - $mem_array['cached'] - $mem_array['buffered'];
-      }
+        if (isset($attribs['ucd_memory_bad']) && $attribs['ucd_memory_bad']) {
+            $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'];
+        } else {
+            $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'] - $mem_array['cached'] - $mem_array['buffered'];
+        }
     }
 
     /* Moved to mib definition
@@ -217,10 +219,10 @@ if (!is_device_mib($device, 'UCD-SNMP-MIB')) { return; }
       $device_state['ucd_load']  = $load_raw[2]['laLoadInt'];
     }
     */
-  }
+}
 
-  unset($ss, $load_rrd, $load_raw, $snmpdata);
-  unset($memTotalSwap, $memAvailSwap, $memTotalReal, $memAvailReal, $memTotalFree, $memShared, $memBuffer, $memCached);
-  unset($key, $mem_rrd, $mem_rrd_create, $collect_oids, $value, $filename, $cpu_rrd, $cpu_rrd_create, $oid);
+unset($ss, $load_rrd, $load_raw, $snmpdata);
+unset($memTotalSwap, $memAvailSwap, $memTotalReal, $memAvailReal, $memTotalFree, $memShared, $memBuffer, $memCached);
+unset($key, $mem_rrd, $mem_rrd_create, $collect_oids, $value, $filename, $cpu_rrd, $cpu_rrd_create, $oid);
 
 // EOF

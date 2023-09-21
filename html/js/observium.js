@@ -5,13 +5,13 @@
  *
  * @package    observium
  * @subpackage js
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Workaround jQuery XSS
-jQuery.htmlPrefilter = function( html ) {
-	return html;
+jQuery.htmlPrefilter = function (html) {
+    return html;
 };
 
 function url_from_form(form_id) {
@@ -56,8 +56,10 @@ function form_to_path(form_id) {
 }
 
 function encode_var(value) {
-    var val = value.replace(/\//g, '%7F'); // %7F (DEL, delete) - not defined in HTML 4 standard
-    val = val.replace(/,/g, '%1F');        // %1F (US, unit separator) - not defined in HTML 4 standard
+    // Control characters have nothing to do inside a URL.
+    var val = value.replace(/%/g, '%05')  // %05 (ENQ, enquiry) - not defined in HTML 4 standard
+        .replace(/\//g, '%7F') // %7F (DEL, delete) - not defined in HTML 4 standard
+        .replace(/,/g, '%1F'); // %1F (US, unit separator) - not defined in HTML 4 standard
     val = encodeURIComponent(val);
     // add quotes for empty or multiword strings
     if ((val !== value || val === '') && !is_base64(value)) {
@@ -74,7 +76,7 @@ function is_base64(value) {
         atob(value);
         //console.log("Value '" + value + "' is base64 encoded.");
         return true;
-    } catch(e) {
+    } catch (e) {
         // if you want to be specific and only catch the error which means
         // the base 64 was invalid, then check for 'e.code === 5'.
         // (because 'DOMException.INVALID_CHARACTER_ERR === 5')
@@ -94,7 +96,7 @@ function toggleAttrib(attribute, form_id) {
     //console.log('attrib: '+attrib+', id: '+form_id);
     //console.log(Array.isArray(form_id));
     if (Array.isArray(form_id)) {
-        form_id.forEach(function(entry) {
+        form_id.forEach(function (entry) {
             toggleAttrib(attribute, entry);
             //console.log(entry);
         });
@@ -111,7 +113,7 @@ function toggleAttrib(attribute, form_id) {
     let toggles = document.querySelectorAll(dom); // js objects
     //console.log(toggles);
 
-    $(dom).each(function(i) {
+    $(dom).each(function (i) {
         let element = $(this);   // jQuery object
         let toggle = toggles[i]; // js object
         //console.log(toggle);
@@ -142,8 +144,7 @@ function toggleAttrib(attribute, form_id) {
                 // bootstrap select
                 element.selectpicker('refresh'); // re-render selectpicker
                 //console.log('bootstrap-select');
-            }
-            else if (toggle.hasAttribute('data-toggle') && toggle.getAttribute('data-toggle') === 'tagsinput') {
+            } else if (toggle.hasAttribute('data-toggle') && toggle.getAttribute('data-toggle') === 'tagsinput') {
                 // bootstrap tagsinput
                 element.tagsinput('refresh'); // re-render tagsinput
                 //console.log('bootstrap-tagsinput');
@@ -189,7 +190,7 @@ function toggleAttrib(attribute, form_id) {
 
 function toggleOn(target_id) {
     if (Array.isArray(target_id)) {
-        target_id.forEach(function(entry) {
+        target_id.forEach(function (entry) {
             toggleOn(entry);
             //console.log(entry);
         });
@@ -205,7 +206,7 @@ function toggleOn(target_id) {
     }
     let toggles = document.querySelectorAll(dom); // js objects
 
-    $(dom).each(function(i) {
+    $(dom).each(function (i) {
         let element = $(this);   // jQuery object
         let toggle = toggles[i]; // js object
 
@@ -230,7 +231,7 @@ function toggleOn(target_id) {
 
 function toggleOff(target_id) {
     if (Array.isArray(target_id)) {
-        target_id.forEach(function(entry) {
+        target_id.forEach(function (entry) {
             toggleOff(entry);
             //console.log(entry);
         });
@@ -246,7 +247,7 @@ function toggleOff(target_id) {
     }
     let toggles = document.querySelectorAll(dom); // js objects
 
-    $(dom).each(function(i) {
+    $(dom).each(function (i) {
         let element = $(this);   // jQuery object
         let toggle = toggles[i]; // js object
 
@@ -308,8 +309,7 @@ function openLink(url) {
     }
 }
 
-function entity_popup(element)
-{
+function entity_popup(element) {
     $(element).qtip({
         content: {
             text: '<i class="icon-spinner icon-spin text-center vertical-align" style="width: 100%;"></i>',
@@ -340,11 +340,13 @@ function entity_popup(element)
 
 
 function entity_popups() {
-
-    $('.entity-popup').each(function () {
-
-        entity_popup(this);
-
+    $('body').on('mouseover', '.entity-popup', function () {
+        // Check if the tooltip is already initialized
+        if (!$(this).data('qtip')) {
+            entity_popup(this);
+            // Trigger the 'mouseover' event to immediately show the tooltip
+            $(this).trigger('mouseover');
+        }
     });
 }
 
@@ -436,8 +438,8 @@ function popups_from_data() {
 
 // prevent a resubmit POST on refresh and back button
 function clear_post_query() {
-    if ( window.history.replaceState ) {
-        window.history.replaceState( null, null, window.location.href );
+    if (window.history.replaceState) {
+        window.history.replaceState(null, null, window.location.href);
     }
 }
 
@@ -455,7 +457,7 @@ var toggle_visibility = (function () {
             var s = els[i].style;
             s.display = s.display === 'none' ? 'block' : 'none';
         }
-        ;
+
     }
 
     return function (cl) {
@@ -470,37 +472,35 @@ var toggle_visibility = (function () {
 })();
 
 // Used to set session variables and then reload page.
-function ajax_action (action, value = '')
-{
+function ajax_action(action, value = '') {
 
-  var params = {
-     action: action,
-     value: value
-  };
+    var params = {
+        action: action,
+        value: value
+    };
 
-  $.ajax({
-    type: "POST",
-    url: "ajax/actions.php",
-    async: true,
-    cache: false,
-    data: jQuery.param(params),
-    success: function (response) {
-           if (response.status === 'ok') {
-              location.reload(true);
-              //console.log(response);
-           } else {
-              console.log(response);
-           }
-       }
-  });
+    $.ajax({
+        type: "POST",
+        url: "ajax/actions.php",
+        async: true,
+        cache: false,
+        data: jQuery.param(params),
+        success: function (response) {
+            if (response.status === 'ok') {
+                location.reload(true);
+                //console.log(response);
+            } else {
+                console.log(response);
+            }
+        }
+    });
 
-  event.preventDefault();
+    event.preventDefault();
 
-  return false;
+    return false;
 }
 
-function ajax_settings(setting, value = '')
-{
+function ajax_settings(setting, value = '') {
 
     var params = {
         action: 'settings_user',
@@ -532,20 +532,21 @@ function ajax_settings(setting, value = '')
 function processAjaxForm(event) {
 
     let id = event.target.id;
+    let div = $('div#message-' + id);
     let serialize = {checkboxUncheckedValue: "0"};
-    let data = JSON.stringify($('#'+id).serializeJSON(serialize));
+    let data = JSON.stringify($('#' + id).serializeJSON(serialize));
     //console.log(data);
 
     let messageClass = 'danger';
     let messageTimeout = 60000; // 60s
-    let html = '<div id="message-'+id+'" class="alert">' +
+    let html = '<div id="message-' + id + '" class="alert">' +
         '  <button type="button" class="close" data-dismiss="alert">×</button>' +
         '  <span></span>' +
         '</div>';
     var dom = $(html);
     //console.log(dom);
     // Remove previous message if too fast save request...
-    $('div#message-'+id).remove();
+    div.remove();
 
     $.ajax({
         url: 'ajax/actions.php',
@@ -572,21 +573,20 @@ function processAjaxForm(event) {
                 //var form_selector = $('form#' + id);
                 // use top level div (from form generator)
                 var form_selector = $('div#box-' + id);
-                if (form_selector.length === 0) {
+                if ($("div#ajax-form-message").length) {
+                    // check if custom message placeholder exist
+                    form_selector = $("div#ajax-form-message");
+                } else if (form_selector.length === 0) {
                     // custom forms (without generator)
                     form_selector = $('form#' + id);
-                    //console.log(form_selector);
                 }
+                //console.log(form_selector);
                 form_selector.after(dom.addClass('alert-' + messageClass).children("span").text(json.message).end());
-                $('div#message-' + id).delay(messageTimeout).fadeOut("normal", function () {
-                    $(this).remove();
-                });
+                delay_remove(div, messageTimeout);
             }
 
             if (json.reload) {
-                setTimeout(function(){
-                    location.reload(1);
-                }, messageTimeout);
+                reload_timeout(messageTimeout);
             }
             // DEBUG
             // if (json.update_array) {
@@ -602,63 +602,87 @@ function processAjaxForm(event) {
     return false;
 }
 
+function delay_remove(element, timeout = 60000) {
+    element.delay(timeout).fadeOut("normal", function () {
+        $(this).remove();
+    });
+}
+
+function delay_empty(element, timeout = 60000) {
+    element.delay(timeout).fadeOut("normal", function () {
+        $(this).empty().removeAttr("style");
+    });
+}
+
+function reload_timeout(timeout, redirect = window.location.href) {
+    setTimeout(function () {
+        // Clean back button history for prevent resubmit the post
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, redirect);
+        }
+        // reload without resubmit data warning
+        window.location = redirect;
+        //location.reload(1);
+    }, timeout);
+}
+
 delete_ap = function (id) {
 
-   var params = {
-      action: 'delete_ap',
-      id: id
-   };
+    var params = {
+        action: 'delete_ap',
+        id: id
+    };
 
-   // Run AJAX query and update div HTML with response.
-   $.ajax({
-       type: "POST",
-       url: "ajax/actions.php",
-       data: jQuery.param(params),
-       cache: false,
-       success: function (response) {
-           if (response.status === 'ok') {
-               console.log(response);
-           } else {
-              console.log(response);
-           }
-       }
-   });
-
-   return false;
-
-};
-
-$(document).on('blur', 'input[name^="widget-config-"]', function(event) {
-        event.preventDefault();
-        var $this = $(this);
-        var field = $this.data("field");
-        var id    = $this.data("id");
-        // console.log($this);
-        if($this.data("type") === "checkbox") {
-            var value = $this.is(":checked") ? "yes" : "no";
-        } else {
-            var value = $this.val();
-        }
-        if ($this[0].checkValidity()) {
-            $.ajax({
-                type: 'POST',
-                url: 'ajax/actions.php',
-                data: {action: "update_widget_config", widget_id: id, config_field: field, config_value: value},
-                dataType: "json",
-                success: function (data) {
-                    if (data.status == 'ok') {
-                    } else {
-                    }
-                },
-                error: function (data) {
-                    console.log(data);
-                }
-            });
+    // Run AJAX query and update div HTML with response.
+    $.ajax({
+        type: "POST",
+        url: "ajax/actions.php",
+        data: jQuery.param(params),
+        cache: false,
+        success: function (response) {
+            if (response.status === 'ok') {
+                console.log(response);
+            } else {
+                console.log(response);
+            }
         }
     });
 
+    return false;
+
+};
+
+$(document).on('blur', 'input[name^="widget-config-"]', function (event) {
+    event.preventDefault();
+    var $this = $(this);
+    var field = $this.data("field");
+    var id = $this.data("id");
+    // console.log($this);
+    if ($this.data("type") === "checkbox") {
+        var value = $this.is(":checked") ? "yes" : "no";
+    } else {
+        var value = $this.val();
+    }
+    if ($this[0].checkValidity()) {
+        $.ajax({
+            type: 'POST',
+            url: 'ajax/actions.php',
+            data: {action: "update_widget_config", widget_id: id, config_field: field, config_value: value},
+            dataType: "json",
+            success: function (data) {
+                if (data.status == 'ok') {
+                } else {
+                }
+            },
+            error: function (data) {
+                console.log(data);
+            }
+        });
+    }
+});
+
 // Run confirmation popovers if the function is loaded.
-window.onload = function() {
+window.onload = function () {
     if (typeof $().confirmation === 'function') {
         $("[data-toggle='confirm']").confirmation(
             {

@@ -149,7 +149,7 @@ class Mail_mail extends Mail {
 
         // We only use mail()'s optional fifth parameter if the additional
         // parameters have been provided and we're not running in safe mode.
-        if (empty($this->_params)) {
+        if (empty($this->_params) || ini_get('safe_mode')) {
             $result = mail($recipients, $subject, $body, $text_headers);
         } else {
             $result = mail($recipients, $subject, $body, $text_headers,

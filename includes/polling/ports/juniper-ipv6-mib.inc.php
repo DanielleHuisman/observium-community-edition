@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -20,12 +20,11 @@ JUNIPER-IPv6-MIB::jnxIpv6IfOutOctets.509 = Counter64: 46668220396161
 
 $port_module = 'jnxIpv6IfStats';
 
-if ($ports_modules[$port_module] || TRUE)
-{
-  echo("JUNIPER-IPv6-MIB jnxIpv6IfStats ");
+if ($ports_modules[$port_module] || TRUE) {
+    echo("JUNIPER-IPv6-MIB jnxIpv6IfStats ");
 
-  $port_stats = snmpwalk_cache_oid($device, 'jnxIpv6IfStatsTable', $port_stats, "JUNIPER-IPv6-MIB", NULL, OBS_SNMP_ALL_TABLE);
+    $port_stats = snmpwalk_cache_oid($device, 'jnxIpv6IfStatsTable', $port_stats, "JUNIPER-IPv6-MIB", NULL, OBS_SNMP_ALL_TABLE);
 
-  $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
+    $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
 
 }

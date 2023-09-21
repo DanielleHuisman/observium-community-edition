@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -22,19 +22,17 @@
 $oid   = ".1.3.6.1.4.1.17409.1.11.9.0";
 $value = snmp_get_oid($device, $oid);
 
-if (is_numeric($value) && $value != 0)
-    //&& !isset($valid['sensor']['dbm']['NSCRTV-HFCEMS-OPTICALAMPLIFIER-MIB-oaInputOpticalPower']))
+if (is_numeric($value) && $value != 0) //&& !isset($valid['sensor']['dbm']['NSCRTV-HFCEMS-OPTICALAMPLIFIER-MIB-oaInputOpticalPower']))
 {
-  discover_sensor('dbm', $device, $oid, 1, 'nscrtv-input-a-amplifier', 'Input on Optical Amplifier Input A', 0.1, $value);
+    discover_sensor('dbm', $device, $oid, 1, 'nscrtv-input-a-amplifier', 'Input on Optical Amplifier Input A', 0.1, $value);
 }
 
 $oid   = ".1.3.6.1.4.1.17409.1.11.10.0";
 $value = snmp_get_oid($device, $oid);
 
-if (is_numeric($value) && $value != 0)
-    //&& !isset($valid['sensor']['dbm']['NSCRTV-HFCEMS-OPTICALAMPLIFIER-MIB-oaOutputOpticalPower']))
+if (is_numeric($value) && $value != 0) //&& !isset($valid['sensor']['dbm']['NSCRTV-HFCEMS-OPTICALAMPLIFIER-MIB-oaOutputOpticalPower']))
 {
-  discover_sensor('dbm', $device, $oid, 1, 'nscrtv-input-b-amplifier', 'Input on Optical Amplifier Input B', 0.1, $value);
+    discover_sensor('dbm', $device, $oid, 1, 'nscrtv-input-b-amplifier', 'Input on Optical Amplifier Input B', 0.1, $value);
 }
 
 // EOF

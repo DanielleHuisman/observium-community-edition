@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -106,79 +106,73 @@ zone.master=3
 zone.slave=0
 */
 
-if (!empty($agent_data['app']['nsd']))
-{
-  $app_id = discover_app($device, 'nsd');
+if (!empty($agent_data['app']['nsd'])) {
+    $app_id = discover_app($device, 'nsd');
 
-  foreach (explode("\n",$agent_data['app']['nsd']) as $line)
-  {
-    list($key,$value) = explode("=",$line,2);
-    $nsd[$key] = $value;
-  }
+    foreach (explode("\n", $agent_data['app']['nsd']) as $line) {
+        [$key, $value] = explode("=", $line, 2);
+        $nsd[$key] = $value;
+    }
 
-  // Memory
-  $rrd_filename = "app-nsd-memory.rrd";
+    // Memory
+    $rrd_filename = "app-nsd-memory.rrd";
 
-  rrdtool_create($device, $rrd_filename, " \
+    rrdtool_create($device, $rrd_filename, " \
     DS:memDBDisk:GAUGE:600:0:125000000000 \
     DS:memDBMem:GAUGE:600:0:125000000000 \
     DS:memXFRDMem:GAUGE:600:0:125000000000 \
     DS:memConfDisk:GAUGE:600:0:125000000000 \
     DS:memConfMem:GAUGE:600:0:125000000000 ");
 
-  foreach (array("size.db.disk","size.db.mem","size.xfrd.mem","size.config.disk","size.config.disk") as $key)
-  {
-    $rrd_values[] = $nsd[$key];
-  }
+    foreach (["size.db.disk", "size.db.mem", "size.xfrd.mem", "size.config.disk", "size.config.disk"] as $key) {
+        $rrd_values[] = $nsd[$key];
+    }
 
-  rrdtool_update($device, $rrd_filename, "N:" . implode(':', $rrd_values));
+    rrdtool_update($device, $rrd_filename, "N:" . implode(':', $rrd_values));
 
-  unset($rrd_values);
+    unset($rrd_values);
 
-  // Zones
-  $rrd_filename = "app-nsd-zones.rrd";
+    // Zones
+    $rrd_filename = "app-nsd-zones.rrd";
 
-  rrdtool_create($device, $rrd_filename, " \
+    rrdtool_create($device, $rrd_filename, " \
     DS:zoneMaster:GAUGE:600:0:125000000000 \
     DS:zoneSlave:GAUGE:600:0:125000000000 ");
 
-  foreach (array("zone.master","zone.slave") as $key)
-  {
-    $rrd_values[] = $nsd[$key];
-  }
+    foreach (["zone.master", "zone.slave"] as $key) {
+        $rrd_values[] = $nsd[$key];
+    }
 
-  rrdtool_update($device, $rrd_filename, "N:" . implode(':', $rrd_values));
+    rrdtool_update($device, $rrd_filename, "N:" . implode(':', $rrd_values));
 
-  unset($rrd_values);
+    unset($rrd_values);
 
-  // Queries
-  $rrd_filename = "app-nsd-queries.rrd";
+    // Queries
+    $rrd_filename = "app-nsd-queries.rrd";
 
-  $dns_qtype = array(
-    'A','NS','MD','MF','CNAME','SOA','MB','MG','MR','NULL','WKS','PTR','HINFO','MINFO','MX','TXT','RP','AFSDB','X25',
-    'ISDN','RT','NSAP','SIG','KEY','PX','AAAA','LOC','NXT','SRV','NAPTR','KX','CERT','DNAME','OPT','APL','DS','SSHFP','IPSECKEY',
-    'RRSIG','NSEC','DNSKEY','DHCID','NSEC3','NSEC3PARAM','TLSA','SPF','NID','L32','L64','LP','EUI48','EUI64');
+    $dns_qtype = [
+      'A', 'NS', 'MD', 'MF', 'CNAME', 'SOA', 'MB', 'MG', 'MR', 'NULL', 'WKS', 'PTR', 'HINFO', 'MINFO', 'MX', 'TXT', 'RP', 'AFSDB', 'X25',
+      'ISDN', 'RT', 'NSAP', 'SIG', 'KEY', 'PX', 'AAAA', 'LOC', 'NXT', 'SRV', 'NAPTR', 'KX', 'CERT', 'DNAME', 'OPT', 'APL', 'DS', 'SSHFP', 'IPSECKEY',
+      'RRSIG', 'NSEC', 'DNSKEY', 'DHCID', 'NSEC3', 'NSEC3PARAM', 'TLSA', 'SPF', 'NID', 'L32', 'L64', 'LP', 'EUI48', 'EUI64'];
 
-  $dns_rcode = array('FORMERR', 'NOERROR', 'NOTIMP', 'NXDOMAIN', 'REFUSED', 'SERVFAIL', 'YXDOMAIN');
+    $dns_rcode = ['FORMERR', 'NOERROR', 'NOTIMP', 'NXDOMAIN', 'REFUSED', 'SERVFAIL', 'YXDOMAIN'];
 
-  foreach ($dns_qtype as $qtype)
-  {
-    $rrd_queries .= "DS:qType$qtype:DERIVE:600:0:125000000000 ";
-  }
+    foreach ($dns_qtype as $qtype) {
+        $rrd_queries .= "DS:qType$qtype:DERIVE:600:0:125000000000 ";
+    }
 
-  $rrd_queries .= "DS:classIN:DERIVE:600:0:125000000000 ";
+    $rrd_queries .= "DS:classIN:DERIVE:600:0:125000000000 ";
 
-  foreach ($dns_rcode as $rcode)
-  {
-    $rrd_queries .= "DS:rcode$rcode:DERIVE:600:0:125000000000 ";
-  }
+    foreach ($dns_rcode as $rcode) {
+        $rrd_queries .= "DS:rcode$rcode:DERIVE:600:0:125000000000 ";
+    }
 
-  $rrd_queries .= "DS:opcodeIN:DERIVE:600:0:125000000000 ";
+    $rrd_queries .= "DS:opcodeIN:DERIVE:600:0:125000000000 ";
 
-  $rrd_queries .= "DS:numQueries:DERIVE:600:0:125000000000 ";
+    $rrd_queries .= "DS:numQueries:DERIVE:600:0:125000000000 ";
 
-  $rrd_queries .=
-    "DS:numQueryUDP:DERIVE:600:0:125000000000 \
+    $rrd_queries .=
+      "DS:numQueryUDP:DERIVE:600:0:125000000000 \
     DS:numQueryUDP6:DERIVE:600:0:125000000000 \
     DS:numQueryTCP:DERIVE:600:0:125000000000 \
     DS:numQueryTCP6:DERIVE:600:0:125000000000 \
@@ -192,52 +186,45 @@ if (!empty($agent_data['app']['nsd']))
     DS:numQueriesWoAA:DERIVE:600:0:125000000000 \
     ";
 
-  rrdtool_create($device, $rrd_filename, "" . $rrd_queries );
+    rrdtool_create($device, $rrd_filename, "" . $rrd_queries);
 
-  foreach ($dns_qtype as $qtype)
-  {
-    $rrd_values[] = $nsd["num.type.$qtype"];
-  }
-
-  $rrd_values[] = $nsd["num.class.IN"];
-
-  foreach ($dns_rcode as $rcode)
-  {
-    $rrd_values[] = $nsd["num.rcode.$rcode"];
-  }
-
-  $rrd_values[] = $nsd["num.opcode.IN"];
-  $rrd_values[] = $nsd["num.queries"];
-
-  foreach (array('num.udp','num.udp6', 'num.tcp','num.tcp6', 'num.edns','num.ednserr','num.rxerr','num.txerr','num.raxfr','num.truncated','num.dropped','num.answer_wo_aa') as $key)
-  {
-    $rrd_values[] = $nsd[$key];
-  }
-
-  update_application($app_id, $nsd);
-  rrdtool_update($device, $rrd_filename, "N:" . implode(':', $rrd_values));
-
-  unset($rrd_values);
-
-  $serverNum = 0;
-  while (1)
-  {
-    if (isset($nsd["server$serverNum.queries"]))
-    {
-      $rrd_filename = "app-nsd-server$serverNum.rrd";
-
-      rrdtool_create($device, $rrd_filename, "DS:numQueries:DERIVE:600:0:125000000000");
-
-      rrdtool_update($device, $rrd_filename, "N:" . $nsd["server$serverNum.queries"]);
-      $serverNum++;
+    foreach ($dns_qtype as $qtype) {
+        $rrd_values[] = $nsd["num.type.$qtype"];
     }
-    else
-    {
-      break;
-    }
-  }
 
-  unset($serverNum);
+    $rrd_values[] = $nsd["num.class.IN"];
+
+    foreach ($dns_rcode as $rcode) {
+        $rrd_values[] = $nsd["num.rcode.$rcode"];
+    }
+
+    $rrd_values[] = $nsd["num.opcode.IN"];
+    $rrd_values[] = $nsd["num.queries"];
+
+    foreach (['num.udp', 'num.udp6', 'num.tcp', 'num.tcp6', 'num.edns', 'num.ednserr', 'num.rxerr', 'num.txerr', 'num.raxfr', 'num.truncated', 'num.dropped', 'num.answer_wo_aa'] as $key) {
+        $rrd_values[] = $nsd[$key];
+    }
+
+    update_application($app_id, $nsd);
+    rrdtool_update($device, $rrd_filename, "N:" . implode(':', $rrd_values));
+
+    unset($rrd_values);
+
+    $serverNum = 0;
+    while (1) {
+        if (isset($nsd["server$serverNum.queries"])) {
+            $rrd_filename = "app-nsd-server$serverNum.rrd";
+
+            rrdtool_create($device, $rrd_filename, "DS:numQueries:DERIVE:600:0:125000000000");
+
+            rrdtool_update($device, $rrd_filename, "N:" . $nsd["server$serverNum.queries"]);
+            $serverNum++;
+        } else {
+            break;
+        }
+    }
+
+    unset($serverNum);
 }
 
 // EOF

@@ -1,9 +1,9 @@
 -- ============================================================================
--- Copyright (C) 2018 by  HUAWEI TECHNOLOGIES. All rights reserved.
+-- Copyright (C) 2021 by  HUAWEI TECHNOLOGIES. All rights reserved.
 -- Description:  The mib is used for configuring the information of the VLAN, including
 --               VLAN management, VLAN interface, VLAN aggregation and so on.
 -- Reference:
--- Version:      V3.88
+-- Version:      V3.92
 --
 -- ============================================================================
 
@@ -23,7 +23,7 @@
                FROM SNMPv2-TC;
 
        hwVlan MODULE-IDENTITY
-           LAST-UPDATED "201803211000Z"
+           LAST-UPDATED "202108091000Z"
            ORGANIZATION
                "Huawei Technologies Co.,Ltd."
            CONTACT-INFO
@@ -39,6 +39,18 @@
                 VLAN management,VLAN interface,VLAN aggregation and so on."
 
            -- Revision history 
+           REVISION    "202108091000Z"
+           DESCRIPTION "V3.92, Modify the node type of hwVlanConnectSrcPara."
+
+           REVISION    "202106181000Z"
+           DESCRIPTION "V3.91, added leaf node hwVlanPortsExtendFrame."
+
+	   REVISION    "202001211000Z"
+           DESCRIPTION "V3.90, Added hwDhcpOption82CaptureArpSwitch, hwDhcpv6OptionCaptureNaSwitch."
+
+	   REVISION    "201901161000Z"
+           DESCRIPTION "V3.89, modified the value range of hwVOIPAddressIndex."
+	   
            REVISION    "201803211000Z"
            DESCRIPTION "V3.88, modified the description of hwPortVlanOuterEthernetTypeTable and hwPortVlanOuterEthernetTypeEntry."
 
@@ -426,7 +438,9 @@
              hwVlanTrafficSuppressUnknowncastNetwork
                Integer32,
              hwVlanMethL2Forward
-               INTEGER
+               INTEGER,
+             hwVlanPortsExtendFrame
+	           OCTET STRING
             }
 
        hwVlanIndex OBJECT-TYPE
@@ -672,7 +686,7 @@
                 The value can be subvlan(4) only in the read operation. Adding a VLAN to
                 or deleting a VLAN from a super VLAN must be performed through hwVlanAggregationTable.
                "
-           DEFVAL { 1 }
+           DEFVAL { common }
            ::= { hwVlanMIBEntry 14 }
 
        hwVlanSuperID OBJECT-TYPE
@@ -708,7 +722,7 @@
                 is bound to the VLAN, the configuration in the VLAN service profile
                 takes effect.
                "
-           DEFVAL { 1 }
+           DEFVAL { vlanMac }
            ::= { hwVlanMIBEntry 16 }
 
        hwVlanPolicyBroadcast OBJECT-TYPE
@@ -732,7 +746,7 @@
                 configured in hwPolicyBroadcast of hwVlanSrvProfTable. If a VLAN service
                 profile is bound to the VLAN, the configuration in the VLAN service profile takes effect.
                "
-           DEFVAL { 1 }
+           DEFVAL { forward }
            ::= { hwVlanMIBEntry 17 }
 
        hwVlanPolicyMulticast OBJECT-TYPE
@@ -756,7 +770,7 @@
                 also be configured in hwPolicyMulticast of hwVlanSrvProfTable. If a VLAN service
                 profile is bound to the VLAN, the configuration in the VLAN service profile takes effect.
                "
-           DEFVAL { 1 }
+           DEFVAL { forward }
            ::= { hwVlanMIBEntry 18 }
 
        hwVlanPolicyUnknowncast OBJECT-TYPE
@@ -780,7 +794,7 @@
                 configured in hwPolicyUnknowncast of hwVlanSrvProfTable. If a VLAN service profile is bound
                 to the VLAN, the configuration in the VLAN service profile takes effect.
                "
-           DEFVAL { 1 }
+           DEFVAL { forward }
            ::= { hwVlanMIBEntry 19 }
 
        hwVlanOuterTpid OBJECT-TYPE
@@ -887,6 +901,48 @@
                 The default value is disable(2).
                "
            ::= { hwVlanMIBEntry 25 }
+
+       hwVlanPortsExtendFrame OBJECT-TYPE
+           SYNTAX OCTET STRING (SIZE (0..2048))
+           MAX-ACCESS read-write
+           STATUS current
+           DESCRIPTION
+               "Indicates the list of the extend frame standard ports in the VLAN. If 
+                the VLAN contains a port, the corresponding bit of the port is set to 1. 
+                The value of hwVlanPortsExtendFrame is mixed encoding of the index 
+                and octet string. Encoding area, which specifies the index of the FrameId 
+                and SlotId, consisting of 4 characters and 2 characters respectively. 
+                Port area, which is represented in octet string format and occupies 16 characters. 
+                One bit in each octet indicates one port, so 8 octet means 64 ports in a slot. 
+                When a bit is set to 0, it indicates that the corresponding port does not 
+		        belong to this VLAN. When a bit is set to 1, it indicates that the corresponding 
+		        port belongs to this VLAN. The order is as follows:
+                If a extend frame has a port that belongs to a VLAN, the port in the 
+                corresponding frame and slot are represented by octet strings.  The maximum number
+                of ports in a slot is 64, so the ports need to occupy eight octets.
+                The order, from left to right, is presented as eight groups, 0-7, 8-15,
+                16-23, 24-31, 32-39, 40-47, 48-55, and 56-63. In each octet,
+                the PortId in ascending order are presented from low bit to high bit.
+                For example, ports 0/11/2 and 0/11/3 need to added to the same VLAN.
+                The values of hwVlanPortsExtendFrame of the upstream ports
+                (ports 1/02/2 and 1/02/3 and 1/03/1) to be added is calculated as follows:
+                For ports 0-7 in slot 02 in frame 1, their corresponding character string
+                positions are 76543210, and after ports 1/02/2 and 1/02/3 are added, the bitmap is 
+		        00001100 00000000 00000000 00000000 00000000 00000000 00000000 00000000,
+                and the string is (HEX) 0C 00 00 00 00 00 00 00.
+                After the FrameId (2 Octet) and SoltId (1 Octet) are added at the front, 
+		        the string is 0001 02 0c 00 00 00 00 00 00 00.
+                In the same way, 1 / 03 / 1 is encoded as 0001 03 02 00 00 00 00 00 00 00.
+                Assuming that the other slots do not have any port that is added to the VLAN,
+                The slot information is not filled in. 
+                Therefore, the length of the code is variable, but usually is an integer multiple 
+		        of 22 characters.finally, the string is
+                00 01 02 0C 00 00 00 00 00 00 00
+                00 01 03 02 00 00 00 00 00 00 00
+		        Under special circumstances, none port in VLAN is described by '0',which is 
+		        just one character.
+               "
+           ::= { hwVlanMIBEntry 26 }
 
        hwifSVLANVlanListTable OBJECT-TYPE
            SYNTAX SEQUENCE OF HwifSVLANVlanListEntry
@@ -1225,7 +1281,7 @@
                 1. uplinkPort(1)    -uplink port
                 2. cascadingPort(2) -cascading port
                "
-           DEFVAL { 2 }
+           DEFVAL { cascadingPort }
            ::= { hwMuxVlanPortConfEntry 1 }
 
        hwMuxVlanStartVlanId OBJECT-TYPE
@@ -1768,7 +1824,7 @@
                 1. enabled(1)    -Enable MAC learning by VLAN.
                 2. disabled(2)   -Disable MAC learning by VLAN.
                "
-           DEFVAL { 1 }
+           DEFVAL { enabled }
            ::= { hwVlanParaEntry 2 }
 
        hwVlanMaxMacLearnNum OBJECT-TYPE
@@ -1895,7 +1951,7 @@
                                   connection-oriented service streams with two VLAN tags on the port.
                 Default: dot1qTpid(1)
                "
-           DEFVAL { 1 }
+           DEFVAL { dot1qTpid }
            ::= { hwPortOuterEthernetTypeEntry 1 }
 
        hwVlanLocalSwitch OBJECT-TYPE
@@ -1956,7 +2012,7 @@
                 1. enable(1)  -Enable local VLAN.
                 2. disable(2) -Disable local VLAN.
                "
-           DEFVAL { 2 }
+           DEFVAL { disable }
            ::= { hwLocalVlanEntry 1 }
 
         hwVlanInterfaceTable OBJECT-TYPE
@@ -2427,7 +2483,7 @@
        HwVOIPAddressEntry ::=
            SEQUENCE {
              hwVOIPAddressIndex
-               Integer32,
+               Unsigned32,
              hwVOIPIPType
                INTEGER,
              hwVOIPIPAddress
@@ -2453,7 +2509,7 @@
            }
 
        hwVOIPAddressIndex OBJECT-TYPE
-           SYNTAX Integer32 (0..63)
+           SYNTAX Unsigned32 (0..63|4294967295)
            MAX-ACCESS not-accessible
            STATUS current
            DESCRIPTION
@@ -2785,7 +2841,11 @@
              hwAntiMacDuplicateSwitch
                INTEGER,  
              hwArpDetectMaxUserCountSwitch
-               INTEGER, 
+               INTEGER,	       
+             hwDhcpOption82CaptureArpSwitch
+               INTEGER,
+             hwDhcpv6OptionCaptureNaSwitch
+               INTEGER,
              hwProfileRowStatus
                RowStatus
             }
@@ -3886,6 +3946,38 @@
 				Default: enable(1)
                "
            ::= { hwVlanSrvProfEntry 48 }
+
+	   hwDhcpOption82CaptureArpSwitch OBJECT-TYPE
+           SYNTAX INTEGER
+             {
+               enable(1),
+               disable(2)
+             }
+           MAX-ACCESS read-write
+           STATUS current
+           DESCRIPTION
+               "Indicates the VLAN-based DHCP option 82 capture ARP function.
+                Options:
+                1. enable(1)  -enable ARP packet capturing when DHCP option82 is enabled.
+                2. disable(2) -disable ARP packet capturing when DHCP option82 is enabled.
+               "
+           ::= { hwVlanSrvProfEntry 49 }
+		  
+       hwDhcpv6OptionCaptureNaSwitch OBJECT-TYPE
+           SYNTAX INTEGER
+             {
+               enable(1),
+               disable(2)
+             }
+           MAX-ACCESS read-write
+           STATUS current
+           DESCRIPTION
+               "Indicates the VLAN-based DHCPv6 option capture NA function.
+                Options:
+                1. enable(1)  -enable NA packet capturing when DHCPv6 option is enabled.
+                2. disable(2) -disable NA packet capturing when DHCPv6 option is enabled.
+               "
+           ::= { hwVlanSrvProfEntry 50 }
            
        hwProfileRowStatus   OBJECT-TYPE
            SYNTAX RowStatus
@@ -4016,7 +4108,7 @@
                 2. virtualIp(2)            -The source IP address obtaining mode is virtual IP.
                 Default: clientIp(1)
                "
-           DEFVAL { 1 }
+           DEFVAL { clientIp }
            ::= { hwVlanIpAwareEntry 4 }
 
        hwVlanIpAwareArpSendPeriod OBJECT-TYPE
@@ -4540,7 +4632,7 @@
              hwVlanConnectSrcType
                INTEGER,
              hwVlanConnectSrcPara
-               Integer32,
+               Unsigned32,
              hwVlanConnectDstType
                INTEGER,
              hwVlanConnectDstPara
@@ -4584,7 +4676,7 @@
            ::= { hwVlanConnectEntry 3 }
 
        hwVlanConnectSrcPara OBJECT-TYPE
-           SYNTAX Integer32
+           SYNTAX Unsigned32
            MAX-ACCESS read-write
            STATUS current
            DESCRIPTION

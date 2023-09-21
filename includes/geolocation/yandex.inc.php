@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage geolocation
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -17,75 +15,59 @@
  * At end returned main $location variables
  */
 
-  if (isset($data['response']))
-  {
+if (isset($data['response'])) {
     // Detect if required second request
     $try_second = FALSE;
-    if ($data['response']['GeoObjectCollection']['metaDataProperty']['GeocoderResponseMetaData']['found'] > 0)
-    {
-      $data = $data['response']['GeoObjectCollection']['featureMember'][0];
-      print_debug_vars($data);
-      if ($geo_type == 'forward' && $data['GeoObject']['metaDataProperty']['GeocoderMetaData']['precision'] == 'other')
-      {
+    if ($data['response']['GeoObjectCollection']['metaDataProperty']['GeocoderResponseMetaData']['found'] > 0) {
+        $data = $data['response']['GeoObjectCollection']['featureMember'][0];
+        print_debug_vars($data);
+        if ($geo_type === 'forward' && $data['GeoObject']['metaDataProperty']['GeocoderMetaData']['precision'] === 'other') {
+            $try_second = TRUE;
+        }
+    } elseif ($geo_type === 'forward') {
         $try_second = TRUE;
-      }
-    }
-    elseif ($geo_type == 'forward')
-    {
-      $try_second = TRUE;
     }
 
     // Make second request (address_second passed from main function get_geolocation()
-    if ($try_second && strlen($address_second) > 4)
-    {
-      // Re-Generate geolocation tags, override location
-      $tags['location'] = $address_second;
+    if ($try_second && !safe_empty($address_second)) {
+        // Re-Generate geolocation tags, override location
+        $tags['location'] = $address_second;
 
-      // Generate context/options with encoded data and geo specific api headers
-      $options_new = generate_http_context($geo_def[$geo_type], $tags);
-
-      // API URL to POST to
-      $url_new = generate_http_url($geo_def[$geo_type], $tags);
-
-      // Second request
-      $mapresponse = get_http_request($url_new, $options_new, $ratelimit);
-      if (test_http_request($geo_def[$geo_type], $mapresponse))
-      {
-        // Valid response
-        $data_new = json_decode($mapresponse, TRUE);
-        if ($data_new['response']['GeoObjectCollection']['metaDataProperty']['GeocoderResponseMetaData']['found'] > 0 &&
-            $data_new['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty']['GeocoderMetaData']['precision'] != 'other')
-        {
-          $url  = $url_new;
-          $data = $data_new['response']['GeoObjectCollection']['featureMember'][0];
+        // Second request
+        $data_new = get_geo_http_def($geo_def, $geo_type, $tags);
+        if ($data_new && $data_new['response']['GeoObjectCollection']['metaDataProperty']['GeocoderResponseMetaData']['found'] > 0 &&
+            $data_new['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty']['GeocoderMetaData']['precision'] !== 'other') {
+            $data = $data_new['response']['GeoObjectCollection']['featureMember'][0];
         }
-      }
+        unset($data_new);
     }
 
-    if ($geo_type == 'forward')
-    {
-      // If using reverse queries, do not change lat/lon
-      list($location['location_lon'], $location['location_lat']) = explode(' ', $data['GeoObject']['Point']['pos']);
+    if ($geo_type === 'forward') {
+        // If using reverse queries, do not change lat/lon
+        [ $location['location_lon'], $location['location_lat'] ] = explode(' ', $data['GeoObject']['Point']['pos']);
     }
 
     $data = $data['GeoObject']['metaDataProperty']['GeocoderMetaData']['AddressDetails'];
     $location['location_country'] = strtolower($data['Country']['CountryNameCode']);
     $location['location_state']   = $data['Country']['AdministrativeArea']['AdministrativeAreaName'];
-    if (isset($data['Country']['AdministrativeArea']['SubAdministrativeArea']))
-    {
-      $location['location_county']  = $data['Country']['AdministrativeArea']['SubAdministrativeArea']['SubAdministrativeAreaName'];
-      $location['location_city']    = $data['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']['LocalityName'];
-    }
-    else if (isset($data['Country']['AdministrativeArea']['Locality']['DependentLocality']))
-    {
-      $location['location_county']  = $data['Country']['AdministrativeArea']['Locality']['DependentLocality']['DependentLocalityName'];
-      $location['location_city']    = $data['Country']['AdministrativeArea']['Locality']['DependentLocality']['DependentLocality']['DependentLocalityName'];
+    if (isset($data['Country']['AdministrativeArea']['SubAdministrativeArea'])) {
+        $entry = $data['Country']['AdministrativeArea']['SubAdministrativeArea'];
+        print_debug_vars($entry);
+        $location['location_county'] = $entry['SubAdministrativeAreaName'];
+        $location['location_city']   = $entry['Locality']['LocalityName'] ?? $entry['Locality']['DependentLocality']['DependentLocalityName'];
+    } elseif (isset($data['Country']['AdministrativeArea']['Locality']['DependentLocality'])) {
+        $entry = $data['Country']['AdministrativeArea']['Locality']['DependentLocality'];
+        print_debug_vars($entry);
+        $location['location_county'] = $entry['DependentLocalityName'];
+        $location['location_city']   = $entry['DependentLocality']['DependentLocalityName'];
     } else {
-      $location['location_county']  = $data['Country']['AdministrativeArea']['AdministrativeAreaName'];
-      $location['location_city']    = $data['Country']['AdministrativeArea']['Locality']['LocalityName'];
+        $entry = $data['Country']['AdministrativeArea'];
+        print_debug_vars($entry);
+        $location['location_county'] = $entry['AdministrativeAreaName'];
+        $location['location_city']   = $entry['Locality']['LocalityName'];
     }
-  } else {
+} else {
     $data = FALSE;
-  }
+}
 
 // EOF

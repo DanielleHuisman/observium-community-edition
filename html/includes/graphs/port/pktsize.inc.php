@@ -5,23 +5,23 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 $rrd_filename_escape = rrdtool_escape($rrd_filename);
 
-$defs  = ' DEF:in_octets='.$rrd_filename_escape.':INOCTETS:AVERAGE';
-$defs .= ' DEF:out_octets='.$rrd_filename_escape.':OUTOCTETS:AVERAGE';
-$defs .= ' DEF:in_upkts='.$rrd_filename_escape.':INUCASTPKTS:AVERAGE';
-$defs .= ' DEF:out_upkts='.$rrd_filename_escape.':OUTUCASTPKTS:AVERAGE';
+$defs = ' DEF:in_octets=' . $rrd_filename_escape . ':INOCTETS:AVERAGE';
+$defs .= ' DEF:out_octets=' . $rrd_filename_escape . ':OUTOCTETS:AVERAGE';
+$defs .= ' DEF:in_upkts=' . $rrd_filename_escape . ':INUCASTPKTS:AVERAGE';
+$defs .= ' DEF:out_upkts=' . $rrd_filename_escape . ':OUTUCASTPKTS:AVERAGE';
 
-$defs .= ' DEF:in_bpkts='.$rrd_filename_escape.':INBROADCASTPKTS:AVERAGE';
-$defs .= ' DEF:out_bpkts='.$rrd_filename_escape.':OUTBROADCASTPKTS:AVERAGE';
-$defs .= ' DEF:in_mpkts='.$rrd_filename_escape.':INMULTICASTPKTS:AVERAGE';
-$defs .= ' DEF:out_mpkts='.$rrd_filename_escape.':OUTMULTICASTPKTS:AVERAGE';
+$defs .= ' DEF:in_bpkts=' . $rrd_filename_escape . ':INBROADCASTPKTS:AVERAGE';
+$defs .= ' DEF:out_bpkts=' . $rrd_filename_escape . ':OUTBROADCASTPKTS:AVERAGE';
+$defs .= ' DEF:in_mpkts=' . $rrd_filename_escape . ':INMULTICASTPKTS:AVERAGE';
+$defs .= ' DEF:out_mpkts=' . $rrd_filename_escape . ':OUTMULTICASTPKTS:AVERAGE';
 
 #$defs .= ' CDEF:in_bits=in_octets,8,*';
 #$defs .= ' CDEF:out_bits=out_octets,8,*';
@@ -36,8 +36,8 @@ $defs .= ' CDEF:out=out_octets,out_pkts,/';
 $defs .= ' CDEF:in_max=in';
 $defs .= ' CDEF:out_max=out';
 
-$colour_area_in = '53BBAD';
-$colour_line_in = '2D9284';
+$colour_area_in  = '53BBAD';
+$colour_line_in  = '2D9284';
 $colour_area_out = 'FFAC72';
 $colour_line_out = 'C7763D';
 
@@ -50,7 +50,9 @@ $colour_line_out = 'C7BF3D';
 $graph_max = 0;
 $unit_text = 'Octets/Pkts';
 
-$args['nototal'] = 1; $print_total = 0; $nototal = 1;
+$args['nototal'] = 1;
+$print_total     = 0;
+$nototal         = 1;
 
 include('includes/graphs/generic_duplex.inc.php');
 

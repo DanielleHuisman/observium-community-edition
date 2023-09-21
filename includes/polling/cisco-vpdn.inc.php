@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -21,27 +21,24 @@
 
 // FIXME. Candidate for migrate to graphs module with table_collect()
 // ^ will need to be able to set $graphs[], not sure this is possible yet?
-if (is_device_mib($device, 'CISCO-VPDN-MGMT-MIB'))
-{
-  $data = snmpwalk_cache_oid($device, "cvpdnSystemEntry", NULL, "CISCO-VPDN-MGMT-MIB");
+if (is_device_mib($device, 'CISCO-VPDN-MGMT-MIB')) {
+    $data = snmpwalk_cache_oid($device, "cvpdnSystemEntry", NULL, "CISCO-VPDN-MGMT-MIB");
 
-  foreach ($data as $type => $vpdn)
-  {
-    if ($vpdn['cvpdnSystemTunnelTotal'] || $vpdn['cvpdnSystemSessionTotal'])
-    {
-      rrdtool_update_ng($device, 'cisco-vpdn', array(
-        'tunnels'  => $vpdn['cvpdnSystemTunnelTotal'],
-        'sessions' => $vpdn['cvpdnSystemSessionTotal'],
-        'denied'   => $vpdn['cvpdnSystemDeniedUsersTotal'],
-      ), $type);
-                  
-      $graphs['vpdn_sessions_'.$type]   = TRUE;
-      $graphs['vpdn_tunnels_'.$type]   = TRUE;
+    foreach ($data as $type => $vpdn) {
+        if ($vpdn['cvpdnSystemTunnelTotal'] || $vpdn['cvpdnSystemSessionTotal']) {
+            rrdtool_update_ng($device, 'cisco-vpdn', [
+              'tunnels'  => $vpdn['cvpdnSystemTunnelTotal'],
+              'sessions' => $vpdn['cvpdnSystemSessionTotal'],
+              'denied'   => $vpdn['cvpdnSystemDeniedUsersTotal'],
+            ],                $type);
 
-      echo(" Cisco VPDN ($type) ");
+            $graphs['vpdn_sessions_' . $type] = TRUE;
+            $graphs['vpdn_tunnels_' . $type]  = TRUE;
+
+            echo(" Cisco VPDN ($type) ");
+        }
     }
-  }
-  unset($data, $vpdn, $type);
+    unset($data, $vpdn, $type);
 }
 
 // EOF

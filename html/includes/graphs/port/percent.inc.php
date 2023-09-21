@@ -5,21 +5,21 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 $rrd_filename_escape = rrdtool_escape($rrd_filename);
 
-$defs  = ' DEF:in_octets='.$rrd_filename_escape.':INOCTETS:AVERAGE';
-$defs .= ' DEF:out_octets='.$rrd_filename_escape.':OUTOCTETS:AVERAGE';
+$defs = ' DEF:in_octets=' . $rrd_filename_escape . ':INOCTETS:AVERAGE';
+$defs .= ' DEF:out_octets=' . $rrd_filename_escape . ':OUTOCTETS:AVERAGE';
 $defs .= ' CDEF:in_bits=in_octets,8,*';
 $defs .= ' CDEF:out_bits=out_octets,8,*';
 
-$defs .= ' CDEF:in=in_bits,'.$port['ifSpeed'].',/,100,*';
-$defs .= ' CDEF:out=out_bits,'.$port['ifSpeed'].',/,100,*';
+$defs .= ' CDEF:in=in_bits,' . $port['ifSpeed'] . ',/,100,*';
+$defs .= ' CDEF:out=out_bits,' . $port['ifSpeed'] . ',/,100,*';
 
 $defs .= ' CDEF:in_max=in';
 $defs .= ' CDEF:out_max=out';
@@ -41,10 +41,12 @@ $graph_max = 0;
 $scale_max = '100';
 $scale_min = '-100';
 
-$unit_text = '% of '.formatRates($port['ifSpeed'], 4, 4);
+$unit_text = '% of ' . format_bps($port['ifSpeed'], 4, 4);
 
-$args['nototal'] = 1; $print_total = 0; $nototal = 1;
+$args['nototal'] = 1;
+$print_total     = 0;
+$nototal         = 1;
 
-include($config['html_dir'].'/includes/graphs/generic_duplex.inc.php');
+include($config['html_dir'] . '/includes/graphs/generic_duplex.inc.php');
 
 // EOF

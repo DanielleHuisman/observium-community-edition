@@ -4,29 +4,29 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$rrd_filename = get_rrd_path($device, "wmi-app-mssql_".$app['app_instance']."-memory.rrd");
+$rrd_filename = get_rrd_path($device, "wmi-app-mssql_" . $app['app_instance'] . "-memory.rrd");
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$colour="CC0000";
-$colour_area="ffaaaa";
+$colour      = "CC0000";
+$colour_area = "ffaaaa";
 
-$sql = "SELECT * FROM `applications-state` WHERE `application_id` = ?";
-$app_state = dbFetchRow($sql, array($app['app_id']));
-$app_data = safe_unserialize($app_state['app_state']);
-$descr = rrdtool_escape($app['app_instance'], $descr_len);
+$sql       = "SELECT * FROM `applications-state` WHERE `application_id` = ?";
+$app_state = dbFetchRow($sql, [$app['app_id']]);
+$app_data  = safe_unserialize($app_state['app_state']);
+$descr     = rrdtool_escape($app['app_instance'], $descr_len);
 
 $rrd_options .= " -b 1024 -l 0 ";
 $rrd_options .= " COMMENT:'            Current      Average      Maximum\l'";
-$rrd_options .= " DEF:used=".$rrd_filename_escape.":totalmemory:AVERAGE ";
-$rrd_options .= " DEF:total=".$rrd_filename_escape.":targetmemory:AVERAGE ";
-$rrd_options .= " DEF:cache=".$rrd_filename_escape.":cachememory:AVERAGE ";
+$rrd_options .= " DEF:used=" . $rrd_filename_escape . ":totalmemory:AVERAGE ";
+$rrd_options .= " DEF:total=" . $rrd_filename_escape . ":targetmemory:AVERAGE ";
+$rrd_options .= " DEF:cache=" . $rrd_filename_escape . ":cachememory:AVERAGE ";
 $rrd_options .= " CDEF:free=total,used,-";
 $rrd_options .= " CDEF:usedperc=used,total,/,100,* ";
 $rrd_options .= " CDEF:cacheperc=cache,total,/,100,* ";

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -24,7 +24,7 @@
 //$cache['megaraid']['pd'] = snmpwalk_cache_oid($device, 'physicalDriveTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 echo('enclosureTable ');
-$cache['megaraid']['encl'] = snmpwalk_cache_oid($device, 'enclosureTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['encl'] = snmpwalk_cache_oid($device, 'enclosureTable', [], 'LSI-MegaRAID-SAS-MIB');
 
 /*
 FIXME
@@ -52,9 +52,8 @@ _> state sensor: lsi-megaraid-sas-pd-state
 */
 
 // Fix up enclosure indexes
-foreach ($cache['megaraid']['encl'] as $oldindex => $data)
-{
-  $cache['megaraid']['enclosure'][$data['enclosureIndex']] = $data;
+foreach ($cache['megaraid']['encl'] as $oldindex => $data) {
+    $cache['megaraid']['enclosure'][$data['enclosureIndex']] = $data;
 }
 
 // Physical disk temperature and state
@@ -65,27 +64,26 @@ foreach ($cache['megaraid']['encl'] as $oldindex => $data)
 // LSI-MegaRAID-SAS-MIB::slotNumber.0 = INTEGER: 0
 // LSI-MegaRAID-SAS-MIB::enclDeviceId.0 = INTEGER: 8
 
-foreach ($cache['megaraid']['pd'] as $index => $pd)
-{
-  $encl  = trim(trim($cache['megaraid']['enclosure'][$pd['enclIndex']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['enclosure'][$pd['enclIndex']]['productID'], '.'));
-  if ($encl == '') { $encl = 'Enclosure'; } // Static string if no enclosure vendor/product ID
-  $descr = $encl . ' (' . $pd['enclIndex'] . ') Slot ' . $pd['slotNumber'] . ': ' . $pd['pdVendorID'] . ' ' . $pd['pdProductID'];
+foreach ($cache['megaraid']['pd'] as $index => $pd) {
+    $encl = trim(trim($cache['megaraid']['enclosure'][$pd['enclIndex']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['enclosure'][$pd['enclIndex']]['productID'], '.'));
+    if ($encl == '') {
+        $encl = 'Enclosure';
+    } // Static string if no enclosure vendor/product ID
+    $descr = $encl . ' (' . $pd['enclIndex'] . ') Slot ' . $pd['slotNumber'] . ': ' . $pd['pdVendorID'] . ' ' . $pd['pdProductID'];
 
-  $value = $pd['pdTemperature'];
-  $oid   = ".1.3.6.1.4.1.3582.4.1.4.2.1.2.1.36.$index";
+    $value = $pd['pdTemperature'];
+    $oid   = ".1.3.6.1.4.1.3582.4.1.4.2.1.2.1.36.$index";
 
-  if ($value != '')
-  {
-    //discover_sensor('temperature', $device, $oid, "pdTemperature.$index", 'lsi-megaraid-sas-mib', $descr, 1, $value);
-  }
+    if ($value != '') {
+        //discover_sensor('temperature', $device, $oid, "pdTemperature.$index", 'lsi-megaraid-sas-mib', $descr, 1, $value);
+    }
 
-  $value = $pd['pdState'];
-  $oid   = ".1.3.6.1.4.1.3582.4.1.4.2.1.2.1.10.$index";
+    $value = $pd['pdState'];
+    $oid   = ".1.3.6.1.4.1.3582.4.1.4.2.1.2.1.10.$index";
 
-  if ($value !== '')
-  {
-    //discover_status($device, $oid, "pdState.$index", 'lsi-megaraid-sas-pd-state', $descr,  $value);
-  }
+    if ($value !== '') {
+        //discover_status($device, $oid, "pdState.$index", 'lsi-megaraid-sas-pd-state', $descr,  $value);
+    }
 }
 
 // Enclosure power supplies
@@ -98,23 +96,21 @@ foreach ($cache['megaraid']['pd'] as $index => $pd)
 // LSI-MegaRAID-SAS-MIB::powerSupplyStatus.1 = INTEGER: status-ok(2)
 
 echo(' enclosurePowerSupplyTable ');
-$cache['megaraid']['psu'] = snmpwalk_cache_oid($device, 'enclosurePowerSupplyTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['psu'] = snmpwalk_cache_oid($device, 'enclosurePowerSupplyTable', [], 'LSI-MegaRAID-SAS-MIB');
 
-foreach ($cache['megaraid']['psu'] as $index => $psu)
-{
-  $encl  = trim(trim($cache['megaraid']['encl'][$psu['enclosureId-EPST']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['encl'][$psu['enclosureId-EPST']]['productID'], '.'));
-  if ($encl == '')
-  {
-    $encl = 'Enclosure (' . $cache['megaraid']['encl'][$psu['enclosureId-EPST']]['enclosureIndex'] . ')'; // Static string if no vendor/product ID for enclosure
-  } else {
-    $encl .= ' (' . $cache['megaraid']['encl'][$psu['enclosureId-EPST']]['enclosureIndex'] . ')';
-  }
-  $descr = $encl . ' Power Supply ' . (++$lsi_counter['psu'][$psu['enclosureId-EPST']]);
+foreach ($cache['megaraid']['psu'] as $index => $psu) {
+    $encl = trim(trim($cache['megaraid']['encl'][$psu['enclosureId-EPST']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['encl'][$psu['enclosureId-EPST']]['productID'], '.'));
+    if ($encl == '') {
+        $encl = 'Enclosure (' . $cache['megaraid']['encl'][$psu['enclosureId-EPST']]['enclosureIndex'] . ')'; // Static string if no vendor/product ID for enclosure
+    } else {
+        $encl .= ' (' . $cache['megaraid']['encl'][$psu['enclosureId-EPST']]['enclosureIndex'] . ')';
+    }
+    $descr = $encl . ' Power Supply ' . (++$lsi_counter['psu'][$psu['enclosureId-EPST']]);
 
-  $value = $psu['powerSupplyStatus'];
-  $oid   = ".1.3.6.1.4.1.3582.4.1.5.5.1.3.$index";
+    $value = $psu['powerSupplyStatus'];
+    $oid   = ".1.3.6.1.4.1.3582.4.1.5.5.1.3.$index";
 
-  discover_status($device, $oid, "powerSupplyStatus.$index", 'lsi-megaraid-sas-sensor-state', $descr,  $value);
+    discover_status($device, $oid, "powerSupplyStatus.$index", 'lsi-megaraid-sas-sensor-state', $descr, $value);
 }
 
 // Enclosure temperature sensors
@@ -133,31 +129,29 @@ foreach ($cache['megaraid']['psu'] as $index => $psu)
 // LSI-MegaRAID-SAS-MIB::enclosureTemperature.2 = INTEGER: 211
 
 echo(' enclosureTempSensorTable ');
-$cache['megaraid']['temp'] = snmpwalk_cache_oid($device, 'enclosureTempSensorTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['temp'] = snmpwalk_cache_oid($device, 'enclosureTempSensorTable', [], 'LSI-MegaRAID-SAS-MIB');
 
-foreach ($cache['megaraid']['temp'] as $index => $temp)
-{
-  $encl  = trim(trim($cache['megaraid']['encl'][$temp['enclosureId-ETST']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['encl'][$temp['enclosureId-ETST']]['productID'], '.'));
-  if ($encl == '')
-  {
-    $encl = 'Enclosure (' . $cache['megaraid']['encl'][$temp['enclosureId-ETST']]['enclosureIndex'] . ')'; // Static string if no vendor/product ID for enclosure
-  } else {
-    $encl .= ' (' . $cache['megaraid']['encl'][$temp['enclosureId-ETST']]['enclosureIndex'] . ')';
-  }
-  $descr = $encl . ' Temperature sensor ' . (++$lsi_counter['temp'][$temp['enclosureId-ETST']]);
+foreach ($cache['megaraid']['temp'] as $index => $temp) {
+    $encl = trim(trim($cache['megaraid']['encl'][$temp['enclosureId-ETST']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['encl'][$temp['enclosureId-ETST']]['productID'], '.'));
+    if ($encl == '') {
+        $encl = 'Enclosure (' . $cache['megaraid']['encl'][$temp['enclosureId-ETST']]['enclosureIndex'] . ')'; // Static string if no vendor/product ID for enclosure
+    } else {
+        $encl .= ' (' . $cache['megaraid']['encl'][$temp['enclosureId-ETST']]['enclosureIndex'] . ')';
+    }
+    $descr = $encl . ' Temperature sensor ' . (++$lsi_counter['temp'][$temp['enclosureId-ETST']]);
 
-  $value = $temp['tempSensorStatus'];
-  $oid   = ".1.3.6.1.4.1.3582.4.1.5.6.1.3.$index";
+    $value = $temp['tempSensorStatus'];
+    $oid   = ".1.3.6.1.4.1.3582.4.1.5.6.1.3.$index";
 
-  discover_status($device, $oid, "tempSensorStatus.$index", 'lsi-megaraid-sas-sensor-state', $descr,  $value);
+    discover_status($device, $oid, "tempSensorStatus.$index", 'lsi-megaraid-sas-sensor-state', $descr, $value);
 
-  $value = $temp['enclosureTemperature'];
-  $oid   = ".1.3.6.1.4.1.3582.4.1.5.6.1.4.$index";
+    $value = $temp['enclosureTemperature'];
+    $oid   = ".1.3.6.1.4.1.3582.4.1.5.6.1.4.$index";
 
-  if ($value < 200) // Filter out some silly values, possibly *10'd?
-  {
-    discover_sensor('temperature', $device, $oid, "enclosureTemperature.$index", 'lsi-megaraid-sas-mib', $descr, 1, $value);
-  }
+    if ($value < 200) // Filter out some silly values, possibly *10'd?
+    {
+        discover_sensor('temperature', $device, $oid, "enclosureTemperature.$index", 'lsi-megaraid-sas-mib', $descr, 1, $value);
+    }
 }
 
 // LSI-MegaRAID-SAS-MIB::fanID.0 = INTEGER: 0
@@ -165,23 +159,21 @@ foreach ($cache['megaraid']['temp'] as $index => $temp)
 // LSI-MegaRAID-SAS-MIB::fanStatus.0 = INTEGER: status-ok(2)
 
 echo(' enclosureFanTable ');
-$cache['megaraid']['fan'] = snmpwalk_cache_oid($device, 'enclosureFanTable', array(), 'LSI-MegaRAID-SAS-MIB');
+$cache['megaraid']['fan'] = snmpwalk_cache_oid($device, 'enclosureFanTable', [], 'LSI-MegaRAID-SAS-MIB');
 
-foreach ($cache['megaraid']['fan'] as $index => $fan)
-{
-  $encl  = trim(trim($cache['megaraid']['encl'][$fan['enclosureId']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['encl'][$fan['enclosureId']]['productID'], '.'));
-  if ($encl == '')
-  {
-    $encl = 'Enclosure (' . $cache['megaraid']['encl'][$fan['enclosureId']]['enclosureIndex'] . ')'; // Static string if no vendor/product ID for enclosure
-  } else {
-    $encl .= ' (' . $cache['megaraid']['encl'][$fan['enclosureId']]['enclosureIndex'] . ')';
-  }
-  $descr = $encl . ' Fan ' . (++$lsi_counter['fan'][$fan['enclosureId']]);
+foreach ($cache['megaraid']['fan'] as $index => $fan) {
+    $encl = trim(trim($cache['megaraid']['encl'][$fan['enclosureId']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['encl'][$fan['enclosureId']]['productID'], '.'));
+    if ($encl == '') {
+        $encl = 'Enclosure (' . $cache['megaraid']['encl'][$fan['enclosureId']]['enclosureIndex'] . ')'; // Static string if no vendor/product ID for enclosure
+    } else {
+        $encl .= ' (' . $cache['megaraid']['encl'][$fan['enclosureId']]['enclosureIndex'] . ')';
+    }
+    $descr = $encl . ' Fan ' . (++$lsi_counter['fan'][$fan['enclosureId']]);
 
-  $value = $fan['fanStatus'];
-  $oid   = ".1.3.6.1.4.1.3582.4.1.5.3.1.3.$index";
+    $value = $fan['fanStatus'];
+    $oid   = ".1.3.6.1.4.1.3582.4.1.5.3.1.3.$index";
 
-  discover_status($device, $oid, "fanStatus.$index", 'lsi-megaraid-sas-sensor-state', $descr,  $value);
+    discover_status($device, $oid, "fanStatus.$index", 'lsi-megaraid-sas-sensor-state', $descr, $value);
 }
 
 /*

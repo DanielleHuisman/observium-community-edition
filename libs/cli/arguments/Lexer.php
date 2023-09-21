@@ -15,6 +15,7 @@ namespace cli\arguments;
 use cli\Memoize;
 
 class Lexer extends Memoize implements \Iterator {
+	private $_item;
 	private $_items = array();
 	private $_index = 0;
 	private $_length = 0;
@@ -33,6 +34,7 @@ class Lexer extends Memoize implements \Iterator {
 	 *
 	 * @return string
 	 */
+	#[\ReturnTypeWillChange]
 	public function current() {
 		return $this->_item;
 	}
@@ -49,6 +51,7 @@ class Lexer extends Memoize implements \Iterator {
 	/**
 	 * Move the cursor forward 1 element if it is valid.
 	 */
+	#[\ReturnTypeWillChange]
 	public function next() {
 		if ($this->valid()) {
 			$this->_shift();
@@ -60,6 +63,7 @@ class Lexer extends Memoize implements \Iterator {
 	 *
 	 * @return int
 	 */
+	#[\ReturnTypeWillChange]
 	public function key() {
 		return $this->_index;
 	}
@@ -68,6 +72,7 @@ class Lexer extends Memoize implements \Iterator {
 	 * Move forward 1 element and, if the method hasn't been called before, reset
 	 * the cursor's position to 0.
 	 */
+	#[\ReturnTypeWillChange]
 	public function rewind() {
 		$this->_shift();
 		if ($this->_first) {
@@ -81,6 +86,7 @@ class Lexer extends Memoize implements \Iterator {
 	 *
 	 * @return bool
 	 */
+	#[\ReturnTypeWillChange]
 	public function valid() {
 		return ($this->_index < $this->_length);
 	}

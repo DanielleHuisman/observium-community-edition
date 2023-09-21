@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -29,30 +29,28 @@
 //HUAWEI-POE-MIB::hwPoeSlotPowerRsvPercent.0 = INTEGER: 20
 //HUAWEI-POE-MIB::hwPoeSlotPowerUtilizationThreshold.0 = INTEGER: 90
 
-$oids = snmpwalk_cache_oid($device, 'hwPoeSlotEntry', array(), $mib);
+$oids = snmpwalk_cache_oid($device, 'hwPoeSlotEntry', [], $mib);
 
 // Stacked devices
-foreach ($oids as $index => $entry)
-{
-  if ($entry['hwPoeSlotConsumingPower'] == 0 && $entry['hwPoeSlotIsPoeDevice'] != 'yes')
-  {
-    continue;
-  }
+foreach ($oids as $index => $entry) {
+    if ($entry['hwPoeSlotConsumingPower'] == 0 && $entry['hwPoeSlotIsPoeDevice'] != 'yes') {
+        continue;
+    }
 
-  $descr    = "PoE Slot " . ($index + 1);
-  $oid_name = 'hwPoeSlotConsumingPower';
-  $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.2.1.5.$index";
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
-  $scale    = 0.001;
+    $descr    = "PoE Slot " . ($index + 1);
+    $oid_name = 'hwPoeSlotConsumingPower';
+    $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.2.1.5.$index";
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
+    $scale    = 0.001;
 
-  // Options
-  $options = array('limit_high'      => $entry['hwPoeSlotMaximumPower'] * $scale, // I not sure.. or hwPoeSlotAvailablePower or hwPoeSlotReferencePower
-                   'limit_low'       => 0); // Hardcode 0 as lower limit. Low warning limit will be calculated.
+    // Options
+    $options = ['limit_high' => $entry['hwPoeSlotMaximumPower'] * $scale, // I not sure.. or hwPoeSlotAvailablePower or hwPoeSlotReferencePower
+                'limit_low'  => 0]; // Hardcode 0 as lower limit. Low warning limit will be calculated.
 
-  $options['limit_high_warn'] = $entry['hwPoeSlotPowerUtilizationThreshold'] > 0 ? $entry['hwPoeSlotPowerUtilizationThreshold'] / 100 : 0.9;
-  $options['limit_high_warn'] *= $options['limit_high'];
-  discover_sensor('power', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    $options['limit_high_warn'] = $entry['hwPoeSlotPowerUtilizationThreshold'] > 0 ? $entry['hwPoeSlotPowerUtilizationThreshold'] / 100 : 0.9;
+    $options['limit_high_warn'] *= $options['limit_high'];
+    discover_sensor('power', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 }
 
 print_debug_vars($oids);
@@ -89,73 +87,69 @@ print_debug_vars($oids);
 //HUAWEI-POE-MIB::hwPoePortVoltage.20 = STRING: "0"
 //HUAWEI-POE-MIB::hwPoePortManualOperation.20 = INTEGER: powerOff(1)
 
-$oids = snmpwalk_cache_oid($device, 'hwPoePortEntry', array(), $mib);
+$oids = snmpwalk_cache_oid($device, 'hwPoePortEntry', [], $mib);
 
 print_debug_vars($oids);
 
-foreach ($oids as $index => $entry)
-{
-  if ($entry['hwPoePortEnable'] != 'enabled' ||
-      (($entry['hwPoePortPowerOnStatus'] == 'off' || $entry['hwPoePortPowerStatus'] == 'Detecting') &&
-       $entry['hwPoePortConsumingPower'] == 0 && $entry['hwPoePortCurrent'] == 0 && $entry['hwPoePortVoltage'] == 0))
-  {
-    // Skip PoE disabled ports
-    continue;
-  }
+foreach ($oids as $index => $entry) {
+    if ($entry['hwPoePortEnable'] != 'enabled' ||
+        (($entry['hwPoePortPowerOnStatus'] == 'off' || $entry['hwPoePortPowerStatus'] == 'Detecting') &&
+         $entry['hwPoePortConsumingPower'] == 0 && $entry['hwPoePortCurrent'] == 0 && $entry['hwPoePortVoltage'] == 0)) {
+        // Skip PoE disabled ports
+        continue;
+    }
 
-  $options = array('entPhysicalIndex' => $index);
-  $port    = get_port_by_ifIndex($device['device_id'], $index);
-  // print_vars($port);
+    $options = ['entPhysicalIndex' => $index];
+    $port    = get_port_by_ifIndex($device['device_id'], $index);
+    // print_vars($port);
 
-  if (is_array($port))
-  {
-    $entry['ifDescr']           = $port['port_label'];
-    $options['measured_class']  = 'port';
-    $options['measured_entity'] = $port['port_id'];
-    $options['entPhysicalIndex_measured'] = $port['ifIndex'];
-  } else {
-    $entry['ifDescr'] = $entry['hwPoePortName'];
-  }
+    if (is_array($port)) {
+        $entry['ifDescr']                     = $port['port_label'];
+        $options['measured_class']            = 'port';
+        $options['measured_entity']           = $port['port_id'];
+        $options['entPhysicalIndex_measured'] = $port['ifIndex'];
+    } else {
+        $entry['ifDescr'] = $entry['hwPoePortName'];
+    }
 
-  $descr    = $entry['ifDescr'] . ' PoE Power';
-  $oid_name = 'hwPoePortConsumingPower';
-  $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.3.1.10.$index";
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
-  $scale    = 0.001;
+    $descr    = $entry['ifDescr'] . ' PoE Power';
+    $oid_name = 'hwPoePortConsumingPower';
+    $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.3.1.10.$index";
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
+    $scale    = 0.001;
 
-  // Limits
-  $options['limit_high'] = $entry['hwPoePortMaximumPower'] * $scale;
-  if ($options['limit_high'] > 0)
-  {
-    $options['limit_high_warn'] = $options['limit_high'] * 0.9; // Warning at 90% of power limit - FIXME should move to centralized smart calculation function
-  } else {
-    unset($options['limit_high']);
-  }
+    // Limits
+    $options['limit_high'] = $entry['hwPoePortMaximumPower'] * $scale;
+    if ($options['limit_high'] > 0) {
+        $options['limit_high_warn'] = $options['limit_high'] * 0.9; // Warning at 90% of power limit - FIXME should move to centralized smart calculation function
+    } else {
+        unset($options['limit_high']);
+    }
 
-  discover_sensor('power', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    discover_sensor('power', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 
-  $descr    = $entry['ifDescr'] . ' PoE Current';
-  $oid_name = 'hwPoePortCurrent';
-  $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.3.1.13.$index";
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
-  $scale    = 0.001;
+    $descr    = $entry['ifDescr'] . ' PoE Current';
+    $oid_name = 'hwPoePortCurrent';
+    $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.3.1.13.$index";
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
+    $scale    = 0.001;
 
-  unset($options['limit_high'], $options['limit_high_warn']);
+    unset($options['limit_high'], $options['limit_high_warn']);
 
-  discover_sensor('current', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    discover_sensor('current', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 
-  $descr    = $entry['ifDescr'] . ' PoE Voltage';
-  $oid_name = 'hwPoePortVoltage';
-  $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.3.1.14.$index";
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
-  $scale    = 1;
+    $descr    = $entry['ifDescr'] . ' PoE Voltage';
+    $oid_name = 'hwPoePortVoltage';
+    $oid_num  = ".1.3.6.1.4.1.2011.5.25.195.3.1.14.$index";
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
+    $scale    = 1;
 
-  unset($options['limit_high'], $options['limit_high_warn']);
+    unset($options['limit_high'], $options['limit_high_warn']);
 
-  discover_sensor('voltage', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    discover_sensor('voltage', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 
 }
 

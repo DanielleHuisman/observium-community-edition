@@ -5,100 +5,134 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // FIXME. This file unused
 
-if (!is_array($vars['id'])) { $vars['id'] = array($vars['id']); }
-if (!is_array($vars['idb'])) { $vars['idb'] = array($vars['idb']); }
-if (!is_array($vars['idc'])) { $vars['idc'] = array($vars['idc']); }
+if (!is_array($vars['id'])) {
+    $vars['id'] = [$vars['id']];
+}
+if (!is_array($vars['idb'])) {
+    $vars['idb'] = [$vars['idb']];
+}
+if (!is_array($vars['idc'])) {
+    $vars['idc'] = [$vars['idc']];
+}
 
-if (!isset($vars['colour_a'])) { $vars['colour_a'] = "0a5f7f"; }
-if (!isset($vars['colour_b'])) { $vars['colour_b'] = "4d9221"; }
-if (!isset($vars['colour_c'])) { $vars['colour_c'] = "d9534f"; }
+if (!isset($vars['colour_a'])) {
+    $vars['colour_a'] = "0a5f7f";
+}
+if (!isset($vars['colour_b'])) {
+    $vars['colour_b'] = "4d9221";
+}
+if (!isset($vars['colour_c'])) {
+    $vars['colour_c'] = "d9534f";
+}
 
-if (!isset($vars['descr_a'])) { $vars['descr_a'] = "Peering"; }
-if (!isset($vars['descr_b'])) { $vars['descr_b'] = "Cache"; }
-if (!isset($vars['descr_c'])) { $vars['descr_c'] = "Transit"; }
+if (!isset($vars['descr_a'])) {
+    $vars['descr_a'] = "Peering";
+}
+if (!isset($vars['descr_b'])) {
+    $vars['descr_b'] = "Cache";
+}
+if (!isset($vars['descr_c'])) {
+    $vars['descr_c'] = "Transit";
+}
 
 
-if ($vars['legend']) { $legend = $vars['legend']; }
+if ($vars['legend']) {
+    $legend = $vars['legend'];
+}
 
-$descr_lens = array(strlen($vars['descr_a']), strlen($vars['descr_b']), strlen($vars['descr_c']));
+$descr_lens = [strlen($vars['descr_a']), strlen($vars['descr_b']), strlen($vars['descr_c'])];
 $max_descr  = max($descr_lens);
-if($max_descr < 10) { $max_descr = 10; }
-
-
-
-include($config['html_dir']."/includes/graphs/common.inc.php");
-
-if ($height < "99") { $rrd_options .= " --only-graph"; }
-$i = 1;
-$rrd_multi = array();
-foreach ($vars['id'] as $ifid)
-{
-  $int = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
-  $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
-  if (rrd_is_file($rrdfile))
-  {
-    if (strstr($inverse, "a")) { $in = "OUT"; $out = "IN"; } else { $in = "IN"; $out = "OUT"; }
-    $rrd_options .= " DEF:inoctets" . $i . "=" . $rrdfile . ":".$in."OCTETS:AVERAGE";
-    $rrd_options .= " DEF:outoctets" . $i . "=" . $rrdfile . ":".$out."OCTETS:AVERAGE";
-
-    $rrd_multi['in_thing'][]  = "inoctets" .  $i . ",UN,0," . "inoctets" .  $i . ",IF";
-    $rrd_multi['out_thing'][] = "outoctets" . $i . ",UN,0," . "outoctets" . $i . ",IF";
-
-    $i++;
-  }
+if ($max_descr < 10) {
+    $max_descr = 10;
 }
 
-foreach ($vars['idb'] as $ifid)
-{
-  $int = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
-  $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
-  if (rrd_is_file($rrdfile))
-  {
-    if (strstr($inverse, "b")) { $in = "OUT"; $out = "IN"; } else { $in = "IN"; $out = "OUT"; }
-    $rrd_options .= " DEF:inoctetsb" . $i . "=" . $rrdfile . ":".$in."OCTETS:AVERAGE";
-    $rrd_options .= " DEF:outoctetsb" . $i . "=" . $rrdfile . ":".$out."OCTETS:AVERAGE";
 
-    $rrd_multi['in_thingb'][]  = "inoctetsb" .  $i . ",UN,0," . "inoctetsb" .  $i . ",IF";
-    $rrd_multi['out_thingb'][] = "outoctetsb" . $i . ",UN,0," . "outoctetsb" . $i . ",IF";
+include($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-    $i++;
-  }
+if ($height < "99") {
+    $rrd_options .= " --only-graph";
+}
+$i         = 1;
+$rrd_multi = [];
+foreach ($vars['id'] as $ifid) {
+    $int     = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", [$ifid]);
+    $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
+    if (rrd_is_file($rrdfile)) {
+        if (strstr($inverse, "a")) {
+            $in  = "OUT";
+            $out = "IN";
+        } else {
+            $in  = "IN";
+            $out = "OUT";
+        }
+        $rrd_options .= " DEF:inoctets" . $i . "=" . $rrdfile . ":" . $in . "OCTETS:AVERAGE";
+        $rrd_options .= " DEF:outoctets" . $i . "=" . $rrdfile . ":" . $out . "OCTETS:AVERAGE";
+
+        $rrd_multi['in_thing'][]  = "inoctets" . $i . ",UN,0," . "inoctets" . $i . ",IF";
+        $rrd_multi['out_thing'][] = "outoctets" . $i . ",UN,0," . "outoctets" . $i . ",IF";
+
+        $i++;
+    }
 }
 
-foreach ($vars['idc'] as $ifid)
-{
-  $int = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices as D WHERE I.port_id = ? AND I.device_id = D.device_id", array($ifid));
-  $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
-  if (rrd_is_file($rrdfile))
-  {
-    if (strstr($inverse, "c")) { $in = "OUT"; $out = "IN"; } else { $in = "IN"; $out = "OUT"; }
-    $rrd_options .= " DEF:inoctetsc" . $i . "=" . $rrdfile . ":".$in."OCTETS:AVERAGE";
-    $rrd_options .= " DEF:outoctetsc" . $i . "=" . $rrdfile . ":".$out."OCTETS:AVERAGE";
+foreach ($vars['idb'] as $ifid) {
+    $int     = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices AS D WHERE I.port_id = ? AND I.device_id = D.device_id", [$ifid]);
+    $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
+    if (rrd_is_file($rrdfile)) {
+        if (strstr($inverse, "b")) {
+            $in  = "OUT";
+            $out = "IN";
+        } else {
+            $in  = "IN";
+            $out = "OUT";
+        }
+        $rrd_options .= " DEF:inoctetsb" . $i . "=" . $rrdfile . ":" . $in . "OCTETS:AVERAGE";
+        $rrd_options .= " DEF:outoctetsb" . $i . "=" . $rrdfile . ":" . $out . "OCTETS:AVERAGE";
 
-    $rrd_multi['in_thingc'][]  = "inoctetsc" .  $i . ",UN,0," . "inoctetsc" .  $i . ",IF";
-    $rrd_multi['out_thingc'][] = "outoctetsc" . $i . ",UN,0," . "outoctetsc" . $i . ",IF";
+        $rrd_multi['in_thingb'][]  = "inoctetsb" . $i . ",UN,0," . "inoctetsb" . $i . ",IF";
+        $rrd_multi['out_thingb'][] = "outoctetsb" . $i . ",UN,0," . "outoctetsb" . $i . ",IF";
 
-    $i++;
-  }
+        $i++;
+    }
 }
 
-foreach(array('', 'b', 'c') as $trio)
-{
-  $in_name  = 'in_thing'.$trio;
-  $out_name = 'out_thing'.$trio;
-  $pluses_name = 'pluses'.$trio;
-  $$in_name  = implode(',', $rrd_multi[$in_name]);
-  $$out_name = implode(',', $rrd_multi[$out_name]);
-  $$pluses_name = str_repeat(',ADDNAN', safe_count($rrd_multi[$in_name]) - 1);
-  unset($in_name, $out_name, $pluses_name);
+foreach ($vars['idc'] as $ifid) {
+    $int     = dbFetchRow("SELECT `ifIndex`, `hostname`, D.`device_id` FROM `ports` AS I, devices as D WHERE I.port_id = ? AND I.device_id = D.device_id", [$ifid]);
+    $rrdfile = get_port_rrdfilename($int, NULL, TRUE);
+    if (rrd_is_file($rrdfile)) {
+        if (strstr($inverse, "c")) {
+            $in  = "OUT";
+            $out = "IN";
+        } else {
+            $in  = "IN";
+            $out = "OUT";
+        }
+        $rrd_options .= " DEF:inoctetsc" . $i . "=" . $rrdfile . ":" . $in . "OCTETS:AVERAGE";
+        $rrd_options .= " DEF:outoctetsc" . $i . "=" . $rrdfile . ":" . $out . "OCTETS:AVERAGE";
+
+        $rrd_multi['in_thingc'][]  = "inoctetsc" . $i . ",UN,0," . "inoctetsc" . $i . ",IF";
+        $rrd_multi['out_thingc'][] = "outoctetsc" . $i . ",UN,0," . "outoctetsc" . $i . ",IF";
+
+        $i++;
+    }
+}
+
+foreach (['', 'b', 'c'] as $trio) {
+    $in_name      = 'in_thing' . $trio;
+    $out_name     = 'out_thing' . $trio;
+    $pluses_name  = 'pluses' . $trio;
+    $$in_name     = implode(',', $rrd_multi[$in_name]);
+    $$out_name    = implode(',', $rrd_multi[$out_name]);
+    $$pluses_name = str_repeat(',ADDNAN', safe_count($rrd_multi[$in_name]) - 1);
+    unset($in_name, $out_name, $pluses_name);
 }
 
 $rrd_options .= " CDEF:inoctets=" . $in_thing . $pluses;
@@ -146,21 +180,21 @@ $rrd_options .= " CDEF:doutbits_stot=outbits_stot,-1,*";
 $rrd_options .= " CDEF:doutbits_tot=outbits_tot,-1,*";
 $rrd_options .= " CDEF:nothing=outbits_tot,outbits_tot,-";
 
-$rrd_options .= " COMMENT:'".str_pad('%age', $max_descr)."        Last     Avg      Min      Max'\\n";
+$rrd_options .= " COMMENT:'" . str_pad('%age', $max_descr) . "        Last     Avg      Min      Max'\\n";
 
-$rrd_options .= " AREA:perc_a#".$vars['colour_a'].":'".str_pad($vars['descr_a'], $max_descr)."'";
+$rrd_options .= " AREA:perc_a#" . $vars['colour_a'] . ":'" . str_pad($vars['descr_a'], $max_descr) . "'";
 $rrd_options .= " GPRINT:perc_a:LAST:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_a:AVERAGE:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_a:MIN:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_a:MAX:%6.2lf%s\\l";
 
-$rrd_options .= " AREA:perc_b#".$vars['colour_b'].":'".str_pad($vars['descr_b'], $max_descr)."':STACK";
+$rrd_options .= " AREA:perc_b#" . $vars['colour_b'] . ":'" . str_pad($vars['descr_b'], $max_descr) . "':STACK";
 $rrd_options .= " GPRINT:perc_b:LAST:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_b:AVERAGE:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_b:MIN:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_b:MAX:%6.2lf%s\\l";
 
-$rrd_options .= " AREA:perc_c#".$vars['colour_c'].":'".str_pad($vars['descr_c'], $max_descr)."':STACK";
+$rrd_options .= " AREA:perc_c#" . $vars['colour_c'] . ":'" . str_pad($vars['descr_c'], $max_descr) . "':STACK";
 $rrd_options .= " GPRINT:perc_c:LAST:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_c:AVERAGE:%6.2lf%s";
 $rrd_options .= " GPRINT:perc_c:MIN:%6.2lf%s";

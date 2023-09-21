@@ -4,21 +4,21 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if ($fn_hw = rewrite_definition_hardware($device, $poll_device['sysObjectID'])) {
-  // Prefer defined hardware
-  $hardware = $fn_hw;
-  $fn_type  = rewrite_definition_type($device, $poll_device['sysObjectID']);
-  if (!empty($fn_type)) {
-    $type = $fn_type;
-  }
+if ($fn_hw = get_model_param($device, 'hardware', $poll_device['sysObjectID'])) {
+    // Prefer defined hardware
+    $hardware = $fn_hw;
+
+    if ($fn_type = get_model_param($device, 'type', $poll_device['sysObjectID'])) {
+        $type = $fn_type;
+    }
 } elseif (str_contains($hardware, 'WiFi')) {
-  $type = 'wireless';
+    $type = 'wireless';
 }
 
 // EOF

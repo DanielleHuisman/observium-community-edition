@@ -3,10 +3,10 @@
 /**
  * Observium Network Management and Monitoring System
  *
- * @package    observium
- * @subpackage web
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package        observium
+ * @subpackage     web
+ * @author         Adam Armstrong <adama@observium.org>
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -17,18 +17,18 @@ $navbar['class'] = "navbar-narrow";
 
 if (isset($vars['customer']) && $vars['customer'] == 'hide') {
     $navbar['options_right']['cust']['class'] = 'active';
-    $navbar['options_right']['cust']['url'] = generate_url($vars, array('customer' => NULL));
+    $navbar['options_right']['cust']['url']   = generate_url($vars, ['customer' => NULL]);
 } else {
-    $navbar['options_right']['cust']['url'] = generate_url($vars, array('customer' => 'hide'));
+    $navbar['options_right']['cust']['url'] = generate_url($vars, ['customer' => 'hide']);
 }
 $navbar['options_right']['cust']['text'] = 'Customer Graphs';
 $navbar['options_right']['cust']['icon'] = $config['icon']['graphs'];
 
 if (isset($vars['aggregate']) && $vars['aggregate'] == 'show') {
     $navbar['options_right']['aggregate']['class'] = 'active';
-    $navbar['options_right']['aggregate']['url'] = generate_url($vars, array('aggregate' => NULL));
+    $navbar['options_right']['aggregate']['url']   = generate_url($vars, ['aggregate' => NULL]);
 } else {
-    $navbar['options_right']['aggregate']['url'] = generate_url($vars, array('aggregate' => 'show'));
+    $navbar['options_right']['aggregate']['url'] = generate_url($vars, ['aggregate' => 'show']);
 }
 $navbar['options_right']['aggregate']['text'] = 'Aggregate';
 $navbar['options_right']['aggregate']['icon'] = $config['icon']['graphs'];
@@ -42,23 +42,23 @@ unset($navbar);
 if (isset($vars['aggregate']) && $vars['aggregate'] == 'show') {
 
     $where = "WHERE `port_descr_type` = 'cust'";
-    $where .= generate_query_permitted(array('port'));
+    $where .= generate_query_permitted(['port']);
 
     $ports = dbFetchRows('SELECT `port_id` FROM `ports` ' . $where);
 
-    $port_list = array();
+    $port_list = [];
     foreach ($ports as $port) {
         $port_list[] = $port['port_id'];
     }
     $port_list = implode(',', $port_list);
 
-    echo generate_box_open(array('title' => 'Total Customer Traffic'));
+    echo generate_box_open(['title' => 'Total Customer Traffic']);
 
     if ($port_list) {
-        $graph_array['type'] = 'multi-port_bits_separate';
-        $graph_array['to'] = $config['time']['now'];
+        $graph_array['type']   = 'multi-port_bits_separate';
+        $graph_array['to']     = $config['time']['now'];
         $graph_array['legend'] = 'no';
-        $graph_array['id'] = $port_list;
+        $graph_array['id']     = $port_list;
 
         print_graph_row($graph_array);
 
@@ -85,15 +85,14 @@ echo generate_box_open();
 <?php
 
 
-
 $customers = [];
 foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' ORDER BY `port_descr_descr`") as $customer) {
-  $customers[$customer['port_descr_descr']][] = $customer;
+    $customers[$customer['port_descr_descr']][] = $customer;
 }
 
-foreach($customers as $customer => $ports) {
+foreach ($customers as $customer => $ports) {
 
-  $customer_name = $customer; // Set text name to use on first port.
+    $customer_name = $customer; // Set text name to use on first port.
 
     foreach ($ports as $port) {
         $device = device_by_id_cache($port['device_id']);
@@ -130,8 +129,8 @@ foreach($customers as $customer => $ports) {
         echo('<tr><td colspan="7">');
 
         $graph_array['type'] = "customer_bits";
-        $graph_array['to'] = $config['time']['now'];
-        $graph_array['id'] = '"' . $port['port_descr_descr'] . '"'; // use double quotes for prevent split var by commas
+        $graph_array['to']   = $config['time']['now'];
+        $graph_array['id']   = '"' . $port['port_descr_descr'] . '"'; // use double quotes for prevent split var by commas
 
         print_graph_row($graph_array);
 

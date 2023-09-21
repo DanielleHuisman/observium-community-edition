@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -59,114 +59,91 @@
 // Detect base version, since 9.10 Dell changed base MIBs, but NOT changed devices sysObjectID
 // for 9.10 and above set $is_dell to TRUE
 $is_dell = FALSE;
-if (preg_match('/Application Software Version:\s+(?<version>(?<base>[\d\.]+)\S*)\s+Series: +(?<hardware>\S+)/', $poll_device['sysDescr'], $matches))
-{
-  //Dell Networking OS Operating System Version: 2.0 Application Software Version: 9.10(0.1P3) Series: S4810 Copyright (c) 1999-2016 by Dell Inc. All Rights Reserved. Build Time: Tue Jun 14 15:00:23 2016
-  //Dell Networking OS Operating System Version: 2.0 Application Software Version: 9.10(0.1) Series: S4048-ON Copyright (c) 1999-2016 by Dell Inc. All Rights Reserved. Build Time: Wed May 11 23:07:56 2016
-  //Dell Networking OS Operating System Version: 2.0 Application Software Version: 9.7(0.0P9) Series: S6000 Copyright (c) 1999-2015 by Dell Inc. All Rights Reserved. Build Time: Wed Jun 17 13:21:33 2015
-  //Dell Force10 OS Operating System Version: 1.0 Application Software Version: 8.4.2.7 Series: S25N Copyright (c) 1999-2012 by Dell Inc. All Rights Reserved. Build Time: Thu Sep 27 14:03:07 PDT 2012
-  $is_dell = version_compare($matches['base'], '9.10') >= 0;
+if (preg_match('/Application Software Version:\s+(?<version>(?<base>[\d\.]+)\S*)\s+Series: +(?<hardware>\S+)/', $poll_device['sysDescr'], $matches)) {
+    //Dell Networking OS Operating System Version: 2.0 Application Software Version: 9.10(0.1P3) Series: S4810 Copyright (c) 1999-2016 by Dell Inc. All Rights Reserved. Build Time: Tue Jun 14 15:00:23 2016
+    //Dell Networking OS Operating System Version: 2.0 Application Software Version: 9.10(0.1) Series: S4048-ON Copyright (c) 1999-2016 by Dell Inc. All Rights Reserved. Build Time: Wed May 11 23:07:56 2016
+    //Dell Networking OS Operating System Version: 2.0 Application Software Version: 9.7(0.0P9) Series: S6000 Copyright (c) 1999-2015 by Dell Inc. All Rights Reserved. Build Time: Wed Jun 17 13:21:33 2015
+    //Dell Force10 OS Operating System Version: 1.0 Application Software Version: 8.4.2.7 Series: S25N Copyright (c) 1999-2012 by Dell Inc. All Rights Reserved. Build Time: Thu Sep 27 14:03:07 PDT 2012
+    $is_dell = version_compare($matches['base'], '9.10') >= 0;
 
-  $hardware = $matches['hardware'];
-  $version  = $matches['version'];
+    $hardware = $matches['hardware'];
+    $version  = $matches['version'];
 } else {
-  $hardware = rewrite_definition_hardware($device, $poll_device['sysObjectID']);
+    $hardware = get_model_param($device, 'hardware', $poll_device['sysObjectID']);
 }
 
-if ($is_dell)
-{
-  // DELL-NETWORKING-CHASSIS-MIB::dellNetNumStackUnits.0 = INTEGER: 1
-  // DELL-NETWORKING-CHASSIS-MIB::dellNetStackUnitIndexNext.0 = INTEGER: 1
+if ($is_dell) {
+    // DELL-NETWORKING-CHASSIS-MIB::dellNetNumStackUnits.0 = INTEGER: 1
+    // DELL-NETWORKING-CHASSIS-MIB::dellNetStackUnitIndexNext.0 = INTEGER: 1
 
-  // YES, this not joke snmpwalk instead snmpget, since some Dell devices return wrong 'No Such Instance currently exists at this OID'
-  //$data     = snmp_get_multi_oid($device, 'dellNetStackUnitCodeVersion.1 dellNetStackUnitProductOrder.1 dellNetStackUnitModelId.1 dellNetStackUnitSerialNumber.1 dellNetStackUnitServiceTag.1', array(), 'DELL-NETWORKING-CHASSIS-MIB');
-  $oids = array('dellNetStackUnitSerialNumber', 'dellNetStackUnitServiceTag');
-  if (!$hardware)
-  {
-    $oids[] = 'dellNetStackUnitProductOrder';
-    $oids[] = 'dellNetStackUnitModelId';
-  }
-  if (!$version)
-  {
-    $oids[] = 'dellNetStackUnitCodeVersion';
-  }
-  $data = array();
-  foreach ($oids as $oid)
-  {
-    $data = snmpwalk_cache_oid($device, $oid, $data, 'DELL-NETWORKING-CHASSIS-MIB');
-  }
-  if ($data[1]['dellNetStackUnitProductOrder'] && $data[1]['dellNetStackUnitProductOrder'] != 'NA' &&
-      strlen($data[1]['dellNetStackUnitProductOrder']) < 20)
-  {
-    $hardware = $data[1]['dellNetStackUnitProductOrder'];
-  }
-  else if (!$hardware)
-  {
-    $hardware = $data[1]['dellNetStackUnitModelId'];
-  }
-  if ($data[1]['dellNetStackUnitCodeVersion'])
-  {
-    $version  = $data[1]['dellNetStackUnitCodeVersion'];
-  }
-  if ($version) { $icon = 'dell'; } // Switch icon to Dell
+    // YES, this not joke snmpwalk instead snmpget, since some Dell devices return wrong 'No Such Instance currently exists at this OID'
+    //$data     = snmp_get_multi_oid($device, 'dellNetStackUnitCodeVersion.1 dellNetStackUnitProductOrder.1 dellNetStackUnitModelId.1 dellNetStackUnitSerialNumber.1 dellNetStackUnitServiceTag.1', array(), 'DELL-NETWORKING-CHASSIS-MIB');
+    $oids = ['dellNetStackUnitSerialNumber', 'dellNetStackUnitServiceTag'];
+    if (!$hardware) {
+        $oids[] = 'dellNetStackUnitProductOrder';
+        $oids[] = 'dellNetStackUnitModelId';
+    }
+    if (!$version) {
+        $oids[] = 'dellNetStackUnitCodeVersion';
+    }
+    $data = [];
+    foreach ($oids as $oid) {
+        $data = snmpwalk_cache_oid($device, $oid, $data, 'DELL-NETWORKING-CHASSIS-MIB');
+    }
+    if ($data[1]['dellNetStackUnitProductOrder'] && $data[1]['dellNetStackUnitProductOrder'] != 'NA' &&
+        strlen($data[1]['dellNetStackUnitProductOrder']) < 20) {
+        $hardware = $data[1]['dellNetStackUnitProductOrder'];
+    } elseif (!$hardware) {
+        $hardware = $data[1]['dellNetStackUnitModelId'];
+    }
+    if ($data[1]['dellNetStackUnitCodeVersion']) {
+        $version = $data[1]['dellNetStackUnitCodeVersion'];
+    }
+    if ($version) {
+        $icon = 'dell';
+    } // Switch icon to Dell
 
-  // Serial
-  if ($data[1]['dellNetStackUnitSerialNumber'] && $data[1]['dellNetStackUnitSerialNumber'] != 'NA')
-  {
-    $serial   = $data[1]['dellNetStackUnitSerialNumber'];
-  } else {
-    $serial   = $data[1]['dellNetStackUnitServiceTag'];
-  }
-}
-else if (strstr($poll_device['sysObjectID'], '.1.3.6.1.4.1.6027.1.3.'))
-{
-  $data     = snmp_get_multi_oid($device, 'chStackUnitCodeVersion.1 chStackUnitProductOrder.1 chStackUnitModelID.1 chStackUnitSerialNumber.1 chStackUnitServiceTag.1', array(), 'F10-S-SERIES-CHASSIS-MIB');
-  if ($data[1]['chStackUnitProductOrder'] && !str_starts($data[1]['chStackUnitProductOrder'], array('NA', '.')) &&
-      preg_match('/^[A-Z]/', $data[1]['chStackUnitProductOrder'])) // This Oid can return unprintable chars
-  {
-    $hardware = $data[1]['chStackUnitProductOrder'];
-  }
-  else if (!$hardware)
-  {
-    $hardware = $data[1]['chStackUnitModelID'];
-  }
-  $version  = $data[1]['chStackUnitCodeVersion'];
+    // Serial
+    if ($data[1]['dellNetStackUnitSerialNumber'] && $data[1]['dellNetStackUnitSerialNumber'] != 'NA') {
+        $serial = $data[1]['dellNetStackUnitSerialNumber'];
+    } else {
+        $serial = $data[1]['dellNetStackUnitServiceTag'];
+    }
+} elseif (strstr($poll_device['sysObjectID'], '.1.3.6.1.4.1.6027.1.3.')) {
+    $data = snmp_get_multi_oid($device, 'chStackUnitCodeVersion.1 chStackUnitProductOrder.1 chStackUnitModelID.1 chStackUnitSerialNumber.1 chStackUnitServiceTag.1', [], 'F10-S-SERIES-CHASSIS-MIB');
+    if ($data[1]['chStackUnitProductOrder'] && !str_starts($data[1]['chStackUnitProductOrder'], ['NA', '.']) &&
+        preg_match('/^[A-Z]/', $data[1]['chStackUnitProductOrder'])) // This Oid can return unprintable chars
+    {
+        $hardware = $data[1]['chStackUnitProductOrder'];
+    } elseif (!$hardware) {
+        $hardware = $data[1]['chStackUnitModelID'];
+    }
+    $version = $data[1]['chStackUnitCodeVersion'];
 
-  // Serial
-  if ($data[1]['chStackUnitSerialNumber'] && $data[1]['chStackUnitSerialNumber'] != 'NA')
-  {
-    $serial   = $data[1]['chStackUnitSerialNumber'];
-  } else {
-    $serial   = $data[1]['chStackUnitServiceTag'];
-  }
-}
-else if (strstr($poll_device['sysObjectID'], '.1.3.6.1.4.1.6027.1.2.'))
-{
-  $version = snmp_get($device, 'chSwVersion.0',    '-Oqvn', 'F10-C-SERIES-CHASSIS-MIB');
-  $serial  = snmp_get($device, 'chSerialNumber.0', '-Oqvn', 'F10-C-SERIES-CHASSIS-MIB');
-}
-else if (strstr($poll_device['sysObjectID'], '.1.3.6.1.4.1.6027.1.4.'))
-{
-  $data     = snmp_get_multi_oid($device, 'chStackUnitCodeVersion.1 chStackUnitProductOrder.1 chStackUnitModelID.1 chStackUnitSerialNumber.1 chStackUnitServiceTag.1', array(), 'F10-M-SERIES-CHASSIS-MIB');
-  if ($data[1]['chStackUnitProductOrder'] && $data[1]['chStackUnitProductOrder'] != 'NA')
-  {
-    $hardware = $data[1]['chStackUnitProductOrder'];
-  }
-  else if (!$hardware)
-  {
-    $hardware = $data[1]['chStackUnitModelID'];
-  }
-  $version  = $data[1]['chStackUnitCodeVersion'];
-  if ($data[1]['chStackUnitSerialNumber'] && $data[1]['chStackUnitSerialNumber'] != 'NA')
-  {
-    $serial   = $data[1]['chStackUnitSerialNumber'];
-  } else {
-    $serial   = $data[1]['chStackUnitServiceTag'];
-  }
-}
-else if (!$version)
-{
-  $version = snmp_get($device, 'chSysSwRuntimeImgVersion.1.1', '-Oqvn', 'F10-CHASSIS-MIB');
+    // Serial
+    if ($data[1]['chStackUnitSerialNumber'] && $data[1]['chStackUnitSerialNumber'] != 'NA') {
+        $serial = $data[1]['chStackUnitSerialNumber'];
+    } else {
+        $serial = $data[1]['chStackUnitServiceTag'];
+    }
+} elseif (strstr($poll_device['sysObjectID'], '.1.3.6.1.4.1.6027.1.2.')) {
+    $version = snmp_get($device, 'chSwVersion.0', '-Oqvn', 'F10-C-SERIES-CHASSIS-MIB');
+    $serial  = snmp_get($device, 'chSerialNumber.0', '-Oqvn', 'F10-C-SERIES-CHASSIS-MIB');
+} elseif (strstr($poll_device['sysObjectID'], '.1.3.6.1.4.1.6027.1.4.')) {
+    $data = snmp_get_multi_oid($device, 'chStackUnitCodeVersion.1 chStackUnitProductOrder.1 chStackUnitModelID.1 chStackUnitSerialNumber.1 chStackUnitServiceTag.1', [], 'F10-M-SERIES-CHASSIS-MIB');
+    if ($data[1]['chStackUnitProductOrder'] && $data[1]['chStackUnitProductOrder'] != 'NA') {
+        $hardware = $data[1]['chStackUnitProductOrder'];
+    } elseif (!$hardware) {
+        $hardware = $data[1]['chStackUnitModelID'];
+    }
+    $version = $data[1]['chStackUnitCodeVersion'];
+    if ($data[1]['chStackUnitSerialNumber'] && $data[1]['chStackUnitSerialNumber'] != 'NA') {
+        $serial = $data[1]['chStackUnitSerialNumber'];
+    } else {
+        $serial = $data[1]['chStackUnitServiceTag'];
+    }
+} elseif (!$version) {
+    $version = snmp_get($device, 'chSysSwRuntimeImgVersion.1.1', '-Oqvn', 'F10-CHASSIS-MIB');
 }
 
 unset($data, $is_dell);

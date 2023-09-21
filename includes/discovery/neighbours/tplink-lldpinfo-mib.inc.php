@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -47,48 +47,48 @@ print_debug_vars($lldp_array);
 
 foreach ($lldp_array as $index => $lldp) {
 
-  // Local port
-  list($ifIndex, $lldpNeighborPortIndexId) = explode('.', $index, 2);
-  $ifName = $lldp['lldpNeighborPortId'];
-  $port = get_port_by_index_cache($device, $ifIndex);
-  if (!$port) {
-    $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` = ? AND (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?)", [ $device['device_id'], 0, $ifName, $ifName, $ifName ]);
-  }
-
-  // Remote device & port
-  $remote_device_id = FALSE;
-  $remote_port_id   = NULL;
-
-  // Try find remote device and check if already cached
-  $remote_device_id = get_autodiscovery_device_id($device, $lldp['lldpNeighborDeviceName'], $lldp['lldpNeighborManageIpAddr'], $lldp['lldpNeighborChassisId']);
-  if (is_null($remote_device_id) &&                                                              // NULL - never cached in other rounds
-      check_autodiscovery($lldp['lldpNeighborDeviceName'], $lldp['lldpNeighborManageIpAddr'])) { // Check all previous autodiscovery rounds
-    // Neighbour never checked, try autodiscovery
-    $remote_device_id = autodiscovery_device($lldp['lldpNeighborDeviceName'], $lldp['lldpNeighborManageIpAddr'], 'LLDP', $lldp['lldpNeighborDeviceDescr'], $device, $port);
-  }
-
-  if ($remote_device_id) {
-    // Try lldpNeighborPortIdDescr
-    $if = $lldp['lldpNeighborPortIdDescr'];
-    $query = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
-    $remote_port_id = dbFetchCell($query, [ $if, $if, $if, $remote_device_id, 0 ]);
-    if (!$remote_port_id && $lldp['lldpNeighborPortDescr'] !== $if) {
-      $if = $lldp['lldpNeighborPortDescr'];
-      // Try same by lldpNeighborPortDescr
-      $remote_port_id = dbFetchCell($query, [ $if, $if, $if, $remote_device_id, 0 ]);
+    // Local port
+    [$ifIndex, $lldpNeighborPortIndexId] = explode('.', $index, 2);
+    $ifName = $lldp['lldpNeighborPortId'];
+    $port   = get_port_by_index_cache($device, $ifIndex);
+    if (!$port) {
+        $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` = ? AND (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?)", [$device['device_id'], 0, $ifName, $ifName, $ifName]);
     }
-    //$id = $lldp['lldpNeighborManageAddrInterfaceId'];
-  }
 
-  $neighbour = [
-    'remote_port_id'  => $remote_port_id,
-    'remote_hostname' => $lldp['lldpNeighborDeviceName'],
-    'remote_port'     => $lldp['lldpNeighborPortIdDescr'],
-    'remote_platform' => $lldp['lldpNeighborDeviceDescr'],
-    'remote_version'  => NULL,
-    'remote_address'  => $lldp['lldpNeighborManageIpAddr']
-  ];
-  discover_neighbour($port, 'lldp', $neighbour);
+    // Remote device & port
+    $remote_device_id = FALSE;
+    $remote_port_id   = NULL;
+
+    // Try find remote device and check if already cached
+    $remote_device_id = get_autodiscovery_device_id($device, $lldp['lldpNeighborDeviceName'], $lldp['lldpNeighborManageIpAddr'], $lldp['lldpNeighborChassisId']);
+    if (is_null($remote_device_id) &&                                                              // NULL - never cached in other rounds
+        check_autodiscovery($lldp['lldpNeighborDeviceName'], $lldp['lldpNeighborManageIpAddr'])) { // Check all previous autodiscovery rounds
+        // Neighbour never checked, try autodiscovery
+        $remote_device_id = autodiscovery_device($lldp['lldpNeighborDeviceName'], $lldp['lldpNeighborManageIpAddr'], 'LLDP', $lldp['lldpNeighborDeviceDescr'], $device, $port);
+    }
+
+    if ($remote_device_id) {
+        // Try lldpNeighborPortIdDescr
+        $if             = $lldp['lldpNeighborPortIdDescr'];
+        $query          = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
+        $remote_port_id = dbFetchCell($query, [$if, $if, $if, $remote_device_id, 0]);
+        if (!$remote_port_id && $lldp['lldpNeighborPortDescr'] !== $if) {
+            $if = $lldp['lldpNeighborPortDescr'];
+            // Try same by lldpNeighborPortDescr
+            $remote_port_id = dbFetchCell($query, [$if, $if, $if, $remote_device_id, 0]);
+        }
+        //$id = $lldp['lldpNeighborManageAddrInterfaceId'];
+    }
+
+    $neighbour = [
+      'remote_port_id'  => $remote_port_id,
+      'remote_hostname' => $lldp['lldpNeighborDeviceName'],
+      'remote_port'     => $lldp['lldpNeighborPortIdDescr'],
+      'remote_platform' => $lldp['lldpNeighborDeviceDescr'],
+      'remote_version'  => NULL,
+      'remote_address'  => $lldp['lldpNeighborManageIpAddr']
+    ];
+    discover_neighbour($port, 'lldp', $neighbour);
 }
 
 // EOF

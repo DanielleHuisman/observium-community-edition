@@ -2,42 +2,62 @@ SAVI-MIB DEFINITIONS ::=BEGIN
 
 IMPORTS
     MODULE-COMPLIANCE,OBJECT-GROUP
-        FROM SNMPv2-CONF
-    MODULE-IDENTITY, OBJECT-IDENTITY, OBJECT-TYPE, Counter32, Unsigned32  
-        FROM SNMPv2-SMI
-    TEXTUAL-CONVENTION,MacAddress,TimeInterval,RowStatus
-        FROM SNMPv2-TC
-    InterfaceIndex	
-        FROM IF-MIB
-    InetVersion,InetAddressType,InetAddress 
-        FROM INET-ADDRESS-MIB
-    ip 
-        FROM IP-MIB
+        FROM SNMPv2-CONF                    --RFC2580
+    MODULE-IDENTITY,OBJECT-TYPE,Unsigned32,Counter64
+        FROM SNMPv2-SMI                     --RFC2578
+    MacAddress,TimeInterval,RowStatus,DateAndTime
+        FROM SNMPv2-TC                      --RFC2579
+    InterfaceIndex
+        FROM IF-MIB                         --RFC2863
+    InetVersion,InetAddressType,InetAddress
+        FROM INET-ADDRESS-MIB               --RFC4001
+    ip
+        FROM IP-MIB                         --RFC4293
     ;
 
 saviMIB MODULE-IDENTITY
-    LAST-UPDATED "201003080037Z" --March 08,2010
+    LAST-UPDATED "202007240000Z"
     ORGANIZATION
         "IETF SAVI Working Group"
     CONTACT-INFO
-        "Changqing An
-        
-         Postal:  Network Research Center, Tsinghua University
-         Beijing 100084
-         China
-         
-         Email: acq@tsinghua.edu.cn"
+        "WG charter:
+           http://datatracker.ietf.org/wg/savi/charter/
+         Editor:
+           Changqing An
+           CERNET
+           Postal:  Network Research Center, Tsinghua University
+           Beijing 100084
+           China
+           Email: acq@cernet.edu.cn
+
+           Jiahai Yang
+           CERNET
+           Postal:  Network Research Center, Tsinghua University
+           Beijing 100084
+           China
+           Email: yang@cernet.edu.cn
+        "
     DESCRIPTION
-        "The MIB Module for managing SAVI implementations."
+        "This MIB Module is designed to support configuration
+        and monitoring of SAVI  protocol.
+        "
+    REVISION    "202007240000Z"
+    DESCRIPTION
+        "Added support for spoofing log.
+         Added support for filtering entry log.
+         Added support for binding table statistics.
+         Added support for filter table statistics."
+    REVISION    "201506150000Z"
+    DESCRIPTION
+        "Initial version"
     ::= {ip 40}
 
 saviObjects OBJECT IDENTIFIER ::= { saviMIB 1 }
 
-
--- Savi parameters 
+-- System parameters for SAVI protocol
 
 saviObjectsSystemTable OBJECT-TYPE
-    SYNTAX     SEQUENCE OF SaviObjectsSystemEntry   
+    SYNTAX     SEQUENCE OF SaviObjectsSystemEntry
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
@@ -45,24 +65,35 @@ saviObjectsSystemTable OBJECT-TYPE
     ::= { saviObjects 1 }
 
 saviObjectsSystemEntry OBJECT-TYPE
-    SYNTAX     SaviObjectsSystemEntry               
+    SYNTAX     SaviObjectsSystemEntry
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "Each entry  containing savi system-wide parameters for a
-            particular IP version."
+           "An entry  containing savi system-wide parameters for a
+            particular IP version.
+           "
     INDEX { saviObjectsSystemIPVersion  }
-    ::= { saviObjectsSystemTable 1 }
-
-    
+    ::=   { saviObjectsSystemTable 1 }
 
 SaviObjectsSystemEntry ::=
     SEQUENCE {
-        saviObjectsSystemIPVersion             InetVersion,
-        saviObjectsSystemMode                  INTEGER,
-        saviObjectsSystemMaxDadDelay           TimeInterval,
-        saviObjectsSystemMaxDadPrepareDelay    TimeInterval
-    }    
+        saviObjectsSystemIPVersion              InetVersion,
+        saviObjectsSystemMode                   INTEGER,
+        saviObjectsSystemMaxDhcpResponseTime    TimeInterval,
+        saviObjectsSystemDataSnoopingInterval   TimeInterval,
+        saviObjectsSystemMaxLeaseQueryDelay     TimeInterval,
+        saviObjectsSystemOffLinkDelay           TimeInterval,
+        saviObjectsSystemDetectionTimeout       TimeInterval,
+        saviObjectsSystemTentLT                 TimeInterval,
+        saviObjectsSystemDefaultLT              TimeInterval,
+        saviObjectsSystemTWAIT                  TimeInterval,
+        saviObjectsSystemNotifySpoofing         INTEGER,
+        saviObjectsSystemNotifyFilter           INTEGER,
+        saviObjectsSystemNotifySpoofingInterval Unsigned32,
+        saviObjectsSystemNotifySpoofingNumber   Unsigned32,
+        saviObjectsSystemBindingCount           Unsigned32,
+        saviObjectsSystemFilteringCount         Unsigned32
+    }
 
 saviObjectsSystemIPVersion OBJECT-TYPE
     SYNTAX     InetVersion
@@ -71,89 +102,232 @@ saviObjectsSystemIPVersion OBJECT-TYPE
     DESCRIPTION
            "The IP version "
     ::= { saviObjectsSystemEntry 1 }
-    
-    
+
 saviObjectsSystemMode OBJECT-TYPE
     SYNTAX     INTEGER {
                  savi-disable(1),
                  savi-default(2),
                  savi-dhcp-only(3),
                  savi-slaac-only(4),
-                 savi-dhcp-slaac-mix(5)
+                 savi-dhcp-slaac-mix(5),
+                 savi-send(6)
                }
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
            "IP Address Assignment Methods. "
     ::= { saviObjectsSystemEntry 2 }
-    
-saviObjectsSystemMaxDadDelay OBJECT-TYPE
-    SYNTAX     TimeInterval 
+
+saviObjectsSystemMaxDhcpResponseTime OBJECT-TYPE
+    SYNTAX     TimeInterval
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
-           "A constant. When A gratuitous ARP Request or Duplicate 
-            Address Detection Neighbor Solicitation is received 
-            from anchor, the lifetime of the BST(Binding State Table)
-            entry MUST be set to be MAX_ARP_DELAY or MAX_DAD_DELAY 
-            respectively."
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
     ::= { saviObjectsSystemEntry 3 }
 
-saviObjectsSystemMaxDadPrepareDelay OBJECT-TYPE
-    SYNTAX     TimeInterval 
+saviObjectsSystemDataSnoopingInterval OBJECT-TYPE
+    SYNTAX     TimeInterval
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
-           "A constant. When a DHCPv4 DHCPACK or DHCPv6 REPLY message
-            is received, the lifetime of the BST(Binding State Table)
-            entry MUST be set to be MAX_ARP_PREPARE_DELAY or 
-            MAX_DAD_PREPARE_DELAY respectively."
-    ::= { saviObjectsSystemEntry 4 }    
-    
-    
- 
- 
--- Interface parameters 
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 4 }
 
-saviObjectsIfTable OBJECT-TYPE
-    SYNTAX     SEQUENCE OF SaviObjectsIfEntry 
+saviObjectsSystemMaxLeaseQueryDelay OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 5 }
+
+saviObjectsSystemOffLinkDelay OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 6 }
+
+saviObjectsSystemDetectionTimeout OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 7 }
+
+saviObjectsSystemTentLT OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 8 }
+
+saviObjectsSystemDefaultLT OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 9 }
+
+saviObjectsSystemTWAIT OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "A constant.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+           "
+    ::= { saviObjectsSystemEntry 10 }
+
+
+saviObjectsSystemNotifySpoofing OBJECT-TYPE
+    SYNTAX     INTEGER  {
+                 enable(1),
+                 disable(2)
+               }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "Spoofing log status.
+            enable indicates that spoofing log is enabled.
+            disable indicates that spoofing log is disabled.
+          "
+    ::= { saviObjectsSystemEntry 11 }
+
+
+saviObjectsSystemNotifyFilter OBJECT-TYPE
+    SYNTAX     INTEGER  {
+                 enable(1),
+                 disable(2)
+               }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "Filtering entry log status.
+            enable indicates that filtering log is enabled.
+            disable indicates that filtering log is disabled.
+          "
+    ::= { saviObjectsSystemEntry 12 }
+
+
+saviObjectsSystemNotifySpoofingInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0|5..3600)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "Interval for spoofing log. 0, 5 to 3600s.
+          "
+    ::= { saviObjectsSystemEntry 13 }
+
+
+saviObjectsSystemNotifySpoofingNumber OBJECT-TYPE
+    SYNTAX     Unsigned32 (1..128)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "Number of spoofing log entries. 1 to 128.
+          "
+    ::= { saviObjectsSystemEntry 14 }
+
+
+saviObjectsSystemBindingCount OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+          "Current binding entry count.
+          "
+    ::= { saviObjectsSystemEntry 15 }
+
+
+saviObjectsSystemFilteringCount OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+          "Current filtering entry count.
+          "
+    ::= { saviObjectsSystemEntry 16 }
+
+-- Port parameters for SAVI protocol
+
+saviObjectsPortTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF SaviObjectsPortEntry
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "The table containing SAVI running parameters of each anchor."
+           "The table containing SAVI parameters of each anchor."
     ::= { saviObjects 2 }
 
-saviObjectsIfEntry OBJECT-TYPE
-    SYNTAX     SaviObjectsIfEntry
+saviObjectsPortEntry OBJECT-TYPE
+    SYNTAX     SaviObjectsPortEntry
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
            "An entry containing SAVI running parameters of an anchor."
-    INDEX { saviObjectsIfIPVersion, 
-            saviObjectsIfIfIndex }
-    ::= { saviObjectsIfTable 1 }
+    INDEX {
+            saviObjectsPortIPVersion,
+            saviObjectsPortIfIndex
+          }
+    ::= { saviObjectsPortTable 1 }
 
-    
 
-SaviObjectsIfEntry ::=
+SaviObjectsPortEntry ::=
     SEQUENCE {
-        saviObjectsIfIPVersion          InetVersion,
-        saviObjectsIfIfIndex            InterfaceIndex,
-        saviObjectsIfValidationStatus   INTEGER,
-        saviObjectsIfTrustStatus        INTEGER,
-        saviObjectsIfFilteringNum         Unsigned32
-    }    
+        saviObjectsPortIPVersion          InetVersion,
+        saviObjectsPortIfIndex            InterfaceIndex,
+        saviObjectsPortValidatingAttr     INTEGER,
+        saviObjectsPortDhcpTrustAttr      INTEGER,
+        saviObjectsPortTrustAttr          INTEGER,
+        saviObjectsPortDhcpSnoopingAttr   INTEGER,
+        saviObjectsPortDataSnoopingAttr   INTEGER,
+        saviObjectsPortFilteringNum       Unsigned32
+    }
 
-saviObjectsIfIPVersion      OBJECT-TYPE
+saviObjectsPortIPVersion      OBJECT-TYPE
     SYNTAX     InetVersion
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
            "The IP version "
-    ::= { saviObjectsIfEntry 1 }
+    ::= { saviObjectsPortEntry 1 }
 
-
-saviObjectsIfIfIndex  OBJECT-TYPE
+saviObjectsPortIfIndex  OBJECT-TYPE
     SYNTAX     InterfaceIndex
     MAX-ACCESS not-accessible
     STATUS     current
@@ -161,10 +335,11 @@ saviObjectsIfIfIndex  OBJECT-TYPE
            "The index value that uniquely identifies the interface to
             which this entry is applicable.  The interface identified by
             a particular value of this index is the same interface as
-            identified by the same value of the IF-MIB's ifIndex."
-    ::= { saviObjectsIfEntry 2 }
+            identified by the same value of the IF-MIB's ifIndex.
+           "
+    ::= { saviObjectsPortEntry 2 }
 
-saviObjectsIfValidationStatus OBJECT-TYPE
+saviObjectsPortValidatingAttr OBJECT-TYPE
     SYNTAX     INTEGER {
                  enable(1),
                  disable(2)
@@ -172,49 +347,87 @@ saviObjectsIfValidationStatus OBJECT-TYPE
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
-           "The validation status of the interface.  
-            enable(1), check source address.
-            disable(2), don't check source address. 
-            "
-    ::= { saviObjectsIfEntry 3 }
+           "An attribute defined in SAVI protocol.
+            enable(1), the attribute is set.
+            disable(2), the attribute is not set.
+           "
+    ::= { saviObjectsPortEntry 3 }
 
-
-saviObjectsIfTrustStatus OBJECT-TYPE
+saviObjectsPortDhcpTrustAttr OBJECT-TYPE
     SYNTAX     INTEGER  {
-    						 no-trust(1),
-                 dhcp-trust(2),
-                 ra-trust(3),
-                 dhcp-ra-trust(4)
+                 enable(1),
+                 disable(2)
                }
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
-           "The trust status of the interface.  
-           no-trust(1), discard dhcp adv/reply and ra packet,
-           dhcp-trust(2), permit dhcp adv/reply packet and discard ra packet,
-           ra-trust(3), permit ra packet and discard dhcp adv/reply packet,
-           dhcp-ra-trust(4), permit dhcp adv/reply and ra packet.
-           "
-    ::= { saviObjectsIfEntry 4 }
-    
-saviObjectsIfFilteringNum OBJECT-TYPE
-    SYNTAX     Unsigned32 
+          "An attribute defined in SAVI protocol.
+            enable(1), the attribute is set.
+            disable(2), the attribute is not set.
+          "
+    ::= { saviObjectsPortEntry 4 }
+
+saviObjectsPortTrustAttr OBJECT-TYPE
+    SYNTAX     INTEGER  {
+                 enable(1),
+                 disable(2)
+               }
     MAX-ACCESS read-write
     STATUS     current
     DESCRIPTION
-           "The max filtering number of the Interface"
-    ::= { saviObjectsIfEntry 5 }
+          "An attribute defined in SAVI protocol.
+            enable(1), the attribute is set.
+            disable(2), the attribute is not set.
+          "
+    ::= { saviObjectsPortEntry 5 }
+
+saviObjectsPortDhcpSnoopingAttr OBJECT-TYPE
+    SYNTAX     INTEGER  {
+                 enable(1),
+                 disable(2)
+               }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "An attribute defined in SAVI protocol.
+            enable(1), the attribute is set.
+            disable(2), the attribute is not set.
+          "
+    ::= { saviObjectsPortEntry 6 }
+
+saviObjectsPortDataSnoopingAttr OBJECT-TYPE
+    SYNTAX     INTEGER  {
+                 enable(1),
+                 disable(2)
+               }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+          "An attribute defined in SAVI protocol.
+            enable(1), the attribute is set.
+            disable(2), the attribute is not set.
+          "
+    ::= { saviObjectsPortEntry 7 }
+
+saviObjectsPortFilteringNum OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+           "The max filtering number of the Port."
+    ::= { saviObjectsPortEntry 8 }
 
 
--- Savi Binding Table
+-- Binding Status Table for SAVI protocol
 
 saviObjectsBindingTable OBJECT-TYPE
     SYNTAX     SEQUENCE OF SaviObjectsBindingEntry
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "The Binding State Table containing the state of binding 
-            between source address and anchor."
+           "The table containing the state of binding
+            between source address and anchor.
+           "
     ::= { saviObjects 3 }
 
 saviObjectsBindingEntry OBJECT-TYPE
@@ -222,49 +435,53 @@ saviObjectsBindingEntry OBJECT-TYPE
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "An entry containing the state of binding between source 
-            address and anchor. Entries are keyed on the anchor, 
-            binding type, source IP address version, and source IP 
-            address."
-    INDEX { saviObjectsBindingIpAddressType,
+           "An entry containing the state of binding between source
+            address and anchor.
+            Entries are keyed on the source IP address type,
+            binding type, anchor, and source IP address.
+           "
+    INDEX {
+            saviObjectsBindingIpAddressType,
             saviObjectsBindingType,
             saviObjectsBindingIfIndex,
             saviObjectsBindingIpAddress
-             }
+          }
     ::= { saviObjectsBindingTable 1 }
 
-SaviObjectsBindingEntry ::= 
+SaviObjectsBindingEntry ::=
     SEQUENCE {
         saviObjectsBindingIpAddressType  InetAddressType,
         saviObjectsBindingType           INTEGER,
         saviObjectsBindingIfIndex        InterfaceIndex,
         saviObjectsBindingIpAddress      InetAddress,
-        saviObjectsBindingMacAddr	       MacAddress,
-        saviObjectsBindingState	         INTEGER,
-        saviObjectsBindingLifetime	     TimeInterval,
-	      saviObjectsBindingRowStatus      RowStatus
-	 }
+        saviObjectsBindingMacAddr        MacAddress,
+        saviObjectsBindingState          INTEGER,
+        saviObjectsBindingLifetime       TimeInterval,
+        saviObjectsBindingCreationtime   DateAndTime,
+        saviObjectsBindingTID            INTEGER,
+        saviObjectsBindingRowStatus      RowStatus
+     }
 
 saviObjectsBindingIpAddressType OBJECT-TYPE
     SYNTAX     InetAddressType
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "IP address type of the  binding source IP"
+           "IP address type of the  binding source IP."
     ::= { saviObjectsBindingEntry 1 }
 
 saviObjectsBindingType OBJECT-TYPE
     SYNTAX     INTEGER {
-                 static(1),          
+                 manual(1),
                  slaac(2),
-                 dhcp(3) 
+                 dhcp(3),
+                 send(4)
                }
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "IP address assignment methods." 
+           "IP address assignment methods."
     ::= { saviObjectsBindingEntry 2 }
-
 
 saviObjectsBindingIfIndex OBJECT-TYPE
     SYNTAX     InterfaceIndex
@@ -274,10 +491,10 @@ saviObjectsBindingIfIndex OBJECT-TYPE
            "The index value that uniquely identifies the interface to
             which this entry is applicable.  The interface identified by
             a particular value of this index is the same interface as
-            identified by the same value of the IF-MIB's ifIndex."
+            identified by the same value of the IF-MIB's ifIndex.
+           "
     ::= { saviObjectsBindingEntry 3 }
 
-    
 saviObjectsBindingIpAddress OBJECT-TYPE
     SYNTAX     InetAddress
     MAX-ACCESS not-accessible
@@ -294,15 +511,22 @@ saviObjectsBindingMacAddr OBJECT-TYPE
            "The binding source mac address."
     ::= { saviObjectsBindingEntry 5 }
 
-
 saviObjectsBindingState OBJECT-TYPE
     SYNTAX     INTEGER  {
-                 start(1),
-    	           live(2),
-    	           detection(3),
-    	           query(4),
-    	           bound(5)
-               }
+                   nO-BIND(1),
+                   iNIT-BIND(2),
+                   bOUND(3),
+                   dETECTION(4),
+                   rECOVERY(5),
+                   vERIFY(6),
+                   tENTATIVE(7),
+                   vALID(8),
+                   tESTING-TP-LT(9),
+                   tESTING-VP(10),
+                   tESTING-VPP(11),
+                   tENTATIVE-NUD(12),
+                   tENTATIVE-DAD(13)
+              }
     MAX-ACCESS read-create
     STATUS     current
     DESCRIPTION
@@ -314,11 +538,33 @@ saviObjectsBindingLifetime OBJECT-TYPE
     MAX-ACCESS read-create
     STATUS     current
     DESCRIPTION
-           "The remaining lifetime of the entry. 
-           If saviObjectsBindingType=static, a value of 2147483647 
-           represents infinity."
+           "The remaining lifetime of the entry.
+            TimeInterval is defined in RFC 2579, it's a period of time,
+            measured in units of 0.01 seconds,
+            and the value is (0..2147483647).
+            If saviObjectsBindingType=manual, a value of 2147483647
+            represents infinity.
+           "
     ::= { saviObjectsBindingEntry 7 }
-    
+
+saviObjectsBindingCreationtime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+           "The value of the local clock when the entry was firstly created.
+           "
+    ::= { saviObjectsBindingEntry 8 }
+
+
+saviObjectsBindingTID OBJECT-TYPE
+    SYNTAX     INTEGER
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+           "The Transaction ID (TID) (refer to RFC2131 and RFC3315) of  the corresponding DHCP transaction.
+           "
+    ::= { saviObjectsBindingEntry 9 }
 
 saviObjectsBindingRowStatus OBJECT-TYPE
        SYNTAX     RowStatus
@@ -326,21 +572,21 @@ saviObjectsBindingRowStatus OBJECT-TYPE
        STATUS     current
        DESCRIPTION
              "The status of this row, by which new entries may be
-              created, or old entries deleted from this table. 
-              An Entry can be created or deleted only when 
-              saviObjectsBindingType=static."
-    ::= { saviObjectsBindingEntry 8 }
+              created, or old entries deleted from this table.
+              An Entry can be created or deleted only when
+              saviObjectsBindingType=manual.
+             "
+    ::= { saviObjectsBindingEntry 10 }
 
 
-
--- Savi Filtering Table
+-- Filtering Table for SAVI protocol
 
 saviObjectsFilteringTable OBJECT-TYPE
     SYNTAX     SEQUENCE OF SaviObjectsFilteringEntry
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "The Filtering Table is used to filter packets."
+           "The table containing the filtering entries."
     ::= { saviObjects 4 }
 
 saviObjectsFilteringEntry OBJECT-TYPE
@@ -348,20 +594,23 @@ saviObjectsFilteringEntry OBJECT-TYPE
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "An entry containing the filtering parameters. Entries are keyed on the anchor."
+           "An entry containing the filtering parameters.
+            Entries are keyed on the source IP address type,
+            anchor, and source IP address.
+           "
     INDEX { saviObjectsFilteringIpAddressType,
             saviObjectsFilteringIfIndex,
-            saviObjectsFilteringIpAddress }
+            saviObjectsFilteringIpAddress
+          }
     ::= { saviObjectsFilteringTable 1 }
 
-SaviObjectsFilteringEntry ::= 
+SaviObjectsFilteringEntry ::=
     SEQUENCE {
         saviObjectsFilteringIpAddressType  InetAddressType,
         saviObjectsFilteringIfIndex        InterfaceIndex,
         saviObjectsFilteringIpAddress      InetAddress,
-        saviObjectsFilteringMacAddr	       MacAddress
-	 }
-
+        saviObjectsFilteringMacAddr        MacAddress
+    }
 
 saviObjectsFilteringIpAddressType OBJECT-TYPE
     SYNTAX     InetAddressType
@@ -379,18 +628,17 @@ saviObjectsFilteringIfIndex OBJECT-TYPE
            "The index value that uniquely identifies the interface to
             which this entry is applicable.  The interface identified by
             a particular value of this index is the same interface as
-            identified by the same value of the IF-MIB's ifIndex."
+            identified by the same value of the IF-MIB's ifIndex.
+           "
     ::= { saviObjectsFilteringEntry 2 }
 
-    
 saviObjectsFilteringIpAddress OBJECT-TYPE
     SYNTAX     InetAddress
     MAX-ACCESS not-accessible
     STATUS     current
     DESCRIPTION
-           "The filtering source IP address"
+           "The filtering source IP address."
     ::= { saviObjectsFilteringEntry 3 }
-
 
 saviObjectsFilteringMacAddr OBJECT-TYPE
     SYNTAX     MacAddress
@@ -400,76 +648,159 @@ saviObjectsFilteringMacAddr OBJECT-TYPE
            "The filtering source mac address."
     ::= { saviObjectsFilteringEntry 4 }
 
-   
--- Conformance information    
+
+-- Count of packets dropped because of validation failure for each interface.
+
+saviObjectsCountTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF SaviObjectsCountEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The table containing count of packets dropped because of validation failure."
+    ::= { saviObjects 5 }
+
+saviObjectsCountEntry OBJECT-TYPE
+    SYNTAX     SaviObjectsCountEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "An entry containing count of packets dropped because of validation failure for each interface."
+    INDEX { saviObjectsCountIPVersion,
+            saviObjectsCountIfIndex
+          }
+    ::= { saviObjectsCountTable 1 }
+
+SaviObjectsCountEntry ::=
+    SEQUENCE {
+        saviObjectsCountIPVersion          InetVersion,
+        saviObjectsCountIfIndex            InterfaceIndex,
+        saviObjectsCountFilterPkts         Counter64,
+        saviObjectsCountFilterOctets       Counter64
+    }
+
+saviObjectsCountIPVersion      OBJECT-TYPE
+    SYNTAX     InetVersion
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The IP version "
+    ::= { saviObjectsCountEntry 1 }
+
+saviObjectsCountIfIndex            OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+           "The Interface."
+    ::= { saviObjectsCountEntry 2 }
+
+
+saviObjectsCountFilterPkts OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "Dropped packet count."
+    ::= { saviObjectsCountEntry 3 }
+
+
+saviObjectsCountFilterOctets OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "Dropped octet count."
+    ::= { saviObjectsCountEntry 4 }
+
+-- Conformance information
 saviConformance OBJECT IDENTIFIER ::= { saviMIB 2 }
 saviCompliances OBJECT IDENTIFIER ::= { saviConformance 1 }
 
 -- Compliance statements
 saviCompliance MODULE-COMPLIANCE
     STATUS current
-    DESCRIPTION 
-           "The compliance statement for entities which implement SAVI."
-
+    DESCRIPTION
+           "The compliance statement for entities which implement SAVI
+            protocol.
+           "
     MODULE
     MANDATORY-GROUPS {
-        systemGroup, 
-        ifGroup,
+        systemGroup,
+        portGroup,
         bindingGroup,
         filteringGroup
     }
-
     ::= { saviCompliances 1}
-        
+
 saviGroups OBJECT IDENTIFIER ::= { saviConformance 2 }
 
---Units of conformance
-    
+-- Units of conformance
+
 systemGroup OBJECT-GROUP
     OBJECTS {
         saviObjectsSystemMode,
-        saviObjectsSystemMaxDadDelay,
-        saviObjectsSystemMaxDadPrepareDelay
+        saviObjectsSystemMaxDhcpResponseTime,
+        saviObjectsSystemDataSnoopingInterval,
+        saviObjectsSystemMaxLeaseQueryDelay,
+        saviObjectsSystemOffLinkDelay,
+        saviObjectsSystemDetectionTimeout,
+        saviObjectsSystemTentLT,
+        saviObjectsSystemDefaultLT,
+        saviObjectsSystemTWAIT,
+        saviObjectsSystemNotifySpoofing,
+        saviObjectsSystemNotifyFilter,
+        saviObjectsSystemNotifySpoofingInterval,
+        saviObjectsSystemNotifySpoofingNumber,
+        saviObjectsSystemBindingCount,
+        saviObjectsSystemFilteringCount
     }
     STATUS current
     DESCRIPTION
-           "The system group of objects containing savi system parameter."
+           "The system group contains objects corrsponding to savi system
+            parameters.
+           "
     ::= {saviGroups 1}
 
-   
-ifGroup OBJECT-GROUP
+portGroup OBJECT-GROUP
     OBJECTS {
-        saviObjectsIfValidationStatus,
-        saviObjectsIfTrustStatus,
-        saviObjectsIfFilteringNum
+        saviObjectsPortValidatingAttr,
+        saviObjectsPortDhcpTrustAttr,
+        saviObjectsPortTrustAttr,
+        saviObjectsPortDhcpSnoopingAttr,
+        saviObjectsPortDataSnoopingAttr,
+        saviObjectsPortFilteringNum
     }
     STATUS current
     DESCRIPTION
-           "The if group of objects containing the savi running parameters
-            of each anchor."
+           "The if group contains objects corresponding to the savi running
+            parameters of each anchor.
+           "
     ::= {saviGroups 2}
 
 bindingGroup OBJECT-GROUP
     OBJECTS {
-    	  saviObjectsBindingMacAddr,
-        saviObjectsBindingState, 
+        saviObjectsBindingMacAddr,
+        saviObjectsBindingState,
         saviObjectsBindingLifetime,
+        saviObjectsBindingCreationtime,
+        saviObjectsBindingTID,
         saviObjectsBindingRowStatus
     }
     STATUS current
     DESCRIPTION
-           "The binding group of objects containing the binding information 
-            of anchor and soure ip address. "
-    ::= {saviGroups 3}  
-    
-    
+           "The binding group contains the binding
+            information of anchor and soure ip address.
+           "
+    ::= {saviGroups 3}
+
 filteringGroup OBJECT-GROUP
     OBJECTS {
-    	  saviObjectsFilteringMacAddr
+          saviObjectsFilteringMacAddr
     }
     STATUS current
     DESCRIPTION
-           "The filtering group of objects containing the filtering information 
-            of anchor and soure ip address. "
-    ::= {saviGroups 4}  
+           "The filtering group contains the filtering
+            information of anchor and soure ip address.
+           "
+    ::= {saviGroups 4}
 END

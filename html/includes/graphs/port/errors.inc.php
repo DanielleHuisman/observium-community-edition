@@ -5,32 +5,32 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$ds_in = "INERRORS";
+$ds_in  = "INERRORS";
 $ds_out = "OUTERRORS";
 
-$colour_area_in  = $config['colours']['graphs']['errors']['in_area'];
-$colour_line_in  = $config['colours']['graphs']['errors']['in_line'];
+$colour_area_in = $config['colours']['graphs']['errors']['in_area'];
+$colour_line_in = $config['colours']['graphs']['errors']['in_line'];
 
 $colour_area_out = $config['colours']['graphs']['errors']['out_area'];
 $colour_line_out = $config['colours']['graphs']['errors']['out_line'];
 
-$colour_area_in_max = $config['colours']['graphs']['errors']['in_max'];
+$colour_area_in_max  = $config['colours']['graphs']['errors']['in_max'];
 $colour_area_out_max = $config['colours']['graphs']['errors']['out_max'];
 
 $graph_max = 1;
 $unit_text = "Errors/s";
 
 $args['nototal'] = 1;
-$print_total = 0;
-$nototal = 1;
+$print_total     = 0;
+$nototal         = 1;
 
-include($config['html_dir']."/includes/graphs/generic_duplex.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_duplex.inc.php");
 
 
 

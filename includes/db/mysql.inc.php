@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     db
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -31,7 +31,7 @@ It's a bit simplistic, but gives you the really useful bits in non-class form.
  */
 function dbClientInfo()
 {
-  return mysql_get_client_info();
+    return mysql_get_client_info();
 }
 
 /**
@@ -41,7 +41,7 @@ function dbClientInfo()
  */
 function dbHostInfo()
 {
-  return mysql_get_host_info();
+    return mysql_get_host_info();
 }
 
 /**
@@ -57,106 +57,84 @@ function dbHostInfo()
  */
 function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'utf8')
 {
-  // Check host params
-  $host_array = explode(':', $host);
-  if (count($host_array) > 1)
-  {
-    if ($host_array[0] === 'p')
-    {
-      // This is for compatability with new style host option (from mysqli extension)
-      // p:example.com
-      // p:::1
-      array_shift($host_array);
-      $host = implode(':', $host_array);
-      $GLOBALS['config']['db_persistent'] = TRUE;
+    // Check host params
+    $host_array = explode(':', $host);
+    if (count($host_array) > 1) {
+        if ($host_array[0] === 'p') {
+            // This is for compatability with new style host option (from mysqli extension)
+            // p:example.com
+            // p:::1
+            array_shift($host_array);
+            $host                               = implode(':', $host_array);
+            $GLOBALS['config']['db_persistent'] = TRUE;
+        } elseif (count($host_array) === 2) {
+            // IPv6 host not possible here
+            $host = $host_array[0];
+            if (is_numeric($host_array[1])) {
+                // example.com:3306
+                $port = $host_array[1];
+            } else {
+                // example.com:/tmp/mysql.sock
+                $socket = $host_array[1];
+            }
+        }
     }
-    else if (count($host_array) === 2)
-    {
-      // IPv6 host not possible here
-      $host = $host_array[0];
-      if (is_numeric($host_array[1]))
-      {
-        // example.com:3306
-        $port   = $host_array[1];
-      } else {
-        // example.com:/tmp/mysql.sock
-        $socket = $host_array[1];
-      }
+
+    switch ($host) {
+        case 'localhost':
+        case '127.0.0.1':
+        case '::1':
+        case '':
+            // For localhost socket prefer
+            if (strlen($GLOBALS['config']['db_socket'])) {
+                $host .= ':' . $GLOBALS['config']['db_socket'];
+            } elseif (strlen($socket)) {
+                $host .= ':' . $socket;
+            } elseif (is_numeric($GLOBALS['config']['db_port'])) {
+                $host .= ':' . $GLOBALS['config']['db_port'];
+            } elseif (is_numeric($port)) {
+                $host .= ':' . $port;
+            }
+            break;
+        default:
+            // All other host uses only port
+            if (is_numeric($GLOBALS['config']['db_port'])) {
+                $host .= ':' . $GLOBALS['config']['db_port'];
+            } elseif (is_numeric($port)) {
+                $host .= ':' . $port;
+            }
     }
-  }
 
-  switch ($host)
-  {
-    case 'localhost':
-    case '127.0.0.1':
-    case '::1':
-    case '':
-      // For localhost socket prefer
-      if (strlen($GLOBALS['config']['db_socket']))
-      {
-        $host .= ':' . $GLOBALS['config']['db_socket'];
-      }
-      else if (strlen($socket))
-      {
-        $host .= ':' . $socket;
-      }
-      else if (is_numeric($GLOBALS['config']['db_port']))
-      {
-        $host .= ':' . $GLOBALS['config']['db_port'];
-      }
-      else if (is_numeric($port))
-      {
-        $host .= ':' . $port;
-      }
-      break;
-    default:
-      // All other host uses only port
-      if (is_numeric($GLOBALS['config']['db_port']))
-      {
-        $host .= ':' . $GLOBALS['config']['db_port'];
-      }
-      else if (is_numeric($port))
-      {
-        $host .= ':' . $port;
-      }
-  }
+    $client_flags = 0;
+    // Optionally compress connection
+    if ($GLOBALS['config']['db_compress'] && defined('MYSQL_CLIENT_COMPRESS')) {
+        $client_flags |= MYSQL_CLIENT_COMPRESS;
+    }
 
-  $client_flags = 0;
-  // Optionally compress connection
-  if ($GLOBALS['config']['db_compress'] && defined('MYSQL_CLIENT_COMPRESS'))
-  {
-    $client_flags |= MYSQL_CLIENT_COMPRESS;
-  }
-
-  if ($GLOBALS['config']['db_persistent'] && ini_get('mysql.allow_persistent'))
-  {
-    // Open a persistent connection
-    $connection = mysql_pconnect($host, $user, $password, $client_flags);
-  } else {
-    // force opening a new link because we might be selecting a different database
-    $connection = mysql_connect($host, $user, $password, TRUE, $client_flags);
-  }
-
-  if ($connection)
-  {
-    if (mysql_select_db($database, $connection))
-    {
-      // Connected to DB
-      if ($charset)
-      {
-        mysql_set_charset($charset, $connection);
-      }
+    if ($GLOBALS['config']['db_persistent'] && ini_get('mysql.allow_persistent')) {
+        // Open a persistent connection
+        $connection = mysql_pconnect($host, $user, $password, $client_flags);
     } else {
-      // DB not exist, reset $connection
-      if (OBS_DEBUG)
-      {
-        echo('MySQL connection error ' . mysql_errno() . ': ' . mysql_error($connection) . PHP_EOL);
-      }
-      return NULL;
+        // force opening a new link because we might be selecting a different database
+        $connection = mysql_connect($host, $user, $password, TRUE, $client_flags);
     }
-  }
 
-  return $connection;
+    if ($connection) {
+        if (mysql_select_db($database, $connection)) {
+            // Connected to DB
+            if ($charset) {
+                mysql_set_charset($charset, $connection);
+            }
+        } else {
+            // DB not exist, reset $connection
+            if (OBS_DEBUG) {
+                echo('MySQL connection error ' . mysql_errno() . ': ' . mysql_error($connection) . PHP_EOL);
+            }
+            return NULL;
+        }
+    }
+
+    return $connection;
 }
 
 /**
@@ -168,12 +146,11 @@ function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'ut
  */
 function dbClose($connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_close($connection);
-  } else {
-    return mysql_close();
-  }
+    if (is_resource($connection)) {
+        return mysql_close($connection);
+    } else {
+        return mysql_close();
+    }
 }
 
 /**
@@ -185,12 +162,11 @@ function dbClose($connection = NULL)
  */
 function dbError($connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_error($connection);
-  } else {
-    return mysql_error();
-  }
+    if (is_resource($connection)) {
+        return mysql_error($connection);
+    } else {
+        return mysql_error();
+    }
 }
 
 /**
@@ -202,42 +178,38 @@ function dbError($connection = NULL)
  */
 function dbErrorNo($connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_errno($connection);
-  } else {
-    return mysql_errno();
-  }
+    if (is_resource($connection)) {
+        return mysql_errno($connection);
+    } else {
+        return mysql_errno();
+    }
 }
 
 function dbPing($connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_ping($connection);
-  } else {
-    return mysql_ping();
-  }
+    if (is_resource($connection)) {
+        return mysql_ping($connection);
+    } else {
+        return mysql_ping();
+    }
 }
 
 function dbAffectedRows($connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_affected_rows($connection);
-  } else {
-    return mysql_affected_rows();
-  }
+    if (is_resource($connection)) {
+        return mysql_affected_rows($connection);
+    } else {
+        return mysql_affected_rows();
+    }
 }
 
 function dbCallQuery($fullSql, $connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_query($fullSql, $connection);
-  } else {
-    return mysql_query($fullSql);
-  }
+    if (is_resource($connection)) {
+        return mysql_query($fullSql, $connection);
+    } else {
+        return mysql_query($fullSql);
+    }
 }
 
 /**
@@ -249,12 +221,11 @@ function dbCallQuery($fullSql, $connection = NULL)
  */
 function dbEscape($string, $connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_real_escape_string($string, $connection);
-  } else {
-    return mysql_real_escape_string($string);
-  }
+    if (is_resource($connection)) {
+        return mysql_real_escape_string($string, $connection);
+    } else {
+        return mysql_real_escape_string($string);
+    }
 }
 
 /**
@@ -266,103 +237,98 @@ function dbEscape($string, $connection = NULL)
  */
 function dbLastID($connection = NULL)
 {
-  if (is_resource($connection))
-  {
-    return mysql_insert_id($connection);
-  } else {
-    return mysql_insert_id();
-  }
+    if (is_resource($connection)) {
+        return mysql_insert_id($connection);
+    } else {
+        return mysql_insert_id();
+    }
 }
 
 /*
  * Fetches all of the rows (associatively) from the last performed query.
  * Most other retrieval functions build off this
  * */
-function dbFetchRows($sql, $parameters = array(), $print_query = FALSE)
+function dbFetchRows($sql, $parameters = [], $print_query = FALSE)
 {
-  $time_start = utime();
-  $result = dbQuery($sql, $parameters, $print_query);
+    $time_start = utime();
+    $result     = dbQuery($sql, $parameters, $print_query);
 
-  $rows = array();
-  if (mysql_num_rows($result) > 0)
-  {
-    while ($row = mysql_fetch_assoc($result))
-    {
-      $rows[] = $row;
+    $rows = [];
+    if (mysql_num_rows($result) > 0) {
+        while ($row = mysql_fetch_assoc($result)) {
+            $rows[] = $row;
+        }
+        mysql_free_result($result);
+
+        $time_end                             = utime();
+        $GLOBALS['db_stats']['fetchrows_sec'] += $time_end - $time_start;
+        $GLOBALS['db_stats']['fetchrows']++;
     }
-    mysql_free_result($result);
 
-    $time_end = utime();
-    $GLOBALS['db_stats']['fetchrows_sec'] += $time_end - $time_start;
-    $GLOBALS['db_stats']['fetchrows']++;
-  }
-
-  // no records, thus return empty array
-  // which should evaluate to false, and will prevent foreach notices/warnings
-  return $rows;
+    // no records, thus return empty array
+    // which should evaluate to false, and will prevent foreach notices/warnings
+    return $rows;
 }
 
 /*
  * Like fetch(), accepts any number of arguments
  * The first argument is an sprintf-ready query stringTypes
  * */
-function dbFetchRow($sql = null, $parameters = array(), $print_query = FALSE)
+function dbFetchRow($sql = NULL, $parameters = [], $print_query = FALSE)
 {
-  $time_start = utime();
-  $result = dbQuery($sql, $parameters, $print_query);
-  if ($result)
-  {
-    $row = mysql_fetch_assoc($result);
-    mysql_free_result($result);
-    $time_end = utime();
+    $time_start = utime();
+    $result     = dbQuery($sql, $parameters, $print_query);
+    if ($result) {
+        $row = mysql_fetch_assoc($result);
+        mysql_free_result($result);
+        $time_end = utime();
 
-    $GLOBALS['db_stats']['fetchrow_sec'] += $time_end - $time_start;
-    $GLOBALS['db_stats']['fetchrow']++;
+        $GLOBALS['db_stats']['fetchrow_sec'] += $time_end - $time_start;
+        $GLOBALS['db_stats']['fetchrow']++;
 
-    return $row;
-  } else {
-    return null;
-  }
+        return $row;
+    } else {
+        return NULL;
+    }
 
-  //$time_start = utime();
+    //$time_start = utime();
 }
 
 /*
  * Fetches the first call from the first row returned by the query
  * */
-function dbFetchCell($sql, $parameters = array(), $print_query = FALSE)
+function dbFetchCell($sql, $parameters = [], $print_query = FALSE)
 {
-  $time_start = utime();
-  //$row = dbFetchRow($sql, $parameters);
-  $result = dbQuery($sql, $parameters, $print_query);
-  if ($result)
-  {
-    $row = mysql_fetch_assoc($result);
-    mysql_free_result($result);
-    $time_end = utime();
+    $time_start = utime();
+    //$row = dbFetchRow($sql, $parameters);
+    $result = dbQuery($sql, $parameters, $print_query);
+    if ($result) {
+        $row = mysql_fetch_assoc($result);
+        mysql_free_result($result);
+        $time_end = utime();
 
-    $GLOBALS['db_stats']['fetchcell_sec'] += $time_end - $time_start;
-    $GLOBALS['db_stats']['fetchcell']++;
+        $GLOBALS['db_stats']['fetchcell_sec'] += $time_end - $time_start;
+        $GLOBALS['db_stats']['fetchcell']++;
 
-    return array_shift($row); // shift first field off first row
-  }
+        return array_shift($row); // shift first field off first row
+    }
 
-  return null;
+    return NULL;
 }
 
 function dbBeginTransaction()
 {
-  mysql_query('begin');
+    mysql_query('begin');
 }
 
 function dbCommitTransaction()
 {
-  mysql_query('commit');
+    mysql_query('commit');
 }
 
 function dbRollbackTransaction()
 {
-  mysql_query('rollback');
+    mysql_query('rollback');
 }
 
 /*

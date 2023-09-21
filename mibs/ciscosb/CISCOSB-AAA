@@ -114,7 +114,8 @@ RlAAAServiceType  ::= TEXTUAL-CONVENTION
       rlAAAServiceTypeSsh(3),
       rlAAAServiceTypeHttps(4),
       rlAAAServiceTypeSnmp(5),
-      rlAAAServiceTypeSshPubkey(6)
+      rlAAAServiceTypeSshPubkey(6),
+      rlAAAServiceTypeDebug(7)
 }
 
 RlAAALinePortType ::= TEXTUAL-CONVENTION
@@ -125,6 +126,20 @@ RlAAALinePortType ::= TEXTUAL-CONVENTION
         rlAAAPortDontCare(0),
         rlAAAPortNetwork(1),
         rlAAAPortConsole(2)
+}
+
+RlAAAHashType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Specifies which hash method type was used to create
+                    the hashed password of the local user.
+                    rlAAAHashTypeSuperHash signifies that the hashing type
+                    is SHA1 nested within the default hash method (a composition function).
+                    i.e default(sha1(password))."
+    SYNTAX INTEGER {
+        rlAAAHashTypeMD5(0),
+        rlAAAHashTypeSHA1(1),
+        rlAAAHashTypeSHA512(2),
+        rlAAAHashTypeSuperHash(3)
 }
 
 rlAAAMibVersion OBJECT-TYPE
@@ -452,7 +467,10 @@ RlAAALineEntry ::= SEQUENCE {
    rlAAALineLockedState              INTEGER,
    rlAAALineConsFailedLogins         Counter32,
    rlAAALinePasswordValidTime        Unsigned32,
-   rlAAALinePasswordExpieryDate      DisplayString
+   rlAAALinePasswordExpieryDate      DisplayString,
+   rlAAALinePasswordSalt             OCTET STRING,
+   rlAAALinePasswordHashMethod       RlAAAHashType,
+   rlAAALinePasswordCreationDate     DisplayString
 }
 
 
@@ -677,6 +695,29 @@ rlAAALinePasswordExpieryDate OBJECT-TYPE
                      Otherwise zero size string"
   ::= { rlAAALineEntry 24 }
 
+rlAAALinePasswordSalt OBJECT-TYPE
+  SYNTAX OCTET STRING
+  MAX-ACCESS read-write
+  STATUS current
+  DESCRIPTION       "The salt of the line password used to prevent
+                     rainbow table attacks."
+  ::= { rlAAALineEntry 25 }
+
+rlAAALinePasswordHashMethod OBJECT-TYPE
+  SYNTAX RlAAAHashType
+  MAX-ACCESS read-write
+  STATUS current
+  DESCRIPTION       "The method the line password uses to hash
+                     the password."
+  ::= { rlAAALineEntry 26 }
+
+rlAAALinePasswordCreationDate OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "The date on which the current password was created.
+                      Otherwise zero size string"
+   ::= { rlAAALineEntry 27 }
 
 --
 -- local user db table
@@ -686,6 +727,7 @@ rlAAALinePasswordExpieryDate OBJECT-TYPE
 --- Added read only fields to show if a user is locked,
 --- password expiry date and number of consecutive failed logins.
 --- New read write field to set the expiry time for a password.
+
 
 
 rlAAALocalUserTable OBJECT-TYPE
@@ -713,7 +755,9 @@ RlAAALocalUserEntry ::= SEQUENCE {
     rlAAALocalConsFailedLogins      Counter32,
     rlAAALocalPasswordValidTime     Unsigned32,
     rlAAALocalPasswordExpieryDate   DisplayString,
-    rlAAALocalPasswordCreationDate  DisplayString
+    rlAAALocalPasswordCreationDate  DisplayString,
+    rlAAALocalUserSalt              OCTET STRING,
+    rlAAALocalUserHashMethod        RlAAAHashType
 }
 
 rlAAALocalUserName OBJECT-TYPE
@@ -798,16 +842,37 @@ rlAAALocalPasswordCreationDate OBJECT-TYPE
    DESCRIPTION       "The date on which the current password was created.
                       Otherwise zero size string"
    ::= { rlAAALocalUserEntry 9 }
+   
+rlAAALocalUserSalt OBJECT-TYPE
+   SYNTAX OCTET STRING (SIZE(0..64))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Salt stored and used to prevent lookup tables,
+						reverse lookup tables, and rainbow table attacks.
+                        Not used in MD5 and SHA1 Hashing."
+
+   DEFVAL { "" }
+   ::= { rlAAALocalUserEntry 10 }
+
+rlAAALocalUserHashMethod OBJECT-TYPE
+   SYNTAX RlAAAHashType
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The method used to hash the user's password"
+   ::= { rlAAALocalUserEntry 11 }
 
 --
--- system password
+-- system password 
+-- DEPRECATED, USE rlAAASysPassAttributeTable
 --
 
 rlAAASystemPasswordlevel1 OBJECT-TYPE
    SYNTAX DisplayString (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION    "system Password for level 1.
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION    "Deprecated, use rlAAASysPassAttributeTable instead
+
+                   system Password for level 1.
                    allowed formats:
                    a. Display string starting with '$' for clear text
                    b. Encrypted password: starts with # sign followed by 32
@@ -820,8 +885,10 @@ rlAAASystemPasswordlevel1 OBJECT-TYPE
 rlAAASystemPasswordlevel2 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 2
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 2.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -834,8 +901,10 @@ rlAAASystemPasswordlevel2 OBJECT-TYPE
 rlAAASystemPasswordlevel3 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 3
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 3.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -848,8 +917,10 @@ rlAAASystemPasswordlevel3 OBJECT-TYPE
 rlAAASystemPasswordlevel4 OBJECT-TYPE
    SYNTAX DisplayString (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 4
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 4.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -862,8 +933,10 @@ rlAAASystemPasswordlevel4 OBJECT-TYPE
 rlAAASystemPasswordlevel5 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 5
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 5.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -876,8 +949,10 @@ rlAAASystemPasswordlevel5 OBJECT-TYPE
 rlAAASystemPasswordlevel6 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 6
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 6.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -890,8 +965,10 @@ rlAAASystemPasswordlevel6 OBJECT-TYPE
 rlAAASystemPasswordlevel7 OBJECT-TYPE
    SYNTAX DisplayString (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 7
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 7.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -904,8 +981,10 @@ rlAAASystemPasswordlevel7 OBJECT-TYPE
 rlAAASystemPasswordlevel8 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 8
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 8.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -918,8 +997,10 @@ rlAAASystemPasswordlevel8 OBJECT-TYPE
 rlAAASystemPasswordlevel9 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 9
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 9.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -932,8 +1013,10 @@ rlAAASystemPasswordlevel9 OBJECT-TYPE
 rlAAASystemPasswordlevel10 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 10
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 10.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -946,8 +1029,10 @@ rlAAASystemPasswordlevel10 OBJECT-TYPE
 rlAAASystemPasswordlevel11 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 11
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION    " Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 11.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -960,8 +1045,10 @@ rlAAASystemPasswordlevel11 OBJECT-TYPE
 rlAAASystemPasswordlevel12 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 12
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 12.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -974,8 +1061,10 @@ rlAAASystemPasswordlevel12 OBJECT-TYPE
 rlAAASystemPasswordlevel13 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 13
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 13.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -988,8 +1077,10 @@ rlAAASystemPasswordlevel13 OBJECT-TYPE
 rlAAASystemPasswordlevel14 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 14
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 13.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -1002,8 +1093,10 @@ rlAAASystemPasswordlevel14 OBJECT-TYPE
 rlAAASystemPasswordlevel15 OBJECT-TYPE
    SYNTAX DisplayString  (SIZE(0..160))
    MAX-ACCESS read-write
-   STATUS current
-   DESCRIPTION       "system Password for level 15
+   STATUS deprecated -- DEPRECATED, moved to rlAAASysPassAttributeTable
+   DESCRIPTION       "Deprecated, use rlAAASysPassAttributeTable instead
+
+                      system Password for level 15.
                       allowed formats:
                       a. Display string starting with '$' for clear text
                       b. Encrypted password: starts with # sign followed by 32
@@ -1154,7 +1247,7 @@ rlAAATestIfIndex OBJECT-TYPE
    SYNTAX INTEGER
    MAX-ACCESS read-write
    STATUS current
-   DESCRIPTION       " line ifIndex can configue to be zero witch means
+   DESCRIPTION       "Line ifIndex can be configured to zero which means
                       Don't-care value"
    ::= { rlAAATestUserEntry 3}
 
@@ -2525,7 +2618,8 @@ RlAAASysPassStatEntry ::= SEQUENCE {
    rlAAASysPassStatLockedState              INTEGER,
    rlAAASysPassStatConsFailedLogins         Counter32,
    rlAAASysPassStatPasswordValidTime        Unsigned32,
-   rlAAASysPassStatPasswordExpieryDate      DisplayString
+   rlAAASysPassStatPasswordExpieryDate      DisplayString,
+   rlAAASysPassStatPasswordCreationDate     DisplayString
 }
 
 rlAAASysPassStatLevel OBJECT-TYPE
@@ -2574,8 +2668,15 @@ rlAAASysPassStatPasswordExpieryDate OBJECT-TYPE
                      on which the current password will expire.
                      Otherwise zero size string"
   ::= { rlAAASysPassStatEntry 5 }
-
 ---        Number of failures before lock-out (1-5, 0 for disable)
+
+rlAAASysPassStatPasswordCreationDate OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "The date on which the current password was created.
+                      Otherwise zero size string"
+   ::= { rlAAASysPassStatEntry 6 }
 
 
 rlAAAMaxNumLogAttmpts  OBJECT-TYPE
@@ -3385,4 +3486,572 @@ rlAAAPasswordComplexityExcludeKeywordRowStatus OBJECT-TYPE
   DESCRIPTION       "Status can be destroy or createAndGo"
   ::= { rlAAAPasswordComplexityExcludeKeywordEntry 2 }
 
+
+--
+-- System Passwords Attributes table
+--
+
+rlAAASysPassAttributeTable OBJECT-TYPE
+  SYNTAX  SEQUENCE OF RlAAASysPassAttributeEntry
+  MAX-ACCESS  not-accessible
+  STATUS current
+  DESCRIPTION      "The table specifies the system password's
+                    attributes: the salt needed for hashing 
+                    the cleartext password, and the hashing
+                    method used to digest."
+  ::= { rlAAA 72 }
+
+rlAAASysPassAttributeEntry OBJECT-TYPE
+   SYNTAX  RlAAASysPassAttributeEntry
+   MAX-ACCESS  not-accessible
+   STATUS current
+   DESCRIPTION        "The row definition for this table."
+   INDEX { rlAAASysPassAttributeLevel}
+::= { rlAAASysPassAttributeTable 1 }
+
+RlAAASysPassAttributeEntry ::= SEQUENCE {
+   rlAAASysPassAttributeLevel               INTEGER,
+   rlAAASysPassAttributePassword            DisplayString,
+   rlAAASysPassAttributeSalt                OCTET STRING,
+   rlAAASysPassAttributeHashMethod          RlAAAHashType
+}
+
+rlAAASysPassAttributeLevel OBJECT-TYPE
+  SYNTAX INTEGER (1..15)
+  MAX-ACCESS read-only
+  STATUS current
+  DESCRIPTION       "System password level"
+  ::= { rlAAASysPassAttributeEntry 1 }
+
+rlAAASysPassAttributePassword OBJECT-TYPE
+   SYNTAX DisplayString  (SIZE(0..160))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "System Password
+                      allowed formats:
+                      a. Display string starting with '$' for clear text
+                      b. Encrypted password: starts with # sign followed by 
+                        octets representing Hex Decimal value or Base64 Encoding
+                       the $ and # as first octet are a directive to indicate what
+                       is the type of password and are not part of the password"
+   ::= { rlAAASysPassAttributeEntry 2 }
+
+rlAAASysPassAttributeSalt OBJECT-TYPE
+  SYNTAX OCTET STRING
+  MAX-ACCESS read-write
+  STATUS current
+  DESCRIPTION       "The salt of the system password used to prevent
+                     rainbow table attacks."
+  ::= { rlAAASysPassAttributeEntry 3 }
+
+rlAAASysPassAttributeHashMethod OBJECT-TYPE
+  SYNTAX RlAAAHashType
+  MAX-ACCESS read-write
+  STATUS current
+  DESCRIPTION       "The method the system password uses to hash
+                     the password."
+  ::= { rlAAASysPassAttributeEntry 4 }
+
+--
+-- LinePasswordVerificationAndSetting Table
+--
+
+rlAAALinePasswordVerificationAndSettingTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlAAALinePasswordVerificationAndSettingEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+   DESCRIPTION        "The table specifies line old and new passwords.
+                       Serves for verification of the old password and setting a new password."
+   ::= { rlAAA 73 }
+
+rlAAALinePasswordVerificationAndSettingEntry OBJECT-TYPE
+    SYNTAX  RlAAALinePasswordVerificationAndSettingEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The row of line password verification and setting table."
+    INDEX { rlAAALinePasswordVerificationPortType,
+            rlAAALinePasswordVerificationIfIndex,
+            rlAAALinePasswordVerificationServiceType }
+    ::= { rlAAALinePasswordVerificationAndSettingTable 1 }
+
+RlAAALinePasswordVerificationAndSettingEntry ::= SEQUENCE {
+    rlAAALinePasswordVerificationPortType               RlAAALinePortType,
+    rlAAALinePasswordVerificationIfIndex                Unsigned32,
+    rlAAALinePasswordVerificationServiceType            RlAAAServiceType,
+    rlAAALinePasswordVerificationOldPassword            DisplayString,
+    rlAAALinePasswordSettingNewPassword                 DisplayString,
+    rlAAALinePasswordConfirmNewPassword                 DisplayString
+}
+
+rlAAALinePasswordVerificationPortType OBJECT-TYPE
+   SYNTAX RlAAALinePortType
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The physical port type ."
+   ::= { rlAAALinePasswordVerificationAndSettingEntry 1 }
+
+rlAAALinePasswordVerificationIfIndex OBJECT-TYPE
+   SYNTAX Unsigned32
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Line ifIndex can be configured to zero which means
+                      Don't-care value"
+   ::= { rlAAALinePasswordVerificationAndSettingEntry 2 }
+
+rlAAALinePasswordVerificationServiceType OBJECT-TYPE
+   SYNTAX RlAAAServiceType
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The service type"
+   ::= { rlAAALinePasswordVerificationAndSettingEntry 3 }
+
+rlAAALinePasswordVerificationOldPassword OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION    "Old line password to be verified."
+
+   ::= { rlAAALinePasswordVerificationAndSettingEntry 4 }
+
+rlAAALinePasswordSettingNewPassword OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION    "New line password to be set."
+
+   ::= { rlAAALinePasswordVerificationAndSettingEntry 5 }
+
+rlAAALinePasswordConfirmNewPassword OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION    "New line password to be confirmed."
+
+   ::= { rlAAALinePasswordVerificationAndSettingEntry 6 }
+  
+rlAAAPasswordGeneratePassword OBJECT-TYPE
+   SYNTAX DisplayString (SIZE(0..160))
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "Auto password generation by system, to meet system password complexity requirements, 
+                      Minimum password length is system depended"
+   ::= { rlAAA 74 }
+  
+rlAAAPasswordHistory OBJECT-TYPE
+        SYNTAX   INTEGER (0..24)
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION "Indicates how many passwords previously configured (history) on the device shouldn't be used.
+	             Zero means passwords history is disabled."
+      ::= { rlAAA 75 }
+
+-- table for local users password history --
+rlAAAPasswordHistoryLocalUserTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlAAAPasswordHistoryLocalUserEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The table holds the last 24 passwords of each users in encrypted format."
+   ::= { rlAAA 76 }
+
+rlAAAPasswordHistoryLocalUserEntry OBJECT-TYPE
+    SYNTAX  RlAAAPasswordHistoryLocalUserEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The row definition for this table."
+    INDEX { rlAAAPasswordHistoryLocalUserName,
+            rlAAAPasswordHistoryLocalUserPasswordIndex }
+    ::= { rlAAAPasswordHistoryLocalUserTable 1 }
+
+RlAAAPasswordHistoryLocalUserEntry ::= SEQUENCE {
+    rlAAAPasswordHistoryLocalUserName                  DisplayString,
+    rlAAAPasswordHistoryLocalUserPasswordIndex         INTEGER,
+    rlAAAPasswordHistoryLocalUserEncPassword           DisplayString,
+    rlAAAPasswordHistoryLocalUserSalt                  OCTET STRING,
+    rlAAAPasswordHistoryLocalUserHashMethod            RlAAAHashType
+}
+
+rlAAAPasswordHistoryLocalUserName OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "Local User Name"
+   ::= { rlAAAPasswordHistoryLocalUserEntry 1 }
+
+rlAAAPasswordHistoryLocalUserPasswordIndex OBJECT-TYPE
+   SYNTAX INTEGER (0..65535)
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "The index of the password, arranged from the oldest password to the newest"
+   ::= { rlAAAPasswordHistoryLocalUserEntry 2 }
+
+rlAAAPasswordHistoryLocalUserEncPassword OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Local User Password in encrypted format"
+   ::= { rlAAAPasswordHistoryLocalUserEntry 3 }
+
+rlAAAPasswordHistoryLocalUserSalt OBJECT-TYPE
+   SYNTAX OCTET STRING (SIZE(0..64))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The salt stored and used to prevent lookup tables,
+                      reverse lookup tables, and rainbow table attacks."
+   ::= { rlAAAPasswordHistoryLocalUserEntry 4 }
+
+rlAAAPasswordHistoryLocalUserHashMethod OBJECT-TYPE
+   SYNTAX RlAAAHashType
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The method used to hash the user's password"
+   ::= { rlAAAPasswordHistoryLocalUserEntry 5 }
+
+-- table for system (enable) passwords history --
+   rlAAAPasswordHistorySystemPasswordTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF RlAAAPasswordHistorySystemPasswordEntry
+      MAX-ACCESS  not-accessible
+      STATUS current
+      DESCRIPTION        "The table holds the last 24 passwords of all system (enable) levels in encrypted format."
+     ::= { rlAAA 77 }
+
+rlAAAPasswordHistorySystemPasswordEntry OBJECT-TYPE
+    SYNTAX  RlAAAPasswordHistorySystemPasswordEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The row definition for this table."
+    INDEX { rlAAAPasswordHistorySystemPasswordIndex }
+    ::= { rlAAAPasswordHistorySystemPasswordTable 1 }
+
+RlAAAPasswordHistorySystemPasswordEntry ::= SEQUENCE {
+    rlAAAPasswordHistorySystemPasswordIndex                 INTEGER,
+    rlAAAPasswordHistorySystemPasswordEncPassword           DisplayString,
+    rlAAAPasswordHistorySystemPasswordSalt                  OCTET STRING,
+    rlAAAPasswordHistorySystemPasswordHashMethod            RlAAAHashType
+}
+
+rlAAAPasswordHistorySystemPasswordIndex OBJECT-TYPE
+   SYNTAX INTEGER (0..65535)
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "The index of the password, arranged from the oldest password to the newest"
+   ::= { rlAAAPasswordHistorySystemPasswordEntry 1 }
+
+rlAAAPasswordHistorySystemPasswordEncPassword OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "System Password in encrypted format"
+   ::= { rlAAAPasswordHistorySystemPasswordEntry 2 }
+
+rlAAAPasswordHistorySystemPasswordSalt OBJECT-TYPE
+   SYNTAX OCTET STRING (SIZE(0..64))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The salt stored and used to prevent lookup tables,
+                      reverse lookup tables, and rainbow table attacks."
+   ::= { rlAAAPasswordHistorySystemPasswordEntry 3 }
+
+rlAAAPasswordHistorySystemPasswordHashMethod OBJECT-TYPE
+   SYNTAX RlAAAHashType
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The method used to hash the system's password"
+   ::= { rlAAAPasswordHistorySystemPasswordEntry 4 }
+
+-- table for line passwords history --
+   rlAAAPasswordHistoryLinePasswordTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF RlAAAPasswordHistoryLinePasswordEntry
+      MAX-ACCESS  not-accessible
+      STATUS current
+      DESCRIPTION        "The table holds the last 24 passwords of each line method in encrypted format."
+     ::= { rlAAA 78 }
+
+rlAAAPasswordHistoryLinePasswordEntry OBJECT-TYPE
+    SYNTAX  RlAAAPasswordHistoryLinePasswordEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The row definition for this table."
+    INDEX { rlAAAPasswordHistoryLinePasswordPortType,
+            rlAAAPasswordHistoryLinePasswordIfIndex,
+            rlAAAPasswordHistoryLinePasswordServiceType,
+            rlAAAPasswordHistoryLinePasswordIndex }
+    ::= { rlAAAPasswordHistoryLinePasswordTable 1 }
+
+RlAAAPasswordHistoryLinePasswordEntry ::= SEQUENCE {
+    rlAAAPasswordHistoryLinePasswordPortType              RlAAALinePortType,
+    rlAAAPasswordHistoryLinePasswordIfIndex               Unsigned32,
+    rlAAAPasswordHistoryLinePasswordServiceType           RlAAAServiceType,
+    rlAAAPasswordHistoryLinePasswordIndex                 INTEGER,
+    rlAAAPasswordHistoryLinePasswordEncPassword           DisplayString,
+    rlAAAPasswordHistoryLinePasswordSalt                  OCTET STRING,
+    rlAAAPasswordHistoryLinePasswordHashMethod            RlAAAHashType
+}
+
+rlAAAPasswordHistoryLinePasswordPortType OBJECT-TYPE
+   SYNTAX RlAAALinePortType
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "The physical port type ."
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 1 }
+
+rlAAAPasswordHistoryLinePasswordIfIndex OBJECT-TYPE
+   SYNTAX Unsigned32
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "Line ifIndex can be configured to zero which means
+                      Don't-care value"
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 2 }
+
+rlAAAPasswordHistoryLinePasswordServiceType OBJECT-TYPE
+   SYNTAX RlAAAServiceType
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "The service type"
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 3 }
+
+rlAAAPasswordHistoryLinePasswordIndex OBJECT-TYPE
+   SYNTAX INTEGER (0..65535)
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "The index of the password, arranged from the oldest password to the newest"
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 4 }
+
+rlAAAPasswordHistoryLinePasswordEncPassword OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "System Password in encrypted format"
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 5 }
+
+rlAAAPasswordHistoryLinePasswordSalt OBJECT-TYPE
+   SYNTAX OCTET STRING (SIZE(0..64))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The salt stored and used to prevent lookup tables,
+                      reverse lookup tables, and rainbow table attacks."
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 6 }
+
+rlAAAPasswordHistoryLinePasswordHashMethod OBJECT-TYPE
+   SYNTAX RlAAAHashType
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The method used to hash the system's password"
+   ::= { rlAAAPasswordHistoryLinePasswordEntry 7 }
+
+rlAAALoginAttemptsDelay OBJECT-TYPE
+   SYNTAX INTEGER (0..10)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Delay time between successive login attempts (range 1-10 seconds; 0 - disabled)"
+   ::= { rlAAA 79 }
+
+rlAAALoginAttemptsDelayActive OBJECT-TYPE
+   SYNTAX INTEGER (0..10)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Active delay time between successive login attempts (range 1-10 seconds; 0 - disabled). May be set by another application."
+   ::= { rlAAA 80 }
+
+rlAAALoginFailedAttemptsQuietActiveAccessClassName OBJECT-TYPE
+   SYNTAX DisplayString  (SIZE(0..32))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Management access control list (MACL) name that is to be applied when the device is in quiet mode"
+   ::= { rlAAA 81 }
+
+rlAAALoginFailedAttemptsQuietActiveMode OBJECT-TYPE
+   SYNTAX INTEGER {
+                   active(1),
+                   inactive(2)
+                  }
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "Shows Quiet mode activity state"
+   ::= { rlAAA 82 }
+
+rlAAALoginFailedAttemptsQuietActiveRemainTime OBJECT-TYPE
+   SYNTAX INTEGER (0..65535)
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "The remaining time till rlAAALoginFailedAttemptsQuietPeriod expired"
+   ::= { rlAAA 83 }
+
+rlAAALoginFailedAttemptsQuietActiveTerminateAction OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+          "Action that terminates quiet mode"
+    ::= { rlAAA 84 }
+ 
+---        Read-write table for quiet period configuration upon failed login attempts
+
+rlAAALoginFailedAttemptsQuietTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF RlAAALoginFailedAttemptsQuietEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The Table sets a quiet period following a configured number of failed login attempts
+         during configured time period. During the quiet period the device will not accept any additional
+         connection request - telnet, SSH, SNMP, HTTP or HTTPS"
+    ::= { rlAAA 85 }
+
+rlAAALoginFailedAttemptsQuietEntry OBJECT-TYPE
+    SYNTAX RlAAALoginFailedAttemptsQuietEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The entry in rlAAALoginFailedAttemptsQuietTable"
+    INDEX      { rlAAALoginFailedAttemptsQuietIndex }
+    ::= { rlAAALoginFailedAttemptsQuietTable 1 }
+
+RlAAALoginFailedAttemptsQuietEntry ::= SEQUENCE {
+    rlAAALoginFailedAttemptsQuietIndex                 INTEGER,
+    rlAAALoginFailedAttemptsQuietSamplingPeriod        INTEGER,
+    rlAAALoginFailedAttemptsQuietSamplingNumber        INTEGER,
+    rlAAALoginFailedAttemptsQuietPeriod                INTEGER,
+    rlAAALoginFailedAttemptsQuietSamplingRemainPeriod  INTEGER,
+    rlAAALoginFailedAttemptsQuietSamplingCurrentNumber INTEGER,
+    rlAAALoginFailedAttemptsQuietSamplingEnable        TruthValue
+}
+
+rlAAALoginFailedAttemptsQuietIndex OBJECT-TYPE
+    SYNTAX  INTEGER
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        ""
+    ::= { rlAAALoginFailedAttemptsQuietEntry 1 }
+
+rlAAALoginFailedAttemptsQuietSamplingPeriod OBJECT-TYPE
+   SYNTAX INTEGER (0..3600)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Duration of time in which login attempts are denied (range 1- 3600 (1 hours) seconds; 0 - disabled)"
+   ::= { rlAAALoginFailedAttemptsQuietEntry 2 }
+
+rlAAALoginFailedAttemptsQuietSamplingNumber OBJECT-TYPE
+   SYNTAX INTEGER (0..100)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The number of failed attempts after which quiet period is imposed (range 1 to 100 attempts); 0 - disabled"
+   ::= { rlAAALoginFailedAttemptsQuietEntry 3 }
+
+rlAAALoginFailedAttemptsQuietPeriod OBJECT-TYPE
+   SYNTAX INTEGER (0..65535)
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Duration of quiet period (range 1 to 65535 (18 hours) seconds), 0 - disabled"
+   ::= { rlAAALoginFailedAttemptsQuietEntry 4 }
+
+rlAAALoginFailedAttemptsQuietSamplingRemainPeriod OBJECT-TYPE
+   SYNTAX INTEGER (0..3600)
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "The remaining time till rlAAALoginFailedAttemptsQuietSamplingPeriod expired"
+   ::= { rlAAALoginFailedAttemptsQuietEntry 5 }
+
+rlAAALoginFailedAttemptsQuietSamplingCurrentNumber OBJECT-TYPE
+   SYNTAX INTEGER (0..65535)
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "Current number of failed login attempts in rlAAALoginFailedAttemptsQuietSamplingPeriod"
+   ::= { rlAAALoginFailedAttemptsQuietEntry 6 }
+
+rlAAALoginFailedAttemptsQuietSamplingEnable OBJECT-TYPE
+   SYNTAX TruthValue
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "The sampling period is started"
+   ::= { rlAAALoginFailedAttemptsQuietEntry 7 }
+
+
+---        Read-only table for failed login attempts - rlAAALoginFailedAttemptsUserEntry
+
+rlAAALoginFailedAttemptsUserTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlAAALoginFailedAttemptsUserEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The table holds last 50 failed attempts. This table is read-only."
+   ::= { rlAAA 86 }
+
+rlAAALoginFailedAttemptsUserEntry OBJECT-TYPE
+    SYNTAX  RlAAALoginFailedAttemptsUserEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION        "The row definition for this table."
+    INDEX { rlAAALoginFailedAttemptsUserInsertionIndex,
+            rlAAALoginFailedAttemptsUserName,
+            rlAAALoginFailedAttemptsUserIpAddressType,
+            rlAAALoginFailedAttemptsUserIpAddress,
+            rlAAALoginFailedAttemptsUserService}
+    ::= { rlAAALoginFailedAttemptsUserTable 1 }
+
+RlAAALoginFailedAttemptsUserEntry ::= SEQUENCE {
+    rlAAALoginFailedAttemptsUserInsertionIndex    Unsigned32,
+    rlAAALoginFailedAttemptsUserName              DisplayString,
+    rlAAALoginFailedAttemptsUserIpAddressType     InetAddressType,
+    rlAAALoginFailedAttemptsUserIpAddress         InetAddress,
+    rlAAALoginFailedAttemptsUserService           RlAAAServiceType,
+    rlAAALoginFailedAttemptsUserDateTime          DisplayString,
+    rlAAALoginFailedAttemptsUserAttemptsCounter   Unsigned32
+}
+
+rlAAALoginFailedAttemptsUserInsertionIndex OBJECT-TYPE
+   SYNTAX Unsigned32
+   MAX-ACCESS read-only
+   STATUS current
+   DESCRIPTION       "The index of the insertion, start from 0x7FFFFFFF"
+   ::= { rlAAALoginFailedAttemptsUserEntry 1 }
+
+rlAAALoginFailedAttemptsUserName OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS not-accessible 
+   STATUS current
+   DESCRIPTION       "User Name provided during the failed connection attempt"
+   ::= { rlAAALoginFailedAttemptsUserEntry 2 }
+
+rlAAALoginFailedAttemptsUserIpAddressType OBJECT-TYPE
+   SYNTAX InetAddressType
+   MAX-ACCESS not-accessible 
+   STATUS current
+   DESCRIPTION       "The source IP type used for the failed connection attempt"
+   ::= { rlAAALoginFailedAttemptsUserEntry 3 }
+
+rlAAALoginFailedAttemptsUserIpAddress OBJECT-TYPE
+   SYNTAX InetAddress
+   MAX-ACCESS not-accessible 
+   STATUS current
+   DESCRIPTION       "The source IP used for the failed connection attempt."
+   ::= { rlAAALoginFailedAttemptsUserEntry 4 }
+
+rlAAALoginFailedAttemptsUserService OBJECT-TYPE
+   SYNTAX RlAAAServiceType
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION       "The service the failed attempt was trying to connect to"
+   ::= { rlAAALoginFailedAttemptsUserEntry 5 }
+
+rlAAALoginFailedAttemptsUserDateTime OBJECT-TYPE
+   SYNTAX DisplayString
+   MAX-ACCESS read-only 
+   STATUS current
+   DESCRIPTION       "The time stamp of the last failed attempt from this username + source IP + service tuple.
+                      Date and time in the SysLog Format: DD-MMM-YYYY HH:MM:SS"
+   ::= { rlAAALoginFailedAttemptsUserEntry 6 }
+
+rlAAALoginFailedAttemptsUserAttemptsCounter OBJECT-TYPE
+   SYNTAX Unsigned32
+   MAX-ACCESS read-only 
+   STATUS current
+   DESCRIPTION       "The number of attempts made from this username + source IP + service tuple"
+   ::= { rlAAALoginFailedAttemptsUserEntry 7 }
+
+rlAAALoginFailedAttemptsClearAction OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+          "Clears failed login attempts database"
+    ::= { rlAAA 87 }
 END

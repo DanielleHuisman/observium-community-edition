@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -18,294 +18,438 @@
 // Darwin hostname.local 19.5.0 Darwin Kernel Version 19.5.0: Tue May 26 20:41:44 PDT 2020; root:xnu-6153.121.2~2/RELEASE_X86_64 x86_64
 // Darwin hostname.local 20.3.0 Darwin Kernel Version 20.3.0: Thu Jan 21 00:07:06 PST 2021; root:xnu-7195.81.3~1/RELEASE_X86_64 x86_64
 if (preg_match('/Darwin Kernel Version (?<kernel>\d\S+): .* root\S+ (?<arch>\S+)/', $poll_device['sysDescr'], $matches)) {
-  $kernel = $matches['kernel'];
-  $arch   = $matches['arch'];
+    $kernel = $matches['kernel'];
+    $arch   = $matches['arch'];
 
-  $macos_kernels = [
-    // Cats
-    9  => [ 'version' => '10.5',  'name' => 'Leopard',       'icon' => '' ],
-    10 => [ 'version' => '10.6',  'name' => 'Snow Leopard',  'icon' => '' ],
-    11 => [ 'version' => '10.7',  'name' => 'Lion',          'icon' => 'macos-lion' ],
-    12 => [ 'version' => '10.8',  'name' => 'Mountain Lion', 'icon' => 'macos-mountain-lion' ],
-    // Mountains
-    13 => [ 'version' => '10.9',  'name' => 'Mavericks',     'icon' => 'macos-mavericks' ],
-    14 => [ 'version' => '10.10', 'name' => 'Yosemite',      'icon' => 'macos-yosemite' ],
-    15 => [ 'version' => '10.11', 'name' => 'El Capitan',    'icon' => 'macos-el-capitan' ],
-    16 => [ 'version' => '10.12', 'name' => 'Sierra',        'icon' => 'macos-sierra' ],
-    17 => [ 'version' => '10.13', 'name' => 'High Sierra',   'icon' => 'macos-high-sierra' ],
-    18 => [ 'version' => '10.14', 'name' => 'Mojave',        'icon' => 'macos-mojave' ],
-    19 => [ 'version' => '10.15', 'name' => 'Catalina',      'icon' => 'macos-catalina' ],
-    20 => [ 'version' => '11.0',  'name' => 'Big Sur',       'icon' => 'macos-big-sur' ],
-  ];
+    $macos_kernels = [
+        // Cats
+        9  => ['version' => '10.5', 'name' => 'Leopard', 'icon' => ''],
+        10 => ['version' => '10.6', 'name' => 'Snow Leopard', 'icon' => ''],
+        11 => ['version' => '10.7', 'name' => 'Lion', 'icon' => 'macos-lion'],
+        12 => ['version' => '10.8', 'name' => 'Mountain Lion', 'icon' => 'macos-mountain-lion'],
+        // Mountains
+        13 => ['version' => '10.9', 'name' => 'Mavericks', 'icon' => 'macos-mavericks'],
+        14 => ['version' => '10.10', 'name' => 'Yosemite', 'icon' => 'macos-yosemite'],
+        15 => ['version' => '10.11', 'name' => 'El Capitan', 'icon' => 'macos-el-capitan'],
+        16 => ['version' => '10.12', 'name' => 'Sierra', 'icon' => 'macos-sierra'],
+        17 => ['version' => '10.13', 'name' => 'High Sierra', 'icon' => 'macos-high-sierra'],
+        18 => ['version' => '10.14', 'name' => 'Mojave', 'icon' => 'macos-mojave'],
+        19 => ['version' => '10.15', 'name' => 'Catalina', 'icon' => 'macos-catalina'],
+        20 => ['version' => '11.0', 'name' => 'Big Sur', 'icon' => 'macos-big-sur'],
+    ];
 
-  // 19.5.0 -> 10.15.5, 14.0.0 -> 10.10
-  list($k1, $k2, $k3) = explode('.', $kernel);
-  if (isset($macos_kernels[$k1])) {
-    $version = $macos_kernels[$k1]['version'] . '.' . $k2;
-    if ($k3 > 0) {
-      $version .= '.' . $k3;
+    // 19.5.0 -> 10.15.5, 14.0.0 -> 10.10
+    [$k1, $k2, $k3] = explode('.', $kernel);
+    if (isset($macos_kernels[$k1])) {
+        $version = $macos_kernels[$k1]['version'] . '.' . $k2;
+        if ($k3 > 0) {
+            $version .= '.' . $k3;
+        }
+        $features = $macos_kernels[$k1]['name'];
+        if (strlen($macos_kernels[$k1]['icon'])) {
+            $icon = $macos_kernels[$k1]['icon'];
+        }
+    } else {
+        $version = $kernel;
     }
-    $features = $macos_kernels[$k1]['name'];
-    if (strlen($macos_kernels[$k1]['icon'])) {
-      $icon = $macos_kernels[$k1]['icon'];
-    }
-  } else {
-    $version = $kernel;
-  }
 } else {
-  list(,,$version) = explode (' ', $poll_device['sysDescr']);
+    [, , $version] = explode(' ', $poll_device['sysDescr']);
 }
 $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
 
 // Hardware/serial/type "extend" support
 if (is_device_mib($device, 'UCD-SNMP-MIB')) {
-  // Append this line to /etc/snmp/snmpd.conf:
-  // extend .1.3.6.1.4.1.2021.7890.2 hardware /usr/sbin/system_profiler SPHardwareDataType SPSoftwareDataType
-  // restart service:
-  // sudo launchctl unload -w /System/Library/LaunchDaemons/org.net-snmp.snmpd.plist
-  // sudo launchctl load -w /System/Library/LaunchDaemons/org.net-snmp.snmpd.plist
-  // Check output:
-  // snmpget -v2c -c <community> <hostname> .1.3.6.1.4.1.2021.7890.2.3.1.2.8.104.97.114.100.119.97.114.101
-/*
-Hardware:
+    // Append this line to /etc/snmp/snmpd.conf:
+    // extend .1.3.6.1.4.1.2021.7890.2 hardware /usr/sbin/system_profiler SPHardwareDataType SPSoftwareDataType
+    // restart service:
+    // sudo launchctl unload -w /System/Library/LaunchDaemons/org.net-snmp.snmpd.plist
+    // sudo launchctl load -w /System/Library/LaunchDaemons/org.net-snmp.snmpd.plist
+    // Check output:
+    // snmpget -v2c -c <community> <hostname> .1.3.6.1.4.1.2021.7890.2.3.1.2.8.104.97.114.100.119.97.114.101
+    /*
+    Hardware:
 
-    Hardware Overview:
+        Hardware Overview:
 
-      Model Name: MacBook Pro
-      Model Identifier: MacBookPro16,1
-      Processor Name: 8-Core Intel Core i9
-      Processor Speed: 2.3 GHz
-      Number of Processors: 1
-      Total Number of Cores: 8
-      L2 Cache (per Core): 256 KB
-      L3 Cache: 16 MB
-      Hyper-Threading Technology: Enabled
-      Memory: 16 GB
-      System Firmware Version: 1554.80.3.0.0 (iBridge: 18.16.14347.0.0,0)
-      Serial Number (system): C02ZJ6XXXXX
-      Hardware UUID: XXXX-9AE6-5112-A312-XXXXXX
-      Provisioning UDID: XXXX-9AE6-5112-A312-XXXXXX
-      Activation Lock Status: Enabled
+          Model Name: MacBook Pro
+          Model Identifier: MacBookPro16,1
+          Processor Name: 8-Core Intel Core i9
+          Processor Speed: 2.3 GHz
+          Number of Processors: 1
+          Total Number of Cores: 8
+          L2 Cache (per Core): 256 KB
+          L3 Cache: 16 MB
+          Hyper-Threading Technology: Enabled
+          Memory: 16 GB
+          System Firmware Version: 1554.80.3.0.0 (iBridge: 18.16.14347.0.0,0)
+          Serial Number (system): C02ZJ6XXXXX
+          Hardware UUID: XXXX-9AE6-5112-A312-XXXXXX
+          Provisioning UDID: XXXX-9AE6-5112-A312-XXXXXX
+          Activation Lock Status: Enabled
 
-Software:
+    Software:
 
-    System Software Overview:
+        System Software Overview:
 
-      System Version: macOS 11.2.3 (20D91)
-      Kernel Version: Darwin 20.3.0
-      Boot Volume: Macintosh HD
-      Boot Mode: Normal
-      Computer Name: hostname
-      User Name: System Administrator (root)
-      Secure Virtual Memory: Enabled
-      System Integrity Protection: Enabled
-      Time since boot: 5 days 20:57
-*/
+          System Version: macOS 11.2.3 (20D91)
+          Kernel Version: Darwin 20.3.0
+          Boot Volume: Macintosh HD
+          Boot Mode: Normal
+          Computer Name: hostname
+          User Name: System Administrator (root)
+          Secure Virtual Memory: Enabled
+          System Integrity Protection: Enabled
+          Time since boot: 5 days 20:57
+    */
 
-  $hw = snmp_get_oid($device, '.1.3.6.1.4.1.2021.7890.2.3.1.2.8.104.97.114.100.119.97.114.101', 'UCD-SNMP-MIB');
-  if (strlen($hw)) {
+    $hw = snmp_get_oid($device, '.1.3.6.1.4.1.2021.7890.2.3.1.2.8.104.97.114.100.119.97.114.101', 'UCD-SNMP-MIB');
+    if (strlen($hw)) {
 
-    $hw_array = [];
-    foreach (explode("\n", $hw) as $line) {
-      list($param, $value) = explode(': ', trim($line), 2);
+        $hw_array = [];
+        foreach (explode("\n", $hw) as $line) {
+            [$param, $value] = explode(': ', trim($line), 2);
 
-      switch ($param) {
-        case 'Model Name':
-        case 'Model Identifier':
-        case 'Processor Name':
-        case 'Processor Speed':
-        case 'Number of Processors':
-        case 'Total Number of Cores':
-        case 'Memory':
-          // useful info for detect hardware
-          $param = strtolower(str_replace(' ', '_', $param));
-          $hw_array[$param] = $value;
-          break;
+            switch ($param) {
+                case 'Model Name':
+                case 'Model Identifier':
+                case 'Processor Name':
+                case 'Processor Speed':
+                case 'Number of Processors':
+                case 'Total Number of Cores':
+                case 'Memory':
+                    // useful info for detect hardware
+                    $param            = strtolower(str_replace(' ', '_', $param));
+                    $hw_array[$param] = $value;
+                    break;
 
-        case 'Serial Number (system)':
-          $serial = $value;
-          break;
+                case 'Serial Number (system)':
+                    $serial = $value;
+                    break;
 
-        case 'System Version':
-          // accurate version
-          list(, $version) = explode(' ', $value);
-          break;
+                case 'System Version':
+                    // accurate version
+                    [, $version] = explode(' ', $value);
+                    break;
 
-        case 'Time since boot':
-          // accurate uptime?..
-          break;
-      }
+                case 'Time since boot':
+                    // accurate uptime?..
+                    break;
+            }
+        }
+
+        if ($hw_array) {
+            print_debug_vars($hw_array);
+            $hardware = $hw_array['model_name'];
+
+            // idents
+            preg_match('/^(?<base>[a-z]+)(?<num>[\d,]+)/i', $hw_array['model_identifier'], $ident);
+
+            if (str_starts($hw_array['model_identifier'], ['iMacPro', 'MacPro'])) {
+                // iMacPro1,1 - iMac Pro "10-Core" 3.0 27-Inch (5K, Late 2017)
+                // MacPro7,1  - Mac Pro "28-Core" 2.5 (2019)
+                // MacPro7,1  - Mac Pro "28-Core" 2.5 (2019 - Rack)
+                $type = 'workstation';
+
+                // append processor cores
+                $hardware .= ' "' . $hw_array['total_number_of_cores'] . '-Core"';
+                // append processor speed
+                $hardware .= ' ' . preg_replace('/[^\d\.]+$/', '', $hw_array['processor_speed']);
+                // extra
+                if ($ident['base'] === 'iMacPro') {
+                    switch ($ident['num']) {
+                        case '1,1':
+                            $hardware .= ' 27-Inch (Late 2017, 5K)';
+                            break;
+                        //case '1,2': $hardware .= ' (Early 2013)'; break;
+                    }
+                } elseif ($ident['base'] === 'MacPro') {
+                    switch ($ident['num']) {
+                        case '4,1':
+                            $hardware .= ' (2009)';
+                            break;
+                        case '5,1':
+                            $hardware .= ' (2012)';
+                            break;
+                        case '6,1':
+                            $hardware .= ' (Late 2013)';
+                            break;
+                        case '7,1':
+                            $hardware .= ' (2019)';
+                            break;
+                    }
+                }
+            } elseif (str_starts($hw_array['model_identifier'], ['iMac', 'Macmini', 'MacBook'])) {
+                // iMac19,2       - iMac 21.5-Inch "Core i7" 3.2 (4K, 2019)
+                // Macmini8,1     - Mac mini "Core i7" 3.2 (Late 2018)
+                // MacBook10,1    - MacBook "Core m3" 1.2 12" (Mid-2017)
+                // MacBookAir9,1  - MacBook Air "Core i7" 1.2 13" (Scissor, 2020)
+                // MacBookPro16,1 - MacBook Pro 16-Inch "Core i9" 2.4 2019 (Scissor)
+                $type = 'workstation';
+
+                // append processor
+                $hardware .= ' "' . preg_replace('/^.*Intel /', '', $hw_array['processor_name']) . '"';
+                // append processor speed
+                $hardware .= ' ' . preg_replace('/[^\d\.]+$/', '', $hw_array['processor_speed']);
+                // extra
+                if ($ident['base'] === 'MacBookPro') {
+                    switch ($ident['num']) {
+                        case '10,1':
+                            $hardware .= ' 15" (Early 2013)';
+                            break;
+                        case '10,2':
+                            $hardware .= ' 13" (Early 2013)';
+                            break;
+
+                        case '11,1':
+                            $hardware .= ' 13" (Late 2013)';
+                            break;
+                        case '11,2':
+                            $hardware .= ' 15" (Late 2013, IG)';
+                            break;
+                        case '11,3':
+                            $hardware .= ' 15" (Late 2013, DG)';
+                            break;
+                        case '11,4':
+                            $hardware .= ' 15" (Mid-2015, IG)';
+                            break;
+                        case '11,5':
+                            $hardware .= ' 15" (Mid-2015, DG)';
+                            break;
+
+                        case '12,1':
+                            $hardware .= ' 13" (Early 2015)';
+                            break;
+                        case '12,2':
+                            $hardware .= ' 13" (Early 2015)';
+                            break;
+                        case '12,3':
+                            $hardware .= ' 15" (Early 2015)';
+                            break;
+
+                        case '13,1':
+                            $hardware .= ' 13" (Late 2016)';
+                            break;
+                        case '13,2':
+                            $hardware .= ' 13" (Touch/Late 2016)';
+                            break;
+                        case '13,3':
+                            $hardware .= ' 15" (Touch/Late 2016)';
+                            break;
+
+                        case '14,1':
+                            $hardware .= ' 13" (Mid 2017)';
+                            break;
+                        case '14,2':
+                            $hardware .= ' 13" (Touch/Mid 2017)';
+                            break;
+                        case '14,3':
+                            $hardware .= ' 15" (Touch/Mid 2017)';
+                            break;
+
+                        case '15,1':
+                            $hardware .= ' 15" (2018)';
+                            break;
+                        case '15,2':
+                            $hardware .= ' 13" (2018)';
+                            break;
+                        case '15,3':
+                            $hardware .= ' 13" (2018, Vega)';
+                            break;
+                        case '15,4':
+                            $hardware .= ' 13" (2019, 2)';
+                            break;
+
+                        case '16,1':
+                            $hardware .= ' 16" (2019)';
+                            break;
+                        case '16,2':
+                            $hardware .= ' 13" (2020, 4)';
+                            break;
+                        case '16,3':
+                            $hardware .= ' 13" (2020, 2)';
+                            break;
+                        case '16,4':
+                            $hardware .= ' 16" (2019, 5600M)';
+                            break;
+
+                        case '17,1':
+                            $hardware .= ' 13" (M1, 2020)';
+                            break;
+                    }
+                } elseif ($ident['base'] === 'MacBookAir') {
+                    switch ($ident['num']) {
+                        case '5,1':
+                            $hardware .= ' 11" (Mid 2012)';
+                            break;
+                        case '5,2':
+                            $hardware .= ' 13" (Mid 2012)';
+                            break;
+
+                        case '6,1':
+                            $hardware .= ' 11" (Early 2014)';
+                            break;
+                        case '6,2':
+                            $hardware .= ' 13" (Early 2014)';
+                            break;
+
+                        case '7,1':
+                            $hardware .= ' 11" (Early 2015)';
+                            break;
+                        case '7,2':
+                            $hardware .= ' 13" (Early 2015)';
+                            break;
+
+                        case '8,1':
+                            $hardware .= ' 13" (Late 2018)';
+                            break;
+                        case '8,2':
+                            $hardware .= ' 13" (2019)';
+                            break;
+
+                        case '9,1':
+                            $hardware .= ' 13" (2020)';
+                            break;
+                        //case '9,2': $hardware .= ' 13" (Early 2013)'; break;
+
+                        case '10,1':
+                            $hardware .= ' 13" (M1, 2020)';
+                            break;
+                    }
+                } elseif ($ident['base'] === 'Macmini') {
+                    switch ($ident['num']) {
+                        case '5,1':
+                            $hardware .= ' (Mid 2011)';
+                            break;
+                        case '5,2':
+                            $hardware .= ' (Mid 2011)';
+                            break;
+                        case '5,3':
+                            $hardware .= ' (Mid 2011)';
+                            $type     = 'server';
+                            break; // Server
+
+                        case '6,1':
+                            $hardware .= ' (Late 2012)';
+                            break;
+                        case '6,2':
+                            $hardware .= ' (Late 2012)';
+                            $type     = 'server';
+                            break; // Server
+
+                        case '7,1':
+                            $hardware .= ' (Late 2014)';
+                            break;
+
+                        case '8,1':
+                            $hardware .= ' (Late 2018)';
+                            break;
+
+                        case '9,1':
+                            $hardware .= ' (M1, 2020)';
+                            break;
+                    }
+                } elseif ($ident['base'] === 'iMac') {
+                    switch ($ident['num']) {
+                        case '13,1':
+                            $hardware .= ' (Late 2012)';
+                            break;
+                        case '13,2':
+                            $hardware .= ' (Late 2012)';
+                            break;
+
+                        case '14,1':
+                            $hardware .= ' (Late 2013)';
+                            break;
+                        case '14,2':
+                            $hardware .= ' (Late 2013)';
+                            break;
+                        case '14,3':
+                            $hardware .= ' (Late 2013)';
+                            break;
+                        case '14,4':
+                            $hardware .= ' (Mid 2014)';
+                            break;
+
+                        case '15,1':
+                            $hardware .= ' (Late 2014, 5K)';
+                            break;
+
+                        case '16,1':
+                            $hardware .= ' (Late 2015)';
+                            break;
+                        case '16,2':
+                            $hardware .= ' (Late 2015, 4K)';
+                            break;
+
+                        case '17,1':
+                            $hardware .= ' (Late 2015, 5K)';
+                            break;
+                        //case '17,2': $hardware .= ' (Mid-2017, 4K)'; break;
+                        //case '17,3': $hardware .= ' (Mid-2017, 5K)'; break;
+
+                        case '18,1':
+                            $hardware .= ' (Mid 2017)';
+                            break;
+                        case '18,2':
+                            $hardware .= ' (Mid 2017, 4K)';
+                            break;
+                        case '18,3':
+                            $hardware .= ' (Mid 2017, 5K)';
+                            break;
+
+                        case '19,1':
+                            $hardware .= ' 27-Inch (2019)';
+                            break;
+                        case '19,2':
+                            $hardware .= ' 21.5-Inch (2019, 4K)';
+                            break;
+                        case '19,3':
+                            $hardware .= ' (2019, 5K)';
+                            break;
+
+                        case '20,1':
+                            $hardware .= ' 27-Inch (Mid 2020, 5K)';
+                            break;
+                        case '20,2':
+                            $hardware .= ' 27-Inch (Mid 2020, 5K, 5700/XT)';
+                            break;
+
+                        case '21,1':
+                            $hardware .= ' 24-Inch (M1, 2021)';
+                            break; // 8-Core
+                        case '21,2':
+                            $hardware .= ' 24-Inch (M1, 2021, 7c)';
+                            break; // 7-Core
+                    }
+                }
+            } elseif (str_starts($hw_array['model_identifier'], ['PowerBook', 'PowerMac'])) {
+                // PowerBook5,9   - PowerBook G4 1.67 17" (DLSD/HR - Al)
+                // PowerMac11,2   - Power Macintosh G5 "Quad Core" (2.5)
+                $type = 'workstation';
+            } elseif (str_starts($hw_array['model_identifier'], ['RackMac', 'Xserve'])) {
+                $type = 'server';
+
+                // append processor speed
+                $hardware .= ' ' . preg_replace('/[^\d\.]+$/', '', $hw_array['processor_speed']);
+                // append processor cores
+                $hardware .= ' "' . $hw_array['total_number_of_cores'] . '-Core"';
+                // extra
+                if ($ident['base'] === 'Xserve') {
+                    switch ($ident['num']) {
+                        case '1,1':
+                            $hardware .= ' (Late 2006)';
+                            break;
+                        case '2,1':
+                            $hardware .= ' (Early 2008)';
+                            break;
+                        case '3,1':
+                            $hardware .= ' (Early 2009)';
+                            break;
+                    }
+                }
+            }
+        }
     }
-
-    if ($hw_array) {
-      print_debug_vars($hw_array);
-      $hardware = $hw_array['model_name'];
-
-      // idents
-      preg_match('/^(?<base>[a-z]+)(?<num>[\d,]+)/i', $hw_array['model_identifier'], $ident);
-
-      if (str_starts($hw_array['model_identifier'], [ 'iMacPro', 'MacPro' ])) {
-        // iMacPro1,1 - iMac Pro "10-Core" 3.0 27-Inch (5K, Late 2017)
-        // MacPro7,1  - Mac Pro "28-Core" 2.5 (2019)
-        // MacPro7,1  - Mac Pro "28-Core" 2.5 (2019 - Rack)
-        $type = 'workstation';
-
-        // append processor cores
-        $hardware .= ' "' . $hw_array['total_number_of_cores'] . '-Core"';
-        // append processor speed
-        $hardware .= ' ' . preg_replace('/[^\d\.]+$/', '', $hw_array['processor_speed']);
-        // extra
-        if ($ident['base'] === 'iMacPro') {
-          switch ($ident['num']) {
-            case '1,1': $hardware .= ' 27-Inch (Late 2017, 5K)'; break;
-            //case '1,2': $hardware .= ' (Early 2013)'; break;
-          }
-        } elseif ($ident['base'] === 'MacPro') {
-          switch ($ident['num']) {
-            case '4,1': $hardware .= ' (2009)'; break;
-            case '5,1': $hardware .= ' (2012)'; break;
-            case '6,1': $hardware .= ' (Late 2013)'; break;
-            case '7,1': $hardware .= ' (2019)'; break;
-          }
-        }
-      } elseif (str_starts($hw_array['model_identifier'], [ 'iMac', 'Macmini', 'MacBook' ])) {
-        // iMac19,2       - iMac 21.5-Inch "Core i7" 3.2 (4K, 2019)
-        // Macmini8,1     - Mac mini "Core i7" 3.2 (Late 2018)
-        // MacBook10,1    - MacBook "Core m3" 1.2 12" (Mid-2017)
-        // MacBookAir9,1  - MacBook Air "Core i7" 1.2 13" (Scissor, 2020)
-        // MacBookPro16,1 - MacBook Pro 16-Inch "Core i9" 2.4 2019 (Scissor)
-        $type = 'workstation';
-
-        // append processor
-        $hardware .= ' "' . preg_replace('/^.*Intel /', '', $hw_array['processor_name']) . '"';
-        // append processor speed
-        $hardware .= ' ' . preg_replace('/[^\d\.]+$/', '', $hw_array['processor_speed']);
-        // extra
-        if ($ident['base'] === 'MacBookPro') {
-          switch ($ident['num']) {
-            case '10,1': $hardware .= ' 15" (Early 2013)'; break;
-            case '10,2': $hardware .= ' 13" (Early 2013)'; break;
-
-            case '11,1': $hardware .= ' 13" (Late 2013)'; break;
-            case '11,2': $hardware .= ' 15" (Late 2013, IG)'; break;
-            case '11,3': $hardware .= ' 15" (Late 2013, DG)'; break;
-            case '11,4': $hardware .= ' 15" (Mid-2015, IG)'; break;
-            case '11,5': $hardware .= ' 15" (Mid-2015, DG)'; break;
-
-            case '12,1': $hardware .= ' 13" (Early 2015)'; break;
-            case '12,2': $hardware .= ' 13" (Early 2015)'; break;
-            case '12,3': $hardware .= ' 15" (Early 2015)'; break;
-
-            case '13,1': $hardware .= ' 13" (Late 2016)'; break;
-            case '13,2': $hardware .= ' 13" (Touch/Late 2016)'; break;
-            case '13,3': $hardware .= ' 15" (Touch/Late 2016)'; break;
-
-            case '14,1': $hardware .= ' 13" (Mid 2017)'; break;
-            case '14,2': $hardware .= ' 13" (Touch/Mid 2017)'; break;
-            case '14,3': $hardware .= ' 15" (Touch/Mid 2017)'; break;
-
-            case '15,1': $hardware .= ' 15" (2018)'; break;
-            case '15,2': $hardware .= ' 13" (2018)'; break;
-            case '15,3': $hardware .= ' 13" (2018, Vega)'; break;
-            case '15,4': $hardware .= ' 13" (2019, 2)'; break;
-
-            case '16,1': $hardware .= ' 16" (2019)'; break;
-            case '16,2': $hardware .= ' 13" (2020, 4)'; break;
-            case '16,3': $hardware .= ' 13" (2020, 2)'; break;
-            case '16,4': $hardware .= ' 16" (2019, 5600M)'; break;
-
-            case '17,1': $hardware .= ' 13" (M1, 2020)'; break;
-          }
-        } elseif ($ident['base'] === 'MacBookAir') {
-          switch ($ident['num']) {
-            case '5,1': $hardware .= ' 11" (Mid 2012)'; break;
-            case '5,2': $hardware .= ' 13" (Mid 2012)'; break;
-
-            case '6,1': $hardware .= ' 11" (Early 2014)'; break;
-            case '6,2': $hardware .= ' 13" (Early 2014)'; break;
-
-            case '7,1': $hardware .= ' 11" (Early 2015)'; break;
-            case '7,2': $hardware .= ' 13" (Early 2015)'; break;
-
-            case '8,1': $hardware .= ' 13" (Late 2018)'; break;
-            case '8,2': $hardware .= ' 13" (2019)'; break;
-
-            case '9,1': $hardware .= ' 13" (2020)'; break;
-            //case '9,2': $hardware .= ' 13" (Early 2013)'; break;
-
-            case '10,1': $hardware .= ' 13" (M1, 2020)'; break;
-          }
-        } elseif ($ident['base'] === 'Macmini') {
-          switch ($ident['num']) {
-            case '5,1': $hardware .= ' (Mid 2011)'; break;
-            case '5,2': $hardware .= ' (Mid 2011)'; break;
-            case '5,3': $hardware .= ' (Mid 2011)'; $type = 'server'; break; // Server
-
-            case '6,1': $hardware .= ' (Late 2012)'; break;
-            case '6,2': $hardware .= ' (Late 2012)'; $type = 'server'; break; // Server
-
-            case '7,1': $hardware .= ' (Late 2014)'; break;
-
-            case '8,1': $hardware .= ' (Late 2018)'; break;
-
-            case '9,1': $hardware .= ' (M1, 2020)'; break;
-          }
-        } elseif ($ident['base'] === 'iMac') {
-          switch ($ident['num']) {
-            case '13,1': $hardware .= ' (Late 2012)'; break;
-            case '13,2': $hardware .= ' (Late 2012)'; break;
-
-            case '14,1': $hardware .= ' (Late 2013)'; break;
-            case '14,2': $hardware .= ' (Late 2013)'; break;
-            case '14,3': $hardware .= ' (Late 2013)'; break;
-            case '14,4': $hardware .= ' (Mid 2014)'; break;
-
-            case '15,1': $hardware .= ' (Late 2014, 5K)'; break;
-
-            case '16,1': $hardware .= ' (Late 2015)'; break;
-            case '16,2': $hardware .= ' (Late 2015, 4K)'; break;
-
-            case '17,1': $hardware .= ' (Late 2015, 5K)'; break;
-            //case '17,2': $hardware .= ' (Mid-2017, 4K)'; break;
-            //case '17,3': $hardware .= ' (Mid-2017, 5K)'; break;
-
-            case '18,1': $hardware .= ' (Mid 2017)'; break;
-            case '18,2': $hardware .= ' (Mid 2017, 4K)'; break;
-            case '18,3': $hardware .= ' (Mid 2017, 5K)'; break;
-
-            case '19,1': $hardware .= ' 27-Inch (2019)'; break;
-            case '19,2': $hardware .= ' 21.5-Inch (2019, 4K)'; break;
-            case '19,3': $hardware .= ' (2019, 5K)'; break;
-
-            case '20,1': $hardware .= ' 27-Inch (Mid 2020, 5K)'; break;
-            case '20,2': $hardware .= ' 27-Inch (Mid 2020, 5K, 5700/XT)'; break;
-
-            case '21,1': $hardware .= ' 24-Inch (M1, 2021)'; break; // 8-Core
-            case '21,2': $hardware .= ' 24-Inch (M1, 2021, 7c)'; break; // 7-Core
-          }
-        }
-      } elseif (str_starts($hw_array['model_identifier'], [ 'PowerBook', 'PowerMac' ])) {
-        // PowerBook5,9   - PowerBook G4 1.67 17" (DLSD/HR - Al)
-        // PowerMac11,2   - Power Macintosh G5 "Quad Core" (2.5)
-        $type = 'workstation';
-      } elseif (str_starts($hw_array['model_identifier'], [ 'RackMac', 'Xserve' ])) {
-        $type = 'server';
-
-        // append processor speed
-        $hardware .= ' ' . preg_replace('/[^\d\.]+$/', '', $hw_array['processor_speed']);
-        // append processor cores
-        $hardware .= ' "' . $hw_array['total_number_of_cores'] . '-Core"';
-        // extra
-        if ($ident['base'] === 'Xserve') {
-          switch ($ident['num']) {
-            case '1,1': $hardware .= ' (Late 2006)'; break;
-            case '2,1': $hardware .= ' (Early 2008)'; break;
-            case '3,1': $hardware .= ' (Early 2009)'; break;
-          }
-        }
-      }
-    }
-  }
 }
 
 /* https://everymac.com/systems/by_capability/mac-specs-by-machine-model-machine-id.html

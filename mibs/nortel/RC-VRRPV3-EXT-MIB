@@ -1,0 +1,411 @@
+RC-VRRPV3-EXT-MIB DEFINITIONS ::= BEGIN 
+
+       IMPORTS
+           MODULE-IDENTITY, OBJECT-TYPE,
+           NOTIFICATION-TYPE,
+           Unsigned32,Integer32                FROM SNMPv2-SMI
+           TruthValue,TimeInterval             FROM SNMPv2-TC
+
+           ifIndex                             FROM IF-MIB
+           InetAddress                         FROM INET-ADDRESS-MIB
+
+           rcVrrpTmpOperationsEntry            FROM RC-VRRPV3-TMP-MIB  
+           rcVrrpTmpOperationsPrimaryIpAddr    FROM RC-VRRPV3-TMP-MIB
+           rcVrrpTmpOperationsMasterIpAddr     FROM RC-VRRPV3-TMP-MIB
+           VrId                                FROM VRRP-MIB
+           rcVrrpv3                            FROM RAPID-CITY;
+
+       rcVrrpExtMib  MODULE-IDENTITY 
+           LAST-UPDATED "201511020000Z"
+           ORGANIZATION "Nortel Networks"  
+           CONTACT-INFO "Lok Marty
+                      Postal:   Nortel Networks, Inc.
+                                600 Technology Park Drive
+                                Billerica, MA 02478
+                      Tel:      978-288-4470
+                      E-mail:   malok@nortel.com"
+
+           DESCRIPTION
+            "This MIB module is an extension to VRRP for IPv6
+             MIB draft-ietf-vrrp-unified-mib-06.txt.
+             
+             This MIB describes objects used for managing Virtual
+             Router Redundancy Protocol (VRRP) over IPv4 and IPv6
+             protocols.
+
+             This MIB supports VRRP for IPv4 and IPv6 protocols
+             simultaneously running on a given interface of a
+             router."
+
+           REVISION "201511020000Z" -- 2 November 2015
+           DESCRIPTION
+              "Version 6: Added rcVrrpExtOperationsClearStats"
+
+
+           REVISION "201504020000Z" -- 07 Oct 2015
+           DESCRIPTION          
+              "Version 5: Added to Imports 
+                  Integer32                FROM SNMPv2-SMI
+                  TimeInterval             FROM SNMPv2-TC"
+
+
+	   REVISION "201504020000Z" -- 02 Apr 2015
+           DESCRIPTION          
+              "Version 4: Added rcVrrpExtOperationsMasterAdvInterval
+	      Requested by ristina Pauna/Toncea Doru (submit 23249) (Prem)"
+
+	   REVISION "201312190000Z" -- 19 Dec 2013
+           DESCRIPTION          
+              "Version 3: Added lowerPriorityAdvertizeReceived to
+	      rcVrrpExtTrapStateTransitionCause by ERS 7.2.10.1 "
+
+           REVISION "201008230000Z" -- 23 AUG 2010
+           DESCRIPTION          
+              "Versiob 3: Added rcVrrpExtOperationsGlobalIpAddr to rcVrrpExtOperationsTable."
+
+           REVISION "200906150000Z" -- 15 JUN 2009
+           DESCRIPTION          
+              "Versuib 2: Changed some MIB attributes from Unsigned32 to Integer32.
+               Also deleted rcVrrpExtOperationsGlobalIpAddr MIB attribute.
+               Now rcVrrpTmpAssociatedIpAddrTable is used for associated addresses
+               with VRRP."
+
+           REVISION "200903110000Z" -- 11 Mar 2009
+           DESCRIPTION 						
+            "Version 1 :Initial Draft.
+             This draft provides MIB support for the Virtual Router
+             Redundancy Protocol (VRRP) in both IPv4 and IPv6
+             environments that are Nortel specific."
+
+      
+           ::= { rcVrrpv3 2}    					
+
+      -- ---------------------------------------------------------------------
+      --  Vrrp 
+
+        rcVrrpExtObjects           OBJECT IDENTIFIER ::= { rcVrrpExtMib 1 }   
+        rcVrrpExtNotifications     OBJECT IDENTIFIER ::= { rcVrrpExtMib 2 }  
+    
+      -- ---------------------------------------------------------------------
+      -- Scalar Objects
+      -- ---------------------------------------------------------------------
+
+	rcVrrpExtScalars OBJECT IDENTIFIER ::= { rcVrrpExtObjects 1 }
+
+	rcVrrpExtPingVirtualAddrEnable  OBJECT-TYPE 
+            SYNTAX       TruthValue
+            MAX-ACCESS   read-write
+            STATUS       current
+	      DESCRIPTION
+              "Used to configure whether this device should respond to
+	       pings directed to a virtual router's IPv6 address."
+               DEFVAL { true }
+            ::= { rcVrrpExtScalars 1 }
+
+	rcVrrpExtVersionNumber OBJECT-TYPE
+            SYNTAX          INTEGER { version3(3) }           
+	      MAX-ACCESS      read-only
+            STATUS          current
+	      DESCRIPTION     "The version number of Vrrp for IPv6 is 3."
+	      ::= { rcVrrpExtScalars 2 }
+
+	rcVrrpExtTrapStateTransitionType OBJECT-TYPE
+            SYNTAX   INTEGER {
+	    		none(1),
+			masterToBackup(2),
+			backupToMaster(3),
+			initializeToMaster(4),
+			masterToInitialize(5),
+			initializeToBackup(6),
+			backupToInitialize(7)
+    		}
+	    	MAX-ACCESS   read-only
+	    	STATUS       current
+	    	DESCRIPTION  
+                   "Potential types of state transitions.Used by 
+                    rcVrrpv3TrapStateTransition trap."
+	      ::= { rcVrrpExtScalars 3 }
+
+	rcVrrpExtTrapStateTransitionCause OBJECT-TYPE
+             SYNTAX        INTEGER {
+        		  none(1), 
+		        higherPriorityAdvertizeReceived(2),
+		        shutdownReceived(3),
+		        rcVrrpAddrAndPhysicalAddrMatch(4),
+		        masterDownInterval(5),
+		        preempted(6),
+			lowerPriorityAdvertizeReceived(7)
+    		}
+	     MAX-ACCESS   read-only
+    	     STATUS       current
+	     DESCRIPTION  
+               "Potential types of causes that will generate a 
+                rcVrrpExtTrapStateTransition trap."
+	     ::= { rcVrrpExtScalars 4 }
+
+      rcVrrpExtOperationsVrId OBJECT-TYPE
+          SYNTAX       VrId
+          MAX-ACCESS   read-only
+          STATUS       current
+          DESCRIPTION
+              "This object contains the Virtual Router Identifier
+               (VRID).This is used in rcVrrpExtTrapStateTransition trap."
+          ::= { rcVrrpExtScalars 5 }
+
+
+	--   Trap Definitions
+
+	rcVrrpExtTrapStateTransition NOTIFICATION-TYPE
+        	OBJECTS      { ifIndex,
+                	       rcVrrpExtTrapStateTransitionType,
+                       	       rcVrrpExtTrapStateTransitionCause,
+	             	       rcVrrpExtOperationsVrId,
+                               rcVrrpTmpOperationsPrimaryIpAddr,           
+	                       rcVrrpTmpOperationsMasterIpAddr
+                }
+	      STATUS       current
+        	DESCRIPTION
+                  "A rcVrrpExtTrapStateTransition trap signifies a state
+	           transition has occurred on a particular vrrp interface.
+	           Implementation of this trap is optional."
+	      ::= { rcVrrpExtNotifications 1 }
+
+	-- ---------------------------------------------------------------------
+        --
+        --  Vrrp Ext Operations Table
+        --
+        -- ---------------------------------------------------------------------
+       
+        rcVrrpExtOperations     OBJECT IDENTIFIER ::= { rcVrrpExtMib 3}
+
+        rcVrrpExtOperationsTable OBJECT-TYPE
+           SYNTAX       SEQUENCE OF RcVrrpExtOperationsEntry
+           MAX-ACCESS   not-accessible
+           STATUS       current
+           DESCRIPTION  
+              "Unified Operations table for a VRRP router which consists of
+               a sequence (i.e., one or more conceptual rows) of
+               'rcVrrpExtOperationsEntry'and 'rcVrrpTmpOperationsEntry' items
+               which describe the operational characteristics of a virtual
+               router.
+               This table is an extention of 'rcVrrpTmpOperationsTable'.It
+               contains the mib objects that are Nortel specific." 
+           ::= { rcVrrpExtOperations 11 }
+
+        rcVrrpExtOperationsEntry OBJECT-TYPE
+            SYNTAX       RcVrrpExtOperationsEntry
+            MAX-ACCESS   not-accessible
+            STATUS       current
+            DESCRIPTION
+               "An entry in the rcVrrpExtOperationsTable containing the
+                operational characteristics of a virtual router.  On a
+                VRRP router, a given virtual router is identified by a
+                combination of the IP version, VRID and ifIndex.
+                ifIndex represents a physical interface of the router.
+                Note that rows in this table can be distinguished on a
+                multi-stacked device running VRRP over IPv4 and
+                IPv6 on the same physical interface.
+                Rows in the table cannot be modified unless the value
+                of 'rcVrrpTmpOperationsState' has transitioned to
+                'initialize'."
+           AUGMENTS    { rcVrrpTmpOperationsEntry }
+           ::= { rcVrrpExtOperationsTable 1 }
+
+       RcVrrpExtOperationsEntry ::=
+           SEQUENCE {
+            rcVrrpExtOperationsAction  		             INTEGER,   
+            rcVrrpExtOperationsBackUpMaster                  INTEGER,
+            rcVrrpExtOperationsBackUpMasterState             INTEGER,
+            rcVrrpExtOperationsCriticalIpAddr                InetAddress,    
+            rcVrrpExtOperationsCriticalIpAddrEnabled         TruthValue,
+            rcVrrpExtOperationsControl                       INTEGER,
+            rcVrrpExtOperationsHoldDownTimer                 Integer32,
+            rcVrrpExtOperationsHoldDownState                 INTEGER,
+            rcVrrpExtOperationsHoldDownTimeRemaining         Integer32,
+            rcVrrpExtOperationsFasterAdvInterval             Integer32,
+            rcVrrpExtOperationsFasterAdvIntervalEnabled      TruthValue,
+            rcVrrpExtOperationsLinkLocalAddr	             InetAddress,
+	    rcVrrpExtOperationsGlobalIpAddr                  InetAddress,
+	    rcVrrpExtOperationsMasterAdvInterval             TimeInterval,
+            rcVrrpExtOperationsClearStats                    TruthValue
+            
+           }
+
+	rcVrrpExtOperationsAction OBJECT-TYPE
+        	SYNTAX       INTEGER {
+                	        none(1),
+                        	preemptHoldDownTimer(2)
+                       	}
+	      MAX-ACCESS   read-create
+              STATUS     current
+	      DESCRIPTION
+            	 "Used to trigger an action on this vrrp interface."
+	      ::= { rcVrrpExtOperationsEntry 1 }
+
+	rcVrrpExtOperationsBackUpMaster OBJECT-TYPE
+	      SYNTAX      INTEGER {
+                          enabled(1),
+                	  disabled(2)
+                     	}
+              MAX-ACCESS   read-create
+              STATUS       current
+              DESCRIPTION  
+                  "Enable the backup VRRP switch traffic forwarding.
+        	   This will reduce the traffic in IST link in the 
+                   time of SMLT."
+	      DEFVAL       { disabled }
+              ::= { rcVrrpExtOperationsEntry 2 }
+
+        rcVrrpExtOperationsBackUpMasterState OBJECT-TYPE
+              SYNTAX       INTEGER {
+                 	        up(1),
+                                down(2)
+                     	}
+	      MAX-ACCESS   read-only
+              STATUS       current
+	      DESCRIPTION 
+                  "Indicate whether backup VRRP switch traffic 
+                   forwarding is enabled or not."
+              DEFVAL       { down }
+	      ::= { rcVrrpExtOperationsEntry 3 }
+
+	rcVrrpExtOperationsCriticalIpAddr OBJECT-TYPE
+            SYNTAX       InetAddress
+            MAX-ACCESS   read-create
+            STATUS       current
+	    DESCRIPTION  
+                  "IP address of the interface that will cause a
+                   shutdown event.Only IPv6 address is supported as of now."
+	    ::= { rcVrrpExtOperationsEntry 4 }
+	
+       rcVrrpExtOperationsCriticalIpAddrEnabled OBJECT-TYPE
+           SYNTAX       TruthValue
+	   MAX-ACCESS   read-create
+           STATUS       current
+	   DESCRIPTION
+              "Indicate if an user-defined critical IP address should be
+               enabled. 'NO' = use the default IP address (::).
+               No effect if an user-defined IP address does not exist."
+           DEFVAL       { false }
+           ::= { rcVrrpExtOperationsEntry 5 }
+
+      rcVrrpExtOperationsControl OBJECT-TYPE
+            SYNTAX       INTEGER {
+		         enabled(1),
+		         disabled(2)
+        		}
+	    MAX-ACCESS   read-create
+            STATUS       current
+            DESCRIPTION
+	           "This object will enable/disable the virtual router
+	            function. Setting the value to 'enabled', will transition
+	            the state of the router from 'initialize to 'backup';
+	            Setting the value to 'disabled', will tranisition the
+	            router from 'master' or 'backup' to 'initialize'."
+            DEFVAL    { enabled }
+            ::= { rcVrrpExtOperationsEntry 6 }
+
+	rcVrrpExtOperationsHoldDownTimer OBJECT-TYPE
+              SYNTAX       Integer32 (0..21600)
+	      UNITS        "seconds"
+	      MAX-ACCESS   read-create
+              STATUS       current
+	      DESCRIPTION  
+        	 "Used to configure the amount of time (in seconds)
+            	  to wait before preempting the current vrrp master."
+	      DEFVAL    { 0 }
+              ::= { rcVrrpExtOperationsEntry 7 }
+
+	rcVrrpExtOperationsHoldDownState OBJECT-TYPE
+             SYNTAX       INTEGER {
+                	  dormant(1),
+                          active(2)
+                     	}
+            MAX-ACCESS   read-only
+            STATUS       current
+	    DESCRIPTION   
+                "Used to indicate the hold-down state of this vrrp
+            	 interface.  If the hold-down timer is operational
+            	 this variable will be set to 'active'.  'dormant'
+            	 otherwise."
+	    ::= { rcVrrpExtOperationsEntry 8 }
+
+	rcVrrpExtOperationsHoldDownTimeRemaining OBJECT-TYPE
+	     SYNTAX       Integer32 (0..21600)
+             UNITS        "seconds"
+             MAX-ACCESS   read-only
+	     STATUS       current
+             DESCRIPTION   
+	          "Used to indicate the amount of time (in seconds) left
+                  before the rcVrrpExtOperationsHoldDownTimer will expire."
+	      ::= { rcVrrpExtOperationsEntry 9 }
+
+	rcVrrpExtOperationsFasterAdvInterval OBJECT-TYPE
+             SYNTAX       Integer32 (200..1000)
+             MAX-ACCESS   read-create
+	     STATUS       current
+             DESCRIPTION   
+                  "This is the faster advertisement interval, in milliseconds,
+                   between sending advertisement messages. When the faster 
+		   advertisement interval enable is checked, the faster 
+                   advertisement interval is being used instead of the regular
+                   advertisement interval."
+        	DEFVAL       { 200 }
+	        ::= { rcVrrpExtOperationsEntry 10 }
+
+	rcVrrpExtOperationsFasterAdvIntervalEnabled OBJECT-TYPE
+	     SYNTAX       TruthValue
+             MAX-ACCESS   read-create
+             STATUS       current
+	     DESCRIPTION   
+                 "Used to indicate if the Faster Advertisement Interval 
+                  should be used.'Disable' means use regular Advertisement
+                  interval."
+	     DEFVAL       { false }
+	     ::= { rcVrrpExtOperationsEntry 11 }
+
+	rcVrrpExtOperationsLinkLocalAddr OBJECT-TYPE
+             SYNTAX       InetAddress
+             MAX-ACCESS   read-create
+	     STATUS       current
+             DESCRIPTION
+                  "The assigned  Linklocal addresses to the  virtual
+                   router interface. This mib object support only IPv6
+                   address as of now."
+	      ::= { rcVrrpExtOperationsEntry 12 }
+
+        rcVrrpExtOperationsGlobalIpAddr OBJECT-TYPE  
+	    SYNTAX       InetAddress
+	    MAX-ACCESS   read-create
+	    STATUS       current
+	    DESCRIPTION
+		 "The assigned Global addresses to the  virtual router 
+		 interface. This mib object support only IPv6 address
+		 as of now."
+	    ::= { rcVrrpExtOperationsEntry 13 }
+
+	rcVrrpExtOperationsMasterAdvInterval OBJECT-TYPE
+	    SYNTAX       TimeInterval
+	    UNITS        "milliseconds"
+	    MAX-ACCESS   read-only
+	    STATUS       current
+	    DESCRIPTION
+		"This is the Advertisement Interval contained in advertisements
+		received from the Master. This value is saved by virtual
+		routers in the Backup state and is used to compute Skew_time
+		and Master_Down_Interval. The initial value is the same as
+		Advertisement_Interval. It is measured in milliseconds."
+	    REFERENCE "RFC 5798 section 6.1"
+	    ::= { rcVrrpExtOperationsEntry 14 }
+
+       rcVrrpExtOperationsClearStats OBJECT-TYPE
+            SYNTAX       TruthValue
+            MAX-ACCESS   read-create
+            STATUS       current
+            DESCRIPTION  
+                "Clear VRRPv3 statistics for a given virtual router"
+            DEFVAL        { false } 
+            ::= { rcVrrpExtOperationsEntry 15 }
+
+END
+

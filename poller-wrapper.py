@@ -6,7 +6,7 @@
 
  @package    observium
  @subpackage poller
- @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2022 Observium Limited
+ @copyright  (C) 2013-2014 Job Snijders, (C) 2014-2023 Observium Limited
 """
 
 """

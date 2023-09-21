@@ -507,7 +507,8 @@ TmnxBsxExprSubStringType         ::= TEXTUAL-CONVENTION
              rtmpSwfHost        - RTMP SWF (Shock Wave Flash) host substring
              rtmpSwfUri         - RTMP SWF URI substring
              rtmpTcHost         - RTMP TC (Target Content) host substring
-             rtmpTcUri          - RTMP TC URI substring"
+             rtmpTcUri          - RTMP TC URI substring
+             dnsDomainName      - DNS domain name substring"
     SYNTAX      INTEGER {
         none            (0),
         httpHost        (1),
@@ -529,7 +530,8 @@ TmnxBsxExprSubStringType         ::= TEXTUAL-CONVENTION
         rtmpSwfHost     (17),
         rtmpSwfUri      (18),
         rtmpTcHost      (19),
-        rtmpTcUri       (20)
+        rtmpTcUri       (20),
+        dnsDomainName   (21)
     }
 
 TmnxBsxExprSubString             ::= TEXTUAL-CONVENTION
@@ -821,6 +823,23 @@ TmnxBsxAaSubStatsInterval        ::= TEXTUAL-CONVENTION
         unknown  (0),
         realtime (1),
         snapshot (2)
+    }
+
+TmnxBsxUrlFilterDefaultAction    ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "TmnxBsxUrlFilterDefaultAction specifies the default action to take
+         when the associated URL filter type (deny-list, icap, or web service)
+         is out of service.
+
+         The default actions are:
+         'allow'               - allow all requests.
+         'blockRedirectHttp'   - block and redirect requests.
+         'blockAll'            - block all requests."
+    SYNTAX      INTEGER {
+        allow             (0),
+        blockHttpRedirect (1),
+        blockAll          (2)
     }
 
 TmnxBsxAaSubAcctLossReason       ::= TEXTUAL-CONVENTION
@@ -1261,14 +1280,17 @@ TmnxBsxUrlListFlags              ::= TEXTUAL-CONVENTION
             switchOverError(4)        - CPM activity switch has occurred during
                                         a URL list upgrade
             tooManyChars(5)           - number of characters in file exceeds
-                                        limit"
+                                        limit
+            tooManyHostExprUrls(6)      - number of host expression URLs in
+                                          the file exceed the limit"
     SYNTAX      BITS {
-        adminDown         (0),
-        fileDoesNotExist  (1),
-        invalidFileFormat (2),
-        tooManyUrls       (3),
-        switchOverError   (4),
-        tooManyChars      (5)
+        adminDown           (0),
+        fileDoesNotExist    (1),
+        invalidFileFormat   (2),
+        tooManyUrls         (3),
+        switchOverError     (4),
+        tooManyChars        (5),
+        tooManyHostExprUrls (6)
     }
 
 TmnxBsxSessionFilterAction       ::= TEXTUAL-CONVENTION
@@ -1499,6 +1521,7 @@ TmnxBsxIsaAaGrpEntry             ::= SEQUENCE
     tmnxBsxIsaAaGrpUnassEsmMacSubs   Gauge32,
     tmnxBsxIsaAaGrpOvrldSubQuarAdmin TmnxAdminState,
     tmnxBsxIsaAaGrpFlowAttributes    TmnxEnabledDisabled,
+    tmnxBsxIsaAaGrpVmTrafficDistByIp TmnxEnabledDisabled,
     tmnxBsxIsaAaGrpSRWebServCachSize Unsigned32,
     tmnxBsxIsaAaGrpGtpTunnelDb       Unsigned32,
     tmnxBsxIsaAaGrpVmTrafficDistTeid TmnxEnabledDisabled
@@ -1859,20 +1882,21 @@ tmnxBsxIsaAaGrpUnassignedTIpSubs OBJECT-TYPE
 
 tmnxBsxIsaAaGrpAaSubScale        OBJECT-TYPE
     SYNTAX      INTEGER {
-        residential         (0),
-        vpn                 (1),
-        mobileGateway       (2),
-        lightweightInternet (3),
-        residential8k       (4),
-        residential16k      (5),
-        residential32k      (6),
-        residential64k      (7),
-        vpn1k               (8),
-        vpn2k               (9),
-        vpn4k               (10),
-        vpn8k               (11),
-        mobileGateway1M     (12),
-        mobileGateway2M     (13)
+        residential             (0),
+        vpn                     (1),
+        mobileGateway           (2),
+        lightweightInternet     (3),
+        residential8k           (4),
+        residential16k          (5),
+        residential32k          (6),
+        residential64k          (7),
+        vpn1k                   (8),
+        vpn2k                   (9),
+        vpn4k                   (10),
+        vpn8k                   (11),
+        mobileGateway1M         (12),
+        mobileGateway2M         (13),
+        lightweightInternet512k (14)
     }
     MAX-ACCESS  read-create
     STATUS      current
@@ -1908,6 +1932,8 @@ tmnxBsxIsaAaGrpAaSubScale        OBJECT-TYPE
                                       with 1000000 subscribers
             mobileGateway2M    (13) - scaling limits for mobile gateway
                                       with 2000000 subscribers
+            lightweightInternet512k (14) - scaling limits for lightweight internet
+                                      with 524288 subscribers
          Values larger than 'lightweightInternet (3)' can only be set on a
          Virtual Service Router (VSR).
          tmnxBsxIsaAaGrpAaSubScale can only be set during row creation."
@@ -2114,6 +2140,17 @@ tmnxBsxIsaAaGrpFlowAttributes    OBJECT-TYPE
          the tmnxBsxIsaAaGrpFlowAttrTable."
     DEFVAL      { disabled }
     ::= { tmnxBsxIsaAaGrpEntry 47 }
+
+tmnxBsxIsaAaGrpVmTrafficDistByIp OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxIsaAaGrpVmTrafficDistByIp specifies whether the
+         packets IP addresses will be included in the traffic distribution
+         mechanism."
+    DEFVAL      { disabled }
+    ::= { tmnxBsxIsaAaGrpEntry 48 }
 
 tmnxBsxIsaAaGrpSRWebServCachSize OBJECT-TYPE
     SYNTAX      Unsigned32 (0..100)
@@ -9173,7 +9210,8 @@ tmnxBsxPolicerRatePercentage     OBJECT-TYPE
         "The value of tmnxBsxPolicerRatePercentage specifies the percentage of
          the non-congested access network location rate used to police ANL.
 
-         tmnxBsxPolicerRatePercentage is meaningful only in when the value of
+         tmnxBsxPolicerRatePercentage is meaningful only when the value of
+         policer type is set to 'singleBucketBandwidth (1)' and the value of
          policer granularity is set to 'accessNetworkLocation (3)'."
     DEFVAL      { -1 }
     ::= { tmnxBsxPolicerEntry 16 }
@@ -9504,7 +9542,7 @@ tmnxBsxFlowFullLowWatermark      OBJECT-TYPE
     ::= { tmnxBsxInfo 2 }
 
 tmnxBsxFlowSetupHighWatermark    OBJECT-TYPE
-    SYNTAX      Integer32 (-1 | 1..800000)
+    SYNTAX      Integer32 (-1 | 1..2000000)
     UNITS       "flows per second"
     MAX-ACCESS  read-write
     STATUS      current
@@ -9519,7 +9557,7 @@ tmnxBsxFlowSetupHighWatermark    OBJECT-TYPE
     ::= { tmnxBsxInfo 3 }
 
 tmnxBsxFlowSetupLowWatermark     OBJECT-TYPE
-    SYNTAX      Integer32 (0..799999)
+    SYNTAX      Integer32 (0..1999999)
     UNITS       "flows per second"
     MAX-ACCESS  read-write
     STATUS      current
@@ -9532,7 +9570,7 @@ tmnxBsxFlowSetupLowWatermark     OBJECT-TYPE
     ::= { tmnxBsxInfo 4 }
 
 tmnxBsxPacketRateHighWatermark   OBJECT-TYPE
-    SYNTAX      Integer32 (-1 | 1..59523808)
+    SYNTAX      Integer32 (-1 | 1..148809524)
     UNITS       "packets per second"
     MAX-ACCESS  read-write
     STATUS      current
@@ -9547,7 +9585,7 @@ tmnxBsxPacketRateHighWatermark   OBJECT-TYPE
     ::= { tmnxBsxInfo 5 }
 
 tmnxBsxPacketRateLowWatermark    OBJECT-TYPE
-    SYNTAX      Integer32 (0..59523807)
+    SYNTAX      Integer32 (0..148809523)
     UNITS       "packets per second"
     MAX-ACCESS  read-write
     STATUS      current
@@ -9560,7 +9598,7 @@ tmnxBsxPacketRateLowWatermark    OBJECT-TYPE
     ::= { tmnxBsxInfo 6 }
 
 tmnxBsxBitRateHighWatermark      OBJECT-TYPE
-    SYNTAX      Integer32 (-1 | 1..40000)
+    SYNTAX      Integer32 (-1 | 1..100000)
     UNITS       "megabps"
     MAX-ACCESS  read-write
     STATUS      current
@@ -9575,7 +9613,7 @@ tmnxBsxBitRateHighWatermark      OBJECT-TYPE
     ::= { tmnxBsxInfo 7 }
 
 tmnxBsxBitRateLowWatermark       OBJECT-TYPE
-    SYNTAX      Integer32 (0..39999)
+    SYNTAX      Integer32 (0..99999)
     UNITS       "megabps"
     MAX-ACCESS  read-write
     STATUS      current
@@ -12916,6 +12954,100 @@ tmnxBsxWebUrlCategSetRowLastChg  OBJECT-TYPE
          since system startup, a successful set was performed on this row."
     ::= { tmnxBsxWebUrlCategorySetEntry 4 }
 
+tmnxBsxUrlFltrWSClassOvrdTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxBsxUrlFltrWSClassOvrdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxBsxUrlFltrWSClassOvrdTable contains the URL filter web
+         service classification override configuration."
+    ::= { tmnxBsxAqpObjs 11 }
+
+tmnxBsxUrlFltrWSClassOvrdEntry   OBJECT-TYPE
+    SYNTAX      TmnxBsxUrlFltrWSClassOvrdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each tmnxBsxUrlFltrWSClassOvrdEntry specifies a a URL filter Web
+         Service classification override entry."
+    INDEX       {
+        tmnxBsxIsaAaGroupIndex,
+        tmnxBsxUrlFilterName,
+        tmnxBsxUrlFltrWSClassOvrdEntryId
+    }
+    ::= { tmnxBsxUrlFltrWSClassOvrdTable 1 }
+
+TmnxBsxUrlFltrWSClassOvrdEntry   ::= SEQUENCE
+{
+    tmnxBsxUrlFltrWSClassOvrdEntryId Unsigned32,
+    tmnxBsxUrlFltWSClassOvrdRowSt    RowStatus,
+    tmnxBsxUrlFltWSClassOvrdUrlExpr  TmnxBsxExprSubString,
+    tmnxBsxUrlFltWSClassOvrdUrlCateg TmnxBsxWebServiceCategoryId,
+    tmnxBsxUrlFltWSClassOvrdLstChg   TimeStamp,
+    tmnxBsxUrlFltWSClassOvrdCategNam TNamedItem
+}
+
+tmnxBsxUrlFltrWSClassOvrdEntryId OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..65535)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrWSClassOvrdEntryId specifies the web
+         service classification override entry index."
+    ::= { tmnxBsxUrlFltrWSClassOvrdEntry 1 }
+
+tmnxBsxUrlFltWSClassOvrdRowSt    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltWSClassOvrdRowSt specifies
+         the row status.  It allows entries to be created
+         and deleted in the tmnxBsxUrlFltrWSClassOvrdTable.
+
+         Rows are created by specifying the value of 'createAndGo (4)', and
+         deleted by specifying the value of 'destroy (6)'."
+    ::= { tmnxBsxUrlFltrWSClassOvrdEntry 2 }
+
+tmnxBsxUrlFltWSClassOvrdUrlExpr  OBJECT-TYPE
+    SYNTAX      TmnxBsxExprSubString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltWSClassOvrdUrlExpr specifies the URL
+         expression that will be overriden to a category."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFltrWSClassOvrdEntry 3 }
+
+tmnxBsxUrlFltWSClassOvrdUrlCateg OBJECT-TYPE
+    SYNTAX      TmnxBsxWebServiceCategoryId
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltWSClassOvrdUrlCateg specifies the web
+         service category assocaited with the URL expression indicated in
+         tmnxBsxUrlFltWSClassOvrdUrlExpr."
+    DEFVAL      { 0 }
+    ::= { tmnxBsxUrlFltrWSClassOvrdEntry 4 }
+
+tmnxBsxUrlFltWSClassOvrdLstChg   OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltWSClassOvrdLstChg indicates the last time,
+         since system startup, a successful set was performed on this row."
+    ::= { tmnxBsxUrlFltrWSClassOvrdEntry 5 }
+
+tmnxBsxUrlFltWSClassOvrdCategNam OBJECT-TYPE
+    SYNTAX      TNamedItem
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltWSClassOvrdCategNam indicates the name of
+         the category."
+    ::= { tmnxBsxUrlFltrWSClassOvrdEntry 6 }
+
 tmnxBsxAnlTable                  OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxAnlEntry
     MAX-ACCESS  not-accessible
@@ -13007,8 +13139,10 @@ tmnxBsxAnlRttThresholdTolerance  OBJECT-TYPE
     MAX-ACCESS  read-create
     STATUS      current
     DESCRIPTION
-        "The value of tmnxBsxAnlRttThresholdTolerance specifies the ANL
-         threshold tolerance.
+        "The value of tmnxBsxAnlRttThresholdTolerance specifies the percentage
+         of RTT samples (number of excessive RTT samples / total RTT samples)
+         in a collection period that is considered tolerable and does not
+         trigger a congestion event.
 
          tmnxBsxAnlRttThresholdTolerance is applicable only when the value of
          tmnxBsxAnlRttThreshold is non-zero."
@@ -13351,8 +13485,10 @@ tmnxBsxSubRttThresholdTolerance  OBJECT-TYPE
     MAX-ACCESS  read-create
     STATUS      current
     DESCRIPTION
-        "The value of tmnxBsxSubRttThresholdTolerance specifies the AA
-         subscriber threshold  tolerance.
+        "The value of tmnxBsxSubRttThresholdTolerance specifies the percentage
+         of RTT samples (number of excessive RTT samples / total RTT samples)
+         in a collection period that is considered tolerable and does not
+         trigger a congestion event.
 
          tmnxBsxSubRttThresholdTolerance is applicable only when the value of
          tmnxBsxSubRttThreshold is non-zero."
@@ -16107,7 +16243,8 @@ TmnxBsxUrlListStatusEntry        ::= SEQUENCE
     tmnxBsxUrlListStatusUrlAttempted TmnxDisplayStringURL,
     tmnxBsxUrlListStatusIsCfgUrlDpld TruthValue,
     tmnxBsxUrlListStatusNumChars     Gauge32,
-    tmnxBsxUrlListStatusUpgInProgres TruthValue
+    tmnxBsxUrlListStatusUpgInProgres TruthValue,
+    tmnxBsxUrlListRegExprNumEntries  Gauge32
 }
 
 tmnxBsxUrlListStatusOperState    OBJECT-TYPE
@@ -16273,6 +16410,16 @@ tmnxBsxUrlListStatusUpgInProgres OBJECT-TYPE
          the most recent URL list upgrade. A value of 'true (1)' indicates the
          upgrade is in progress and a value of 'false (2)' indicates otherwise."
     ::= { tmnxBsxUrlListStatusEntry 14 }
+
+tmnxBsxUrlListRegExprNumEntries  OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlListRegExprNumEntries indicates the number of
+         host expression entries in the URL list, which were retrieved from the
+         specified tmnxBsxUrlListFileUrl."
+    ::= { tmnxBsxUrlListStatusEntry 15 }
 
 tmnxBsxGtpStatsTable             OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxGtpStatsEntry
@@ -19127,7 +19274,9 @@ TmnxBsxCflowdEntry               ::= SEQUENCE
     tmnxBsxCflowdTemplateRetransmit  Unsigned32,
     tmnxBsxCflowdDirectExportVlan    VlanIdOrNone,
     tmnxBsxCflowdExpOvdMode          TmnxBsxCflowdExpOvdMode,
-    tmnxBsxCflowdExpOvdPrefix        SnmpAdminString
+    tmnxBsxCflowdExpOvdPrefix        SnmpAdminString,
+    tmnxBsxCflowdAes128EncrptKey     OCTET STRING,
+    tmnxBsxCflowdAes256EncrptKey     OCTET STRING
 }
 
 tmnxBsxCflowdRowLastChange       OBJECT-TYPE
@@ -19209,6 +19358,32 @@ tmnxBsxCflowdExpOvdPrefix        OBJECT-TYPE
          to the non-default value."
     DEFVAL      { "" }
     ::= { tmnxBsxCflowdEntry 7 }
+
+tmnxBsxCflowdAes128EncrptKey     OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0|16))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxCflowdAes128EncrptKey specifies the AES-128 key to
+         enrypt cflowd fields that are defined to be AES-128 encrypted fields
+         before tranmitting from the SR router to a configured collector.
+
+         This value is write-only and will appear empty when reading from SNMP."
+    DEFVAL      { ''H }
+    ::= { tmnxBsxCflowdEntry 8 }
+
+tmnxBsxCflowdAes256EncrptKey     OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0|32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxCflowdAes256EncrptKey specifies the AES-256 key to
+         enrypt cflowd fields that are defined to be AES-256 encrypted before
+         tranmitting from the SR router to a configured collector.
+
+         This value is write-only and will appear empty when reading from SNMP."
+    DEFVAL      { ''H }
+    ::= { tmnxBsxCflowdEntry 9 }
 
 tmnxBsxCflowdCollTable           OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxCflowdCollEntry
@@ -20494,7 +20669,8 @@ TmnxBsxTransitIpPolicyEntry      ::= SEQUENCE
     tmnxBsxTransitIpPolicyAutoCreate TmnxEnabledDisabled,
     tmnxBsxTransitIpPolicySeenIpRad  TNamedItemOrEmpty,
     tmnxBsxTransitIpPolicyDiameter   TmnxEnabledDisabled,
-    tmnxBsxTransitIpPolicyDiamAppPlc TNamedItemOrEmpty
+    tmnxBsxTransitIpPolicyDiamAppPlc TNamedItemOrEmpty,
+    tmnxBsxTransitIpPolicyAutoInact  TmnxEnabledDisabled
 }
 
 tmnxBsxTransitIpPolicyId         OBJECT-TYPE
@@ -20758,6 +20934,21 @@ tmnxBsxTransitIpPolicyDiamAppPlc OBJECT-TYPE
          (1)'."
     DEFVAL      { "" }
     ::= { tmnxBsxTransitIpPolicyEntry 18 }
+
+tmnxBsxTransitIpPolicyAutoInact  OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxTransitIpPolicyAutoInact specifies whether
+         transit subscribers will be monitored for inactivity.  When
+         tmnxBsxTransitIpPolicySeenIp, tmnxBsxTransitIpPolicyAutoCreate and
+         tmnxBsxTransitIpPolicyAutoInact are set, auto-created transit
+         subscribers will be monitored for inactivity and inactive subscribers
+         will be removed. To change this object,
+         tmnxBsxTransitIpPolicyAutoCreate must be  disabled."
+    DEFVAL      { disabled }
+    ::= { tmnxBsxTransitIpPolicyEntry 19 }
 
 tmnxBsxTransitIpPolicySubTable   OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxTransitIpPolicySubEntry
@@ -24580,6 +24771,16 @@ tmnxBsxUrlFltrWsCatListLastCTime OBJECT-TYPE
          tmnxBsxUrlFltWebSerCategoryTable caused a value to change."
     ::= { tmnxBsxUrlFilterScalars 5 }
 
+tmnxBsxUrlFltrWsClasOvrLastCTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrWsClasOvrLastCTime indicates the last time,
+         since system startup, a successful SNMP set on
+         tmnxBsxUrlFltrWSClassOvrdTable  caused a value to change."
+    ::= { tmnxBsxUrlFilterScalars 6 }
+
 tmnxBsxUrlFilterTable            OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxUrlFilterEntry
     MAX-ACCESS  not-accessible
@@ -24624,7 +24825,15 @@ TmnxBsxUrlFilterEntry            ::= SEQUENCE
     tmnxBsxUrlFltrWebServDnsAddr     InetAddress,
     tmnxBsxUrlFltrWebServDefaultProf TNamedItemOrEmpty,
     tmnxBsxUrlFilterWebServPortVlan  VlanIdOrNone,
-    tmnxBsxUrlFltrWebServCategSetId  TmnxBsxWebServCategorySetId
+    tmnxBsxUrlFltrWebServCategSetId  TmnxBsxWebServCategorySetId,
+    tmnxBsxUrlFilterIcapDefAction    TmnxBsxUrlFilterDefaultAction,
+    tmnxBsxUrlFilterIcapDefHttpRedir TNamedItemOrEmpty,
+    tmnxBsxUrlFilterIcapHttpRedirObj TNamedItemOrEmpty,
+    tmnxBsxUrlFilterWebDefAction     TmnxBsxUrlFilterDefaultAction,
+    tmnxBsxUrlFilterWebDefHttpRedir  TNamedItemOrEmpty,
+    tmnxBsxUrlFilterWebSerHttpRedir  TNamedItemOrEmpty,
+    tmnxBsxUrlFilterUrlAllowList     TNamedItemOrEmpty,
+    tmnxBsxUrlFltrApplyFuncBehavior  TruthValue
 }
 
 tmnxBsxUrlFilterName             OBJECT-TYPE
@@ -24840,6 +25049,148 @@ tmnxBsxUrlFltrWebServCategSetId  OBJECT-TYPE
          category set Id."
     DEFVAL      { 0 }
     ::= { tmnxBsxUrlFilterEntry 18 }
+
+tmnxBsxUrlFilterIcapDefAction    OBJECT-TYPE
+    SYNTAX      TmnxBsxUrlFilterDefaultAction
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterIcapDefAction specifies the default
+         action to take when the ICAP server is out of service.
+
+         A tmnxBsxUrlFilterIcapDefHttpRedir must be specified if
+         tmnxBsxUrlFilterIcapDefAction has a value of 'blockRedirectHttp(1)'.
+
+         This object can be changed when ICAP is configured (i.e.
+         tmnxBsxUrlFilterServicePortVlan is not the default value)."
+    DEFVAL      { blockAll }
+    ::= { tmnxBsxUrlFilterEntry 19 }
+
+tmnxBsxUrlFilterIcapDefHttpRedir OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterIcapDefHttpRedir specifies the HTTP
+         redirect that will be applied as defined in the tmnxBsxHttpRedirTable.
+         An empty value specifies no HTTP redirect.
+
+         A tmnxBsxUrlFilterIcapDefAction must have a value of
+         'blockHttpRedirect(1)' if tmnxBsxUrlFilterIcapDefHttpRedir is not an
+         empty string.
+
+         This object can be changed when ICAP is configured (i.e.
+         tmnxBsxUrlFilterServicePortVlan is not the default value)."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFilterEntry 20 }
+
+tmnxBsxUrlFilterIcapHttpRedirObj OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterIcapHttpRedirObj specifies the HTTP
+         redirect that will be applied when the ICAP server blocks an HTTP
+         request. This HTTP redirect must exist in the tmnxBsxHttpRedirTable.
+
+         An empty value specifies no HTTP redirect.
+
+         This object can be changed when ICAP is configured (i.e.
+         tmnxBsxUrlFilterServicePortVlan is not the default value)."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFilterEntry 21 }
+
+tmnxBsxUrlFilterWebDefAction     OBJECT-TYPE
+    SYNTAX      TmnxBsxUrlFilterDefaultAction
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterWebDefAction specifies the default action
+         to take when the web service is out of service.
+
+         A tmnxBsxUrlFilterWebDefHttpRedir must be specified if
+         tmnxBsxUrlFilterWebDefAction has a value of 'blockRedirectHttp(1)'.
+
+         This object can be changed when web service is configured (i.e.
+         tmnxBsxUrlFltrWebServClassifyId is not the default value)."
+    DEFVAL      { blockAll }
+    ::= { tmnxBsxUrlFilterEntry 22 }
+
+tmnxBsxUrlFilterWebDefHttpRedir  OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterWebDefHttpRedir specifies the HTTP
+         redirect because of web service that will be applied as defined in the
+         tmnxBsxHttpRedirTable. An empty value specifies no HTTP redirect.
+
+         A tmnxBsxUrlFilterWebDefAction must have a value of
+         'blockHttpRedirect(1)' if tmnxBsxUrlFilterWebDefHttpRedir is not an
+         empty string.
+
+         This object can be changed when web service is configured (i.e.
+         tmnxBsxUrlFltrWebServClassifyId is not set to the default value)."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFilterEntry 23 }
+
+tmnxBsxUrlFilterWebSerHttpRedir  OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterWebSerHttpRedir specifies the HTTP
+         redirect that will be applied when the web service blocks an HTTP
+         request. This HTTP redirect must exist in the tmnxBsxHttpRedirTable.
+
+         An empty value specifies no HTTP redirect.
+
+         This object can be changed when web service is configured (i.e.
+         tmnxBsxUrlFltrWebServClassifyId is not set to the default value)."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFilterEntry 24 }
+
+tmnxBsxUrlFilterUrlAllowList     OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterUrlAllowList specifies the local
+         filtering URL allow-list name, as defined in the tmnxBsxUrlListTable.
+
+         An empty value specifies no URL allow-list."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFilterEntry 25 }
+
+tmnxBsxUrlFltrApplyFuncBehavior  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrApplyFuncBehavior configures whether
+         function-specific or common url-filter level behaviours are applied.
+         This can be used to provide function specific feedback to users for
+         blocked URLs. It dictates the default action, default action HTTP
+         redirect, and  HTTP redirect that will be applied for all URL filter
+         function types (i.e. web-service, ICAP, or local filtering URL list).
+         When set to false, the default action  (or
+         tmnxBsxUrlFilterDefaultAction), the default action HTTP redirect (or
+         tmnxBsxUrlFilterHttpRedirName) and the HTTP redirect (or
+         tmnxBsxUrlFilterIcapHttpRedir) will be applied  on all configured URL
+         function types in this filter. When set to true, the forementioned
+         objects are ignored and each  URL filter function type will have its
+         own set  of default action, default action HTTP redirect and HTTP
+         redirect objects that will be applied for that function. For
+         web-service, the set of objects is  tmnxBsxUrlFilterWebDefAction,
+         tmnxBsxUrlFilterWebDefHttpRedir, and tmnxBsxUrlFilterWebSerHttpRedir
+         respectively. For ICAP the set of objects is
+         tmnxBsxUrlFilterIcapDefAction,  tmnxBsxUrlFilterIcapDefHttpRedir, and
+         tmnxBsxUrlFilterIcapHttpRedirObj respectively.  For local filtering
+         URL list the set of objects is tmnxBsxUrlFilterBlListDefAction,
+         tmnxBsxUrlFilterBlListDefHtRedir, and  tmnxBsxUrlFilterBlListHttpRedir
+         respectively."
+    DEFVAL      { false }
+    ::= { tmnxBsxUrlFilterEntry 26 }
 
 tmnxBsxIcapServerTable           OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxIcapServerEntry
@@ -25349,7 +25700,19 @@ TmnxBsxUrlFltrStatsEntry         ::= SEQUENCE
     tmnxBsxUrlFltrWebSvDnsOperFlags  BITS,
     tmnxBsxUrlFltrWebServCacheSize   Unsigned32,
     tmnxBsxUrlFltrWebSerStatCacheHit Counter64,
-    tmnxBsxUrlFltrWebSerStatCacheMis Counter64
+    tmnxBsxUrlFltrWebSerStatCacheMis Counter64,
+    tmnxBsxUrlFltrStatsWebSvRspAllow Counter64,
+    tmnxBsxUrlFltrStatsWebSvRspRedir Counter64,
+    tmnxBsxUrlFltrStatsWebSvRspBlock Counter64,
+    tmnxBsxUrlFltrStatsWebSvDefault  Counter64,
+    tmnxBsxUrlFltrStatsAllowListLkup Counter64,
+    tmnxBsxUrlFltrStatsAllowLstMatch Counter64,
+    tmnxBsxUrlFltrStatsUrlAllow      Counter64,
+    tmnxBsxUrlFltrStatsUrlBlockRedir Counter64,
+    tmnxBsxUrlFltrStatsUrlDefAction  Counter64,
+    tmnxBsxUrlFltrStatsIcapDefault   Counter64,
+    tmnxBsxUrlFltrStatsWSClassOvrHit Counter64,
+    tmnxBsxUrlFltrStatsWSClassOvrMis Counter64
 }
 
 tmnxBsxUrlFltrOperState          OBJECT-TYPE
@@ -25636,6 +25999,124 @@ tmnxBsxUrlFltrWebSerStatCacheMis OBJECT-TYPE
          configured url-filter classifier."
     ::= { tmnxBsxUrlFltrStatsEntry 26 }
 
+tmnxBsxUrlFltrStatsWebSvRspAllow OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsWebSvRspAllow indicates the number of
+         times the response from the web service server resulted to an 'allow'
+         action by the URL filter."
+    ::= { tmnxBsxUrlFltrStatsEntry 27 }
+
+tmnxBsxUrlFltrStatsWebSvRspRedir OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsWebSvRspRedir indicates the number of
+         times the response from the web service server resulted to an
+         'redirect' action by the URL filter."
+    ::= { tmnxBsxUrlFltrStatsEntry 28 }
+
+tmnxBsxUrlFltrStatsWebSvRspBlock OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsWebSvRspBlock indicates the number of
+         times the response from the web service server resulted to a 'block'
+         action by the URL filter."
+    ::= { tmnxBsxUrlFltrStatsEntry 29 }
+
+tmnxBsxUrlFltrStatsWebSvDefault  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsWebSvDefault indicates the number of
+         times the web service takes the default action due to the url filter's
+         inability to send the request to the web-service server or receiving a
+         malformed response from the web-service server."
+    ::= { tmnxBsxUrlFltrStatsEntry 30 }
+
+tmnxBsxUrlFltrStatsAllowListLkup OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsAllowListLkup indicates the number of
+         URL allow-list lookups."
+    ::= { tmnxBsxUrlFltrStatsEntry 31 }
+
+tmnxBsxUrlFltrStatsAllowLstMatch OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsAllowLstMatch indicates the number of
+         lookups that matched entries in the URL allow-list."
+    ::= { tmnxBsxUrlFltrStatsEntry 32 }
+
+tmnxBsxUrlFltrStatsUrlAllow      OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsUrlAllow indicates the total number of
+         URL lookup requests that resulted in an 'allow' action by the the last
+         filtering type  within the filter."
+    ::= { tmnxBsxUrlFltrStatsEntry 33 }
+
+tmnxBsxUrlFltrStatsUrlBlockRedir OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsUrlBlockRedir indicates the total
+         number of URL lookup requests that resulted in an action of 'redirect'
+         or 'block' by the the last filtering type  within the filter."
+    ::= { tmnxBsxUrlFltrStatsEntry 34 }
+
+tmnxBsxUrlFltrStatsUrlDefAction  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsUrlDefAction indicates the number of
+         times the url filter resulted in taking the default action by the last
+         filtering type within the filter."
+    ::= { tmnxBsxUrlFltrStatsEntry 35 }
+
+tmnxBsxUrlFltrStatsIcapDefault   OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsIcapDefault indicates the number of
+         times the ICAP filter takes the default action due to the url filter's
+         inability to send the request to an ICAP server or receiving a
+         malformed response from it."
+    ::= { tmnxBsxUrlFltrStatsEntry 36 }
+
+tmnxBsxUrlFltrStatsWSClassOvrHit OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsWSClassOvrHit indicates the number of
+         lookups that matched entries in the classification override entries."
+    ::= { tmnxBsxUrlFltrStatsEntry 37 }
+
+tmnxBsxUrlFltrStatsWSClassOvrMis OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrStatsWSClassOvrMis indicates the number of
+         lookups that missed entries in the classification override entries."
+    ::= { tmnxBsxUrlFltrStatsEntry 38 }
+
 tmnxBsxUrlFltrUrlListTable       OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxBsxUrlFltrUrlListEntry
     MAX-ACCESS  not-accessible
@@ -25672,7 +26153,10 @@ TmnxBsxUrlFltrUrlListEntry       ::= SEQUENCE
 {
     tmnxBsxUrlFltrUrlListName        TNamedItem,
     tmnxBsxUrlFltrUrlListRowStatus   RowStatus,
-    tmnxBsxUrlFltrUrlListRowLastCh   TimeStamp
+    tmnxBsxUrlFltrUrlListRowLastCh   TimeStamp,
+    tmnxBsxUrlFilterBlListDefAction  TmnxBsxUrlFilterDefaultAction,
+    tmnxBsxUrlFilterBlListDefHtRedir TNamedItemOrEmpty,
+    tmnxBsxUrlFilterBlListHttpRedir  TNamedItemOrEmpty
 }
 
 tmnxBsxUrlFltrUrlListName        OBJECT-TYPE
@@ -25680,8 +26164,8 @@ tmnxBsxUrlFltrUrlListName        OBJECT-TYPE
     MAX-ACCESS  not-accessible
     STATUS      current
     DESCRIPTION
-        "The value of tmnxBsxUrlFltrUrlListName specifies the URL list name, as
-         defined in the tmnxBsxUrlListTable."
+        "The value of tmnxBsxUrlFltrUrlListName specifies the URL deny-list
+         name, as defined in the tmnxBsxUrlListTable."
     ::= { tmnxBsxUrlFltrUrlListEntry 1 }
 
 tmnxBsxUrlFltrUrlListRowStatus   OBJECT-TYPE
@@ -25703,6 +26187,117 @@ tmnxBsxUrlFltrUrlListRowLastCh   OBJECT-TYPE
          since system startup, a successful SNMP set caused a value in this row
          to change."
     ::= { tmnxBsxUrlFltrUrlListEntry 3 }
+
+tmnxBsxUrlFilterBlListDefAction  OBJECT-TYPE
+    SYNTAX      TmnxBsxUrlFilterDefaultAction
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterBlListDefAction
+         specifies the default  action to take when this
+         URL deny-list is out of service."
+    DEFVAL      { blockAll }
+    ::= { tmnxBsxUrlFltrUrlListEntry 4 }
+
+tmnxBsxUrlFilterBlListDefHtRedir OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterBlListDefHtRedir specifies the HTTP
+         redirect that will be applied as defined in the tmnxBsxHttpRedirTable.
+         An empty value specifies no HTTP redirect.
+
+         A tmnxBsxUrlFilterBlListDefAction must have a value of
+         'blockHttpRedirect(1)' if tmnxBsxUrlFilterBlListDefHtRedir is not an
+         empty string."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFltrUrlListEntry 5 }
+
+tmnxBsxUrlFilterBlListHttpRedir  OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFilterBlListHttpRedir specifies the HTTP
+         redirect that will be applied when the local-filtering URL deny-list
+         blocks an HTTP request. This HTTP redirect must exist in the
+         tmnxBsxHttpRedirTable.
+
+         An empty value specifies no HTTP redirect."
+    DEFVAL      { "" }
+    ::= { tmnxBsxUrlFltrUrlListEntry 6 }
+
+tmnxBsxUrlFltrUrlListStatsTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxBsxUrlFltrUrlListStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxBsxUrlFltrUrlListStatsTable contains operational information
+         related to a particular URL deny-list associated with a particular URL
+         filter in an AA group."
+    ::= { tmnxBsxUrlFilterObjs 8 }
+
+tmnxBsxUrlFltrUrlListStatsEntry  OBJECT-TYPE
+    SYNTAX      TmnxBsxUrlFltrUrlListStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry represents the statistics for a particular AA URL filter
+         URL list.
+
+         An index with a valid URL Filter URL list (an existing row in
+         tmnxBsxUrlFltrUrlListTable) and tmnxChassisIndex set to one with a
+         zero value for each of tmnxBsxCardSlotEsaId and tmnxBsxMdaSlotEsaVmId
+         will return the summarized per group and URL Filter URL list
+         statistics.
+
+         Entries will appears in this table only for equipped ISA-AA MDAs
+         associated with an AA group, URL filter and URL list."
+    INDEX       {
+        tmnxBsxIsaAaGroupIndex,
+        tmnxBsxUrlFilterName,
+        tmnxBsxUrlFltrUrlListName,
+        tmnxChassisIndex,
+        tmnxBsxCardSlotEsaId,
+        tmnxBsxMdaSlotEsaVmId
+    }
+    ::= { tmnxBsxUrlFltrUrlListStatsTable 1 }
+
+TmnxBsxUrlFltrUrlListStatsEntry  ::= SEQUENCE
+{
+    tmnxBsxUrlFltrUrlListStatLkup    Counter64,
+    tmnxBsxUrlFltrUrlListStatMatch   Counter64,
+    tmnxBsxUrlFltrUrlListStatDefault Counter64
+}
+
+tmnxBsxUrlFltrUrlListStatLkup    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrUrlListStatLkup indicates the number of URL
+         list lookups."
+    ::= { tmnxBsxUrlFltrUrlListStatsEntry 1 }
+
+tmnxBsxUrlFltrUrlListStatMatch   OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrUrlListStatMatch indicates the number of
+         lookups that matched entries in the URL list."
+    ::= { tmnxBsxUrlFltrUrlListStatsEntry 2 }
+
+tmnxBsxUrlFltrUrlListStatDefault OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlFltrUrlListStatDefault indicates the number of
+         lookups that resulted in taking the URL list configured default
+         action."
+    ::= { tmnxBsxUrlFltrUrlListStatsEntry 3 }
 
 tmnxBsxHttpNotifObjs             OBJECT IDENTIFIER ::= { tmnxBsxObjs 15 }
 
@@ -26397,7 +26992,8 @@ TmnxBsxUrlListEntry              ::= SEQUENCE
     tmnxBsxUrlListFileUrl            TmnxDisplayStringURL,
     tmnxBsxUrlListUpgrade            TmnxActionType,
     tmnxBsxUrlListDescription        TItemDescription,
-    tmnxBsxUrlListSize               INTEGER
+    tmnxBsxUrlListSize               INTEGER,
+    tmnxBsxUrlListHostExpressions    TruthValue
 }
 
 tmnxBsxUrlListName               OBJECT-TYPE
@@ -26500,6 +27096,22 @@ tmnxBsxUrlListSize               OBJECT-TYPE
          is more, the maximum number of URLs will decrease accordingly."
     DEFVAL      { standard }
     ::= { tmnxBsxUrlListEntry 9 }
+
+tmnxBsxUrlListHostExpressions    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBsxUrlListHostExpressions specifies URL entries in
+         the file specified by tmnxBsxUrlListFileUrl may be host expressions
+         that will be parsed based on rules defined in TmnxBsxExprSubString. If
+         tmnxBsxUrlListHostExpressions is true, and an entry in the url-list
+         starts with * or ^ then it will be parsed according to the rules
+         defined by TmnxBsxExprSubString, and in addition, '/' will not be
+         allowed. If tmnxBsxUrlListHostExpressions is set to false, then the
+         entry will be parsed as flat alpha-numeric string."
+    DEFVAL      { false }
+    ::= { tmnxBsxUrlListEntry 10 }
 
 tmnxBsxGtpObjs                   OBJECT IDENTIFIER ::= { tmnxBsxObjs 18 }
 
@@ -28357,7 +28969,7 @@ tmnxBsxComplianceV17v0           MODULE-COMPLIANCE
         MANDATORY-GROUPS {
             tmnxBsxFlowAttrObjGrp,
             tmnxBsxPartitionObsoleteGroup,
-            tmnxBsxIsaAaVmTrafDistribTeidGrp,
+            tmnxBsxIsaAaVmTrafDistribByIpGrp,
             tmnxBsxCflowConfigFieldsGroup,
             tmnxBsxTetherStateObjGrp,
             tmnxBsxTetherDetectObjGrp,
@@ -28368,6 +28980,19 @@ tmnxBsxComplianceV17v0           MODULE-COMPLIANCE
             tmnxBsxTlsTrafficStatsObjGrp
         }
     ::= { tmnxBsxCompliances 12 }
+
+tmnxBsxComplianceV20v0           MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for management of BSX features for SROS
+         release 20.0 in the TIMETRA-BSX-NG-MIB."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxBsxUrlListEnhancementObjGrp,
+            tmnxBsxUrlFilterEnhancementGrp,
+            tmnxBsxCflowdFieldEncryptObjGrp
+        }
+    ::= { tmnxBsxCompliances 13 }
 
 tmnxBsxGroups                    OBJECT IDENTIFIER ::= { tmnxBsxConformance 2 }
 
@@ -30165,7 +30790,8 @@ tmnxBsxTransitSeenIpGroup        OBJECT-GROUP
         tmnxBsxAarpInstPeerEPSapPortId,
         tmnxBsxAarpInstPeerEPSapEncap,
         tmnxBsxAarpInstPeerEPSapEncType,
-        tmnxBsxAarpInstPeerEPSdpBindId
+        tmnxBsxAarpInstPeerEPSdpBindId,
+        tmnxBsxTransitIpPolicyAutoInact
     }
     STATUS      current
     DESCRIPTION
@@ -31829,6 +32455,17 @@ tmnxBsxPartitionObsoleteGroup    OBJECT-GROUP
          removal of non partitioned groups on Nokia series routers."
     ::= { tmnxBsxGroupsV17v0 6 }
 
+tmnxBsxIsaAaVmTrafDistribByIpGrp OBJECT-GROUP
+    OBJECTS     {
+        tmnxBsxIsaAaGrpVmTrafficDistByIp
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects introduced in SROS Release 17.0 for Application
+         Assurance and ISA support of packet IP address inclusion in the
+         traffic distribution mechanism."
+    ::= { tmnxBsxGroupsV17v0 7 }
+
 tmnxBsxCflowConfigFieldsGroup    OBJECT-GROUP
     OBJECTS     {
         tmnxBsxCflowdRecTmplAdmin,
@@ -31966,7 +32603,8 @@ tmnxBsxGtpStatefulFirwallObjGrp  OBJECT-GROUP
         tmnxBsxGrpMdaSRGtpTunDbSize,
         tmnxBsxGrpMdaSRGtpTunDbUtil,
         tmnxBsxGtpFltrDefTunnelEpLimit,
-        tmnxBsxGtpFltrStatsPkDndTunEpLmt
+        tmnxBsxGtpFltrStatsPkDndTunEpLmt,
+        tmnxBsxIsaAaGrpVmTrafficDistTeid
     }
     STATUS      current
     DESCRIPTION
@@ -31988,7 +32626,7 @@ tmnxBsxIsaAaVmTrafDistribTeidGrp OBJECT-GROUP
     OBJECTS     {
         tmnxBsxIsaAaGrpVmTrafficDistTeid
     }
-    STATUS      current
+    STATUS      obsolete
     DESCRIPTION
         "The group of objects introduced in SROS Release 19.0 for Application
          Assurance and ISA support of GTP packet TEID inclusion in the traffic
@@ -32073,6 +32711,71 @@ tmnxBsxTlsTrafficStatsObjGrp     OBJECT-GROUP
     ::= { tmnxBsxGroupsV17v0 22 }
 
 tmnxBsxGroupsV20v0               OBJECT IDENTIFIER ::= { tmnxBsxGroups 32 }
+
+tmnxBsxUrlListEnhancementObjGrp  OBJECT-GROUP
+    OBJECTS     {
+        tmnxBsxUrlListHostExpressions
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects introduced in SROS Release 20.0 for Application
+         Assurance support for URL list with host expression support on Nokia
+         systems."
+    ::= { tmnxBsxGroupsV20v0 1 }
+
+tmnxBsxUrlFilterEnhancementGrp   OBJECT-GROUP
+    OBJECTS     {
+        tmnxBsxUrlFilterIcapDefAction,
+        tmnxBsxUrlFilterIcapDefHttpRedir,
+        tmnxBsxUrlFilterIcapHttpRedirObj,
+        tmnxBsxUrlFilterWebDefAction,
+        tmnxBsxUrlFilterWebDefHttpRedir,
+        tmnxBsxUrlFilterWebSerHttpRedir,
+        tmnxBsxUrlFilterUrlAllowList,
+        tmnxBsxUrlFltrApplyFuncBehavior,
+        tmnxBsxUrlFilterBlListDefAction,
+        tmnxBsxUrlFilterBlListDefHtRedir,
+        tmnxBsxUrlFilterBlListHttpRedir,
+        tmnxBsxUrlListRegExprNumEntries,
+        tmnxBsxUrlFltrUrlListStatLkup,
+        tmnxBsxUrlFltrUrlListStatMatch,
+        tmnxBsxUrlFltrUrlListStatDefault,
+        tmnxBsxUrlFltrStatsWebSvRspAllow,
+        tmnxBsxUrlFltrStatsWebSvRspRedir,
+        tmnxBsxUrlFltrStatsWebSvRspBlock,
+        tmnxBsxUrlFltrStatsWebSvDefault,
+        tmnxBsxUrlFltrStatsAllowListLkup,
+        tmnxBsxUrlFltrStatsAllowLstMatch,
+        tmnxBsxUrlFltrStatsUrlAllow,
+        tmnxBsxUrlFltrStatsUrlBlockRedir,
+        tmnxBsxUrlFltrStatsUrlDefAction,
+        tmnxBsxUrlFltrStatsIcapDefault,
+        tmnxBsxUrlFltWSClassOvrdRowSt,
+        tmnxBsxUrlFltWSClassOvrdUrlExpr,
+        tmnxBsxUrlFltWSClassOvrdUrlCateg,
+        tmnxBsxUrlFltWSClassOvrdLstChg,
+        tmnxBsxUrlFltrStatsWSClassOvrHit,
+        tmnxBsxUrlFltrStatsWSClassOvrMis,
+        tmnxBsxUrlFltrWsClasOvrLastCTime,
+        tmnxBsxUrlFltWSClassOvrdCategNam
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects introduced in SROS Release 20.0 for Application
+         Assurance support for URL filter enhancement on Nokia systems."
+    ::= { tmnxBsxGroupsV20v0 2 }
+
+tmnxBsxCflowdFieldEncryptObjGrp  OBJECT-GROUP
+    OBJECTS     {
+        tmnxBsxCflowdAes128EncrptKey,
+        tmnxBsxCflowdAes256EncrptKey
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects introduced in SROS Release 20.0 for Application
+         Assurance support for transmition of encrypted dynamic cflowd fields
+         on Nokia systems."
+    ::= { tmnxBsxGroupsV20v0 3 }
 
 tmnxBsxNotifyPrefix              OBJECT IDENTIFIER ::= { tmnxSRNotifyPrefix 63 }
 
@@ -32419,7 +33122,8 @@ tmnxBsxTransIpPolAaSubDeleted    NOTIFICATION-TYPE
     OBJECTS     {
         tmnxBsxNotifyAaGrpPartIndex,
         tmnxBsxNotifyTransitIpPolicyId,
-        tmnxBsxNotifyAaSubscriberName
+        tmnxBsxNotifyAaSubscriberName,
+        tmnxBsxNotifyReason
     }
     STATUS      current
     DESCRIPTION

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -16,30 +16,30 @@ $radio1 = get_rrd_path($device, "wificlients-radio1.rrd");
 $radio2 = get_rrd_path($device, "wificlients-radio2.rrd");
 
 if (rrd_is_file($radio1, TRUE)) {
-  $radio2_exists = rrd_is_file($radio2, TRUE);
+    $radio2_exists = rrd_is_file($radio2, TRUE);
 
-  $rrd_list[0]['filename'] = $radio1;
-  $rrd_list[0]['descr'] = $radio2_exists ? 'Clients on Radio1' : 'Clients';
-  $rrd_list[0]['ds'] = 'wificlients';
-  $rrd_list[0]['colour'] = '008C00';
-  $rrd_list[0]['areacolour'] = 'CDEB8B';
+    $rrd_list[0]['filename']   = $radio1;
+    $rrd_list[0]['descr']      = $radio2_exists ? 'Clients on Radio1' : 'Clients';
+    $rrd_list[0]['ds']         = 'wificlients';
+    $rrd_list[0]['colour']     = '008C00';
+    $rrd_list[0]['areacolour'] = 'CDEB8B';
 
-  if ($radio2_exists) {
-    $rrd_list[1]['filename'] = $radio2;
-    $rrd_list[1]['descr'] = 'Clients on Radio2';
-    $rrd_list[1]['ds'] = 'wificlients';
-    $rrd_list[1]['colour'] = 'CC0000';
-    //$rrd_list[1]['areacolour'] = 'CDEB8B';
-  }
+    if ($radio2_exists) {
+        $rrd_list[1]['filename'] = $radio2;
+        $rrd_list[1]['descr']    = 'Clients on Radio2';
+        $rrd_list[1]['ds']       = 'wificlients';
+        $rrd_list[1]['colour']   = 'CC0000';
+        //$rrd_list[1]['areacolour'] = 'CDEB8B';
+    }
 }
 
 //$colours   = "mixed";
 $scale_rigid = FALSE;
-$scale_min = 0;
-$nototal   = 1;
-$unit_text = "Total";
+$scale_min   = 0;
+$nototal     = 1;
+$unit_text   = "Total";
 
-include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi_line.inc.php");
 #include($config['html_dir']."/includes/graphs/generic_multi_simplex_separated.inc.php");
 /*
 $rrd_options .= " -l 0 -E ";

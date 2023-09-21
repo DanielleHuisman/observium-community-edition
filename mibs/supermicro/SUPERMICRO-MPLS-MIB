@@ -1,0 +1,3254 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsmpls.mib,v 1.33 2013/09/19 13:24:05 siva Exp $
+SUPERMICRO-MPLS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MplsBitRate, MplsBurstSize, MplsTunnelIndex, MplsLsrIdentifier,
+    MplsTunnelInstanceIndex, MplsExtendedTunnelId
+           FROM MPLS-TC-STD-MIB
+    mplsTunnelIndex, mplsTunnelInstance, mplsTunnelResourceIndex, 
+    mplsTunnelIngressLSRId, mplsTunnelEgressLSRId, mplsTunnelResourceEntry
+           FROM MPLS-TE-STD-MIB
+    mplsLdpEntityEntry, mplsLdpPeerEntry
+           FROM MPLS-LDP-STD-MIB
+    TEXTUAL-CONVENTION
+        FROM SNMPv2-TC               -- [RFC2579]
+    pwMplsEntry
+        FROM PW-MPLS-STD-MIB
+    pwEntry
+        FROM PW-STD-MIB
+    PwIndexType
+        FROM PW-TC-STD-MIB
+    MessageSize
+        FROM INTEGRATED-SERVICES-MIB
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, 
+    enterprises, Unsigned32, NOTIFICATION-TYPE, Counter32, IpAddress
+        FROM SNMPv2-SMI
+    RowStatus, TimeInterval, RowPointer, StorageType, TruthValue
+        FROM SNMPv2-TC
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB
+    ifIndex 
+        FROM IF-MIB;
+
+fsMplsMIB MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"   
+    ORGANIZATION "Super Micro Computer Inc."
+    CONTACT-INFO "support@Supermicro.com" 
+
+    DESCRIPTION  "All rights reserved"
+    REVISION     "201209050000Z"    
+    DESCRIPTION  "The Proprietary MIB for MPLS module
+	30-Jul-2010: Updated to provide support for VCCV - RFC 5085 & 
+	BFD for VCCV - RFC 5885"
+
+    ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) futureMpls (13) 1}
+
+fsMplsVplsNotifications           OBJECT IDENTIFIER ::= { fsMplsMIB 0 }
+
+fsMplsConfigObjects               OBJECT IDENTIFIER ::= { fsMplsMIB 1 }
+fsMplsSizingObjects               OBJECT IDENTIFIER ::= { fsMplsMIB 2 }
+fsMplsStatsObjects                OBJECT IDENTIFIER ::= { fsMplsMIB 3 }
+fsMplsLdpCrlspObjects             OBJECT IDENTIFIER ::= { fsMplsMIB 4 }
+fsMplsL2VpnObjects                OBJECT IDENTIFIER ::= { fsMplsMIB 5 }
+fsMplsTnlResourceObjects          OBJECT IDENTIFIER ::= { fsMplsMIB 6 }
+fsMplsDiffServObjects             OBJECT IDENTIFIER ::= { fsMplsMIB 7 }
+fsMplsDsTeObjects                 OBJECT IDENTIFIER ::= { fsMplsMIB 8 }
+fsMplsTestObjects                 OBJECT IDENTIFIER ::= { fsMplsMIB 9 }
+fsMplsLdpGrObjects                OBJECT IDENTIFIER ::= { fsMplsMIB 10 }
+fsMplsLdpScalarObjects            OBJECT IDENTIFIER ::= { fsMplsMIB 11 }
+fsMplsL2VpnConfigObjects          OBJECT IDENTIFIER ::= { fsMplsL2VpnObjects 1 }
+fsMplsL2VpnStatsObjects           OBJECT IDENTIFIER ::= { fsMplsL2VpnObjects 2 }
+
+PwCcTypesCapabilities ::= TEXTUAL-CONVENTION
+     STATUS      current
+     DESCRIPTION
+          "Indicates the control channel capabilities supported for Pseudowire 
+           OAM mechanisms.
+  
+           ach (0) bit indicates that Inband-VCCV (CC Type-1) is supported that 
+           uses PW Associated Channel Header (PW-ACH) with the first nibble is 
+           set to 0001b. 
+
+           routerAlertLabel (1) bit indicates that out-of-band VCCV (CC Type-2) 
+           is supported. It is also referred as MPLS Router Alert Label. 
+
+           ttlExpiry (2) bit indicates that TTL expiry VCCV (CC Type-3) is 
+           supported. It is also referred to as MPLS PW Label with TTL == 1."
+     SYNTAX     BITS {
+                      ach (0), 
+                      routerAlertLabel (1), 
+                      ttlExpiry (2) 
+                     }
+
+PwCvTypesCapabilities ::= TEXTUAL-CONVENTION
+     STATUS      current
+     DESCRIPTION
+          "Indicates the connectivity verification capabilities supported 
+           for Pseudowire OAM mechanism. 
+           
+           icmpping (0) bit indicates that ICMP is supported for connectivity 
+           verification. ICMP ping is optional CV mode for PW fault detection.
+
+           lspping (1) bit indicates that LSP Ping is supported for 
+           connectivity verification. LSP ping is default CV mode for 
+           PW fault detection.
+
+           bfdIpUdpFaultDetect (2) bit indicates that IP/UDP encapsulated BFD 
+           connection verification type is supported for fault detection.
+           This CV type is called BFD IP/UDP-encapsulated, for PW Fault 
+           Detection only. 
+
+           bfdIpUdpFaultDetectAndStatusNotif (3) bit indicates that IP/UDP 
+           encapsulated BFD connection verification type is supported for fault
+           detection and status notification. This CV type is called 
+           BFD IP/UDP-encapsulated, for PW Fault Detection and AC/PW 
+           Fault Status Signaling. 
+
+           bfdAchFaultDetect (4) bit indicates that PW-ACH encapsulated BFD
+           connection verification type is supported for fault detection.
+           This CV type is called BFD PW-ACH-encapsulated, for PW Fault 
+           Detection only. 
+           
+           bfdAchFaultDetectAndStatusNotif (5) bit indicates that IP/UDP 
+           encapsulated BFD connection verification type is supported for fault
+           detection and status notification. This CV type is called 
+           BFD PW-ACH-encapsulated, for PW Fault Detection and AC/PW Fault 
+           Status Signaling.
+
+           For the IP/UDP encapsulation of BFD (BFD with IP/UDP headers), 
+           if a PW ACH is used, the channel type must indicate either 
+           IPv4 (0x0021) or IPv6 (0x0057).
+           
+           bfdIpUdpFaultDetectAndStatusNotif and bfdAchFaultDetectAndStatusNotif
+           CV types should not be used when a control protocol such as LDP 
+           is available that can signal the AC/PW status to the remote 
+           endpoint of the PW.            
+
+           All the four BFD CV types (bfdIpUdpFaultDetect, 
+           bfdIpUdpFaultDetectAndStatusNotif,bfdAchFaultDetect, 
+           bfdAchFaultDetectAndStatusNotif) are mutually exclusive.
+           Only a single BFD CV type can be selected and used among them."
+     SYNTAX          BITS {
+                          icmpping (0), 
+                          lspping (1), 
+                          bfdIpUdpFaultDetect (2), 
+                          bfdIpUdpFaultDetectAndStatusNotif (3), 
+                          bfdAchFaultDetect (4), 
+                          bfdAchFaultDetectAndStatusNotif (5) 
+                         } 
+
+
+PwGenIdType ::= TEXTUAL-CONVENTION 
+   DISPLAY-HINT "d"
+   STATUS       current 
+   DESCRIPTION 
+      "Represents the AGI Type and AII Type in generalized FEC
+       signaling and configuration." 
+   SYNTAX      Unsigned32(0..254) 
+
+IANAPwCapabilities ::=  TEXTUAL-CONVENTION
+   STATUS       current 
+   DESCRIPTION 
+      "This describes a collection of cabailities related to
+       a specific PW. Values may be added in the future based on new capabilities
+       introduced in IETF documents. "
+   SYNTAX      BITS { pwStatusIndication (0), pwVCCV (1) }
+       
+-- Definitions of fsMplsConfigObjects - Starts
+
+fsMplsAdminStatus OBJECT-TYPE
+    SYNTAX     INTEGER { up(1) , down(2) , upinprgrs(3), downinprgrs(4)}
+    MAX-ACCESS read-write  
+    STATUS     current
+    DESCRIPTION 
+         "The fsMpls module's administration status indicating whether
+          it is up or down or not in service. The Admin Status can be set
+          to only up and down whereas the upinprgrs and downinprgrs are
+          intermediate states which cannot be configured."
+    DEFVAL { down }
+    ::= { fsMplsConfigObjects 1 }
+
+fsMplsQosPolicy OBJECT-TYPE
+   SYNTAX    INTEGER  { stdip (0) , rfc1349 (1) , diffserv (2) }
+   MAX-ACCESS read-write 
+   STATUS     current
+   DESCRIPTION
+         "Specifies the Qos Policy to be adapted by this MPLS system.
+          Mpls-FM, interprets the ServiceType field of IP Header, based on
+          the Qos configured. MPLS admin status should be made down to update
+          this." 
+   DEFVAL { stdip } 
+   ::= { fsMplsConfigObjects 2 }
+
+fsMplsFmDebugLevel OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This is a 4-byte (32-bit) object with each bit enabling/
+          disabling a particular type of trace/debug statement.
+          On setting the following bit patterns on the Least Significant
+          Bits of the debug object, the following type of debug statements
+          will be displayed
+          0000 0000 0000 0001 - all memory related debug statements
+          0000 0000 0000 0010 - all timer messages
+          0000 0000 0000 0100 - all semaphore related messages
+          0000 0000 0010 0000 - all process related messages
+          0000 0000 0100 0000 - all SNMP related messages
+          0000 0010 0000 0000 - all miscellaneous messages
+          0000 0100 0000 0000 - all entry exit messages
+          0000 1000 0000 0000 - all interface related messages
+          The following are the bit patterns of the Most Significant Bits
+          to display the above mentioned messages module-wise
+          0001 0000 0000 0000 - displays messages from main module
+          0010 0000 0000 0000 - displays interface related messages
+          0100 0000 0000 0000 - displays process related debug messages
+          The combination of all these bits will enable/disable particular
+          debug statement in respective modules"
+    ::= { fsMplsConfigObjects 3 }
+
+fsMplsTeDebugLevel OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This is a 4-byte (32-bit) object with each bit enabling/
+         disabling the debug message.
+         It Tells the level at which the Debug value is enabled
+         Five most significant nibbles correspond to the module identity
+         and the three least significant nibbles correspond to the various
+         Log Types.
+         A log of specific type in a module is displayed when the
+         bits corresponding to the module and the log type are both
+         set to 1.
+         The various bit patterns corresponding to the module and the log
+         type are as follows:
+         
+         ROUTINE:
+         0000 0000 0000 0000 0001 - MAIN     - Te main module routines
+         0000 0000 0000 0000 0010 - LLVL     - Low level routines
+         0000 0000 0000 0000 0100 - EXTN     - External module routines
+         0000 0000 0000 0000 1000 - DIFF     - Diff Serv routines
+         
+         LOG TYPES:
+         0000 0000 0001 - PRCS       - Process related logs
+         0000 0000 0010 - FAIL       - Failure logs
+         0000 1000 0000 - TEST FAIL  - Test routines failure logs
+         1111 1111 1111 - ALL        - All types of logs
+         
+         Logs will be displayed with module name as MAIN or EXTN."
+
+    ::= { fsMplsConfigObjects 4 }
+
+fsMplsLsrLabelAllocationMethod OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   ordered(1),
+                   independent(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "For any given LSR , the method of label allocation must be
+         specified. Label can be allocated in either ordered mode or
+         in the independent mode."
+    DEFVAL  { ordered }
+    ::= { fsMplsConfigObjects 5 }
+
+fsMplsDiffServElspPreConfExpPhbMapIndex OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-write 
+    STATUS     current
+    DESCRIPTION "Index to the PreConfigured EXP to PHB Mapping for ELSPs.
+                 Value of this object should be less then
+                 fsMplsDiffServElspMapEntries."
+    ::= { fsMplsConfigObjects 6 }
+
+
+fsMplsLdpEntityTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF FsMplsLdpEntityEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "This table contains information about the
+             MPLS Label Distribution Protocol Entities which
+             exist on this Label Switch Router (LSR)."
+         ::= { fsMplsConfigObjects 7 }
+
+
+fsMplsLdpEntityEntry OBJECT-TYPE
+         SYNTAX      FsMplsLdpEntityEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "An entry in this table represents an LDP entity.
+             An entry can be created by a network administrator
+             or by an SNMP agent as instructed by LDP."
+         AUGMENTS    { mplsLdpEntityEntry }
+         ::= { fsMplsLdpEntityTable 1 }
+
+FsMplsLdpEntityEntry ::= SEQUENCE {
+         fsMplsLdpEntityPHPRequestMethod         INTEGER,
+         fsMplsLdpEntityTransAddrTlvEnable       TruthValue,
+         fsMplsLdpEntityTransportAddress         IpAddress,
+         fsMplsLdpEntityLdpOverRsvpEnable        TruthValue,
+         fsMplsLdpEntityOutTunnelIndex           MplsTunnelIndex,
+         fsMplsLdpEntityOutTunnelInstance        MplsTunnelInstanceIndex,
+         fsMplsLdpEntityOutTunnelIngressLSRId    MplsExtendedTunnelId,
+         fsMplsLdpEntityOutTunnelEgressLSRId     MplsExtendedTunnelId,
+         fsMplsLdpEntityInTunnelIndex            MplsTunnelIndex,
+         fsMplsLdpEntityInTunnelInstance         MplsTunnelInstanceIndex,
+         fsMplsLdpEntityInTunnelIngressLSRId     MplsExtendedTunnelId,
+         fsMplsLdpEntityInTunnelEgressLSRId      MplsExtendedTunnelId
+     }
+
+fsMplsLdpEntityPHPRequestMethod OBJECT-TYPE
+         SYNTAX      INTEGER {
+                        explicit(0),
+                        disabled(1),
+                        implicit(3)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "For any given LDP session, the method of requesting PHP
+              support must be specified, if PHP(penultimate Hop Popping)
+              is desired, PHP request can be advertised either by 
+              implicit null labels or explicit null labels. 
+              NOTE: DO not enable PHP for ATM or FR if the support(PHP) 
+              is not available in the hardware "
+         DEFVAL  { disabled }
+         ::= { fsMplsLdpEntityEntry 1 }
+
+fsMplsLdpEntityTransAddrTlvEnable OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " When this object is set to true(1), Transport Address TLV
+               is sent in the LDP Hello Message.
+
+               When this object is set to false(2), Transport Address TLV 
+               is not set in the LDP Hello Message. "
+         DEFVAL  { false }
+         ::= { fsMplsLdpEntityEntry 2 }
+
+fsMplsLdpEntityTransportAddress OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " The IP Address stored in this object is carried in the 
+               Transport Address TLV of the LDP Hello Message. 
+               
+               The IP Address configured in this object should be a loopback
+               address.
+               " 
+         ::= { fsMplsLdpEntityEntry 3 }
+
+fsMplsLdpEntityLdpOverRsvpEnable OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " When this object is set to true(1), LDP LSP Tunneling over RSVP 
+               is enabled. 
+               
+               This object is applicable only for the Targeted Session i.e., 
+               this object can be set to true(1) only if the object 
+               mplsLdpEntityTargetPeer is set to true(1)." 
+         ::= { fsMplsLdpEntityEntry 4 }
+
+fsMplsLdpEntityOutTunnelIndex OBJECT-TYPE
+         SYNTAX      MplsTunnelIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               Outgoing Tunnel Index is stored in this object. " 
+         ::= { fsMplsLdpEntityEntry 5 }
+
+fsMplsLdpEntityOutTunnelInstance OBJECT-TYPE
+         SYNTAX      MplsTunnelInstanceIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               Outgoing Tunnel Instance is stored in this object. " 
+         ::= { fsMplsLdpEntityEntry 6 }
+
+fsMplsLdpEntityOutTunnelIngressLSRId OBJECT-TYPE
+         SYNTAX      MplsExtendedTunnelId
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               IP Address of Ingress LSR of Outgoing Tunnel 
+               is stored in this object." 
+         ::= { fsMplsLdpEntityEntry 7 }
+
+fsMplsLdpEntityOutTunnelEgressLSRId OBJECT-TYPE
+         SYNTAX      MplsExtendedTunnelId
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               IP Address of Egress LSR of Outgoing Tunnel 
+               is stored in this object." 
+         ::= { fsMplsLdpEntityEntry 8 }
+
+fsMplsLdpEntityInTunnelIndex OBJECT-TYPE
+         SYNTAX      MplsTunnelIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               Incoming Tunnel Index is stored in this object. " 
+         ::= { fsMplsLdpEntityEntry 9 }
+
+fsMplsLdpEntityInTunnelInstance OBJECT-TYPE
+         SYNTAX      MplsTunnelInstanceIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               Incoming Tunnel Instance is stored in this object. " 
+         ::= { fsMplsLdpEntityEntry 10 }
+
+fsMplsLdpEntityInTunnelIngressLSRId OBJECT-TYPE
+         SYNTAX      MplsExtendedTunnelId
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               IP Address of Ingress LSR of  Tunnel 
+               is stored in this object." 
+         ::= { fsMplsLdpEntityEntry 11 }
+
+fsMplsLdpEntityInTunnelEgressLSRId OBJECT-TYPE
+         SYNTAX      MplsExtendedTunnelId
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             " This object is applicable only if LDP LSP Tunneling over RSVP
+               is enabled i.e., if fsMplsLdpEntityLdpOverRsvpEnable is set to
+               true(1).
+               
+               IP Address of Egress LSR of Incoming Tunnel 
+               is stored in this object." 
+         ::= { fsMplsLdpEntityEntry 12 }
+
+fsMplsLdpLsrId OBJECT-TYPE
+    SYNTAX     MplsLsrIdentifier 
+    MAX-ACCESS read-write 
+    STATUS     current
+    DESCRIPTION " The Label Switching Router's Identifier. This object is a 
+                  writable version of the object mplsLdpLsrId in
+                  MPLS-LDP-STD-MIB. When changing this object, the following
+                  actions take place.
+
+                  Validation of the object fsMplsLdpForceOption is done.
+
+                  1. If fsMplsLdpForceOption is set to true(1), the value 
+                     passed is immediately applied to this object and
+                     retriggering of LDP sessions is done immediately.
+
+                  2. If fsMplsLdpForceOption is set to false(2), the value
+                     passed is stored in temporary variable. Once the 
+                     interface associated with the current active LDP LSR ID
+                     goes down operationally, the value stored temporarily is
+                     copied into the object and retriggering of LDP Sessions
+                     is done. 
+                  
+                  The error WrongValue is thrown if configured IP Address does
+                  not exist in the system.
+                  
+                  The error InconsistentValue is thrown if the interface 
+                  of the configured IP Addresss is currently operationally
+                  down. "
+    ::= { fsMplsConfigObjects 8 }
+
+fsMplsLdpForceOption OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION " This object is currently used only in conjunction with
+                  the object fsMplsLdpLsrId. 
+
+                  If this object is set to true(1), Label Switching
+                  Router's Identifier when configured through the object
+                  fsMplsLdpLsrId makes an immediate effect in retriggering
+                  the LDP Sessions available.
+
+                  If this object is set to false(2), Label Switching
+                  Router's Identifier when configured through the object
+                  fsMplsLdpLsrId does not make an immediate effect. Instead
+                  retriggering of the LDP Sessions occurs only when the
+                  interface of the Active LDP LSR ID goes down. "
+     DEFVAL { false }
+     ::= { fsMplsConfigObjects 9 }
+
+fsMplsRsvpTeGrMaxWaitTime OBJECT-TYPE
+    SYNTAX      Integer32 (30..1200)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  "This object denotes the time period (in seconds) till which 
+                  router should retain its Forwarding Table Entries created by 
+                  RSVP-TE LSPs after RSVP-TE component is restarted."
+    DEFVAL { 600 }
+    ::= { fsMplsConfigObjects 10 }
+
+fsMplsLdpGrMaxWaitTime OBJECT-TYPE
+    SYNTAX      Integer32 (30..1200)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  "This object denotes the time period (in seconds) till which 
+                  router should retain its Forwarding Table Entries created by 
+                  LDP LSPs after LDP component is restarted."
+    DEFVAL { 600 }
+    ::= { fsMplsConfigObjects 11 }
+
+-- Definitions of fsMplsConfigObjects - Ends
+
+
+-- Definitions of fsMplsSizingObjects - Starts
+
+fsMplsMaxIfTableEntries OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of IF Table entries memory pool"
+    ::= { fsMplsSizingObjects 1 }
+
+fsMplsMaxFTNEntries OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of FTN entries memory pool"
+    ::= { fsMplsSizingObjects 2 }
+
+fsMplsMaxInSegmentEntries OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of in segment entries memory pool"
+    ::= { fsMplsSizingObjects 3 }
+
+fsMplsMaxOutSegmentEntries OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of out segment memory pool"
+    ::= { fsMplsSizingObjects 4 }
+
+fsMplsMaxXCEntries OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of XC memory pool"
+    ::= { fsMplsSizingObjects 5 }
+
+fsMplsDiffServElspMapEntries OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of Elsp EXP to PHB mappings in
+                 memory pool"
+    ::= { fsMplsSizingObjects 6 }
+
+fsMplsDiffServParamsEntries OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only 
+    STATUS     current
+    DESCRIPTION "Maximum number blocks of DiffServParams in
+                 memory pool"
+    ::= { fsMplsSizingObjects 7 }
+
+fsMplsMaxHopLists OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of ER-Hop Lists that can be supported."
+    ::= { fsMplsSizingObjects 8 }
+
+fsMplsMaxPathOptPerList OBJECT-TYPE
+    SYNTAX      Unsigned32(1..8)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of Path Options that are supported per 
+        HopList."
+    ::= { fsMplsSizingObjects 9 }
+
+fsMplsMaxHopsPerPathOption OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of Er-Hops that are supported for a 
+        Path Option."
+    ::= { fsMplsSizingObjects 10 }
+
+fsMplsMaxArHopLists OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of AR-Hop Lists that can be supported."
+    ::= { fsMplsSizingObjects 11 }
+
+fsMplsMaxHopsPerArHopList OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of Ar-Hops that are supported for an 
+        AR Hop List."
+    ::= { fsMplsSizingObjects 12 }
+
+fsMplsMaxRsvpTrfcParams OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of RSVP Traffic Parameters that can be 
+        supported"
+    ::= { fsMplsSizingObjects 13 }
+
+fsMplsMaxCrLdpTrfcParams OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of CR-LDP Traffic Parameters that can be 
+        supported"
+    ::= { fsMplsSizingObjects 14 }
+
+fsMplsMaxDServElsps OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of Diff-Serv E LSP's supported."
+    ::= { fsMplsSizingObjects 15 }
+
+fsMplsMaxDServLlsps OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of Diff-Serv L LSP's supported."
+    ::= { fsMplsSizingObjects 16 }
+    
+fsMplsMaxTnls OBJECT-TYPE
+    SYNTAX      Unsigned32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        " The maximum number of TE tunnels supported."
+    ::= { fsMplsSizingObjects 17 }
+
+fsMplsLsrMaxLdpEntities OBJECT-TYPE
+    SYNTAX      Integer32 (1..1024)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of LDP entities that can be supported by
+         MPLS system."
+    ::= { fsMplsSizingObjects 18 }
+
+fsMplsLsrMaxLocalPeers OBJECT-TYPE
+    SYNTAX      Integer32 (1..1024)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of Local LDP peers that can be supported by 
+         MPLS system."
+    ::= { fsMplsSizingObjects 19 }
+
+fsMplsLsrMaxRemotePeers OBJECT-TYPE
+    SYNTAX      Integer32 (1..1024)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of Remote LDP peers that can be supported by 
+         MPLS system."
+    ::= { fsMplsSizingObjects 20 }
+
+fsMplsLsrMaxIfaces OBJECT-TYPE
+    SYNTAX      Integer32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of Label enabled Interfaces that can be 
+         supported by MPLS system."
+    ::= { fsMplsSizingObjects 21 }
+
+fsMplsLsrMaxLsps OBJECT-TYPE
+    SYNTAX      Integer32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of Label Switched Paths that can be 
+         supported by MPLS system."
+    ::= { fsMplsSizingObjects 22 }
+
+fsMplsLsrMaxVcMergeCount OBJECT-TYPE
+	 SYNTAX      Integer32(1..65535)
+	 MAX-ACCESS  read-only
+	 STATUS      current
+	 DESCRIPTION
+	      "The maximum number of VC's that can be merged by this
+          MPLS system."
+	 ::= { fsMplsSizingObjects 23 }
+
+fsMplsLsrMaxVpMergeCount OBJECT-TYPE
+	 SYNTAX      Integer32(1..65535)
+	 MAX-ACCESS  read-only
+	 STATUS      current
+	 DESCRIPTION
+	      "The maximum number of VP's that can be merged by this
+          MPLS system."
+	 ::= { fsMplsSizingObjects 24 }
+
+fsMplsLsrMaxCrlspTnls OBJECT-TYPE
+    SYNTAX      Integer32(1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	      "The maximum number of CRLSPs that can be supported by this
+	       MPLS system."
+	 ::= { fsMplsSizingObjects 25 }
+
+-- Definitions of fsMplsSizingObjects - Ends
+
+
+-- Definitions of fsMplsStatsObjects - Starts
+
+fsMplsActiveRsvpTeTnls OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only   
+    STATUS      current
+    DESCRIPTION
+        "This variable provides the number of active LSPs at the node
+         created using the RSVPTE Signaling protocol. The detailed info of
+         the LSPs will be displayed at the user terminal of the node."
+    ::= { fsMplsStatsObjects 1 }
+
+fsMplsActiveLsps OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only   
+    STATUS      current
+    DESCRIPTION
+        "This variable provides the number of active LSPs at the node
+         created using the LSP Signaling protocol. The detailed info of
+         the LSPs will be displayed at the user terminal of the node."
+    ::= { fsMplsStatsObjects 2 }
+
+fsMplsActiveCrLsps OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only   
+    STATUS      current
+    DESCRIPTION
+        "This variable provides the number of active LSPs at the node
+         created using the CRLDP Signaling protocol. The detailed info of
+         the LSPs will be displayed at the user terminal of the node."
+    ::= { fsMplsStatsObjects 3 }
+
+-- Definitions of fsMplsStatsObjects - Ends
+
+
+-- Definitions of fsMplsLdpCrlspObjects - Starts
+
+fsMplsCrlspDebugLevel OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This is a 4-byte (32-bit) object with each bit enabling/
+        disabling the debug message.
+        Three most significant nibbles correspond to the routine identity
+        and the three least significant nibbles correspond to the various
+        Log Types.
+        A log of specific type in a routine is displayed when the
+        bits corresponding to the module and the log type are both
+        set to 1.
+        The various bit patterns corresponding to the routine and the log
+        type are as follows:
+
+        ROUTINE:
+        0001 0000 0000 - MAIN     - Ldp main routines
+        0010 0000 0000 - IF       - Interface with other module
+                                    routines
+        0100 0000 0000 - ADVT     - Advertisement module routines
+        1000 0000 0000 - SESSION  - Session module routines
+        0000 0001 0000 - PRCS     - PDU Processing module routines
+        0000 0010 0000 - NOTIF    - Notification module routines
+        0000 0100 0000 - DIFF     - Diffserv module routines
+        0000 1000 0000 - PREEMPT  - PreEmption module routines
+        0000 0000 0001 - RE-ROUTE - Rerouting timer routines
+        0000 0000 0010 - GR       - Graceful Restart routines
+        
+        LOG TYPES:
+        0000 0000 0001 - MEM      - Memory related logs
+        0000 0000 0010 - TIMER    - Timer related logs
+        0000 0000 0100 - SEM      - Semaphore related logs
+        0000 0000 1000 - RX       - Packet Receiving related logs
+        0000 0001 0000 - TX       - Packet Transmitting related logs
+        0000 0010 0000 - PRCS     - Process related logs
+        0000 0100 0000 - SNMP     - SNMP related logs
+        0001 0000 0000 - UDP      - UDP related logs
+        0010 0000 0000 - MISC     - Miscellaneous logs
+        0100 0000 0000 - RR TIMER - Rerouting timer logs
+        
+        This variable activates the particular type debug statements"
+    ::= { fsMplsLdpCrlspObjects 1 }
+
+fsMplsCrlspDumpType OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This is a 4-byte (32-bit) object with each bit enabling/
+         disabling a particular type of Dump messages.
+         The following bit patterns in the Most Significant bits when set 
+         will display the following message dumps. 
+         The Least Significant Bits are set to 0000 0000 0000 0000
+         0001 0000 0000 0000 - dumps of hello messages
+         0010 0000 0000 0000 - dumps of LDP Init message
+         0100 0000 0000 0000 - dumps of keepalive message
+         1000 0000 0000 0000 - dumps of address message
+         0000 0001 0000 0000 - dumps of address withdraw message
+         0000 0010 0000 0000 - dumps of Label request message
+         0000 0100 0000 0000 - dumps of Label map message
+         0000 1000 0000 0000 - dumps of Label abort message
+         0000 0000 0001 0000 - dumps of Label withdraw message
+         0000 0000 0010 0000 - dumps of Label release message
+         0000 0000 0100 0000 - dumps of notif message
+         0000 0000 1000 0000 - dumps of time stamps
+         1111 1111 1111 0000 - dumps of all messages"
+    ::= { fsMplsLdpCrlspObjects 2 }
+
+-- Definitions of FSMPLS-CRLSP Table - Starts
+
+fsMplsCrlspTnlTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FsMplsCrlspTnlEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       " The fsMplsCrlspTnlTable uses fsMplsCrlspTnlIndexn.
+         fsMplsCrlspTnlIndex points to the primary index of 
+         the mplsTunnelTable (See <draft-ietf-mpls-te-mib-06.txt>)."
+   ::= { fsMplsLdpCrlspObjects 3 }
+
+fsMplsCrlspTnlEntry OBJECT-TYPE
+   SYNTAX        FsMplsCrlspTnlEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       " An entry in this table represents fsMplsCrlspTnlIndex.
+         An entry can be created by a network administrator
+         or by an SNMP agent as instructed by CRLDP."
+   INDEX  { fsMplsCrlspTnlIndex }
+   ::= { fsMplsCrlspTnlTable 1 }
+
+FsMplsCrlspTnlEntry ::= SEQUENCE {
+      fsMplsCrlspTnlIndex           MplsTunnelIndex,
+      fsMplsCrlspTnlRowStatus       RowStatus,
+      fsMplsCrlspTnlStorageType     StorageType
+   }
+
+fsMplsCrlspTnlIndex OBJECT-TYPE
+   SYNTAX        MplsTunnelIndex
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION
+       " This index points to the primary index of the 
+         mplsTunnelTable of <draft-ietf-mpls-te-mib-06.txt>."
+   REFERENCE      
+       " 1. MPLS-TE: MPLS Traffic Engineering Management 
+            Information Base Using SMIv2, Cheenu Srinivasan, 
+            Arun Viswanathan and  Thomas D. Nadeau,
+            Internet Draft <draft-ietf-mpls-te-mib-06.txt>,
+            2 March 2001."
+   ::= { fsMplsCrlspTnlEntry 1 }
+
+fsMplsCrlspTnlRowStatus OBJECT-TYPE
+   SYNTAX        RowStatus
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+        "This variable is used to create, modify, and/or
+         delete a row in this table."
+   ::= { fsMplsCrlspTnlEntry 2 }
+
+fsMplsCrlspTnlStorageType OBJECT-TYPE
+   SYNTAX        StorageType
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+        "This variable indicates the storage type for this
+         object."
+   ::= { fsMplsCrlspTnlEntry 3 }
+
+fsMplsCrlspDumpDirection OBJECT-TYPE
+         SYNTAX      INTEGER { none (0), in(1), out(2), inout(3) }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "This is a 4-byte (32-bit) object with each bit enabling/
+              disabling a the direction of Dump messages.
+              The dump messages can be enabled selectively with respective
+              to the direction, the following 32-bit pattern will display all
+              incoming, outgoing and all message dumps respectively
+              0000 0000 0000 0000 0000 0000 0000 0001
+              0000 0000 0000 0000 0000 0000 0000 0010
+              0000 0000 0000 0000 0000 0000 0000 0011
+              By default only dump direction inout is supported. Support
+              is not present to set other defined values"
+         DEFVAL { inout }
+         ::= { fsMplsLdpCrlspObjects 4 }
+
+fsMplsCrlspPersistance OBJECT-TYPE
+         SYNTAX      INTEGER { no (0), yes(1) }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+             "To define persistance property"
+         DEFVAL { 0 }
+         ::= { fsMplsLdpCrlspObjects 5 }
+
+
+-- Definitions of fsMplsLdpCrlspObjects - Ends
+
+
+-- Definitions of fsMplsTnlResourceObjects - Starts
+
+fsMplsTunnelRSVPResTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsTunnelRSVPResEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "The fsMplsTunnelRSVPResTable allows a manager to
+           specify which resources are desired for an MPLS
+           tunnel. This table also allows several tunnels
+           to point to a single entry in this table,
+           implying that these tunnels should share
+           resources."
+     ::= { fsMplsTnlResourceObjects 1 }
+
+fsMplsTunnelRSVPResEntry OBJECT-TYPE
+     SYNTAX        FsMplsTunnelRSVPResEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "An entry in this table represents a set of
+           resources for an MPLS RSVP based tunnel. An entry in this table
+           is augemented by an entry in mplsTunnelResourceTable.
+
+           The values of the MIB elements present
+           in a given row will be sent in the TSPEC object
+           of the RSVP Path message associated with the Tunnel."
+     AUGMENTS { mplsTunnelResourceEntry }
+     ::= { fsMplsTunnelRSVPResTable 1 }
+
+FsMplsTunnelRSVPResEntry ::= SEQUENCE {
+     fsMplsTunnelRSVPResTokenBucketRate       MplsBitRate,
+     fsMplsTunnelRSVPResTokenBucketSize       MplsBitRate,
+     fsMplsTunnelRSVPResPeakDataRate          MplsBitRate,
+     fsMplsTunnelRSVPResMinimumPolicedUnit    MessageSize,
+     fsMplsTunnelRSVPResMaximumPacketSize     MessageSize
+}
+
+fsMplsTunnelRSVPResTokenBucketRate OBJECT-TYPE
+     SYNTAX        MplsBitRate
+     UNITS         "kilobits per second"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The maximum incoming rate in kilobits/second.  Note
+           that setting fsMplsTunnelInMaxRate,
+           fsMplsTunnelInMeanRate, and
+           fsMplsTunnelInMaxBurstSize to 0 indicates best-
+           effort treatment.
+           This object is copied to an instance of
+           mplsTSpecMaxRate in mplsTSpecTable the index of
+           which is copied into the corresponding
+           mplsInSegmentTSpecIndex.
+
+           Value to be placed in the Token Bucket Rate field in the TSPEC
+           object."
+     REFERENCE
+          "RFC 2210"
+     DEFVAL        { 0 }
+     ::= { fsMplsTunnelRSVPResEntry 1 }
+
+fsMplsTunnelRSVPResTokenBucketSize OBJECT-TYPE
+     SYNTAX        MplsBitRate
+     UNITS         "kilobits per second"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The maximum incoming rate in kilobits/second.  Note
+           that setting fsMplsTunnelInMaxRate,
+           fsMplsTunnelInMeanRate, and
+           fsMplsTunnelInMaxBurstSize to 0 indicates best-
+           effort treatment.
+           This object is copied to an instance of
+           mplsTSpecMaxRate in mplsTSpecTable the index of
+           which is copied into the corresponding
+           mplsInSegmentTSpecIndex.
+
+           Value to be placed in the Token Bucket Size field in the TSPEC
+           object."
+     REFERENCE
+          "RFC 2210"
+     DEFVAL        { 0 }
+     ::= { fsMplsTunnelRSVPResEntry 2 }
+
+fsMplsTunnelRSVPResPeakDataRate OBJECT-TYPE
+     SYNTAX        MplsBitRate
+     UNITS         "kilobits per second"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The maximum incoming rate in kilobits/second.  Note
+           that setting fsMplsTunnelInMaxRate,
+           fsMplsTunnelInMeanRate, and
+           fsMplsTunnelInMaxBurstSize to 0 indicates best-
+           effort treatment.
+           This object is copied to an instance of
+           mplsTSpecMaxRate in mplsTSpecTable the index of
+           which is copied into the corresponding
+           mplsInSegmentTSpecIndex.
+
+           Value to be placed in the Peak Data Rate field in the TSPEC
+           object."
+     REFERENCE
+          "RFC 2210"
+     DEFVAL        { 0 }
+     ::= { fsMplsTunnelRSVPResEntry 3 }
+
+fsMplsTunnelRSVPResMinimumPolicedUnit OBJECT-TYPE
+     SYNTAX        MessageSize
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The maximum incoming rate in bits/second.  Note
+           that setting fsMplsTunnelInMaxRate,
+           fsMplsTunnelInMeanRate, and
+           fsMplsTunnelInMaxBurstSize to 0 indicates best-
+           effort treatment.
+           This object is copied to an instance of
+           mplsTSpecMaxRate in mplsTSpecTable the index of
+           which is copied into the corresponding
+           mplsInSegmentTSpecIndex.
+
+           Value to be placed in the Minimum Policied Unit field in 
+           the TSPEC object."
+     REFERENCE
+          "RFC 2210"
+     DEFVAL        { 0 }
+     ::= { fsMplsTunnelRSVPResEntry 4 }
+
+fsMplsTunnelRSVPResMaximumPacketSize OBJECT-TYPE
+     SYNTAX        MessageSize
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The maximum incoming rate in bits/second.  Note
+           that setting fsMplsTunnelInMaxRate,
+           fsMplsTunnelInMeanRate, and
+           fsMplsTunnelInMaxBurstSize to 0 indicates best-
+           effort treatment.
+           This object is copied to an instance of
+           mplsTSpecMaxRate in mplsTSpecTable the index of
+           which is copied into the corresponding
+           mplsInSegmentTSpecIndex.
+
+           Value to be placed in the Maximum Packet Size field in the TSPEC
+           object."
+     REFERENCE
+          "RFC 2210"
+     DEFVAL        { 1500 }
+     ::= { fsMplsTunnelRSVPResEntry 5 }
+
+-- Definitions of CR-LDP Tunnel Resource Table - Ends
+
+fsMplsTunnelCRLDPResTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsTunnelCRLDPResEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "The fsMplsTunnelCRLDPResTable allows a manager to
+           specify which CR-LDP-specific resources are desired
+           for an MPLS tunnel if that tunnel is signaled using
+           CR-LDP. Note that these attributes are in addition
+           to those specified in mplsTunnelCRLDPResTable. This
+           table augments the mplsTunnelCRLDPResTable."
+     ::= { fsMplsTnlResourceObjects 2 }
+  
+fsMplsTunnelCRLDPResEntry OBJECT-TYPE
+     SYNTAX        FsMplsTunnelCRLDPResEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "An entry in this table represents a set of 
+           resources for an MPLS tunnel established using CRLDP
+           (mplsTunnelSignallingProto equal to crldp (3)). An
+           entry can be created by a network administrator or
+           by an SNMP agent as instructed by any MPLS
+           signaling protocol."
+     INDEX         { mplsTunnelResourceIndex }
+     ::= { fsMplsTunnelCRLDPResTable 1 }
+
+FsMplsTunnelCRLDPResEntry ::= SEQUENCE {
+     fsMplsTunnelCRLDPResPeakDataRate          MplsBitRate,
+     fsMplsTunnelCRLDPResCommittedDataRate     MplsBitRate,
+     fsMplsTunnelCRLDPResPeakBurstSize         MplsBurstSize,
+     fsMplsTunnelCRLDPResCommittedBurstSize    MplsBurstSize,
+     fsMplsTunnelCRLDPResExcessBurstSize       MplsBurstSize
+}
+
+fsMplsTunnelCRLDPResPeakDataRate OBJECT-TYPE
+     SYNTAX        MplsBitRate
+     UNITS         "kilobits per second"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The peak rate - the maximum rate at which traffic 
+           will be sent on the CRLSP."
+     REFERENCE
+          "1. Section 4.3, Constraint-Based LSP Setup using LDP,
+              Jamoussi, et. al,<draft-ietf-mpls-crldp-04.txt>,
+              July 2000."
+     ::= { fsMplsTunnelCRLDPResEntry 1 }
+
+fsMplsTunnelCRLDPResCommittedDataRate OBJECT-TYPE
+     SYNTAX        MplsBitRate
+     UNITS         "kilobits per second"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The committed rate - the committed rate at which 
+           traffic will be sent on the CRLSP."
+     REFERENCE
+          "1. Section 4.3, Constraint-Based LSP Setup using LDP,
+              Jamoussi, et. al,<draft-ietf-mpls-crldp-04.txt>,
+              July 2000."
+     ::= { fsMplsTunnelCRLDPResEntry 2 }
+
+fsMplsTunnelCRLDPResPeakBurstSize OBJECT-TYPE
+     SYNTAX        MplsBurstSize
+     UNITS         "bytes"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The peak burst size - the maximum burst size 
+           of the traffic that can occur in the established 
+           CRLSP."
+     REFERENCE
+          "1. Section 4.3, Constraint-Based LSP Setup using LDP,
+              Jamoussi, et. al,<draft-ietf-mpls-crldp-04.txt>,
+              July 2000."
+     ::= { fsMplsTunnelCRLDPResEntry 3 }
+
+fsMplsTunnelCRLDPResCommittedBurstSize OBJECT-TYPE
+     SYNTAX        MplsBurstSize
+     UNITS         "bytes"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The committed burst size - the committed burst size 
+           of the traffic that will be handled in the established 
+           CRLSP."
+     REFERENCE
+          "1. Section 4.3, Constraint-Based LSP Setup using LDP,
+              Jamoussi, et. al,<draft-ietf-mpls-crldp-04.txt>,
+              July 2000."
+     ::= { fsMplsTunnelCRLDPResEntry 4 }
+
+fsMplsTunnelCRLDPResExcessBurstSize OBJECT-TYPE
+     SYNTAX        MplsBurstSize
+     UNITS         "bytes"
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "The Excess burst size - the excess burst size limit to 
+           be used for traffic conditioning at the ingress of the 
+           CRLSP."
+     REFERENCE
+          "1. Section 4.3, Constraint-Based LSP Setup using LDP,
+              Jamoussi, et. al,<draft-ietf-mpls-crldp-04.txt>,
+              July 2000."
+     ::= { fsMplsTunnelCRLDPResEntry 5 }
+
+-- Definitions of CR-LDP Tunnel Resource Table - Ends
+
+-- Definitions of fsMplsTnlResourceObjects - Ends
+
+
+-- Definitions of fsMplsDiffServObjects - Starts
+
+-- Definitions of DiffServ ELSP Map Table - Starts
+
+fsMplsDiffServElspMapTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsMplsDiffServElspMapEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "ELSP's EXP to PHB Mapping Table "
+    ::= { fsMplsDiffServObjects 1 }
+
+fsMplsDiffServElspMapEntry OBJECT-TYPE
+    SYNTAX     FsMplsDiffServElspMapEntry 
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "ELSP Mapping Table Entry"
+    INDEX      { fsMplsDiffServElspMapIndex,
+                 fsMplsDiffServElspMapExpIndex}
+    ::= { fsMplsDiffServElspMapTable 1 }
+
+FsMplsDiffServElspMapEntry ::= SEQUENCE {
+    fsMplsDiffServElspMapIndex                  Integer32,
+    fsMplsDiffServElspMapExpIndex               Integer32,
+    fsMplsDiffServElspMapPhbDscp                INTEGER,
+    fsMplsDiffServElspMapStatus                 RowStatus
+}
+
+
+fsMplsDiffServElspMapIndex         OBJECT-TYPE
+    SYNTAX     Integer32(0..65535)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This object specifies the Index of the ELSP Map Element
+                 Value of this object should be less then
+                 fsMplsDiffServElspMapEntries"
+    ::= { fsMplsDiffServElspMapEntry 1 }
+
+
+fsMplsDiffServElspMapExpIndex         OBJECT-TYPE
+    SYNTAX     Integer32 (0..255)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This object specifies the Exp value of a particular EXP to PHB 
+                 mapping"
+    ::= { fsMplsDiffServElspMapEntry 2 }
+
+
+fsMplsDiffServElspMapPhbDscp         OBJECT-TYPE
+    SYNTAX     INTEGER { df   (0),
+                         cs1  (8),
+                         af11 (10),
+                         af12 (12),
+                         af13 (14),
+                         cs2  (16),
+                         af21 (18),
+                         af22 (20),
+                         af23 (22),
+                         cs3  (24),
+                         af31 (26),
+                         af32 (28),
+                         af33 (30),
+                         cs4  (32),
+                         af41 (34),
+                         af42 (36),
+                         af43 (38), 
+                         cs5  (40),
+                         ef   (46),
+                         cs6  (48),
+                         cs7  (56)}
+                         
+                         
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION " This object specifies the PHB Dscp value for a given EXP 
+                  value in a given EXP to PHB mapping."
+    DEFVAL { 0 }
+    ::= { fsMplsDiffServElspMapEntry 3 }
+
+
+fsMplsDiffServElspMapStatus         OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create 
+    STATUS     current
+    DESCRIPTION "Specifies whether this given EXP to PHB mapping is 
+                 active/notInService. fsMplsDiffServElspPreConfExpPhbMapIndex
+                 should be set to -1 to unmap a entry in preconfigured case."
+    ::= { fsMplsDiffServElspMapEntry 4 }
+
+-- Definitions of DiffServ ELSP Map Table - Ends
+
+-- Definitions of DiffServ Params Table - Starts
+
+fsMplsDiffServParamsTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsMplsDiffServParamsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "Table containing the DiffServ Params for a given NHLFE"
+    ::= { fsMplsDiffServObjects 2 }
+
+fsMplsDiffServParamsEntry OBJECT-TYPE
+    SYNTAX     FsMplsDiffServParamsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "DiffServ Params Table Entry"
+    INDEX      { fsMplsDiffServParamsIndex }
+    ::= { fsMplsDiffServParamsTable 1 }
+
+
+FsMplsDiffServParamsEntry ::= SEQUENCE {
+    fsMplsDiffServParamsIndex                  Integer32,
+    fsMplsDiffServParamsServiceType            INTEGER,
+    fsMplsDiffServParamsLlspPscDscp            INTEGER,
+    fsMplsDiffServParamsElspType               INTEGER,
+    fsMplsDiffServParamsElspSigExpPhbMapIndex  Integer32,
+    fsMplsDiffServParamsStatus                 RowStatus
+}
+
+
+fsMplsDiffServParamsIndex         OBJECT-TYPE
+    SYNTAX     Integer32(0..65535)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This object specifies the Index of the DiffServ Params Element
+                 Value of this index should be less then
+                 fsMplsDiffServParamsEntries"
+    ::= { fsMplsDiffServParamsEntry 1 }
+
+                   
+fsMplsDiffServParamsServiceType         OBJECT-TYPE
+    SYNTAX     INTEGER { genlsp (0), 
+                         diffservelsp (1), 
+                         diffservllsp(2),
+                         intserv (3) 
+                       }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION " This object specifies the type of service supported on this
+                  lsp"
+    DEFVAL { genlsp }
+    ::= { fsMplsDiffServParamsEntry 2 }
+
+
+fsMplsDiffServParamsLlspPscDscp         OBJECT-TYPE
+    SYNTAX     INTEGER { df  (0),
+                         cs1 (8),
+                         af1 (10),
+                         cs2 (16),
+                         af2 (18),
+                         cs3 (24),
+                         af3 (26),
+                         cs4 (32),
+                         af4 (34), 
+                         cs5 (40),
+                         ef  (46),   
+                         cs6 (48),
+                         cs7 (56)}
+                         
+    MAX-ACCESS read-create  
+    STATUS     current      
+    DESCRIPTION " This object specifies the PSC Dscp value if the DiffServ 
+                  Params corresponds to an llsp.  This should be configured
+                  only if fsMplsDiffServParamsServiceType is diffservllsp"
+    DEFVAL { 0 }             
+    ::= { fsMplsDiffServParamsEntry 3 }
+
+
+fsMplsDiffServParamsElspType         OBJECT-TYPE
+    SYNTAX     INTEGER { preconf (0), sig (1) }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION " This object specifies the type of ELSP if the DiffServ 
+                  Params corresponds to an elsp.  This should be configured
+                  only if fsMplsDiffServParamsServiceType is diffservelsp"
+    DEFVAL { 0 }
+    ::= { fsMplsDiffServParamsEntry 4 }
+
+fsMplsDiffServParamsElspSigExpPhbMapIndex         OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION " This object specifies the index to the Elsp Map Table which 
+                  gives the Signaled EXP to PHB mapping if the DiffServ 
+                  Params corresponds to a signaled Elsp.  This should be 
+                  configured only if fsMplsDiffServParamsServiceType is 
+                  diffservelsp and fsMplsDiffServParamsElspType is sig
+                  Value of this object should be less then
+                  fsMplsDiffServElspMapEntries"
+    ::= { fsMplsDiffServParamsEntry 5 }
+
+
+fsMplsDiffServParamsStatus         OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create 
+    STATUS     current
+    DESCRIPTION "Specifies whether this given DiffServ Params entry is 
+                 active/notInService"
+    ::= { fsMplsDiffServParamsEntry 6 }
+
+-- Definitions of DiffServ Params Table - Ends
+
+-- Definitions of fsMplsDiffServTable - Starts
+
+fsMplsDiffServTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF FsMplsDiffServEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "The fsMplsDiffServTable allows a manager to
+           specify the diffServ Service-Type and the corresponding 
+           attributes for the Service-Type as desired for the tunnel 
+           when the mpls is diffServ aware."
+     ::= { fsMplsDiffServObjects 3 }
+
+fsMplsDiffServEntry OBJECT-TYPE
+     SYNTAX        FsMplsDiffServEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "An entry in this table represents the diffServ
+           Service-Type and diffServ related parameters 
+           for the tunnel."
+     INDEX         { mplsTunnelIndex, mplsTunnelInstance,
+                     mplsTunnelIngressLSRId, mplsTunnelEgressLSRId }
+     ::= { fsMplsDiffServTable 1 }
+
+FsMplsDiffServEntry ::= SEQUENCE {
+     fsMplsDiffServClassType          Integer32,  	  
+     fsMplsDiffServServiceType        INTEGER,
+     fsMplsDiffServLlspPsc            INTEGER,
+     fsMplsDiffServElspType           INTEGER,
+     fsMplsDiffServElspListIndex      Integer32,
+     fsMplsDiffServRowStatus          RowStatus,
+     fsMplsDiffServStorageType        StorageType
+ }
+
+fsMplsDiffServClassType OBJECT-TYPE
+     SYNTAX        Integer32 (0..7) 
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "Represents the Class-Type associated with the tunnel."
+     ::= { fsMplsDiffServEntry 1 }
+
+fsMplsDiffServServiceType OBJECT-TYPE
+     SYNTAX        INTEGER {
+                            nonDiffServLSP(0),
+                            diffServElsp(1),
+                            diffServLlsp(2),
+                            intServLSP(3)
+                           }
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "Represents the Service-Type associated with the tunnel.
+           By default, it is NonDiffServ."
+     DEFVAL        { nonDiffServLSP }
+     ::= { fsMplsDiffServEntry 2 }
+
+fsMplsDiffServLlspPsc OBJECT-TYPE
+     SYNTAX        INTEGER { df  (0),
+                             cs1 (8),
+                             af1 (10),
+                             cs2 (16),
+                             af2 (18),
+                             cs3 (24),
+                             af3 (26),
+                             cs4 (32),
+                             af4 (34),
+                             cs5 (40),
+                             ef  (46),
+                             cs6 (48),
+                             cs7 (56),
+                             ef1 (62)}
+
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "If the fsMplsDiffServServiceType is set to  
+           'DiffServLlsp', then this value identifies an entry in 
+           the fsMplsDiffServLlspTable that gives the PSC 
+           associated with the diffServ aware tunnel. Otherwise, this 
+           variable should contain the value of zero indicating that 
+           the tunnel is not a Llsp tunnel."
+     ::= { fsMplsDiffServEntry 3 }
+
+fsMplsDiffServElspType OBJECT-TYPE
+     SYNTAX         INTEGER {
+                             preconfigured(0),
+                             signaled(1)
+                            }
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION
+          "Represents whether the Elsp is signaled or 
+           preconfigured."
+     DEFVAL         { preconfigured }
+     ::= { fsMplsDiffServEntry 4  }
+
+fsMplsDiffServElspListIndex OBJECT-TYPE
+     SYNTAX        Integer32 (1..65535)
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This value corresponds to the entry in the 
+           fsMplsDiffServElspInfoTable , which gives 
+           the information about the PHBs and the resource 
+           requirement for the PSC of the PHB." 
+     ::= { fsMplsDiffServEntry 5 }
+
+fsMplsDiffServRowStatus OBJECT-TYPE
+     SYNTAX        RowStatus
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This variable is used to create, modify, and/or
+           delete a row in this table."
+     ::= { fsMplsDiffServEntry 6 }
+
+fsMplsDiffServStorageType OBJECT-TYPE
+     SYNTAX        StorageType
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This variable indicates the storage type for this
+           object."
+     ::= { fsMplsDiffServEntry 7 }
+
+-- Definitions of fsMplsDiffServTable - Ends
+
+-- Definitions of fsMplsDIffServTnlElspInfoTable - Starts
+
+fsMplsDiffServElspInfoTable OBJECT-TYPE
+     SYNTAX       SEQUENCE OF FsMplsDiffServElspInfoEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+          "The fsMplsDiffServElspInfoTable allows a manager to
+           specify  the information about the PHBs and the resource 
+           requirement for the PSC of the PHB for the diffServ Elsp   
+           Tunnel." 
+     ::= { fsMplsDiffServObjects 4 }
+
+fsMplsDiffServElspInfoEntry OBJECT-TYPE
+     SYNTAX       FsMplsDiffServElspInfoEntry
+     MAX-ACCESS   not-accessible
+     STATUS       current
+     DESCRIPTION
+          "An entry in this table represents the 
+           information about the PHBs and the resource 
+           requirement for the PSC of the PHB."
+
+     INDEX         { fsMplsDiffServElspInfoListIndex,
+                     fsMplsDiffServElspInfoIndex }
+     ::= { fsMplsDiffServElspInfoTable 1 }
+
+FsMplsDiffServElspInfoEntry ::= SEQUENCE {
+     fsMplsDiffServElspInfoListIndex          Integer32,
+     fsMplsDiffServElspInfoIndex              Integer32,
+     fsMplsDiffServElspInfoPHB                INTEGER,
+     fsMplsDiffServElspInfoResourcePointer    RowPointer,
+     fsMplsDiffServElspInfoRowStatus          RowStatus,
+     fsMplsDiffServElspInfoStorageType        StorageType
+}
+
+fsMplsDiffServElspInfoListIndex OBJECT-TYPE
+     SYNTAX         Integer32 (1..65535)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION 
+           "Uniquely identifies the list of the entries in the
+            table. This value is  referred in fsMmplsDiffServEntry."
+     ::= { fsMplsDiffServElspInfoEntry 1 }
+
+fsMplsDiffServElspInfoIndex OBJECT-TYPE
+     SYNTAX        Integer32 (1..8)
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION 
+           "Uniquely identifies each entry in the table."
+     ::= { fsMplsDiffServElspInfoEntry 2 }
+
+fsMplsDiffServElspInfoPHB OBJECT-TYPE
+     SYNTAX        INTEGER { df   (0),
+                             cs1  (8),
+                             af11 (10),
+                             af12 (12),
+                             af13 (14),
+                             cs2  (16),
+                             af21 (18),
+                             af22 (20),
+                             af23 (22),
+                             cs3  (24),
+                             af31 (26),
+                             af32 (28),
+                             af33 (30),
+                             cs4  (32),
+                             af41 (34),
+                             af42 (36),
+                             af43 (38), 
+                             cs5  (40),
+                             ef   (46),
+                             cs6  (48),
+                             cs7  (56),
+                             ef1 (62)}
+                     
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION 
+           "Represents the DSCP value of the PHB for this entry."
+     ::= { fsMplsDiffServElspInfoEntry 3 }
+
+fsMplsDiffServElspInfoResourcePointer OBJECT-TYPE
+     SYNTAX        RowPointer
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This variable represents a pointer to the traffic
+           parameter specification for this PSC. This
+           value may point at an entry in the
+           mplsTunnelResourceEntry to indicate which
+           mplsTunnelResourceEntry is to be assigned to this
+           PSC.By having the same value of this object, two or 
+           more segments can indicate resource sharing."
+     ::= { fsMplsDiffServElspInfoEntry 4 }
+
+fsMplsDiffServElspInfoRowStatus OBJECT-TYPE
+     SYNTAX        RowStatus
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This variable is used to create, modify, and/or
+           delete a row in this table."
+     ::= { fsMplsDiffServElspInfoEntry 5 }
+
+fsMplsDiffServElspInfoStorageType OBJECT-TYPE
+     SYNTAX        StorageType
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This variable indicates the storage type for this object."
+     ::= { fsMplsDiffServElspInfoEntry 6 }
+
+-- Definitions of fsMplsDiffServElspInfoTable - Ends
+
+fsMplsDiffServElspInfoListIndexNext OBJECT-TYPE
+     SYNTAX        Integer32 (0..65535)
+     MAX-ACCESS    read-only
+     STATUS        current
+     DESCRIPTION
+          "This object contains the next appropriate value to
+           be used for fsMplsDiffServElspInfoListIndex when creating entries
+           in  fsMplsDiffServElspInfoTable. If the number of unassigned
+           entries is exhausted, a retrival operation will
+           return a value of 0.To obtain the value of 
+           fsMplsDiffServElspInfoIndex for a new entry, the manager 
+           must first issue a management
+           protocol retrieval operation to obtain the current
+           value of this object. The agent should modify the
+           value to reflect the next unassigned index after
+           each retrieval operation. After a manager retrieves
+           a value the agent will determine through its local
+           policy when this index value will be made available
+           for reuse."
+::= { fsMplsDiffServObjects 5 }
+
+fsMplsTnlModel OBJECT-TYPE
+    SYNTAX     INTEGER { uniform (1), pipe (2), shortpipe(3) }
+    MAX-ACCESS read-write 
+    STATUS     current
+    DESCRIPTION
+         "Type of Tunneling Model supported on the LSR.
+         
+            With the Pipe Model, MPLS tunnels (aka LSPs) are used to hide the
+         intermediate MPLS nodes between LSP Ingress and Egress from the
+         Diff-Serv perspective.
+         
+         With the Short Pipe Model, the Diff-Serv forwarding treatment at the
+         LSP Egress is applied based on the 'Tunneled Diff-Serv Information'
+         (i.e., Diff-Serv information conveyed in the encapsulated header)
+         rather than on the 'LSP Diff-Serv information' (i.e., Diff-Serv
+         information conveyed in the encapsulating header).
+
+         With the Uniform Model, MPLS tunnels (aka LSPs) are viewed as
+         artifacts of the end-to-end path from the Diff-Serv standpoint.
+         In this model, any packet contains exactly one piece of Diff-Serv
+         information which is meaningful and is always encoded in the outer
+         most label entry (or in the IP DSCP where the IP packet is
+         transmitted unlabelled for instance at the egress of the LSP)."
+    DEFVAL { pipe } 
+::= { fsMplsDiffServObjects 6 }
+
+fsMplsRsrcMgmtType OBJECT-TYPE
+
+    SYNTAX        INTEGER { class(0), peroa(1), aggregated(2) }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This read-write object is used for configuring resource
+    management type for diffserv,depending on the type reservation is
+    done"
+    DEFVAL        { aggregated }
+::= { fsMplsDiffServObjects 7 }
+
+fsMplsTTLVal OBJECT-TYPE
+
+    SYNTAX      Integer32 (1..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Value of the TTL  on the LSR.
+
+          In Pipe Model, the configured TTL value shall be copied to the newly
+    formed MPLS header at the ingress LSR of the MPLS tunnels.This
+    TTL value shall be visible only till the egress LSR of the
+    MPLS tunnel.
+
+          In Short Pipe Mode, the configured TTL value shall be copied to the
+    newly formed MPLS header at the ingress LSR of the MPLS tunnel.
+    This TTL value shall be visible only till the egress LSR of the
+    MPLS tunnel.
+
+          In Uniform Model the configured TTL value is ignored and
+    value available in the Ip header is used to fill the TTL value of the
+    MPLS header at the ingress LSR of the MPLS tunnel."
+
+
+    DEFVAL { 255 }
+::= { fsMplsDiffServObjects 8 }
+
+-- Definitions of DiffservObjects - Ends
+-- Definitions of fsMplsDsTeObjects - Starts
+
+fsMplsDsTeStatus OBJECT-TYPE
+    SYNTAX      INTEGER { disable(0), enable(1)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    " This object is used to enable or disable the differntiated service
+      on particular node to provide scalable Quality of service.
+      When this object is set to enable(1), DS-TE is enabled.
+      When this object is set to disable(0), DS-TE is disabled."
+    DEFVAL        { disable }
+    ::= { fsMplsDsTeObjects 1 }
+
+--Start of DiffServ TE Class Type Table
+
+fsMplsDsTeClassTypeTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsMplsDsTeClassTypeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This table is used to configure different class types and 
+                 bandwidth percentages for the particular class type."
+    ::= { fsMplsDsTeObjects 2 }
+
+fsMplsDsTeClassTypeEntry  OBJECT-TYPE
+    SYNTAX     FsMplsDsTeClassTypeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "Class Type Table Entry"
+    INDEX      {fsMplsDsTeClassTypeIndex}
+    ::= { fsMplsDsTeClassTypeTable 1 }
+
+FsMplsDsTeClassTypeEntry ::= SEQUENCE {
+    fsMplsDsTeClassTypeIndex            Unsigned32,
+    fsMplsDsTeClassTypeDescription      SnmpAdminString,
+    fsMplsDsTeClassTypeRowStatus        RowStatus,
+    fsMplsDsTeClassTypeBwPercentage     Integer32
+}
+
+fsMplsDsTeClassTypeIndex         OBJECT-TYPE
+    SYNTAX     Unsigned32(0..7)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This object uniquely identifies a row in this table."
+    ::= { fsMplsDsTeClassTypeEntry 1 }
+
+fsMplsDsTeClassTypeDescription    OBJECT-TYPE
+    SYNTAX     SnmpAdminString
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This object is used to provide description for the Class Type."
+    ::= { fsMplsDsTeClassTypeEntry 2 }
+
+fsMplsDsTeClassTypeRowStatus      OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This variable is used to create, modify, and/or delete a row
+                 in this table.  When a row in this table is in active(1) state,
+                 no objects in that row can be modified by the agent except 
+                 fsMplsDsTeClassTypeRowStatus."
+    ::= { fsMplsDsTeClassTypeEntry 3 }
+
+fsMplsDsTeClassTypeBwPercentage    OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This object specifies the percentage of total bandwidth of a
+                 TE link allocated to this Class Type."
+    DEFVAL        { 0 }
+::= { fsMplsDsTeClassTypeEntry 4 }
+
+
+-- End of DiffServ TE Class Type Table
+
+-- Start of DiffServ TE Class Type(CT) to Traffic Class(TC) Map Table
+
+fsMplsDsTeClassTypeToTcMapTable  OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsMplsDsTeClassTypeToTcMapEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This table maps the Class Type to Traffic Classes. One 
+                 Traffic Class can belong to only one Class Type."
+    ::= { fsMplsDsTeObjects 3 }
+
+fsMplsDsTeClassTypeToTcMapEntry  OBJECT-TYPE
+    SYNTAX      FsMplsDsTeClassTypeToTcMapEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "Class Type to Traffic Class Mapping Table Entry."
+    INDEX      {fsMplsDsTeClassTypeIndex,
+                fsMplsDsTeTcIndex}
+    ::= { fsMplsDsTeClassTypeToTcMapTable 1 }
+
+FsMplsDsTeClassTypeToTcMapEntry ::= SEQUENCE {
+    fsMplsDsTeTcIndex                   Unsigned32,
+    fsMplsDsTeTcType                    INTEGER,
+    fsMplsDsTeTcDescription             SnmpAdminString,
+    fsMplsDsTeTcMapRowStatus            RowStatus
+}
+
+fsMplsDsTeTcIndex         OBJECT-TYPE
+    SYNTAX     Unsigned32(0..7)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This object is a secondary index to this table. 
+                 It specifies the traffic class index."
+    ::= { fsMplsDsTeClassTypeToTcMapEntry 1 }
+
+
+fsMplsDsTeTcType         OBJECT-TYPE
+    SYNTAX     INTEGER  {df  (0),
+                         cs1 (8),
+                         af1 (10),
+                         cs2 (16),
+                         af2 (18),
+                         cs3 (24),
+                         af3 (26),
+                         cs4 (32),
+                         af4 (34),
+                         cs5 (40),
+                         ef  (46),
+                         cs6 (48),
+                         cs7 (56),
+                         ef1 (62)}
+
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This object specifies the traffic class value associated with this
+                 Class Type. Traffic Class Mapping Entry."
+    
+    DEFVAL        { 0 }
+    
+    ::= {fsMplsDsTeClassTypeToTcMapEntry 2 }
+
+fsMplsDsTeTcDescription    OBJECT-TYPE
+    SYNTAX     SnmpAdminString
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This object describes the traffic class mapping entry."
+    ::= { fsMplsDsTeClassTypeToTcMapEntry 3 }
+
+fsMplsDsTeTcMapRowStatus    OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This variable is used to create, modify, and/or delete a row
+                 in this table.  When a row in this table is in active(1) state,
+                 no objects in that row can be modified by the agent except 
+                 fsMplsDsTeTcMapRowStatus."
+    ::= { fsMplsDsTeClassTypeToTcMapEntry 4 }
+
+-- End of DiffServ TE Class Type(CT) to Traffic Class(TC) Map Table
+
+
+--Start of DiffServ TE Class Type(CT) to TE Class Map Table
+fsMplsDsTeTeClassTable     OBJECT-TYPE
+    SYNTAX     SEQUENCE OF FsMplsDsTeTeClassEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This table maps the Class Type to Priority. Each row in this 
+                 table corresponds to a Diffserv TE Class. Each DS-TE class
+                 is defined by associating Class Type with priority."
+    ::= { fsMplsDsTeObjects 4 }
+
+fsMplsDsTeTeClassEntry  OBJECT-TYPE
+    SYNTAX     FsMplsDsTeTeClassEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "TE Class Table Entry"
+    INDEX      {fsMplsDsTeClassTypeIndex,
+                fsMplsDsTeTeClassPriority}
+    ::= { fsMplsDsTeTeClassTable 1 }
+
+
+FsMplsDsTeTeClassEntry ::= SEQUENCE {
+    fsMplsDsTeTeClassPriority                Unsigned32,
+    fsMplsDsTeTeClassDesc                    SnmpAdminString,
+    fsMplsDsTeTeClassNumber                  Unsigned32,
+    fsMplsDsTeTeClassRowStatus               RowStatus
+}
+
+fsMplsDsTeTeClassPriority         OBJECT-TYPE
+    SYNTAX     Unsigned32(0..7)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION "This object specifies the preemption priority
+                 associated with a Class-Type to form a TE-Class.
+                 This priority will be used both as set-up and holding priority"
+    ::= { fsMplsDsTeTeClassEntry 1 }
+
+fsMplsDsTeTeClassDesc       OBJECT-TYPE
+    SYNTAX     SnmpAdminString
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This object describes the Class Type mapping with Priority."
+    ::= {fsMplsDsTeTeClassEntry 2 }
+
+fsMplsDsTeTeClassNumber         OBJECT-TYPE
+    SYNTAX     Unsigned32(0..7)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION " This object specifies the TE-Class Number.
+                  This is unique throughout the system."
+    
+    DEFVAL        { 0 }
+    
+    ::= {fsMplsDsTeTeClassEntry 3 }
+
+fsMplsDsTeTeClassRowStatus      OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION "This variable is used to create, modify, and/or delete a row
+                 in this table.  When a row in this table is in active(1) state,
+                 no objects in that row can be modified by the agent except 
+                 fsMplsDsTeTeClassRowStatus."
+    ::= { fsMplsDsTeTeClassEntry 4 }
+
+-- End of DiffServ TE  DiffServ TE Class Type(CT) to TE Class Map Table
+
+-- End of fsMplsDsTeObjects
+-- Definitions of fsMplsL2VpnConfigObjects - Starts
+
+fsMplsL2VpnTrcFlag OBJECT-TYPE
+    SYNTAX        Integer32 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+          "This is a 4-byte (32-bit) object with each bit enabling/disabling a 
+           particular type of trace/debug statement. Following is the convention
+           followed.
+
+           |<------------ 32 bits ------------>|
+           +--------+--------+--------+--------+
+           |00000000|00000000|00000000|00000000|
+           +--------+--------+--------+--------+
+             CPT      VCCV     Func     Levels
+                       GR
+
+           00000000  00000000  00000000  00000001 - Level One Critical Trace
+           00000000  00000000  00000000  00000011 - Level Two Error Trace that includes
+                                                    level One
+           00000000  00000000  00000000  00000111 - Level Three Debug Trace that includes
+                                                    level One and level Two
+
+
+           00000000  00000000  00000001  00000000 - Signalling Functional Traces
+           00000000  00000000  00000010  00000000 - Session Functional Traces
+           00000000  00000000  00000100  00000000 - VC Functional Traces
+           00000000  00000000  00001000  00000000 - Critical Functional Traces
+
+
+           01000000  00000000  00000000  00000000 - Debug Messages for Packet Rx
+           00100000  00000000  00000000  00000000 - Debug Messages for Packet Tx
+           01100000  00000000  00000000  00000000 - Debug Messages for Packet Tx and Rx
+
+           00000000  00000001  00000000  00000000 - VCCV critical debug statements
+           00000000  00000010  00000000  00000000 - VCCV management configuration
+           00000000  00000100  00000000  00000000 - VCCV capability exchange and selection
+           00000000  00001000  00000000  00000000 - Graceful Restart related debug Statements
+           "
+
+    DEFVAL        { 2048 }
+
+    ::= { fsMplsL2VpnConfigObjects 1 }
+
+fsMplsL2VpnCleanupInterval OBJECT-TYPE
+    SYNTAX        TimeInterval   -- UNITS thousandths of a second
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+         "The Cleanup time interval value will be in terms of thousandths of a second.
+          This determines how long the peer label information can be kept
+          waiting for local configuration.The PW label map information
+          received from Peer LSRs with invalid or no matching PW VC ID
+          configured at Local LSR , will be cleaned up if waiting time
+          exceeds fsMplsL2VpnCleanupInterval value."
+    DEFVAL        { 60000 }
+    ::= { fsMplsL2VpnConfigObjects 2 }
+
+fsMplsL2VpnAdminStatus OBJECT-TYPE
+    SYNTAX        INTEGER {
+                            up(1),
+                            down(2)
+                          }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Field indicates the status of the L2VPN functionality.
+         When the value is set to UP, required resource will be
+         allocated and L2VPN functionality will be started.
+         When made down from up condition, resources will be
+         released and L2VPN functionality will be stopped."
+    DEFVAL       { up }
+    ::= { fsMplsL2VpnConfigObjects 3 }
+
+-- Definitions of L2VpnPwTable - Starts
+fsMplsL2VpnPwTable   OBJECT-TYPE  
+      SYNTAX        SEQUENCE OF FsMplsL2VpnPwEntry  
+      MAX-ACCESS    not-accessible  
+      STATUS        current  
+      DESCRIPTION  
+          "This table is an extension to pw Table for configuring the mode
+          of Pseudowire"
+      ::= { fsMplsL2VpnConfigObjects 4 }  
+    
+fsMplsL2VpnPwEntry   OBJECT-TYPE  
+      SYNTAX        FsMplsL2VpnPwEntry  
+      MAX-ACCESS    not-accessible  
+      STATUS        current  
+      DESCRIPTION  
+           "A row in this table augments a row in pwTable.   
+            This entry specifies the mode of PW."  
+         AUGMENTS    { pwEntry }
+         ::= { fsMplsL2VpnPwTable 1 }
+    
+FsMplsL2VpnPwEntry ::= SEQUENCE {  
+         fsMplsL2VpnPwMode                   INTEGER,
+         fsMplsL2VpnVplsIndex                Unsigned32,
+         fsMplsL2VpnPwLocalCapabAdvert       IANAPwCapabilities,
+         fsMplsL2VpnPwLocalCCSelected        PwCcTypesCapabilities,
+         fsMplsL2VpnPwLocalCVSelected        PwCvTypesCapabilities,
+         fsMplsL2VpnPwLocalCCAdvert          PwCcTypesCapabilities,
+         fsMplsL2VpnPwLocalCVAdvert          PwCvTypesCapabilities,
+         fsMplsL2VpnPwRemoteCCAdvert         PwCcTypesCapabilities,
+         fsMplsL2VpnPwRemoteCVAdvert         PwCvTypesCapabilities,
+         fsMplsL2VpnPwOamEnable              TruthValue,
+         fsMplsL2VpnPwGenAGIType             PwGenIdType,
+         fsMplsL2VpnPwGenLocalAIIType        PwGenIdType,
+         fsMplsL2VpnPwGenRemoteAIIType       PwGenIdType,
+         fsMplsL2VpnProactiveOamSsnIndex     Unsigned32,
+         fsMplsL2VpnPwAIIFormat              BITS,
+         fsMplsL2VpnIsStaticPw               TruthValue,
+         fsMplsL2VpnNextFreePwEnetPwInstance PwIndexType,
+         fsMplsL2VpnPwSynchronizationStatus  Integer32
+      }  
+    
+fsMplsL2VpnPwMode OBJECT-TYPE
+    SYNTAX        INTEGER {
+                            vpws(1),
+                            vpls(2),
+                            ipls(3)
+                          }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This field indicates the mode of pseudowire."
+    DEFVAL       { vpws }
+    ::= { fsMplsL2VpnPwEntry 1 }
+
+fsMplsL2VpnVplsIndex OBJECT-TYPE 
+    SYNTAX          Unsigned32 (1.. 2147483647)
+    MAX-ACCESS      read-write 
+    STATUS          current 
+    DESCRIPTION     
+        "Valid only if fsMplsL2VpnPwMode is vpls(2).
+         Contains the Index of fsMplsVplsConfigTable
+         (fsMplsVplsInstanceIndex)"
+    ::= { fsMplsL2VpnPwEntry 2 }
+
+
+fsMplsL2VpnPwLocalCapabAdvert OBJECT-TYPE
+    SYNTAX        IANAPwCapabilities
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This object is set to indicate the capabilities of the pseudowire."
+   ::= { fsMplsL2VpnPwEntry 3 }
+
+fsMplsL2VpnPwLocalCCSelected OBJECT-TYPE
+    SYNTAX          PwCcTypesCapabilities
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the type of Control channel selected from the matching
+         types between fsMplsL2VpnPwLocalCCAdvert and fsMplsL2VpnPwRemoteCCAdvert 
+         based on the following precedency rule
+
+         1.  Type 1: PWE3 Control Word with 0001b as first nibble
+
+         2.  Type 2: MPLS Router Alert Label
+
+         3.  Type 3: MPLS PW Label with TTL == 1"
+
+    ::= { fsMplsL2VpnPwEntry 4 }
+
+
+fsMplsL2VpnPwLocalCVSelected OBJECT-TYPE
+    SYNTAX          PwCvTypesCapabilities
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the selected connection verification type from the matching
+         types between fsMplsL2VpnPwLocalCVAdvert and 
+         fsMplsL2VpnPwRemoteCVAdvert."
+
+    ::= { fsMplsL2VpnPwEntry 5 }
+
+
+fsMplsL2VpnPwLocalCCAdvert OBJECT-TYPE 
+    SYNTAX          PwCcTypesCapabilities 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     
+        "Indicates the type of control channel types advertised by this node to peer. 
+         PW Local control channel can have one or more types available in the 
+         fsMplsLocalCCTypesCapabilities object. If this object is not configured,
+         it takes the value of the MIB object fsMplsLocalCCTypesCapabilities.
+
+         The value of this object cannot be changed when pwRowStatus is active." 
+    REFERENCE
+        "See section 4 of RFC5085 where bit values 
+         for corresponding CC types are defined" 
+
+    ::= { fsMplsL2VpnPwEntry 6 }
+
+fsMplsL2VpnPwLocalCVAdvert OBJECT-TYPE 
+    SYNTAX          PwCvTypesCapabilities
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     
+        "Indicates the type of connection verification types advertised by this node
+         to the peer. PW Local CV types can have one or more types available in the 
+         fsMplsLocalCVTypesCapabilities object. When this object is not configured, 
+         it takes the value of the MIB object fsMplsLocalCVTypesCapabilities.
+         
+         The value of this object cannot be changed when pwRowStatus is active."
+    REFERENCE
+        "See section 4 of RFC5085 where defined bit values 
+         for corresponding CV types are mentioned. 
+         See section 3.3 of RFC5885 where bit values for CV types 
+         are defined exclusively for BFD"
+    
+    ::= { fsMplsL2VpnPwEntry 7 }
+
+fsMplsL2VpnPwRemoteCCAdvert OBJECT-TYPE 
+    SYNTAX          PwCcTypesCapabilities
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     
+        "This field indicates the type of control channel advertised
+         by the peer to this node. This object is configurable only for manual
+         mode of pseudowire (i.e., when pseudowire signaling is not used). 
+         This object acts as read-only object for signaling type of pseudowires.
+
+         Only matching capabilities can be selected from the remote CC type.
+         When multiple capabilities match, only one CC Type MUST be used.
+         For cases where multiple CC Types are advertised, the following
+         precedence rules apply while choosing the single CC Type for use:
+         1.  Type 1: PWE3 Control Word with 0001b as first nibble
+         2.  Type 2: MPLS Router Alert Label
+         3.  Type 3: MPLS PW Label with TTL == 1
+
+         Value of this object cannot be changed when pwRowStatus is active." 
+    REFERENCE
+        "See section 4 of RFC5085 where bit values 
+         for corresponding CC types are defined." 
+    ::= { fsMplsL2VpnPwEntry 8 }
+
+fsMplsL2VpnPwRemoteCVAdvert OBJECT-TYPE 
+    SYNTAX          PwCvTypesCapabilities
+    MAX-ACCESS      read-create
+    STATUS          current 
+    DESCRIPTION     
+         "This field indicates the type of connection verification advertised 
+          by the peer to this node. This object is configurable only for manual  
+          mode of pseudowires (i.e., when pseudowire signaling is not used).
+          This object acts as read-only object for signaling type of pseudowires.
+
+          The Value of this object can not be changed when pwRowStatus is active."
+    REFERENCE
+        "See section 4 of RFC5085 where defined bit values 
+         for corresponding CV types are mentioned. 
+         See section 3.3 of RFC5885 where bit values for CV types 
+         are defined exclusively for BFD."
+    ::= { fsMplsL2VpnPwEntry 9 }
+ 
+fsMplsL2VpnPwOamEnable  OBJECT-TYPE
+     SYNTAX        TruthValue
+     MAX-ACCESS    read-create
+     STATUS        deprecated
+     DESCRIPTION
+         "This variable indicates the OAM status of the pseudowire. The value 
+          'true' denotes that OAM is enabled for this pseudowire and 'false' denotes 
+          that OAM is disabled for this pseudowire. The value of this object 
+          may be changed at any time. This object is not supported."
+     DEFVAL { true }
+
+    ::= { fsMplsL2VpnPwEntry 10 }
+
+fsMplsL2VpnPwGenAGIType OBJECT-TYPE
+     SYNTAX        PwGenIdType
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+         "This variable indicates the AGI type if generalized FEC
+          (129) is used for PW signaling or configuration. It SHOULD
+          return the value of zero otherwise."
+     DEFVAL { 0 }
+    ::= { fsMplsL2VpnPwEntry 11 }
+
+fsMplsL2VpnPwGenLocalAIIType OBJECT-TYPE
+     SYNTAX        PwGenIdType
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+          "This object is the type of the local forwarder
+          attachment individual identifier (AII) to be used
+          by this PW if generalized FEC (129) is used for PW
+          signaling or configuration.
+
+          If Source-AC-Id and Destination-AC-Id are configured for
+          this pseudowire, this object should be set to 2.
+          Else this object should be set to 1."
+     DEFVAL { 0 }
+    ::= { fsMplsL2VpnPwEntry 12 }
+
+fsMplsL2VpnPwGenRemoteAIIType OBJECT-TYPE
+     SYNTAX        PwGenIdType
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+        "This object is the type of the remote forwarder
+          attachment individual identifier (AII) to be used
+          by this PW if generalized FEC (129) is used for PW
+          signaling or configuration.
+
+          If Source-AC-Id and Destination-AC-Id are configured for
+          this pseudowire, this object should be set to 2.
+          Else this object should be set to 1"
+     DEFVAL { 0 }
+    ::= { fsMplsL2VpnPwEntry 13 }
+
+fsMplsL2VpnProactiveOamSsnIndex  OBJECT-TYPE
+       SYNTAX        Unsigned32
+       MAX-ACCESS    read-only
+       STATUS        current
+       DESCRIPTION
+         "Indicates the proactive session index for this Pseudowire.
+          When a proactive session for this Pseudowire is established,
+          the application has to update this object with the 
+          session index.
+          The value '0' indicates that proactive OAM session is not 
+          estabilshed for this pseudowire."
+       DEFVAL { 0 }
+ ::= { fsMplsL2VpnPwEntry 14 }
+
+
+fsMplsL2VpnPwAIIFormat  OBJECT-TYPE
+    SYNTAX     BITS {
+               saiiIp (0),
+               taiiIp (1)
+               }
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+            "Indicates whether the configured Attachment identifier is an IP address
+             or a string.
+
+             The value of bit 0 (saiiIp) if set indicates SAII input is an 
+             IP address.
+
+             The value of bit 0 (saiiIp) if not set indicates SAII input is a string.
+             
+             The value of bit 1 (taiiIp) if set indicates TAII input is an
+             IP address.
+             
+             The value of bit 1 (taiiIp) if not set indicates TAII input is a string."
+            
+    DEFVAL { 0 }    
+ ::= { fsMplsL2VpnPwEntry 15 }
+
+
+fsMplsL2VpnIsStaticPw  OBJECT-TYPE
+     SYNTAX        TruthValue
+     MAX-ACCESS    read-only
+     STATUS        current
+     DESCRIPTION
+         "This MIB object indicates whether the pseudowire is created via administrative 
+          control or dynamically. If value is 'true', then it denotes that PW is created 
+          by the user/administrator. Otherwise,it is a signalled pseudowire."
+
+    ::= { fsMplsL2VpnPwEntry 16 }
+
+fsMplsL2VpnNextFreePwEnetPwInstance OBJECT-TYPE
+     SYNTAX        PwIndexType
+     MAX-ACCESS    read-only
+     STATUS        current
+     DESCRIPTION
+         "This MIB object contains the next free running ethernet pseudowire Instance 
+          associated with the pseudowire Index."
+    ::= { fsMplsL2VpnPwEntry 17 }
+
+fsMplsL2VpnPwSynchronizationStatus OBJECT-TYPE
+    SYNTAX          Integer32 
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the Synchronization status of the Pseudowire upon LDP Graceful
+         Restart. Only Four different values are possible.
+         0. Fully Synchronized
+         1. Local Synchronized.
+         2. Remote Synchronized
+         3. Not Synchronized.
+
+         Fully Synchronized refers that the both Peer and the node has exchanged the 
+         Label Mapping Message after restart.
+
+         Local Synchronized refers that the Label Mapping Message is sent by the node
+         and waiting for the Label Mapping Message from the Peer.
+
+         Remote Synchronized refers that the Label Mapping Message is sent by the Peer
+         and waiting to send the Label Mapping Message to the Peer.
+
+         Not Synchronized state refers that no Label Mapping Message exchanged between
+         the Nodes after restart."
+
+    ::= { fsMplsL2VpnPwEntry 18 }
+
+
+-- Definitions of L2VpnPwTable - Ends
+
+-- Definitions of fsMplsVplsConfigTable - Starts
+
+fsMplsVplsConfigTable OBJECT-TYPE 
+    SYNTAX          SEQUENCE OF FsMplsVplsConfigEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     
+      "This table specifies information for configuring
+      and monitoring Virtual Private Lan Services(VPLS)." 
+    ::= { fsMplsL2VpnConfigObjects 5 } 
+       
+fsMplsVplsConfigEntry OBJECT-TYPE 
+    SYNTAX          FsMplsVplsConfigEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     
+      
+      "A row in this table represents a Virtual Private Lan 
+      Service(VPLS) in a packet network. It is indexed by  
+      fsMplsVplsInstanceIndex, which uniquely identifies a single VPLS.   
+
+      A row is created by the operator or by the agent if a 
+      VPLS service is created by non-SNMP application or 
+      due to autodiscovery process.  
+
+      None of the read-create objects values can be 
+      changed when fsMplsVplsRowStatus is in the active(1) 
+      state. Changes are allowed when the fsMplsVplsRowStatus 
+      is in notInService(2) or notReady(3) states only.   
+      If the operator need to change one of the values 
+      for an active row the fsMplsVplsRowStatus should be 
+      first changed to notInService(2), the objects may 
+      be changed now, and later to active(1) in order to 
+      re-initiate the signaling process with the new 
+      values in effect.  
+      "  
+    INDEX   { fsMplsVplsInstanceIndex } 
+    ::= { fsMplsVplsConfigTable 1 } 
+               
+FsMplsVplsConfigEntry ::= SEQUENCE { 
+    fsMplsVplsInstanceIndex         Unsigned32,
+    fsMplsVplsVsi                   Integer32,
+    fsMplsVplsVpnId                 OCTET STRING,
+    fsMplsVplsName                  SnmpAdminString,
+    fsMplsVplsDescr                 SnmpAdminString,
+    fsMplsVplsFdbHighWatermark      Unsigned32,
+    fsMplsVplsFdbLowWatermark       Unsigned32,
+    fsMplsVplsRowStatus             RowStatus,
+    fsMplsVplsL2MapFdbId            Integer32
+  } 
+
+fsMplsVplsInstanceIndex  OBJECT-TYPE 
+    SYNTAX          Unsigned32 (1.. 2147483647)
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     
+      "Unique index for the conceptual row identifying 
+       a VPLS service." 
+    ::= { fsMplsVplsConfigEntry 1 } 
+
+fsMplsVplsVsi  OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "The Layer2 Bridge Instance Identifier (or) 
+       Virtual Switch Identifier. An Entry with this 
+       object as the index should exist in  the 
+       fsVcmConfigTable of fsvcm.mib"
+    ::= { fsMplsVplsConfigEntry  2 }
+
+fsMplsVplsVpnId OBJECT-TYPE 
+    SYNTAX          OCTET STRING (SIZE (0 | 7))
+    MAX-ACCESS      read-write 
+    STATUS          current 
+    DESCRIPTION     
+      "This objects indicates the IEEE 802-1990 
+       VPN ID of the associated VPLS service.
+       The First 3 Octects consists of OUI(Organizationally
+       Unique Identifier).Rest 4 Octects uniquely identifies
+       the VPN within the context of the OUI."
+    ::= { fsMplsVplsConfigEntry 3 } 
+
+fsMplsVplsName  OBJECT-TYPE 
+    SYNTAX          SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS      read-write
+    STATUS          current 
+    DESCRIPTION     
+      "A textual name of the VPLS Service.
+       If there is no local name or this object is 
+       otherwise not applicable, then this object MUST 
+       contain a zero-length octet string." 
+    DEFVAL        { "" }
+    ::= { fsMplsVplsConfigEntry 4 } 
+
+fsMplsVplsDescr  OBJECT-TYPE 
+    SYNTAX          SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS      read-write
+    STATUS          current 
+    DESCRIPTION     
+    "A textual string containing information about the
+    VPLS service. If there is no information for this VPLS
+    service, then this object MUST contain a zero-length 
+    octet string."
+    DEFVAL           { "" }
+    ::= { fsMplsVplsConfigEntry 5 }
+    
+fsMplsVplsFdbHighWatermark OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..100) 
+    UNITS           "percentage"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the utilization of the
+    forwarding database for this VPLS instance at 
+    which the fsMplsVplsFdbFullAlarm notification 
+    will be sent." 
+    DEFVAL          { 95 } 
+    ::= { fsMplsVplsConfigEntry 6 }
+
+fsMplsVplsFdbLowWatermark OBJECT-TYPE 
+    SYNTAX          Unsigned32 (0..100)
+    UNITS           "percentage" 
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     
+    "This object specifies the utilization of the
+    forwarding database for this VPLS instance 
+    at which the fsMplsVplsFdbClearedAlarm 
+    notification will be sent." 
+    DEFVAL          { 90 } 
+    ::= { fsMplsVplsConfigEntry 7 } 
+
+fsMplsVplsRowStatus OBJECT-TYPE 
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-write
+    STATUS          current 
+    DESCRIPTION     
+      "For creating, modifying, and deleting this row. 
+       For making a row available for use [Active State],
+       a valid VSI and VPN Id is Mandatory."
+    ::= { fsMplsVplsConfigEntry 8 } 
+
+fsMplsVplsL2MapFdbId OBJECT-TYPE 
+    SYNTAX          Integer32 (4096..65535)
+    MAX-ACCESS      read-write
+    STATUS          current 
+    DESCRIPTION    
+      "For mapping VplsInstance to a L2 FDB Id (Forwarding database Identifier)."
+    DEFVAL          { 4096 } 
+    ::= { fsMplsVplsConfigEntry 9 } 
+
+-- Definitions of fsMplsVplsConfigTable - Ends 
+
+-- Definitions of PW MPLS Inbound Tunnel table - Starts
+
+fsPwMplsInboundTable   OBJECT-TYPE  
+    SYNTAX        SEQUENCE OF FsPwMplsInboundEntry  
+    MAX-ACCESS    not-accessible  
+    STATUS        current  
+    DESCRIPTION  
+         "This table reports and configure the current inbound MPLS   
+          tunnels (i.e. Egress Tunnels). This table is to be used only
+          in case of pwMplsType TE. It also reports the current 
+          incoming tunnel and LSP which carries the PW traffic from the PSN." 
+     ::= { fsMplsL2VpnConfigObjects 6 }
+   
+fsPwMplsInboundEntry OBJECT-TYPE  
+     SYNTAX        FsPwMplsInboundEntry  
+     MAX-ACCESS    not-accessible  
+     STATUS        current  
+     DESCRIPTION  
+         "A row in this table configures the incoming tunnel used for   
+          carrying the PW traffic from the PSN.  
+   
+          An entry in this table augments the pwMplsEntry, and is  
+          created automatically when the corresponding row has been  
+          created by the agent in the pwMplsEntry.  
+
+          This table is used only for MPLS-TE case and points to the appropriate
+          MPLS MIB module. Here, the 3 variables relevant to the indexing of a
+          TE tunnel tail-end are used as in MPLS-TE-STD-MIB are to be 
+          configured, and the tunnel instance indicates the LSP that is 
+          currently in use for carrying the traffic from the PSN. 
+         "      
+   
+     AUGMENTS { pwMplsEntry }  
+   
+        ::= { fsPwMplsInboundTable 1 }  
+   
+FsPwMplsInboundEntry ::= SEQUENCE {  
+        fsPwMplsInboundTunnelIndex         MplsTunnelIndex,  
+        fsPwMplsInboundTunnelInstance      MplsTunnelInstanceIndex,  
+        fsPwMplsInboundTunnelEgressLSR     MplsLsrIdentifier,  
+        fsPwMplsInboundTunnelIngressLSR    MplsLsrIdentifier
+        }  
+   
+  fsPwMplsInboundTunnelIndex         OBJECT-TYPE  
+     SYNTAX        MplsTunnelIndex  
+     MAX-ACCESS    read-write  
+     STATUS        current  
+     DESCRIPTION  
+         "This object is part of set of indexes for inbound tunnel.  
+          The operator set this object to represent the desired  
+          tunnel tail-end coming from the peer carrying the PW traffic.  
+         "  
+     ::= { fsPwMplsInboundEntry  1 }   
+   
+  fsPwMplsInboundTunnelInstance      OBJECT-TYPE  
+     SYNTAX        MplsTunnelInstanceIndex  
+     MAX-ACCESS    read-only  
+     STATUS        current  
+     DESCRIPTION  
+         "This object indicates the actual tunnel instance that is currently   
+          active and carrying the PW traffic - it should return the   
+          value of zero until if the information from the MPLS-TE   
+          application is not yet known.  
+         "  
+     ::= { fsPwMplsInboundEntry  2 }   
+   
+  fsPwMplsInboundTunnelEgressLSR        OBJECT-TYPE  
+     SYNTAX        MplsLsrIdentifier  
+     MAX-ACCESS    read-write  
+     STATUS        current  
+     DESCRIPTION   
+         "This object is part of set of indexes for inbound tunnel.  
+          The operator set this object to represent the desired  
+          tunnel tail-end coming from the peer carrying the PW traffic. 
+         "  
+     ::= { fsPwMplsInboundEntry   3 }   
+   
+  fsPwMplsInboundTunnelIngressLSR       OBJECT-TYPE  
+     SYNTAX        MplsLsrIdentifier  
+     MAX-ACCESS    read-write  
+     STATUS        current  
+     DESCRIPTION  
+         "This object is part of set of indexes for inbound tunnel. 
+          The operator set this object to represent the desired
+          tunnel tail-end coming from the peer carrying the PW traffic
+          It is typically equal to pwPeerAddr.
+         "  
+     ::= { fsPwMplsInboundEntry   4 }   
+
+-- Definitions PW MPLS Inbound Tunnel table - Ends 
+
+fsMplsLocalCCTypesCapabilities OBJECT-TYPE
+    SYNTAX      PwCcTypesCapabilities
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+          "This object denotes the configured control channel type capabilities that 
+           are used to demultiplex the incoming VCCV control packets. 
+
+           Configuration of this object is optional and the configuration is allowed based 
+           on the hardware capabilities supported. When this object is not configured,
+           the value of the object fsMplsHwCCTypeCapabilities (same as that of the 
+           capabilities supported by hardware) is used as CC type capabilities." 
+
+    REFERENCE
+        "See section 4 of RFC5085 where bit values
+         for corresponding CC types are defined"
+    ::= { fsMplsL2VpnConfigObjects 7 }
+
+fsMplsLocalCVTypesCapabilities OBJECT-TYPE
+    SYNTAX      PwCvTypesCapabilities
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "This object denotes the configured connectivity verification types of the local node 
+          that are used to demultiplex the incoming VCCV control packets. 
+
+          Configuration of this object is optional. When this object is not configured, 
+          the default CV type `LSP Ping` is used." 
+
+    REFERENCE
+        "See section 4 of RFC5085 where bit values
+        for corresponding CV types are defined for PW VCCV.
+        See section 3.3 of RFC5885 where bit values for CV types
+        are defined exclusively for BFD VCCV"
+    ::= { fsMplsL2VpnConfigObjects 8 }
+
+fsMplsRouterID OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE (4))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object denotes the MPLS router Identifier. This Identifier is used 
+         in identifying the router for OAM operations." 
+    ::=  { fsMplsL2VpnConfigObjects 9 }
+
+fsMplsHwCCTypeCapabilities OBJECT-TYPE
+    SYNTAX  PwCcTypesCapabilities
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This object indicates the Control channel capability supported by hardware. 
+         The value of this object is obtained from the NP layer."
+    ::=  { fsMplsL2VpnConfigObjects 10 }
+
+
+fsMplsPortTable   OBJECT-TYPE
+    SYNTAX        SEQUENCE OF FsMplsPortEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+         "This table is used for the Port related configuration on MPLS.
+          All the objects in this table are applicable for UNI ports only."
+     ::= { fsMplsL2VpnConfigObjects 11 }
+
+fsMplsPortEntry OBJECT-TYPE
+     SYNTAX        FsMplsPortEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "Each entry in this table specifies the MPLS  related
+         port configurations. This table is indexed by ifIndex."
+
+       INDEX { ifIndex }
+
+        ::= { fsMplsPortTable 1 }
+
+FsMplsPortEntry ::=
+    SEQUENCE {
+                fsMplsPortBundleStatus              TruthValue,
+                fsMplsPortMultiplexStatus           TruthValue,
+                fsMplsPortAllToOneBundleStatus      TruthValue,
+                fsMplsPortRowStatus                 RowStatus
+             }
+fsMplsPortBundleStatus OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "A Truth value indicating that Bundling is enabled/disabled 
+       on this Port.if Bundling is enabled,Multiple AC on the UNI 
+       port can map to the same VPLS.If Bundling is disabled, 
+       multiple AC on the UNI port cannot be mapped to a VPLS, 
+       only one AC can be mapped to a VPLS."
+   DEFVAL   { true }       
+   ::= { fsMplsPortEntry  1 }
+
+fsMplsPortMultiplexStatus OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "A Truth value indicating that Multiplexing is enabled/disabled 
+       on this port.if Multiplexing is enabled,UNI port can be mapped 
+       to multiple VPLS instances/VPNs.If Multiplexing is disabled, 
+       UNI port cannot be mapped to multiple VPLS instances/VPNs."
+   DEFVAL   { true }       
+   ::= { fsMplsPortEntry 2 }
+
+fsMplsPortAllToOneBundleStatus OBJECT-TYPE
+   SYNTAX      TruthValue
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "A Truth value indicating that AllToOneBundling is enabled/disabled
+       on this port.If AllToOneBundling is enabled,All ACs on a UNI port 
+       are mapped to single VPLS.if AllToOneBundling is disabled,bundling 
+       of ACs on a UNI port is determined by the value stored in mib object
+       fsMplsPortBundleStatus."
+   DEFVAL  { false }       
+   ::= { fsMplsPortEntry 3 }
+
+fsMplsPortRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry. An entry is
+        created in this table when this object is SET to 'createAndWait'.
+        The entry in this table is used when the status of this object
+        is SET 'active'. The entry in this table is not used when this
+        object is SET 'notInService'. An entry created in this table is
+        be deleted when this object is SET 'destroy'."
+    ::= { fsMplsPortEntry 4 }
+-- Definitions of fsMplsL2VpnConfigObjects - Ends
+
+-- Definitions of fsMplsL2VpnStatsObjects - Starts
+
+fsMplsL2VpnMaxPwVcEntries OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+         "The maximum number of PwVc entries supported."
+    DEFVAL        { 256 }
+    ::= { fsMplsL2VpnStatsObjects 1 }
+
+fsMplsL2VpnMaxPwVcMplsEntries OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The maximum number of PwVc, with PSN type as MPLS,
+         supported."
+    DEFVAL        { 16 }
+    ::= { fsMplsL2VpnStatsObjects 2 }
+
+fsMplsL2VpnMaxPwVcMplsInOutEntries OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The maximum number of Mpls In and Out bound entries
+         supported."
+    DEFVAL        { 256 }
+    ::= { fsMplsL2VpnStatsObjects 3 }
+
+fsMplsL2VpnMaxEthernetPwVcs OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The maximum number of PwVc, with the VCtype as
+         'ethernetVLAN' or
+         'ethernet' or
+         'ethernetVPLS',
+         supported."
+    DEFVAL        { 256 }
+    ::= { fsMplsL2VpnStatsObjects 4 }
+
+fsMplsL2VpnMaxPwVcEnetEntries OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The maximum number of PwVc Enet Entries supported."
+    DEFVAL        { 256 }
+    ::= { fsMplsL2VpnStatsObjects 5 }
+
+fsMplsL2VpnActivePwVcEntries OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This specifies the number of PwVc entries that are
+         operationally 'up'."
+    ::= { fsMplsL2VpnStatsObjects 6 }
+
+fsMplsL2VpnActivePwVcMplsEntries OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This specifies the number of PwVc entries, with PSN
+         type as MPLS, that are operationally 'up'."
+    ::= { fsMplsL2VpnStatsObjects 7 }
+
+fsMplsL2VpnActivePwVcEnetEntries OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This specifies the number of PwVc entries, with the
+         VCtye as
+         'ethernetVLAN' or
+         'ethernet' or
+         'ethernetVPLS',
+         that are
+         operationally 'up'."
+    ::= { fsMplsL2VpnStatsObjects 8 }
+
+fsMplsL2VpnNoOfPwVcEntriesCreated OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This counter specifies the number of PwVc entries
+         that were created from the moment L2Vpn module is
+         administratively 'up'."
+    ::= { fsMplsL2VpnStatsObjects 9 }
+
+fsMplsL2VpnNoOfPwVcEntriesDeleted OBJECT-TYPE
+    SYNTAX        Counter32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This counter specifies the number of PwVc entries
+         that were destroyed from the moment L2Vpn module is
+         administratively 'up'."
+    ::= { fsMplsL2VpnStatsObjects 10 }
+
+-- Definitions of fsMplsL2VpnStatsObjects - Ends
+
+-- Definitions of MPLS VPLS Notifications - Starts
+
+fsMplsVplsFdbFullAlarm NOTIFICATION-TYPE 
+    OBJECTS { 
+             fsMplsVplsVpnId, 
+             fsMplsVplsFdbHighWatermark,
+             fsMplsVplsFdbLowWatermark
+            } 
+    STATUS          current 
+    DESCRIPTION     
+        "The fsMplsVplsFdbFullAlarm notification is 
+         generated when the utilization of the Forwarding
+         database is above the value specified by                     
+         fsMplsVplsFdbHighWatermark." 
+    ::= { fsMplsVplsNotifications 1 } 
+
+fsMplsVplsFdbClearedAlarm NOTIFICATION-TYPE 
+    OBJECTS { 
+             fsMplsVplsVpnId, 
+             fsMplsVplsFdbHighWatermark,
+             fsMplsVplsFdbLowWatermark
+            } 
+    STATUS          current 
+    DESCRIPTION     
+        "The fsMplsVplsFdbClearedAlarm notification is 
+         generated when the utilization of the Forwarding
+         database is below the value specified by                     
+         fsMplsVplsFdbLowWatermark." 
+   ::= { fsMplsVplsNotifications 2 } 
+
+-- Definitions of MPLS VPLS Notifications - Ends
+
+-- Definitions of fsMplsTestObjects.  - Start
+
+    fsMplsSimulateFailure OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                testBandwidthReservationFailure (1),
+                                testClassTypeZero (2),
+                                testNoLabelRequest (3),
+                                testNoSessionObject (4),
+                                testUnknownCNumForClassType (5),
+                                testUnknownCTypeForClassType (6),
+                                testMultipleClassType (7),
+                                testLspTnlIfIdClassType1 (8),
+                                testNoRestartCapObj (9),
+                                testNoILMEntries (10),
+                                testNoSuggestedLblObj (11),
+                                testNoSuggestedLbl (12),
+                                testNoRBitInCapabilityObj (13),
+                                testNoAckMsg (14),
+                                testNackMsg (15),
+                                testRestartTimeZero (16),
+                                testRecoveryTimeZero (17),
+                                testLdpMplsFwdStateLost (18),
+                                testLdpSendNewLbl (19),
+                                testLdpBlockLblMap (20),
+                                testLdpQueueFull (21),
+                                testNoSupportForCrLspFecTlv (22),
+                                testNoSupportForDODLabelDistMethod (23),
+                                testNoSupportForDULabelDistMethod (24),
+                                testLdpMaxPduLengthAs500 (25),
+                                testLdpLblMrgCapable (26),
+                                testLdpLblReqMrgCapable (27),
+                                testLdpEnableWildCardFec (28),
+                                testLdpPropagateLblRelMsg (29),
+                                testLdpPropagateLblAbrtReqMsg (30),
+                                testLdpDisableProxyEgress (31),
+                                testNoSupportForGenFecTlv (32),
+                                testWrongCBitStatusCode (33),
+                                testLdpL2vpnEnableWildCardFec (34),
+                                testPwControlWordMandatory (35),
+                                testLdpAcceptLblMapForSamePrefixAndNextHop (36),
+                                testL2vpnEnableWdrawNotSupport (37)
+
+                               }
+
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object is for Testing purpose. 
+             If the object is set to testBandwidthReservationFailure (1)
+                      then the bandwidth reservation will fail 
+                      irrespective of Available bandwidth.
+             If the object is set to testClassTypeZero (2)
+                      then the path message will carry the class Type object
+                      of type zero.
+             If the object is set to testNoLabelRequest (3)
+                      then the path message will not have Label Request
+                      object.
+             If the object is set to testNoSessionObject (4)
+                      then the path message will not contain Session Object 
+                      sessiontype.
+             If the object is set to testUnknownCNumForClassType (5)
+                       then the path message will have unknown C Num in class
+                       Type object.
+             If the object is set to testUnknownCTypeForClassType (6)
+                       then the path message will have unknown C Type in class
+                       Type object.
+             If the object is set to testMultipleClassType (7),
+                        then the path message will have multiple class Type
+                        objects.
+             If the object is set to testLspTnlIfIdClassType1 (8),
+                        then the paths message will have the LSP_TNL_IF_ID
+                        of class type 1.
+             If the object is set to testNoRestartCapObj (9),
+                        then the hello message will not have restart cap object.
+             If the object is set to testNoILMEntries (10),
+                        then the node will remove the forwarding table when it
+                        is restarted.
+             If the object is set to testNoSuggestedLblObj (11),
+                        then the path message will not have suggested label object.
+             If the object is set to testNoSuggestedLbl (12),
+                        Then the path message will have invalid suggested label in
+                        suggested label object.
+             If the object is set to testNoRBitInCapabilityObj (13),
+                        Then the hello message will have R bit - 0 
+                        in capability object. 
+             If the object is set to  testNoAckMsg (14),
+                        Then Ack message will not be sent after receiving the RSVP messages.
+             If the object is set to  testNoAckMsg (15),
+                        Then Nack message will be sent after receiving the RSVP messages.
+             If the object is set to testRestartTime (16),
+                        Then hello message will have capability object with restart time 0.
+             If the object is set to testRecoveryTime (17),
+                        Then hello message will have capability object with recovery time 0.
+             If the object is set to testLdpMplsFwdStateLost (18),
+                         Then Recover Time Fault Tolerance Session TLV of Initialization 
+                         message will be filled with zero.
+             If the object is set to testLdpSendNewLbl (19),
+                         Then the helper node will send the different label upon 
+                         Graceful Restart.
+             If the object is set to testLdpBlockLblMap (20),
+                          Then the Label mapping message will not be sent.
+             If the object is set to testLdpQueueFull (21),
+                          Then the scenario of LDP Queue will be simulated.
+             If the object is set to testNoSupportForCrLspFecTlv (22),
+                          Then FEC for CRLSP will not be supported.
+             If the object is set to testNoSupportForDODLabelDistMethod (23),
+                          Then DownstreamonDemand mode of Label Distribution will not be 
+                          supported.
+             If the object is set to testNoSupportForDULabelDistMethod (24),
+                          Then DownstreamUnSolicited mode of Label Distribution will not be 
+                          supported.
+             If the object is set to testLdpMaxPduLengthAs500 (25),
+                          Then PDU Size will be set to exact 500. Anything above or below   
+                          will not be supported.
+             If the obejct is set to testLdpLblMrgCapable (26),
+                          Then Label merge capability is enabled in the LSR.
+             If the obejct is set to testLdpLblReqMrgCapable (27),             
+                          Then Label Request merge capability is enabled in the LSR
+             If the obejct is set to testLdpEnableWildCardFec (28),
+                          Then LSR will send label release/label withdraw message
+                          with wildcard fec. 
+             If the obejct is set to testLdpPropagateLblRelMsg (29),
+                          Then intermediate LSR will forward the received label release
+                          message.
+             If the obejct is set to testLdpPropagateLblAbrtReqMsg (30),
+                          Then intermediate LSR will forward the received label abort
+                          request message. 
+             If the obejct is set to testLdpDisableProxyEgress (31),
+                          Then the LSR will not act as proxy egress.
+             If the obejct is set to testNoSupportForGenFecTlv (32),
+                          Then GEN FEC will not be supported.
+             If the obejct is set to testWrongCBitStatusCode (33)
+                          Then wrong c bit status code will be set as
+                          0x20000002 as per RFC 4906
+             If the obejct is set to testLdpL2vpnEnableWildCardFec (34),
+                        Then LSR will send label release/label withdraw message
+                        with wildcard fec for targetted session.
+             If the object is set to testPwControlWordMandatory (35),
+                        Packet will be sent with PW-Control word.
+             If the object is set to testLdpAcceptLblMapForSamePrefixAndNextHop (36),
+                        LSR will also accept the label mapping message when both
+                        FEC and Nexthop are same.
+             If the object is set to testL2vpnEnableWdrawNotSupport (37),
+                        LSR does not support Label Withdraw method "
+
+
+        ::=           { fsMplsTestObjects 1 }
+
+fsMplsiTTLVal OBJECT-TYPE
+
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Value of the iTTL  on the LSR."
+
+    DEFVAL { 255 }
+::= { fsMplsTestObjects 2 }
+
+
+fsMplsOTTLVal OBJECT-TYPE
+
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Value of the OTTL  on the LSR."
+
+    DEFVAL { 255 }
+::= { fsMplsTestObjects 3 }
+
+
+fsMplsprviTTLVal OBJECT-TYPE
+
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Value of the iTTL  on the LSR."
+
+    DEFVAL { 0 }
+::= { fsMplsTestObjects 4 }
+
+
+fsMplsprvOTTLVal OBJECT-TYPE
+
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Value of the OTTL  on the LSR."
+
+    DEFVAL { 0 }
+::= { fsMplsTestObjects 5 }
+
+
+-- Definitions of fsMplsTestObjects.  - Ends
+
+-- Definitions of fsMplsLdpGrObjects. - Start
+
+fsMplsLdpGrCapability OBJECT-TYPE
+    SYNTAX      INTEGER {
+                         none(1), 
+                         full(2),
+                         helper(3)
+                 }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  "This object is used to configure the Graceful Restart 
+                  capability for Label Distribution Protocol.
+                  None refers that the Node does not support Graceful Restart.
+                  Full refers that the Node supports Complete Graceful Restart.
+                  Helper refers that the node can only help other nodes to 
+                  recover, But it could not recover its state upon Graceful restart."
+    DEFVAL { none }
+    ::= { fsMplsLdpGrObjects 1 }
+
+fsMplsLdpGrForwardEntryHoldTime OBJECT-TYPE
+    SYNTAX      Integer32 (30..600)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  "Amount of time (in seconds) that the MPLS forwarding state 
+                  must be preserved after the restart of LDP Component. 
+                  The default value is 600 seconds. 
+                  The acceptable range of values is 30 to 600 seconds."
+    REFERENCE
+        "Section 3.1 - RFC 3478, Graceful Restart Mechanism for Label
+         Distribution Protocol."
+    DEFVAL { 600 }      
+    ::= { fsMplsLdpGrObjects 2 }
+
+fsMplsLdpGrMaxRecoveryTime OBJECT-TYPE
+    SYNTAX      Integer32 (15..600)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  "The amount of time (in seconds) that the router should hold stale 
+                  label-FEC bindings after an LDP session has been reestablished. 
+                  The default is 120 seconds. 
+                  The acceptable range of values is 15 to 600 seconds.
+                  This value is transmitted initially in recovery time of FT 
+                  TLV in initialization Message.
+                  The Recovery Time SHOULD be long enough to allow the neighbouring
+                  LSR's to re-sync all the LSP's in a graceful restart manner, without
+                  creating congestion in the LDP control plane."
+    REFERENCE
+        "Section 2 - RFC 3478, Graceful Restart Mechanism for Label
+         Distribution Protocol."
+    DEFVAL { 120 }      
+    ::= { fsMplsLdpGrObjects 3 }
+
+fsMplsLdpGrNeighborLivenessTime OBJECT-TYPE
+    SYNTAX      Integer32 (5..300)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The amount of time (in seconds) that the router should wait for an 
+                 LDP session to be reestablished. 
+                 The default is 120 seconds. 
+                 The range is 5 to 300 seconds. 
+                 This value is transmitted initially in reconnect timeout of FT 
+                 TLV in initialization Message.
+                 If a Node is configured as helper, then the value of zero will be
+                 carried in reconnect timeout of FT TLV in Initialisation Message,
+                 irrespective of value configured in this object"
+    REFERENCE
+        "Section 3.3 - RFC 3478, Graceful Restart Mechanism for Label
+         Distribution Protocol."
+    DEFVAL { 120 }
+    ::= { fsMplsLdpGrObjects 4 }
+
+fsMplsLdpGrProgressStatus OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION   "This object denotes the current State of the Node's GR Progress.
+                        Following are the different State of GR in the Node.
+                        1. Not started.
+                        2. GR shutdown in progress.
+                        3. Reconnection in progress.
+                        4. Aborted.
+                        5. Recovery in progress.
+                        6. Completed."
+    ::= { fsMplsLdpGrObjects 5 }
+
+fsMplsLdpPeerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsMplsLdpPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information about LDP peers known by Entities in
+        the fsmplsLdpEntityTable.  The information in this table
+        is based on information from the Entity-Peer interaction
+        during session initialization but is not appropriate
+        for the mplsLdpSessionTable, because objects in this
+        table may or may not be used in session establishment."
+    ::= { fsMplsLdpGrObjects 6 }
+
+fsMplsLdpPeerEntry   OBJECT-TYPE  
+    SYNTAX        FsMplsLdpPeerEntry  
+    MAX-ACCESS    not-accessible  
+    STATUS        current  
+    DESCRIPTION  
+        "Information about LDP peers known by Entities in
+        the fsmplsLdpEntityTable.  The information in this table
+        is based on information from the Entity-Peer interaction
+        during session initialization but is not appropriate
+        for the mplsLdpSessionTable, because objects in this
+        table may or may not be used in session establishment."
+    AUGMENTS { mplsLdpPeerEntry }
+    ::= { fsMplsLdpPeerTable 1 }
+
+FsMplsLdpPeerEntry ::= SEQUENCE {
+        fsMplsLdpPeerGrReconnectTime           Integer32,
+        fsMplsLdpPeerGrRecoveryTime            Integer32,
+        fsMplsLdpPeerGrProgressStatus          Integer32
+    }
+
+fsMplsLdpPeerGrReconnectTime OBJECT-TYPE
+         SYNTAX       Integer32 
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION   "This object denotes the reconnect timeout value (in Seconds) 
+                        advertised by LDP peer in FT session TLV in initialization message."
+         ::= { fsMplsLdpPeerEntry 1 } 
+
+fsMplsLdpPeerGrRecoveryTime OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION   "This object denotes the recovery time value (in Seconds) 
+                        advertised by LDP peer in FT session TLV in initialization message."
+         ::= { fsMplsLdpPeerEntry 2 } 
+
+fsMplsLdpPeerGrProgressStatus OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION   "This object denotes the current State of the Peer's GR Progress.
+                        Following are the different State of Peer's GR Progress.
+                        1. Not started.
+                        2. Reconnection in progress.
+                        3. Aborted.
+                        4. Recovery in progress.
+                        5. Completed."
+
+         ::= { fsMplsLdpPeerEntry 3 } 
+
+
+-- Definitions of fsMplsLdpGrObjects. - Ends
+
+-- Definitions of fsMplsLdpScalarObjects. - Start                                                                            +
+fsMplsLdpConfigurationSequenceTLVEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+             " When this object is set to true(1), Configuration Sequence TLV
+               is sent in the LDP Hello Message.
+
+               When this object is set to false(2), Configuration Sequence TLV
+               is not set in the LDP Hello Message.
+
+               Value set in this object is reflected only on the LDP Entities
+               created after setting this object."
+
+    DEFVAL        { false }
+    ::=           { fsMplsLdpScalarObjects 1 }
+
+-- Definitions of fsMplsLdpScalarObjects..  - Ends
+
+END

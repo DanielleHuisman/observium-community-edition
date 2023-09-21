@@ -2,7 +2,7 @@
 
 //define('OBS_DEBUG', 1);
 
-include(__DIR__ . '/../includes/sql-config.inc.php');
+include(__DIR__ . '/../includes/observium.inc.php');
 include(__DIR__ . '../html/includes/functions.inc.php');
 
 class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
@@ -346,12 +346,35 @@ class IncludesSyslogTest extends \PHPUnit\Framework\TestCase {
                                            'msg'       => '[420813.870000] wmi_unified_event_rx : no registered event handler : event id 0x901b',
                                            'msg_orig'  => 'kernel: [420813.870000] wmi_unified_event_rx : no registered event handler : event id 0x901b',
                                            ));
-    $result[] = array('unifi||1||6||6||U7LR,44d9e7f618f2,v4.3.21.11325:||2020-10-05 16:28:50|| : stahtd[2839]: [STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}||U7LR,44d9e7f618f2,v4.3.21.11325',
-                      array('facility'  => 'user', 'priority' => '6', 'level' => '6',
-                            'tag'       => 'stahtd[2839]', 'program' => 'STAHTD',
-                            'msg'       => '[STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}',
-                            'msg_orig'  => ': stahtd[2839]: [STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}',
-                      ));
+    $result[] = [ 'unifi||1||6||6||U7LR,44d9e7f618f2,v4.3.21.11325:||2020-10-05 16:28:50|| : stahtd[2839]: [STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}||U7LR,44d9e7f618f2,v4.3.21.11325',
+                  [ 'facility'  => 'user', 'priority' => '6', 'level' => '6',
+                    'tag'       => 'stahtd[2839]', 'program' => 'STAHTD',
+                    'msg'       => '[STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}',
+                    'msg_orig'  => ': stahtd[2839]: [STA-TRACKER].stahtd_dump_event(): {"mac":"0c:70:4a:7d:5c:73","message_type":"STA_ASSOC_TRACKER","vap":"ath4","auth_ts":"0.0","event_type":"fixup","event_id":"1","assoc_status":"0","arp_reply_gw_seen":"yes","dns_resp_seen":"yes"}',
+                  ] ];
+
+    // Unifi v2 new format... fuck you Ubiquiti with your changes in each firmware!
+    $result[] = [ 'unifi||0||4||4||44d9e7f618f2,UAP-AC-LR-6.5.28+14491:||2023-03-06 15:57:43|| kernel: [399142.041095] [wifi1] FWLOG: [6086408] WAL_DBGID_SECURITY_MCAST_KEY_SET ( 0x2 )||44d9e7f618f2,UAP-AC-LR-6.5.28+14491',
+                  [ 'facility'  => 'kern', 'priority' => '4', 'level' => '4',
+
+                    'tag'       => 'kernel', 'program' => 'KERNEL',
+                    'msg'       => '[399142.041095] [wifi1] FWLOG: [6086408] WAL_DBGID_SECURITY_MCAST_KEY_SET ( 0x2 )',
+                    'msg_orig'  => 'kernel: [399142.041095] [wifi1] FWLOG: [6086408] WAL_DBGID_SECURITY_MCAST_KEY_SET ( 0x2 )',
+                  ] ];
+    $result[] = [ 'unifi||3||6||6||44d9e7f618f2,UAP-AC-LR-6.5.28+14491:||2023-03-06 15:43:20|| hostapd[15580]: ath4: STA d4:57:63:d6:a0:c3 IEEE 802.11: sta_stats||44d9e7f618f2,UAP-AC-LR-6.5.28+14491',
+                  [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+
+                    'tag'       => 'hostapd[15580]', 'program' => 'HOSTAPD',
+                    'msg'       => 'ath4: STA d4:57:63:d6:a0:c3 IEEE 802.11: sta_stats',
+                    'msg_orig'  => 'hostapd[15580]: ath4: STA d4:57:63:d6:a0:c3 IEEE 802.11: sta_stats',
+                  ] ];
+    $result[] = [ 'unifi||3||6||6||44d9e7f618f2,UAP-AC-LR-6.5.28+14491:||2023-03-06 15:43:20|| stahtd: stahtd[15573]: [STA-TRACKER].stahtd_dump_event(): {"message_type":"STA_ASSOC_TRACKER","mac":"d4:57:63:d6:a0:c3","vap":"ath4","event_type":"sta_roam","assoc_status":"0","event_id":"1"}||44d9e7f618f2,UAP-AC-LR-6.5.28+14491',
+                  [ 'facility'  => 'daemon', 'priority' => '6', 'level' => '6',
+
+                    'tag'       => 'stahtd', 'program' => 'STAHTD',
+                    'msg'       => '[STA-TRACKER].stahtd_dump_event(): {"message_type":"STA_ASSOC_TRACKER","mac":"d4:57:63:d6:a0:c3","vap":"ath4","event_type":"sta_roam","assoc_status":"0","event_id":"1"}',
+                    'msg_orig'  => 'stahtd: stahtd[15573]: [STA-TRACKER].stahtd_dump_event(): {"message_type":"STA_ASSOC_TRACKER","mac":"d4:57:63:d6:a0:c3","vap":"ath4","event_type":"sta_roam","assoc_status":"0","event_id":"1"}',
+                  ] ];
 
     // JunOS/JunOSe
     $result[] = array('junos||9||6||6||/usr/sbin/cron[50991]:||2016-10-07 00:15:00|| (root) CMD (   /usr/libexec/atrun)||',

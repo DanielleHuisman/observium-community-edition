@@ -1,0 +1,319 @@
+CUMULUS-STATUS-MIB DEFINITIONS ::= BEGIN
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, IpAddress,
+    Integer32, Unsigned32, Counter32, Counter64, Gauge32, TimeTicks,
+    OBJECT-IDENTITY
+                                        FROM SNMPv2-SMI
+    RowStatus, TruthValue, MacAddress, DateAndTime, TEXTUAL-CONVENTION
+                                        FROM SNMPv2-TC
+    InetAddressType, InetAddress        FROM INET-ADDRESS-MIB
+    IANAifType                          FROM IANAifType-MIB
+    InterfaceIndex, ifIndex, InterfaceIndexOrZero
+                                        FROM IF-MIB
+    DisplayString,PhysAddress           FROM RFC1213-MIB
+    IANAifType                          FROM IANAifType-MIB
+    cumulusMib                          FROM CUMULUS-SNMP-MIB;
+
+
+    cumulusSystemStatus MODULE-IDENTITY
+        LAST-UPDATED "202106280000Z"
+        ORGANIZATION "Cumulus Networks/Nvidia"
+        CONTACT-INFO ""
+        DESCRIPTION
+          "Status info for Nvidia Cumulus linux"
+
+    ::= { cumulusMib 5 }
+
+--
+-- Textual Conventions
+--
+
+agentSwitchSensorStatus ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "This enumerated data type provides
+               information about the status of the           
+               Valid values are:
+
+               other(1):        a measure other than those listed below
+               unknown(2):      unknown measurement, or arbitrary,
+                                relative numbers
+
+               normal(3),
+               warning(4),
+               alert(5),
+               critical(6),
+               NotPresent(7),
+               NotOperational(8)
+            "
+                   
+    SYNTAX INTEGER {
+        other(1),
+        unknown(2),
+        normal(3),
+        warning(4),
+        alert(5),
+        critical(6),
+        NotPresent(7),
+        NotOperational(8)
+    }
+
+agentSwitchErrorFlag ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Represents a possible error condition"
+    SYNTAX INTEGER  { noError(0),  error(1) }
+
+agentSwitchPrecision ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "An object using this data type represents a sensor
+            precision range.
+
+            An object of this type SHOULD be defined together with
+            objects of type EntitySensorDataType and
+            EntitySensorDataScale.  Together, associated objects of
+            these three types are used to identify the semantics of an
+            object of type EntitySensorValue.
+
+            If an object of this type contains a value in the range 1 to
+            9, it represents the number of decimal places in the
+            fractional part of an associated EntitySensorValue fixed-
+            point number.
+
+            If an object of this type contains a value in the range -8
+            to -1, it represents the number of accurate digits in the
+            associated EntitySensorValue fixed-point number.
+
+            The value zero indicates the associated EntitySensorValue
+            object is not a fixed-point number.
+
+            Agent implementors must choose a value for the associated
+            EntitySensorPrecision object so that the precision and
+
+            accuracy of the associated EntitySensorValue object is
+            correctly indicated.
+
+            For example, a physical entity representing a temperature
+            sensor that can measure 0 degrees to 100 degrees C in 0.1
+            degree increments, +/- 0.05 degrees, would have an
+            EntitySensorPrecision value of '1', an EntitySensorDataScale
+            value of 'units(9)', and an EntitySensorValue ranging from
+            '0' to '1000'.  The EntitySensorValue would be interpreted
+            as 'degrees C * 10'."
+    SYNTAX Integer32 (-8..9)
+
+    agentInfoGroup  OBJECT IDENTIFIER ::= { cumulusSystemStatus 1 }
+
+    agentSwitchCpuProcessGroup  OBJECT IDENTIFIER ::= { agentInfoGroup 1 }
+
+    agentSwitchCpuProcessMemFree OBJECT-TYPE
+      SYNTAX      Integer32
+      UNITS      "KBytes"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The total memory free for utilization in KBytes."
+     ::= { agentSwitchCpuProcessGroup 1 }
+
+    agentSwitchCpuProcessMemAvailable OBJECT-TYPE
+      SYNTAX     Integer32
+      UNITS      "KBytes"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       "  The total memory available in KBytes."
+      DEFVAL { 2 }
+    ::= { agentSwitchCpuProcessGroup 2 }
+
+    agentSwitchCpuProcessMemTotal OBJECT-TYPE
+      SYNTAX      Integer32
+      UNITS      "KBytes"
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION
+       " The total memory on a switch"
+     ::= { agentSwitchCpuProcessGroup 3 }
+
+    agentSwitchCpuProcessMemPrecision OBJECT-TYPE
+      SYNTAX     agentSwitchPrecision 
+      MAX-ACCESS read-only
+      STATUS     current
+      DESCRIPTION 
+                    " Precision for memory data "
+     ::= { agentSwitchCpuProcessGroup 4 }
+
+    agentSwitchCpuProcessRisingThreshold OBJECT-TYPE
+      SYNTAX        Unsigned32(0..100)
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+                    "The CPU Rising utilization threshold in percentage. A zero percent
+                    threshold indicates CPU Utilization Notification feature is disabled.
+                    A notification is triggered when the total CPU utilization exceeds this
+                    threshold over the configured Rising threshold interval.
+                    If the Rising threshold is configured to be less than the Falling threshold,
+                    the Falling threshold is set equal to the Rising threshold."
+      DEFVAL { 0 }
+      ::= { agentSwitchCpuProcessGroup 5 }
+
+    agentSwitchCpuProcessRisingThresholdInterval OBJECT-TYPE
+      SYNTAX        Unsigned32(0|5..86400)
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+                    "The CPU Rising threshold interval in seconds.
+                    The time interval is configured in multiples of 5 seconds.
+                    A zero Rising interval indicates CPU Utilization Notification feature is disabled."
+      ::= { agentSwitchCpuProcessGroup 6 }
+
+    agentSwitchCpuProcessFallingThreshold OBJECT-TYPE
+      SYNTAX        Unsigned32(0..100)
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+                    "The CPU Falling utilization threshold in percentage. Configuration of this
+                    object value is optional. Value '0' is not allowed for configuration,
+                    if the Rising threshold is non-zero. If the Falling threshold is configured
+                    to be greater than the Rising threshold, the Rising threshold is set equal
+                    to the Falling threshold. If the Falling threshold is not configured,
+                    it takes the same value as the Rising threshold.
+                    A notification is triggered when the total CPU utilization
+                    falls below this threshold over the configured Falling threshold interval."
+      DEFVAL { 0 }
+      ::= { agentSwitchCpuProcessGroup 7 }
+
+    agentSwitchCpuProcessFallingThresholdInterval OBJECT-TYPE
+      SYNTAX        Unsigned32(0|5..86400)
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+                    "The CPU Falling threshold interval in seconds. Configuration of this object
+                    value is optional. Value '0' is not allowed for configuration,
+                    if the Rising interval is non-zero. If the Falling interval
+                    is not configured, it takes the same value as the Rising interval.
+                    The time interval is configured in multiples of 5 seconds."
+      ::= { agentSwitchCpuProcessGroup 8 }
+
+    agentSwitchCpuProcessFreeMemoryThreshold OBJECT-TYPE
+      SYNTAX        Unsigned32
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+                    "The CPU Free Memory threshold in kilobytes. A zero threshold value
+                    indicates the CPU Free Memory Notification feature is disabled.
+                    Notifications are triggered when the CPU Free Memory falls below the
+                    configured threshold and when it rises to 10% above the configured threshold."
+      DEFVAL { 0 }
+      ::= { agentSwitchCpuProcessGroup 9 }
+
+    agentSwitchCpuProcessTotalUtilization OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Total CPU utilization over a period of 5, 60, 300 seconds,
+                    and the Rising threshold period also in seconds, if configured."
+         ::= { agentSwitchCpuProcessGroup 10 }
+
+    agentSwitchCpuProcess5SecUtilization OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Last 1 min utilization"
+         ::= { agentSwitchCpuProcessGroup 11 }
+
+    agentSwitchCpuProcess1minUtilization OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Last 1 min utilization"
+         ::= { agentSwitchCpuProcessGroup 12 }
+
+    agentSwitchCpuProcess5minUtilization OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Last 5 min utilization"
+         ::= { agentSwitchCpuProcessGroup 13 }
+
+    agentSwitchCpuProcess15minUtilization OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Last 15 min utilization"
+         ::= { agentSwitchCpuProcessGroup 14 }
+
+    agentSwitchCpuUtzPrecision OBJECT-TYPE
+         SYNTAX      agentSwitchPrecision
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                   "Precision for CPU utilization"
+         ::= { agentSwitchCpuProcessGroup 15 }
+
+    agentSwitchCpuCores OBJECT-TYPE
+         SYNTAX      Integer32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                   "Number of CPU cores present"
+         ::= { agentSwitchCpuProcessGroup 16 }
+
+    agentSwitchCPUUtzErrorFlag OBJECT-TYPE
+         SYNTAX agentSwitchErrorFlag 
+         MAX-ACCESS  read-only
+         STATUS  current
+         DESCRIPTION
+         "CPU utilization over 1 min goes above agentSwitchCpuProcessRisingThreshold"
+         ::= { agentSwitchCpuProcessGroup 100 }
+
+    agentSwitchCPUUtzErrorMsg OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Error message for CPU utilization exceeding threshold"
+         ::= { agentSwitchCpuProcessGroup 101 }
+
+    agentSwitchMemErrorFlag OBJECT-TYPE
+         SYNTAX  agentSwitchErrorFlag
+         MAX-ACCESS  read-only
+         STATUS  current
+         DESCRIPTION
+         "Free memory goes below agentSwitchCpuProcessFreeMemoryThreshold raise error"
+         ::= { agentSwitchCpuProcessGroup 102 }
+
+    agentSwitchMemErrorMsg OBJECT-TYPE
+         SYNTAX      DisplayString
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "Error message for memory ecxeeding threshold"
+         ::= { agentSwitchCpuProcessGroup 103 }
+
+    agentSwitchNotifications OBJECT IDENTIFIER ::= { cumulusSystemStatus 2 }
+
+    agentSwitchCpuutilizationStatus OBJECT-TYPE
+         SYNTAX      agentSwitchSensorStatus
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "CPU Utilization status which will generate alarms 
+                     according to utilization"
+         ::= { agentSwitchNotifications 1 }
+
+    agentSwitchMemStatus OBJECT-TYPE
+         SYNTAX      agentSwitchSensorStatus
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "CPU Utilization status which will generate alarms 
+                     according to utilization"
+         ::= { agentSwitchNotifications 2 }
+
+END

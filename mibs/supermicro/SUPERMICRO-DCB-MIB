@@ -1,0 +1,1870 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsdcbx.mib,v 1.10 2012/09/07 09:52:05 siva Exp $
+
+-- DCB Proprietary MIB Definition
+
+-- This document explains the proprietary MIB implemented
+-- for the DCB Features.
+
+-- Data Center Bridging is a flexible framework that defines the 
+-- capabilities required for switches and end points to be part of a 
+-- data center network.
+
+-- DCB contains the following capabilities:
+
+--     1. Priority-based flow control (PFC; IEEE 802.1Qbb) 
+--          The Priority-based Flow Control (PFC) feature is used for a 
+--          link level flow control mechanism that can be independently 
+--          controlled for each priority.
+--     2. Enhanced transmission selection (ETS; IEEE 802.1Qaz) 
+--         The Enhanced Transmission Selection (ETS) feature provides a 
+--         common management framework for assignment of bandwidth to 
+--         traffic classes
+--       3.DCBX is a discovery and capability exchange protocol that is used 
+--        by devices enabled for Data Center Bridging to exchange configuration information."
+
+SUPERMICRO-DCB-MIB DEFINITIONS ::= BEGIN
+IMPORTS
+    	Unsigned32,MODULE-IDENTITY, OBJECT-TYPE,NOTIFICATION-TYPE,
+	enterprises,Counter32,Integer32	FROM SNMPv2-SMI
+        InterfaceIndex FROM IF-MIB
+	lldpV2PortConfigEntry, lldpV2LocPortIfIndex,
+        lldpV2RemTimeMark, lldpV2RemLocalIfIndex,
+         lldpV2RemLocalDestMACAddress, lldpV2RemIndex
+         FROM LLDP-V2-MIB
+        lldpXdot1dcbxAdminApplicationPriorityAppEntry FROM 
+        LLDP-EXT-DOT1-DCBX-MIB
+        TEXTUAL-CONVENTION,RowStatus,TruthValue  FROM SNMPv2-TC;
+
+fsDcbMIB MODULE-IDENTITY
+        LAST-UPDATED "201209050000Z"
+        ORGANIZATION "Super Micro Computer Inc."
+        CONTACT-INFO "support@Supermicro.com"
+        DESCRIPTION 
+         "The proprietary extension MIB module for DCB. " 
+        REVISION "201209050000Z"
+        DESCRIPTION 
+         "The proprietary extension MIB module for DCB. " 
+    ::=  { enterprises supermicro-computer-inc(10876) super-switch(101) extended(2) 22}
+
+EnabledStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A simple status value for the object."
+    SYNTAX      INTEGER { enabled(1), disabled(2) }
+
+DcbAdminMode ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "'auto(0)', In this mode, all the opertaional(local) parameters 
+	 for the feature will be determined by the DCBX state machine.  
+
+         'on(1)', In this mode, all the opertaional(local) parameters 
+	 for the feature will not be determined by the DCBX state 
+	 machine. Operational(local) parameters will be same as Admin 
+	 Configuration parameters.
+
+         'off(2)', In this mode, all the operational(local) parameters 
+	 for the feature will be same as Admin Configuration Paramters. 
+	 But Operational(local) parameters do not have any impact in the system."
+
+    SYNTAX      INTEGER { auto(0), on(1), off(2)}
+
+
+DcbState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+ 	"The state of the DCBX state machine.
+
+	 off '(0)', In this state all Operational(local) parameters
+	 for the feature will be same as Admin Configuration parameters
+	 but will not be operational in the system(hardware).
+
+         init '(1)', In this state all Operational(local) parameters
+	 for the feature will be same as Admin Configuration Parameters.
+
+         rxrecommended '(2)', In this state all the Operational(local) 
+	 parameters for the feature will be same as particular 
+	 feature Remote Paramters."
+    SYNTAX      INTEGER { off(0), init(1), rxrecommended(2) }
+
+DcbStateMachineType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "asymmetric'(1)',By using this state machine the operational parameters 
+                        for the DCB feature can be same as peer or not.
+         symmetric '(2)',By using this state machine the operational parameters 
+                        for the DCB feature will be same as peer. "
+    SYNTAX      INTEGER { asymmetric(1), symmetric(2) }
+FsLldpXdot1dcbxTCSupportedCapacity ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS    current
+    DESCRIPTION
+        "Indicates the supported capacity of a given feature,
+        for example, the number of traffic classes supported.
+        This TC is used for features that have a maximum
+        capacity of eight but may have fewer supported.
+
+        A value of zero indicates that there are not capacity
+        restrictions, i.e., the capacity is eight."
+    SYNTAX Integer32 (0|1..7)
+
+
+-- ****************************************************************************
+--                           Groups in the MIB
+-- ****************************************************************************
+
+fsDcbSystem   		OBJECT IDENTIFIER ::= { fsDcbMIB 1 }
+fsDcbObjects  		OBJECT IDENTIFIER ::= { fsDcbMIB 2 }
+fsDcbApplicationObjects OBJECT IDENTIFIER ::= { fsDcbMIB 3 }
+fsDcbNotificationObjects OBJECT IDENTIFIER ::= { fsDcbMIB 4 }
+
+fsDCBXObjects 	OBJECT IDENTIFIER ::= { fsDcbApplicationObjects 1 }
+fsETSObjects	OBJECT IDENTIFIER ::= { fsDcbApplicationObjects 2 }
+fsPFCObjects	OBJECT IDENTIFIER ::= { fsDcbApplicationObjects 3 }
+fsAppPriObjects	OBJECT IDENTIFIER ::= { fsDcbApplicationObjects 4 }
+fsTCSupportedObjects OBJECT IDENTIFIER ::= { fsDcbApplicationObjects 5 }
+
+fsDCBXScalars	OBJECT IDENTIFIER ::= { fsDCBXObjects 1 }
+fsETSScalars	OBJECT IDENTIFIER ::= { fsETSObjects 1 }
+fsPFCScalars	OBJECT IDENTIFIER ::= { fsPFCObjects 1 }
+fsAppPriScalars OBJECT IDENTIFIER ::= { fsAppPriObjects 1}
+-- ****************************************************************************
+-- DCB Scalar  MIB Objects
+-- ****************************************************************************
+fsDcbPfcMinThreshold    OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 1..65535 )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The minimum PFC(Priority Based Flow Control) threshold for the switch.
+         This Object indicates the minimum Receive queue buffer count. 
+         The minimum and maximum values for this object may vary based on the 
+         underlying hardware's capacity."
+    ::= { fsDcbSystem 1 }
+
+fsDcbPfcMaxThreshold    OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 1..65535 )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The maximum PFC(Priority Based Flow Control)threshold for the switch.
+         This Object indicates the maximum Receive queue buffer count. 
+         The minimum and maximum values for this object may vary based 
+         on the underlying hardware's capacity. "
+    ::= { fsDcbSystem 2 }
+
+fsDcbMaxPfcProfiles    OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..256)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The maximum number of PFC(Priority Based Flow Control)profiles supported 
+         by the device.
+
+         A PFC profile is a bitmap, containing the status of PFC for all the
+         priorities.
+
+         If Bit 0 is set, then it means PFC is enabled for priority 0, otherwise 
+         PFC is disabled for priority 0.
+         
+         If Bit 1 is set, then it means PFC is enabled for priority 1, otherwise 
+         PFC is disabled for priority 1, and so on.
+
+         If this object value is zero, it means all the bits are set to zero and 
+         PFC is disabled for all priorities.
+
+         If this object's value is 3, it means the bits 0 and 1 are set and 
+         PFC is enabled for priorities 0 and 1 and disabled for all other priorities.
+
+         Device supporting 256 PFC profiles, means all possible combination of
+         PFC status on 8 priorities are supported. "
+
+    DEFVAL { 256 }
+    ::= { fsDcbSystem 3}
+
+-- ****************************************************************************
+-- DCB Port Configuration MIB Objects
+-- ****************************************************************************
+
+fsDcbPortTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsDcbPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      obsolete
+    DESCRIPTION
+        "Port table contains the DCB features 
+         (Enhanced Transmission Selection/Priortiy Based Flow Control) 
+         status (enabled or disabled)."
+    ::= { fsDcbObjects 1 }
+
+fsDcbPortEntry    OBJECT-TYPE
+    SYNTAX      FsDcbPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      obsolete
+    DESCRIPTION
+        "An entry containing DCB control parameters for a particular port."
+    INDEX  {fsDcbPortNumber}
+    ::= { fsDcbPortTable 1 }
+
+FsDcbPortEntry ::= 
+SEQUENCE {
+    fsDcbPortNumber	    InterfaceIndex,
+    fsDcbETSAdminStatus     EnabledStatus,
+    fsDcbPFCAdminStatus     EnabledStatus,
+    fsDcbRowStatus          RowStatus
+    }
+
+fsDcbPortNumber OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible 
+    STATUS       obsolete
+    DESCRIPTION
+       "This indicates the interface identifier for which the Dcb 
+        configuration is applied." 
+    ::= { fsDcbPortEntry 1 }
+
+fsDcbETSAdminStatus    OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      obsolete
+    DESCRIPTION
+        "This object is used to enable or disable ETS feature on
+         the given port.
+
+         If set to 'enabled(1)', ETS feature will be enabled 
+         on this port.  
+
+         If set to 'disabled(2)', ETS feature will be disabled 
+         on this port."
+    DEFVAL { disabled }
+    ::= { fsDcbPortEntry 2 }
+
+fsDcbPFCAdminStatus    OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      obsolete
+    DESCRIPTION
+        "This object is used to enable or disable PFC feature on
+         the given port.
+
+         If set to 'enabled(1)', PFC feature will be enabled 
+         on this port.
+
+         If set to 'disabled(2)', PFC feature will be disabled 
+         on this port."
+    DEFVAL { disabled }
+    ::= { fsDcbPortEntry 3 }
+
+
+fsDcbRowStatus      OBJECT-TYPE
+    SYNTAX            RowStatus
+    MAX-ACCESS        read-write
+    STATUS            obsolete
+    DESCRIPTION
+        "This object is used to create and delete a row in this table.
+
+         Only 'createAndGo', and 'destroy' values are allowed for this
+         object. 'createAndWait' and 'notInService' values are not allowed.
+
+         An entry can be created in this table only when the interface is 
+         present in the system and mapped to a virtual context.
+
+         When an interface is deleted or unmapped from a virtual context,
+         the corresponding entry from this table will be deleted.
+         
+         Entries can be created in this table only for physical interfaces." 
+         ::= {fsDcbPortEntry 4}
+
+
+-- ****************************************************************************
+-- DCBX Scalar Objects
+-- ****************************************************************************
+
+fsDcbxGlobalTraceLevel    OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object is used to enable Trace Statements in DCBX Module.
+
+         A FOUR BYTE integer is used for enabling the level of tracing.
+         Each BIT in the four byte integer represents a particular
+         level of Trace.
+
+         The mapping between the bit positions & the level of trace is
+         as follows:
+                  1 - Management Traces
+                  2 - DCBX State Machine Traces
+                  3 - TLV Traces
+                  4 - System Resource Traces
+                  5 - Failure Traces
+                  6 - Redundancy Traces
+                  7 - MBSM Traces
+                  8 - Control Plane Traces.
+
+         The remaining bits are unused. Combinations of levels are
+         also allowed.
+
+         For example if the bits 1 and 2 are set, then the trace
+         statements related to management and DCBX State Machine
+         will be printed.
+
+	 By default 'Failure Traces' are enabled.
+         The user has to enter the corresponding INTEGER VALUE for the
+         bits set. For example if bits 1 and 2 are set then user has to
+         set the value 3."
+    DEFVAL { 16 }
+    ::= { fsDCBXScalars 1 }
+
+-- ****************************************************************************
+-- DCBX Port Configuration MIB Objects
+-- ****************************************************************************
+
+fsDCBXPortTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsDCBXPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Port table contains the DCBX feature status (enabled or disabled)."
+    ::= { fsDCBXObjects 2 }
+
+fsDCBXPortEntry    OBJECT-TYPE
+    SYNTAX      FsDCBXPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing DCBX control parameters for a particular port."
+    INDEX  {fsDCBXPortNumber}
+    ::= { fsDCBXPortTable 1 }
+
+FsDCBXPortEntry ::= 
+SEQUENCE {
+    fsDCBXPortNumber	  InterfaceIndex,
+    fsDCBXAdminStatus     EnabledStatus
+    }
+
+fsDCBXPortNumber OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible 
+    STATUS       current
+    DESCRIPTION
+       "This indicates the interface identifier for which the DCBX 
+        configuration is applied." 
+    ::= { fsDCBXPortEntry 1 }
+
+fsDCBXAdminStatus    OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to enable or disable DCBX feature on
+         the given port.
+
+         If set to 'enabled(1)', DCBX feature will be enabled 
+         on this port. This will start the state machine for 
+	 the feature for which the AdminMode is configured as 
+	 'auto'. 
+
+         If set to 'disabled(2)', DCBX feature will be disabled 
+         on this port.This will stop the state machine for 
+	 the feature for which the AdminMode is configured as 
+	 'auto'. "
+    DEFVAL { enabled }
+    ::= { fsDCBXPortEntry 2 }
+
+-- ****************************************************************************
+-- ETS Scalar Objects
+-- ****************************************************************************
+
+fsETSSystemControl   OBJECT-TYPE
+    SYNTAX        INTEGER { start(1), shutdown(2) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The ETS(Enhanced Transmission selection) system control status 
+	 for the switch.
+	 
+	 Starts or shutdown ETS Module in the system. When set as
+	 'start', resources required by ETS module are allocated and 
+	 ETS module starts runnig. When shutdown, all the pools used
+	 by ETS module will be released to the system."
+    DEFVAL { start}
+    ::= { fsETSScalars 1 }
+
+fsETSModuleStatus   OBJECT-TYPE
+    SYNTAX        EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The ETS(Enhanced Transmission Selection) Module status for the switch.
+	 
+	 If this object is set as 'disabled', then for all the ports in
+	 which ETS has been enabled, will make the ETS feature disbaled
+	 in the system(hardware) and stop the DCBX state machine running 
+	 on the port for which fsETSAdminMode is configured as 'auto'.
+	
+	 If this object is set as 'enabled', then for all the ports in 
+	 which ETS has been enabled, will make the ETS feature enabled in
+	 the system(hardware) and start the DCBX state machine on the port
+	 for which fsETSAdminMode is configured as 'auto'."
+    DEFVAL { enabled }
+    ::= { fsETSScalars 2 }
+
+fsETSClearCounters   OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object when set to TRUE, clears the following counters
+         for the ETS Module:
+	    fsETSConfTxTLVCounter,  
+	    fsETSConfRxTLVCounter,
+	    fsETSConfRxTLVErrors,
+	    fsETSRecoTxTLVCounter,
+	    fsETSRecoRxTLVCounter,
+	    fsETSRecoRxTLVErrors,
+	    fsETSTcSuppTxTLVCounter,
+	    fsETSTcSuppRxTLVCounter,
+	    fsETSTcSuppRxTLVErrors
+
+         Setting this object to FALSE has no effect. 
+         This object always returns FALSE when read."   
+    DEFVAL { false }
+    ::= {fsETSScalars 3 }
+
+fsETSGlobalEnableTrap   OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+           "This object is used to enable or disable the transmission of
+            TRAP notification messages for ETS feature.
+           
+            Each bit in this object corresponds to a particular trap
+            If the corresponding bit is set, then the particular
+            trap is enabled. The following traps are supported:
+            
+            Bit Position       Trap 
+	    1              ETS Global Module Status Enable/Disable.
+	    2		   ETS Portwise Admin Status Change. 
+	    3	 	   Peer Up or Peer down Trap. 
+	    4              ETS DCBX State Machine Statefor the port.
+
+            The remaining bits are unused. More than one trap can also be 
+            enabled. 
+
+            For example, if bits 1 and 2 are set, then both fsETSModuleStatusTrap  
+            and fsETSPortStatusTrap(for Admin Mode Status)are enabled in the module.
+
+            The user has to enter the corresponding INTEGER VALUE 
+            for the bit set."
+    DEFVAL { 3 }
+    ::= { fsETSScalars 4 }
+
+fsETSGeneratedTrapCount OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of Traps sent. This counter
+        will be incremented every time when there is any trap sent"
+
+   ::= { fsETSScalars 5 }
+
+-- ****************************************************************************
+-- ETS Port Configuration table 
+-- ****************************************************************************
+
+fsETSPortTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsETSPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "ETS Port table contains the ETS (Enhanced Transmission Selection) features 
+         information specific to this port. 
+
+	 An entry created in this table in the following tables in the standard 
+	 DCBX Mib for this port.
+	 lldpXdot1dcbxConfigTCSupportedTable,
+	 lldpXdot1dcbxConfigETSConfigurationTable,
+	 lldpXdot1dcbxConfigETSRecommendationTable,
+	 lldpXdot1dcbxLocTCSupportedTable,
+	 lldpXdot1dcbxLocETSBasicConfigurationTable,
+	 lldpXdot1dcbxLocETSConPriorityAssignmentTable,
+	 lldpXdot1dcbxLocETSRecommendationTable,
+	 lldpXdot1dcbxAdminTCSupportedTable,
+	 lldpXdot1dcbxAdminETSBasicConfigurationTable,
+	 lldpXdot1dcbxAdminETSConPriorityAssignmentTable,
+	 lldpXdot1dcbxAdminETSRecommendationTable.
+ 
+	 Deletion of entry in this table deletes all the entries in the above tables 
+	 in the standatd DCBX mib for this port."
+    ::= { fsETSObjects 2 }
+
+fsETSPortEntry    OBJECT-TYPE
+    SYNTAX      FsETSPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing ETS control parameters and ETS information
+	 for a particular port."
+    INDEX  {fsETSPortNumber}
+    ::= { fsETSPortTable 1 }
+
+FsETSPortEntry ::= 
+SEQUENCE {
+    fsETSPortNumber	    InterfaceIndex,
+    fsETSAdminMode     	    DcbAdminMode,
+    fsETSDcbxOperState      DcbState,
+    fsETSDcbxStateMachine   DcbStateMachineType,
+    fsETSClearTLVCounters   TruthValue,
+    fsETSConfTxTLVCounter   Counter32,
+    fsETSConfRxTLVCounter   Counter32,
+    fsETSConfRxTLVErrors    Counter32,
+    fsETSRecoTxTLVCounter   Counter32,
+    fsETSRecoRxTLVCounter   Counter32,
+    fsETSRecoRxTLVErrors    Counter32,
+    fsETSTcSuppTxTLVCounter Counter32,
+    fsETSTcSuppRxTLVCounter Counter32,
+    fsETSTcSuppRxTLVErrors  Counter32,
+    fsETSRowStatus          RowStatus
+    }
+
+fsETSPortNumber OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible 
+    STATUS       current
+    DESCRIPTION
+       "This indicates the interface identifier for which the ETS 
+        configuration is applied." 
+    ::= { fsETSPortEntry 1 }
+
+fsETSAdminMode    OBJECT-TYPE
+    SYNTAX      DcbAdminMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to configure Admin mode for ETS feature on
+         the given port.
+
+         If set to 'auto(0)', and if ETS feature is enabled 
+         on this port then all the opertaional(local) parameters for 
+	 the ETS feature will be determined by the DCBX state 
+	 machine and fsETSDcbxOperState will be also be determined by
+	 DCBX State machine. If fsDCBXAdminStatus for this port is set as 
+	 disabled, then  operation(local) parameters will not be determined 
+	 by the DCBX state machine and  Operational(local) parameters will take 
+	 the value of Admin Configuration Paramters and fsETSDcbxOperState 
+	 will be moved to 'Init'.
+
+         If set to 'on(1)', and if ETS feature is enabled 
+         on this port then all the opertaional(local) parameters for 
+	 the ETS feature will not be determined by the DCBX state 
+	 machine. Operational(local) parameters will be same as Admin 
+	 Configuration parameters and fsETSDcbxOperState will be moved to 'Init'.  
+
+         If set to 'off(2)', ETS feature will be disabled on this port. 
+	 Operational(local) parameters will be same as Admin Configuration 
+	 Paramters. But Operational(local) parameters do not have any impact 
+	 in the system and fsETSOperState will be moved to 'Off' state.
+
+	 The Operational(local) parameters do not have any imapact in 
+	 the system if this object value is set as 'auto(0)' or 'on(1)'
+	 and fsETSModuleStatus is set as disabled. fsETSDcbxOperState will 
+	 be moved to 'Off' State."
+    DEFVAL { off }
+    ::= { fsETSPortEntry 2 }
+
+fsETSDcbxOperState    OBJECT-TYPE
+    SYNTAX      DcbState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to display the current state of the
+	 DCBX state machine for the ETS feature on the given port.
+
+         If state is Off '(0)', then ETS Operational(local) parameters
+	 will be same as ETS Admin Configuration Paramters and will
+	 not have any impact in the system(hardware).
+
+         If state is init '(1)', then ETS Operational(local) parameters
+	 will be same as ETS Admin Configuration Paramters.
+
+         If state is rxrecommended '(2)', then ETS Operational(local) parameters
+	 will be same as ETS Remote Paramters."
+
+    ::= { fsETSPortEntry 3 }
+
+fsETSDcbxStateMachine    OBJECT-TYPE
+    SYNTAX      DcbStateMachineType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to display the DCBX state machine 
+	 type that is used by the ETS feature on the given port."
+
+    ::= { fsETSPortEntry 4 }
+
+fsETSClearTLVCounters    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object when set to TRUE, clears the following counters
+         associated with a Port:
+	    fsETSConfTxTLVCounter,  
+	    fsETSConfRxTLVCounter,
+	    fsETSConfRxTLVErrors,
+	    fsETSRecoTxTLVCounter,
+	    fsETSRecoRxTLVCounter,
+	    fsETSRecoRxTLVErrors,
+	    fsETSTcSuppTxTLVCounter,
+	    fsETSTcSuppRxTLVCounter,
+	    fsETSTcSuppRxTLVErrors.
+
+         Setting this object to FALSE has no effect. 
+         This object always returns FALSE when read."    
+
+    DEFVAL { false }
+    ::= { fsETSPortEntry 5 }
+
+fsETSConfTxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of ETS 
+	 configuration TLV that are transmitted from this port. 
+	 This counter will be incremented every time when there 
+	 is ETS Configuration TLV is generated and transmitted 
+	 to the LLDP."
+
+    ::= { fsETSPortEntry 6 }
+
+fsETSConfRxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of ETS 
+	 ConfigurationTLV that are received in this port. This 
+	 counter will be incremented every time when there is ETS 
+	 Configuration TLV is received from the LLDP."
+
+    ::= { fsETSPortEntry 7 }
+
+fsETSConfRxTLVErrors    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of number of malformed 
+	 ETS Conf TLVs received by ETS. This counter will be 
+	 incremented every time a ETS Conf TLV is dropped by ETS."
+
+    ::= { fsETSPortEntry 8 }
+
+
+fsETSRecoTxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of ETS 
+	 Recommendation TLV that are transmitted from this port. 
+	 This counter will be incremented every time when there 
+	 is ETS Recommendation TLV is generated and transmitted 
+	 to the LLDP."
+
+    ::= { fsETSPortEntry 9 }
+
+fsETSRecoRxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of ETS 
+	 Recommendation TLV that are received in this port. This 
+	 counter will be incremented every time when there is ETS 
+	 Recommendation TLV is received from the LLDP."
+
+    ::= { fsETSPortEntry 10 }
+
+fsETSRecoRxTLVErrors    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of number of malformed 
+	 ETS Reco TLVs received by ETS. This counter will be 
+	 incremented every time a ETS Reco TLV is dropped by ETS."
+
+    ::= { fsETSPortEntry 11 }
+
+fsETSTcSuppTxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of TC 
+	 Supported TLV that are transmitted from this port. 
+	 This counter will be incremented every time when there 
+	 is TC Supported TLV is generated and transmitted 
+	 to the LLDP."
+
+    ::= { fsETSPortEntry 12 }
+
+fsETSTcSuppRxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of TC
+	 Supported TLV that are received in this port. This 
+	 counter will be incremented every time when there is TC 
+	 Supported TLV is received from the LLDP."
+
+    ::= { fsETSPortEntry 13 }
+
+fsETSTcSuppRxTLVErrors    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of number of malformed 
+	 TC Supp TLVs received by ETS. This counter will be 
+	 incremented every time a TC Supp TLV is dropped by ETS."
+
+    ::= { fsETSPortEntry 14 }
+
+fsETSRowStatus      OBJECT-TYPE
+    SYNTAX            RowStatus
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+        "This object is used to create and delete a row in this table.
+
+         Only 'createAndGo', and 'destroy' values are allowed for this
+         object. 'createAndWait' and 'notInService' values are not allowed.
+
+         An entry can be created in this table only when the interface is 
+         present in the system and mapped to a virtual context.
+
+         When an interface is deleted or unmapped from a virtual context,
+         the corresponding entry from this table will be deleted.
+         
+	 When the object is read, it will always return 'Active'. 
+	 Entries can be created in this table for physical and
+	 port channel interfaces." 
+
+    ::= { fsETSPortEntry 15 }
+
+-- ****************************************************************************
+--  PFC Scalar Objects
+-- ****************************************************************************
+
+fsPFCSystemControl   OBJECT-TYPE
+    SYNTAX        INTEGER { start(1), shutdown(2) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The PFC(Priority Based Flow Control) system control status for the switch.
+	 
+	 Starts or shutdown PFC Module in the system. When set as
+	 'start', resources required by PFC module are allocated and 
+	 PFC module starts runnig. When shutdown, all the pools used
+	 by PFC module will be released to the system."
+    DEFVAL { start}
+    ::= { fsPFCScalars 1 }
+
+fsPFCModuleStatus   OBJECT-TYPE
+    SYNTAX        EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The PFC(Priority Based Flow Control) Module status for the switch.
+	 
+	 If this object is set as 'disabled', then for all the ports in
+	 which PFC has been enabled, will make the PFC feature disbaled
+	 in the system(hardware) and stop the DCBX state machine on the port
+	 for which fsPFCAdminMode is configured as 'auto'.
+	
+	 If this object is set as 'enabled', then for all the ports in 
+	 which PFC has been enabled, will make the PFC feature enabled in
+	 the system(hardware) and start the DCBX state machine on the port
+	 for which fsPFCAdminMode is configured as 'auto'."
+    DEFVAL { enabled }
+    ::= { fsPFCScalars 2 }
+
+fsPFCClearCounters   OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object when set to TRUE, clears the following counters
+         for the PFC Module:
+	    fsPFCTxTLVCounter,
+	    fsPFCRxTLVCounter,
+	    fsPFCRxTLVErrors.
+
+         Setting this object to FALSE has no effect. 
+         This object always returns FALSE when read."    
+
+    DEFVAL { false }
+    ::= {fsPFCScalars 3 }
+
+fsPFCGlobalEnableTrap   OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+           "This object is used to enable or disable the transmission of
+            TRAP notification messages for PFC feature.
+           
+            Each bit in this object corresponds to a particular trap
+            If the corresponding bit is set, then the particular
+            trap is enabled. The following traps are supported:
+            
+            Bit Position       Trap 
+	    1              PFC Global Module Status Enable/Disable.
+	    2		   PFC Portwise Admin Status. 
+	    3	 	   Peer Up or Peer down Trap. 
+	    4              PFC DCBX State Machine State for the port.
+
+            The remaining bits are unused. More than one trap can also be 
+            enabled. 
+
+            For example, if bits 1 and 2 are set, then both fsPFCModuleStatusTrap  
+            and fsPFCPortStatusTrap(for Admin Mode Status)are enabled in the module.
+
+            The user has to enter the corresponding INTEGER VALUE 
+            for the bit set."
+    DEFVAL { 3 }
+    ::= { fsPFCScalars 4 }
+
+fsPFCGeneratedTrapCount OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of Traps sent. This counter
+        will be incremented every time when there is any trap sent"
+
+   ::= { fsPFCScalars 5 }
+
+-- ****************************************************************************
+--  PFC Port Configuration table 
+-- ****************************************************************************
+
+fsPFCPortTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPFCPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "PFC Port table contains the PFC (Priortiy Based Flow Control) features 
+         information specific to this port. 
+
+	 An entry created in the port table populates the entry in this table and 
+	 in the following tables in the standard DCBX Mib for this port. 
+	 lldpXdot1dcbxConfigPFCTable,
+	 lldpXdot1dcbxLocPFCBasicTable,
+	 lldpXdot1dcbxLocPFCEnableTable,
+	 lldpXdot1dcbxAdminPFCBasicTable,
+ 	 lldpXdot1dcbxAdminPFCEnableTable.
+	 
+	 Deletion of entry in the port table deletes the entry in this table and
+	 all the entries in the above tables in the standatd DCBX mib for this port."
+    ::= { fsPFCObjects 2 }
+
+fsPFCPortEntry    OBJECT-TYPE
+    SYNTAX      FsPFCPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing PFC control parameters and PFC information
+	 for a particular port."
+    INDEX  {fsPFCPortNumber}
+    ::= { fsPFCPortTable 1 }
+
+FsPFCPortEntry ::= 
+SEQUENCE {
+    fsPFCPortNumber	    InterfaceIndex,
+    fsPFCAdminMode     	    DcbAdminMode,
+    fsPFCDcbxOperState      DcbState,
+    fsPFCDcbxStateMachine   DcbStateMachineType,
+    fsPFCClearTLVCounters   TruthValue,
+    fsPFCTxTLVCounter	    Counter32,
+    fsPFCRxTLVCounter	    Counter32,
+    fsPFCRxTLVErrors	    Counter32,
+    fsPFCRowStatus          RowStatus
+    }
+
+fsPFCPortNumber OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible 
+    STATUS       current
+    DESCRIPTION
+       "This indicates the interface identifier for which the PFC 
+        configuration is applied." 
+    ::= { fsPFCPortEntry 1 }
+
+fsPFCAdminMode    OBJECT-TYPE
+    SYNTAX      DcbAdminMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to configure Admin mode for PFC feature on
+         the given port.
+
+         If set to 'auto(0)', and if PFC feature is enabled 
+         on this port then all the opertaional(local) parameters for 
+	 the PFC feature  and fsPFCDcbxOperState will be determined by the DCBX state 
+	 machine.If fsDCBXAdminStatus is set as disabled, then operational(local) 
+	 parameters will not be determined by the DCBX state machine and 
+	 Operational(local) parameters will take the value of Admin 
+	 Configuration Paramters and fsPFCDcbxOperState will be moved to 'Init'.
+
+         If set to 'on(1)', and if PFC feature is enabled 
+         on this port then all the opertaional(local) parameters for 
+	 the PFC feature will not be determined by the DCBX state 
+	 machine. Operational(local) parameters will be same as Admin 
+	 Configuration parameters and fsPFCDcbxOperState will be moved to 'Init'.  
+
+         If set to 'off(2)', PFC feature will be disabled on this port. 
+	 Operational(local) parameters will be same as Admin Configuration 
+	 Paramters. But Operational(local) parameters do not have any impact 
+	 in the system and fsPFCOperState will be moved to 'off' State.
+
+	 The Operational(local) parameters do not have any imapact in 
+	 the system if this object value is set as 'auto(0)' or 'on(1)'
+	 and fsPFCModuleStatus is set as disabled. fsPFCDcbxOperState will
+	 be moved to 'off' State in this scenario."
+    DEFVAL { off }
+    ::= { fsPFCPortEntry 2 }
+
+fsPFCDcbxOperState    OBJECT-TYPE
+    SYNTAX      DcbState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to display the current state of the
+	 DCBX state machine for the PFC feature on the given port.
+
+         If state is Off '(1)', then PFC Operational(local) parameters
+	 will be same as PFC Admin Configuration Paramters and will
+	 not have any impact in the system(hardware).
+
+         If state is init '(1)', then PFC Operational(local) parameters
+	 will be same as PFC Admin Configuration Paramters.
+
+         If state is rxrecommended '(2)', then PFC Operational(local) parameters
+	 will be same as PFC Remote Paramters."
+
+    ::= { fsPFCPortEntry 3 }
+
+fsPFCDcbxStateMachine    OBJECT-TYPE
+    SYNTAX      DcbStateMachineType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to display the DCBX state machine 
+	 type that is used by the PFC feature on the given port."
+
+    ::= { fsPFCPortEntry 4 }
+
+fsPFCClearTLVCounters    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object when set to TRUE, clears the following counters
+         associated with a Port:
+	    fsPFCTxTLVCounter,
+	    fsPFCRxTLVCounter,
+	    fsPFCRxTLVErrors.
+
+         Setting this object to FALSE has no effect. 
+         This object always returns FALSE when read."    
+
+    DEFVAL { false }
+    ::= { fsPFCPortEntry 5 }
+
+fsPFCTxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of PFC TLV
+	 that are transmitted from this port. This counter will be 
+	 incremented every time when there is PFC TLV is generated 
+	 and transmitted to the LLDP."
+
+    ::= { fsPFCPortEntry 6 }
+
+fsPFCRxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of the number of PFC TLV
+	 that are received in this port. This counter will be 
+	 incremented every time when there is PFC TLV is received
+	 from the LLDP."
+
+    ::= { fsPFCPortEntry 7 }
+
+fsPFCRxTLVErrors    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to keep track of number of malformed TLVs received by PFC. 
+         This counter will be incremented every time a PFC-TLV is dropped by PFC."
+
+    ::= { fsPFCPortEntry 8 }
+
+fsPFCRowStatus      OBJECT-TYPE
+    SYNTAX            RowStatus
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+        "This object is used to create and delete a row in this table.
+
+         Only 'createAndGo', and 'destroy' values are allowed for this
+         object. 'createAndWait' and 'notInService' values are not allowed.
+
+         An entry can be created in this table only when the interface is 
+         present in the system and mapped to a virtual context.
+
+         When an interface is deleted or unmapped from a virtual context,
+         the corresponding entry from this table will be deleted.
+         
+         When the object is read, it will always return 'Active'. 
+	 Entries can be created in this table for physical and port-channel
+	 interfaces." 
+    ::= { fsPFCPortEntry 9 }
+
+
+-- ****************************************************************************
+--  Application Priority Scalar Objects
+-- ****************************************************************************
+
+fsAppPriSystemControl   OBJECT-TYPE
+    SYNTAX        INTEGER { start(1), shutdown(2) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The application priority system control status for the switch which 
+        starts or shuts down  the application priority module in the system. 
+        When set as 'start', resources required by application prioirty
+        module are allocated and application prioirty module starts runnig.
+        When shutdown, all the pools used by application prioirty module 
+        will be released to the system."
+    DEFVAL { start}
+    ::= { fsAppPriScalars 1 }
+
+fsAppPriModuleStatus   OBJECT-TYPE
+    SYNTAX        EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The application priority Module status for the switch.
+	 
+         When this object is set as 'disabled', the  application priority 
+         feature is disabled in the system(hardware) and the DCBX state 
+         machine is stopped for all the ports for which  fsAppPriAdminMode is 
+         configured as 'auto' 
+	     
+         When this object is set as 'enabled', application prioirty feature 
+         is enabled in the system(hardware) and the DCBX state machine is
+         started for all ports for which fsAppPriAdminMode is configured as 'auto'."
+    DEFVAL { enabled }
+    ::= { fsAppPriScalars 2 }
+
+fsAppPriClearCounters   OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object when set to TRUE, clears the following counters
+         for the  application prioirty module and resets its value to FALSE:
+	    fsAppPriTxTLVCounter,
+	    fsAppPriRxTLVCounter,
+	    fsAppPriRxTLVErrors.
+       
+       Setting this object to FALSE has no effect."
+
+    DEFVAL { false }
+    ::= {fsAppPriScalars 3 }
+
+fsAppPriGlobalEnableTrap   OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+           "This object is used to enable or disable the transmission of
+            TRAP notification messages for Application Priority feature.
+           
+            The user has to enter the corresponding INTEGER VALUE 
+            for the bit set.
+            
+            Each bit in this object corresponds to a particular trap
+            If the corresponding bit is set, then the particular
+            trap is enabled. The following traps are supported:
+            
+            Bit Position       Trap 
+	    1              Application Priority Global Module Status Enable/Disable.
+	    2		       Application Priority Portwise Admin Status. 
+	    3	 	       Peer Up or Peer down Trap. 
+	    4              Application Priority DCBX State Machine state change for the port.
+
+            The remaining bits are unused. More than one trap can also be 
+            enabled. 
+
+            For example, if bits 1 and 2 are set, then both fsAppPriModuleStatusTrap  
+            and fsAppPriPortStatusTrap(for Admin Mode Status)are enabled in the module."
+
+    DEFVAL { 3 }
+    ::= { fsAppPriScalars 4 }
+
+fsAppPriGeneratedTrapCount OBJECT-TYPE
+   SYNTAX      Unsigned32
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the number of Traps sent. This counter
+        will be incremented every time when there is any trap sent"
+
+   ::= { fsAppPriScalars 5 }
+
+-- ****************************************************************************
+--  AppPri Port Configuration table 
+-- ****************************************************************************
+
+fsAppPriPortTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsAppPriPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Application Priority Port table contains the application priority feature's 
+         information specific to this port. 
+
+	 An entry created in the port table populates the entry in this table and 
+	 in the following tables in the standard DCBX Mib for this port. 
+	 lldpXdot1dcbxConfigAppPriTable,
+	 lldpXdot1dcbxLocAppPriBasicTable,
+	 lldpXdot1dcbxLocAppPriEnableTable,
+	 lldpXdot1dcbxAdminAppPriBasicTable,
+ 	 lldpXdot1dcbxAdminAppPriEnableTable.
+	 
+	 Deletion of entry in the port table deletes the entry in this table and
+	 all the entries in the above tables in the standatd DCBX mib for this port."
+    ::= { fsAppPriObjects 2 }
+
+fsAppPriPortEntry    OBJECT-TYPE
+    SYNTAX      FsAppPriPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing application priority control parameters and 
+        application priority information for a particular port."
+    INDEX  {fsAppPriPortNumber}
+    ::= { fsAppPriPortTable 1 }
+
+FsAppPriPortEntry ::= 
+SEQUENCE {
+    fsAppPriPortNumber	    InterfaceIndex,
+    fsAppPriAdminMode     	    DcbAdminMode,
+    fsAppPriDcbxOperState      DcbState,
+    fsAppPriDcbxStateMachine   DcbStateMachineType,
+    fsAppPriClearTLVCounters   TruthValue,
+    fsAppPriTxTLVCounter	    Counter32,
+    fsAppPriRxTLVCounter	    Counter32,
+    fsAppPriRxTLVErrors	        Counter32,
+    fsAppPriAppProtocols        Unsigned32,
+    fsAppPriRowStatus          RowStatus
+    }
+
+fsAppPriPortNumber OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible 
+    STATUS       current
+    DESCRIPTION
+       "This indicates the interface identifier for which the application priority 
+        configuration is applied." 
+    ::= { fsAppPriPortEntry 1 }
+
+fsAppPriAdminMode    OBJECT-TYPE
+    SYNTAX      DcbAdminMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to configure the admin mode for application 
+        priority feature on the given port.
+
+            - If this object is configured as 'auto(0)' on a port then all the 
+              operational(local) parameters and fsAppPriDcbxOperState of the 
+              application priority feature will be determined by the DCBX state 
+              machine.
+
+            - If this object is configured as 'auto(0)' on a port and if 
+              fsDCBXAdminStatus is disabled, then operational(local) parameters 
+              will not be determined by the DCBX state machine and 
+              Operational(local) parameters will take the value of admin 
+              configuration Paramters  and the fsAppPriDcbxOperState will be 
+              moved to 'Init'.
+
+            - If this object is configured as 'on(1)'on a port,then all the 
+              opertaional(local) parameters for the application priority feature 
+              will not be determined by the DCBX state  machine.
+              Operational(local) parameters will be same as admin configuration 
+              parameters and fsAppPriDcbxOperState will be moved to 'Init'.  
+
+            - If this object is configured as'off(2)'on a port,the application
+              priority feature will be disabled on that port and hence the
+              operational parameters do not have any impact in the system.
+              The operational(local) parameters will be same as admin configuration
+              parameters and fsAppPriOperState will be moved to 'off' State. 
+
+              The Operational(local) parameters do not have any impact in the 
+              system if this object value is set as 'auto(0)' or 'on(1)' and
+              fsAppPriModuleStatus is set as disabled. fsAppPriDcbxOperState will
+              be moved to 'off' State in this scenario."
+
+    DEFVAL { off }
+    ::= { fsAppPriPortEntry 2 }
+
+fsAppPriDcbxOperState    OBJECT-TYPE
+    SYNTAX      DcbState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This object is used to display the current state of the
+	    DCBX state machine for the application priority feature on the given 
+        port.
+
+        If state is Off '(1)', then application priority Operational(local)
+        parameters will be same as application priority admin Configuration 
+        Paramters and will not have any impact in the system(hardware).
+
+        If state is init '(1)', then application priority Operational(local)
+        parameters will be same as application priority admin Configuration 
+        Paramters.
+
+        If state is rxrecommended '(2)', then application priority 
+        Operational(local) parameters will be same as application priority
+        remote Paramters."
+
+    ::= { fsAppPriPortEntry 3 }
+
+fsAppPriDcbxStateMachine    OBJECT-TYPE
+    SYNTAX      DcbStateMachineType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to display the DCBX state machine type that is
+        used by the application priority feature on the given port."
+
+    ::= { fsAppPriPortEntry 4 }
+
+fsAppPriClearTLVCounters    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object when set to TRUE, clears the following counters
+         associated with this port and resets its value to FALSE:
+	    fsAppPriTxTLVCounter,
+	    fsAppPriRxTLVCounter,
+	    fsAppPriRxTLVErrors.
+       
+       Setting this object to FALSE has no effect."
+
+    DEFVAL { false }
+    ::= { fsAppPriPortEntry 5 }
+
+fsAppPriTxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+           "This object is used to keep track of the number of application 
+           priority TLVs that are transmitted from the port. This counter will 
+           be  incremented every time an application priority TLV is generated
+           and transmitted to LLDP."
+
+    ::= { fsAppPriPortEntry 6 }
+
+fsAppPriRxTLVCounter    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of application priority
+        TLVs that are received in this port. This counter will be incremented
+        every time when there is application priority TLV is received from LLDP."
+
+    ::= { fsAppPriPortEntry 7 }
+
+fsAppPriRxTLVErrors    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of malformed TLVs received by 
+         application priority module. This counter will be incremented every 
+         time an application priority TLV is dropped by the
+         application priority module."
+
+    ::= { fsAppPriPortEntry 8 }
+
+fsAppPriAppProtocols    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+          "This object indicates the total number of application prioirty 
+          entries present in the last TLV received from its peer"
+
+    ::= { fsAppPriPortEntry 9 }
+fsAppPriRowStatus      OBJECT-TYPE
+    SYNTAX            RowStatus
+    MAX-ACCESS        read-write
+    STATUS            current
+    DESCRIPTION
+        "This object is used to create and delete a row in this table.
+
+         Only 'createAndGo', and 'destroy' values are allowed for this
+         object. 'createAndWait' and 'notInService' values are not allowed.
+
+         An entry can be created in this table only when the interface is 
+         present in the system and mapped to a virtual context.
+
+	     Entries can be created in this table for physical and port-channel
+	     interfaces. 
+
+         When an interface is deleted or unmapped from a virtual context,
+         the corresponding entry from this table will be deleted.
+         
+         When the object is read, it will always return 'Active'." 
+    ::= { fsAppPriPortEntry 10 }
+
+-- ****************************************************************************
+--  Application Priority Table Extension.
+-- ****************************************************************************
+    fsAppPriXAppTable OBJECT-TYPE
+       SYNTAX   SEQUENCE OF FsAppPriXAppEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+           "This table augments lldpXdot1dcbxAdminApplicationPriorityAppTable,
+            describing parameters of an application priority table."
+    ::= { fsAppPriObjects 3 }
+
+    fsAppPriXAppEntry OBJECT-TYPE
+        SYNTAX      FsAppPriXAppEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table contains management information applicable to
+             an application entry."
+        AUGMENTS { lldpXdot1dcbxAdminApplicationPriorityAppEntry }
+        ::= { fsAppPriXAppTable 1 }
+    
+    FsAppPriXAppEntry ::=
+        SEQUENCE {
+          fsAppPriXAppRowStatus RowStatus
+                 }
+
+    fsAppPriXAppRowStatus OBJECT-TYPE
+        SYNTAX     RowStatus
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION 
+            "The row status of Application Priority Mapping Entry"
+    ::= { fsAppPriXAppEntry 1 }
+   
+    fslldpXdot1dcbxLocApplicationPriorityBasicTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF
+        FsLldpXdot1dcbxLocApplicationPriorityBasicEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table contains one row per port for the IEEE 802.1
+        organizationally defined LLDP Application PrioriyTLV on
+        the local system known to this agent"
+    ::= { fsAppPriObjects 4 }
+
+    fslldpXdot1dcbxLocApplicationPriorityBasicEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxLocApplicationPriorityBasicEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Information about the IEEE 802.1 organizational defined
+        Application PriorityTLV LLDP extension."
+    INDEX         { lldpV2LocPortIfIndex }
+    ::= { fslldpXdot1dcbxLocApplicationPriorityBasicTable 1 }
+
+    FsLldpXdot1dcbxLocApplicationPriorityBasicEntry ::= SEQUENCE {
+       fslldpXdot1dcbxLocApplicationPriorityWilling    TruthValue
+    }
+ 
+    fslldpXdot1dcbxLocApplicationPriorityWilling OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates if the local system is willing to accept
+        the Application Priority configuration of the remote system."
+    ::= { fslldpXdot1dcbxLocApplicationPriorityBasicEntry 1}
+
+    fslldpXdot1dcbxAdminApplicationPriorityBasicTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF
+        FsLldpXdot1dcbxAdminApplicationPriorityBasicEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table contains one row per port for the IEEE 802.1
+        organizationally defined LLDP Application PrioriyTLV on
+        the local system known to this agent"
+    ::= { fsAppPriObjects 5 }
+
+    fslldpXdot1dcbxAdminApplicationPriorityBasicEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxAdminApplicationPriorityBasicEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Information about the IEEE 802.1 organizational defined
+        Application PriorityTLV LLDP extension."
+    INDEX         { lldpV2LocPortIfIndex }
+    ::= { fslldpXdot1dcbxAdminApplicationPriorityBasicTable 1 }
+  
+    FsLldpXdot1dcbxAdminApplicationPriorityBasicEntry ::= SEQUENCE {
+       fslldpXdot1dcbxAdminApplicationPriorityWilling    TruthValue
+    }
+  
+    fslldpXdot1dcbxAdminApplicationPriorityWilling OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates if the local system is willing to accept the
+        Application Priority configuration of the remote system."
+    REFERENCE
+        "35.5.5"
+    DEFVAL      { false }
+    ::= { fslldpXdot1dcbxAdminApplicationPriorityBasicEntry 1}
+    
+    fslldpXdot1dcbxRemApplicationPriorityBasicTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF FsLldpXdot1dcbxRemApplicationPriorityBasicEntry
+                  
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table contains one row per port for the IEEE 802.1
+        organizationally defined LLDP Application Prioriy TLV
+        on the local system known to this agent"
+    ::= { fsAppPriObjects 6 }
+
+    fslldpXdot1dcbxRemApplicationPriorityBasicEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxRemApplicationPriorityBasicEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Information about the IEEE 802.1 organizational defined
+        Application Priority TLV LLDP extension."
+    INDEX         { 
+                  lldpV2RemTimeMark,
+                  lldpV2RemLocalIfIndex,
+                  lldpV2RemLocalDestMACAddress,
+                  lldpV2RemIndex
+    }
+    ::= { fslldpXdot1dcbxRemApplicationPriorityBasicTable 1 }
+
+    FsLldpXdot1dcbxRemApplicationPriorityBasicEntry ::= SEQUENCE {
+        fslldpXdot1dcbxRemApplicationPriorityWilling    TruthValue
+    }
+
+    fslldpXdot1dcbxRemApplicationPriorityWilling OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates if the local system is willing to accept the 
+        Application Priority configuration of the remote system."
+    ::= { fslldpXdot1dcbxRemApplicationPriorityBasicEntry 1}
+
+----------------------       
+-- TC supported table
+----------------------
+
+fslldpXdot1dcbxConfigTCSupportedTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF FsLldpXdot1dcbxConfigTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "A table that controls selection of Traffic Classes Supported
+        TLVs to be transmitted on individual ports."
+    ::= { fsTCSupportedObjects 1 }
+
+fslldpXdot1dcbxConfigTCSupportedEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxConfigTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "LLDP configuration information that controls the
+        transmission of IEEE 802.1 organizationally defined Traffic
+        Classes Supported TLV on LLDP transmission capable ports.
+
+        This configuration object augments the lldpV2PortConfigEntry of
+        the LLDP-MIB, therefore it is only present along with the port
+        configuration defined by the associated lldpV2PortConfigEntry
+        entry.
+
+        Each active lldpConfigEntry is restored from non-volatile
+        storage (along with the corresponding lldpV2PortConfigEntry)
+        after a re-initialization of the management system."
+    AUGMENTS     { lldpV2PortConfigEntry }
+    ::= { fslldpXdot1dcbxConfigTCSupportedTable 1 }
+
+  FsLldpXdot1dcbxConfigTCSupportedEntry ::= SEQUENCE {
+    fslldpXdot1dcbxConfigTCSupportedTxEnable TruthValue
+}
+
+
+   fslldpXdot1dcbxConfigTCSupportedTxEnable OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The fslldpXdot1dcbxConfigTCSupportedTxEnable, which is defined
+        as a truth value and configured by the network management,
+        determines whether the IEEE 802.1 organizationally defined
+        port VLAN TLV transmission is allowed on a given LLDP
+        transmission capable port.
+
+        The value of this object is restored from non-volatile
+        storage after a re-initialization of the management system."
+    REFERENCE
+        "35.5.1"
+    DEFVAL         { false }
+    ::= { fslldpXdot1dcbxConfigTCSupportedEntry 1 }
+
+
+
+--
+-- fslldpXdot1dcbxLocTCSupportedTable - Contains the information for the
+-- Traffic Classes Supported TLV.
+--
+
+fslldpXdot1dcbxLocTCSupportedTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF FsLldpXdot1dcbxLocTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table contains one row per port for the IEEE 802.1
+        organizationally defined LLDP TCSupported TLV on the local
+        system known to this agent"
+    ::= { fsTCSupportedObjects 2 }
+
+fslldpXdot1dcbxLocTCSupportedEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxLocTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Information about the IEEE 802.1 organizational defined
+        Traffic Classes Supported TLV LLDP extension."
+    INDEX         { lldpV2LocPortIfIndex }
+    ::= { fslldpXdot1dcbxLocTCSupportedTable 1 }
+
+FsLldpXdot1dcbxLocTCSupportedEntry ::= SEQUENCE {
+    fslldpXdot1dcbxLocTCSupported    FsLldpXdot1dcbxTCSupportedCapacity
+}
+
+fslldpXdot1dcbxLocTCSupported OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxTCSupportedCapacity
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the number of traffic classes supported on the
+        local system. A value of 0 indicates that 8 traffic classes
+        are supported."
+    REFERENCE
+        "35.5.1"
+    ::= { fslldpXdot1dcbxLocTCSupportedEntry 1 }
+
+--
+-- fslldpXdot1dcbxRemTCSupportedTable - Contains the information for the
+-- Traffic Classes Supported TLV.
+--
+
+fslldpXdot1dcbxRemTCSupportedTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF FsLldpXdot1dcbxRemTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table contains one row per port for the IEEE 802.1
+        organizationally defined LLDP TCSupported TLV on the local
+        system known to this agent"
+    ::= { fsTCSupportedObjects 3 }
+
+fslldpXdot1dcbxRemTCSupportedEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxRemTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Information about the IEEE 802.1 organizational defined
+        Traffic Classes Supported TLV LLDP extension."
+    INDEX         {
+                  lldpV2RemTimeMark,
+                  lldpV2RemLocalIfIndex,
+                  lldpV2RemLocalDestMACAddress,
+                  lldpV2RemIndex
+    }
+    ::= { fslldpXdot1dcbxRemTCSupportedTable 1 }
+
+FsLldpXdot1dcbxRemTCSupportedEntry ::= SEQUENCE {
+    fslldpXdot1dcbxRemTCSupported    FsLldpXdot1dcbxTCSupportedCapacity
+}
+
+fslldpXdot1dcbxRemTCSupported OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxTCSupportedCapacity
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the number of traffic classes supported on the
+        local system. A value of 0 indicates that 8 traffic classes
+        are supported."
+    REFERENCE
+        "35.5.1"
+    ::= { fslldpXdot1dcbxRemTCSupportedEntry 1 }
+
+
+-- fslldpXdot1dcbxAdminTCSupportedTable - Contains the information for
+-- the Traffic Classes Supported TLV.
+--
+
+fslldpXdot1dcbxAdminTCSupportedTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF FsLldpXdot1dcbxAdminTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table contains one row per port for the IEEE 802.1
+        organizationally defined LLDP TCSupported TLV on the local
+        system known to this agent"
+    ::= { fsTCSupportedObjects 4 }
+
+fslldpXdot1dcbxAdminTCSupportedEntry OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxAdminTCSupportedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Information about the IEEE 802.1 organizational defined
+        Traffic Classes Supported TLV LLDP extension."
+    INDEX         { lldpV2LocPortIfIndex }
+    ::= { fslldpXdot1dcbxAdminTCSupportedTable 1 }
+
+FsLldpXdot1dcbxAdminTCSupportedEntry ::= SEQUENCE {
+    fslldpXdot1dcbxAdminTCSupported   FsLldpXdot1dcbxTCSupportedCapacity
+}
+
+fslldpXdot1dcbxAdminTCSupported OBJECT-TYPE
+    SYNTAX        FsLldpXdot1dcbxTCSupportedCapacity
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the number of traffic classes supported on the
+        local system. A value of 0 indicates that 8 traffic classes
+        are supported.
+
+        Note that generaly this represents a physical characteristic
+        of the device.  However, some devices may allow this to be
+        programmable, in which case MAX-ACCESS would change to
+        read-write"
+    REFERENCE
+        "35.5.1"
+    ::= { fslldpXdot1dcbxAdminTCSupportedEntry 1 }
+
+
+-- ****************************************************************************
+--  fsDCbNotification subtree contains the objects related to notifications.
+-- ****************************************************************************
+fsDCBTraps OBJECT IDENTIFIER ::= { fsDcbNotificationObjects 0 }
+fsDCBTrapObjects OBJECT IDENTIFIER ::= { fsDcbNotificationObjects 1 }
+
+    fsDcbTrapPortNumber OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object refers to the Port number for which the DCBX feature
+	 is enabled. And will be used in sending the feature port specific Traps."
+    ::= { fsDCBTrapObjects 1 }
+
+    fsDcbPeerUpStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object refers to the DCBX Peer Up or Peer down status 
+	 on the port.
+	 If the value is 'true', then the DCBX Peer will be present
+	 and UP. 
+	 If the value is 'false', then the DCBX Peer will be absent
+	 and DOWN."
+    ::= { fsDCBTrapObjects 2 }
+ 
+    fsETSModuleStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+           fsETSModuleStatus 
+                }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated when there is a change in the ETS Module 
+	     status.. This trap is generated only if the corresponding
+	     bit (bit 1) in the fsETSGlobalEnableTrap is set to send the trap."
+        ::= { fsDCBTraps 1 }
+
+    fsETSPortAdminStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsETSAdminMode
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated in the following conditions.
+	    Whenever there is a change in the ETS Admin status and the 
+	    corresponding bit (bit 2) in the fsETSGlobalEnableTrap is set
+	    to send the trap for ETS Admin mode change. "
+        ::= {fsDCBTraps 2 }   
+
+    fsETSPortPeerStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsDcbPeerUpStatus
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated in the following conditions.
+	    Whenever there is a change in the DCBX Peer Status and the 
+	    corresponding bit (bit 3) in the fsETSGlobalEnableTrap is set
+	    to send the trap for Peer Up or Peer Down."
+        ::= {fsDCBTraps 3 }   
+
+    fsETSPortDcbxOperStateTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsETSDcbxOperState
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated in the following conditions.
+	    Whenever there is a change in the ETS Operational State and the 
+	    corresponding bit (bit 4) in the fsETSGlobalEnableTrap is set
+	    to send the trap for ETS state machine state change."
+        ::= {fsDCBTraps 4 }   
+
+    fsPFCModuleStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+           fsPFCModuleStatus 
+                }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated when there is a change in the PFC Module 
+	     status is enabled. This trap is generated only if the corresponding
+	     bit (bit 1) in the fsPFCGlobalEnableTrap is set to send the trap."
+        ::= { fsDCBTraps 5 }
+
+    fsPFCPortAdminStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsPFCAdminMode	
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated in the following conditions.
+	    Whenever there is a change in the PFC Admin Status and the 
+	    corresponding bit (bit 2) in the fsPFCGlobalEnableTrap is set
+	    to send the trap for PFC Admin Status change." 
+        ::= {fsDCBTraps 6 }   
+
+    fsPFCPortPeerStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsDcbPeerUpStatus
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated in the following conditions.
+	    Whenever there is a change in the DCBX Peer Status and the 
+	    corresponding bit (bit 3) in the fsPFCGlobalEnableTrap is set
+	    to send the trap for Peer Up or Peer Down."
+        ::= {fsDCBTraps 7 }   
+
+    fsPFCPortDcbxOperStateTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsPFCDcbxOperState
+            }
+        STATUS   current
+        DESCRIPTION
+            "This trap is generated in the following conditions.
+	    Whenever there is a change in the PFC Operational State and the 
+	    corresponding bit (bit 4) in the fsPFCGlobalEnableTrap is set
+	    to send the trap for PFC state machine state change."
+        ::= {fsDCBTraps 8 }   
+
+    fsAppPriModuleStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+           fsAppPriModuleStatus 
+                }
+        STATUS   current
+        DESCRIPTION
+              "This trap is generated whenever there is a change in the
+              application priority Module status. This trap is generated only 
+              if  the corresponding bit (bit 1) in the fsAppPriGlobalEnableTrap
+              is set to send the trap."
+        ::= { fsDCBTraps 9 }
+
+    fsAppPriPortAdminStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	    fsAppPriAdminMode	
+            }
+        STATUS   current
+        DESCRIPTION
+               "This trap is generated whenever there is a change in the 
+               application priority Admin Status and the  corresponding 
+               bit (bit 2) in the fsAppPriGlobalEnableTrap is set to send the
+               trap for application priorityAdmin Status change." 
+        ::= {fsDCBTraps 10 }   
+
+    fsAppPriPortPeerStatusTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	        fsDcbPeerUpStatus
+            }
+        STATUS   current
+        DESCRIPTION
+                "This trap is generated whenever there is a change in the DCBX 
+                Peer Status and the  corresponding bit (bit 3) in the 
+                fsAppPriGlobalEnableTrap is set to send the trap for Peer Up 
+                or Peer Down."
+        ::= {fsDCBTraps 11 }   
+
+    fsAppPriPortDcbxOperStateTrap NOTIFICATION-TYPE
+        OBJECTS  {
+            fsDcbTrapPortNumber,
+	        fsAppPriDcbxOperState
+            }
+        STATUS   current
+        DESCRIPTION
+              "This trap is generated whenever there is a change in the 
+              application priority Operational State and the  
+              corresponding bit (bit 4) in the fsAppPriGlobalEnableTrap is set
+              to send the trap for application priority state machine state change."
+        ::= {fsDCBTraps 12 }   
+
+END
+

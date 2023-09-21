@@ -30,37 +30,43 @@ load_graph_definitions();
 
 /**
  * Send back new list content
+ *
  * @items Array of options values to return to browser
  * @method Name of Javascript method that will be called to process data
  */
-function dhtml_response_list(&$items, $method) {
-        header("Content-Type: text/xml");
+function dhtml_response_list(&$items, $method)
+{
+    header("Content-Type: text/xml");
 
-        print('<?xml version="1.0" encoding="utf-8" ?>'."\n");
-        print("<response>\n");
-        printf(" <method>%s</method>\n", escape_html($method));
-        print(" <result>\n");
-        foreach ($items as &$item)
-                printf('  <option>%s</option>'."\n", escape_html($item));
-        print(" </result>\n");
-        print("</response>");
+    print('<?xml version="1.0" encoding="utf-8" ?>' . "\n");
+    print("<response>\n");
+    printf(" <method>%s</method>\n", escape_html($method));
+    print(" <result>\n");
+    foreach ($items as &$item) {
+        printf('  <option>%s</option>' . "\n", escape_html($item));
+    }
+    print(" </result>\n");
+    print("</response>");
 }
 
-$link_array = array('page'    => 'device',
-                    'device'  => $device['device_id'],
-                    'tab' => 'collectd');
+$link_array = ['page'   => 'device',
+               'device' => $device['device_id'],
+               'tab'    => 'collectd'];
 
 $plugins = collectd_list_plugins($device['hostname']);
 
 #$navbar['brand'] = "CollectD";
 $navbar['class'] = "navbar-narrow";
 
-foreach ($plugins as &$plugin)
-{
-  if (!$vars['plugin']) { $vars['plugin'] = $plugin; }
-  if ($vars['plugin'] == $plugin) { $navbar['options'][$plugin]['class'] = "active"; }
-  $navbar['options'][$plugin]['url'] = generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'collectd', 'plugin' => $plugin));
-  $navbar['options'][$plugin]['text'] = escape_html(ucwords($plugin));
+foreach ($plugins as &$plugin) {
+    if (!$vars['plugin']) {
+        $vars['plugin'] = $plugin;
+    }
+    if ($vars['plugin'] == $plugin) {
+        $navbar['options'][$plugin]['class'] = "active";
+    }
+    $navbar['options'][$plugin]['url']  = generate_url(['page' => 'device', 'device' => $device['device_id'], 'tab' => 'collectd', 'plugin' => $plugin]);
+    $navbar['options'][$plugin]['text'] = escape_html(ucwords($plugin));
 }
 
 print_navbar($navbar);
@@ -69,48 +75,50 @@ echo generate_box_open();
 
 echo '<table class="table table-condensed table-striped table-hover">';
 
-   $i=0;
+$i = 0;
 
-    $pinsts = collectd_list_pinsts($device['hostname'], $vars['plugin']);
-    foreach ($pinsts as &$instance) {
+$pinsts = collectd_list_pinsts($device['hostname'], $vars['plugin']);
+foreach ($pinsts as &$instance) {
 
-     $types = collectd_list_types($device['hostname'], $vars['plugin'], $instance);
-     foreach ($types as &$type) {
+    $types = collectd_list_types($device['hostname'], $vars['plugin'], $instance);
+    foreach ($types as &$type) {
 
-     $typeinstances = collectd_list_tinsts($device['hostname'], $vars['plugin'], $instance, $type);
+        $typeinstances = collectd_list_tinsts($device['hostname'], $vars['plugin'], $instance, $type);
 
-     if ($MetaGraphDefs[$type]) { $typeinstances = array($MetaGraphDefs[$type]); }
+        if ($MetaGraphDefs[$type]) {
+            $typeinstances = [$MetaGraphDefs[$type]];
+        }
 
-     foreach ($typeinstances as &$tinst) {
-       $i++;
-       $row_colour = !is_intnum($i / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
+        foreach ($typeinstances as &$tinst) {
+            $i++;
+            $row_colour = !is_intnum($i / 2) ? OBS_COLOUR_LIST_A : OBS_COLOUR_LIST_B;
 
-       echo('<tr><td>');
-       echo('<h3>'.$graph_title);
+            echo('<tr><td>');
+            echo('<h3>' . $graph_title);
 
-       if ($tinst) {
-       echo($vars['plugin']." $instance - $type - $tinst");
-       } else {
-        echo($vars['plugin']." $instance - $type");
-       }
-       echo('</h3>');
+            if ($tinst) {
+                echo($vars['plugin'] . " $instance - $type - $tinst");
+            } else {
+                echo($vars['plugin'] . " $instance - $type");
+            }
+            echo('</h3>');
 
-       $graph_array['type']                    = "device_collectd";
-       $graph_array['device']                      = $device['device_id'];
+            $graph_array['type']   = "device_collectd";
+            $graph_array['device'] = $device['device_id'];
 
-       $graph_array['c_plugin']           = $vars['plugin'];
-       $graph_array['c_plugin_instance'] = $instance;
-       $graph_array['c_type']                 = $type;
-       $graph_array['c_type_instance']   = $tinst;
+            $graph_array['c_plugin']          = $vars['plugin'];
+            $graph_array['c_plugin_instance'] = $instance;
+            $graph_array['c_type']            = $type;
+            $graph_array['c_type_instance']   = $tinst;
 
-       print_graph_row($graph_array);
+            print_graph_row($graph_array);
 
-       echo('</tr></td>');
+            echo('</tr></td>');
 
-      }
-     }
-
+        }
     }
+
+}
 
 echo '</table>';
 

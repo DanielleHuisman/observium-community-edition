@@ -1,4 +1,14 @@
 <?php
+/**
+* Observium
+*
+*   This file is part of Observium.
+*
+* @package    observium
+* @subpackage tests
+* @author     Observium Limited <http://www.observium.org/>
+*
+*/
 
 $base_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $base_dir;
@@ -7,6 +17,10 @@ $config['install_dir'] = $base_dir;
 
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/../includes/definitions.inc.php');
 //include(dirname(__FILE__) . '/data/test_definitions.inc.php'); // Fake definitions for testing
@@ -167,6 +181,11 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
 
   public function providerSnmpFixNumeric()
   {
+    $split_lanes = '
+Lane  1:  1.01 dBm
+Lane  2:  1.29 dBm
+Lane  3:   2.1 dBm
+Lane  4:  2.71 dBm';
     $array = array(
       array(         0,           0),
       array(  '-65000',      -65000),
@@ -201,6 +220,19 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       array('Current 12V Rail Loc: right-PSU: 9.53A', 9.53),
       array('Capacitor Charge-Ctlr B: 100%',          100),
       array('Spinning at 5160 RPM',                   5160),
+      // Split
+      array('42.50 ,35.97 ,40.64 ,40.38', 42.5,  'split1'),
+      array('42.50 ,35.97 ,40.64 ,40.38', 35.97, 'split2'),
+      array('42.50 ,35.97 ,40.64 ,40.38', 40.64, 'split3'),
+      array('42.50 ,35.97 ,40.64 ,40.38', 40.38, 'split4'),
+      array($split_lanes, 1.01,  'split_lane1'),
+      array($split_lanes, 1.29,  'split_lane2'),
+      array($split_lanes, 2.1,   'split_lane3'),
+      array($split_lanes, 2.71,  'split_lane4'),
+
+      array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 0, 'split1'),
+      array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 2, 'split2'),
+      array('CPU Load (100ms, 1s, 10s) : 0%, 2%, 3%', 3, 'split3'),
     );
 
     foreach ($array as $index => $entry)

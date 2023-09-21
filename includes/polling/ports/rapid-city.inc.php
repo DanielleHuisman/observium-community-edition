@@ -5,19 +5,18 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Ports Duplex, Secure
-$entries = snmpwalk_cache_oid($device, 'rcPortOperDuplex',        array(), 'RAPID-CITY');
+$entries = snmpwalk_cache_oid($device, 'rcPortOperDuplex', [], 'RAPID-CITY');
 //$entries = snmpwalk_cache_oid($device, 'rcPortHighSecureEnable', $entries, 'RAPID-CITY');
-foreach ($entries as $ifIndex => $entry)
-{
-  // Set ifDuplex
-  $port_stats[$ifIndex]['ifDuplex'] = $entry['rcPortOperDuplex'];
+foreach ($entries as $ifIndex => $entry) {
+    // Set ifDuplex
+    $port_stats[$ifIndex]['ifDuplex'] = $entry['rcPortOperDuplex'];
 }
 
 /*
@@ -49,8 +48,8 @@ foreach ($ports_vlans as $vlan_num => $entry)
 $port_module = 'vlan';
 
 if (!$ports_modules[$port_module]) {
-  // Module disabled
-  return;
+    // Module disabled
+    return;
 }
 
 /*
@@ -61,31 +60,30 @@ RAPID-CITY::rcVlanPortDefaultVlanId.514 = INTEGER: 6
 */
 
 // Base vlan IDs
-$ports_vlans_oids = snmpwalk_cache_oid($device, 'rcVlanPortDefaultVlanId', array(), 'RAPID-CITY');
+$ports_vlans_oids = snmpwalk_cache_oid($device, 'rcVlanPortDefaultVlanId', [], 'RAPID-CITY');
 
 if (snmp_status()) {
-  echo("rcVlanPortDefaultVlanId ");
+    echo("rcVlanPortDefaultVlanId ");
 
-  $ports_vlans_oids = snmpwalk_cache_oid($device, 'rcVlanPortType', $ports_vlans_oids, 'RAPID-CITY');
+    $ports_vlans_oids = snmpwalk_cache_oid($device, 'rcVlanPortType', $ports_vlans_oids, 'RAPID-CITY');
 
-  print_debug_vars($ports_vlans_oids);
+    print_debug_vars($ports_vlans_oids);
 
-  $vlan_rows = array();
-  foreach ($ports_vlans_oids as $ifIndex => $vlan)
-  {
-    $vlan_num = $vlan['rcVlanPortDefaultVlanId'];
-    $trunk    = $vlan['rcVlanPortType'] != 'access' ? 'dot1Q' : $vlan['rcVlanPortType'];
-    $vlan_rows[] = array($ifIndex, $vlan_num, $trunk);
+    $vlan_rows = [];
+    foreach ($ports_vlans_oids as $ifIndex => $vlan) {
+        $vlan_num    = $vlan['rcVlanPortDefaultVlanId'];
+        $trunk       = $vlan['rcVlanPortType'] != 'access' ? 'dot1Q' : $vlan['rcVlanPortType'];
+        $vlan_rows[] = [$ifIndex, $vlan_num, $trunk];
 
-    // Set Vlan and Trunk
-    $port_stats[$ifIndex]['ifVlan']  = $vlan_num;
-    $port_stats[$ifIndex]['ifTrunk'] = $trunk;
+        // Set Vlan and Trunk
+        $port_stats[$ifIndex]['ifVlan']  = $vlan_num;
+        $port_stats[$ifIndex]['ifTrunk'] = $trunk;
 
-  }
+    }
 
 }
 
-$headers = array('%WifIndex%n', '%WVlan%n', '%WTrunk%n');
+$headers = ['%WifIndex%n', '%WVlan%n', '%WTrunk%n'];
 print_cli_table($vlan_rows, $headers);
 
 //$process_port_functions[$port_module] = $GLOBALS['snmp_status'];

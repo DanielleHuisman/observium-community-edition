@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -71,42 +71,40 @@ JUNIPER-COS-MIB::jnxCosQstatRateLimitDropByteRate[526][0] = Counter64: 0
 function process_port_jnx_cos_qstat(&$this_port, $device, $port)
 {
 
-  if(isset($this_port['jnx_cos_qstat']) && count($this_port['jnx_cos_qstat']))
-  {
+    if (isset($this_port['jnx_cos_qstat']) && count($this_port['jnx_cos_qstat'])) {
 
-    $queues = array();
+        $queues = [];
 
-    foreach($this_port['jnx_cos_qstat'] as $q_index => $q_stats)
-    {
+        foreach ($this_port['jnx_cos_qstat'] as $q_index => $q_stats) {
 
-      rrdtool_update_ng($device, 'port-jnx_cos_qstat', array(
-        'QedPkts'           => $q_stats['jnxCosQstatQedPkts'],
-        'QedBytes'          => $q_stats['jnxCosQstatQedBytes'],
-        'TxedPkts'          => $q_stats['jnxCosQstatTxedPkts'],
-        'TxedBytes'         => $q_stats['jnxCosQstatTxedBytes'],
-        'TailDropPkts'      => $q_stats['jnxCosQstatTailDropPkts'],
-        'TotalRedDropPkts'  => $q_stats['jnxCosQstatTotalRedDropPkts'],
-        'TotalRedDropBytes' => $q_stats['jnxCosQstatTotalRedDropBytes'],
-      ), get_port_rrdindex($port).'-'.$q_index);
+            rrdtool_update_ng($device, 'port-jnx_cos_qstat', [
+              'QedPkts'           => $q_stats['jnxCosQstatQedPkts'],
+              'QedBytes'          => $q_stats['jnxCosQstatQedBytes'],
+              'TxedPkts'          => $q_stats['jnxCosQstatTxedPkts'],
+              'TxedBytes'         => $q_stats['jnxCosQstatTxedBytes'],
+              'TailDropPkts'      => $q_stats['jnxCosQstatTailDropPkts'],
+              'TotalRedDropPkts'  => $q_stats['jnxCosQstatTotalRedDropPkts'],
+              'TotalRedDropBytes' => $q_stats['jnxCosQstatTotalRedDropBytes'],
+            ],                get_port_rrdindex($port) . '-' . $q_index);
 
-      $queues[] = $q_index;
+            $queues[] = $q_index;
 
-      /*
-      if ($GLOBALS['config']['statsd']['enable'])
-      {
-        foreach ($adsl_oids as $oid)
-        {
-          // Update StatsD/Carbon
-          StatsD::gauge(str_replace(".", "_", $device['hostname']).'.'.'port'.'.'.$port['ifIndex'].'.'.$oid, $this_port[$oid]);
+            /*
+            if ($GLOBALS['config']['statsd']['enable'])
+            {
+              foreach ($adsl_oids as $oid)
+              {
+                // Update StatsD/Carbon
+                StatsD::gauge(str_replace(".", "_", $device['hostname']).'.'.'port'.'.'.$port['ifIndex'].'.'.$oid, $this_port[$oid]);
+              }
+            } */
+
         }
-      } */
+
+        set_entity_attrib('port', $port['port_id'], 'jnx_cos_queues', json_encode($queues));
 
     }
 
-    set_entity_attrib('port', $port['port_id'], 'jnx_cos_queues', json_encode($queues));
-
-  }
-
-  // FIXME -- remove attrib if it doesn't exist.
+    // FIXME -- remove attrib if it doesn't exist.
 
 }

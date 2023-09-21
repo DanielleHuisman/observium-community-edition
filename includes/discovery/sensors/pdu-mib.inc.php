@@ -4,14 +4,14 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Raritan External Environmental Sensors
-$oids = snmpwalk_cache_oid($device, "externalSensorTable", array(), "PDU-MIB");
+$oids = snmpwalk_cache_oid($device, "externalSensorTable", [], "PDU-MIB");
 
 // PDU-MIB::sensorID.1 = INTEGER: 1
 // PDU-MIB::sensorID.2 = INTEGER: 2
@@ -60,63 +60,63 @@ $sensor_types = [
   //'airPressure', 'onOff', 'trip', 'vibration', 'waterDetection', 'smokeDetection', 'binary', 'contact', 'other', 'none'
 ];
 $sensor_units = [
-  //none(-1), other(0),
-  'volt' => 'voltage',
-  'amp'  => 'current',
-  'watt' => 'power',
-  'voltamp' => 'apower',
-  'wattHour' => 'energy',
-  'voltampHour' => 'aenergy',
-  'degreeC' => 'temperature',
-  'hertz' => 'frequency',
-  //'percent' => 'humidity',
-  //meterpersec(10),
-  'pascal' => 'pressure',
-  'psi' => 'pressure',
-  //g(13),
-  'degreeF' => 'temperature',
-  //feet(15),
-  //inches(16),
-  //cm(17),
-  //meters(18)
+    //none(-1), other(0),
+    'volt'        => 'voltage',
+    'amp'         => 'current',
+    'watt'        => 'power',
+    'voltamp'     => 'apower',
+    'wattHour'    => 'energy',
+    'voltampHour' => 'aenergy',
+    'degreeC'     => 'temperature',
+    'hertz'       => 'frequency',
+    //'percent' => 'humidity',
+    //meterpersec(10),
+    'pascal'      => 'pressure',
+    'psi'         => 'pressure',
+    //g(13),
+    'degreeF'     => 'temperature',
+    //feet(15),
+    //inches(16),
+    //cm(17),
+    //meters(18)
 ];
 foreach ($oids as $index => $entry) {
-  $descr   = $entry['externalSensorName']; // The name set by the device's admin through Raritan's web interface.
-  $oid     = ".1.3.6.1.4.1.13742.4.3.3.1.41.$index";
-  $scale   = si_to_scale('units', $entry['externalSensorDecimalDigits']);
-  $value   = $entry['externalSensorValue'];
+    $descr = $entry['externalSensorName']; // The name set by the device's admin through Raritan's web interface.
+    $oid   = ".1.3.6.1.4.1.13742.4.3.3.1.41.$index";
+    $scale = si_to_scale('units', $entry['externalSensorDecimalDigits']);
+    $value = $entry['externalSensorValue'];
 
-  if (isset($sensor_types[$entry['externalSensorType']])) {
-    $type = $sensor_types[$entry['externalSensorType']];
-  } elseif (isset($sensor_units[$entry['externalSensorUnits']])) {
-    $type = $sensor_units[$entry['externalSensorUnits']];
-  } else {
-    // FIXME. Statuses
-    continue;
-  }
-
-  if (in_array($type, [ 'energy', 'aenergy' ])) {
-    // Counters
-    discover_counter($device, $type, $mib, 'externalSensorValue', $oid, $index, $descr, $scale, $value);
-  } elseif (isset($sensor_types[$entry['externalSensorType']]) && is_numeric($value)) {
-    // Sensors
-    $options = [
-      'limit_high'      => $entry['externalSensorUpperWarningThreshold']  * $scale,
-      'limit_low'       => $entry['externalSensorLowerCriticalThreshold'] * $scale,
-      'limit_high_warn' => $entry['externalSensorUpperCriticalThreshold'] * $scale,
-      'limit_low_warn'  => $entry['externalSensorLowerWarningThreshold']  * $scale
-    ];
-    $options['rename_rrd'] = "raritan-0";
-    // Units
-    if ($sensor_types[$entry['externalSensorType']] === 'velocity') {
-      //$options['sensor_unit'] = "LFM";
-    }
-    if ($entry['externalSensorUnits'] === 'degreeF') {
-      $options['sensor_unit'] = "F";
+    if (isset($sensor_types[$entry['externalSensorType']])) {
+        $type = $sensor_types[$entry['externalSensorType']];
+    } elseif (isset($sensor_units[$entry['externalSensorUnits']])) {
+        $type = $sensor_units[$entry['externalSensorUnits']];
+    } else {
+        // FIXME. Statuses
+        continue;
     }
 
-    discover_sensor_ng($device, $sensor_types[$entry['externalSensorType']], $mib, 'externalSensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
-  }
+    if (in_array($type, ['energy', 'aenergy'])) {
+        // Counters
+        discover_counter($device, $type, $mib, 'externalSensorValue', $oid, $index, $descr, $scale, $value);
+    } elseif (isset($sensor_types[$entry['externalSensorType']]) && is_numeric($value)) {
+        // Sensors
+        $options               = [
+          'limit_high'      => $entry['externalSensorUpperWarningThreshold'] * $scale,
+          'limit_low'       => $entry['externalSensorLowerCriticalThreshold'] * $scale,
+          'limit_high_warn' => $entry['externalSensorUpperCriticalThreshold'] * $scale,
+          'limit_low_warn'  => $entry['externalSensorLowerWarningThreshold'] * $scale
+        ];
+        $options['rename_rrd'] = "raritan-0";
+        // Units
+        if ($sensor_types[$entry['externalSensorType']] === 'velocity') {
+            //$options['sensor_unit'] = "LFM";
+        }
+        if ($entry['externalSensorUnits'] === 'degreeF') {
+            $options['sensor_unit'] = "F";
+        }
+
+        discover_sensor_ng($device, $sensor_types[$entry['externalSensorType']], $mib, 'externalSensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
+    }
 }
 
 // EOF

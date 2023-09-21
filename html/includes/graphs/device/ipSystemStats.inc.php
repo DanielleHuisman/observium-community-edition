@@ -5,13 +5,13 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $rrd_filename_4 = rrdtool_escape(get_rrd_path($device, "ipSystemStats-ipv4.rrd"));
 $rrd_filename_6 = rrdtool_escape(get_rrd_path($device, "ipSystemStats-ipv6.rrd"));

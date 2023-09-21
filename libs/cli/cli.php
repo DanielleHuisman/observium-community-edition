@@ -289,7 +289,7 @@ function _safe_substr_eaw( $str, $length ) {
 			if ( $width < 0 && $length > 1 ) {
 				$length--;
 			}
-			return join( '', array_slice( $chars, 0, $length ) );
+			return implode('', array_slice($chars, 0, $length ) );
 		}
 	}
 	return $str;

@@ -1,0 +1,613 @@
+
+RC-MCAST-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, Counter32, IpAddress, TimeTicks, Counter64
+        FROM SNMPv2-SMI
+    TruthValue, RowStatus
+        FROM SNMPv2-TC
+    InterfaceIndex
+        FROM IF-MIB
+    rcIpMulticastSoftwareForwarding, rcIpMrouteHw
+        FROM RC-IP-MIB
+    rcIp, rcMcast, rcStat, PortSet
+        FROM RAPID-CITY;
+
+
+rcMcastMib MODULE-IDENTITY
+       LAST-UPDATED     "201702090000Z"
+       ORGANIZATION     "Bay Networks, Rapid-City Group"
+       CONTACT-INFO     "
+                                        Edwin Tsang
+                         Postal:        Bay Networks, Inc.
+                                        4401 Great America Parkway
+                                        Santa Clara, CA 95052-8185
+
+                         Tel:           408-495-6159
+                         Fax:           408-495-5215
+                         E-mail:        edwin_tsang@baynetworks.com
+                        "
+       DESCRIPTION      "Enterprise MIB for the Accelar product family."
+
+       REVISION "201702090000Z" -- 09 Feb 2017
+       DESCRIPTION "Version 6: Corrected MIB compiler error."
+
+       REVISION "201512080000Z" -- 08 Dec 2015
+       DESCRIPTION "Version 5: Added rcMcastObjects, rcMcastNotifications,
+	   		       rcMcastStreamCountTable, rcMcastNotificationStreamCountSlot
+			       and rcMcastNotificationStreamCountLane.
+			       Requested by Ankit Barak (ERS86/8800) (prempa)" 
+
+       REVISION "200409230000Z" -- 23 Sept 2004
+       DESCRIPTION "Version 4: Add range for mib rcIpMrouteHwIndex and rcIpMrouteHwEgressVlansIndex" 
+       REVISION "200409220000Z" -- 22 Sept 2004
+       DESCRIPTION "Version 3: Remove range for mib rcIpMrouteHwIndex and rcIpMrouteHwEgressVlansIndex"  
+       REVISION "200407200000Z" -- 20 July 2004
+       DESCRIPTION "Version 3: Added version info"  
+
+       ::= { rcMcast 1 }
+
+rcMcastObjects		OBJECT IDENTIFIER ::= { rcMcastMib 1 }
+rcMcastNotifications	OBJECT IDENTIFIER ::= { rcMcastMib 2 }
+
+--IP Multicast Table
+
+rcIpMulticastTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcIpMulticastEntry
+        MAX-ACCESS    not-accessible
+        STATUS        deprecated
+        DESCRIPTION   "Ip multicast table."
+        ::= { rcIp 18 }
+ 
+rcIpMulticastEntry OBJECT-TYPE
+        SYNTAX        RcIpMulticastEntry
+        MAX-ACCESS    not-accessible
+        STATUS        deprecated
+        DESCRIPTION   "Entry containing Proprietary Ip Multicast information."
+        INDEX         { rcIpMulticastIfIndex }
+        ::= { rcIpMulticastTable 1 }
+ 
+RcIpMulticastEntry ::=
+        SEQUENCE {
+                rcIpMulticastIfIndex InterfaceIndex,
+                rcIpMulticastMulticastIp IpAddress
+        }
+ 
+rcIpMulticastIfIndex OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      read-only
+        STATUS          deprecated
+        DESCRIPTION     "IfIndex."
+        ::= { rcIpMulticastEntry 1 }
+ 
+rcIpMulticastMulticastIp OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-write
+        STATUS          deprecated
+        DESCRIPTION     "IP Address on this IfIndex
+                         to be used for all Multicast
+                         protocols running on this
+                         interface."
+        ::= { rcIpMulticastEntry 2 }
+
+-- IP Timed Prune Table
+
+rcIpMulticastTimedPruneTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF RcIpMulticastTimedPruneEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "This feature provides the ability for the user to 
+                         create (S,G)  Forwarding Entries that would not be
+                         pruned until a configurable timer expires. This feature 
+                         is targeted for Passport 8600. Currently
+                         the timer value is set to 0."
+        ::= { rcIp 21 }
+
+rcIpMulticastTimedPruneEntry OBJECT-TYPE
+        SYNTAX          RcIpMulticastTimedPruneEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "An entry of Ip Multicast Timed Prune Table."
+        INDEX           { rcIpMulticastTimedPruneGroupAddress,
+                          rcIpMulticastTimedPruneSourceAddress,
+                          rcIpMulticastTimedPruneSrcSubnetMask }
+        ::= { rcIpMulticastTimedPruneTable 1 }
+
+RcIpMulticastTimedPruneEntry ::=
+        SEQUENCE {
+                rcIpMulticastTimedPruneGroupAddress    IpAddress,
+                rcIpMulticastTimedPruneSourceAddress   IpAddress,
+                rcIpMulticastTimedPruneSrcSubnetMask  IpAddress,
+                rcIpMulticastTimedPruneAgingTimer     Integer32,
+                rcIpMulticastTimedPruneTimeLeft       Integer32,
+                rcIpMulticastTimedPruneLastActivity   TimeTicks,
+                rcIpMulticastTimedPruneRowStatus      RowStatus
+        }
+
+rcIpMulticastTimedPruneGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This field indicates the IP Multicast Group 
+                       Address associated with the IP multicast stream."
+        ::= { rcIpMulticastTimedPruneEntry 1 }
+
+rcIpMulticastTimedPruneSourceAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This is the Source Subnet IP address of the 
+                       sender of the IP multicast stream."
+        ::= { rcIpMulticastTimedPruneEntry 2 }
+
+rcIpMulticastTimedPruneSrcSubnetMask OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This is the Source Subnet Mask IP address of 
+                       the sender of the IP multicast stream."
+        ::= { rcIpMulticastTimedPruneEntry 3 }
+
+rcIpMulticastTimedPruneAgingTimer OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This field represents the amount of time 
+                       (in minutes) this timed prune entry will be 
+                       kept in the forwarding table when there are no 
+                       more receivers. After this timer expires, this 
+                       timed prune entry would be treated as a normal 
+                       DVMRP/PIM forwarding entry. Aging Timer value of 
+                       0 (infinite time) indicates this timed prune entry 
+                       will not be deleted even when there are no 
+                       more receivers."
+        DEFVAL        { 5 }
+        ::= { rcIpMulticastTimedPruneEntry 4 }
+
+rcIpMulticastTimedPruneTimeLeft OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "This read-only field represents the remaining time 
+                       for which this timed prune entry will be kept in
+                       the forwarding table. After this timer expires, 
+                       this timed prune entry would be treated as a normal 
+                       DVMRP/PIM forwarding entry. 0 in this field indicates 
+                       that this entry would not be aged out."
+        ::= { rcIpMulticastTimedPruneEntry 5 }
+
+rcIpMulticastTimedPruneLastActivity OBJECT-TYPE
+        SYNTAX        TimeTicks
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "This read-only field represents the actual time since 
+                       the traffic has come from this Source, Group pair."
+        ::= { rcIpMulticastTimedPruneEntry 6 }
+
+rcIpMulticastTimedPruneRowStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "row status"
+        ::= { rcIpMulticastTimedPruneEntry 7 }
+
+
+--IP Mcast Software Forwarding Group
+
+rcIpMulticastSoftwareForwardingEnable OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Enable/Disable multicast software
+forwarding."
+        DEFVAL { false }
+        ::= { rcIpMulticastSoftwareForwarding 1 }
+
+rcIpMulticastSoftwareForwardingThreshold OBJECT-TYPE
+        SYNTAX        INTEGER (1..65535)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Threshold to switch from software forwarding to hardware forwarding. Unit = pkt per second"
+        DEFVAL { 5 }
+        ::= { rcIpMulticastSoftwareForwarding 2 }
+
+--IP Mroute-Hw
+
+rcIpMrouteHwTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcIpMrouteHwEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "The (conceptual) table containing hardware entries of
+                       multicast routing information for all the Group Address."
+        ::= { rcIpMrouteHw 1 }
+
+rcIpMrouteHwEntry OBJECT-TYPE
+        SYNTAX        RcIpMrouteHwEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "An entry (conceptual row) containing hardware entries of
+	                    multicast routing information for a particular Group 
+		                 Address."
+        INDEX         { rcIpMrouteHwGroupAddress,
+                        rcIpMrouteHwSubnet, 
+                        rcIpMrouteHwInvlan,
+                        rcIpMrouteHwIndex }
+        ::= { rcIpMrouteHwTable 1 }
+
+RcIpMrouteHwEntry ::=
+        SEQUENCE {
+                rcIpMrouteHwGroupAddress        IpAddress,
+                rcIpMrouteHwSubnet              IpAddress,
+                rcIpMrouteHwInvlan              INTEGER,
+                rcIpMrouteHwPruned              TruthValue,
+                rcIpMrouteHwIndex               Integer32
+        }
+
+rcIpMrouteHwGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The IP multicast group address for which this entry
+                       contains multicast routing information."
+        ::= { rcIpMrouteHwEntry 1 }
+
+rcIpMrouteHwSubnet OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The network address from where the source is sending the
+                       stream of traffic for which this entry contains multicast
+                       routing information."
+        ::= { rcIpMrouteHwEntry 2 }
+
+rcIpMrouteHwInvlan OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Ingress vlan Id from where the traffic is coming for
+                       which this entry contains multicast routing information."
+        ::= { rcIpMrouteHwEntry 3 }
+
+rcIpMrouteHwPruned OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "This is to show weather the entry containing multicast
+                       routing information has received Prune message or not."
+        ::= { rcIpMrouteHwEntry  4 }
+
+rcIpMrouteHwIndex OBJECT-TYPE
+        SYNTAX        Integer32 (0..2147483647)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "This Index value keep tracks of the hardware record that
+                       has been accessed for displaying the entry containing                           multicast routing information."
+        ::= { rcIpMrouteHwEntry  5 }
+
+rcIpMrouteHwPrunesTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcIpMrouteHwPrunesEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "The (conceptual) table containing prune entries of
+                       multicast routing information for the Group Address."
+        ::= { rcIpMrouteHw 2 }
+
+rcIpMrouteHwPrunesEntry OBJECT-TYPE
+        SYNTAX        RcIpMrouteHwPrunesEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "An entry (conceptual row) containing prune entries of
+                       multicast routing information for a particular Group 
+                       Address."
+        INDEX         { rcIpMrouteHwPrunesGroupAddress,
+                        rcIpMrouteHwPrunesSubnet,
+                        rcIpMrouteHwPrunesInvlan,
+                        rcIpMrouteHwPrunesNeighbor }
+        ::= { rcIpMrouteHwPrunesTable 1 }
+
+RcIpMrouteHwPrunesEntry ::=
+        SEQUENCE {
+                rcIpMrouteHwPrunesGroupAddress  IpAddress,
+                rcIpMrouteHwPrunesSubnet        IpAddress,
+                rcIpMrouteHwPrunesInvlan        INTEGER,
+                rcIpMrouteHwPrunesNeighbor      IpAddress,
+                rcIpMrouteHwPrunesTimer         Integer32
+        }
+
+rcIpMrouteHwPrunesGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The IP multicast group address for which this entry
+                       contains multicast routing information."
+        ::= { rcIpMrouteHwPrunesEntry 1 }
+
+rcIpMrouteHwPrunesSubnet OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The network address from where the source is sending the
+                       stream of traffic for which this entry contains 
+                       multicast routing information."
+        ::= { rcIpMrouteHwPrunesEntry 2 }
+
+rcIpMrouteHwPrunesInvlan OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Ingress vlan Id from where the traffic is coming for
+                       which this entry contains multicast routing information."
+        ::= { rcIpMrouteHwPrunesEntry 3 }
+
+rcIpMrouteHwPrunesNeighbor OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The IpAddress from where the Prune message has been
+                       received."
+        ::= { rcIpMrouteHwPrunesEntry 4 }
+
+rcIpMrouteHwPrunesTimer OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "This is to show how much time is left for this particular
+                       entry containing multicast routing information during 
+                       which  the graft message can be sent."
+        ::= { rcIpMrouteHwPrunesEntry 5 }
+
+rcIpMrouteHwSourcesTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcIpMrouteHwSourcesEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "The (conceptual) table containing source entries of
+                       multicast routing information for the Group Address."
+        ::= { rcIpMrouteHw 3 }
+
+rcIpMrouteHwSourcesEntry OBJECT-TYPE
+        SYNTAX        RcIpMrouteHwSourcesEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "An entry (conceptual row) containing source entries of
+                       multicast routing information for a particular Group 
+                       Address."
+        INDEX         { rcIpMrouteHwSourcesGroupAddress,
+                        rcIpMrouteHwSourcesSubnet,
+                        rcIpMrouteHwSourcesInvlan,
+                        rcIpMrouteHwSourcesAddress }
+        ::= { rcIpMrouteHwSourcesTable 1 }
+
+RcIpMrouteHwSourcesEntry ::=
+        SEQUENCE {
+                rcIpMrouteHwSourcesGroupAddress  IpAddress,
+                rcIpMrouteHwSourcesSubnet        IpAddress,
+                rcIpMrouteHwSourcesInvlan        INTEGER,
+                rcIpMrouteHwSourcesAddress       IpAddress,
+                rcIpMrouteHwSourcesIngressPort   PortSet
+        }
+
+rcIpMrouteHwSourcesGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The IP multicast group address for which this entry
+                       contains multicast routing information."
+        ::= { rcIpMrouteHwSourcesEntry 1 }
+
+rcIpMrouteHwSourcesSubnet OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The network address from where the source is sending the
+                       stream of traffic for which this entry contains 
+                       multicast routing information."
+        ::= { rcIpMrouteHwSourcesEntry 2 }
+
+rcIpMrouteHwSourcesInvlan OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Ingress vlan Id from where the traffic is coming for
+                       which this entry contains multicast routing information."
+        ::= { rcIpMrouteHwSourcesEntry 3 }
+
+rcIpMrouteHwSourcesAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Source Address from where the stream of traffic is                          reaching the corresponding Group Address for which this 
+                       entry contains multicast routing information."
+        ::= { rcIpMrouteHwSourcesEntry 4 }
+
+rcIpMrouteHwSourcesIngressPort OBJECT-TYPE
+        SYNTAX        PortSet
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Ingress vlan ports from where the traffic is coming,
+                       for which this entry contains multicast routing 
+                       information."
+        ::= { rcIpMrouteHwSourcesEntry 5 }
+
+rcIpMrouteHwEgressVlansTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcIpMrouteHwEgressVlansEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "The (conceptual) table containing egress vlan entries of
+                       multicast routing information for the Group Address."
+        ::= { rcIpMrouteHw 4 }
+
+rcIpMrouteHwEgressVlansEntry OBJECT-TYPE
+        SYNTAX        RcIpMrouteHwEgressVlansEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "An entry (conceptual row) containing egress vlan entries
+                       of multicast routing information for a particular Group 
+                       Address."
+        INDEX         { rcIpMrouteHwEgressVlansGroupAddress,
+                        rcIpMrouteHwEgressVlansSubnet,
+                        rcIpMrouteHwEgressVlansInvlan,
+                        rcIpMrouteHwEgressVlansId,
+                        rcIpMrouteHwEgressVlansIndex }
+        ::= { rcIpMrouteHwEgressVlansTable 1 }
+
+RcIpMrouteHwEgressVlansEntry ::=
+        SEQUENCE {
+                rcIpMrouteHwEgressVlansGroupAddress IpAddress,
+                rcIpMrouteHwEgressVlansSubnet       IpAddress,
+                rcIpMrouteHwEgressVlansInvlan       INTEGER,
+                rcIpMrouteHwEgressVlansId           INTEGER,
+                rcIpMrouteHwEgressVlansPorts        PortSet,
+                rcIpMrouteHwEgressVlansIndex        Integer32
+        }
+
+rcIpMrouteHwEgressVlansGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The IP multicast group address for which this entry 
+                       contains multicast routing information."
+        ::= { rcIpMrouteHwEgressVlansEntry 1 }
+
+rcIpMrouteHwEgressVlansSubnet OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The network address from where the source is sending the
+                       stream of traffic for which this entry contains 
+                       multicast routing information."
+        ::= { rcIpMrouteHwEgressVlansEntry 2 }
+
+rcIpMrouteHwEgressVlansInvlan OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Ingress vlan Id from where the traffic is coming for
+                       which this entry contains multicast routing information."
+        ::= { rcIpMrouteHwEgressVlansEntry 3 }
+
+rcIpMrouteHwEgressVlansId OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The Egress vlan Id from where the traffic is going out
+                       for which this entry contains multicast routing
+                       information"
+        ::= { rcIpMrouteHwEgressVlansEntry 4 }
+
+rcIpMrouteHwEgressVlansPorts OBJECT-TYPE
+        SYNTAX        PortSet
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "he Egress vlan ports from where the traffic is going out
+                       for which this entry contains multicast routing 
+                       information."
+        ::= { rcIpMrouteHwEgressVlansEntry 5 }
+
+rcIpMrouteHwEgressVlansIndex OBJECT-TYPE
+        SYNTAX        Integer32 (0..2147483647)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "This Index value keep tracks of the hardware record that
+                       has been accessed for displaying the entry containing 
+                       multicast routing information."
+        ::= { rcIpMrouteHwEgressVlansEntry  6 }
+
+
+-- Common resource threshold exceeded counter for all multicast protocols
+-- active on the chassis
+
+rcStatMulticast      OBJECT IDENTIFIER ::= { rcStat 9 }
+
+rcStatMulticastSourceGroupThresholdExceeded OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION   "The count of number of times the threshold of 
+                       available IP Multicast (Source,Group) Records was 
+                       reached. When this threshold is reached, a new IP 
+                       Multicast stream ingressing the switch cannot be 
+                       forwarded."
+        ::= { rcStatMulticast 1 }
+
+rcStatMulticastEgressStreamThresholdExceeded OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The count of number of times the threshold of 
+                       available IP Multicast Egress Forwarding Records was 
+                       reached. When this threshold is reached, a new IP 
+                       Multicast Receiver that needs new Egress Forwarding 
+                       Record (PepStrem Record) will not be programmed to 
+                       receive the subscribing multicast stream."
+        ::= { rcStatMulticast 2 }
+
+--
+-- Multicast Stream Count Table
+--
+rcMcastStreamCountTable	OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcMcastStreamCountEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Multicast streams count per lane per slot.
+                       Number of lanes per slot will be defined by the type of card."
+        ::= { rcMcastObjects 1 }
+
+rcMcastStreamCountEntry OBJECT-TYPE
+        SYNTAX        RcMcastStreamCountEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Table entry."
+        INDEX         { rcMcastStreamCountSlot,
+                        rcMcastStreamCountLane }
+        ::= { rcMcastStreamCountTable 1 }
+
+RcMcastStreamCountEntry ::=
+	SEQUENCE {
+		rcMcastStreamCountSlot		Integer32,
+		rcMcastStreamCountLane		Integer32,
+		rcMcastStreamCountTotal		Counter64
+	}
+
+rcMcastStreamCountSlot	OBJECT-TYPE
+        SYNTAX        Integer32 (1..10)
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Slot number of the card for which the number of
+	    	       multicast stream count is queried."
+        ::= { rcMcastStreamCountEntry 1 }
+
+rcMcastStreamCountLane	OBJECT-TYPE
+        SYNTAX        Integer32 (1..3)
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Lane number of specific card for which the number of
+	    	       multicast stream count is queried - leftLane-1, middleLane-2
+		       and rightLane-3"
+        ::= { rcMcastStreamCountEntry 2 }
+
+rcMcastStreamCountTotal	OBJECT-TYPE
+        SYNTAX        Counter64
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Total multicast streams for a particular lane of the slot"
+        ::= { rcMcastStreamCountEntry 3 }
+
+--
+-- Notification Objects
+--
+rcMcastNotificationStreamCountSlot	OBJECT-TYPE
+        SYNTAX        Integer32 (1..10)
+        MAX-ACCESS    accessible-for-notify
+        STATUS        current
+        DESCRIPTION   "This value indicates the slot numer."
+        ::= { rcMcastNotifications 1 }
+--
+rcMcastNotificationStreamCountLane	OBJECT-TYPE
+        SYNTAX        Integer32 (1..3)
+        MAX-ACCESS    accessible-for-notify
+        STATUS        current
+        DESCRIPTION   "This value indicates the lane numer - leftLane-1, 
+	    	       middleLane-2 and rightLane-3"
+        ::= { rcMcastNotifications 2 }
+
+END

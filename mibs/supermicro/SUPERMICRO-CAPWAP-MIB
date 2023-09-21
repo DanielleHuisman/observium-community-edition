@@ -1,0 +1,2438 @@
+--******************************************************************************
+--Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+--
+--$Id: fscapw.mib,v 1.1 2013/09/19 13:02:52 siva Exp $
+--
+--Description : This file contains MIB definitions for Supermicro CAPWAP module.
+--
+--******************************************************************************/
+
+-- SupermicroISS MIB Definition
+
+-- MIB for 'Wireless Switch Solution'
+
+-- The 'Wireless Switch Solution' MIB definition is as follows:
+
+
+SUPERMICRO-CAPWAP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+   MODULE-IDENTITY, OBJECT-TYPE, 
+   Integer32, enterprises, Unsigned32, TimeTicks FROM SNMPv2-SMI
+   ifIndex, InterfaceIndex FROM IF-MIB
+   InetAddressType, InetAddress FROM INET-ADDRESS-MIB
+   SnmpAdminString FROM SNMP-FRAMEWORK-MIB 
+   DisplayString, TruthValue, RowStatus, MacAddress,
+   DateAndTime, TEXTUAL-CONVENTION FROM SNMPv2-TC;   
+
+fsCapwap MODULE-IDENTITY
+      LAST-UPDATED "201302150000Z"
+      ORGANIZATION "Super Micro Computer Inc."
+      CONTACT-INFO
+
+        "Super Micro Computer Inc.
+         E-mail:support@Supermicro.com"
+
+      DESCRIPTION
+       "The enterprise ID 10876 is originally assigned to Super Micro Computer Inc."
+      REVISION "201302150000Z"
+
+      DESCRIPTION
+         "The MIB for Supermicro WSS."
+   ::=  { enterprises supermicro-computer-inc(10876) super-switch(101) extended(2) 82 }
+
+-- Textual Conventions
+EnabledStatus ::= TEXTUAL-CONVENTION
+   STATUS      current
+   DESCRIPTION
+         "A simple status value for the object."
+   SYNTAX      INTEGER { enabled(1), disabled(2) }
+
+CapwapBaseRadioIdTC ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS      current
+    DESCRIPTION
+        "Represents the unique identifier of a radio on a WTP."
+    SYNTAX      Unsigned32 (1..31)
+
+
+CapwapBaseTunnelModeTC ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Represents the tunneling modes of operation that are
+         supported by a WTP.
+         The WTP MAY support more than one option, represented by
+         the bit field below:
+           localBridging(0) - Local bridging mode
+           dot3Tunnel(1)    - 802.3 frame tunnel mode
+           nativeTunnel(2)  - Native frame tunnel mode"
+    REFERENCE
+        "Section 4.6.43 of CAPWAP Protocol Specification, RFC 5415."
+    SYNTAX      BITS {
+                  localBridging(0),
+                  dot3Tunnel(1),
+                  nativeTunnel(2)
+                }
+
+CapwapBaseMacTypeTC ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Represents the MAC mode of operation supported by a WTP.
+         The following enumerated values are supported:
+           localMAC(0) - Local-MAC mode
+           splitMAC(1) - Split-MAC mode
+           both(2)     - Both Local-MAC and Split-MAC
+         Note that the CAPWAP field [RFC5415] modeled by this
+         object takes zero as starting value; this MIB object
+         follows that rule."
+    REFERENCE
+        "Section 4.6.44 of CAPWAP Protocol Specification, RFC 5415."
+    SYNTAX      INTEGER {
+                  localMAC(0),
+                  splitMAC(1),
+                  both(2)
+                }
+
+
+CapwapBaseStationIdTC ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "1x:"
+    STATUS      current
+    DESCRIPTION
+        "Represents the unique identifier of a station instance.
+         As usual, the MAC address of the station is used."
+    SYNTAX      OCTET STRING (SIZE(6|8))
+
+-- The different groups in  Supermicro CAPWAP MIB are as follows:
+fsCapwapSystem          OBJECT IDENTIFIER ::= { fsCapwap 1 }
+fsCapwapWtpModel        OBJECT IDENTIFIER ::= { fsCapwap 2 }
+fsCapwapConfig          OBJECT IDENTIFIER ::= { fsCapwap 3 }
+
+fsCapwapModuleStatus     OBJECT-TYPE
+    SYNTAX       EnabledStatus
+    MAX-ACCESS   read-write
+    STATUS   current
+    DESCRIPTION
+    "This objects used to perform CAPWAP enable/disable"
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 1 }
+
+fsCapwapSystemControl     OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS   read-write
+    STATUS   current
+    DESCRIPTION
+    "This objects used to Shut down CAPWAP module"
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 2 }
+
+fsCapwapControlUdpPort  OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..65535)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION   "Configure capwap Control channel UDP port number "
+    DEFVAL { 5246 }
+    ::= { fsCapwapSystem 3 }
+
+fsCapwapControlChannelDTLSPolicyOptions  OBJECT-TYPE
+    SYNTAX    BITS {
+              other(0),
+              clear(1),
+              dtls(2)
+    }
+    MAX-ACCESS   read-write
+    STATUS   current
+    DESCRIPTION " The AC communicates its policy on the use of DTLS for
+    the CAPWAP Control channel "
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 4 }
+
+fsCapwapDataChannelDTLSPolicyOptions  OBJECT-TYPE
+    SYNTAX    BITS {
+              other(0),
+              clear(1),
+              dtls(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION " The AC communicates its policy on the use of DTLS for
+                  the CAPWAP data channel "
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 5 }
+
+
+fsWlcDiscoveryMode  OBJECT-TYPE
+    SYNTAX      BITS {
+                other(0),
+                macDiscMode(1),
+                autoDiscMode(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+    " Configure discovery Mode. The supported values are 
+    MAC Disc Mode (1) (Default)  Auto Disc mode (2)"
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 6 }
+
+fsCapwapWtpModeIgnore   OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "When set to enabled the compatibility between the AP's and WLC's 
+     MAC and Tunnel modes need not be checked during discovery and any 
+     mode should be supported by the WLC."
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 7 }
+
+fsCapwapDebugMask OBJECT-TYPE
+      SYNTAX Integer32
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+        "This object is used to enable Trace Statements in
+        CAPWAP Module.
+
+        A FOUR BYTE integer is used for enabling the level of tracing.
+        Each BIT in the four byte integer, represents a particular
+        level of Trace.
+
+        The maping between the bit positions & the level of trace is
+        as follows
+ 	0 - Fn Entry Traces
+        1 - Fn Exit  Traces
+        2 - Packet Traces
+        3 - Response Traces 
+	4 - All 
+        The remaining bits are unused. Combination of levels are
+        also allowed.
+
+        The user has to enter the corresponding Integer32 VALUE for the
+        bits set. For example if bits 0 and 1 are set then user has to
+        give the value 3."
+      DEFVAL { 0 }
+      ::= { fsCapwapSystem 8 }
+
+fsDtlsDebugMask OBJECT-TYPE
+      SYNTAX Integer32
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+        "This object is used to enable Trace Statements in
+        DTLS Module.
+
+        A FOUR BYTE integer is used for enabling the level of tracing.
+        Each BIT in the four byte integer, represents a particular
+        level of Trace.
+
+        The maping between the bit positions & the level of trace is
+        as follows
+        0 - Fn Entry Traces
+        1 - Fn Exit  Traces
+        2 - Packet Traces
+        3 - Response Traces
+        4 - All
+        The remaining bits are unused. Combination of levels are
+        also allowed.
+
+        The user has to enter the corresponding Integer32 VALUE for the
+        bits set. For example if bits 0 and 1 are set then user has to
+        give the value 3."
+      DEFVAL { 0 }
+      ::= { fsCapwapSystem 9 }
+
+fsDtlsEncryption OBJECT-TYPE
+    SYNTAX      INTEGER {
+                preShared  (1),
+                certificates (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Set the encryption tyep for DTLS."
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 10 }
+
+fsDtlsEncryptAlgorithm OBJECT-TYPE
+    SYNTAX      INTEGER {
+                aes128 (1), 
+                dheaes128 (2),
+                aes256 (3),
+                dhaaes256 (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Set the encryption Algoritham."
+    DEFVAL { 1 }
+    ::= { fsCapwapSystem 11 }
+
+fsStationType     OBJECT-TYPE
+    SYNTAX      INTEGER {
+                auto (0),
+                blacklist (1),
+                whitelist (2)
+    }
+    MAX-ACCESS   read-write
+    STATUS   current
+    DESCRIPTION
+    "This objects used to identify whether the station type is blacklist or whitelist"
+    DEFVAL { 0 }
+    ::= { fsCapwapSystem 12 }
+
+
+-- **********************************************************************
+-- * fsWtpModel TABLE
+-- **********************************************************************
+fsWtpModelTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsWtpModelEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table to manage the WTP based on model number. This table contains 
+         the default parameters for each Model number. This table is mandatory
+         for a WTP to connect to AC."
+    ::= { fsCapwapWtpModel 1 }
+
+fsWtpModelEntry OBJECT-TYPE
+    SYNTAX      FsWtpModelEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry appears in this table for each model number.
+         Index to this table is the WTP Profile Model Number."
+    INDEX { fsCapwapWtpModelNumber }
+    ::= { fsWtpModelTable 1 }
+
+FsWtpModelEntry ::=     
+    SEQUENCE {
+	fsCapwapWtpModelNumber      SnmpAdminString,
+    fsNoOfRadio                 CapwapBaseRadioIdTC,
+    fsCapwapWtpMacType          CapwapBaseMacTypeTC,
+    fsCapwapWtpTunnelMode       CapwapBaseTunnelModeTC,
+    fsCapwapSwVersion		    DisplayString,
+	fsCapwapImageName	        DisplayString,
+    fsCapwapQosProfileName      OCTET STRING,
+    fsMaxStations		        Integer32,
+    fsWtpModelRowStatus         RowStatus
+    }
+
+fsCapwapWtpModelNumber  OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Represents the model number of a WTP.
+         A WTP profile MUST include the WTP's model number, which
+         reflects the number of Physical Layer (PHY) radios on the WTP.
+         In this way, the creation of a WTP profile triggers the AC
+         to automatically create the same number of WTP Virtual Radio
+         Interfaces corresponding to the WTP's PHY radios without
+         manual intervention.  With the ifIndexes of WTP Virtual
+         Radio Interfaces, the operator could configure and manage
+         the WTP's PHY radios through the wireless binding MIB
+         modules."
+    ::= { fsWtpModelEntry  1 }
+
+fsNoOfRadio OBJECT-TYPE
+    SYNTAX      CapwapBaseRadioIdTC
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of radio interface for the
+         specific model number."
+    ::= { fsWtpModelEntry 2 }    
+
+fsCapwapWtpMacType OBJECT-TYPE
+    SYNTAX      CapwapBaseMacTypeTC
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the default MAC type for the specific model
+         number."
+    DEFVAL { 0 }     
+    ::= { fsWtpModelEntry 3 }    
+
+fsCapwapWtpTunnelMode OBJECT-TYPE
+    SYNTAX      CapwapBaseTunnelModeTC
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the default Tunnel mode for the specific model
+         number."
+    DEFVAL { 0 }     
+    ::= { fsWtpModelEntry 4 } 
+
+fsCapwapSwVersion  OBJECT-TYPE
+    SYNTAX	   DisplayString (SIZE(1..12))      
+    MAX-ACCESS     read-write
+    STATUS	   current
+    DESCRIPTION
+        "This object represent the WTP Sw version."
+    ::= { fsWtpModelEntry 5 }
+ 
+fsCapwapImageName   OBJECT-TYPE
+    SYNTAX         DisplayString (SIZE(1..23))
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION
+ 	"Name of the Image name that can be used for
+         the given model number."
+    ::= { fsWtpModelEntry 6 }
+
+fsCapwapQosProfileName    OBJECT-TYPE
+    SYNTAX          OCTET STRING
+    MAX-ACCESS      read-write
+    STATUS         current
+    DESCRIPTION
+    "Name of the Qos pofile used for the given WTP model."
+    ::= {fsWtpModelEntry 7 }
+
+fsMaxStations    OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-write
+    STATUS         current
+    DESCRIPTION
+    "Maximum number of stations associated with the given WTP model."
+    ::= {fsWtpModelEntry 8 }
+
+fsWtpModelRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row 
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsWtpModelRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row 
+     have been assigned valid values."
+    ::= { fsWtpModelEntry 9 }
+
+-- **********************************************************************
+-- * fsWtpRadio TABLE
+-- **********************************************************************
+fsWtpRadioTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsWtpRadioEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table to manage the WTP radio for each model number. This table contains
+         the default radio parameters for each Model number. This table is mandatory
+         for a WTP to connect to AC."
+    ::= { fsCapwapWtpModel 2 }
+
+fsWtpRadioEntry OBJECT-TYPE
+    SYNTAX      FsWtpRadioEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry appears in this table for each radio for a specific model number.
+         Index to this table is the WTP Profile Model Number and number of radio."
+    INDEX { fsCapwapWtpModelNumber, fsRadioNumber }
+    ::= { fsWtpRadioTable 1 }
+
+FsWtpRadioEntry ::=
+    SEQUENCE {
+        fsRadioNumber               CapwapBaseRadioIdTC,
+        fsWtpRadioType              INTEGER,
+        fsRadioAdminStatus          EnabledStatus,
+        fsWtpRadioRowStatus         RowStatus
+    }
+
+fsRadioNumber OBJECT-TYPE
+    SYNTAX      CapwapBaseRadioIdTC
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of radio interface for the
+         specific model number."
+    ::= { fsWtpRadioEntry  1 }
+
+fsWtpRadioType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                dot11b (1),
+                dot11a (2),
+                dot11g (4),
+                dot11bg (5),
+                dot11an (10),
+                dot11bgn (13)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the default radio type for each radio of a
+         specific model number."
+    DEFVAL { dot11b }     
+    ::= { fsWtpRadioEntry 2 }
+
+fsRadioAdminStatus OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the default admin status for the radio interface."
+    DEFVAL { enabled }     
+    ::= { fsWtpRadioEntry 3 }
+
+fsWtpRadioRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsWtpRadioRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsWtpRadioEntry 4 }
+
+-- **********************************************************************
+-- * fsCapwapWhiteList TABLE
+-- **********************************************************************
+fsCapwapWhiteListTable  OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCapwapWhiteListEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the List of WTP MAC address which needs to
+     serviced by WLC."
+    ::= { fsCapwapConfig 1 }
+
+fsCapwapWhiteListEntry  OBJECT-TYPE
+    SYNTAX          FsCapwapWhiteListEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the List of WTP MAC address which needs to
+     serviced by WLC."
+    INDEX { fsCapwapWhiteListId }
+    ::= { fsCapwapWhiteListTable 1 }
+
+FsCapwapWhiteListEntry  ::=
+    SEQUENCE {  fsCapwapWhiteListId              Unsigned32,
+                fsCapwapWhiteListWtpBaseMac      MacAddress,
+		        fsCapwapWhiteListRowStatus       RowStatus
+    }
+
+fsCapwapWhiteListId     OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..512)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Represents the unique White List profile id."
+    ::= { fsCapwapWhiteListEntry 1 }
+
+fsCapwapWhiteListWtpBaseMac OBJECT-TYPE
+    SYNTAX                    MacAddress
+    MAX-ACCESS                read-write
+    STATUS                    current
+    DESCRIPTION
+        "Indicates the WTP BASE MAC to proivide the service"
+    ::= { fsCapwapWhiteListEntry 2 }
+
+fsCapwapWhiteListRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapWhiteListRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapWhiteListEntry 3 }
+
+-- **********************************************************************
+-- * fsWssBlackList TABLE
+-- **********************************************************************
+
+fsCapwapBlackListTable  OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCapwapBlackListEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the List of WTP MAC address which should not
+     be serviced by WLC."
+    ::= { fsCapwapConfig 2 }
+
+fsCapwapBlackListEntry  OBJECT-TYPE
+    SYNTAX          FsCapwapBlackListEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the List of WTP MAC address which should not
+     be serviced by WLC."
+    INDEX { fsCapwapBlackListId }
+    ::= { fsCapwapBlackListTable 1 }
+
+FsCapwapBlackListEntry  ::=
+    SEQUENCE {  fsCapwapBlackListId              Unsigned32,
+                fsCapwapBlackListWtpBaseMac      MacAddress,
+		        fsCapwapBlackListRowStatus       RowStatus
+    }
+
+fsCapwapBlackListId     OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..512)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Represents the unique Black List profile id."
+    ::= { fsCapwapBlackListEntry 1 }
+
+fsCapwapBlackListWtpBaseMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the WTP BASE MAC address."
+    ::= { fsCapwapBlackListEntry 2 }
+
+fsCapwapBlackListRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapBlackListRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapBlackListEntry 3 }
+
+-- *********************************************************************
+-- * fsCapwapWtpConfig  TABLE
+-- *********************************************************************
+fsCapwapWtpConfigTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCapwapWtpConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    " WTP Reset configuration or WTP Clear configuration."
+    ::= {fsCapwapConfig 3 }
+
+fsCapwapWtpConfigEntry    OBJECT-TYPE
+    SYNTAX           FsCapwapWtpConfigEntry
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+    " This entry used to reset the WTP."
+    INDEX { capwapBaseWtpProfileId }
+    ::= {fsCapwapWtpConfigTable 1 }
+
+FsCapwapWtpConfigEntry   ::=
+    SEQUENCE {  
+        fsCapwapWtpReset                 INTEGER,
+        fsCapwapClearConfig              INTEGER,
+	    fsWtpDiscoveryType               INTEGER,
+	    fsWtpCountryString               OCTET STRING, 
+	    fsWtpCrashDumpFileName		     DisplayString,
+	    fsWtpMemoryDumpFileName		     DisplayString, 
+        fsWtpDeleteOperation             INTEGER,
+        fsCapwapClearApStats             INTEGER,
+	    fsCapwapWtpConfigRowStatus       RowStatus		
+    }
+
+fsCapwapWtpReset     OBJECT-TYPE
+    SYNTAX           EnabledStatus
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+    "Reset the given WTP."
+    DEFVAL { disabled }     
+    ::= {fsCapwapWtpConfigEntry 1}
+
+fsCapwapClearConfig  OBJECT-TYPE
+    SYNTAX           EnabledStatus
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+    "Clear the configuration for the given WTP."
+    DEFVAL { disabled }     
+    ::= {fsCapwapWtpConfigEntry 2}
+
+fsWtpDiscoveryType     OBJECT-TYPE
+    SYNTAX      INTEGER {
+                unknown (0),
+                static (1),
+                dhcp (2),
+                dns (3),
+                acReferral (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the WTP discovery type."
+    DEFVAL { acReferral }     
+    ::= { fsCapwapWtpConfigEntry 3 }
+
+fsWtpCountryString    OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE(3))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+    "This attribute identifies the country or non-country
+    entity in which the station is operating. If it is a
+    country, the first two octets of this
+    string is the two character country code as described
+    in document ISO/IEC 3166-1. The third octet shall
+    be one of the following:
+    1. an ASCII space character, if the regulations under
+    which the station is operating encompass all
+    environments in the country,
+    2. an ASCII 'O' character, if the regulations under
+    which the station is operating are for an Outdoor
+    environment only, or
+    3. an ASCII 'I' character, if the regulations under
+    which the station is operating are for an Indoor
+    environment only.
+    4. an ASCII 'X' character, if the station is operating
+    under a non-country entity. The first two octets of the
+    non-country entity shall be two ASCII 'XX' characters."
+    ::= { fsCapwapWtpConfigEntry 4 }
+
+fsWtpCrashDumpFileName  OBJECT-TYPE
+    SYNTAX              DisplayString
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+        "Wtp Crash Dump filename."
+    ::= { fsCapwapWtpConfigEntry 5 }
+
+
+fsWtpMemoryDumpFileName  OBJECT-TYPE
+    SYNTAX              DisplayString
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+        "Wtp Memory Dump filename."
+    ::= { fsCapwapWtpConfigEntry 6 }
+
+fsWtpDeleteOperation  OBJECT-TYPE
+    SYNTAX              EnabledStatus
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+    "When enabled will delete the crash file received for an AP."
+    DEFVAL { disabled }     
+    ::= { fsCapwapWtpConfigEntry 7 }
+
+fsCapwapClearApStats  OBJECT-TYPE
+    SYNTAX              EnabledStatus
+    MAX-ACCESS          read-write
+    STATUS              current
+    DESCRIPTION
+    "When enabled clear all AP related stats in WLC."
+    DEFVAL { disabled }     
+    ::= { fsCapwapWtpConfigEntry 8 }
+
+fsCapwapWtpConfigRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapWtpConfigRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapWtpConfigEntry 9 }
+
+-- **********************************************************************
+--   fsCapwapLinkEncryption
+-- **********************************************************************
+fsCapwapLinkEncryptionTable  OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCapwapLinkEncryptionEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "WTP DTLS configuration for Data and Control channel."
+    ::= { fsCapwapConfig 4 }
+
+fsCapwapLinkEncryptionEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapLinkEncryptionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the fsCapwapLinkEncryptionTable representing the DTLS configuration
+     for Control and data chennal."
+    INDEX { capwapBaseWtpProfileId, fsCapwapEncryptChannel }
+    ::= { fsCapwapLinkEncryptionTable 1 }
+
+FsCapwapLinkEncryptionEntry  ::=
+    SEQUENCE {  fsCapwapEncryptChannel       	  INTEGER,
+                fsCapwapEncryptChannelStatus 	  EnabledStatus,
+		        fsCapwapEncryptChannelRowStatus   RowStatus
+    }
+
+fsCapwapEncryptChannel     OBJECT-TYPE
+    SYNTAX      INTEGER {
+          	control (1),
+          	data (2)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Represents the channel type either control channel or data channel."
+    ::= { fsCapwapLinkEncryptionEntry 1 }
+
+fsCapwapEncryptChannelStatus    OBJECT-TYPE
+    SYNTAX       EnabledStatus
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+    "DTLS configuration enable or disabled for given WTP."
+    DEFVAL { disabled }     
+    ::= {fsCapwapLinkEncryptionEntry 2}
+
+fsCapwapEncryptChannelRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapEncryptChannelRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapLinkEncryptionEntry 3 }
+
+-- **********************************************************************
+-- fsCapwapDefaultWtpProfile
+-- **********************************************************************
+
+fsCapwapDefaultWtpProfileTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsCapwapDefaultWtpProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of objects that configure Default WTP profiles."
+    ::= { fsCapwapConfig 5 }
+
+fsCapwapDefaultWtpProfileEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapDefaultWtpProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A set of objects that configures and displays a WTP profile."
+    INDEX { fsCapwapWtpModelNumber }
+    ::= { fsCapwapDefaultWtpProfileTable 1 }
+
+FsCapwapDefaultWtpProfileEntry ::= SEQUENCE {
+      fsCapwapDefaultQosProfile                           OCTET STRING,
+      fsCapwapDefaultWtpProfileRowStatus                  RowStatus
+    }
+
+fsCapwapDefaultQosProfile OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(31))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Represents the default Qos Profile string to be used for this  
+         model."
+    ::= { fsCapwapDefaultWtpProfileEntry 1 }
+
+fsCapwapDefaultWtpProfileRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapDefaultWtpProfileRowStatus  may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapDefaultWtpProfileEntry 2 }
+
+--**************************************************************************
+-- fsCawapDnsProfile
+--**************************************************************************
+fsCapwapDnsProfileTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCapwapDnsProfileEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the discovery type configured for WTP."
+    ::= { fsCapwapConfig 6}
+
+
+fsCapwapDnsProfileEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapDnsProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "configure the DNS profile for the given WTP." 
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsCapwapDnsProfileTable 1 }
+
+FsCapwapDnsProfileEntry   ::=
+    SEQUENCE {
+        fsCapwapDnsAddressType          InetAddressType,
+        fsCapwapDnsServerIp          	InetAddress,
+        fsCapwapDnsDomainName      	 	SnmpAdminString,
+        fsCapwapDnsProfileRowStatus     RowStatus
+    }
+
+fsCapwapDnsAddressType  OBJECT-TYPE
+    SYNTAX       InetAddressType
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+    "The (ipv4 or ipv6) type of Nameserver's address."
+    DEFVAL { ipv4 }     
+    ::= { fsCapwapDnsProfileEntry 1 }
+
+fsCapwapDnsServerIp  OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(4))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "It represents the static IP address of the DNS server.The format of this IP address is determined by the
+     corresponding instance of object"
+    ::= { fsCapwapDnsProfileEntry 2 }
+
+fsCapwapDnsDomainName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "It Represents the DNS Serve Domain Name Suffix."
+    ::= { fsCapwapDnsProfileEntry 3 }
+
+fsCapwapDnsProfileRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsWtpModelRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapDnsProfileEntry 4 }
+
+-- **********************************************************************
+-- * fsWtpNativeVlanIdTable  TABLE
+-- **********************************************************************
+
+fsWtpNativeVlanIdTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsWtpNativeVlanIdEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the native vlan id configured for WTP."
+    ::= { fsCapwapConfig 7 }
+
+fsWtpNativeVlanIdEntry  OBJECT-TYPE
+    SYNTAX      FsWtpNativeVlanIdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "configure the native vlan id used by WTP."
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsWtpNativeVlanIdTable 1 }
+
+FsWtpNativeVlanIdEntry  ::=
+    SEQUENCE {
+    fsWtpNativeVlanId                 Integer32,
+    fsWtpNativeVlanIdRowStatus        RowStatus
+    }
+
+fsWtpNativeVlanId     OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the WTP Native Vlan Id."
+    DEFVAL { 0 }     
+    ::= { fsWtpNativeVlanIdEntry 1 }
+
+fsWtpNativeVlanIdRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsWtpNativeVlanIdRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+     ::= { fsWtpNativeVlanIdEntry 2 }
+
+--**************************************************************************
+-- fsCawapDiscStats TABLE
+--**************************************************************************
+fsCawapDiscStatsTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCawapDiscStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the CAPWAP discovery statistics."
+    ::= { fsCapwapConfig 8 }
+
+fsCawapDiscStatsEntry  OBJECT-TYPE
+    SYNTAX      FsCawapDiscStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A Set of Objects that mantains the CAPWAP Discovery state statistics."    
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsCawapDiscStatsTable 1 }
+
+FsCawapDiscStatsEntry  ::=
+    SEQUENCE {
+    fsCapwapDiscReqReceived                	Unsigned32,
+    fsCapwapDiscRspReceived                	Unsigned32,
+    fsCapwapDiscReqTransmitted              	Unsigned32,
+    fsCapwapDiscRspTransmitted		   	Unsigned32,
+    fsCapwapDiscunsuccessfulProcessed           Unsigned32,
+    fsCapwapDiscLastUnsuccAttemptReason        	    Integer32,
+    fsCapwapDiscLastSuccAttemptTime		            TimeTicks,
+    fsCapwapDiscLastUnsuccessfulAttemptTime         TimeTicks,
+    fsCapwapDiscStatsRowStatus             	RowStatus
+    }
+
+fsCapwapDiscReqReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of discovery requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapDiscStatsEntry 1 }
+
+fsCapwapDiscRspReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of discovery responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapDiscStatsEntry 2 }
+
+fsCapwapDiscReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of discovery requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapDiscStatsEntry 3 }
+
+fsCapwapDiscRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of discovery responses Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapDiscStatsEntry 4 }
+
+fsCapwapDiscunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of discovery packets dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapDiscStatsEntry 5 }
+
+fsCapwapDiscLastUnsuccAttemptReason  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt."
+    DEFVAL { 0 }     
+    ::= { fsCawapDiscStatsEntry 6 }
+
+fsCapwapDiscLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time."
+    ::= { fsCawapDiscStatsEntry 7 }
+
+fsCapwapDiscLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time."
+    ::= { fsCawapDiscStatsEntry 8 }
+
+fsCapwapDiscStatsRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapDiscStatsRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCawapDiscStatsEntry 9 }
+
+--**************************************************************************
+-- fsCawapJoinStats TABLE
+--**************************************************************************
+fsCawapJoinStatsTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCawapJoinStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the CAPWAP discovery statistics."
+    ::= { fsCapwapConfig 9 }
+
+fsCawapJoinStatsEntry  OBJECT-TYPE
+    SYNTAX      FsCawapJoinStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A Set of Objects that mantains the CAPWAP Join state statistics."
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsCawapJoinStatsTable 1 }
+
+FsCawapJoinStatsEntry  ::=
+    SEQUENCE {
+    fsCapwapJoinReqReceived                     Unsigned32,
+    fsCapwapJoinRspReceived                     Unsigned32,
+    fsCapwapJoinReqTransmitted                   Unsigned32,
+    fsCapwapJoinRspTransmitted                   Unsigned32,
+    fsCapwapJoinunsuccessfulProcessed           Unsigned32,
+    fsCapwapJoinReasonLastUnsuccAttempt         Integer32,
+    fsCapwapJoinLastSuccAttemptTime             TimeTicks,
+    fsCapwapJoinLastUnsuccAttemptTime           TimeTicks,
+    fsCapwapJoinStatsRowStatus                  RowStatus
+    }
+
+fsCapwapJoinReqReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapJoinStatsEntry 1 }
+
+fsCapwapJoinRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapJoinStatsEntry 2}
+
+fsCapwapJoinReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join requests transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapJoinStatsEntry 3}
+
+fsCapwapJoinRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join Responses transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapJoinStatsEntry 4}
+
+fsCapwapJoinunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join packets dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapJoinStatsEntry 5}
+
+fsCapwapJoinReasonLastUnsuccAttempt  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt."
+    DEFVAL { 0 }     
+    ::= { fsCawapJoinStatsEntry 6 }
+
+fsCapwapJoinLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time."
+    ::= { fsCawapJoinStatsEntry 7 }
+
+fsCapwapJoinLastUnsuccAttemptTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time."
+    ::= { fsCawapJoinStatsEntry 8 }
+
+fsCapwapJoinStatsRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapJoinStatsRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCawapJoinStatsEntry 9 }
+
+--**************************************************************************
+-- fsCawapConfigStats TABLE
+--**************************************************************************
+fsCawapConfigStatsTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCawapConfigStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the CAPWAP Configuration status statistics."
+    ::= { fsCapwapConfig 10 }
+
+fsCawapConfigStatsEntry  OBJECT-TYPE
+    SYNTAX      FsCawapConfigStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A Set of Objects that mantains the CAPWAP Config state statistics."
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsCawapConfigStatsTable 1 }
+
+FsCawapConfigStatsEntry  ::=
+    SEQUENCE {
+    fsCapwapConfigReqReceived                     Unsigned32,
+    fsCapwapConfigRspReceived                     Unsigned32,
+    fsCapwapConfigReqTransmitted                  Unsigned32,
+    fsCapwapConfigRspTransmitted                  Unsigned32,
+    fsCapwapConfigunsuccessfulProcessed           Unsigned32,
+    fsCapwapConfigReasonLastUnsuccAttempt         Integer32,
+    fsCapwapConfigLastSuccAttemptTime             TimeTicks,
+    fsCapwapConfigLastUnsuccessfulAttemptTime     TimeTicks,
+    fsCapwapConfigStatsRowStatus                  RowStatus
+    }
+
+fsCapwapConfigReqReceived OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapConfigStatsEntry 1 }
+
+fsCapwapConfigRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapConfigStatsEntry 2}
+
+fsCapwapConfigReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join requests transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapConfigStatsEntry 3}
+
+fsCapwapConfigRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join Responses transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapConfigStatsEntry 4}
+
+fsCapwapConfigunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Join packets dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapConfigStatsEntry 5}
+
+fsCapwapConfigReasonLastUnsuccAttempt  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt."
+    DEFVAL { 0 }     
+    ::= { fsCawapConfigStatsEntry 6 }
+
+fsCapwapConfigLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time."
+    ::= { fsCawapConfigStatsEntry 7 }
+
+fsCapwapConfigLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time."
+    ::= { fsCawapConfigStatsEntry 8 }
+
+fsCapwapConfigStatsRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapConfigStatsRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCawapConfigStatsEntry 9 }
+
+--**************************************************************************
+-- fsCawapRunStats TABLE
+--**************************************************************************
+fsCawapRunStatsTable   OBJECT-TYPE
+    SYNTAX          SEQUENCE OF FsCawapRunStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+    "This table contains the CAPWAP Run state level statistics."
+    ::= { fsCapwapConfig 11 }
+
+fsCawapRunStatsEntry  OBJECT-TYPE
+    SYNTAX      FsCawapRunStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A Set of Objects that mantains the CAPWAP Run state statistics."
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsCawapRunStatsTable 1 }
+
+FsCawapRunStatsEntry  ::=
+    SEQUENCE {
+    fsCapwapRunConfigUpdateReqReceived                    Unsigned32,
+    fsCapwapRunConfigUpdateRspReceived                    Unsigned32,
+    fsCapwapRunConfigUpdateReqTransmitted                  Unsigned32,
+    fsCapwapRunConfigUpdateRspTransmitted                  Unsigned32,
+    fsCapwapRunConfigUpdateunsuccessfulProcessed          Unsigned32,
+    fsCapwapRunConfigUpdateReasonLastUnsuccAttempt        SnmpAdminString,
+    fsCapwapRunConfigUpdateLastSuccAttemptTime            DateAndTime,
+    fsCapwapRunConfigUpdateLastUnsuccessfulAttemptTime    DateAndTime,
+    fsCapwapRunStationConfigReqReceived                   Unsigned32,
+    fsCapwapRunStationConfigRspReceived                   Unsigned32,
+    fsCapwapRunStationConfigReqTransmitted                 Unsigned32,
+    fsCapwapRunStationConfigRspTransmitted                 Unsigned32,
+    fsCapwapRunStationConfigunsuccessfulProcessed         Unsigned32,
+    fsCapwapRunStationConfigReasonLastUnsuccAttempt       SnmpAdminString,
+    fsCapwapRunStationConfigLastSuccAttemptTime           DateAndTime,
+    fsCapwapRunStationConfigLastUnsuccessfulAttemptTime   DateAndTime,
+    fsCapwapRunClearConfigReqReceived                     Unsigned32,
+    fsCapwapRunClearConfigRspReceived                     Unsigned32,
+    fsCapwapRunClearConfigReqTransmitted                   Unsigned32,
+    fsCapwapRunClearConfigRspTransmitted                   Unsigned32,
+    fsCapwapRunClearConfigunsuccessfulProcessed           Unsigned32,
+    fsCapwapRunClearConfigReasonLastUnsuccAttempt         SnmpAdminString,
+    fsCapwapRunClearConfigLastSuccAttemptTime             DateAndTime,
+    fsCapwapRunClearConfigLastUnsuccessfulAttemptTime     DateAndTime,
+    fsCapwapRunDataTransferReqReceived                    Unsigned32,
+    fsCapwapRunDataTransferRspReceived                    Unsigned32,
+    fsCapwapRunDataTransferReqTransmitted                  Unsigned32,
+    fsCapwapRunDataTransferRspTransmitted                  Unsigned32,
+    fsCapwapRunDataTransferunsuccessfulProcessed          Unsigned32,
+    fsCapwapRunDataTransferReasonLastUnsuccAttempt        SnmpAdminString,
+    fsCapwapRunDataTransferLastSuccAttemptTime            DateAndTime,
+    fsCapwapRunDataTransferLastUnsuccessfulAttemptTime    DateAndTime,
+    fsCapwapRunResetReqReceived                    	  Unsigned32,
+    fsCapwapRunResetRspReceived                    	  Unsigned32,
+    fsCapwapRunResetReqTransmitted                  	  Unsigned32,
+    fsCapwapRunResetRspTransmitted                  	  Unsigned32,
+    fsCapwapRunResetunsuccessfulProcessed          	  Unsigned32,
+    fsCapwapRunResetReasonLastUnsuccAttempt        	  SnmpAdminString,
+    fsCapwapRunResetLastSuccAttemptTime            	  DateAndTime,
+    fsCapwapRunResetLastUnsuccessfulAttemptTime    	  DateAndTime,
+    fsCapwapRunPriDiscReqReceived                         Unsigned32,
+    fsCapwapRunPriDiscRspReceived                         Unsigned32,
+    fsCapwapRunPriDiscReqTransmitted                       Unsigned32,
+    fsCapwapRunPriDiscRspTransmitted                       Unsigned32,
+    fsCapwapRunPriDiscunsuccessfulProcessed               Unsigned32,
+    fsCapwapRunPriDiscReasonLastUnsuccAttempt             SnmpAdminString,
+    fsCapwapRunPriDiscLastSuccAttemptTime                 DateAndTime,
+    fsCapwapRunPriDiscLastUnsuccessfulAttemptTime         DateAndTime,
+    fsCapwapRunEchoReqReceived                         Unsigned32,
+    fsCapwapRunEchoRspReceived                         Unsigned32,
+    fsCapwapRunEchoReqTransmitted                       Unsigned32,
+    fsCapwapRunEchoRspTransmitted                       Unsigned32,
+    fsCapwapRunEchounsuccessfulProcessed               Unsigned32,
+    fsCapwapRunEchoReasonLastUnsuccAttempt             SnmpAdminString,
+    fsCapwapRunEchoLastSuccAttemptTime                 DateAndTime,
+    fsCapwapRunEchoLastUnsuccessfulAttemptTime         DateAndTime,
+    fsCapwapRunStatsRowStatus                          RowStatus
+    }
+
+fsCapwapRunConfigUpdateReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config update requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 1 }
+
+fsCapwapRunConfigUpdateRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config update Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 2 }
+
+fsCapwapRunConfigUpdateReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config update requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 3 }
+
+fsCapwapRunConfigUpdateRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config update response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 4 }
+
+fsCapwapRunConfigUpdateunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Config update message dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 5 }
+
+fsCapwapRunConfigUpdateReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt 
+     for configuration update request message or configuratin update response message."
+    ::= { fsCawapRunStatsEntry 6 }
+
+fsCapwapRunConfigUpdateLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for 
+     configuration update request message or configuratin update response message."
+    ::= { fsCawapRunStatsEntry 7 }
+
+fsCapwapRunConfigUpdateLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for 
+     configuration update request message or configuratin update response message."
+    ::= { fsCawapRunStatsEntry 8 }
+
+fsCapwapRunStationConfigReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Station Config requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 9 }
+
+fsCapwapRunStationConfigRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Station Config Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 10 }
+
+fsCapwapRunStationConfigReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Station Config requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 11 }
+
+fsCapwapRunStationConfigRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Station Config response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 12 }
+
+fsCapwapRunStationConfigunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Station Configuration requests message dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 13 }
+
+fsCapwapRunStationConfigReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt
+     for station configuration request message or station configuratin response message."
+    ::= { fsCawapRunStatsEntry 14 }
+
+fsCapwapRunStationConfigLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for
+     Station configuration request message or station configuratin response message."
+    ::= { fsCawapRunStatsEntry 15 }
+
+fsCapwapRunStationConfigLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for
+     Station configuration request message or station configuratin response message."
+    ::= { fsCawapRunStatsEntry 16 }
+
+fsCapwapRunClearConfigReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Clear Config requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 17 }
+
+fsCapwapRunClearConfigRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Clear Config Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 18 }
+
+fsCapwapRunClearConfigReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Clear Config requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 19 }
+
+fsCapwapRunClearConfigRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Clear Config response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 20 }
+
+fsCapwapRunClearConfigunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Clear Configuration messages dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 21 }
+
+fsCapwapRunClearConfigReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt
+     for Clear configuration request message or clear configuratin response message."
+    ::= { fsCawapRunStatsEntry 22 }
+
+fsCapwapRunClearConfigLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for
+     Station configuration request message or station configuratin response message."
+    ::= { fsCawapRunStatsEntry 23 }
+
+fsCapwapRunClearConfigLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for
+     Clear configuration request message or clear configuratin response message."
+    ::= { fsCawapRunStatsEntry 24 }
+
+fsCapwapRunDataTransferReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Data Transfer requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 25 }
+
+fsCapwapRunDataTransferRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Data Transfer Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 26 }
+
+fsCapwapRunDataTransferReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Data Transfer requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 27 }
+
+fsCapwapRunDataTransferRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Data Transfer response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 28 }
+
+fsCapwapRunDataTransferunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of data transfer request or data transfer response  messages dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 29 }
+
+fsCapwapRunDataTransferReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt
+     for data transfer request message or data transfer response messages."
+    ::= { fsCawapRunStatsEntry 30 }
+
+fsCapwapRunDataTransferLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for
+     data transfer request message or data transfer response message."
+    ::= { fsCawapRunStatsEntry 31 }
+
+fsCapwapRunDataTransferLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for
+     data transfer request message or data transfer response message."
+    ::= { fsCawapRunStatsEntry 32 }
+
+fsCapwapRunResetReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Reset requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 33 }
+
+fsCapwapRunResetRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Reset Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 34 }
+
+fsCapwapRunResetReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Reset requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 35 }
+
+fsCapwapRunResetRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Reset response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 36 }
+
+fsCapwapRunResetunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of data transfer request or data transfer response  messages dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 37 }
+
+fsCapwapRunResetReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt
+     for data transfer request message or data transfer response messages."
+    ::= { fsCawapRunStatsEntry 38 }
+
+fsCapwapRunResetLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for
+     reset request message or reset response message."
+    ::= { fsCawapRunStatsEntry 39 }
+
+fsCapwapRunResetLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for
+     reset request message or reset response message."
+    ::= { fsCawapRunStatsEntry 40 }
+
+fsCapwapRunPriDiscReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Primary discovery requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 41 }
+
+fsCapwapRunPriDiscRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Primary discovery Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 42 }
+
+fsCapwapRunPriDiscReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Primary discovery requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 43 }
+
+fsCapwapRunPriDiscRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of primary discovery response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 44 }
+
+fsCapwapRunPriDiscunsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of primary discovery request or primary discovery response messages dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 45 }
+
+fsCapwapRunPriDiscReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt
+     for primary discovery request message or primary discovery response messages."
+    ::= { fsCawapRunStatsEntry 46 }
+
+fsCapwapRunPriDiscLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for
+     primary discovery request message or primary discovery response message."
+    ::= { fsCawapRunStatsEntry 47 }
+
+fsCapwapRunPriDiscLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for
+     primary discocery request message or primary discovery response message."
+    ::= { fsCawapRunStatsEntry 48 }
+
+fsCapwapRunEchoReqReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Echo requests received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 49 }
+
+fsCapwapRunEchoRspReceived  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Echo Responses received."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 50 }
+
+fsCapwapRunEchoReqTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Echo requests Transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 51 }
+
+fsCapwapRunEchoRspTransmitted  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Echo response transmitted."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 52 }
+
+fsCapwapRunEchounsuccessfulProcessed  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Number of Echo request or Echo response messages dropped."
+    DEFVAL { 0 }     
+    ::= { fsCawapRunStatsEntry 53 }
+
+fsCapwapRunEchoReasonLastUnsuccAttempt   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the reason for last un-successful attempt
+     for echo request message or echo response messages."
+    ::= { fsCawapRunStatsEntry 54 }
+
+fsCapwapRunEchoLastSuccAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last successful data and time for
+     echo request message or echoresponse message."
+    ::= { fsCawapRunStatsEntry 55 }
+
+fsCapwapRunEchoLastUnsuccessfulAttemptTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Last unsuccessful date and time for
+     echo request message or echo response message."
+    ::= { fsCawapRunStatsEntry 56 }
+
+fsCapwapRunStatsRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write 
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapRunStatsRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+     ::= { fsCawapRunStatsEntry 57 }
+
+-- fsCapwapWirelessBinding Table
+
+fsCapwapWirelessBindingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsCapwapWirelessBindingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of objects that display the mappings between
+         WTP Virtual Radio Interfaces and PHY radios."
+    ::= { fsCapwapConfig 12 }
+
+fsCapwapWirelessBindingEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapWirelessBindingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A set of objects that displays the mapping between
+         a specific WTP Virtual Radio Interface and a PHY
+         radio."
+    INDEX {
+      capwapBaseWtpProfileId,
+      capwapBaseWirelessBindingRadioId
+    }
+    ::= { fsCapwapWirelessBindingTable 1 }
+
+FsCapwapWirelessBindingEntry ::= SEQUENCE {
+      fsCapwapWirelessBindingVirtualRadioIfIndex  InterfaceIndex,
+      fsCapwapWirelessBindingType                 INTEGER,
+      fsCapwapWirelessBindingRowStatus            RowStatus
+    }
+
+fsCapwapWirelessBindingVirtualRadioIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Represents the index value that uniquely identifies a
+         WLAN Virtual Radio Interface.  The interface identified by
+         a particular value of this index is the same interface as
+         identified by the same value of the ifIndex.
+         Before WTPs contact the AC to get configuration,
+         the operator configures WTP profiles for them.
+         The creation of a WTP profile triggers the system to
+         automatically create a specific number of WTP Virtual Radio
+         Interfaces and add a new row object in the
+         capwapBaseWirelessBindingTable without manual intervention.
+         As most MIB modules use the ifIndex to identify an interface
+         for configuration and statistical data (for example, the IEEE
+         802.11 MIB module [IEEE.802-11.2007]), it will be easy to
+         reuse other wireless binding MIB modules through the WTP
+         Virtual Radio Interface in the Centralized WLAN
+         Architecture."
+    ::= { fsCapwapWirelessBindingEntry 1 }
+
+fsCapwapWirelessBindingType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  dot11(1),
+                  epc(3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Represents the wireless binding type for the radio.
+         The following enumerated values are supported:
+           dot11(1) - IEEE 802.11
+           epc(3)   - EPCGlobal"
+    REFERENCE
+        "Section 4.3 of CAPWAP Protocol Specification, RFC 5415."
+    DEFVAL { 1 }     
+    ::= { fsCapwapWirelessBindingEntry 2 }
+
+fsCapwapWirelessBindingRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create, modify, and/or delete a row
+     in this table.
+     All the objects in a row can be modified only when the value
+     of this object in the corresponding conceptual row is not
+     'active'.  Thus, to modify one or more of the objects in
+     this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     The fsCapwapAuthenticationRowStatus may be changed to 'active'
+     if all the managed objects in the conceptual row
+     have been assigned valid values."
+    ::= { fsCapwapWirelessBindingEntry 3 }
+
+-- End of fsCapwapWirelessBindingTable Table
+
+-- **********************************************************************
+--   fsCapwapStationWhiteList Table
+-- **********************************************************************
+
+fsCapwapStationWhiteListTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsCapwapStationWhiteListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table of objects that configure station Access Control
+     Lists (ACLs). The WTP will provide service to
+     the MAC addresses configured in this table.Values of all
+     read-create objects in this table are persistent at AC restart/reboot."
+     ::={ fsCapwapConfig 13 }
+
+fsCapwapStationWhiteListEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapStationWhiteListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A set of objects that configures station White List Table ."
+    INDEX { fsCapwapStationWhiteListId }
+    ::= { fsCapwapStationWhiteListTable 1 }
+
+FsCapwapStationWhiteListEntry ::= SEQUENCE 
+{
+	fsCapwapStationWhiteListId          Unsigned32,
+	fsCapwapStationWhiteListStationId   CapwapBaseStationIdTC,
+ 	fsCapwapStationWhiteListRowStatus   RowStatus
+}
+
+fsCapwapStationWhiteListId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Represents the unique identifier of an Station White List."
+    ::= { fsCapwapStationWhiteListEntry 1 }
+
+fsCapwapStationWhiteListStationId  OBJECT-TYPE
+    SYNTAX      CapwapBaseStationIdTC
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Represents the MAC address of a station to which WTPs will
+         provides service."
+    ::= { fsCapwapStationWhiteListEntry 2 }
+
+fsCapwapStationWhiteListRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    	"This variable is used to create, modify, and/or delete a row
+     	in this table.
+     	All the objects in a row can be modified only when the value
+     	of this object in the corresponding conceptual row is not
+     	'active'.  Thus, to modify one or more of the objects in
+     	this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     	The fsCapwapStationWhiteListRowStatus may be changed to 'active'
+     	if all the managed objects in the conceptual row
+     	have been assigned valid values."
+    ::= { fsCapwapStationWhiteListEntry 3 }
+
+-- **********************************************************************
+--   fsCapwapWtpRebootStatistics Table
+-- **********************************************************************
+fsCapwapWtpRebootStatisticsTable OBJECT-TYPE
+    SYNTAX	SEQUENCE OF FsCapwapWtpRebootStatisticsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table of objects that contain the WTP reboot statistics;"
+     ::={ fsCapwapConfig 14 }
+
+fsCapwapWtpRebootStatisticsEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapWtpRebootStatisticsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A set of objects that contain WTP Reboot Statistics Table ."
+    INDEX { capwapBaseWtpProfileId }
+    ::= { fsCapwapWtpRebootStatisticsTable 1 }
+
+FsCapwapWtpRebootStatisticsEntry ::= SEQUENCE 
+{
+	fsCapwapWtpRebootStatisticsRebootCount          Unsigned32,
+	fsCapwapWtpRebootStatisticsAcInitiatedCount     Unsigned32,
+	fsCapwapWtpRebootStatisticsLinkFailureCount     Unsigned32,
+	fsCapwapWtpRebootStatisticsSwFailureCount       Unsigned32,
+	fsCapwapWtpRebootStatisticsHwFailureCount       Unsigned32,
+	fsCapwapWtpRebootStatisticsOtherFailureCount    Unsigned32,
+	fsCapwapWtpRebootStatisticsUnknownFailureCount  Unsigned32,
+	fsCapwapWtpRebootStatisticsLastFailureType  	INTEGER,
+ 	fsCapwapWtpRebootStatisticsRowStatus   		    RowStatus
+}
+
+fsCapwapWtpRebootStatisticsRebootCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the WTP reboot count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 1 }
+
+fsCapwapWtpRebootStatisticsAcInitiatedCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the AC Initiate count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 2 }
+
+fsCapwapWtpRebootStatisticsLinkFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the link failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 3 }
+
+fsCapwapWtpRebootStatisticsSwFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the SW failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 4 }
+
+fsCapwapWtpRebootStatisticsHwFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the HW failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 5 }
+
+fsCapwapWtpRebootStatisticsOtherFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the other failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 6 }
+
+fsCapwapWtpRebootStatisticsUnknownFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the unknown failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 7 }
+
+fsCapwapWtpRebootStatisticsLastFailureType OBJECT-TYPE
+    SYNTAX      INTEGER { 
+		  notSupported(0),
+		  aCInitiated(1),
+		  linkFailure(2),
+		  softwareFailure(3),
+		  hardwareFailure(4),
+		  otherFailure(5),
+		  unknownFailure(255)
+		}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the unknown failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRebootStatisticsEntry 8 }
+
+fsCapwapWtpRebootStatisticsRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    	"This variable is used to create, modify, and/or delete a row
+     	in this table.
+     	All the objects in a row can be modified only when the value
+     	of this object in the corresponding conceptual row is not
+     	'active'.  Thus, to modify one or more of the objects in
+     	this conceptual row:
+          a. change the row status to 'notInService',
+          b. change the values of the row
+          c. change the row status to 'active'
+     	The fsCapwapStationWhiteListRowStatus may be changed to 'active'
+     	if all the managed objects in the conceptual row
+     	have been assigned valid values."
+    ::= { fsCapwapWtpRebootStatisticsEntry 9 }
+
+-- End of fsCapwapWtpRebootStatistics Table
+
+-- **********************************************************************
+--   fsCapwapWtpRadioStatistics Table
+-- **********************************************************************
+fsCapwapWtpRadioStatisticsTable OBJECT-TYPE
+    SYNTAX	SEQUENCE OF FsCapwapWtpRadioStatisticsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table of objects that contain the WTP Radio statistics;"
+     ::={ fsCapwapConfig 15 }
+
+fsCapwapWtpRadioStatisticsEntry  OBJECT-TYPE
+    SYNTAX      FsCapwapWtpRadioStatisticsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A set of objects that contain WTP Radio Statistics Table ."
+    INDEX { ifIndex }
+    ::= { fsCapwapWtpRadioStatisticsTable 1 }
+
+FsCapwapWtpRadioStatisticsEntry ::= SEQUENCE 
+{
+	fsCapwapWtpRadioLastFailType         INTEGER,
+	fsCapwapWtpRadioResetCount	         Unsigned32,
+	fsCapwapWtpRadioSwFailureCount       Unsigned32,
+	fsCapwapWtpRadioHwFailureCount       Unsigned32,
+	fsCapwapWtpRadioOtherFailureCount    Unsigned32,
+	fsCapwapWtpRadioUnknownFailureCount  Unsigned32,
+	fsCapwapWtpRadioConfigUpdateCount    Unsigned32,
+	fsCapwapWtpRadioChannelChangeCount   Unsigned32,
+ 	fsCapwapWtpRadioBandChangeCount      Unsigned32,
+ 	fsCapwapWtpRadioCurrentNoiseFloor    Integer32,
+    fsCapwapWtpRadioStatRowStatus		 RowStatus
+}
+
+fsCapwapWtpRadioLastFailType OBJECT-TYPE
+    SYNTAX      INTEGER { 
+		  statsNotSupported(0),
+		  softwareFailure(1),
+		  hardwareFailure(2),
+		  otherFailure(3),
+		  unknownFailure(255)
+		}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the last WTP failure count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 1 }
+
+fsCapwapWtpRadioResetCount OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the Radio reset count."
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 2 }
+
+fsCapwapWtpRadioSwFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of timer the radio has failed due to
+     software related reason"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 3 }
+
+fsCapwapWtpRadioHwFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of timer the radio has failed due to
+     hardware related reason"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 4 }
+
+fsCapwapWtpRadioOtherFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of timer the radio has failed due to
+     known reason other than software or hardware failure"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 5 }
+
+fsCapwapWtpRadioUnknownFailureCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of timer the radio has failed due to
+     unknown reason"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 6 }
+
+fsCapwapWtpRadioConfigUpdateCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of times the radio configuration has
+     been updated"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 7 }
+
+fsCapwapWtpRadioChannelChangeCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of times the radio channel has been
+     changed"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 8 }
+
+fsCapwapWtpRadioBandChangeCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of times the radio has changed the 
+     frequency bands"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 9 }
+
+fsCapwapWtpRadioCurrentNoiseFloor OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Represents the number of times the radio has changed the 
+     frequency bands"
+    DEFVAL { 0 }     
+    ::= { fsCapwapWtpRadioStatisticsEntry 10 }
+
+fsCapwapWtpRadioStatRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This variable is used to create or delete a row
+    in this table. This table can be made active at the time of creation.
+    User will not be allowed to change the configurations."
+    ::= { fsCapwapWtpRadioStatisticsEntry 11 }
+
+-- End of fsCapwapWtpRadioStatistics Table
+
+END

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -19,13 +19,15 @@
 
 // MG-SNMP-UPS-MIB::upsmgIdentModelName.0 = STRING: "5000_60"
 
-$model = snmp_get($device,'upsmgIdentModelName.0','-OQv','MG-SNMP-UPS-MIB');
+$model = snmp_get($device, 'upsmgIdentModelName.0', '-OQv', 'MG-SNMP-UPS-MIB');
 
 // "5000_60" -> "5000 (60 kVA)"
-if (strstr($model,'_')) { $model = join(' (',explode('_',$model)) . ' kVA)'; }
+if (strstr($model, '_')) {
+    $model = join(' (', explode('_', $model)) . ' kVA)';
+}
 
-$hardware = snmp_get($device,'upsmgIdentFamilyName.0','-OQv','MG-SNMP-UPS-MIB') . ' ' . $model;
+$hardware = snmp_get($device, 'upsmgIdentFamilyName.0', '-OQv', 'MG-SNMP-UPS-MIB') . ' ' . $model;
 
-$features = 'Firmware: ' . snmp_get($device,'upsmgAgentFirmwareVersion.0','-OQv','MG-SNMP-UPS-MIB');
+$features = 'Firmware: ' . snmp_get($device, 'upsmgAgentFirmwareVersion.0', '-OQv', 'MG-SNMP-UPS-MIB');
 
 // EOF

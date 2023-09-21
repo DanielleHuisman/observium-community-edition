@@ -1,6 +1,6 @@
 TROPIC-EXPRSCALARS DEFINITIONS ::= BEGIN
 
--- (c) Copyright 2019 Nokia Networks.  All rights reserved.
+-- (c) Copyright 2021 Nokia Networks.  All rights reserved.
 -- This software is the confidential and proprietary property of
 -- Nokia and may only be used in accordance with the terms of the
 -- license agreement provided with this software.
@@ -13,11 +13,14 @@ IMPORTS
       InetAddressType, InetAddress            FROM INET-ADDRESS-MIB
       MODULE-COMPLIANCE, OBJECT-GROUP         FROM SNMPv2-CONF
       TruthValue, RowStatus                   FROM SNMPv2-TC
-      AluWdmEnabledDisabled                   FROM TROPIC-TC
+      AluWdmEnabledDisabled,
+      TnTrapCategory,
+      TnCondition,
+      TnEntityType                            FROM TROPIC-TC
       tropicExprModules, tnExprScalarsMIB     FROM TROPIC-GLOBAL-REG;
 
   tnExprScalarsMibModule MODULE-IDENTITY
-      LAST-UPDATED    "201812281200Z"
+      LAST-UPDATED    "202102051200Z"
       ORGANIZATION    "Nokia"
       CONTACT-INFO    "Nokia
                        Attn: Jeff Donnelly
@@ -29,11 +32,47 @@ IMPORTS
 
       DESCRIPTION "."
 
+      REVISION    "202102051200Z"
+      DESCRIPTION "Marked the following as obsolete:
+                   tnSysAuthDenyMode."
+
+      REVISION    "202012311200Z"
+      DESCRIPTION "Added the following tables:
+                   tnSysTacPlusTable
+                   tnSysTacPlusServerTable."
+
+      REVISION    "202011271200Z"
+      DESCRIPTION "Added the following to tnSysTacacsServerTable:
+                   tnSysTacacsServerAuthorizationPriority."
+
+      REVISION    "202011131200Z"
+      DESCRIPTION "Added the following to tnSysTacacsServerTable:
+                   tnSysTacacsServerType
+                   tnSysTacacsServerSrcIpAddress
+                   tnSysTacacsServerSrcInetAddressType
+                   tnSysTacacsServerSrcInetAddress
+                   tnSysTacacsServerSingleConnect
+                   tnSysTacacsServerTimeout
+                   tnSysTacacsServerPriority
+                   tnSysTacacsServerOrder
+                   tnSysTacacsServerRejectOption
+                   tnSysTacacsServerAuthorizationType."
+
+      REVISION    "202010091200Z"
+      DESCRIPTION "1) Added the following scalar to tnExprSysRadius:
+                      tnSysAuthDenyMode.
+                   2) Added the following scalar to tnExprSysTacacs:
+                      tnSysTacacsAuthorizationMode."
+
+      REVISION    "201911011200Z"
+      DESCRIPTION "Fixed MIB compile issues."
+
       REVISION    "201812281200Z"
       DESCRIPTION "1) Added the following table:
                       tnSysTacacsServerTable.
-                   2) Added the following scalars:
-                      tnExprSysTacacs."
+                   2) Added the following scalars to tnExprSysTacacs:
+                      tnSysTacacsTimeout
+                      tnSysTacacsRetries."
 
       REVISION    "201812211200Z"
       DESCRIPTION "Added the following to tnSysAuthenOrder:
@@ -102,6 +141,8 @@ IMPORTS
   tnExprClusterTrap          OBJECT IDENTIFIER ::= { tnExprScalarsObjs 7 }
   tnExprSysTacacsServers     OBJECT IDENTIFIER ::= { tnExprScalarsObjs 8 }
   tnExprSysTacacs            OBJECT IDENTIFIER ::= { tnExprScalarsObjs 9 }
+  tnExprSysTacPlus           OBJECT IDENTIFIER ::= { tnExprScalarsObjs 10 }
+  tnExprSysTacPlusServers    OBJECT IDENTIFIER ::= { tnExprScalarsObjs 11 }
 
 --------------------------------------------------------------------------------
 -- Type Definitions
@@ -192,21 +233,21 @@ IMPORTS
 -- RADIUS Servers
 --------------------------------------------------------------------------------
     tnSysRadiusServerTable OBJECT-TYPE
-        SYNTAX         SEQUENCE OF TnRadiusServerEntry
+        SYNTAX         SEQUENCE OF TnSysRadiusServerEntry
         MAX-ACCESS     not-accessible
         STATUS         current
         DESCRIPTION    "."
         ::= { tnExprSysRadiusServers 1 }
 
     tnSysRadiusServerEntry OBJECT-TYPE
-        SYNTAX         TnRadiusServerEntry
+        SYNTAX         TnSysRadiusServerEntry
         MAX-ACCESS     not-accessible
         STATUS         current
         DESCRIPTION    "."
         INDEX { tnSysRadiusServerIndex }
         ::= { tnSysRadiusServerTable 1 }
 
-    TnRadiusServerEntry ::= SEQUENCE {
+    TnSysRadiusServerEntry ::= SEQUENCE {
         tnSysRadiusServerIndex                      Unsigned32,
         tnSysRadiusServerIpAddress                  IpAddress,
         tnSysRadiusServerIpPort                     Unsigned32,
@@ -321,6 +362,9 @@ IMPORTS
         DESCRIPTION    "Authentication Protocol."
         DEFVAL         { pap }
         ::= { tnExprSysRadius 4 }
+
+--    obsolete
+--    tnSysAuthDenyMode OBJECT-TYPE ::= { tnExprSysRadius 5 }
 
 ----------------------------------------------------------------
 -- Trap Buffering Table for cluster
@@ -588,30 +632,41 @@ IMPORTS
 -- Tacacs Servers
 --------------------------------------------------------------------------------
     tnSysTacacsServerTable OBJECT-TYPE
-        SYNTAX         SEQUENCE OF TnTacacsServerEntry
+        SYNTAX         SEQUENCE OF TnSysTacacsServerEntry
         MAX-ACCESS     not-accessible
         STATUS         current
         DESCRIPTION    "."
         ::= { tnExprSysTacacsServers 1 }
 
     tnSysTacacsServerEntry OBJECT-TYPE
-        SYNTAX         TnTacacsServerEntry
+        SYNTAX         TnSysTacacsServerEntry
         MAX-ACCESS     not-accessible
         STATUS         current
         DESCRIPTION    "."
         INDEX { tnSysTacacsServerIndex }
         ::= { tnSysTacacsServerTable 1 }
 
-    TnTacacsServerEntry ::= SEQUENCE {
-        tnSysTacacsServerIndex                Unsigned32,
-        tnSysTacacsServerIpAddress            IpAddress,
-        tnSysTacacsServerInetAddressType      InetAddressType,
-        tnSysTacacsServerInetAddress          InetAddress,
-        tnSysTacacsServerIpPort               Unsigned32,
-        tnSysTacacsServerSharedSecret         SnmpAdminString,
-        tnSysTacacsServerStatus               AluWdmEnabledDisabled,
-        tnSysTacacsServerRowStatus            RowStatus,
-        tnSysTacacsServerSingleConnection     TruthValue
+    TnSysTacacsServerEntry ::= SEQUENCE {
+        tnSysTacacsServerIndex                  Unsigned32,
+        tnSysTacacsServerIpAddress              IpAddress,
+        tnSysTacacsServerInetAddressType        InetAddressType,
+        tnSysTacacsServerInetAddress            InetAddress,
+        tnSysTacacsServerIpPort                 Unsigned32,
+        tnSysTacacsServerSharedSecret           SnmpAdminString,
+        tnSysTacacsServerStatus                 AluWdmEnabledDisabled,
+        tnSysTacacsServerRowStatus              RowStatus,
+        tnSysTacacsServerSingleConnection       TruthValue,
+        tnSysTacacsServerType                   INTEGER,
+        tnSysTacacsServerSrcIpAddress           IpAddress,
+        tnSysTacacsServerSrcInetAddressType     InetAddressType,
+        tnSysTacacsServerSrcInetAddress         InetAddress,
+        tnSysTacacsServerSingleConnect          AluWdmEnabledDisabled,
+        tnSysTacacsServerTimeout                Unsigned32,
+        tnSysTacacsServerPriority               Unsigned32,
+        tnSysTacacsServerOrder                  Unsigned32,
+        tnSysTacacsServerRejectOption           INTEGER,
+        tnSysTacacsServerAuthorizationType      INTEGER,
+        tnSysTacacsServerAuthorizationPriority  Unsigned32
     }
 
     tnSysTacacsServerIndex OBJECT-TYPE
@@ -675,10 +730,106 @@ IMPORTS
 
     tnSysTacacsServerSingleConnection OBJECT-TYPE
         SYNTAX         TruthValue
-        MAX-ACCESS     read-write
+        MAX-ACCESS     read-create
         STATUS         current
         DESCRIPTION    "."
         ::= { tnSysTacacsServerEntry 9 }
+
+    tnSysTacacsServerType OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         authentication(1),
+                         authorization(2),
+                         accounting(3)
+                       }
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacacsServerEntry 10 }
+
+    tnSysTacacsServerSrcIpAddress OBJECT-TYPE
+        SYNTAX         IpAddress
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacacsServerEntry 11 }
+
+    tnSysTacacsServerSrcInetAddressType OBJECT-TYPE
+        SYNTAX         InetAddressType
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "The value specifies the type of Internet address
+                        stored in tnSysTacacsServerSrcInetAddress."
+        DEFVAL         { unknown }
+        ::= { tnSysTacacsServerEntry 12 }
+
+    tnSysTacacsServerSrcInetAddress OBJECT-TYPE
+        SYNTAX         InetAddress
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "Indicates the Src IPv6 address of the Tacacs Server."
+        DEFVAL         { ''H }
+        ::= { tnSysTacacsServerEntry 13 }
+
+    tnSysTacacsServerSingleConnect OBJECT-TYPE
+        SYNTAX         AluWdmEnabledDisabled
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacacsServerEntry 14 }
+
+    tnSysTacacsServerTimeout OBJECT-TYPE
+        SYNTAX         Unsigned32
+        UNITS          "seconds"
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacacsServerEntry 15 }
+
+    tnSysTacacsServerPriority OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        DEFVAL         { 0 }
+        ::= { tnSysTacacsServerEntry 16 }
+
+    tnSysTacacsServerOrder OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacacsServerEntry 17 }
+
+    tnSysTacacsServerRejectOption OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         exitOnReject(1),
+                         noExitOnReject(2)
+                       }
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        DEFVAL         { exitOnReject }
+        ::= { tnSysTacacsServerEntry 18 }
+
+    tnSysTacacsServerAuthorizationType OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         local(1),
+                         privilege(2),
+                         cmdByCmd(3)
+                       }
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        DEFVAL         { local }
+        ::= { tnSysTacacsServerEntry 19 }
+
+    tnSysTacacsServerAuthorizationPriority OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        DEFVAL         { 0 }
+        ::= { tnSysTacacsServerEntry 20 }
 
 --------------------------------------------------------------------------------
 -- Tacacs
@@ -697,6 +848,115 @@ IMPORTS
         STATUS         current
         DESCRIPTION    "."
         ::= { tnExprSysTacacs 2 }
+
+    tnSysTacacsAuthorizationMode OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         local(1),
+                         privilege(2),
+                         cmdByCmd(3)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION    "."
+        DEFVAL         { local }
+        ::= { tnExprSysTacacs 3 }
+
+--------------------------------------------------------------------------------
+-- TacPlus Table
+--------------------------------------------------------------------------------
+    tnSysTacPlusTable OBJECT-TYPE
+        SYNTAX         SEQUENCE OF TnSysTacPlusEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnExprSysTacPlus 1 }
+
+    tnSysTacPlusEntry OBJECT-TYPE
+        SYNTAX         TnSysTacPlusEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "."
+        INDEX { tnSysTacPlusServerGroupName }
+        ::= { tnSysTacPlusTable 1 }
+
+    TnSysTacPlusEntry ::= SEQUENCE {
+        tnSysTacPlusServerGroupName     OCTET STRING,
+        tnSysTacPlusRowStatus           RowStatus,
+        tnSysTacPlusType                INTEGER
+    }
+
+    tnSysTacPlusServerGroupName OBJECT-TYPE
+        SYNTAX         OCTET STRING
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacPlusEntry 1 }
+
+    tnSysTacPlusRowStatus OBJECT-TYPE
+        SYNTAX         RowStatus
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacPlusEntry 2 }
+
+    tnSysTacPlusType OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         none(1),
+                         authentication(2),
+                         authorization(3),
+                         accounting(4),
+                         authenticationAuthorization(5)
+                       }
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacPlusEntry 3 }
+
+--------------------------------------------------------------------------------
+-- TacPlus Server Group
+--------------------------------------------------------------------------------
+    tnSysTacPlusServerTable OBJECT-TYPE
+        SYNTAX         SEQUENCE OF TnSysTacPlusServerEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnExprSysTacPlusServers 1 }
+
+    tnSysTacPlusServerEntry OBJECT-TYPE
+        SYNTAX         TnSysTacPlusServerEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "."
+        INDEX { tnSysTacPlusServerGroupName,
+                tnSysTacPlusServerIndex }
+        ::= { tnSysTacPlusServerTable 1 }
+
+    TnSysTacPlusServerEntry ::= SEQUENCE {
+        tnSysTacPlusServerIndex         Unsigned32,
+        tnSysTacPlusServerRowStatus     RowStatus,
+        tnSysTacPlusServerPriority      Unsigned32
+    }
+
+    tnSysTacPlusServerIndex OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacPlusServerEntry 1 }
+
+    tnSysTacPlusServerRowStatus OBJECT-TYPE
+        SYNTAX         RowStatus
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacPlusServerEntry 2 }
+
+    tnSysTacPlusServerPriority OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnSysTacPlusServerEntry 3 }
 
 --------------------------------------------------------------------------------
 -- Conformance Group Definitions
@@ -746,6 +1006,8 @@ IMPORTS
             tnSysRadiusRetries,
             tnSysAuthenOrder,
             tnSysRadiusServerAuthenticationProtocol
+--            obsolete
+--            tnSysAuthDenyMode
         }
         STATUS         current
         DESCRIPTION    "."
@@ -786,7 +1048,18 @@ IMPORTS
             tnSysTacacsServerSharedSecret,
             tnSysTacacsServerStatus,
             tnSysTacacsServerRowStatus,
-            tnSysTacacsServerSingleConnection
+            tnSysTacacsServerSingleConnection,
+            tnSysTacacsServerType,
+            tnSysTacacsServerSrcIpAddress,
+            tnSysTacacsServerSrcInetAddressType,
+            tnSysTacacsServerSrcInetAddress,
+            tnSysTacacsServerSingleConnect,
+            tnSysTacacsServerTimeout,
+            tnSysTacacsServerPriority,
+            tnSysTacacsServerOrder,
+            tnSysTacacsServerRejectOption,
+            tnSysTacacsServerAuthorizationType,
+            tnSysTacacsServerAuthorizationPriority
         }
         STATUS         current
         DESCRIPTION    "."
@@ -795,11 +1068,30 @@ IMPORTS
     tnExprSysTacacsGroup OBJECT-GROUP
         OBJECTS {
             tnSysTacacsTimeout,
-            tnSysTacacsRetries
+            tnSysTacacsRetries,
+            tnSysTacacsAuthorizationMode
         }
         STATUS         current
         DESCRIPTION    "."
         ::= { tnExprScalarsGroups 9 }
+
+    tnExprSysTacPlusGroup OBJECT-GROUP
+        OBJECTS {
+            tnSysTacPlusRowStatus,
+            tnSysTacPlusType
+        }
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnExprScalarsGroups 10 }
+
+    tnExprSysTacPlusServersGroup OBJECT-GROUP
+        OBJECTS {
+            tnSysTacPlusServerRowStatus,
+            tnSysTacPlusServerPriority
+        }
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnExprScalarsGroups 11 }
 
 --------------------------------------------------------------------------------
 -- Compliance Statements (mandatory)
@@ -818,7 +1110,9 @@ IMPORTS
             tnClusterTrapBufferGroup,
             tnClusterTrapGroup,
             tnExprSysTacacsServersGroup,
-            tnExprSysTacacsGroup
+            tnExprSysTacacsGroup,
+            tnExprSysTacPlusGroup,
+            tnExprSysTacPlusServersGroup
         }
         ::= { tnExprScalarsCompliances 1 }
 

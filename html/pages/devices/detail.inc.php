@@ -5,45 +5,42 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     webui
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Display devices as a list in detailed format
 
-$header = [  'state-marker' => '',
-             '',
-             [ 'hostname' => 'Hostname', 'domain' => 'Domain', 'location' => 'Location'],
-             '',
-             [ 'os' => 'Operating System', 'hardware' => 'Hardware Platform'],
-             [ 'uptime' => 'Uptime', 'sysName' => 'sysName']];
+$header = ['state-marker' => '',
+           '',
+           ['hostname' => 'Hostname', 'domain' => 'Domain', 'location' => 'Location'],
+           '',
+           ['os' => 'Operating System', 'hardware' => 'Hardware Platform'],
+           ['uptime' => 'Uptime', 'sysName' => 'sysName']];
 
 //r($table_header);
 
 ?>
 
     <table class="table table-hover table-striped table-condensed ">
-<?php
+        <?php
 
-echo generate_table_header($header, $vars);
+        echo generate_table_header($header, $vars);
 
-foreach ($devices as $device)
-{
-  if (device_permitted($device['device_id']))
-  {
-    if (!$location_filter || $device['location'] == $location_filter)
-    {
-      $vars['view'] = 'details';
-      print_device_row($device, $vars);
-    }
-  }
-}
+        foreach ($devices as $device) {
+            if (device_permitted($device['device_id'])) {
+                if (!$location_filter || $device['location'] == $location_filter) {
+                    $vars['view'] = 'details';
+                    print_device_row($device, $vars);
+                }
+            }
+        }
 
-?>
+        ?>
 
-</table>
+    </table>
 
 <?php
 

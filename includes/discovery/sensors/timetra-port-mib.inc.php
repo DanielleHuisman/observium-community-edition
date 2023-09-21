@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -45,138 +45,145 @@ $oids = snmpwalk_cache_oid($device, 'tmnxDDMLaneTable', [], 'TIMETRA-PORT-MIB');
 print_debug_vars($oids);
 
 $multilane = [];
-foreach ($oids as $index => $entry)
-{
-  list($chassis, $ifIndex, $lane) = explode('.', $index);
+foreach ($oids as $index => $entry) {
+    [$chassis, $ifIndex, $lane] = explode('.', $index);
 
-  if ($chassis > 1) { continue; }
+    if ($chassis > 1) {
+        continue;
+    }
 
-  $entry['ifIndex'] = $ifIndex;
-  $entry['index']   = $index;
-  $match            = [ 'measured_match' => [ 'entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%' ] ];
-  $options          = entity_measured_match_definition($device, $match, $entry);
-  //print_debug_vars($options);
+    $entry['ifIndex'] = $ifIndex;
+    $entry['index']   = $index;
+    $match            = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%']];
+    $options          = entity_measured_match_definition($device, $match, $entry);
+    //print_debug_vars($options);
 
-  $name = $options['port_label'] . ' Lane ' . $lane;
+    $name = $options['port_label'] . ' Lane ' . $lane;
 
-  // Temperature
-  $descr     = $name . ' Temperature';
-  $class     = 'temperature';
-  $oid_name  = 'tmnxDDMLaneTemperature';
-  $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.2.'.$index;
-  $value     = $entry[$oid_name];
+    // Temperature
+    $descr    = $name . ' Temperature';
+    $class    = 'temperature';
+    $oid_name = 'tmnxDDMLaneTemperature';
+    $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.2.' . $index;
+    $value    = $entry[$oid_name];
+    $ok       = $value != 0;
 
-  $sensor_options = $options;
-  // Scale
-  //        "The value of tmnxDDMLaneTemperature indicates the current temperature
-  //          of the multi-lane optic in 1/256th degrees Celsius.
-  //
-  //          The formula for translating between the value of tmnxDDMLaneTemperature
-  //          and degrees Celsius is:
-  //                 tmnxDDMLaneTemperature / 256
-  //
-  //          For example: The SNMP value 5734 is 22.4 degrees Celsius."
-  $scale     = 1/256;
+    $sensor_options = $options;
+    // Scale
+    //        "The value of tmnxDDMLaneTemperature indicates the current temperature
+    //          of the multi-lane optic in 1/256th degrees Celsius.
+    //
+    //          The formula for translating between the value of tmnxDDMLaneTemperature
+    //          and degrees Celsius is:
+    //                 tmnxDDMLaneTemperature / 256
+    //
+    //          For example: The SNMP value 5734 is 22.4 degrees Celsius."
+    $scale = 1 / 256;
 
-  // Limits
-  $sensor_options['limit_high']      = $entry['tmnxDDMLaneTempHiAlarm']  * $scale;
-  $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneTempHiWarn']   * $scale;
-  $sensor_options['limit_low']       = $entry['tmnxDDMLaneTempLowAlarm'] * $scale;
-  $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneTempLowWarn']  * $scale;
+    // Limits
+    $sensor_options['limit_high']      = $entry['tmnxDDMLaneTempHiAlarm'] * $scale;
+    $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneTempHiWarn'] * $scale;
+    $sensor_options['limit_low']       = $entry['tmnxDDMLaneTempLowAlarm'] * $scale;
+    $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneTempLowWarn'] * $scale;
 
-  if ($value != 0)
-  {
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-  }
+    if ($ok) {
+        $multilane[$chassis][$ifIndex][$class] = 1;
 
-  // Tx Bias
-  $descr     = $name . ' Tx Bias';
-  $class     = 'current';
-  $oid_name  = 'tmnxDDMLaneTxBiasCurrent';
-  $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.7.'.$index;
-  $value     = $entry[$oid_name];
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+    }
 
-  $sensor_options = $options;
-  // Scale
-  //        "The value of tmnxDDMLaneTxBiasCurrent indicates the current Transmit
-  //          Bias Current of the multi-lane optic in 1/500 milliamperes (mA).
-  //
-  //          The formula for translating between the value of
-  //          tmnxDDMLaneTxBiasCurrent and amperes is:
-  //                 tmnxDDMLaneTxBiasCurrent / 500
-  //
-  //          For example: The SNMP value 2565 is 5.1 milliamperes (mA)."
-  $scale     = 1 / 500000; // 500 * 1000
+    // Tx Bias
+    $descr    = $name . ' Tx Bias';
+    $class    = 'current';
+    $oid_name = 'tmnxDDMLaneTxBiasCurrent';
+    $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.7.' . $index;
+    $value    = $entry[$oid_name];
+    $ok       = $ok || ($value != 0); // Override ok, because multiline temperature can be 0
 
-  // Limits
-  $sensor_options['limit_high']      = $entry['tmnxDDMLaneTxBiasCurrentHiAlarm']  * $scale;
-  $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneTxBiasCurrentHiWarn']   * $scale;
-  $sensor_options['limit_low']       = $entry['tmnxDDMLaneTxBiasCurrentLowAlarm'] * $scale;
-  $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneTxBiasCurrentLowWarn']  * $scale;
+    $sensor_options = $options;
+    // Scale
+    //        "The value of tmnxDDMLaneTxBiasCurrent indicates the current Transmit
+    //          Bias Current of the multi-lane optic in 1/500 milliamperes (mA).
+    //
+    //          The formula for translating between the value of
+    //          tmnxDDMLaneTxBiasCurrent and amperes is:
+    //                 tmnxDDMLaneTxBiasCurrent / 500
+    //
+    //          For example: The SNMP value 2565 is 5.1 milliamperes (mA)."
+    $scale = 1 / 500000;   // 500 * 1000
 
-  if ($value != 0)
-  {
-    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-  }
+    // Limits
+    $sensor_options['limit_high']      = $entry['tmnxDDMLaneTxBiasCurrentHiAlarm'] * $scale;
+    $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneTxBiasCurrentHiWarn'] * $scale;
+    $sensor_options['limit_low']       = $entry['tmnxDDMLaneTxBiasCurrentLowAlarm'] * $scale;
+    $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneTxBiasCurrentLowWarn'] * $scale;
 
-  // Tx Power
-  $descr     = $name . ' Tx Power';
-  $class     = 'power';
-  $oid_name  = 'tmnxDDMLaneTxOutputPower';
-  $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.12.'.$index;
-  $value     = $entry[$oid_name];
+    if ($ok) {
+        $multilane[$chassis][$ifIndex][$class] = 1;
 
-  $sensor_options = $options;
-  // Scale
-  //        "The value of tmnxDDMLaneTxOutputPower indicates the current Output
-  //          Power of the multi-lane optic in one tenths of a microwatt (uW).
-  //
-  //          For example:
-  //          Using the SNMP value of 790, and using units of tenths of microwatt,
-  //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
-  //                10 x log10(0.079) = -11.0 dBm"
-  $scale     = 1 / 1000000; // 10 * 1000 * 1000
-  // Limits
-  $sensor_options['limit_high']      = $entry['tmnxDDMLaneTxOutputPowerHiAlarm']  * $scale;
-  $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneTxOutputPowerHiWarn']   * $scale;
-  $sensor_options['limit_low']       = $entry['tmnxDDMLaneTxOutputPowerLowAlarm'] * $scale;
-  $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneTxOutputPowerLowWarn']  * $scale;
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+    }
 
-  // if ($value != 0)
-  // {
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-  //}
+    // Tx Power
+    $descr    = $name . ' Tx Power';
+    $class    = 'power';
+    $oid_name = 'tmnxDDMLaneTxOutputPower';
+    $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.12.' . $index;
+    $value    = $entry[$oid_name];
 
-  // Rx Power
-  $descr     = $name . ' Rx Power';
-  $class     = 'power';
-  $oid_name  = 'tmnxDDMLaneRxOpticalPower';
-  $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.17.'.$index;
-  $value     = $entry[$oid_name];
+    $sensor_options = $options;
+    // Scale
+    //        "The value of tmnxDDMLaneTxOutputPower indicates the current Output
+    //          Power of the multi-lane optic in one tenths of a microwatt (uW).
+    //
+    //          For example:
+    //          Using the SNMP value of 790, and using units of tenths of microwatt,
+    //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
+    //                10 x log10(0.079) = -11.0 dBm"
+    $scale = 1 / 1000000;  // 10 * 1000 * 1000
+    // Limits
+    $sensor_options['limit_high']      = $entry['tmnxDDMLaneTxOutputPowerHiAlarm'] * $scale;
+    $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneTxOutputPowerHiWarn'] * $scale;
+    $sensor_options['limit_low']       = $entry['tmnxDDMLaneTxOutputPowerLowAlarm'] * $scale;
+    $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneTxOutputPowerLowWarn'] * $scale;
 
-  $sensor_options = $options;
-  // Scale
-  //        "The value of tmnxDDMLaneRxOpticalPower indicates the current Received
-  //          Optical Power of the multi-lane optic in one tenths of a microwatt
-  //          (uW).
-  //
-  //          For example:
-  //          Using the SNMP value of 790, and using units of tenths of microwatt,
-  //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
-  //                10 x log10(0.079) = -11.0 dBm"
-  $scale     = 1 / 10000000; // 10 * 1000 * 1000
-  // Limits
-  $sensor_options['limit_high']      = $entry['tmnxDDMLaneRxOpticalPwrHiAlarm']    * $scale;
-  $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneRxOpticalPwrHiWarn']  * $scale;
-  $sensor_options['limit_low']       = $entry['tmnxDDMLaneRxOpticalPwrLowAlarm']   * $scale;
-  $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneRxOpticalPwrLowWarn'] * $scale;
+    if ($ok) {
+        $multilane[$chassis][$ifIndex][$class] = 1;
 
-  // if ($value != 0)
-  // {
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-  // }
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+    }
 
-  $multilane[$chassis][$ifIndex] = 1;
+    // Rx Power
+    $descr    = $name . ' Rx Power';
+    $class    = 'power';
+    $oid_name = 'tmnxDDMLaneRxOpticalPower';
+    $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.66.1.17.' . $index;
+    $value    = $entry[$oid_name];
+
+    $sensor_options = $options;
+    // Scale
+    //        "The value of tmnxDDMLaneRxOpticalPower indicates the current Received
+    //          Optical Power of the multi-lane optic in one tenths of a microwatt
+    //          (uW).
+    //
+    //          For example:
+    //          Using the SNMP value of 790, and using units of tenths of microwatt,
+    //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
+    //                10 x log10(0.079) = -11.0 dBm"
+    $scale = 1 / 10000000; // 10 * 1000 * 1000
+    // Limits
+    $sensor_options['limit_high']      = $entry['tmnxDDMLaneRxOpticalPwrHiAlarm'] * $scale;
+    $sensor_options['limit_high_warn'] = $entry['tmnxDDMLaneRxOpticalPwrHiWarn'] * $scale;
+    $sensor_options['limit_low']       = $entry['tmnxDDMLaneRxOpticalPwrLowAlarm'] * $scale;
+    $sensor_options['limit_low_warn']  = $entry['tmnxDDMLaneRxOpticalPwrLowWarn'] * $scale;
+
+    if ($ok) {
+        $multilane[$chassis][$ifIndex][$class] = 1;
+
+        discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+    }
+
+    //$multilane[$chassis][$ifIndex] = 1;
 }
 
 /*
@@ -312,297 +319,278 @@ TIMETRA-PORT-MIB::tmnxDDMExternallyCalibrated.1.69435392 = INTEGER: false(2)
 // TIMETRA-PORT-MIB::tmnxPortSFPVendorPartNum.1.69435392 = STRING: "FTRJ8519P2BNL-A5"
 
 $oids = snmpwalk_multipart_oid($device, 'tmnxDigitalDiagMonitorTable', [], 'TIMETRA-PORT-MIB');
-if (snmp_status())
-{
-  $oids = snmpwalk_multipart_oid($device, 'tmnxPortTransceiverType', $oids, 'TIMETRA-PORT-MIB');
+if (snmp_status()) {
+    $oids = snmpwalk_multipart_oid($device, 'tmnxPortTransceiverType', $oids, 'TIMETRA-PORT-MIB');
 }
 print_debug_vars($oids);
 
-foreach ($oids as $chassis => $transeiver)
-{
-  if ($chassis > 1) { continue; }
-
-  foreach ($transeiver as $ifIndex => $entry)
-  {
-    $index = $chassis . '.' . $ifIndex;
-
-    $entry['ifIndex'] = $ifIndex;
-    $entry['index']   = $index;
-    $match            = [ 'measured_match' => [ 'entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%' ] ];
-    $options          = entity_measured_match_definition($device, $match, $entry);
-    //print_debug_vars($options);
-
-    $name = $options['port_label'];
-
-    // Temperature
-    $descr     = $name . ' Temperature';
-    $class     = 'temperature';
-    $oid_name  = 'tmnxDDMTemperature';
-    $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.1.'.$index;
-    $value     = $entry[$oid_name];
-
-    $sensor_options = $options;
-    // Scale
-    //         "The value of tmnxDDMTemperature indicates the current temperature of
-    //          the SFF in 1/256th degrees Celsius.
-    //
-    //          If the SFF is externally calibrated, the objects
-    //          tmnxDDMExtCalTemperatureSlope and tmnxDDMExtCalTemperatureOffset
-    //          affect the temperature calculation.
-    //
-    //          The formula for translating between the value of tmnxDDMTemperature and
-    //          degrees Celsius is:
-    //              Internally Calibrated only:
-    //                 tmnxDDMTemperature / 256
-    //              Externally Calibrated:
-    //                 (tmnxDDMTemperature * (tmnxDDMExtCalTemperatureSlope / 256)
-    //                       + tmnxDDMExtCalTemperatureOffset) / 256
-    //
-    //          For example (internally calibrated SFF): The SNMP value 5734 is 22.4
-    //          degrees Celsius."
-    $scale     = 1/256;
-    if ($entry['tmnxDDMExternallyCalibrated'] == 'true')
-    {
-      $scale = ($entry['tmnxDDMExtCalTemperatureSlope'] / 256) / 256;
-      if ($entry['tmnxDDMExtCalTemperatureOffset'] != 0)
-      {
-        $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTemperatureOffset'] / 256;
-      }
-    }
-    // Limits
-    $sensor_options['limit_high']      = $entry['tmnxDDMTempHiAlarm']    * $scale;
-    $sensor_options['limit_high_warn'] = $entry['tmnxDDMTempHiWarning']  * $scale;
-    $sensor_options['limit_low']       = $entry['tmnxDDMTempLowAlarm']   * $scale;
-    $sensor_options['limit_low_warn']  = $entry['tmnxDDMTempLowWarning'] * $scale;
-    if ($sensor_options['sensor_addition'])
-    {
-      $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
-      $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
+foreach ($oids as $chassis => $transeiver) {
+    if ($chassis > 1) {
+        continue;
     }
 
-    if ($value != 0 && !isset($multilane[$chassis][$ifIndex]))
-    {
-      discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+    foreach ($transeiver as $ifIndex => $entry) {
+        $index = $chassis . '.' . $ifIndex;
+
+        $entry['ifIndex'] = $ifIndex;
+        $entry['index']   = $index;
+        $match            = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%ifIndex%']];
+        $options          = entity_measured_match_definition($device, $match, $entry);
+        //print_debug_vars($options);
+
+        $name = $options['port_label'];
+
+        // Temperature
+        $descr    = $name . ' Temperature';
+        $class    = 'temperature';
+        $oid_name = 'tmnxDDMTemperature';
+        $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.1.' . $index;
+        $value    = $entry[$oid_name];
+        $ok       = $value != 0;
+
+        $sensor_options = $options;
+        // Scale
+        //         "The value of tmnxDDMTemperature indicates the current temperature of
+        //          the SFF in 1/256th degrees Celsius.
+        //
+        //          If the SFF is externally calibrated, the objects
+        //          tmnxDDMExtCalTemperatureSlope and tmnxDDMExtCalTemperatureOffset
+        //          affect the temperature calculation.
+        //
+        //          The formula for translating between the value of tmnxDDMTemperature and
+        //          degrees Celsius is:
+        //              Internally Calibrated only:
+        //                 tmnxDDMTemperature / 256
+        //              Externally Calibrated:
+        //                 (tmnxDDMTemperature * (tmnxDDMExtCalTemperatureSlope / 256)
+        //                       + tmnxDDMExtCalTemperatureOffset) / 256
+        //
+        //          For example (internally calibrated SFF): The SNMP value 5734 is 22.4
+        //          degrees Celsius."
+        $scale = 1 / 256;
+        if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
+            $scale = ($entry['tmnxDDMExtCalTemperatureSlope'] / 256) / 256;
+            if ($entry['tmnxDDMExtCalTemperatureOffset'] != 0) {
+                $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTemperatureOffset'] / 256;
+            }
+        }
+        // Limits
+        $sensor_options['limit_high']      = $entry['tmnxDDMTempHiAlarm'] * $scale;
+        $sensor_options['limit_high_warn'] = $entry['tmnxDDMTempHiWarning'] * $scale;
+        $sensor_options['limit_low']       = $entry['tmnxDDMTempLowAlarm'] * $scale;
+        $sensor_options['limit_low_warn']  = $entry['tmnxDDMTempLowWarning'] * $scale;
+        if ($sensor_options['sensor_addition']) {
+            $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
+            $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
+        }
+
+        if ($ok && !isset($multilane[$chassis][$ifIndex][$class])) {
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        }
+
+        // Voltage
+        $descr    = $name . ' Voltage';
+        $class    = 'voltage';
+        $oid_name = 'tmnxDDMSupplyVoltage';
+        $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.6.' . $index;
+        $value    = $entry[$oid_name];
+
+        $sensor_options = $options;
+        // Scale
+        //        "The value of tmnxDDMSupplyVoltage indicates the current supply voltage
+        //          of the SFF. For 100G MSA Transponder, the supply voltage is in
+        //          millivolts (mV). For all other types the voltage is in deci-millivolts
+        //          (1/10th of a millivolt or 100 microvolt units).
+        //
+        //          If the SFF is externally calibrated, the objects
+        //          tmnxDDMExtCalVoltageSlope and tmnxDDMExtCalVoltageOffset affect the
+        //          voltage calculation.
+        //
+        //          The formula for translating between the value of tmnxDDMSupplyVoltage
+        //          and Voltage is:
+        //              Internally Calibrated only:
+        //                 tmnxDDMSupplyVoltage * conversion_factor
+        //              Externally Calibrated:
+        //                 (tmnxDDMSupplyVoltage * (tmnxDDMExtCalVoltageSlope / 256)
+        //                       + tmnxDDMExtCalVoltageOffset) * conversion_factor
+        //          where conversion_factor is 1/1000 for 100G MSA transponders and
+        //          1/10000 for all the others.
+        //
+        //          For example (internally calibrated SFF): 1. For 100G MSA transponders,
+        //          the SNMP value 32851 is 32.851 Volts (V). 2. For all others, the SNMP
+        //          value 32851 is 3.2851 Volts (V)."
+        $factor = $entry['tmnxPortTransceiverType'] === 'oifMsa100gLh' ? 1000 : 10000;
+        $scale  = 1 / $factor;
+        if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
+            $scale = ($entry['tmnxDDMExtCalVoltageSlope'] / 256) / $factor;
+            if ($entry['tmnxDDMExtCalVoltageOffset'] != 0) {
+                $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalVoltageOffset'] / $factor;
+            }
+        }
+        // Limits
+        $sensor_options['limit_high']      = $entry['tmnxDDMSupplyVoltageHiAlarm'] * $scale;
+        $sensor_options['limit_high_warn'] = $entry['tmnxDDMSupplyVoltageHiWarning'] * $scale;
+        $sensor_options['limit_low']       = $entry['tmnxDDMSupplyVoltageLowAlarm'] * $scale;
+        $sensor_options['limit_low_warn']  = $entry['tmnxDDMSupplyVoltageLowWarning'] * $scale;
+        if ($sensor_options['sensor_addition']) {
+            $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
+            $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
+        }
+
+        if ($ok && !isset($multilane[$chassis][$ifIndex][$class])) {
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        }
+
+        if (isset($multilane[$chassis][$ifIndex])) {
+            // Skip bias, tx/rx power for already multilane sensors
+            continue;
+        }
+
+        // Tx Bias
+        $descr    = $name . ' Tx Bias';
+        $class    = 'current';
+        $oid_name = 'tmnxDDMTxBiasCurrent';
+        $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.11.' . $index;
+        $value    = $entry[$oid_name];
+
+        $sensor_options = $options;
+        // Scale
+        //        "The value of tmnxDDMTxBiasCurrent indicates the current Transmit Bias
+        //          Current of the SFF in 1/500 milliamperes (mA).
+        //
+        //          If the SFF is externally calibrated, the objects
+        //          tmnxDDMExtCalTxLaserBiasSlope and tmnxDDMExtCalTxLaserBiasOffset
+        //          affect the ampere calculation.
+        //
+        //          The formula for translating between the value of tmnxDDMTxBiasCurrent
+        //          and milliamperes is:
+        //              Internally Calibrated only:
+        //                 tmnxDDMTxBiasCurrent / 500
+        //              Externally Calibrated:
+        //                 (tmnxDDMTxBiasCurrent * (tmnxDDMExtCalTxLaserBiasSlope / 256)
+        //                       + tmnxDDMExtCalTxLaserBiasOffset) / 500
+        //
+        //          For example (internally calibrated SFF): The SNMP value 2565 is 5.1
+        //          milliamperes (mA)."
+        $factor = 500000;   // 500 * 1000
+        $scale  = 1 / $factor;
+        if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
+            $scale = ($entry['tmnxDDMExtCalTxLaserBiasSlope'] / 256) / $factor;
+            if ($entry['tmnxDDMExtCalTxLaserBiasOffset'] != 0) {
+                $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxLaserBiasOffset'] / $factor;
+            }
+        }
+        // Limits
+        $sensor_options['limit_high']      = $entry['tmnxDDMTxBiasCurrentHiAlarm'] * $scale;
+        $sensor_options['limit_high_warn'] = $entry['tmnxDDMTxBiasCurrentHiWarning'] * $scale;
+        $sensor_options['limit_low']       = $entry['tmnxDDMTxBiasCurrentLowAlarm'] * $scale;
+        $sensor_options['limit_low_warn']  = $entry['tmnxDDMTxBiasCurrentLowWarning'] * $scale;
+        if ($sensor_options['sensor_addition']) {
+            $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
+            $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
+        }
+
+        if ($ok) {
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        }
+
+        // Tx Power
+        $descr    = $name . ' Tx Power';
+        $class    = 'power';
+        $oid_name = 'tmnxDDMTxOutputPower';
+        $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.16.' . $index;
+        $value    = $entry[$oid_name];
+
+        $sensor_options = $options;
+        // Scale
+        //        "The value of tmnxDDMTxOutputPower indicates the current Output Power
+        //          of the SFF in one tenths of a microwatt (uW).
+        //
+        //          If the SFF is externally calibrated, the objects
+        //          tmnxDDMExtCalTxPowerSlope and tmnxDDMExtCalTxPowerOffset affect the
+        //          output power calculation.
+        //
+        //          For example (internally calibrated SFF):
+        //          Using the SNMP value of 790, and using units of tenths of microwatt,
+        //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
+        //                10 x log10(0.079) = -11.0 dBm"
+        $factor = 10000000; // 10 * 1000 * 1000
+        $scale  = 1 / $factor;
+        if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
+            $scale = ($entry['tmnxDDMExtCalTxPowerSlope'] / 256) / $factor;
+            if ($entry['tmnxDDMExtCalTxPowerOffset'] != 0) {
+                $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxPowerOffset'] / $factor;
+            }
+        }
+        // Limits
+        $sensor_options['limit_high']      = $entry['tmnxDDMTxOutputPowerHiAlarm'] * $scale;
+        $sensor_options['limit_high_warn'] = $entry['tmnxDDMTxOutputPowerHiWarning'] * $scale;
+        $sensor_options['limit_low']       = $entry['tmnxDDMTxOutputPowerLowAlarm'] * $scale;
+        $sensor_options['limit_low_warn']  = $entry['tmnxDDMTxOutputPowerLowWarning'] * $scale;
+        if ($sensor_options['sensor_addition']) {
+            $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
+            $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
+            $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
+        }
+
+        if ($ok) {
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        }
+
+        // Rx Power
+        $descr    = $name . ' Rx Power';
+        $class    = 'power';
+        $oid_name = 'tmnxDDMRxOpticalPower';
+        $oid_num  = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.21.' . $index;
+        $value    = $entry[$oid_name];
+
+        $sensor_options = $options;
+        // Scale
+        //        "The value of tmnxDDMRxOpticalPower indicates the current Received
+        //          Optical Power of the SFF in one tenths of a microwatt (uW).
+        //
+        //          If the SFF is externally calibrated, the objects
+        //          tmnxDDMExtCalRxPower4, tmnxDDMExtCalRxPower3, tmnxDDMExtCalRxPower2,
+        //          tmnxDDMExtCalRxPower1 and tmnxDDMExtCalRxPower0 affect the output
+        //          power calculation.
+        //          Table 3.16 in the SFF Committee Standard's document SFF-8472 Rev 10.2.
+        //
+        //          For example (internally calibrated SFF):
+        //          Using the SNMP value of 790, and using units of tenths of microwatt,
+        //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
+        //                10 x log10(0.079) = -11.0 dBm"
+        $factor = 10000000; // 10 * 1000 * 1000
+        $scale  = 1 / $factor;
+        if ($entry['tmnxDDMExternallyCalibrated'] === 'true') {
+            //FIXME. Dear fucking god.. how this calculated.. how we can poll this????
+            //  tmnxDDMExtCalRxPower0 +
+            // (tmnxDDMExtCalRxPower1 * tmnxDDMRxOpticalPower) +
+            // (tmnxDDMExtCalRxPower2 * tmnxDDMRxOpticalPower^2) +
+            // (tmnxDDMExtCalRxPower3 * tmnxDDMRxOpticalPower^3) +
+            // (tmnxDDMExtCalRxPower4 * tmnxDDMRxOpticalPower^4)
+            // $scale = ($entry['tmnxDDMExtCalTxPowerSlope'] / 256) / $factor;
+            // if ($entry['tmnxDDMExtCalTxPowerOffset'] != 0)
+            // {
+            //   $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxPowerOffset'] / $factor;
+            // }
+        }
+        // Limits
+        $sensor_options['limit_high']      = $entry['tmnxDDMRxOpticalPowerHiAlarm'] * $scale;
+        $sensor_options['limit_high_warn'] = $entry['tmnxDDMRxOpticalPowerHiWarning'] * $scale;
+        $sensor_options['limit_low']       = $entry['tmnxDDMRxOpticalPowerLowAlarm'] * $scale;
+        $sensor_options['limit_low_warn']  = $entry['tmnxDDMRxOpticalPowerLowWarning'] * $scale;
+
+        if ($ok) {
+            discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
+        }
     }
-
-    // Voltage
-    $descr     = $name . ' Voltage';
-    $class     = 'voltage';
-    $oid_name  = 'tmnxDDMSupplyVoltage';
-    $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.6.'.$index;
-    $value     = $entry[$oid_name];
-
-    $sensor_options = $options;
-    // Scale
-    //        "The value of tmnxDDMSupplyVoltage indicates the current supply voltage
-    //          of the SFF. For 100G MSA Transponder, the supply voltage is in
-    //          millivolts (mV). For all other types the voltage is in deci-millivolts
-    //          (1/10th of a millivolt or 100 microvolt units).
-    //
-    //          If the SFF is externally calibrated, the objects
-    //          tmnxDDMExtCalVoltageSlope and tmnxDDMExtCalVoltageOffset affect the
-    //          voltage calculation.
-    //
-    //          The formula for translating between the value of tmnxDDMSupplyVoltage
-    //          and Voltage is:
-    //              Internally Calibrated only:
-    //                 tmnxDDMSupplyVoltage * conversion_factor
-    //              Externally Calibrated:
-    //                 (tmnxDDMSupplyVoltage * (tmnxDDMExtCalVoltageSlope / 256)
-    //                       + tmnxDDMExtCalVoltageOffset) * conversion_factor
-    //          where conversion_factor is 1/1000 for 100G MSA transponders and
-    //          1/10000 for all the others.
-    //
-    //          For example (internally calibrated SFF): 1. For 100G MSA transponders,
-    //          the SNMP value 32851 is 32.851 Volts (V). 2. For all others, the SNMP
-    //          value 32851 is 3.2851 Volts (V)."
-    $factor    = $entry['tmnxPortTransceiverType'] == 'oifMsa100gLh' ? 1000 : 10000;
-    $scale     = 1 / $factor;
-    if ($entry['tmnxDDMExternallyCalibrated'] == 'true')
-    {
-      $scale = ($entry['tmnxDDMExtCalVoltageSlope'] / 256) / $factor;
-      if ($entry['tmnxDDMExtCalVoltageOffset'] != 0)
-      {
-        $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalVoltageOffset'] / $factor;
-      }
-    }
-    // Limits
-    $sensor_options['limit_high']      = $entry['tmnxDDMSupplyVoltageHiAlarm']    * $scale;
-    $sensor_options['limit_high_warn'] = $entry['tmnxDDMSupplyVoltageHiWarning']  * $scale;
-    $sensor_options['limit_low']       = $entry['tmnxDDMSupplyVoltageLowAlarm']   * $scale;
-    $sensor_options['limit_low_warn']  = $entry['tmnxDDMSupplyVoltageLowWarning'] * $scale;
-    if ($sensor_options['sensor_addition'])
-    {
-      $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
-      $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
-    }
-
-    if ($value != 0)
-    {
-      discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-    }
-
-    if (isset($multilane[$chassis][$ifIndex]))
-    {
-      // Skip bias, tx/rx power for already multilane sensors
-      continue;
-    }
-
-    // Tx Bias
-    $descr     = $name . ' Tx Bias';
-    $class     = 'current';
-    $oid_name  = 'tmnxDDMTxBiasCurrent';
-    $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.11.'.$index;
-    $value     = $entry[$oid_name];
-
-    $sensor_options = $options;
-    // Scale
-    //        "The value of tmnxDDMTxBiasCurrent indicates the current Transmit Bias
-    //          Current of the SFF in 1/500 milliamperes (mA).
-    //
-    //          If the SFF is externally calibrated, the objects
-    //          tmnxDDMExtCalTxLaserBiasSlope and tmnxDDMExtCalTxLaserBiasOffset
-    //          affect the ampere calculation.
-    //
-    //          The formula for translating between the value of tmnxDDMTxBiasCurrent
-    //          and milliamperes is:
-    //              Internally Calibrated only:
-    //                 tmnxDDMTxBiasCurrent / 500
-    //              Externally Calibrated:
-    //                 (tmnxDDMTxBiasCurrent * (tmnxDDMExtCalTxLaserBiasSlope / 256)
-    //                       + tmnxDDMExtCalTxLaserBiasOffset) / 500
-    //
-    //          For example (internally calibrated SFF): The SNMP value 2565 is 5.1
-    //          milliamperes (mA)."
-    $factor    = 500000; // 500 * 1000
-    $scale     = 1 / $factor;
-    if ($entry['tmnxDDMExternallyCalibrated'] == 'true')
-    {
-      $scale = ($entry['tmnxDDMExtCalTxLaserBiasSlope'] / 256) / $factor;
-      if ($entry['tmnxDDMExtCalTxLaserBiasOffset'] != 0)
-      {
-        $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxLaserBiasOffset'] / $factor;
-      }
-    }
-    // Limits
-    $sensor_options['limit_high']      = $entry['tmnxDDMTxBiasCurrentHiAlarm']    * $scale;
-    $sensor_options['limit_high_warn'] = $entry['tmnxDDMTxBiasCurrentHiWarning']  * $scale;
-    $sensor_options['limit_low']       = $entry['tmnxDDMTxBiasCurrentLowAlarm']   * $scale;
-    $sensor_options['limit_low_warn']  = $entry['tmnxDDMTxBiasCurrentLowWarning'] * $scale;
-    if ($sensor_options['sensor_addition'])
-    {
-      $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
-      $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
-    }
-
-    if ($value != 0)
-    {
-      discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-    }
-
-    // Tx Power
-    $descr     = $name . ' Tx Power';
-    $class     = 'power';
-    $oid_name  = 'tmnxDDMTxOutputPower';
-    $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.16.'.$index;
-    $value     = $entry[$oid_name];
-
-    $sensor_options = $options;
-    // Scale
-    //        "The value of tmnxDDMTxOutputPower indicates the current Output Power
-    //          of the SFF in one tenths of a microwatt (uW).
-    //
-    //          If the SFF is externally calibrated, the objects
-    //          tmnxDDMExtCalTxPowerSlope and tmnxDDMExtCalTxPowerOffset affect the
-    //          output power calculation.
-    //
-    //          For example (internally calibrated SFF):
-    //          Using the SNMP value of 790, and using units of tenths of microwatt,
-    //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
-    //                10 x log10(0.079) = -11.0 dBm"
-    $factor    = 10000000; // 10 * 1000 * 1000
-    $scale     = 1 / $factor;
-    if ($entry['tmnxDDMExternallyCalibrated'] == 'true')
-    {
-      $scale = ($entry['tmnxDDMExtCalTxPowerSlope'] / 256) / $factor;
-      if ($entry['tmnxDDMExtCalTxPowerOffset'] != 0)
-      {
-        $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxPowerOffset'] / $factor;
-      }
-    }
-    // Limits
-    $sensor_options['limit_high']      = $entry['tmnxDDMTxOutputPowerHiAlarm']    * $scale;
-    $sensor_options['limit_high_warn'] = $entry['tmnxDDMTxOutputPowerHiWarning']  * $scale;
-    $sensor_options['limit_low']       = $entry['tmnxDDMTxOutputPowerLowAlarm']   * $scale;
-    $sensor_options['limit_low_warn']  = $entry['tmnxDDMTxOutputPowerLowWarning'] * $scale;
-    if ($sensor_options['sensor_addition'])
-    {
-      $sensor_options['limit_high']      += $sensor_options['sensor_addition'];
-      $sensor_options['limit_high_warn'] += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low']       += $sensor_options['sensor_addition'];
-      $sensor_options['limit_low_warn']  += $sensor_options['sensor_addition'];
-    }
-
-    // if ($value != 0)
-    // {
-      discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-    //}
-
-    // Rx Power
-    $descr     = $name . ' Rx Power';
-    $class     = 'power';
-    $oid_name  = 'tmnxDDMRxOpticalPower';
-    $oid_num   = '.1.3.6.1.4.1.6527.3.1.2.2.4.31.1.21.'.$index;
-    $value     = $entry[$oid_name];
-
-    $sensor_options = $options;
-    // Scale
-    //        "The value of tmnxDDMRxOpticalPower indicates the current Received
-    //          Optical Power of the SFF in one tenths of a microwatt (uW).
-    //
-    //          If the SFF is externally calibrated, the objects
-    //          tmnxDDMExtCalRxPower4, tmnxDDMExtCalRxPower3, tmnxDDMExtCalRxPower2,
-    //          tmnxDDMExtCalRxPower1 and tmnxDDMExtCalRxPower0 affect the output
-    //          power calculation.
-    //          Table 3.16 in the SFF Committee Standard's document SFF-8472 Rev 10.2.
-    //
-    //          For example (internally calibrated SFF):
-    //          Using the SNMP value of 790, and using units of tenths of microwatt,
-    //          790 becomes 79 microwatts or 0.079 milliwatts. Converting to dBm:
-    //                10 x log10(0.079) = -11.0 dBm"
-    $factor    = 10000000; // 10 * 1000 * 1000
-    $scale     = 1 / $factor;
-    if ($entry['tmnxDDMExternallyCalibrated'] == 'true')
-    {
-      //FIXME. Dear fucking god.. how this calculated.. how we can poll this????
-      //  tmnxDDMExtCalRxPower0 +
-      // (tmnxDDMExtCalRxPower1 * tmnxDDMRxOpticalPower) +
-      // (tmnxDDMExtCalRxPower2 * tmnxDDMRxOpticalPower^2) +
-      // (tmnxDDMExtCalRxPower3 * tmnxDDMRxOpticalPower^3) +
-      // (tmnxDDMExtCalRxPower4 * tmnxDDMRxOpticalPower^4)
-      // $scale = ($entry['tmnxDDMExtCalTxPowerSlope'] / 256) / $factor;
-      // if ($entry['tmnxDDMExtCalTxPowerOffset'] != 0)
-      // {
-      //   $sensor_options['sensor_addition'] = $entry['tmnxDDMExtCalTxPowerOffset'] / $factor;
-      // }
-    }
-    // Limits
-    $sensor_options['limit_high']      = $entry['tmnxDDMRxOpticalPowerHiAlarm']    * $scale;
-    $sensor_options['limit_high_warn'] = $entry['tmnxDDMRxOpticalPowerHiWarning']  * $scale;
-    $sensor_options['limit_low']       = $entry['tmnxDDMRxOpticalPowerLowAlarm']   * $scale;
-    $sensor_options['limit_low_warn']  = $entry['tmnxDDMRxOpticalPowerLowWarning'] * $scale;
-
-    // if ($value != 0)
-    // {
-      discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $sensor_options);
-    // }
-  }
 }
 
 // EOF

@@ -31,9 +31,9 @@ IMPORTS
     TLNamedItemOrEmpty, TNamedItem,
     TNamedItemOrEmpty, TmnxActionType,
     TmnxAdminState, TmnxEnabledDisabled,
-    TmnxEncapVal, TmnxOperState, TmnxPortID,
-    TmnxServId, TmnxSrrpPriorityStep,
-    TmnxTunnelGroupId,
+    TmnxEncapVal, TmnxNatIsaGrpId,
+    TmnxOperState, TmnxPortID, TmnxServId,
+    TmnxSrrpPriorityStep, TmnxTunnelGroupId,
     TmnxTunnelGroupIdOrZero, TmnxVRtrID
                                                          FROM TIMETRA-TC-MIB
     vRtrID, vRtrIfIndex
@@ -136,7 +136,7 @@ TmnxMcsClientApp                 ::= TEXTUAL-CONVENTION
         pimSnpgSap    (14),
         pimSnpgSdp    (15),
         diameterNode  (16),
-        reserved17    (17)
+        nat           (17)
     }
 
 TmnxMcsAccessProtection          ::= TEXTUAL-CONVENTION
@@ -281,6 +281,29 @@ TMcPeerIPsecTnlGrpMasterState    ::= TEXTUAL-CONVENTION
         eligible    (3),
         standby     (4),
         master      (5)
+    }
+
+TMcIPsecActivityState            ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The TMcIPsecActivityState indicates the result of the activity
+         election between the local and remote multichassis IPsec entity.
+
+         The activity state can be one of the following:
+
+         discovery   - no election during initial peer discovery interval
+         notEligible - no election, and not eligible to be active
+         eligible    - no election, but eligible to be active
+         standby     - elected standby
+         active      - elected active
+         unknown     - domain adjacency peer is unreachable (not applicable to tunnel-groups or domains)"
+    SYNTAX      INTEGER {
+        discovery   (1),
+        notEligible (2),
+        eligible    (3),
+        standby     (4),
+        active      (5),
+        unknown     (6)
     }
 
 TMcPeerIPsecTnlGrpProtectionStatus ::= TEXTUAL-CONVENTION
@@ -557,7 +580,8 @@ TmnxMcPeerSyncEntry              ::= SEQUENCE
     tmnxMcPeerSyncDiameterProxy      TruthValue,
     tmnxMcPeerSyncPimSnpgSap         TruthValue,
     tmnxMcPeerSyncPimSnpgSdp         TruthValue,
-    tmnxMcPeerSyncDiameterNode       TruthValue
+    tmnxMcPeerSyncDiameterNode       TruthValue,
+    tmnxMcPeerSyncNat                TruthValue
 }
 
 tmnxMcPeerSyncRowStatus          OBJECT-TYPE
@@ -973,6 +997,16 @@ tmnxMcPeerSyncDiameterNode       OBJECT-TYPE
          data is synchronized with the multi-chassis peer."
     DEFVAL      { false }
     ::= { tmnxMcPeerSyncEntry 36 }
+
+tmnxMcPeerSyncNat                OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMcPeerSyncNat specifies if NAT ISA group data is
+         synchronized with the multi-chassis peer."
+    DEFVAL      { false }
+    ::= { tmnxMcPeerSyncEntry 37 }
 
 tmnxMcPeerSyncPortTable          OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxMcPeerSyncPortEntry
@@ -1700,14 +1734,14 @@ tmnxSrrpOperVrrpPolicy2          OBJECT-TYPE
 
 tmnxSrrpOperFlags                OBJECT-TYPE
     SYNTAX      BITS {
-        subnetMismatch (0),
-        srrpIdMismatch (1),
-        sapMismatch    (2),
-        sapTagMismatch (3),
-        redIfMismatch  (4),
-        dualMaster     (5),
-        dupSubIfAddr   (6),
-        reserved7      (7)
+        subnetMismatch     (0),
+        srrpIdMismatch     (1),
+        sapMismatch        (2),
+        sapTagMismatch     (3),
+        redIfMismatch      (4),
+        dualMaster         (5),
+        dupSubIfAddr       (6),
+        privRetailMismatch (7)
     }
     MAX-ACCESS  read-only
     STATUS      current
@@ -1734,7 +1768,8 @@ tmnxSrrpOperFlags                OBJECT-TYPE
 
          dupSubIfAddr(6)        The IP address for a local subscriber interface
                                 conflicts with the IP address for a remote
-                                subscriber interface."
+                                subscriber interface.
+         privRetailMismatch(7): the peer has a different private retail service configuration."
     ::= { tmnxSrrpOperEntry 17 }
 
 tmnxSrrpOperMasterDownInterval   OBJECT-TYPE
@@ -5729,6 +5764,90 @@ tSrrpAssoBfdIntfSvcName          OBJECT-TYPE
     DEFVAL      { ''H }
     ::= { tSrrpAssoBfdIntfSvcEntry 11 }
 
+tmnxMcRedNatGrpTableLastChanged  OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxMcRedNatGrpTableLastChanged indicates the
+         value of sysUpTime at the time of the last modification of an entry in
+         the tmnxMcRedNatGrpTable."
+    ::= { tmnxMcRedundancyObjs 63 }
+
+tmnxMcRedNatObjs                 OBJECT IDENTIFIER ::= { tmnxMcRedundancyObjs 64 }
+
+tmnxMcRedNatGrpTable             OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxMcRedNatGrpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxMcRedNatGrpTable has an entry for each Integrated Service
+         Adaptor (ISA) NAT group that is being synchronized with a
+         multi-chassis peer.
+
+         Before creating an entry in this table, the entry in the
+         tmnxMcPeerSyncTable that corresponds to this peer, must be created."
+    ::= { tmnxMcRedNatObjs 1 }
+
+tmnxMcRedNatGrpEntry             OBJECT-TYPE
+    SYNTAX      TmnxMcRedNatGrpEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents an ISA NAT group to be synchronized. Entries
+         are created/deleted by the user."
+    INDEX       {
+        tmnxMcPeerIpType,
+        tmnxMcPeerIpAddr,
+        tmnxMcRedNatGrpId
+    }
+    ::= { tmnxMcRedNatGrpTable 1 }
+
+TmnxMcRedNatGrpEntry             ::= SEQUENCE
+{
+    tmnxMcRedNatGrpId                TmnxNatIsaGrpId,
+    tmnxMcRedNatGrpLastCh            TimeStamp,
+    tmnxMcRedNatGrpRowStatus         RowStatus,
+    tmnxMcRedNatGrpSyncTag           TNamedItemOrEmpty
+}
+
+tmnxMcRedNatGrpId                OBJECT-TYPE
+    SYNTAX      TmnxNatIsaGrpId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxMcRedNatGrpId specifies the identifier of
+         the NAT ISA group."
+    ::= { tmnxMcRedNatGrpEntry 1 }
+
+tmnxMcRedNatGrpLastCh            OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMcRedNatGrpLastCh indicates the sysUpTime at the time
+         of the most recent change to this row."
+    ::= { tmnxMcRedNatGrpEntry 2 }
+
+tmnxMcRedNatGrpRowStatus         OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMcRedNatGrpRowStatus specifies the row status of this
+         row."
+    ::= { tmnxMcRedNatGrpEntry 3 }
+
+tmnxMcRedNatGrpSyncTag           OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMcRedNatGrpSyncTag specifies a tag that uniquely
+         identifies this NAT group within the scope of the MCS peer."
+    DEFVAL      { ''H }
+    ::= { tmnxMcRedNatGrpEntry 11 }
+
 tmnxMcDiamNdTable                OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxMcDiamNdEntry
     MAX-ACCESS  not-accessible
@@ -8916,7 +9035,8 @@ tmnxMcRedV20v0Compliance         MODULE-COMPLIANCE
             tmnxMcRedBgpMHSiteGroup,
             tmnxSrrpPolicySvcNameGroup,
             tmnxMcWarmStandbyV19v0Group,
-            tmnxMcObsoletedObjsGroup
+            tmnxMcObsoletedObjsGroup,
+            tmnxMcNotificationV20v0Group
         }
     ::= { tmnxMcRedundancyCompliances 29 }
 
@@ -9913,7 +10033,12 @@ tmnxMcWarmStandbyV19v0Group      OBJECT-GROUP
 
 tmnxMcRedundancyV19v0Group       OBJECT-GROUP
     OBJECTS     {
+        tmnxMcRedNatGrpTableLastChanged,
+        tmnxMcRedNatGrpLastCh,
+        tmnxMcRedNatGrpRowStatus,
+        tmnxMcRedNatGrpSyncTag,
         tmnxMcPeerSyncDiameterNode,
+        tmnxMcPeerSyncNat,
         tmnxMcDiamNdRowStatus,
         tmnxMcDiamNdLastChanged,
         tmnxMcDiamNdSyncTag,
@@ -10081,6 +10206,16 @@ tmnxSrrpNotificationV10v0Group   NOTIFICATION-GROUP
         "The group of notifications supporting the extended SRRP feature on
          Nokia SROS series systems for 10.0 release."
     ::= { tmnxMcRedundancyNotifGroups 8 }
+
+tmnxMcNotificationV20v0Group     NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxSrrpPrivRetailMismatch
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications supporting the multi-chassis redundancy
+         feature added in release 20 of the Nokia SROS series systems."
+    ::= { tmnxMcRedundancyNotifGroups 9 }
 
 tmnxMcMobRedundancyCompliances   OBJECT IDENTIFIER ::= { tmnxMcRedundancyConformance 4 }
 
@@ -10776,6 +10911,27 @@ tmnxSrrpOperDownInvalidMacClear  NOTIFICATION-TYPE
 
          [RECOVERY] There is no recovery required for this notification."
     ::= { tmnxMcRedundancyNotifications 40 }
+
+tmnxSrrpPrivRetailMismatch       NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSrrpOperFlags,
+        tmnxMcNotifyServiceId,
+        tmnxMcNotifyTruthValue
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The notification tmnxSrrpPrivRetailMismatch is generated
+          with a value of 'true' for tmnxMcNotifyServiceId
+          when the list of private retail services received through SRRP-MCS synchronization
+          does not match the list that is locally configured on this system,
+          or with a value of 'false' when a matching list of private retail services is received subsequently.
+
+         [EFFECT] Downstream traffic received on the standby system for a subscriber associated
+          with a misconfigured retail service can not be forwarded.
+
+         [RECOVERY] Restore consistency in the configuration of the private
+         retail services on both systems."
+    ::= { tmnxMcRedundancyNotifications 41 }
 
 tmnxMcMobRedundancyNotifications OBJECT IDENTIFIER ::= { tmnxMcRedundancyNotifyPrefix 1 }
 

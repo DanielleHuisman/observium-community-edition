@@ -1,6 +1,6 @@
 TN-SAP-MIB DEFINITIONS ::= BEGIN
 
--- (c) Copyright 2019 Nokia Networks.  All rights reserved.
+-- (c) Copyright 2021 Nokia Networks.  All rights reserved.
 -- This software is the confidential and proprietary property of
 -- Nokia and may only be used in accordance with the terms of the
 -- license agreement provided with this software.
@@ -27,7 +27,7 @@ IMPORTS
     TPolicyStatementNameOrEmpty, TSapIngressPolicyID, TSapEgressPolicyID,
     TIngHsmdaPerPacketOffsetOvr,
     TEgrHsmdaPerPacketOffsetOvr,
-    ServObjDesc, TFilterID
+    ServObjDesc, TFilterID, TFdbTableSizeProfileID, SapLoopbackMode
                                                 FROM TN-TC-MIB
 
     tnSysSwitchId
@@ -46,7 +46,7 @@ IMPORTS
     tnSRMIBModules                              FROM TROPIC-GLOBAL-REG;
 
 tnSvcSapMIBModule   MODULE-IDENTITY
-    LAST-UPDATED    "201707070000Z"
+    LAST-UPDATED    "202011130000Z"
     ORGANIZATION    "Nokia"
     CONTACT-INFO
         "Nokia 7x50 Support
@@ -54,10 +54,6 @@ tnSvcSapMIBModule   MODULE-IDENTITY
     DESCRIPTION
         "This  document  is the SNMP MIB module to manage and provision
         the various services of the Nokia 7x50 SR system.
-
-        Copyright  2003-2011 Nokia. All rights reserved. Reproduction
-        of  this  document  is  authorized  on  the  condition that the
-        foregoing copyright notice is included.
 
         This   SNMP   MIB  module  (Specification)  embodies  Nokia's
         proprietary  intellectual  property.  Nokia retains all title
@@ -76,6 +72,34 @@ tnSvcSapMIBModule   MODULE-IDENTITY
 --
 --  Revision History
 --
+
+    REVISION        "202011130000Z"
+    DESCRIPTION     "Added the following in tnSapEthernetInfoTable:
+                     tnSapEthernetLoopbackMode
+                     tnSapEthernetLoopbackMacSwapStaticMac."
+
+    REVISION        "202011060000Z"
+    DESCRIPTION     "Added the following to tnSapOperFlags:
+                     bpduGuardBlocked(41)."
+
+    REVISION        "202009250000Z"
+    DESCRIPTION     "Added the following to tnSapOperFlags:
+                     portBouncing(33)
+                     to
+                     rstpBlock(40)         -- indicate RSTP port operatioal down."
+
+    REVISION        "202008140000Z"
+    DESCRIPTION     "Marked the following as deprecated:
+                     tnSapTlsFdbTableSizeProfId."
+
+    REVISION        "201909130000Z"
+    DESCRIPTION     "Added the following to tnSapBaseInfoTable:
+                     tnSapAlmProfName."
+
+    REVISION        "201908160000Z"
+    DESCRIPTION     "Added the following to tnSapTlsInfoTable:
+                     tnSapTlsFdbTableSizeProfId."
+
     REVISION        "201707070000Z"
     DESCRIPTION     "Added the following to tnSapSubType:
                      etree-root (5)
@@ -202,7 +226,8 @@ TnSapBaseInfoEntry ::=
         tnSapEgressHsmdaPacketOffOverride TEgrHsmdaPerPacketOffsetOvr,
         tnSapCallingStationId             DisplayString,
         tnSapIsaAaApplicationProfile      ServObjName,
-        tnSapEthRingIndex                 Unsigned32
+        tnSapEthRingIndex                 Unsigned32,
+        tnSapAlmProfName                  OCTET STRING
     }
 
 tnSapPortId OBJECT-TYPE
@@ -552,8 +577,17 @@ tnSapOperFlags OBJECT-TYPE
                                                  -- blocked.
                       oamTunnelMepFault(31),     -- indicates eth-cfm Tunnel
                                                  -- MEP fault detected.
-                      operGrpDown(32)            -- indicates operational-group
+                      operGrpDown(32),           -- indicates operational-group
                                                  -- is down
+                      portBouncing(33),
+                      sapEgressHQosMgmtMismatch(34),
+                      evpnP2mpConflict(35),
+                      l2tpv3TunnelDown(36),
+                      labelStackLimitExceeded(37),
+                      sapIngQGrpRedirMismatch(38),
+                      sapEgrQGrpRedirMismatch(39),
+                      rstpBlocked(40),           -- indicate RSTP port operatioal down
+                      bpduGuardBlocked(41)
                     }
     MAX-ACCESS      read-only
     STATUS          current
@@ -919,6 +953,13 @@ tnSapEthRingIndex  OBJECT-TYPE
     DEFVAL           { 0 }
     ::= { tnSapBaseInfoEntry 52 }
 
+tnSapAlmProfName OBJECT-TYPE
+    SYNTAX         OCTET STRING (SIZE(1..40))
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "."
+    ::= { tnSapBaseInfoEntry 53 }
+
 -- -------------------------------------
 -- TLS SAP Table
 -- -------------------------------------
@@ -1017,7 +1058,8 @@ SapTlsInfoEntry ::=
         tnSapTlsInTcBitBpdus              Counter32,
         tnSapTlsOutTcBitBpdus             Counter32,
         tnSapTlsShcvRetryTimeout          Unsigned32,
-        tnSapTlsShcvRetryCount            Unsigned32
+        tnSapTlsShcvRetryCount            Unsigned32,
+        tnSapTlsFdbTableSizeProfId        TFdbTableSizeProfileID  -- deprecated
     }
 
 tnSapTlsStpAdminStatus OBJECT-TYPE
@@ -1463,7 +1505,7 @@ tnSapTlsArpReplyAgent OBJECT-TYPE
                               subscriber identification.
                      enabledWithSubscrIdent: the ARP reply function is enabled
                                              with subscriber identification."
-    DEFVAL { disabled }
+    DEFVAL          { disabled }
     ::= { tnSapTlsInfoEntry 39 }
 
 tnSapTlsStpException OBJECT-TYPE
@@ -1480,15 +1522,15 @@ tnSapTlsStpException OBJECT-TYPE
     ::= { tnSapTlsInfoEntry 40 }
 
 tnSapTlsAuthenticationPolicy OBJECT-TYPE
-    SYNTAX      TPolicyStatementNameOrEmpty
-    MAX-ACCESS  read-write
-    STATUS      current
-    DESCRIPTION  "The value of the object tnSapTlsAuthenticationPolicy specifies
-                  which subscriber authentication policy  must  be applied when
-                  a DHCP msg is received on the interface.  The  authentication
-                  policies  must be defined  in  tmnxSubAuthPlcyTable. The policy
-                  will only be applied when tnSapTlsDhcpSnoop is enabled."
-    DEFVAL { ''H }
+    SYNTAX          TPolicyStatementNameOrEmpty
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object tnSapTlsAuthenticationPolicy specifies
+                     which subscriber authentication policy  must  be applied when
+                     a DHCP msg is received on the interface.  The  authentication
+                     policies  must be defined  in  tmnxSubAuthPlcyTable. The policy
+                     will only be applied when tnSapTlsDhcpSnoop is enabled."
+    DEFVAL          { ''H }
     ::= { tnSapTlsInfoEntry 41 }
 
 tnSapTlsL2ptTermination OBJECT-TYPE
@@ -1969,6 +2011,17 @@ tnSapTlsShcvRetryCount OBJECT-TYPE
                      failure."
     DEFVAL          { 2 }
     ::= { tnSapTlsInfoEntry 82 }
+
+tnSapTlsFdbTableSizeProfId OBJECT-TYPE
+    SYNTAX          TFdbTableSizeProfileID
+    MAX-ACCESS      read-write
+    STATUS          deprecated
+    DESCRIPTION     "The value of the object tnSapTlsFdbTableSizeProfId specifies
+                     the row index in the tnPacketSwitchFdbTableSizeProfileTable
+                     corresponding to this Fdb Table Size Profile, or one if no
+                     profile is specified."
+    DEFVAL          { 1 }
+    ::= { tnSapTlsInfoEntry 83 }
 
 -- ---------------------------------------------------------------------
 -- ATM SAP Table
@@ -7156,9 +7209,11 @@ tnSapEthernetInfoEntry OBJECT-TYPE
 
 SapEthernetInfoEntry ::=
     SEQUENCE {
-        tnSapEthernetLLFAdminStatus     ServiceAdminStatus,
-        tnSapEthernetLLFOperStatus      INTEGER,
-        tnSapEthernetLLFId              Unsigned32
+        tnSapEthernetLLFAdminStatus             ServiceAdminStatus,
+        tnSapEthernetLLFOperStatus              INTEGER,
+        tnSapEthernetLLFId                      Unsigned32,
+        tnSapEthernetLoopbackMode               SapLoopbackMode,
+        tnSapEthernetLoopbackMacSwapStaticMac   TruthValue
     }
 
 tnSapEthernetLLFAdminStatus OBJECT-TYPE
@@ -7210,6 +7265,30 @@ tnSapEthernetLLFId OBJECT-TYPE
                     ignored in EPIPE"
     DEFVAL          { 0 }
     ::= { tnSapEthernetInfoEntry 3 }
+
+tnSapEthernetLoopbackMode OBJECT-TYPE
+    SYNTAX          SapLoopbackMode
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     "tnSapEthernetLoopbackMode specifies the loopback mode of a sap.
+                    When mode 'terminal' is set, SAP terminal loopback is enabled
+                      with MAC swap.
+                    When mode 'facility' is set, SAP facility loopback is enabled.
+                      No MAC swap is performed."
+    DEFVAL          { disabled }
+    ::= { tnSapEthernetInfoEntry 4 }
+
+tnSapEthernetLoopbackMacSwapStaticMac OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     "tnSapEthernetLoopbackMacSwapStaticMac indicates whether or
+                     not a unicast MAC is used in MAC swap when SAP terminal
+                     loopback is enabled.  tnCardSapLoopbackMacAddr or
+                     tnPacketSwitchSapLoopbackMacAddr need to be provisioned
+                     before this attribute can be set to true."
+    DEFVAL          { false }
+    ::= { tnSapEthernetInfoEntry 5 }
 
 -- --------------------------------------------------------
 -- tnMtnSapPlcyTable

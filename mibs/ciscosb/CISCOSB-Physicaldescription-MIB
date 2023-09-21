@@ -2,31 +2,6 @@ CISCOSB-Physicaldescription-MIB DEFINITIONS ::= BEGIN
 
 -- Version:              7.46
 -- Date:                 15-Jan-2007
---
--- 30-Jan-2004 Add rlPhdUnitGenParamTable
--- 30-Jan-2004 Add rlPhdUnitEnvParamTable
--- 24-Feb-2004 Add rlPhdStackOrderTopUnit
--- 24-Feb-2004 Add rlPhdStackOrderBottomUnit
--- 24-Feb-2004 Add rlPhdStackOrderPermutation
--- 21-Apr-2005 Add rlPhdPortsTable switch description between:
---                  rlPhdPortsModuleNumber && rlPhdPortsStackUnit due to EWS need
--- 27-Apr-2005 Add rlStackLinkChange trap.
--- 16-May-2005 Add rlPhdNumberOfPoeUnits
--- 02-Jun-2005 Add field to rlPhDUnitEnvParamTable: rlPhdUnitEnvParamUpTime
--- 25-Jul-2005 Add rlPhdPhyLedTimeout and rlPhdPhyLedStackUnit
--- 03-Aug-2005 Remove boundary for unit number field, checked by box
---                    this is done coz different products use different stack size
--- 05-Sep-2005 Add rlCascadeTable
--- 31-Oct-2005 Add rlCascadeAfterResetTable
--- 14-Nov-2005 Change rlPhdUnitGenParamSerialNum to read-write
--- 16-May-2006 Add field rlCascadeUnitId to rlCascadeEntry
--- 14-Jan-2007 rlPhdModuleType was moved to a separated text file
--- 15-Jan-2007 Devided file appolo.txt to a few files
---             Renamed file appolo.txt to ralan-mib.mib
--- 23-Jul-2012 IdanS: Add rlPhdUnitGenParamRegistrationDone and rlPhdUnitGenParamRegistrationSuppressed to RlPhdUnitGenParamEntry
--- 09-Oct-2012 yahal: Add rlPhdUnitEnvParamMonitorAutoRecoveryEnable & rlPhdUnitEnvParamMonitorTemperatureStatus & rlPhdUnitEnvParamMonitorTemperatureStatus
--- 08-Jan-2015 YoramSu: Add rlPhdUnitEnvParamTempSensorWarningThresholdValue and rlPhdUnitEnvParamTempSensorCriticalThresholdValue to rlPhdUnitEnvParamEntry
--- 25-Aug-2016 YoramSu: Add rlPhdPhyLedTimeRemaining scalar
 
 IMPORTS
     OBJECT-TYPE, MODULE-IDENTITY, TimeTicks,
@@ -35,9 +10,10 @@ IMPORTS
     JackType                                                FROM MAU-MIB
     switch001, rndNotifications                             FROM CISCOSB-MIB
     RlEnvMonState                                           FROM CISCOSB-HWENVIROMENT
-    EntitySensorStatus, EntitySensorValue                   FROM CISCOSB-SENSOR-MIB
+    EntitySensorStatus, EntitySensorValue                   FROM ENTITY-SENSOR-MIB
     InterfaceIndexOrZero,ifIndex,InterfaceIndex             FROM IF-MIB
-    rndErrorDesc, rndErrorSeverity                          FROM CISCOSB-DEVICEPARAMS-MIB;
+    rndErrorDesc, rndErrorSeverity                          FROM CISCOSB-DEVICEPARAMS-MIB
+    PortList                                  				FROM Q-BRIDGE-MIB;
 
 rlPhysicalDescription  MODULE-IDENTITY
                        LAST-UPDATED "200602120000Z"
@@ -418,7 +394,7 @@ rlPhdStackSofrwareVer OBJECT-TYPE
     ::= { rlPhdStackEntry 5 }
 
 rlPhdStackProductID OBJECT-TYPE
-    SYNTAX      DisplayString (SIZE (1..40))
+    SYNTAX      DisplayString (SIZE (1..128))
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -1138,7 +1114,10 @@ RlCascadeEntry ::= SEQUENCE {
     rlCascadeTrunkId                   INTEGER,
     rlCascadeUnitId                    INTEGER,
         rlCascadePortSpeed                        CascadePortSpeed,
-        rlCascadePortState                           CascadePortState
+        rlCascadePortState                           CascadePortState,
+	rlCascadePortRow				   INTEGER,
+	rlCascadePortColumn				   INTEGER,
+	rlCascadePortMediaType     		   INTEGER
 }
 
 rlCascadeNeighborIfIndex OBJECT-TYPE
@@ -1192,6 +1171,30 @@ rlCascadePortState OBJECT-TYPE
         "Port state according to cascade LAG state machine"
     ::= { rlCascadeEntry 6 }
 
+rlCascadePortRow OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The port row number"
+    ::= { rlCascadeEntry 7 }
+	
+rlCascadePortColumn OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The port column number"
+    ::= { rlCascadeEntry 8 }
+	
+rlCascadePortMediaType OBJECT-TYPE
+    SYNTAX      INTEGER {copper(1), optic-fiber(2), combo(3)}
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The media type of this port."
+    ::= { rlCascadeEntry 9 }	
+	
 -- rlCascadeAdminTable --
 
 rlCascadeAdminTable OBJECT-TYPE
@@ -1214,7 +1217,8 @@ rlCascadeAdminEntry OBJECT-TYPE
 RlCascadeAdminEntry ::= SEQUENCE {
     rlCascadeAdminUnitId                INTEGER,
     rlCascadeAdminIndexList             OCTET STRING,
-    rlCascadeAdminSpeed                 CascadePortSpeed
+    rlCascadeAdminSpeed                 CascadePortSpeed,
+	rlCascadeSupportedPortList			PortList
 }
 
 rlCascadeAdminUnitId OBJECT-TYPE
@@ -1242,6 +1246,14 @@ rlCascadeAdminSpeed OBJECT-TYPE
     DESCRIPTION
         "Cascade port speed"
     ::= { rlCascadeAdminEntry  3 }
+	
+rlCascadeSupportedPortList OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates which ports can be configured as stack ports."
+    ::= { rlCascadeAdminEntry 4 }	
 
 -- Stack MIB Trap Definitions
 
@@ -1309,7 +1321,8 @@ StackPortType  ::= INTEGER {
    port-type-100M    (0),
    port-type-1G      (1),
    port-type-5G      (2),
-   port-type-10G     (3)
+   port-type-10G     (3),
+   port-type-25G     (4)
 }
 
 ConnectionType ::= INTEGER {
@@ -1449,5 +1462,19 @@ rlPhdPhyLedPattern OBJECT-TYPE
     DESCRIPTION
         "This scalar mib holds the pattern configuration required for the stack light command."
     ::= { rlPhysicalDescription 28 }
+
+-- Reset button status --
+rlPhdResetButtonStatus OBJECT-TYPE
+    SYNTAX INTEGER {
+        enabled(0),
+        disabled(1)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This scalar mib holds the Reset button status configuration."
+    DEFVAL { enabled }
+    ::= { rlPhysicalDescription 29 }
+
 
 END

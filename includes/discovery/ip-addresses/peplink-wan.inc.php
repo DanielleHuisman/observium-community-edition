@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -36,30 +36,30 @@
 $ip_version = 'ipv4';
 if (!safe_count($ip_data[$ip_version])) {
 
-  $oids = snmpwalk_cache_twopart_oid($device, 'wanNetworkIpTable', [], 'PEPLINK-WAN');
-  if (snmp_status()) {
-    $oids_int = snmpwalk_cache_oid($device, 'wanName', [], 'PEPLINK-WAN');
+    $oids = snmpwalk_cache_twopart_oid($device, 'wanNetworkIpTable', [], 'PEPLINK-WAN');
+    if (snmp_status()) {
+        $oids_int = snmpwalk_cache_oid($device, 'wanName', [], 'PEPLINK-WAN');
 
-    foreach ($oids as $wanid => $wan) {
-      $ifIndex = 0;
-      if (isset($oids_int[$wanid]) &&
-          $port_id = get_port_id_by_ifDescr($device['device_id'], $oids_int[$wanid]['wanName'])) {
-        $port = get_port_by_id_cache($port_id);
-        $ifIndex = $port['ifIndex'];
-      }
+        foreach ($oids as $wanid => $wan) {
+            $ifIndex = 0;
+            if (isset($oids_int[$wanid]) &&
+                $port_id = get_port_id_by_ifDescr($device['device_id'], $oids_int[$wanid]['wanName'])) {
+                $port    = get_port_by_id_cache($port_id);
+                $ifIndex = $port['ifIndex'];
+            }
 
-      foreach ($wan as $entry) {
-        $data = [
-          'ifIndex' => $ifIndex,
-          'ip'      => $entry['wanNetworkIpAddress'],
-          'mask'    => $entry['wanNetworkSubnetMask'],
-          //'type'    => $entry[''],
-          'origin'  => $entry['wanNetworkIpType']
-        ];
-        discover_add_ip_address($device, $mib, $data);
-      }
+            foreach ($wan as $entry) {
+                $data = [
+                  'ifIndex' => $ifIndex,
+                  'ip'      => $entry['wanNetworkIpAddress'],
+                  'mask'    => $entry['wanNetworkSubnetMask'],
+                  //'type'    => $entry[''],
+                  'origin'  => $entry['wanNetworkIpType']
+                ];
+                discover_add_ip_address($device, $mib, $data);
+            }
+        }
     }
-  }
 }
 
 // EOF

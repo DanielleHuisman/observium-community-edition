@@ -17,7 +17,10 @@ IMPORTS
                                                          FROM TIMETRA-GLOBAL-MIB
     TItemDescription, TNamedItem,
     TmnxAdminState, TmnxBfdOnLspSessFecType,
-    TmnxBfdSessionProtocols, TmnxOperState
+    TmnxBfdSessOperFlags,
+    TmnxBfdSessProtocolState,
+    TmnxBfdSessionProtocols,
+    TmnxBfdTermination, TmnxOperState
                                                          FROM TIMETRA-TC-MIB
     vRtrID, vRtrLspBfdMaxSessions,
     vRtrLspBfdSession
@@ -144,7 +147,7 @@ tmnxBfdOperTemplateRxInt         OBJECT-TYPE
     ::= { tmnxBfdOperTemplateEntry 4 }
 
 tmnxBfdOperTemplateMultiplier    OBJECT-TYPE
-    SYNTAX      Unsigned32 (3..20)
+    SYNTAX      Unsigned32 (1..20)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -425,8 +428,8 @@ TmnxBfdOnLspSessEntry            ::= SEQUENCE
     tmnxBfdOnLspSessPathId           Unsigned32,
     tmnxBfdOnLspSessTunnelId         Unsigned32,
     tmnxBfdOnLspSessOperState        TmnxOperState,
-    tmnxBfdOnLspSessState            INTEGER,
-    tmnxBfdOnLspSessOperFlags        BITS,
+    tmnxBfdOnLspSessState            TmnxBfdSessProtocolState,
+    tmnxBfdOnLspSessOperFlags        TmnxBfdSessOperFlags,
     tmnxBfdOnLspSessMesgRecv         Counter32,
     tmnxBfdOnLspSessMesgSent         Counter32,
     tmnxBfdOnLspSessLastDownTime     TimeTicks,
@@ -438,7 +441,7 @@ TmnxBfdOnLspSessEntry            ::= SEQUENCE
     tmnxBfdOnLspSessProtocols        TmnxBfdSessionProtocols,
     tmnxBfdOnLspSessTxInterval       Unsigned32,
     tmnxBfdOnLspSessRxInterval       Unsigned32,
-    tmnxBfdOnLspSessType             INTEGER,
+    tmnxBfdOnLspSessType             TmnxBfdTermination,
     tmnxBfdOnLspSessVerMismatch      Counter32,
     tmnxBfdOnLspSessTimeSinceLastRx  Unsigned32,
     tmnxBfdOnLspSessTimeSinceLastTx  Unsigned32
@@ -539,12 +542,7 @@ tmnxBfdOnLspSessOperState        OBJECT-TYPE
     ::= { tmnxBfdOnLspSessEntry 9 }
 
 tmnxBfdOnLspSessState            OBJECT-TYPE
-    SYNTAX      INTEGER {
-        adminDown (0),
-        down      (1),
-        init      (2),
-        up        (3)
-    }
+    SYNTAX      TmnxBfdSessProtocolState
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -553,17 +551,7 @@ tmnxBfdOnLspSessState            OBJECT-TYPE
     ::= { tmnxBfdOnLspSessEntry 10 }
 
 tmnxBfdOnLspSessOperFlags        OBJECT-TYPE
-    SYNTAX      BITS {
-        noProtocols   (0),
-        noHeartBeat   (1),
-        echoFailed    (2),
-        nbrSignalDown (3),
-        fwdPlaneReset (4),
-        pathDown      (5),
-        nbrAdminDown  (6),
-        adminClear    (7),
-        misConnDefect (8)
-    }
+    SYNTAX      TmnxBfdSessOperFlags
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -681,19 +669,12 @@ tmnxBfdOnLspSessRxInterval       OBJECT-TYPE
     ::= { tmnxBfdOnLspSessEntry 22 }
 
 tmnxBfdOnLspSessType             OBJECT-TYPE
-    SYNTAX      INTEGER {
-        iom   (1),
-        cpm   (2),
-        cpmNp (3)
-    }
+    SYNTAX      TmnxBfdTermination
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
         "The value of tmnxBfdOnLspSessType indicates the termination of the BFD
-         session, as follows:
-             'iom (1)'   - termination on the IOM card main processor,
-             'cpm (2)'   - termination on the CPM card main processor,
-             'cpmNp (3)' - termination on the CPM card Network Processor."
+         session."
     ::= { tmnxBfdOnLspSessEntry 23 }
 
 tmnxBfdOnLspSessVerMismatch      OBJECT-TYPE
@@ -733,6 +714,335 @@ tmnxBfdOnLspSessTimeSinceLastTx  OBJECT-TYPE
          to 'cpmNp(3)'.  Otherwise, zero is returned."
     ::= { tmnxBfdOnLspSessEntry 26 }
 
+tmnxBfdOnLspExtSessTable         OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxBfdOnLspExtSessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxBfdOnLspExtSessTable table contains per BFD session statistics
+         and operational settings for BFD on LSP. This table is used for
+         sessions needing an extra key"
+    ::= { tmnxBfdStatistics 2 }
+
+tmnxBfdOnLspExtSessEntry         OBJECT-TYPE
+    SYNTAX      TmnxBfdOnLspExtSessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents a BFD session. Entries are created
+         automatically by the system."
+    INDEX       {
+        tmnxBfdOnLspExtSessLinkType,
+        vRtrID,
+        tmnxBfdOnLspExtSessFecType,
+        tmnxBfdOnLspExtSessRemAddrType,
+        tmnxBfdOnLspExtSessRemAddr,
+        tmnxBfdOnLspExtSessLclAddrType,
+        tmnxBfdOnLspExtSessLclAddr,
+        tmnxBfdOnLspExtSessPathId,
+        tmnxBfdOnLspExtSessTunnelId,
+        tmnxBfdOnLspExtSessInfoId
+    }
+    ::= { tmnxBfdOnLspExtSessTable 1 }
+
+TmnxBfdOnLspExtSessEntry         ::= SEQUENCE
+{
+    tmnxBfdOnLspExtSessLinkType      INTEGER,
+    tmnxBfdOnLspExtSessFecType       TmnxBfdOnLspSessFecType,
+    tmnxBfdOnLspExtSessRemAddrType   InetAddressType,
+    tmnxBfdOnLspExtSessRemAddr       InetAddress,
+    tmnxBfdOnLspExtSessLclAddrType   InetAddressType,
+    tmnxBfdOnLspExtSessLclAddr       InetAddress,
+    tmnxBfdOnLspExtSessPathId        Unsigned32,
+    tmnxBfdOnLspExtSessTunnelId      Unsigned32,
+    tmnxBfdOnLspExtSessInfoId        Unsigned32,
+    tmnxBfdOnLspExtSessOperState     TmnxOperState,
+    tmnxBfdOnLspExtSessState         TmnxBfdSessProtocolState,
+    tmnxBfdOnLspExtSessOperFlags     TmnxBfdSessOperFlags,
+    tmnxBfdOnLspExtSessMesgRecv      Counter32,
+    tmnxBfdOnLspExtSessMesgSent      Counter32,
+    tmnxBfdOnLspExtSessLastDownTime  TimeTicks,
+    tmnxBfdOnLspExtSessLastUpTime    TimeTicks,
+    tmnxBfdOnLspExtSessUpCount       Counter32,
+    tmnxBfdOnLspExtSessDownCount     Counter32,
+    tmnxBfdOnLspExtSessLclDisc       Unsigned32,
+    tmnxBfdOnLspExtSessRemDisc       Unsigned32,
+    tmnxBfdOnLspExtSessProtocols     TmnxBfdSessionProtocols,
+    tmnxBfdOnLspExtSessTxInterval    Unsigned32,
+    tmnxBfdOnLspExtSessRxInterval    Unsigned32,
+    tmnxBfdOnLspExtSessType          TmnxBfdTermination,
+    tmnxBfdOnLspExtSessVerMismatch   Counter32,
+    tmnxBfdOnLspExtSessTimeSinceRx   Unsigned32,
+    tmnxBfdOnLspExtSessTimeSinceTx   Unsigned32
+}
+
+tmnxBfdOnLspExtSessLinkType      OBJECT-TYPE
+    SYNTAX      INTEGER {
+        sSrPolicy (12)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessLinkType indicates the link type of
+         the BFD session."
+    ::= { tmnxBfdOnLspExtSessEntry 1 }
+
+tmnxBfdOnLspExtSessFecType       OBJECT-TYPE
+    SYNTAX      TmnxBfdOnLspSessFecType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessFecType indicates the fec type of this
+         BFD session."
+    ::= { tmnxBfdOnLspExtSessEntry 2 }
+
+tmnxBfdOnLspExtSessRemAddrType   OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessRemAddrType indicates the address type
+         in tmnxBfdOnLspExtSessRemAddr."
+    ::= { tmnxBfdOnLspExtSessEntry 3 }
+
+tmnxBfdOnLspExtSessRemAddr       OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessRemAddr indicates the address of the
+         remote endpoint of this BFD session. Its type is specified by
+         tmnxBfdOnLspExtSessRemAddrType."
+    ::= { tmnxBfdOnLspExtSessEntry 4 }
+
+tmnxBfdOnLspExtSessLclAddrType   OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessLclAddrType indicates the address type
+         in tmnxBfdOnLspExtSessLclAddr."
+    ::= { tmnxBfdOnLspExtSessEntry 5 }
+
+tmnxBfdOnLspExtSessLclAddr       OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessLclAddr indicates the address of the
+         local endpoint of this BFD session. Its type is specified by
+         tmnxBfdOnLspExtSessLclAddrType."
+    ::= { tmnxBfdOnLspExtSessEntry 6 }
+
+tmnxBfdOnLspExtSessPathId        OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessPathId indicates the LSP id."
+    ::= { tmnxBfdOnLspExtSessEntry 7 }
+
+tmnxBfdOnLspExtSessTunnelId      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessTunnelId indicates the tunnel id."
+    ::= { tmnxBfdOnLspExtSessEntry 8 }
+
+tmnxBfdOnLspExtSessInfoId        OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessInfoId indicates the hop id when
+         tmnxBfdOnLspExtSessLinkType has the value sSrPolicy."
+    ::= { tmnxBfdOnLspExtSessEntry 9 }
+
+tmnxBfdOnLspExtSessOperState     OBJECT-TYPE
+    SYNTAX      TmnxOperState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessOperState indicates the operational
+         state of BFD on this interface."
+    ::= { tmnxBfdOnLspExtSessEntry 10 }
+
+tmnxBfdOnLspExtSessState         OBJECT-TYPE
+    SYNTAX      TmnxBfdSessProtocolState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessState indicates the state of the BFD
+         protocol on this interface."
+    ::= { tmnxBfdOnLspExtSessEntry 11 }
+
+tmnxBfdOnLspExtSessOperFlags     OBJECT-TYPE
+    SYNTAX      TmnxBfdSessOperFlags
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessOperFlags indicates the reasons why a
+         BFD session is not up."
+    ::= { tmnxBfdOnLspExtSessEntry 12 }
+
+tmnxBfdOnLspExtSessMesgRecv      OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessMesgRecv indicates the number of
+         messages received in this session.
+
+         This object is applicable if tmnxBfdOnLspExtSessType is 'iom(1)' or
+         'cpm(2)'.  Otherwise, zero is returned."
+    ::= { tmnxBfdOnLspExtSessEntry 13 }
+
+tmnxBfdOnLspExtSessMesgSent      OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessMesgSent indicates the number of
+         messages sent in this session.
+
+         This object is applicable if tmnxBfdOnLspExtSessType is 'iom(1)' or
+         'cpm(2)'.  Otherwise, zero is returned."
+    ::= { tmnxBfdOnLspExtSessEntry 14 }
+
+tmnxBfdOnLspExtSessLastDownTime  OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessLastDownTime indicates the time
+         elapsed since this session last went down."
+    ::= { tmnxBfdOnLspExtSessEntry 15 }
+
+tmnxBfdOnLspExtSessLastUpTime    OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessLastUpTime indicates the time elapsed
+         this session last came up."
+    ::= { tmnxBfdOnLspExtSessEntry 16 }
+
+tmnxBfdOnLspExtSessUpCount       OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessUpCount indicates the number of times
+         tmnxBfdOnLspExtSessOperState changed from 'outOfService' to
+         'inService'."
+    ::= { tmnxBfdOnLspExtSessEntry 17 }
+
+tmnxBfdOnLspExtSessDownCount     OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessDownCount indicates the number of
+         times tmnxBfdOnLspExtSessOperState changed from 'inService' to
+         'outOfService'."
+    ::= { tmnxBfdOnLspExtSessEntry 18 }
+
+tmnxBfdOnLspExtSessLclDisc       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessLclDisc indicates the unique local
+         discriminator for this session."
+    ::= { tmnxBfdOnLspExtSessEntry 19 }
+
+tmnxBfdOnLspExtSessRemDisc       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessRemDisc indicates the remote
+         discriminator for this session."
+    ::= { tmnxBfdOnLspExtSessEntry 20 }
+
+tmnxBfdOnLspExtSessProtocols     OBJECT-TYPE
+    SYNTAX      TmnxBfdSessionProtocols
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessProtocols indicates which protocols
+         are using this BFD session."
+    ::= { tmnxBfdOnLspExtSessEntry 21 }
+
+tmnxBfdOnLspExtSessTxInterval    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessTxInterval indicates the negotiated
+         transmit interval. This value is the minimum of the local node's
+         'vRtrIfBfdExtTransmitInterval' and the remote node's receive interval."
+    ::= { tmnxBfdOnLspExtSessEntry 22 }
+
+tmnxBfdOnLspExtSessRxInterval    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessRxInterval indicates the negotiated
+         receive interval. This value is the minimum of the local node's
+         'vRtrIfBfdExtReceiveInterval' and the remote node's transmit interval."
+    ::= { tmnxBfdOnLspExtSessEntry 23 }
+
+tmnxBfdOnLspExtSessType          OBJECT-TYPE
+    SYNTAX      TmnxBfdTermination
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessType indicates the termination of the
+         BFD session."
+    ::= { tmnxBfdOnLspExtSessEntry 24 }
+
+tmnxBfdOnLspExtSessVerMismatch   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessVerMismatch indicates the number of
+         version mismatch errors for the bfd session."
+    ::= { tmnxBfdOnLspExtSessEntry 25 }
+
+tmnxBfdOnLspExtSessTimeSinceRx   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessTimeSinceRx indicates the number of
+         milliseconds elapsed since the most recent message was received on the
+         BFD session.  If the session is down, zero is returned.
+
+         This object is applicable to sessions with tmnxBfdOnLspExtSessType equal
+         to 'cpmNp(3)'.  Otherwise, zero is returned."
+    ::= { tmnxBfdOnLspExtSessEntry 26 }
+
+tmnxBfdOnLspExtSessTimeSinceTx   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxBfdOnLspExtSessTimeSinceTx indicates the number of
+         milliseconds elapsed since the most recent message was transmitted on
+         the BFD session.  If the session is down, zero is returned.
+
+         This object is applicable to sessions with tmnxBfdOnLspExtSessType equal
+         to 'cpmNp(3)'.  Otherwise, zero is returned."
+    ::= { tmnxBfdOnLspExtSessEntry 27 }
+
 tmnxBfdNotifyObjects             OBJECT IDENTIFIER ::= { tmnxBfdObjects 4 }
 
 tmnxBfdOnLspSessChangedProtocol  OBJECT-TYPE
@@ -753,8 +1063,29 @@ tmnxBfdOnLspSessProtoChngdState  OBJECT-TYPE
     STATUS      current
     DESCRIPTION
         "The value of the object tmnxBfdOnLspSessProtoChngdState indicates the
-         changed state of tmnxBfdOnLspSessProtoChngdState in BFD."
+         changed state of tmnxBfdOnLspSessChangedProtocol in BFD."
     ::= { tmnxBfdNotifyObjects 2 }
+
+tmnxBfdOnLspExtSessChngdProtocol OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxBfdOnLspExtSessChngdProtocol indicates the
+         protocol that changed the state in BFD."
+    ::= { tmnxBfdNotifyObjects 3 }
+
+tmnxBfdOnLspExtSessProtoChngdSta OBJECT-TYPE
+    SYNTAX      INTEGER {
+        added   (0),
+        cleared (1)
+    }
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxBfdOnLspExtSessProtoChngdSta indicates the
+         changed state of tmnxBfdOnLspExtSessChngdProtocol in BFD."
+    ::= { tmnxBfdNotifyObjects 4 }
 
 tmnxBfdSeamlessBfdObjects        OBJECT IDENTIFIER ::= { tmnxBfdObjects 5 }
 
@@ -956,6 +1287,19 @@ tmnxBfdV19v0Compliance           MODULE-COMPLIANCE
         }
     ::= { tmnxBfdCompliances 6 }
 
+tmnxBfdV20v0Compliance           MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for management of additional BFD features
+         supported on Nokia SROS series systems, release 20.0."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxBfdV20v0Group,
+            tmnxBfdV20v0NotifyObjsGroup,
+            tmnxBfdV20v0NotificationGroup
+        }
+    ::= { tmnxBfdCompliances 7 }
+
 tmnxBfdGroups                    OBJECT IDENTIFIER ::= { tmnxBfdConformance 2 }
 
 tmnxBfdV11v0Group                OBJECT-GROUP
@@ -1059,6 +1403,58 @@ tmnxBfdV19v0Group                OBJECT-GROUP
         "The group of objects supporting management of BFD features on version
          19.0 of the Nokia SROS series systems."
     ::= { tmnxBfdGroups 7 }
+
+tmnxBfdV20v0Group                OBJECT-GROUP
+    OBJECTS     {
+        tmnxBfdOnLspExtSessOperState,
+        tmnxBfdOnLspExtSessState,
+        tmnxBfdOnLspExtSessOperFlags,
+        tmnxBfdOnLspExtSessMesgRecv,
+        tmnxBfdOnLspExtSessMesgSent,
+        tmnxBfdOnLspExtSessLastDownTime,
+        tmnxBfdOnLspExtSessLastUpTime,
+        tmnxBfdOnLspExtSessUpCount,
+        tmnxBfdOnLspExtSessDownCount,
+        tmnxBfdOnLspExtSessLclDisc,
+        tmnxBfdOnLspExtSessRemDisc,
+        tmnxBfdOnLspExtSessProtocols,
+        tmnxBfdOnLspExtSessTxInterval,
+        tmnxBfdOnLspExtSessRxInterval,
+        tmnxBfdOnLspExtSessType,
+        tmnxBfdOnLspExtSessVerMismatch,
+        tmnxBfdOnLspExtSessTimeSinceRx,
+        tmnxBfdOnLspExtSessTimeSinceTx
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting Bi-directional Forwarding Detection on
+         version 20.0 Nokia SROS series systems."
+    ::= { tmnxBfdGroups 8 }
+
+tmnxBfdV20v0NotifyObjsGroup      OBJECT-GROUP
+    OBJECTS     {
+        tmnxBfdOnLspExtSessChngdProtocol,
+        tmnxBfdOnLspExtSessProtoChngdSta
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notification objects supporting BFD notifications on
+         Nokia SROS series systems 20.0 release."
+    ::= { tmnxBfdGroups 9 }
+
+tmnxBfdV20v0NotificationGroup    NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxBfdOnLspExtSessDown,
+        tmnxBfdOnLspExtSessUp,
+        tmnxBfdOnLspExtSessDeleted,
+        tmnxBfdOnLspExtSessProtChange,
+        tmnxBfdOnLspExtSessNoCpmNpResrcs
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications reporting BFD on LSP notifications on the
+         SROS series systems 20.0 release."
+    ::= { tmnxBfdGroups 10 }
 
 tmnxBfdNotifyPrefix              OBJECT IDENTIFIER ::= { tmnxSRNotifyPrefix 85 }
 
@@ -1190,5 +1586,90 @@ tmnxBfdOnLspSessNoTailResources  NOTIFICATION-TYPE
          network configuration to reduce the number of active BFD on LSP
          session tail ends."
     ::= { tmnxBfdNotifications 6 }
+
+tmnxBfdOnLspExtSessDown          NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxBfdOnLspExtSessLclDisc,
+        tmnxBfdOnLspExtSessOperFlags
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxBfdOnLspExtSessDown notification is generated when a
+         BFD on LSP session goes down.
+
+         [EFFECT] The effect of this session going down is that it either takes
+         down any protocol that is riding over top of it or it notifies them
+         that the session has gone down.
+
+         [RECOVERY] The session will automatically attempt to re-establish on
+         its own."
+    ::= { tmnxBfdNotifications 7 }
+
+tmnxBfdOnLspExtSessUp            NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxBfdOnLspExtSessLclDisc
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxBfdOnLspExtSessUp notification is generated when a BFD
+         on LSP session goes up.
+
+         [EFFECT] The BFD session will be active.
+
+         [RECOVERY] There is no recovery required for this notification."
+    ::= { tmnxBfdNotifications 8 }
+
+tmnxBfdOnLspExtSessDeleted       NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxBfdOnLspExtSessLclDisc,
+        tmnxBfdOnLspExtSessOperFlags
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxBfdOnLspExtSessDeleted notification is generated when
+         a BFD on LSP session is deleted.
+
+         [EFFECT] The deletion of this session will either take down any
+         protocol that is riding over top of it or notifies them that the
+         session has been deleted.
+
+         [RECOVERY] There is no recovery required for this notification."
+    ::= { tmnxBfdNotifications 9 }
+
+tmnxBfdOnLspExtSessProtChange    NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxBfdOnLspExtSessLclDisc,
+        tmnxBfdOnLspExtSessProtocols,
+        tmnxBfdOnLspExtSessChngdProtocol,
+        tmnxBfdOnLspExtSessProtoChngdSta
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxBfdOnLspExtSessProtChange notification is generated
+         when there is a change in the list of protocols specified by
+         tmnxBfdOnLspExtSessProtocols using the BFD on LSP session.
+
+         [EFFECT] The list of protocols using this session are modified.
+
+         [RECOVERY] There is no recovery required for this notification."
+    ::= { tmnxBfdNotifications 10 }
+
+tmnxBfdOnLspExtSessNoCpmNpResrcs NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxBfdOnLspExtSessLclDisc
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxBfdOnLspExtSessNoCpmNpResrcs notification is generated
+         when a BFD on LSP session could not be established because the session
+         requires a cpmNp session termination resource (see
+         TIMETRA-VRTR-MIB::vRtrIfBfdExtType), and no cpmNp session termination
+         resources are available.
+
+         [EFFECT] The BFD session cannot be established until a cpmNp session
+         termination resource is available
+
+         [RECOVERY] There is no recovery required for this notification."
+    ::= { tmnxBfdNotifications 11 }
 
 END

@@ -75,7 +75,8 @@ PortList ::= TEXTUAL-CONVENTION
       issAclTrafficControl     OBJECT IDENTIFIER ::= { iss 15 }
       issLogTrap               OBJECT IDENTIFIER ::= { iss 16 }
       issHealthCheckGroup      OBJECT IDENTIFIER ::= { iss 17 }
-      issUDFilter             OBJECT IDENTIFIER ::= { iss 18 }
+      issUDFilter              OBJECT IDENTIFIER ::= { iss 18 }
+      ecnProfile               OBJECT IDENTIFIER ::= { iss 19 }
 -- ---------------------------------------------------------------- --
 
 -- System Group 
@@ -554,8 +555,6 @@ issSwitchBaseMacAddress OBJECT-TYPE
       
    DEFVAL  { '000102030405'h }
    ::= { issSystem 32 }
-
-
 
 -- OOB Interface Existence
 
@@ -1679,6 +1678,65 @@ issLogSizeThreshold OBJECT-TYPE
    DEFVAL { oob }
    ::= { issSystem 115 }
 
+-- Login Authentication Type
+
+   issLoginAuthenticationType OBJECT-TYPE
+   SYNTAX      INTEGER {
+               ASCII (1),
+               PAP (2)
+              }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+        "Configures the encrypted type by which the user login has to be authenticated
+        for managing the switch. Authentication is done in the remote side through a
+        TACACS sever.
+        The ASCII for only TACACS+ authentication."
+
+   DEFVAL  { PAP }
+   ::= { issSystem  116 }
+
+   issLoginAuthenticationServerGroup  OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE(0..31))
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+        "This object is used to specify the server group name when doing
+        authentication. If this value is empty, then all TACACS/RADIUS server
+        will be used."
+   DEFVAL { "" }
+   ::= { issSystem 118 }
+
+issMgmtInterfaceVlanId OBJECT-TYPE
+    SYNTAX      Integer32 (1..4094)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configure OOB as a untagged or tagged interface. 
+       
+        The default vlan 1 menas untagged traffic."
+
+    DEFVAL  { 1 }
+
+    ::= { issSystem 119 }
+
+-- Memory and CRU Information
+issMemFree OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This is the free memory size in kilo bytes of the switch"
+
+     ::= { issSystem 120 }
+
+issCRUTotalBufInUseCount OBJECT-TYPE
+     SYNTAX      Integer32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION "This is the in use count of CRU(packet) buffer"
+
+     ::= { issSystem 121 }
+
 ------ Config Control Group ------------------------------------
 
 issConfigCtrlTable OBJECT-TYPE 
@@ -1914,7 +1972,11 @@ issPortCtrlSpeed OBJECT-TYPE
                  tenGB       (4),
                  fortyGB     (5),
                  fiftysixGB  (6),
-                 twentyfivehundredMBPS  (7)
+                 twentyfivehundredMBPS  (7),
+                 twentyfiveGB           (8),
+                 fiftyGB                (9),
+                 hundredGB              (10),
+                 autoSpeed              (11)
               }
    MAX-ACCESS  read-write 
    STATUS      current 
@@ -4480,6 +4542,7 @@ issUDFilterEntry OBJECT-TYPE
 IssUDFilterEntry ::= 
    SEQUENCE { 
       issUDFilterNo    Integer32,
+      issUDFilterPriority Integer32, 
       issUDFilterPktType    INTEGER,
       issUDFilterDstMacAddr    MacAddress, 
       issUDFilterSrcMacAddr    MacAddress,          
@@ -4499,7 +4562,7 @@ IssUDFilterEntry ::=
   }
 
 issUDFilterNo OBJECT-TYPE 
-   SYNTAX      Integer32 (1..65535)
+   SYNTAX      Integer32 (1..50)
    MAX-ACCESS  not-accessible 
    STATUS      current
    DESCRIPTION 
@@ -4508,6 +4571,19 @@ issUDFilterNo OBJECT-TYPE
       met with issUDFilter objects in fsissext.mib."
    ::= { issUDFilterEntry 1 }
 
+issUDFilterPriority OBJECT-TYPE 
+   SYNTAX      Integer32 (1..255)
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "The priority of the UDF filter can be used to decide which filter rule
+       is applicable when  the packet matches with more than one filter rules.
+
+      Higher value of 'filter priority' implies a higher priority."
+
+   DEFVAL  { 1 }
+   ::= { issUDFilterEntry 2 }
+   
 issUDFilterPktType OBJECT-TYPE 
    SYNTAX      INTEGER {
                   mac (0),
@@ -4520,7 +4596,7 @@ issUDFilterPktType OBJECT-TYPE
    DESCRIPTION 
       "The packet header type to be filtered by User-Defined Filter."
    DEFVAL  { mac }
-   ::= { issUDFilterEntry 2 }
+   ::= { issUDFilterEntry 3 }
    
 issUDFilterDstMacAddr OBJECT-TYPE 
    SYNTAX      MacAddress
@@ -4531,7 +4607,7 @@ issUDFilterDstMacAddr OBJECT-TYPE
        Destination Mac Address will be zero which means dont care condition ie)
        any Dst Mac Address.
        This object is valid only if the 'issUDFilterPktType' is 'MAC'."
-   ::= { issUDFilterEntry 3 }
+   ::= { issUDFilterEntry 4 }
 
 issUDFilterSrcMacAddr OBJECT-TYPE 
    SYNTAX      MacAddress
@@ -4542,7 +4618,7 @@ issUDFilterSrcMacAddr OBJECT-TYPE
        Mac Address will be zero which means dont care condition ie) any Src Mac 
        address.
        This object is valid only if the 'issUDFilterPktType' is 'MAC'."
-   ::= { issUDFilterEntry 4 }
+   ::= { issUDFilterEntry 5 }
    
 issUDFilterProtocol OBJECT-TYPE 
    SYNTAX      Integer32 (1..255)
@@ -4555,7 +4631,7 @@ issUDFilterProtocol OBJECT-TYPE
       decide the action.
       This object is valid only if the 'issUDFilterPktType' is 'IP'."
    DEFVAL   { 255 }
-   ::= { issUDFilterEntry 5 }
+   ::= { issUDFilterEntry 6 }
 
 issUDFilterDstIpAddr OBJECT-TYPE 
    SYNTAX      IpAddress
@@ -4565,7 +4641,7 @@ issUDFilterDstIpAddr OBJECT-TYPE
       "Destination IP address to be matched with the packet.
       This object is valid only if the 'issUDFilterPktType' is 'IP', 'UDP' or 'TCP'."
    DEFVAL  { '00000000'h }
-   ::= { issUDFilterEntry 6 }
+   ::= { issUDFilterEntry 7 }
 
 issUDFilterSrcIpAddr OBJECT-TYPE 
    SYNTAX      IpAddress
@@ -4575,7 +4651,7 @@ issUDFilterSrcIpAddr OBJECT-TYPE
       "Source IP address to be matched with the packet.
       This object is valid only if the 'issUDFilterPktType' is 'IP', 'UDP' or 'TCP'."
    DEFVAL  { '00000000'h }
-   ::= { issUDFilterEntry 7 }
+   ::= { issUDFilterEntry 8 }
 
 issUDFilterDstIpAddrMask OBJECT-TYPE 
    SYNTAX      IpAddress
@@ -4585,7 +4661,7 @@ issUDFilterDstIpAddrMask OBJECT-TYPE
       "The IP subnet mask for Destination IP address.
       This object is valid only if the 'issUDFilterPktType' is 'IP', 'UDP' or 'TCP'."
    DEFVAL  { 'FFFFFFFF'h }
-   ::= { issUDFilterEntry 8 }
+   ::= { issUDFilterEntry 9 }
 
 issUDFilterSrcIpAddrMask OBJECT-TYPE 
    SYNTAX      IpAddress
@@ -4595,7 +4671,7 @@ issUDFilterSrcIpAddrMask OBJECT-TYPE
       "The IP subnet mask for Source IP address.
       This object is valid only if the 'issUDFilterPktType' is 'IP', 'UDP' or 'TCP'."
    DEFVAL  { 'FFFFFFFF'h }
-   ::= { issUDFilterEntry 9 }
+   ::= { issUDFilterEntry 10 }
 
 issUDFilterMinDstProtPort OBJECT-TYPE
    SYNTAX      Unsigned32
@@ -4606,7 +4682,7 @@ issUDFilterMinDstProtPort OBJECT-TYPE
        these ports are the TCP / UDP ports.
        This object is valid only if the 'issUDFilterPktType' is 'UDP' or 'TCP'."
    DEFVAL   { 1 }
-   ::= { issUDFilterEntry 10 }
+   ::= { issUDFilterEntry 11 }
 
 issUDFilterMaxDstProtPort OBJECT-TYPE
    SYNTAX      Unsigned32
@@ -4617,7 +4693,7 @@ issUDFilterMaxDstProtPort OBJECT-TYPE
        these ports are the TCP / UDP ports.
        This object is valid only if the 'issUDFilterPktType' is 'UDP' or 'TCP'."
    DEFVAL   { 65535 }
-   ::= { issUDFilterEntry 11 }
+   ::= { issUDFilterEntry 12 }
 
 issUDFilterMinSrcProtPort OBJECT-TYPE
    SYNTAX      Unsigned32
@@ -4628,7 +4704,7 @@ issUDFilterMinSrcProtPort OBJECT-TYPE
        these ports are the TCP / UDP ports.
        This object is valid only if the 'issUDFilterPktType' is 'UDP' or 'TCP'."
    DEFVAL   { 1 }
-   ::= { issUDFilterEntry 12 }
+   ::= { issUDFilterEntry 13 }
 
 issUDFilterMaxSrcProtPort OBJECT-TYPE
    SYNTAX      Unsigned32
@@ -4639,7 +4715,7 @@ issUDFilterMaxSrcProtPort OBJECT-TYPE
        these ports are the TCP / UDP ports.
        This object is valid only if the 'issUDFilterPktType' is 'UDP' or 'TCP'."
    DEFVAL   { 65535 }
-   ::= { issUDFilterEntry 13 }
+   ::= { issUDFilterEntry 14 }
 
 issUDFilterInPortList OBJECT-TYPE 
    SYNTAX      PortList
@@ -4651,7 +4727,7 @@ issUDFilterInPortList OBJECT-TYPE
       If the incoming port list is '0', the filter rule is applicable for all the 
       incoming ports.
       By default inport list is maintained as '0'."
-   ::= { issUDFilterEntry 14 }
+   ::= { issUDFilterEntry 15 }
 
 issUDFilterOutPortList OBJECT-TYPE 
    SYNTAX      PortList
@@ -4667,7 +4743,7 @@ issUDFilterOutPortList OBJECT-TYPE
         2. Out port is not applicable for DLF packet. 
       
       By default outport list is maintained as '0'."
-   ::= { issUDFilterEntry 15 }
+   ::= { issUDFilterEntry 16 }
 
 issUDFilterAction OBJECT-TYPE 
    SYNTAX      INTEGER {
@@ -4685,7 +4761,7 @@ issUDFilterAction OBJECT-TYPE
       based on further processing on the packet.
       If the action is 'drop', the packet will be discarded."
    DEFVAL  { allow } 
-   ::= { issUDFilterEntry 16 }
+   ::= { issUDFilterEntry 17 }
 
 issUDFilterStatus OBJECT-TYPE 
    SYNTAX      RowStatus
@@ -4698,9 +4774,98 @@ issUDFilterStatus OBJECT-TYPE
         is SET 'active'. The entry in this table is not used when this 
         object is SET 'notInService'. An entry created in this table is
         be deleted when this object is SET 'destroy'."
-   ::= { issUDFilterEntry 17 }
+   ::= { issUDFilterEntry 18 }
 
--- ------------------------------------------------------------------ 
+-- ECN Profile table --------------------------------------------------
 
+ecnProfileTable  OBJECT-TYPE 
+   SYNTAX      SEQUENCE OF EcnProfileEntry
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+       " A profile table to configure Explicit Congestion Notification (ECN) in the system."
+   ::= { ecnProfile 1 }
+
+ecnProfileEntry OBJECT-TYPE 
+   SYNTAX      EcnProfileEntry 
+   MAX-ACCESS  not-accessible 
+   STATUS      current 
+   DESCRIPTION 
+       " Each entry in this table is a Explicit Congestion Notification (ECN) profile .
+         Index to the table is profile name."
+   INDEX { ecnProfileName }
+   ::= { ecnProfileTable 1 }
+   
+EcnProfileEntry  ::= 
+   SEQUENCE { 
+      ecnProfileName          DisplayString, 
+      ecnProfileMinThreshold  Unsigned32,
+      ecnProfileMaxThreshold  Unsigned32,
+      ecnProfileProbability   Unsigned32,   
+      ecnProfilePortList      PortList,  
+      ecnProfileRowStatus     RowStatus
+   }
+
+ecnProfileName OBJECT-TYPE 
+   SYNTAX      DisplayString (SIZE(1..32))
+   MAX-ACCESS  not-accessible
+   STATUS      current 
+   DESCRIPTION 
+      "ECN Profile Name"
+   
+   ::= { ecnProfileEntry 1 }
+
+ecnProfileMinThreshold OBJECT-TYPE 
+   SYNTAX      Unsigned32 (1..13631072)
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "Packets are treated normally when average queue size below minimum threshold (bytes)."
+    
+   DEFVAL  { 0 }
+
+   ::= { ecnProfileEntry 2 }
+   
+ecnProfileMaxThreshold OBJECT-TYPE 
+   SYNTAX      Unsigned32 (1..13631280)
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      "Packets are marked congestion experienced when average queue size above maximum threshold (bytes)."
+
+   DEFVAL  { 208 }
+
+   ::= { ecnProfileEntry 3 }
+   
+ecnProfileProbability OBJECT-TYPE 
+   SYNTAX      Unsigned32 (0..100)
+   MAX-ACCESS  read-write 
+   STATUS      current 
+   DESCRIPTION 
+      " The proportion of ECN marking varies linear with average queue size 
+        when average queue size between minimum and maximum thresholds."
+
+   DEFVAL  { 20800 }
+  
+   ::= { ecnProfileEntry 4 }
+
+ecnProfilePortList OBJECT-TYPE 
+   SYNTAX      PortList
+   MAX-ACCESS  read-write 
+   STATUS      current
+   DESCRIPTION 
+      "Specifies the inteface lists to be applied ECN profile.
+      e.g. 8040... : Port 1 and 6 ..."
+   
+   ::= { ecnProfileEntry 5 }
+   
+ecnProfileRowStatus OBJECT-TYPE
+   SYNTAX         RowStatus
+   MAX-ACCESS     read-create
+   STATUS         current
+   DESCRIPTION
+       "This object is used to create and delete rows in the ecnProfileTable."
+   
+   ::= { ecnProfileEntry 6 }
 
 END

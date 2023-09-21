@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -43,58 +43,54 @@ CISCO-POWER-ETHERNET-EXT-MIB::cpeExtPsePortPwrManAlloc.1.2 = Gauge32: 0 milliwat
 CISCO-POWER-ETHERNET-EXT-MIB::cpeExtPsePortPwrManAlloc.1.3 = Gauge32: 0 milliwatts
 */
 
-$oids = snmpwalk_cache_oid($device, 'cpeExtPsePortEntry', array(), $mib);
+$oids = snmpwalk_cache_oid($device, 'cpeExtPsePortEntry', [], $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $index => $entry)
-{
-  if ($entry['cpeExtPsePortEnable'] == 'disable' ||
-      ($entry['cpeExtPsePortPwrAllocated']   == 0 &&
-       $entry['cpeExtPsePortPwrAvailable']   == 0 &&
-       $entry['cpeExtPsePortPwrConsumption'] == 0 &&
-       $entry['cpeExtPsePortMaxPwrDrawn']    == 0))
-  {
-    // Skip PoE disabled or Down ports
-    continue;
-  }
+foreach ($oids as $index => $entry) {
+    if ($entry['cpeExtPsePortEnable'] == 'disable' ||
+        ($entry['cpeExtPsePortPwrAllocated'] == 0 &&
+         $entry['cpeExtPsePortPwrAvailable'] == 0 &&
+         $entry['cpeExtPsePortPwrConsumption'] == 0 &&
+         $entry['cpeExtPsePortMaxPwrDrawn'] == 0)) {
+        // Skip PoE disabled or Down ports
+        continue;
+    }
 
-  // Detect PoE Group and port
-  list($pethPsePortGroupIndex, $cpeExtPsePortIndex) = explode('.', $index);
+    // Detect PoE Group and port
+    [$pethPsePortGroupIndex, $cpeExtPsePortIndex] = explode('.', $index);
 
-  $group = $pethPsePortGroupIndex > 1 ? " Group $pethPsePortGroupIndex" : ''; // Add group name if group number greater than 1
+    $group = $pethPsePortGroupIndex > 1 ? " Group $pethPsePortGroupIndex" : ''; // Add group name if group number greater than 1
 
-  $options = array('entPhysicalIndex' => $entry['cpeExtPsePortEntPhyIndex']);
-  $port    = get_port_by_ent_index($device, $entry['cpeExtPsePortEntPhyIndex']);
-  //print_vars($port);
+    $options = ['entPhysicalIndex' => $entry['cpeExtPsePortEntPhyIndex']];
+    $port    = get_port_by_ent_index($device, $entry['cpeExtPsePortEntPhyIndex']);
+    //print_vars($port);
 
-  if (is_array($port))
-  {
-    $entry['ifDescr']            = $port['ifDescr'];
-    $options['measured_class']   = 'port';
-    $options['measured_entity']  = $port['port_id'];
-    $options['entPhysicalIndex_measured'] = $port['ifIndex'];
-  } else {
-    $entry['ifDescr'] = "Port $cpeExtPsePortIndex";
-  }
+    if (is_array($port)) {
+        $entry['ifDescr']                     = $port['ifDescr'];
+        $options['measured_class']            = 'port';
+        $options['measured_entity']           = $port['port_id'];
+        $options['entPhysicalIndex_measured'] = $port['ifIndex'];
+    } else {
+        $entry['ifDescr'] = "Port $cpeExtPsePortIndex";
+    }
 
-  $descr    = $entry['ifDescr'] . ' PoE Power' . $group;
-  $scale    = 0.001;
+    $descr = $entry['ifDescr'] . ' PoE Power' . $group;
+    $scale = 0.001;
 
-  $oid_name = 'cpeExtPsePortPwrConsumption';
-  $oid_num  = '.1.3.6.1.4.1.9.9.402.1.2.1.9.'.$index;
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
+    $oid_name = 'cpeExtPsePortPwrConsumption';
+    $oid_num  = '.1.3.6.1.4.1.9.9.402.1.2.1.9.' . $index;
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
 
-  // Limits
-  $options['limit_high'] = max($entry['cpeExtPsePortPwrAllocated'], $entry['cpeExtPsePortPwrAvailable']) * $scale;
-  if ($options['limit_high'] > 0)
-  {
-    $options['limit_high_warn'] = $options['limit_high'] - ($options['limit_high'] / 10);
-  } else {
-    unset($options['limit_high']);
-  }
+    // Limits
+    $options['limit_high'] = max($entry['cpeExtPsePortPwrAllocated'], $entry['cpeExtPsePortPwrAvailable']) * $scale;
+    if ($options['limit_high'] > 0) {
+        $options['limit_high_warn'] = $options['limit_high'] - ($options['limit_high'] / 10);
+    } else {
+        unset($options['limit_high']);
+    }
 
-  discover_sensor_ng($device,'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+    discover_sensor_ng($device, 'power', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 }
 
 // EOF

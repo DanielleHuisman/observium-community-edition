@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -19,7 +19,7 @@
 
 //$index        = $sla['sla_index'];
 // Index gets from auth.inc.php
-$rrd_filename_escape = get_rrd_path($device, 'sla_jitter-'.$index.'.rrd');
+$rrd_filename_escape = get_rrd_path($device, 'sla_jitter-' . $index . '.rrd');
 
 //$unit_text    = 'SLA '.$index;
 //if ($sla['sla_tag'])
@@ -34,27 +34,26 @@ $rrd_filename_escape = get_rrd_path($device, 'sla_jitter-'.$index.'.rrd');
 //$scale_min = -0.5;
 $scale_rigid = FALSE;
 
-include($config['html_dir']."/includes/graphs/common.inc.php");
+include($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:rtt=".$rrd_filename_escape.":rtt:AVERAGE ";
-$rrd_options .= " DEF:rtt_success=".$rrd_filename_escape.":rtt_success:AVERAGE ";
-$rrd_options .= " DEF:rtt_loss=".$rrd_filename_escape.":rtt_loss:AVERAGE ";
+$rrd_options .= " DEF:rtt=" . $rrd_filename_escape . ":rtt:AVERAGE ";
+$rrd_options .= " DEF:rtt_success=" . $rrd_filename_escape . ":rtt_success:AVERAGE ";
+$rrd_options .= " DEF:rtt_loss=" . $rrd_filename_escape . ":rtt_loss:AVERAGE ";
 $rrd_options .= " CDEF:rtt_count=rtt_success,rtt_loss,+ ";
 //$rrd_options .= " DEF:req_count=".$rrd_filename_escape.":req_count:AVERAGE ";
 $rrd_options .= " CDEF:ploss=rtt_loss,UNKN,EQ,1,rtt_loss,IF,rtt_count,/,100,*,CEIL ";
 
-$rrd_options .= " DEF:rtt_minimum=".$rrd_filename_escape.":rtt_minimum:AVERAGE ";
+$rrd_options .= " DEF:rtt_minimum=" . $rrd_filename_escape . ":rtt_minimum:AVERAGE ";
 $rrd_options .= " CDEF:smoke_minimal=rtt_minimum,rtt,- ";
 $rrd_options .= " LINE2:rtt#FFFFFF00:'' AREA:smoke_minimal#00000045:'':STACK ";
 
-$rrd_options .= " DEF:rtt_maximum=".$rrd_filename_escape.":rtt_maximum:AVERAGE ";
+$rrd_options .= " DEF:rtt_maximum=" . $rrd_filename_escape . ":rtt_maximum:AVERAGE ";
 $rrd_options .= " CDEF:smoke_maximal=rtt_maximum,rtt,- ";
 $rrd_options .= " LINE2:rtt#FFFFFF00:'' AREA:smoke_maximal#00000045:'':STACK ";
 
 $rrd_options .= " COMMENT:'                   Now      Avg      Min      Max";
-if (is_numeric($sla['rtt_stddev']))
-{
-  $rrd_options .= "    StdDev";
+if (is_numeric($sla['rtt_stddev'])) {
+    $rrd_options .= "    StdDev";
 }
 $rrd_options .= "\l'";
 
@@ -63,9 +62,8 @@ $rrd_options .= " GPRINT:rtt:LAST:%4.1lf%sms ";
 $rrd_options .= " GPRINT:rtt:AVERAGE:%4.1lf%sms ";
 $rrd_options .= " GPRINT:rtt:MIN:%4.1lf%sms ";
 $rrd_options .= " GPRINT:rtt:MAX:%4.1lf%sms";
-if (is_numeric($sla['rtt_stddev']))
-{
-  $rrd_options .= " COMMENT:'" . $sla['rtt_stddev'] . " ms'";
+if (is_numeric($sla['rtt_stddev'])) {
+    $rrd_options .= " COMMENT:'" . $sla['rtt_stddev'] . " ms'";
 }
 $rrd_options .= "\\l ";
 
@@ -77,28 +75,26 @@ $rrd_options .= " GPRINT:ploss:MAX:%6.1lf%%\\l ";
 
 $rrd_options .= " COMMENT:'Loss colour\: ' ";
 
-$loss_values = array(0, 2, 4, 6, 8, 10, 15, 20, 25, 40, 50, 100);
+$loss_values = [0, 2, 4, 6, 8, 10, 15, 20, 25, 40, 50, 100];
 //for ($p = 0; $p < safe_count($config['graph_colours']['percents']); $p++)
-foreach ($loss_values as $p => $loss_value)
-{
-  //$loss_value = $config['sla']['loss_value'][$p];
-  $loss_colour = $config['graph_colours']['percents'][$p];
-  if ($loss_value == 0)
-  {
-    $rrd_options .= " CDEF:ploss".$loss_value."=ploss,0,EQ,rtt,UNKN,IF ";
-    $line_text = "0%";
-  } else {
-    $loss_value_prev = $loss_values[$p-1];
+foreach ($loss_values as $p => $loss_value) {
+    //$loss_value = $config['sla']['loss_value'][$p];
+    $loss_colour = $config['graph_colours']['percents'][$p];
+    if ($loss_value == 0) {
+        $rrd_options .= " CDEF:ploss" . $loss_value . "=ploss,0,EQ,rtt,UNKN,IF ";
+        $line_text   = "0%";
+    } else {
+        $loss_value_prev = $loss_values[$p - 1];
 
-    $rrd_options .= " CDEF:ploss_tmp".$loss_value."=ploss,".$loss_value_prev.",GT,ploss,UNKN,IF ";
-    $rrd_options .= " CDEF:ploss".$loss_value."=ploss_tmp".$loss_value.",".$loss_value.",1,+,LT,rtt,UNKN,IF ";
+        $rrd_options .= " CDEF:ploss_tmp" . $loss_value . "=ploss," . $loss_value_prev . ",GT,ploss,UNKN,IF ";
+        $rrd_options .= " CDEF:ploss" . $loss_value . "=ploss_tmp" . $loss_value . "," . $loss_value . ",1,+,LT,rtt,UNKN,IF ";
 
-    $line_text = ($loss_value_prev + 1).'..'.$loss_value.'%';
-  }
+        $line_text = ($loss_value_prev + 1) . '..' . $loss_value . '%';
+    }
 
-  $rrd_options .= " CDEF:ploss".$loss_value."_1=COUNT,2,%,0,EQ,ploss".$loss_value.",UNKN,IF ";
-  $rrd_options .= " CDEF:ploss".$loss_value."_2=COUNT,2,%,1,EQ,ploss".$loss_value.",UNKN,IF ";
-  $rrd_options .= " LINE2:ploss".$loss_value."_1#".$loss_colour.":'".$line_text."' LINE2:ploss".$loss_value."_2#".$loss_colour.":'' ";
+    $rrd_options .= " CDEF:ploss" . $loss_value . "_1=COUNT,2,%,0,EQ,ploss" . $loss_value . ",UNKN,IF ";
+    $rrd_options .= " CDEF:ploss" . $loss_value . "_2=COUNT,2,%,1,EQ,ploss" . $loss_value . ",UNKN,IF ";
+    $rrd_options .= " LINE2:ploss" . $loss_value . "_1#" . $loss_colour . ":'" . $line_text . "' LINE2:ploss" . $loss_value . "_2#" . $loss_colour . ":'' ";
 }
 unset($loss_value, $loss_colour);
 

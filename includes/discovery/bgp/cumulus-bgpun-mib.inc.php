@@ -4,22 +4,24 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 /**
- * @var array $device
+ * @var array  $device
  * @var string $mib
- * @var array $entry
+ * @var array  $entry
  * @var string $bgpLocalAs
- * @var array $p_list
- * @var array $peerlist
- * @var bool $check_vrfs
+ * @var array  $p_list
+ * @var array  $peerlist
+ * @var bool   $check_vrfs
  * @var string $vrf_name
  */
+
+// NOTE. This mib deprecated since Cumulus 5.1
 
 // CUMULUS-BGPUN-MIB::bgpPeerState.192.168.0.1 = INTEGER: established(6)
 // CUMULUS-BGPUN-MIB::bgpPeerState.192.168.0.5 = INTEGER: established(6)
@@ -53,36 +55,36 @@ $peers_data = snmpwalk_cache_oid($device, 'bgpPeerIface', $peers_data, 'CUMULUS-
 $peers_data = snmpwalk_cache_oid($device, 'bgpPeerAdminStatus', $peers_data, 'CUMULUS-BGPUN-MIB');
 
 foreach ($peers_data as $index => $bgp4_entry) {
-  $peer_ip = $index;
-  $peer_as = snmp_dewrap32bit($bgp4_entry['bgpPeerRemoteAs']); // Dewrap for 32bit ASN
-  if ($peer_as > $bgp4_entry['bgpPeerRemoteAs']) {
-    $peers_data[$index]['bgpPeerRemoteAs'] = $peer_as;
-  }
-  $local_ip = $bgp4_entry['bgpPeerLocalAddr'];
+    $peer_ip = $index;
+    $peer_as = snmp_dewrap32bit($bgp4_entry['bgpPeerRemoteAs']); // Dewrap for 32bit ASN
+    if ($peer_as > $bgp4_entry['bgpPeerRemoteAs']) {
+        $peers_data[$index]['bgpPeerRemoteAs'] = $peer_as;
+    }
+    $local_ip = $bgp4_entry['bgpPeerLocalAddr'];
 
-  // Add bgpPeerIdentifier
-  //$bgp4_entry['bgpPeerIdentifier'] = get_ip_version($bgp4_entry['bgpPeerIface']) ? $bgp4_entry['bgpPeerIface'] : $index;
-  $bgp4_entry['bgpPeerIdentifier'] = $index;
-  $peers_data[$index]['bgpPeerIdentifier'] = $bgp4_entry['bgpPeerIdentifier'];
+    // Add bgpPeerIdentifier
+    //$bgp4_entry['bgpPeerIdentifier'] = get_ip_version($bgp4_entry['bgpPeerIface']) ? $bgp4_entry['bgpPeerIface'] : $index;
+    $bgp4_entry['bgpPeerIdentifier']         = $index;
+    $peers_data[$index]['bgpPeerIdentifier'] = $bgp4_entry['bgpPeerIdentifier'];
 
-  $peer = [
-    'mib'          => $mib,
-    'index'        => $index,
-    'identifier'   => $bgp4_entry['bgpPeerIdentifier'],
-    'local_ip'     => $local_ip,
-    'ip'           => $peer_ip === '0.0.0.0' ? '' : $peer_ip,
-    'local_as'     => $bgpLocalAs,
-    'as'           => $peer_as,
-    'admin_status' => $bgp4_entry['bgpPeerAdminStatus']
-  ];
-  if ($check_vrfs) {
-    $peer['virtual_name'] = $vrf_name;
-  }
-  if (!isset($p_list[$peer_ip][$peer_as]) && is_bgp_peer_valid($peer, $device)) {
-    print_debug("Found peer IP: $peer_ip (AS$peer_as, LocalIP: $local_ip)");
-    $peerlist[]                 = $peer;
-    $p_list[$peer_ip][$peer_as] = 1;
-  }
+    $peer = [
+      'mib'          => $mib,
+      'index'        => $index,
+      'identifier'   => $bgp4_entry['bgpPeerIdentifier'],
+      'local_ip'     => $local_ip,
+      'ip'           => $peer_ip === '0.0.0.0' ? '' : $peer_ip,
+      'local_as'     => $bgpLocalAs,
+      'as'           => $peer_as,
+      'admin_status' => $bgp4_entry['bgpPeerAdminStatus']
+    ];
+    if ($check_vrfs) {
+        $peer['virtual_name'] = $vrf_name;
+    }
+    if (!isset($p_list[$peer_ip][$peer_as]) && is_bgp_peer_valid($peer, $device)) {
+        print_debug("Found peer IP: $peer_ip (AS$peer_as, LocalIP: $local_ip)");
+        $peerlist[]                 = $peer;
+        $p_list[$peer_ip][$peer_as] = 1;
+    }
 }
 
 // EOF

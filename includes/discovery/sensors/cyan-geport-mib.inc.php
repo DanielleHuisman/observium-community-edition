@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -18,12 +18,11 @@ cyanXcvrTxPwrLoAlrmThres.1.1.1 = -3000
 cyanXcvrTxPwrLoWarnThres.1.1.1 = -2000
 */
 
-$oids = array ('cyanXcvrTxPwrHiAlrmThres', 'cyanXcvrTxPwrHiWarnThres', 'cyanXcvrTxPwrLoAlrmThres', 'cyanXcvrTxPwrLoWarnThres');
+$oids = ['cyanXcvrTxPwrHiAlrmThres', 'cyanXcvrTxPwrHiWarnThres', 'cyanXcvrTxPwrLoAlrmThres', 'cyanXcvrTxPwrLoWarnThres'];
 
-$thresholds = array();
-foreach ($oids as $oid)
-{
-  $thresholds = snmpwalk_cache_oid($device, $oid, $thresholds, 'CYAN-XCVR-MIB:CYAN-GEPORT-MIB:CYAN-TENGPORT-MIB');
+$thresholds = [];
+foreach ($oids as $oid) {
+    $thresholds = snmpwalk_cache_oid($device, $oid, $thresholds, 'CYAN-XCVR-MIB:CYAN-GEPORT-MIB:CYAN-TENGPORT-MIB');
 }
 
 /*
@@ -42,54 +41,56 @@ cyanGEPortTxPwr.1.1.24.1 = -5224
 cyanGEPortTxStatus.1.1.24.1 = on
 */
 
-$data = array();
-$oids = array('cyanGEPortRxPwr', 'cyanGEPortTxPwr');
-foreach ($oids as $oid)
-{
-  $data = snmpwalk_cache_oid($device, $oid, $data, 'CYAN-GEPORT-MIB');
+$data = [];
+$oids = ['cyanGEPortRxPwr', 'cyanGEPortTxPwr'];
+foreach ($oids as $oid) {
+    $data = snmpwalk_cache_oid($device, $oid, $data, 'CYAN-GEPORT-MIB');
 }
 
 // Try to identify which IF-MIB port is being referred to, and populate the 'measured_entity' if we can.
 
-$ifNames = snmpwalk_cache_oid($device, 'ifName', array(), 'IF-MIB');
-foreach ($ifNames as $ifIndex => $entry)
-{
+$ifNames = snmpwalk_cache_oid($device, 'ifName', [], 'IF-MIB');
+foreach ($ifNames as $ifIndex => $entry) {
 
-  list(, $cyan_index) = explode("-", $entry['ifName'], 2);
+    [, $cyan_index] = explode("-", $entry['ifName'], 2);
 
-  if ($port = get_port_by_ifIndex($device['device_id'], $ifIndex))
-  {
-    $port_translates[$cyan_index]['measured_entity'] = $port['port_id'];
-  }
+    if ($port = get_port_by_ifIndex($device['device_id'], $ifIndex)) {
+        $port_translates[$cyan_index]['measured_entity'] = $port['port_id'];
+    }
 }
 
-foreach ($data as $index => $entry)
-{
+foreach ($data as $index => $entry) {
 
-  list($shelf_id, $mod_id, $xcvr_id, $port_id) = explode(".", $index);
+    [$shelf_id, $mod_id, $xcvr_id, $port_id] = explode(".", $index);
 
-  $descr = "Transceiver ".$shelf_id."-".$mod_id."-".$xcvr_id." (".$port_id.")";
-  $xcvr_string = $shelf_id."-".$mod_id."-".$xcvr_id;
+    $descr       = "Transceiver " . $shelf_id . "-" . $mod_id . "-" . $xcvr_id . " (" . $port_id . ")";
+    $xcvr_string = $shelf_id . "-" . $mod_id . "-" . $xcvr_id;
 
-  $options = array();
-  if (isset($port_translates[$xcvr_string]['measured_entity'])) { $options['measured_entity'] = $port_translates[$xcvr_string]['measured_entity']; $options['measured_class'] = 'port'; }
+    $options = [];
+    if (isset($port_translates[$xcvr_string]['measured_entity'])) {
+        $options['measured_entity'] = $port_translates[$xcvr_string]['measured_entity'];
+        $options['measured_class']  = 'port';
+    }
 
 //  $options['limit_high'] = $entry['cyanXcvrTxBiasHiAlrmThres'] * 0.001;
 //  $options['limit_low']  = $entry['cyanXcvrTxBiasLoAlrmThres'] * 0.001;
 //  $options['warn_high']  = $entry['cyanXcvrTxBiasHiWarnThres']  * 0.001;
 //  $options['warn_low']   = $entry['cyanXcvrTxBiasHiWarnThres']  * 0.001;
 
-  discover_sensor('dbm', $device, ".1.3.6.1.4.1.28533.5.30.160.1.1.1.16." . $index, $index, 'cyanGEPortTxPwr', $descr. " RX Power", 0.001, $entry['cyanGEPortTxPwr'], $options);
+    discover_sensor('dbm', $device, ".1.3.6.1.4.1.28533.5.30.160.1.1.1.16." . $index, $index, 'cyanGEPortTxPwr', $descr . " RX Power", 0.001, $entry['cyanGEPortTxPwr'], $options);
 
-  $options = array();
-  if (isset($port_translates[$xcvr_string]['measured_entity'])) { $options['measured_entity'] = $port_translates[$xcvr_string]['measured_entity']; $options['measured_class'] = 'port'; }
+    $options = [];
+    if (isset($port_translates[$xcvr_string]['measured_entity'])) {
+        $options['measured_entity'] = $port_translates[$xcvr_string]['measured_entity'];
+        $options['measured_class']  = 'port';
+    }
 
 //  $options['limit_high'] = $entry['cyanXcvrVccVoltHiAlrmThres'] * 0.001;
 //  $options['limit_low']  = $entry['cyanXcvrVccVoltLoAlrmThres'] * 0.001;
 //  $options['warn_high']  = $entry['cyanXcvrVccVoltHiWarnThres']  * 0.001;
 //  $options['warn_low']   = $entry['cyanXcvrVccVoltHiWarnThres']  * 0.001;
 
-  discover_sensor('dbm', $device, ".1.3.6.1.4.1.28533.5.30.160.1.1.1.13." . $index, $index, 'cyanGEPortRxPwr', $descr . " TX Power", 0.001, $entry['cyanGEPortRxPwr'], $options);
+    discover_sensor('dbm', $device, ".1.3.6.1.4.1.28533.5.30.160.1.1.1.13." . $index, $index, 'cyanGEPortRxPwr', $descr . " TX Power", 0.001, $entry['cyanGEPortRxPwr'], $options);
 
 }
 

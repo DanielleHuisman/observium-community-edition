@@ -5,7 +5,7 @@
 define('OBS_DB_SKIP', FALSE);
 //define('OBS_DEBUG', 2);
 
-include(__DIR__ . '/../includes/sql-config.inc.php');
+include(__DIR__ . '/../includes/observium.inc.php');
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');

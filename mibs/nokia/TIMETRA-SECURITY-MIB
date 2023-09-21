@@ -53,12 +53,13 @@ IMPORTS
     TTcpUdpPort, TXLNamedItemOrEmpty,
     TmnxActionType, TmnxAdminState,
     TmnxAdminStateUpDown, TmnxCliEngine,
-    TmnxDisplayStringURL,
+    TmnxCreateOrigin, TmnxDisplayStringURL,
     TmnxDistCpuProtAction,
     TmnxDistCpuProtActionDuration,
     TmnxDistCpuProtBurstSize,
     TmnxDistCpuProtEnforceType,
     TmnxDistCpuProtLogEventType,
+    TmnxDistCpuProtPacketPolicerRateLimit,
     TmnxDistCpuProtPacketRateLimit,
     TmnxDistCpuProtProtocolId,
     TmnxDistCpuProtRate,
@@ -542,6 +543,17 @@ TSSHKexNumber                    ::= TEXTUAL-CONVENTION
         diffieHellmanGroup16Sha512     (5)
     }
 
+TmnxPassHashType                 ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The TmnxPassHashType specifies the hash algorithm used by the system
+         to hash stored user passwords."
+    SYNTAX      INTEGER {
+        bcrypt      (1),
+        sha2-pbkdf2 (2),
+        sha3-pbkdf2 (3)
+    }
+
 tmnxSecurityObjects              OBJECT IDENTIFIER ::= { tmnxSRObjs 22 }
 
 tmnxUserProfileTable             OBJECT-TYPE
@@ -584,7 +596,13 @@ TmnxUserProfileEntry             ::= SEQUENCE
     tmnxUserProfileGrpcAuthCMInstall TProfileGrpcRpcAuth,
     tmnxUserProfileGrpcAuthCMGetCert TProfileGrpcRpcAuth,
     tmnxUserProfileGrpcAuthCMRevoke  TProfileGrpcRpcAuth,
-    tmnxUserProfileGrpcAuthCMCanGen  TProfileGrpcRpcAuth
+    tmnxUserProfileGrpcAuthCMCanGen  TProfileGrpcRpcAuth,
+    tmnxUserProfileGrpcAuthMdCliSess TProfileGrpcRpcAuth,
+    tmnxUserProfileGrpcAuthSysSetPkg TProfileGrpcRpcAuth,
+    tmnxUserProfileGrpcAuthSysSwCP   TProfileGrpcRpcAuth,
+    tmnxUserProfileGrpcAuthSysReboot TProfileGrpcRpcAuth,
+    tmnxUserProfileGrpcAuthSysRebtSt TProfileGrpcRpcAuth,
+    tmnxUserProfileGrpcAuthSysCnRebt TProfileGrpcRpcAuth
 }
 
 tmnxUserProfile                  OBJECT-TYPE
@@ -810,6 +828,72 @@ tmnxUserProfileGrpcAuthCMCanGen  OBJECT-TYPE
     DEFVAL      { deny }
     ::= { tmnxUserProfileEntry 21 }
 
+tmnxUserProfileGrpcAuthMdCliSess OBJECT-TYPE
+    SYNTAX      TProfileGrpcRpcAuth
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxUserProfileGrpcAuthMdCliSess specifies whether a user
+         to whom this profile is assigned is allowed to execute the gRPC MdCli
+         'Session' RPC."
+    DEFVAL      { permit }
+    ::= { tmnxUserProfileEntry 22 }
+
+tmnxUserProfileGrpcAuthSysSetPkg OBJECT-TYPE
+    SYNTAX      TProfileGrpcRpcAuth
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxUserProfileGrpcAuthSysSetPkg specifies whether a user
+         to whom this profile is assigned is allowed to execute the gRPC gNOI
+         System 'SetPackage' RPC."
+    DEFVAL      { deny }
+    ::= { tmnxUserProfileEntry 31 }
+
+tmnxUserProfileGrpcAuthSysSwCP   OBJECT-TYPE
+    SYNTAX      TProfileGrpcRpcAuth
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxUserProfileGrpcAuthSysSwCP specifies whether a user
+         to whom this profile is assigned is allowed to execute the gRPC gNOI
+         System 'SwitchControlProcessor' RPC."
+    DEFVAL      { deny }
+    ::= { tmnxUserProfileEntry 32 }
+
+tmnxUserProfileGrpcAuthSysReboot OBJECT-TYPE
+    SYNTAX      TProfileGrpcRpcAuth
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxUserProfileGrpcAuthSysReboot specifies whether a user
+         to whom this profile is assigned is allowed to execute the gRPC gNOI
+         System 'Reboot' RPC."
+    DEFVAL      { deny }
+    ::= { tmnxUserProfileEntry 33 }
+
+tmnxUserProfileGrpcAuthSysRebtSt OBJECT-TYPE
+    SYNTAX      TProfileGrpcRpcAuth
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxUserProfileGrpcAuthSysRebtSt specifies whether a user
+         to whom this profile is assigned is allowed to execute the gRPC gNOI
+         System 'RebootStatus' RPC."
+    DEFVAL      { deny }
+    ::= { tmnxUserProfileEntry 34 }
+
+tmnxUserProfileGrpcAuthSysCnRebt OBJECT-TYPE
+    SYNTAX      TProfileGrpcRpcAuth
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxUserProfileGrpcAuthSysCnRebt specifies whether a user
+         to whom this profile is assigned is allowed to execute the gRPC gNOI
+         System 'CancelReboot' RPC."
+    DEFVAL      { deny }
+    ::= { tmnxUserProfileEntry 35 }
+
 tmnxUserProfileMatchTable        OBJECT-TYPE
     SYNTAX      SEQUENCE OF TmnxUserProfileMatchEntry
     MAX-ACCESS  not-accessible
@@ -927,7 +1011,8 @@ TmnxUserEntry                    ::= SEQUENCE
     tmnxUserCliEngine1               TmnxCliEngine,
     tmnxUserCliEngine2               TmnxCliEngine,
     tmnxUserPasswordChangedTime      DateAndTime,
-    tmnxUserPasswordExpirationTime   DateAndTime
+    tmnxUserPasswordExpirationTime   DateAndTime,
+    tmnxUserCreationOrigin           TmnxCreateOrigin
 }
 
 tmnxUserName                     OBJECT-TYPE
@@ -956,7 +1041,7 @@ tmnxUserRowStatus                OBJECT-TYPE
     ::= { tmnxUserEntry 2 }
 
 tmnxUserPassword                 OBJECT-TYPE
-    SYNTAX      DisplayString (SIZE (0..60))
+    SYNTAX      DisplayString (SIZE (0..136))
     MAX-ACCESS  read-create
     STATUS      current
     DESCRIPTION
@@ -1292,6 +1377,15 @@ tmnxUserPasswordExpirationTime   OBJECT-TYPE
 
          If password aging is disabled, '0-1-1,0:0:0.0,+0:0' is returned."
     ::= { tmnxUserEntry 26 }
+
+tmnxUserCreationOrigin           OBJECT-TYPE
+    SYNTAX      TmnxCreateOrigin
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxUserCreationOrigin indicates the mechanism
+         which created this user."
+    ::= { tmnxUserEntry 27 }
 
 tmnxMafObjs                      OBJECT IDENTIFIER ::= { tmnxSecurityObjects 4 }
 
@@ -1794,7 +1888,8 @@ TmnxIPMafMatchEntry              ::= SEQUENCE
     tmnxIPMafMatchCount              Counter64,
     tmnxIPMafMatchRouter             TNamedItemOrEmpty,
     tmnxIPMafMatchFlowLabel          IPv6FlowLabel,
-    tmnxIPMafMatchLog                TruthValue
+    tmnxIPMafMatchLog                TruthValue,
+    tmnxMafMatchSrcIpPrefixList      TNamedItemOrEmpty
 }
 
 tmnxIPMafMatchIndex              OBJECT-TYPE
@@ -2055,6 +2150,36 @@ tmnxIPMafMatchLog                OBJECT-TYPE
          enabled."
     DEFVAL      { false }
     ::= { tmnxIPMafMatchEntry 17 }
+
+tmnxMafMatchSrcIpPrefixList      OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of this object specifies the IP prefix list used as match
+         criterion for the source IP address.
+
+         The value specified for this object must correspond to a prefix list
+         defined in tFilterPrefixListTable.
+
+         If the value of this object is empty then the values of the objects
+         tmnxMafMatchSrcIpAddr and tmnxMafMatchSrcIpMask are used as source IP
+         address match criterion.
+
+         When this object is set to a non-empty value then the objects
+         tmnxMafMatchSrcIpAddr and tmnxMafMatchSrcIpMask are reset to their
+         default values by the system.
+
+         Vice versa, when a new (non-default) value is provided for the objects
+         tmnxMafMatchSrcIpAddr and tmnxMafMatchSrcIpMask then this object is
+         reset to its default (empty) value by the system.
+
+         An attempt to set tmnxMafMatchSrcIpPrefixList to a non-default value
+         in combination with setting any of tmnxMafMatchSrcIpAddr or
+         tmnxMafMatchSrcIpMask to (a) non-default value(s) is rejected by the
+         system"
+    DEFVAL      { ''H }
+    ::= { tmnxIPMafMatchEntry 18 }
 
 tmnxMafMacMatchTableLastChanged  OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -2552,7 +2677,7 @@ tmnxPasswordAuthenExitOnReject   OBJECT-TYPE
     ::= { tmnxPasswordInfo 10 }
 
 tmnxAdminPassword                OBJECT-TYPE
-    SYNTAX      OCTET STRING (SIZE (0..129))
+    SYNTAX      OCTET STRING (SIZE (0..136))
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
@@ -2621,7 +2746,7 @@ tmnxPasswordHealthCheckInterval  OBJECT-TYPE
     ::= { tmnxPasswordInfo 14 }
 
 tmnxDynSvcPassword               OBJECT-TYPE
-    SYNTAX      DisplayString (SIZE (0..60))
+    SYNTAX      DisplayString (SIZE (0..136))
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
@@ -2874,7 +2999,7 @@ tmnxPasswordReqNumCharClass      OBJECT-TYPE
     ::= { tmnxPasswordInfo 30 }
 
 tmnxVsdPassword                  OBJECT-TYPE
-    SYNTAX      DisplayString (SIZE (0..60))
+    SYNTAX      DisplayString (SIZE (0..136))
     MAX-ACCESS  read-write
     STATUS      current
     DESCRIPTION
@@ -2899,6 +3024,15 @@ tmnxPasswordAuthenOrder4         OBJECT-TYPE
         "The least preferred method to authenticate and authorize a user."
     DEFVAL      { local }
     ::= { tmnxPasswordInfo 32 }
+
+tmnxPasswordHashing              OBJECT-TYPE
+    SYNTAX      TmnxPassHashType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Algorithm used for user password hashing."
+    DEFVAL      { bcrypt }
+    ::= { tmnxPasswordInfo 33 }
 
 tmnxRadiusInfo                   OBJECT IDENTIFIER ::= { tmnxSecurityObjects 6 }
 
@@ -7747,7 +7881,7 @@ TmnxDCpuProtStaticPlcrEntry      ::= SEQUENCE
     tmnxDCpuProtStaticPlcrRowStatus  RowStatus,
     tmnxDCpuProtStaticPlcrLastMdfy   TimeStamp,
     tmnxDCpuProtStaticPlcrDescr      TItemDescription,
-    tmnxDCpuProtStaticPlcrPackets    TmnxDistCpuProtPacketRateLimit,
+    tmnxDCpuProtStaticPlcrPackets    TmnxDistCpuProtPacketPolicerRateLimit,
     tmnxDCpuProtStaticPlcrWithin     Unsigned32,
     tmnxDCpuProtStaticPlcrInitDelay  Unsigned32,
     tmnxDCpuProtStaticPlcrKbps       TmnxDistCpuProtRate,
@@ -7798,7 +7932,7 @@ tmnxDCpuProtStaticPlcrDescr      OBJECT-TYPE
     ::= { tmnxDCpuProtStaticPlcrEntry 4 }
 
 tmnxDCpuProtStaticPlcrPackets    OBJECT-TYPE
-    SYNTAX      TmnxDistCpuProtPacketRateLimit
+    SYNTAX      TmnxDistCpuProtPacketPolicerRateLimit
     UNITS       "packets per interval"
     MAX-ACCESS  read-create
     STATUS      current
@@ -9687,6 +9821,161 @@ tmnxSecNotifClientAppName        OBJECT-TYPE
         "The value of the object tmnxSecNotifClientAppName indicates the name
          of the client application associated with the notification."
     ::= { tmnxSecurityNotificationObjs 26 }
+
+tmnxSecNotifyUrl                 OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyUrl indicates the user given URL associated
+         with the notification."
+    ::= { tmnxSecurityNotificationObjs 27 }
+
+tmnxSecNotifyCurve               OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyCurve indicates the user given curve name
+         associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 28 }
+
+tmnxSecNotifyKeySize             OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyKeySize indicates the user given key size
+         associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 29 }
+
+tmnxSecNotifyKeyType             OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyKeyType indicates the user given key type
+         associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 30 }
+
+tmnxSecNotifyImportExportType    OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyImportExportType indicates the user given
+         type for importing or exporting associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 31 }
+
+tmnxSecNotifyImportExportFormat  OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyImportExportFormat indicates the user given
+         format for importing or exporting associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 32 }
+
+tmnxSecNotifyCertificateProtocol OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyCertificateProtocol indicates the user given
+         certificate protocol associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 33 }
+
+tmnxSecNotifyNewUrl              OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyNewUrl indicates the new user given URL
+         associated with the notification."
+    ::= { tmnxSecurityNotificationObjs 34 }
+
+tmnxSecEventOutcome              OBJECT-TYPE
+    SYNTAX      INTEGER {
+        success (1),
+        fail    (2)
+    }
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecEventOutcome indicates the outcome of the event
+         that triggered this notification."
+    ::= { tmnxSecurityNotificationObjs 35 }
+
+tmnxSecNotifyDestUrl             OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifyDestUrl indicates the destination directory
+         to save the unzipped content."
+    ::= { tmnxSecurityNotificationObjs 36 }
+
+tmnxSecNotifFileUnzipResult      OBJECT-TYPE
+    SYNTAX      INTEGER {
+        success            (0),
+        partialSuccess     (1),
+        sourceNotFound     (2),
+        sourceNotSupported (3),
+        destNotFound       (4),
+        destFull           (5),
+        fileTooBig         (6),
+        otherFailure       (7)
+    }
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifFileUnzipResult indicates the result of the
+         file unzip operation.
+             success            (0) - unzip is successful.
+             partialSuccess     (1) - unzip is partially successful, skipped some files.
+             sourceNotFound     (2) - failed - cannot find the ZIP file.
+             sourceNotSupported (3) - failed - ZIP file is not supported.
+             destNotFound       (4) - failed - cannot find the destination URL.
+             destFull           (5) - failed - destination storage is full.
+             fileTooBig         (6) - failed - file size exceeds limit.
+             otherFailure       (7) - failed - another reason."
+    ::= { tmnxSecurityNotificationObjs 37 }
+
+tmnxSecNotifNewPasswordHashing   OBJECT-TYPE
+    SYNTAX      TmnxPassHashType
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifNewPasswordHashing indicates the new value of
+         password hashing algorithm."
+    ::= { tmnxSecurityNotificationObjs 38 }
+
+tmnxSecNotifOldPasswordHashing   OBJECT-TYPE
+    SYNTAX      TmnxPassHashType
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSecNotifOldPasswordHashing indicates the old value of
+         password hashing algorithm."
+    ::= { tmnxSecurityNotificationObjs 39 }
+
+tmnxSecNotifyLocalUserName       OBJECT-TYPE
+    SYNTAX      TNamedItem
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxSecNotifyLocalUserName indicates the user
+         name of the local user for which the password has been changed."
+    ::= { tmnxSecurityNotificationObjs 40 }
+
+tmnxSecNotifyAdminUserName       OBJECT-TYPE
+    SYNTAX      TNamedItem
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tmnxSecNotifyAdminUserName indicates the user
+         name of the user, which is changing the password for a local user."
+    ::= { tmnxSecurityNotificationObjs 41 }
 
 tmnxSecurityCpmProtNotificationObjs OBJECT IDENTIFIER ::= { tmnxSecurityObjects 17 }
 
@@ -12834,6 +13123,39 @@ tmnxSSHClientKexListNumber       OBJECT-TYPE
          algorithm."
     ::= { tmnxSSHClientKexListEntry 4 }
 
+tmnxSysSecurityMgmtIfOutputAuth  OBJECT IDENTIFIER ::= { tmnxSecurityObjects 50 }
+
+tmnxMgmtIfOutAuthMdInterfaces    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMgmtIfOutAuthMdInterfaces specifies whether output
+         authorization is performed in all MD interfaces."
+    DEFVAL      { true }
+    ::= { tmnxSysSecurityMgmtIfOutputAuth 1 }
+
+tmnxMgmtIfMDCliCmdAccntLoad      OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMgmtIfMDCliCmdAccntLoad specifies whether remote
+         command accounting is performed during an MD-CLI load or rollback
+         operation."
+    DEFVAL      { true }
+    ::= { tmnxSysSecurityMgmtIfOutputAuth 2 }
+
+tmnxMgmtIfOutAuthTelData         OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxMgmtIfOutAuthTelData specifies whether output
+         authorization for telemetry data is performed."
+    DEFVAL      { false }
+    ::= { tmnxSysSecurityMgmtIfOutputAuth 3 }
+
 tmnxSecurityConformance          OBJECT IDENTIFIER ::= { tmnxSRConfs 22 }
 
 tmnxSecurityCompliances          OBJECT IDENTIFIER ::= { tmnxSecurityConformance 1 }
@@ -13881,9 +14203,31 @@ tmnxSecurityV19v0Compliance      MODULE-COMPLIANCE
             tmnxSecuritySSHMacListV15v0Group,
             tmnxSecuritySSHKeyReExV15v0Group,
             tmnxSecUserV19v0Group,
-            tmnxSecuritySSHKexListV19v0Group
+            tmnxSecuritySSHKexListV19v0Group,
+            tmnxSecurityNiapsNotifyGroup,
+            tmnxSecurityNiapsNotifyObjsGrp,
+            tmnxSecurityMafV20v0Group
         }
     ::= { tmnxSecurityCompliances 30 }
+
+tmnxSecurityV20v0Compliance      MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for management of security features on Nokia
+         SR series systems release R20.0."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxSecurityMgmtIfV20v0Group,
+            tmnxSecurityNotifyObjsV20v0Grp,
+            tmnxSecurityNotificationV20v0Grp,
+            tmnxSecurityPasswordsV20v0Group,
+            tmnxSecUserV20v0Group,
+            tmnxSecPwdHashNotifyObjsGroup,
+            tmnxSecPwdHashNotifyGroup,
+            tmnxSecUsrPwdNotifyObjsGroup,
+            tmnxSecUsrPwdNotifyGroup
+        }
+    ::= { tmnxSecurityCompliances 31 }
 
 tmnxSecurityGroups               OBJECT IDENTIFIER ::= { tmnxSecurityConformance 2 }
 
@@ -15994,7 +16338,13 @@ tmnxSecurityGrpcV16v0Grp         OBJECT-GROUP
         tmnxUserProfileGrpcAuthCMInstall,
         tmnxUserProfileGrpcAuthCMGetCert,
         tmnxUserProfileGrpcAuthCMRevoke,
-        tmnxUserProfileGrpcAuthCMCanGen
+        tmnxUserProfileGrpcAuthCMCanGen,
+        tmnxUserProfileGrpcAuthMdCliSess,
+        tmnxUserProfileGrpcAuthSysSetPkg,
+        tmnxUserProfileGrpcAuthSysSwCP,
+        tmnxUserProfileGrpcAuthSysReboot,
+        tmnxUserProfileGrpcAuthSysRebtSt,
+        tmnxUserProfileGrpcAuthSysCnRebt
     }
     STATUS      current
     DESCRIPTION
@@ -16114,6 +16464,148 @@ tmnxSecuritySSHKexListV19v0Group OBJECT-GROUP
         "The group of objects supporting management of Secure Shell KEX
          algorithm capabilities on Nokia SROS series systems."
     ::= { tmnxSecurityGroups 137 }
+
+tmnxSecurityNiapsNotifyGroup     NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxCertKeyPairGen,
+        tmnxCertImport,
+        tmnxCertExport,
+        tmnxFileDeleted,
+        tmnxFileMoved,
+        tmnxFileCopied
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications supporting NIAPs compliance on Nokia SROS
+         series systems."
+    ::= { tmnxSecurityGroups 139 }
+
+tmnxSecurityNiapsNotifyObjsGrp   OBJECT-GROUP
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifyCurve,
+        tmnxSecNotifyKeySize,
+        tmnxSecNotifyKeyType,
+        tmnxSecNotifyImportExportType,
+        tmnxSecNotifyImportExportFormat,
+        tmnxSecNotifyCertificateProtocol,
+        tmnxSecNotifyNewUrl,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting information for NIAPs security
+         notifications on Nokia SROS series."
+    ::= { tmnxSecurityGroups 140 }
+
+tmnxSecurityMafV20v0Group        OBJECT-GROUP
+    OBJECTS     {
+        tmnxMafMatchSrcIpPrefixList
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of Management Access
+         Filters (MAF) capabilities on Nokia SROS series systems release 20.0"
+    ::= { tmnxSecurityGroups 141 }
+
+tmnxSecurityMgmtIfV20v0Group     OBJECT-GROUP
+    OBJECTS     {
+        tmnxMgmtIfOutAuthMdInterfaces,
+        tmnxMgmtIfMDCliCmdAccntLoad,
+        tmnxMgmtIfOutAuthTelData
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of Management Interfaces
+         capabilities on Nokia SROS series systems release 20.0"
+    ::= { tmnxSecurityGroups 142 }
+
+tmnxSecurityNotifyObjsV20v0Grp   OBJECT-GROUP
+    OBJECTS     {
+        tmnxSecNotifyDestUrl,
+        tmnxSecNotifFileUnzipResult
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting security notifications on Nokia SROS
+         series systems release 20.0."
+    ::= { tmnxSecurityGroups 143 }
+
+tmnxSecurityNotificationV20v0Grp NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxFileUnzip
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications supporting security on Nokia SROS series
+         systems release 20.0."
+    ::= { tmnxSecurityGroups 144 }
+
+tmnxSecurityPasswordsV20v0Group  OBJECT-GROUP
+    OBJECTS     {
+        tmnxPasswordHashing
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of passwords on Nokia SROS
+         series release systems 20.0"
+    ::= { tmnxSecurityGroups 145 }
+
+tmnxSecUserV20v0Group            OBJECT-GROUP
+    OBJECTS     {
+        tmnxUserCreationOrigin
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of user security
+         capabilities on Nokia SROS series systems."
+    ::= { tmnxSecurityGroups 146 }
+
+tmnxSecPwdHashNotifyObjsGroup    OBJECT-GROUP
+    OBJECTS     {
+        tmnxSecNotifNewPasswordHashing,
+        tmnxSecNotifOldPasswordHashing
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of password hashing on
+         Nokia SROS series."
+    ::= { tmnxSecurityGroups 148 }
+
+tmnxSecPwdHashNotifyGroup        NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxPasswordHashingChanged
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications supporting management of password hashing
+         feature on Nokia SROS systems."
+    ::= { tmnxSecurityGroups 149 }
+
+tmnxSecUsrPwdNotifyObjsGroup     OBJECT-GROUP
+    OBJECTS     {
+        tmnxSecNotifyLocalUserName,
+        tmnxSecNotifyAdminUserName
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting local user password change by
+         administrator on Nokia SROS systems."
+    ::= { tmnxSecurityGroups 150 }
+
+tmnxSecUsrPwdNotifyGroup         NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tmnxUserPasswordChangedByAdmin
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications supporting local user password change by
+         administrator on Nokia SROS systems."
+    ::= { tmnxSecurityGroups 151 }
+
+tmnxSecurityMGCompliances        OBJECT IDENTIFIER ::= { tmnxSecurityConformance 3 }
+
+tmnxSecurityMobileGatewayGroups  OBJECT IDENTIFIER ::= { tmnxSecurityConformance 4 }
 
 tmnxSecurityNotifyPrefix         OBJECT IDENTIFIER ::= { tmnxSRNotifyPrefix 22 }
 
@@ -17297,5 +17789,154 @@ tmnxUserNetconfLoginMaxAttempts  NOTIFICATION-TYPE
 
          [RECOVERY] No recovery action is required."
     ::= { tmnxSecurityNotifications 55 }
+
+tmnxCertKeyPairGen               NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifyCurve,
+        tmnxSecNotifyKeySize,
+        tmnxSecNotifyKeyType,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] A tmnxCertKeyPairGen notification is generated when a user
+         generates a cryptographic key with the admin certificate command"
+    ::= { tmnxSecurityNotifications 56 }
+
+tmnxCertImport                   NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifFile,
+        tmnxSecNotifyImportExportType,
+        tmnxSecNotifyImportExportFormat,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] A tmnxCertImport notification is generated when a user imports
+         a cryptographic key, certificate, or CRL with the admin certificate
+         command"
+    ::= { tmnxSecurityNotifications 57 }
+
+tmnxCertExport                   NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifFile,
+        tmnxSecNotifyImportExportType,
+        tmnxSecNotifyImportExportFormat,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] A tmnxCertExport notification is generated when a user exports
+         a cryptographic key, certificate, or CRL with the admin certificate
+         command"
+    ::= { tmnxSecurityNotifications 58 }
+
+tmnxFileDeleted                  NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] A tmnxFileDeleted notification is generated when a user
+         deletes a file through the file command"
+    ::= { tmnxSecurityNotifications 59 }
+
+tmnxFileMoved                    NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifyNewUrl,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] A tmnxFileMoved notification is generated when a user moves a
+         file through the file command"
+    ::= { tmnxSecurityNotifications 60 }
+
+tmnxFileCopied                   NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifyNewUrl,
+        tmnxSecEventOutcome
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] A tmnxFileCopied notification is generated when a user copies
+         a file through the file command"
+    ::= { tmnxSecurityNotifications 61 }
+
+tmnxFileUnzip                    NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyUrl,
+        tmnxSecNotifyDestUrl,
+        tmnxSecNotifFileUnzipResult
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxFileUnzip notification is generated upon the
+         completion of an unzip operation of the source ZIP file specified by
+         tmnxSecNotifyUrl to the destination location specified by
+         tmnxSecNotifyDestUrl.
+
+         [EFFECT] The result is indicated by the value of tmnxSecNotifFileUnzipResult as follows:
+             success            (0) - unzip is successful.
+             partialSuccess     (1) - unzip is partially successful, skipped some files.
+             sourceNotFound     (2) - failed - cannot find the ZIP file.
+             sourceNotSupported (3) - failed - ZIP file is not supported.
+             destNotFound       (4) - failed - cannot find the destination URL.
+             destFull           (5) - failed - destination storage is full.
+             fileTooBig         (6) - failed - file size exceeds limit.
+             otherFailure       (7) - failed - another reason.
+
+         [RECOVERY] No recovery action if tmnxSecNotifFileUnzipResult is
+         success (0). Otherwise, depending on the indicated failure, corrective
+         action should be taken before attempting another unzip operation."
+    ::= { tmnxSecurityNotifications 62 }
+
+tmnxPasswordHashingChanged       NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifNewPasswordHashing,
+        tmnxSecNotifOldPasswordHashing
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxPasswordHashingChanged notification is generated upon
+         the change of password hashing algorithm (tmnxPasswordHashing). The
+         value of the object tmnxSecNotifNewPasswordHashing indicates the new
+         password hashing algorithm. The value of the object
+         tmnxSecNotifOldPasswordHashing indicates the new password hashing
+         algorithm.
+
+         [EFFECT] Users will be prompted to change their password upon log in
+         to the system. All newly stored user passwords will be hashed by the
+         algorithm defined by tmnxPasswordHashing.
+
+         [RECOVERY] No recovery action is required."
+    ::= { tmnxSecurityNotifications 63 }
+
+tmnxUserPasswordChangedByAdmin   NOTIFICATION-TYPE
+    OBJECTS     {
+        tmnxSecNotifyLocalUserName,
+        tmnxSecNotifyAdminUserName
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tmnxUserPasswordChangedByAdmin notification is generated
+         upon the change of a password of a local user by a user with
+         administrative rights. The value of the object
+         tmnxSecNotifyLocalUserName indicates the user name for which the
+         password has been changed. The value of the object
+         tmnxSecNotifyAdminUserName indicates the user name of the user who has
+         changed the password.
+
+         [EFFECT] Local user will be able to authenticate to the system with
+         the new password only.
+
+         [RECOVERY] No recovery action is required."
+    ::= { tmnxSecurityNotifications 64 }
 
 END

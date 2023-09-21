@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -30,13 +30,12 @@
   Total is calculated with Available+PoolAllocated
 */
 
-$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryAvailable', array(), $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryAvailable', [], $mib);
 $mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryUsed', $mempool_array, $mib);
-$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryPoolAllocated', array(), $mib);
+$mempool_array = snmpwalk_cache_oid($device, 'sgiMemoryPoolAllocated', [], $mib);
 
-if (is_numeric($mempool_array[0]['sgiMemoryUsed']))
-{
-  discover_mempool($valid['mempool'], $device, 0, 'TIMETRA-SYSTEM-MIB', 'Memory', 1, ($mempool_array[0]['sgiMemoryAvailable']+$mempool_array[0]['sgiMemoryPoolAllocated']), $mempool_array[0]['sgiMemoryUsed']);
+if (is_numeric($mempool_array[0]['sgiMemoryUsed'])) {
+    discover_mempool($valid['mempool'], $device, 0, 'TIMETRA-SYSTEM-MIB', 'Memory', 1, ($mempool_array[0]['sgiMemoryAvailable'] + $mempool_array[0]['sgiMemoryPoolAllocated']), $mempool_array[0]['sgiMemoryUsed']);
 }
 
 unset ($mempool_array);

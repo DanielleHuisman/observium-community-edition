@@ -1,6 +1,6 @@
 TROPIC-PTP-MIB DEFINITIONS ::= BEGIN
 
--- (c) Copyright 2019 Nokia Networks.  All rights reserved.
+-- (c) Copyright 2021 Nokia Networks.  All rights reserved.
 -- This software is the confidential and proprietary property of
 -- Nokia and may only be used in accordance with the terms of the
 -- license agreement provided with this software.
@@ -20,7 +20,7 @@ IMPORTS
       tnPtpMIB                                FROM TROPIC-GLOBAL-REG;
 
   tnPtpMibModule MODULE-IDENTITY
-      LAST-UPDATED    "201906071200Z"
+      LAST-UPDATED    "202104231200Z"
       ORGANIZATION    "Nokia"
       CONTACT-INFO    "Nokia
                        Attn: Jeff Donnelly
@@ -31,6 +31,44 @@ IMPORTS
                        Email: jeff.donnelly@nokia.com"
 
       DESCRIPTION "Nokia OPD-WDM MIB for 1588V2 module"
+
+      REVISION    "202104231200Z"
+      DESCRIPTION "Added the following to tnPtpPortDSConfigTable:
+                   tnPtpPortDSConfigClearMsgCounter."
+
+      REVISION    "202007031200Z"
+      DESCRIPTION "Added the following to AluWdmtnPtpPortState:
+                   masterOriented(65537)
+                   to
+                   tcFaulty(65539)."
+
+      REVISION    "202004241200Z"
+      DESCRIPTION "Updated DESCRIPTION of the following:
+                   tnPtpClockDefaultDSInfoTwoStepFlag
+                   tnPtpClockCurrentDSCurrentTime
+                   tnPtpPortDSConfigTwoStepFlag."
+
+      REVISION    "202004101200Z"
+      DESCRIPTION "1) Updated DESCRIPTION of the following:
+                      AluWdmPtpClockIdentifier.
+                   2) Added the following textual convention:
+                      AluWdmPtpPortIdentity.
+                   3) Added the following tables:
+                      tnPtpClockGenericTable
+                      tnPtpTransparentClockDefaultDSTable
+                      tnPtpPortGenericTable
+                      tnPtpTransparentClockPortDSTable.
+                   4) Added the following to tnPtpPortDSConfigTable:
+                      tnPtpPortDSConfigAssociatedEntityType
+                      tnPtpPortDSConfigAssociatedEntityID."
+
+      REVISION    "202001101200Z"
+      DESCRIPTION "Added the following to tnPtpExtTodIfTable:
+                   tnPtpExtTodAlmProfName."
+
+      REVISION    "201911151200Z"
+      DESCRIPTION "Updated DESCRIPTION of the following:
+                   tnPtpExtTodIfToDFormat."
 
       REVISION    "201906071200Z"
       DESCRIPTION "Updated the DESCRIPTION of tnPtpPortDSConfigAssociatedPhysicalPort."
@@ -196,11 +234,11 @@ IMPORTS
           only a subset of these address types for a compliant
           implementation."
         SYNTAX         INTEGER {
-                     unknown(0),
-                     ipv4(1),    -- these named numbers are aligned
-                     ipv6(2),    -- with AddressFamilyNumbers from
-                     dns(16)     -- IANA-ADDRESS-FAMILY-NUMBERS-MIB
-                   }
+                         unknown(0),
+                         ipv4(1),    -- these named numbers are aligned
+                         ipv6(2),    -- with AddressFamilyNumbers from
+                         dns(16)     -- IANA-ADDRESS-FAMILY-NUMBERS-MIB
+                       }
 
     InetAddress ::= TEXTUAL-CONVENTION
         STATUS         current
@@ -230,18 +268,35 @@ IMPORTS
     AluWdmPtpClockIdentifier ::= TEXTUAL-CONVENTION
         STATUS         current
         DESCRIPTION
-        "This 64-bit extended unique identifier (EUI-64) is
-        a constructed by the external MAC address of the card and the clock number in the card.
-        For example, if the external MAC address is AC-DE-48-23-45-67, and the clock number is 0x01.
-        The clock identifier shall be:
-                                        |        company_id       | fixed  |clockNum|   extension identifier  | field
-                                        |  AC   |   DE   |   48   |   FF   |   01   |   23   |   45   |   67  | hex
-                                        10101100 11011110 01001000 11111111 00000011 00100011 01000101 01100111 bits
-                                        |  |                                                               |  |
-                                        |  most-significant-byte                      least-significant-byte  |
-                                        most-significant-bit                              least-significant-bit."
+        "This 64-bit extended unique identifier (EUI-64) is a constructed by
+         the external MAC address of the card and the clock number in the card.
+         For example, if the external MAC address is AC-DE-48-23-45-67, and the
+         clock number is 0x01.  The clock identifier shall be:
+
+           |        company_id       | fixed  |clockNum|   extension identifier  | field
+           |  AC   |   DE   |   48   |   FF   |   01   |   23   |   45   |   67  | hex
+           10101100 11011110 01001000 11111111 00000001 00100011 01000101 01100111 bits
+           |  |                                                               |  |
+           |  most-significant-byte                      least-significant-byte  |
+           most-significant-bit                              least-significant-bit."
 
         SYNTAX         OCTET STRING (SIZE(8))
+
+    AluWdmPtpPortIdentity ::= TEXTUAL-CONVENTION
+        STATUS         current
+        DESCRIPTION
+        "This 80-bit extended unique PortIdentity is constructed by
+         64-bit ClockIdentity + 16-bit portNumber.
+         For example, if the ClockIdentity is AC-DE-48-FF-01-23-45-67 and the
+         port number is 0x0003, the PortIdentity shall be:
+           |        company_id       | fixed  |clockNum|   extension identifier   |   port number   | field
+           |  AC   |   DE   |   48   |   FF   |   01   |   23   |   45   |   67   |   00   |   03   | hex
+           10101100 11011110 01001000 11111111 00000001 00100011 01000101 01100111 00000000 00000011  bits
+           |  |                                                                                 |   |
+           |  most-significant-byte                                        least-significant-byte   |
+           most-significant-bit                                                 least-significant-bit."
+
+        SYNTAX         OCTET STRING (SIZE(10))
 
     AluWdmPtpClockIndex ::= TEXTUAL-CONVENTION
         STATUS         current
@@ -265,28 +320,31 @@ IMPORTS
         STATUS         current
         DESCRIPTION    "The state of the PTP clock."
         SYNTAX         INTEGER {
-                         unknown (0),
-                         freeRun (1),
-                         acquiring (2),
-                         phasetracking (3),
-                         holdover (4),
-                         locked (5)
+                         unknown(0),
+                         freeRun(1),
+                         acquiring(2),
+                         phasetracking(3),
+                         holdover(4),
+                         locked(5)
                        }
 
     AluWdmtnPtpPortState ::= TEXTUAL-CONVENTION
         STATUS         current
         DESCRIPTION    "The state of the PTP port."
         SYNTAX         INTEGER {
-                         unknown (0),
-                         initializing (1),
-                         faulty (2),
-                         disabled (3),
-                         listening (4),
-                         premaster (5),
-                         master (6),
-                         passive (7),
-                         uncalibrated (8),
-                         slave (9)
+                         unknown(0),
+                         initializing(1),
+                         faulty(2),
+                         disabled(3),
+                         listening(4),
+                         premaster(5),
+                         master(6),
+                         passive(7),
+                         uncalibrated(8),
+                         slave(9),
+                         masterOriented(65537),
+                         slaveOriented(65538),
+                         tcFaulty(65539)
                       }
 
 -----------------------------------------------------------------------
@@ -445,6 +503,7 @@ IMPORTS
 
 -----------------------------------------------------------------------
 -- Configuration Table for the Default Data Set of an OC/BC PTP Clock
+-- Generic PTP Clock attributes should be added to tnPtpClockGenericTable
 -----------------------------------------------------------------------
     tnPtpClockDefaultDSConfigTable OBJECT-TYPE
         SYNTAX         SEQUENCE OF TnPtpClockDefaultDSConfigEntry
@@ -639,16 +698,18 @@ IMPORTS
         MAX-ACCESS     read-only
         STATUS         current
         DESCRIPTION    "This is an indicator of whether master-slave
-                        synchronization utilizes follow-up messaging
-                        (IEEE 1588-2008 Section 8.2.1.2.1.).  This
-                        parameter is read-only. A PTP port has a
-                        configurable parameter which determines if
-                        follow-up messaging will be used for this port.
+                        synchronization utilizes follow-up messaging (IEEE
+                        1588-2008 Section 8.2.1.2.1.).  This parameter is
+                        read-only.  A PTP port has a configurable parameter
+                        which determines if follow-up messaging will be used
+                        for this port.
 
-                       true:  If some of the PTP ports in the clock uses
-                              follow-up messaging.
-                       false: If none of the PTP ports in the clock uses
-                              follow-up messaging."
+                        true:  If some of the PTP ports in the clock use
+                               follow-up messaging.
+                        false: If none of the PTP ports in the clock use
+                               follow-up messaging.
+
+                        Only false is supported in the current PTP implementation."
         ::= { tnPtpClockDefaultDSInfoEntry 2 }
 
     tnPtpClockDefaultDSInfoNumberOfPorts OBJECT-TYPE
@@ -735,11 +796,9 @@ IMPORTS
         SYNTAX         OCTET STRING(SIZE(81))
         MAX-ACCESS     read-only
         STATUS         current
-        DESCRIPTION    "The current PTP time of the clock PTP clock.
-                        The format is as below: 'S.N'.
-                       S stands for the second part of time (48 octets)
-                       N stands for the nano-second part of time (32
-                         octets)."
+        DESCRIPTION    "The current time of the PTP clock.  ASCII encoded
+                        decimal number in units of seconds with a precision
+                        of 9."
         ::= { tnPtpClockCurrentDSEntry 3 }
 
     tnPtpClockCurrentDSRecoveredClockState OBJECT-TYPE
@@ -1070,7 +1129,6 @@ IMPORTS
         DEFVAL         { "" }
         ::= { tnPtpClockPathTraceDSEntry 2 }
 
-
 -----------------------------------------------------------------------
 -- Table for the PTP Clock Sync OAM
 -----------------------------------------------------------------------
@@ -1234,6 +1292,123 @@ IMPORTS
         DEFVAL         { 0 }
         ::= { tnPtpClockSyncOamEntry 9 }
 
+-----------------------------------------------------------------------
+-- Generic PTP clock Table
+-----------------------------------------------------------------------
+    tnPtpClockGenericTable OBJECT-TYPE
+        SYNTAX         SEQUENCE OF TnPtpClockGenericEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "This table provides generic information for a PTP clock."
+        ::= { tnPtpClock 8 }
+
+    tnPtpClockGenericEntry OBJECT-TYPE
+        SYNTAX         TnPtpClockGenericEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "Generic information for a PTP clock."
+        INDEX { tnPtpClockIndex }
+        ::= { tnPtpClockGenericTable 1 }
+
+    TnPtpClockGenericEntry ::=
+        SEQUENCE {
+            tnPtpClockMode            Unsigned32,
+            tnPtpClockAlmProfName     OCTET STRING
+        }
+
+    tnPtpClockMode OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "This parameter determines the PTP operational mode of
+                        the card.  It is intended to be managed by the System
+                        Operator.
+
+                        0:  1588 function of this card is disabled
+                        1:  Ordinary Clock - Slave
+                        2:  Ordinary Clock - Master
+                        3:  Boundary Clock
+                        10: ITU-T G.8275.1 T-GM
+                        11: ITU-T G.8275.1 T-BC
+                        12: ITU-T G.8275.1 T-TSC
+                        13: ITU-T G.8275.1 T-TC Carrier TC
+                        14: Combined Carrier TC,
+                            ITU-T G.8275.1 T-TSC + Carrier TC
+                        15: ITU-T G.8275.1 T-TC Client TC."
+        DEFVAL         { 0 }
+        ::= { tnPtpClockGenericEntry 1 }
+
+    tnPtpClockAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "ASAP (alarm severity assignment profile) Name for
+                        PTP clock."
+        ::= { tnPtpClockGenericEntry 2 }
+
+-----------------------------------------------------------------------
+-- Table for the Default Data Set of Transparent Clock
+-----------------------------------------------------------------------
+    tnPtpTransparentClockDefaultDSTable OBJECT-TYPE
+        SYNTAX         SEQUENCE OF TnPtpTransparentClockDefaultDSEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "This table provides the default data set of
+                        Transparent Clock.
+
+                        Refer to 8.3.2 transparentClockDefaultDS
+                        data set member specifications."
+        ::= { tnPtpClock 9 }
+
+    tnPtpTransparentClockDefaultDSEntry OBJECT-TYPE
+        SYNTAX         TnPtpTransparentClockDefaultDSEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "Default data set of Transparent Clock."
+        INDEX { tnPtpClockIndex }
+        ::= { tnPtpTransparentClockDefaultDSTable 1 }
+
+    TnPtpTransparentClockDefaultDSEntry ::=
+        SEQUENCE {
+            tnPtpTransparentClockDefaultDSClockIdentity      AluWdmPtpClockIdentifier,
+            tnPtpTransparentClockDefaultDSNumberPorts        Unsigned32,
+            tnPtpTransparentClockDefaultDSDelayMechanism     INTEGER,
+            tnPtpTransparentClockDefaultDSPrimaryDomain      Unsigned32
+        }
+
+    tnPtpTransparentClockDefaultDSClockIdentity OBJECT-TYPE
+        SYNTAX         AluWdmPtpClockIdentifier
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "The clockIdentity of the Transparent Clock."
+        ::= { tnPtpTransparentClockDefaultDSEntry 1 }
+
+    tnPtpTransparentClockDefaultDSNumberPorts OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "The number of PTPPOTRs of the Transparent Clock."
+        ::= { tnPtpTransparentClockDefaultDSEntry 2 }
+
+    tnPtpTransparentClockDefaultDSDelayMechanism OBJECT-TYPE
+        SYNTAX         INTEGER {
+                         e2e(1),
+                         p2p(2)
+                       }
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "E2E(end-to-end) or P2P(peer-to-peer) Transparent Clock."
+        DEFVAL         { e2e }
+        ::= { tnPtpTransparentClockDefaultDSEntry 3 }
+
+    tnPtpTransparentClockDefaultDSPrimaryDomain OBJECT-TYPE
+        SYNTAX         Unsigned32 (24..43)
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "The domainNumber of the primary
+                        syntonization domain."
+        DEFVAL         { 24 }
+        ::= { tnPtpTransparentClockDefaultDSEntry 4 }
 
 -----------------------------------------------------------------------
 -- tnPtpPortNextIndexTable: Used to get the next available index when
@@ -1273,6 +1448,7 @@ IMPORTS
 
 -----------------------------------------------------------------------
 -- Configuration table for the the PTP port Data Set
+-- Generic PTP Port attributes should be added to tnPtpPortTable
 -----------------------------------------------------------------------
     tnPtpPortDSConfigTable OBJECT-TYPE
         SYNTAX         SEQUENCE OF TnPtpPortDSConfigEntry
@@ -1318,7 +1494,10 @@ IMPORTS
             tnPtpPortDSConfigConnectedPtpioTimingPort   InterfaceIndexOrZero,
             tnPtpPortDSConfigAutoLinkAsyMeasureTrigger  TruthValue,
             tnPtpPortDSConfigNotSlave                   TruthValue,
-            tnPtpPortDSConfigLocalPriority              Unsigned32
+            tnPtpPortDSConfigLocalPriority              Unsigned32,
+            tnPtpPortDSConfigAssociatedEntityType       Unsigned32,
+            tnPtpPortDSConfigAssociatedEntityID         OCTET STRING,
+            tnPtpPortDSConfigClearMsgCounter            Unsigned32
         }
 
     tnPtpPortDSPortIndex OBJECT-TYPE
@@ -1329,7 +1508,7 @@ IMPORTS
                         identifies a PTP port in a PTP clock.  It equals
                         to the portNumber used in the PTP message.  Refer
                         to Section 7.5.2.3 of IEEE1588-2008."
-          ::= { tnPtpPortDSConfigEntry 1 }
+        ::= { tnPtpPortDSConfigEntry 1 }
 
     tnPtpPortDSConfigAssociatedPhysicalPort OBJECT-TYPE
         SYNTAX         InterfaceIndex
@@ -1468,8 +1647,8 @@ IMPORTS
 
     tnPtpPortDSConfigVersionNumber OBJECT-TYPE
         SYNTAX         INTEGER {
-                         v1 (1),
-                         v2 (2)
+                         v1(1),
+                         v2(2)
                        }
         MAX-ACCESS     read-create
         STATUS         current
@@ -1502,7 +1681,9 @@ IMPORTS
                         will be used for this PTP port.
 
                         true:  If the port will use follow-up messaging
-                        false: If the port will not use follow-up messaging."
+                        false: If the port will not use follow-up messaging.
+
+                        Only false is supported in the current PTP implementation."
         DEFVAL         { false }
         ::= { tnPtpPortDSConfigEntry 15 }
 
@@ -1640,6 +1821,63 @@ IMPORTS
         DESCRIPTION    "The localPriority value of the PTP port."
         DEFVAL         { 128 }
         ::= { tnPtpPortDSConfigEntry 27 }
+
+    tnPtpPortDSConfigAssociatedEntityType OBJECT-TYPE
+        SYNTAX         Unsigned32 (0..3)
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "Indicates the Associated Entity Type of the PTP port.
+
+                        0: N/A, NOT Applicable
+                        1: Physical PORT
+                        2: Service
+                        3: ERP Ring"
+        DEFVAL         { 0 }
+        ::= { tnPtpPortDSConfigEntry 28 }
+
+    tnPtpPortDSConfigAssociatedEntityID OBJECT-TYPE
+        SYNTAX         OCTET STRING(SIZE(8))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "Indicates the Associated Entity ID(8-byte) of the PTP
+                        port.
+
+                        The first 4-byte is shelfId/slotId/0/0.
+                        The last 4-byte is portId or serviceId or ringId
+                        depends on tnPtpPortDSConfigAssociatedEntityType."
+        ::= { tnPtpPortDSConfigEntry 29 }
+
+    tnPtpPortDSConfigClearMsgCounter OBJECT-TYPE
+        SYNTAX         Unsigned32
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "Clears the Message Counter of the PTP port.  The 32-bit
+                        value is defined as below:
+
+                        +----------+----------------------------+
+                        | 32    11 | 10                       1 |
+                        +----------+----------------------------+
+                        | reserved | message type and direction |
+                        +----------+----------------------------+
+
+                        Bit 1 to bit 10 for type and direction of the message
+                          counter to be cleared. Set one or more bits to 1 to
+                          clear specified message counters.
+                        bit 1  - AnnounceTx
+                        bit 2  - AnnounceRx
+                        bit 3  - SyncTx
+                        bit 4  - SyncRx
+                        bit 5  - DelayReqTx
+                        bit 6  - DelayReqRx
+                        bit 7  - DelayRespTx
+                        bit 8  - DelayRespRx
+                        bit 9  - FollowUpTx
+                        bit 10 - FollowUpRx
+
+                        Other bits (bit 11 to bit 32) are reserved for future,
+                        and suggest to be 0."
+        DEFVAL         { 0 }
+        ::= { tnPtpPortDSConfigEntry 30 }
 
 -----------------------------------------------------------------------
 -- Information table for the the PTP port Data Set
@@ -1861,6 +2099,83 @@ IMPORTS
 --    tnPtpPortSessionTable OBJECT-TYPE ::= { tnPtpPort 4 }
 
 -----------------------------------------------------------------------
+-- Generic PTP port Table
+-----------------------------------------------------------------------
+    tnPtpPortGenericTable OBJECT-TYPE
+        SYNTAX         SEQUENCE OF TnPtpPortGenericEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "This table provides generic information for a PTP port."
+        ::= { tnPtpPort 5 }
+
+    tnPtpPortGenericEntry OBJECT-TYPE
+        SYNTAX         TnPtpPortGenericEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "Generic information for a PTP port."
+        INDEX { tnPtpClockIndex,
+                tnPtpPortDSPortIndex }
+        ::= { tnPtpPortGenericTable 1 }
+
+    TnPtpPortGenericEntry ::=
+        SEQUENCE {
+            tnPtpPortAlmProfName     OCTET STRING
+        }
+
+    tnPtpPortAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "ASAP(alarm severity assignment profile) Name for PTP port."
+        ::= { tnPtpPortGenericEntry 1 }
+
+-----------------------------------------------------------------------
+-- Table for the Data Set of Transparent Clock PTP port
+-----------------------------------------------------------------------
+    tnPtpTransparentClockPortDSTable OBJECT-TYPE
+        SYNTAX         SEQUENCE OF TnPtpTransparentClockPortDSEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "This table provides the data set of Transparent Clock
+                        PTP port.
+
+                        Refer to 8.3.3 transparentClockPortDS data set member
+                        specifications."
+        ::= { tnPtpPort 6 }
+
+    tnPtpTransparentClockPortDSEntry OBJECT-TYPE
+        SYNTAX         TnPtpTransparentClockPortDSEntry
+        MAX-ACCESS     not-accessible
+        STATUS         current
+        DESCRIPTION    "Data set of the PTP port of Transparent Clock."
+        INDEX { tnPtpClockIndex,
+                tnPtpPortDSPortIndex }
+        ::= { tnPtpTransparentClockPortDSTable 1 }
+
+    TnPtpTransparentClockPortDSEntry ::=
+        SEQUENCE {
+            tnPtpTransparentClockPortDSPortIdentity     AluWdmPtpPortIdentity,
+            tnPtpTransparentClockPortDSFaultyFlag       TruthValue
+        }
+
+    tnPtpTransparentClockPortDSPortIdentity OBJECT-TYPE
+        SYNTAX         AluWdmPtpPortIdentity
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "The PortIdentity attribute of the PTP port."
+        ::= { tnPtpTransparentClockPortDSEntry 1 }
+
+    tnPtpTransparentClockPortDSFaultyFlag OBJECT-TYPE
+        SYNTAX         TruthValue
+        MAX-ACCESS     read-only
+        STATUS         current
+        DESCRIPTION    "The value shall be TRUE if the PTP port is faulty and
+                        FALSE if the PTP port is operating normally.  The
+                        initialization value shall be FALSE."
+        DEFVAL         { false }
+        ::= { tnPtpTransparentClockPortDSEntry 2 }
+
+-----------------------------------------------------------------------
 -- 1PPS&ToD External Interface Table
 -----------------------------------------------------------------------
     tnPtpExtTodIfTable OBJECT-TYPE
@@ -1897,7 +2212,8 @@ IMPORTS
             tnPtpExtCompenManualValueOut     Integer32,
             tnPtpExtCompenMeasureStatus      Integer32,
             tnPtpExtTodIfDegradeThreshold    Unsigned32,
-            tnPtpExtTodIfTodClockClass       Unsigned32
+            tnPtpExtTodIfTodClockClass       Unsigned32,
+            tnPtpExtTodAlmProfName           OCTET STRING
         }
 
     tnPtpExtTodIfIndex OBJECT-TYPE
@@ -1951,6 +2267,7 @@ IMPORTS
                         0: UBX
                         1: IRIG-B
                         2: IRIG-D
+                        3: ITU-T
 
                         This parameter is valid only when
                         tnPtpExtTodSignalValid is true."
@@ -2103,6 +2420,13 @@ IMPORTS
                         256: N/A - NotApplicable."
         ::= { tnPtpExtTodIfEntry 17 }
 
+    tnPtpExtTodAlmProfName OBJECT-TYPE
+        SYNTAX         OCTET STRING (SIZE(1..40))
+        MAX-ACCESS     read-create
+        STATUS         current
+        DESCRIPTION    "."
+        ::= { tnPtpExtTodIfEntry 18 }
+
 -----------------------------------------------------------------------
 -- Conformance Group Definitions
 -----------------------------------------------------------------------
@@ -2235,7 +2559,10 @@ IMPORTS
             tnPtpPortDSConfigConnectedPtpioTimingPort,
             tnPtpPortDSConfigAutoLinkAsyMeasureTrigger,
             tnPtpPortDSConfigNotSlave,
-            tnPtpPortDSConfigLocalPriority
+            tnPtpPortDSConfigLocalPriority,
+            tnPtpPortDSConfigAssociatedEntityType,
+            tnPtpPortDSConfigAssociatedEntityID,
+            tnPtpPortDSConfigClearMsgCounter
         }
         STATUS         current
         DESCRIPTION    "Configurable information for a PTP port."
@@ -2288,7 +2615,8 @@ IMPORTS
             tnPtpExtCompenManualValueOut,
             tnPtpExtCompenMeasureStatus,
             tnPtpExtTodIfDegradeThreshold,
-            tnPtpExtTodIfTodClockClass
+            tnPtpExtTodIfTodClockClass,
+            tnPtpExtTodAlmProfName
         }
         STATUS         current
         DESCRIPTION    "Information for an external 1PPS&ToD port."
@@ -2319,6 +2647,43 @@ IMPORTS
         DESCRIPTION    "PTP Clock Sync OAM."
         ::= { tnPtpGroups 13 }
 
+    tnPtpClockGenericGroup OBJECT-GROUP
+        OBJECTS {
+            tnPtpClockMode,
+            tnPtpClockAlmProfName
+        }
+        STATUS         current
+        DESCRIPTION    "Generic PTP clock."
+        ::= { tnPtpGroups 14 }
+
+    tnPtpTransparentClockDefaultDSGroup OBJECT-GROUP
+        OBJECTS {
+            tnPtpTransparentClockDefaultDSClockIdentity,
+            tnPtpTransparentClockDefaultDSNumberPorts,
+            tnPtpTransparentClockDefaultDSDelayMechanism,
+            tnPtpTransparentClockDefaultDSPrimaryDomain
+        }
+        STATUS         current
+        DESCRIPTION    "Table for the Default Data Set of Transparent Clock."
+        ::= { tnPtpGroups 15 }
+
+    tnPtpPortGenericGroup OBJECT-GROUP
+        OBJECTS {
+            tnPtpPortAlmProfName
+        }
+        STATUS         current
+        DESCRIPTION    "Generic information for a PTP port."
+        ::= { tnPtpGroups 16 }
+
+    tnPtpTransparentClockPortDSGroup OBJECT-GROUP
+        OBJECTS {
+            tnPtpTransparentClockPortDSPortIdentity,
+            tnPtpTransparentClockPortDSFaultyFlag
+        }
+        STATUS         current
+        DESCRIPTION    "Table for the Data Set of Transparent Clock PTP port."
+        ::= { tnPtpGroups 17 }
+
 -----------------------------------------------------------------------
 -- Compliance Statements (mandatory)
 -----------------------------------------------------------------------
@@ -2340,7 +2705,11 @@ IMPORTS
 --            tnPtpPortSessionGroup,
             tnPtpExtTodIfGroup,
             tnPtpClockPathTraceDSGroup,
-            tnPtpClockSyncOamGroup
+            tnPtpClockSyncOamGroup,
+            tnPtpClockGenericGroup,
+            tnPtpTransparentClockDefaultDSGroup,
+            tnPtpPortGenericGroup,
+            tnPtpTransparentClockPortDSGroup
         }
         ::= { tnPtpCompliances 1 }
 

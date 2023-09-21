@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -22,652 +22,583 @@
  * print_syslogs(array('short' => TRUE)) - show small block with last syslog messages
  *
  * @param array $vars
+ *
  * @return null
  *
  */
 function print_syslogs($vars)
 {
-  // Short events? (no pagination, small out)
-  $short = (isset($vars['short']) && $vars['short']);
-  // With pagination? (display page numbers in header)
-  $pagination = (isset($vars['pagination']) && $vars['pagination']);
-  pagination($vars, 0, TRUE); // Get default pagesize/pageno
-  $pageno   = $vars['pageno'];
-  $pagesize = $vars['pagesize'];
-  $start = $pagesize * $pageno - $pagesize;
+    // Short events? (no pagination, small out)
+    $short = (isset($vars['short']) && $vars['short']);
+    // With pagination? (display page numbers in header)
+    $pagination = (isset($vars['pagination']) && $vars['pagination']);
+    pagination($vars, 0, TRUE); // Get default pagesize/pageno
+    $pageno   = $vars['pageno'];
+    $pagesize = $vars['pagesize'];
+    $start    = $pagesize * $pageno - $pagesize;
 
-  $device_single = FALSE; // Show syslog entries for single device or multiple (use approximate counts for multiple)
+    $device_single = FALSE; // Show syslog entries for single device or multiple (use approximate counts for multiple)
 
-  $param = [];
-  $where = ' WHERE 1 ';
-  foreach ($vars as $var => $value) {
-    if (!safe_empty($value)) {
-      switch ($var) {
-        case 'device':
-        case 'device_id':
-          $device_single = is_numeric($value);
-          $where .= generate_query_values_and($value, 'device_id');
-          break;
-        case 'priority':
-          $value = get_var_csv($value);
-          foreach ($value as $k => $v) {
-            // Rewrite priority strings to numbers
-            $value[$k] = priority_string_to_numeric($v);
-          }
-          $where .= generate_query_values_and($value, $var);
-          break;
-        case 'tag':
-        case 'program':
-          $condition = str_contains($value, '*') ? 'LIKE' : '=';
-          $value = get_var_csv($value);
-          $where .= generate_query_values_and($value, $var, $condition);
-          break;
-        case 'message':
-          //FIXME: this should just be a function used for all "text" searchable fields
-          if (preg_match(OBS_PATTERN_REGEXP, $value, $matches)) {
-            // Match regular expression
-            $where .= generate_query_values_and($matches['pattern'], 'msg', 'REGEXP');
-          } elseif (preg_match('/^!(=)?\s*(?<msg>.+)/', $value, $matches)) {
-            $where .= generate_query_values_and($matches['msg'], 'msg', '%!=LIKE%');
-          } else {
-            $where .= generate_query_values_and($value, 'msg', '%LIKE%');
-          }
-          break;
-        case 'timestamp_from':
-          $where .= ' AND `timestamp` > ?';
-          $param[] = $value;
-          break;
-        case 'timestamp_to':
-          $where .= ' AND `timestamp` < ?';
-          $param[] = $value;
-          break;
-      }
+    $param = [];
+    $where = ' WHERE 1 ';
+    foreach ($vars as $var => $value) {
+        if (!safe_empty($value)) {
+            switch ($var) {
+                case 'device':
+                case 'device_id':
+                    $device_single = is_numeric($value);
+                    $where         .= generate_query_values_and($value, 'device_id');
+                    break;
+                case 'priority':
+                    $value = get_var_csv($value);
+                    foreach ($value as $k => $v) {
+                        // Rewrite priority strings to numbers
+                        $value[$k] = priority_string_to_numeric($v);
+                    }
+                    $where .= generate_query_values_and($value, $var);
+                    break;
+                case 'tag':
+                case 'program':
+                    $condition = str_contains_array($value, '*') ? 'LIKE' : '=';
+                    $value     = get_var_csv($value);
+                    $where     .= generate_query_values_and($value, $var, $condition);
+                    break;
+                case 'message':
+                    //FIXME: this should just be a function used for all "text" searchable fields
+                    if (preg_match(OBS_PATTERN_REGEXP, $value, $matches)) {
+                        // Match regular expression
+                        $where .= generate_query_values_and($matches['pattern'], 'msg', 'REGEXP');
+                    } elseif (preg_match('/^!(=)?\s*(?<msg>.+)/', $value, $matches)) {
+                        $where .= generate_query_values_and($matches['msg'], 'msg', '%!=LIKE%');
+                    } else {
+                        $where .= generate_query_values_and($value, 'msg', '%LIKE%');
+                    }
+                    break;
+                case 'timestamp_from':
+                    $where   .= ' AND `timestamp` > ?';
+                    $param[] = $value;
+                    break;
+                case 'timestamp_to':
+                    $where   .= ' AND `timestamp` < ?';
+                    $param[] = $value;
+                    break;
+            }
+        }
     }
-  }
 
-  // Show entries only for permitted devices
-  $query_permitted = generate_query_permitted();
-  /*
-  // Convert NOT IN to IN for correctly use indexes
-  $devices_permitted = dbFetchColumn('SELECT DISTINCT `device_id` FROM `syslog` WHERE 1 '.$query_permitted, NULL, TRUE);
-  $query_permitted = generate_query_values_and($devices_permitted, 'device_id');
-  //r($devices_permitted);
-  */
+    // Show entries only for permitted devices
+    $query_permitted = generate_query_permitted();
+    /*
+    // Convert NOT IN to IN for correctly use indexes
+    $devices_permitted = dbFetchColumn('SELECT DISTINCT `device_id` FROM `syslog` WHERE 1 '.$query_permitted, NULL, TRUE);
+    $query_permitted = generate_query_values_and($devices_permitted, 'device_id');
+    //r($devices_permitted);
+    */
 
-  $query = 'FROM `syslog` ';
-  $query .= $where . $query_permitted;
-  $query_count = 'SELECT COUNT(*) ' . $query;
-  $query_count_approx = 'EXPLAIN SELECT * ' . $query; // Fast approximate count
+    $query              = 'FROM `syslog` ';
+    $query              .= $where . $query_permitted;
+    $query_count        = 'SELECT COUNT(*) ' . $query;
+    $query_count_approx = 'EXPLAIN SELECT * ' . $query; // Fast approximate count
 
-  $query = 'SELECT * ' . $query;
-  $query .= ' ORDER BY `seq` DESC ';
-  $query .= "LIMIT $start,$pagesize";
+    $query = 'SELECT * ' . $query;
+    $query .= ' ORDER BY `seq` DESC ';
+    $query .= "LIMIT $start,$pagesize";
 
-  // Query syslog messages
-  $entries = dbFetchRows($query, $param);
-  // Query syslog count
-  if ($pagination && !$short)
-  {
-    dbSetVariable('MAX_EXECUTION_TIME', 500); // Set 0.5 sec maximum query execution time
-    // Exactly count, but it's very SLOW on huge tables
-    $count = dbFetchCell($query_count, $param);
-    dbSetVariable('MAX_EXECUTION_TIME', 0); // Reset maximum query execution time
-    //r($count);
-    if (!is_numeric($count))
-    {
-      // Approximate count correctly around 100-80%
-      dbQuery('ANALYZE TABLE `syslog`;'); // Update INFORMATION_SCHEMA for more correctly count
-      $tmp = dbFetchRow($query_count_approx, $param);
-      $count = $tmp['rows'];
-      $count_estimate = TRUE;
+    // Query syslog messages
+    $entries = dbFetchRows($query, $param);
+    // Query syslog count
+    if ($pagination && !$short) {
+        dbSetVariable('MAX_EXECUTION_TIME', 500); // Set 0.5 sec maximum query execution time
+        // Exactly count, but it's very SLOW on huge tables
+        $count = dbFetchCell($query_count, $param);
+        dbSetVariable('MAX_EXECUTION_TIME', 0); // Reset maximum query execution time
+        //r($count);
+        if (!is_numeric($count)) {
+            // Approximate count correctly around 100-80%
+            dbQuery('ANALYZE TABLE `syslog`;'); // Update INFORMATION_SCHEMA for more correctly count
+            $tmp            = dbFetchRow($query_count_approx, $param);
+            $count          = $tmp['rows'];
+            $count_estimate = TRUE;
+        }
+    } else {
+        $count = safe_count($entries);
     }
-  } else {
-    $count = safe_count($entries);
-  }
 
-  if (!$count)
-  {
-    // There have been no entries returned. Print the warning.
+    if (!$count) {
+        // There have been no entries returned. Print the warning.
 
-    print_warning('<h4>No syslog entries found!</h4>
+        print_warning('<h4>No syslog entries found!</h4>
 Check that the syslog daemon and Observium configuration options are set correctly, that your devices are configured to send syslog to Observium and that there are no firewalls blocking the messages.
 
-See <a href="'.OBSERVIUM_DOCS_URL.'/syslog/" target="_blank">Syslog Integration</a> guide and <a href="'.OBSERVIUM_DOCS_URL.'/config_options/#syslog-settings" target="_blank">configuration options</a> for more information.');
+See <a href="' . OBSERVIUM_DOCS_URL . '/syslog/" target="_blank">Syslog Integration</a> guide and <a href="' . OBSERVIUM_DOCS_URL . '/config_options/#syslog-settings" target="_blank">configuration options</a> for more information.');
 
-  } else {
-    // Entries have been returned. Print the table.
-
-    $list = array('device' => FALSE, 'priority' => TRUE); // For now (temporarily) priority always displayed
-    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'syslog') { $list['device'] = TRUE; }
-    if ($short || !isset($vars['priority']) || empty($vars['priority'])) { $list['priority'] = TRUE; }
-
-
-    $string = generate_box_open($vars['header']);
-    if((isset($vars['short']) && $vars['short'])) {
-        $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">' . PHP_EOL;
     } else {
-        $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED . '">' . PHP_EOL;
+        // Entries have been returned. Print the table.
 
+        $list = ['device' => FALSE, 'priority' => TRUE]; // For now (temporarily) priority always displayed
+        if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'syslog') {
+            $list['device'] = TRUE;
+        }
+        if ($short || !isset($vars['priority']) || empty($vars['priority'])) {
+            $list['priority'] = TRUE;
+        }
+
+
+        $string = generate_box_open($vars['header']);
+        if ((isset($vars['short']) && $vars['short'])) {
+            $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">' . PHP_EOL;
+        } else {
+            $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED . '">' . PHP_EOL;
+
+        }
+        // Generate table header
+        if (!$short) {
+            $cols   = [];
+            $cols[] = [NULL, 'class="state-marker"'];
+            //$cols[]              = [ NULL, 'class="no-width"' ]; // Measured entity link
+            $cols[] = ['Date'];
+            if ($list['device']) {
+                //$cols['device']    = [ 'Device' ];
+                $cols[] = ['Device'];
+            }
+            if ($list['priority']) {
+                //$cols['priority']  = [ 'Priority' ];
+                $cols[] = ['Priority'];
+            }
+            $cols[] = ['[Program] [Tags] Message'];
+
+            $string .= get_table_header($cols, $vars);
+        }
+
+        // Table body
+        $string .= '  <tbody>' . PHP_EOL;
+        foreach ($entries as $entry) {
+            $string .= generate_syslog_row($entry, $vars, $list);
+        }
+        //print_vars($GLOBALS['cache']['syslog']);
+        $string .= '  </tbody>' . PHP_EOL;
+
+        $string .= '</table>' . PHP_EOL;
+
+        $string .= generate_box_close();
+
+        // Print pagination header
+        if ($pagination && !$short) {
+            $string = pagination($vars, $count) . $string . pagination($vars, $count);
+        }
+
+        if (isset($count_estimate) && $count_estimate == TRUE) {
+            print_message("The syslog entry counts shown below are an estimate due to SQL query performance limitations. There may be many fewer results than indicated.", "info");
+        }
+
+        // Print syslog
+        echo $string;
     }
-    // Generate table header
-    if (!$short)
-    {
-      $cols = [];
-      $cols[]              = [ NULL, 'class="state-marker"' ];
-      //$cols[]              = [ NULL, 'class="no-width"' ]; // Measured entity link
-      $cols[]              = [ 'Date' ];
-      if ($list['device'])
-      {
-        //$cols['device']    = [ 'Device' ];
-        $cols[]            = [ 'Device' ];
-      }
-      if ($list['priority'])
-      {
-        //$cols['priority']  = [ 'Priority' ];
-        $cols[]            = [ 'Priority' ];
-      }
-      $cols[]              = [ '[Program] [Tags] Message' ];
-
-      $string .= get_table_header($cols, $vars);
-    }
-
-    // Table body
-    $string .= '  <tbody>' . PHP_EOL;
-    foreach ($entries as $entry)
-    {
-      $string .= generate_syslog_row($entry, $vars, $list);
-    }
-    //print_vars($GLOBALS['cache']['syslog']);
-    $string .= '  </tbody>' . PHP_EOL;
-
-    $string .= '</table>' . PHP_EOL;
-
-    $string .= generate_box_close();
-
-    // Print pagination header
-    if ($pagination && !$short) { $string = pagination($vars, $count) . $string . pagination($vars, $count); }
-
-    if(isset($count_estimate) && $count_estimate == TRUE)
-    {
-        print_message("The syslog entry counts shown below are an estimate due to SQL query performance limitations. There may be many fewer results than indicated.", "info");
-    }
-
-    // Print syslog
-    echo $string;
-  }
 }
 
 function generate_syslog_row($entry, $vars, $list = NULL)
 {
-  // Short events? (no pagination, small out)
-  $short = (isset($vars['short']) && $vars['short']);
-  $priorities = $GLOBALS['config']['syslog']['priorities'];
-  $is_alert = isset($entry['la_id']); // This is syslog alert entry?
+    // Short events? (no pagination, small out)
+    $short      = (isset($vars['short']) && $vars['short']);
+    $priorities = $GLOBALS['config']['syslog']['priorities'];
+    $is_alert   = isset($entry['la_id']); // This is syslog alert entry?
 
-  // List of displayed columns
-  if (is_null($list))
-  {
-    $list = [ 'device' => FALSE, 'priority' => TRUE ]; // For now (temporarily) priority always displayed
-    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'syslog')
-    {
-      $list['device'] = TRUE;
-    }
-    if ($short || !isset($vars['priority']) || empty($vars['priority']))
-    {
-      $list['priority'] = TRUE;
-    }
-  }
-
-  $row_class = strlen($entry['html_row_class']) ? $entry['html_row_class'] : $priorities[$entry['priority']]['row-class'];
-
-  $string = '  <tr class="'.$row_class.'">' . PHP_EOL;
-  $string .= '<td class="state-marker"></td>' . PHP_EOL;
-  $timediff = get_time() - strtotime($entry['timestamp']);
-
-  if ($short || $timediff < 3600) {
-    $string .= '    <td class="syslog text-nowrap">';
-    $string .= generate_tooltip_time($entry['timestamp']) . '</td>' . PHP_EOL;
-  } else {
-    //$string .= '    <td style="width: 130px">';
-    $string .= '    <td>';
-    $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
-  }
-
-  // Device column
-  if ($list['device'])
-  {
-    $dev = device_by_id_cache($entry['device_id']);
-    $device_vars = array('page'    => 'device',
-                         'device'  => $entry['device_id'],
-                         'tab'     => 'logs',
-                         'section' => 'syslog');
-    if ($is_alert) { $device_vars['section'] = 'logalert'; }
-    $string .= '    <td class="entity">' . generate_device_link_short($dev, $device_vars) . '</td>' . PHP_EOL;
-  }
-
-  // Alert Rule column (in syslog alerts)
-  if ($list['la_id'])
-  {
-    $syslog_rules = $GLOBALS['cache']['syslog']['syslog_rules']; // Cached syslog rules
-    $string .= '<td><strong><a href="'.generate_url(array('page' => 'syslog_rules', 'la_id' => $entry['la_id'])).'">' .
-               (is_array($syslog_rules[$entry['la_id']]) ? $syslog_rules[$entry['la_id']]['la_name'] : 'Rule Deleted')  . '</td>' . PHP_EOL;
-  }
-
-  // Priority column
-  if ($list['priority'])
-  {
-    if (!$short)
-    {
-      $string .= '    <td style="width: 95px"><span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' .
-                 nicecase($priorities[$entry['priority']]['name']) . ' (' . $entry['priority'] . ')</span></td>' . PHP_EOL;
-    }
-  }
-
-  // Program and Tags column
-  $entry['program'] = (empty($entry['program'])) ? '[[EMPTY]]' : $entry['program'];
-  if ($short)
-  {
-    $string .= '    <td class="syslog">';
-    $string .= '<span class="label label-' . $priorities[$entry['priority']]['label-class'] . '"><strong>' . escape_html($entry['program']) . '</strong></span>';
-  } else {
-    $string .= '    <td>';
-    $string .= '<span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' . escape_html($entry['program']) . '</span>';
-
-    /* Show tags if not short */
-    $tags = array();
-    foreach(explode(',', $entry['tag']) as $tag)
-    {
-      if (!str_istarts($tag, $entry['program']) &&
-          !preg_match('/^(\d+\:|[\da-f]{2})$/i', $tag) &&
-          !preg_match('/^<(Emer|Aler|Crit|Err|Warn|Noti|Info|Debu)/i', $tag)) // Skip tags same as program or old numeric tags or syslog-ng 2x hex numbers
-      {
-        $tags[] = escape_html($tag);
-      }
-    }
-    if ($tags)
-    {
-      $string .= '<span class="label">';
-      $string .= implode('</span><span class="label">', $tags);
-      $string .= '</span>';
-    }
-    /* End tags */
-  }
-  if ($list['program'])
-  {
-    // Program in separate column (from message)
-    $string .= $short ? '</td><td class="syslog">' : '</td><td>';
-  }
-
-  // Link with syslog ports cache
-  if (!isset($GLOBALS['cache']['syslog']['ports_links'])) {
-    $GLOBALS['cache']['syslog']['ports_links'] = [];
-  }
-  $ports_links = &$GLOBALS['cache']['syslog']['ports_links'];
-
-  // Highlight port links
-  if (!isset($ports_links[$entry['device_id']])) {
-    $ports_links[$entry['device_id']] = [];
-    $sql = 'SELECT `port_id`, `port_label_short`, `port_label_base`, `port_label_num`, `ifDescr`, `ifName` FROM `ports` WHERE `device_id` = ? AND `deleted` = ?';
-    foreach (dbFetchRows($sql, [ $entry['device_id'], 0 ]) as $port_descr) {
-      $search = [ $port_descr['ifDescr'], $port_descr['ifName'], $port_descr['port_label_short'] ];
-      // FIXME. Currently as hack for Extreme (should make universal with lots of examples), see:
-      // https://jira.observium.org/browse/OBS-3304
-      if (preg_match('/\s(port\s*\d.*)/i', $port_descr['ifDescr'], $matches)) {
-        $search[] = $matches[1];
-      } elseif (strlen($port_descr['port_label_base']) && str_contains($port_descr['port_label_num'], '/')) {
-        // Brocade NOS derp interfaces with rbridge ids, ie:
-        // TenGigabitEthernet 22/0/20 or Te 22/0/20 -> TenGigabitEthernet 0/20
-        $search[] = $port_descr['port_label_base'] . '\d+/' . $port_descr['port_label_num'];
-        // and short
-        $search[] = short_ifname($port_descr['port_label_base'] . '\d+/' . $port_descr['port_label_num']);
-      }
-      $ports_links[$entry['device_id']][$port_descr['port_id']] = [
-        'search'  => $search,
-        'replace' => generate_entity_link('port', $port_descr['port_id'], '$2')
-      ];
-    }
-  }
-  $entity_links = $ports_links[$entry['device_id']];
-
-  // Highlight bgp peer links (try only when program match BGP)
-  if (str_icontains_array($entry['program'], 'bgp'))
-  {
-
-    // Link with syslog bgp cache
-    if (!isset($GLOBALS['cache']['syslog']['bgp_links']))
-    {
-      $GLOBALS['cache']['syslog']['bgp_links'] = [];
-    }
-    $bgp_links = &$GLOBALS['cache']['syslog']['bgp_links'];
-
-    if (!isset($bgp_links[$entry['device_id']]))
-    {
-      $bgp_links[$entry['device_id']] = [];
-      //SELECT `bgpPeer_id`, `bgpPeerRemoteAs`, `bgpPeerIdentifier`, `bgpPeerRemoteAddr` FROM `bgpPeers` WHERE `device_id` = 2
-      foreach (dbFetchRows('SELECT * FROM `bgpPeers` WHERE `device_id` = ?', [ $entry['device_id'] ]) as $bgp_descr)
-      {
-        $search = [];
-        foreach ([ 'bgpPeerIdentifier', 'bgpPeerRemoteAddr' ] as $param)
-        {
-          if ($bgp_descr[$param] === '0.0.0.0') { continue; }
-
-          $search[] = 'Nbr ' . $bgp_descr[$param];
-          $search[] = 'Neighbor ' . $bgp_descr[$param];
-          if (get_ip_version($bgp_descr[$param]) == 6)
-          {
-            // For IPv6 append compressed form
-            $bgp_descr[$param] = Net_IPv6::compress($bgp_descr[$param], TRUE);
-            $search[] = 'Nbr ' . $bgp_descr[$param];
-            $search[] = 'Neighbor ' . $bgp_descr[$param];
-          }
+    // List of displayed columns
+    if (is_null($list)) {
+        $list = ['device' => FALSE, 'priority' => TRUE]; // For now (temporarily) priority always displayed
+        if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'syslog') {
+            $list['device'] = TRUE;
         }
-        $bgp_links[$entry['device_id']][] = [ 'search'  => $search,
-                                              'replace' => generate_entity_link('bgp_peer', $bgp_descr, '$2') ];
-        // Additionally append AS text
-        if ($bgp_descr['astext'] && !isset($bgp_links[$entry['device_id']]['as'.$bgp_descr['bgpPeerRemoteAs']]))
-        {
-          $bgp_links[$entry['device_id']]['as'.$bgp_descr['bgpPeerRemoteAs']] = [
-            'search'  => [ 'AS ' . $bgp_descr['bgpPeerRemoteAs'], 'AS: ' . $bgp_descr['bgpPeerRemoteAs'], 'AS' . $bgp_descr['bgpPeerRemoteAs'] ],
-            'replace' => generate_tooltip_link('', '$2', $bgp_descr['astext'])
-          ];
+        if ($short || !isset($vars['priority']) || empty($vars['priority'])) {
+            $list['priority'] = TRUE;
         }
-      }
     }
-    $entity_links = array_merge($entity_links, $bgp_links[$entry['device_id']]);
-  }
 
-  // Linkify entities in syslog messages
-  if (isset($entry['msg']) && !isset($entry['message']))
-  {
-    // Different field in syslog alerts and syslog
-    $entry['message'] = $entry['msg'];
-  }
+    $row_class = !safe_empty($entry['html_row_class']) ? $entry['html_row_class'] : $priorities[$entry['priority']]['row-class'];
 
-  // Restore escaped quotes (for old entries)
-  $entry['message'] = str_replace([ '\"', "\'" ], [ '"', "'" ], $entry['message']);
+    $string   = '  <tr class="' . $row_class . '">' . PHP_EOL;
+    $string   .= '<td class="state-marker"></td>' . PHP_EOL;
+    $timediff = get_time() - strtotime($entry['timestamp']);
 
-  $string .= ' ' . html_highlight(escape_html($entry['message']), $entity_links, NULL, TRUE) . '</td>' . PHP_EOL;
-  //$string .= ' ' . escape_html($entry['msg']) . '</td>' . PHP_EOL;
+    if ($short || $timediff < 3600) {
+        $string .= '    <td class="syslog text-nowrap">';
+        $string .= generate_tooltip_time($entry['timestamp']) . '</td>' . PHP_EOL;
+    } else {
+        //$string .= '    <td style="width: 130px">';
+        $string .= '    <td>';
+        $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
+    }
 
-  // if (!$short)
-  // {
-  //   //$string .= '<td>' . escape_html($entry['log_type']) . '</td>' . PHP_EOL;
-  //   //$string .= '<td style="text-align: right">'. ($entry['notified'] == '1' ? '<span class="label label-success">YES</span>' : ($entry['notified'] == '-1' ? '<span class="label">SKIP</span>' : '<span class="label label-warning">NO</span>')) . '</td>' . PHP_EOL;
-  // }
+    // Device column
+    if ($list['device']) {
+        $dev         = device_by_id_cache($entry['device_id']);
+        $device_vars = ['page'    => 'device',
+                        'device'  => $entry['device_id'],
+                        'tab'     => 'logs',
+                        'section' => 'syslog'];
+        if ($is_alert) {
+            $device_vars['section'] = 'logalert';
+        }
+        $string .= '    <td class="entity">' . generate_device_link_short($dev, $device_vars) . '</td>' . PHP_EOL;
+    }
 
-  $string .= '  </tr>' . PHP_EOL;
+    // Alert Rule column (in syslog alerts)
+    if ($list['la_id']) {
+        $syslog_rules = $GLOBALS['cache']['syslog']['syslog_rules']; // Cached syslog rules
+        $string       .= '<td><strong><a href="' . generate_url(['page' => 'syslog_rules', 'la_id' => $entry['la_id']]) . '">' .
+                         (is_array($syslog_rules[$entry['la_id']]) ? $syslog_rules[$entry['la_id']]['la_name'] : 'Rule Deleted') . '</td>' . PHP_EOL;
+    }
 
-  return $string;
+    // Priority column
+    if ($list['priority']) {
+        if (!$short) {
+            $string .= '    <td style="width: 95px"><span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' .
+                       nicecase($priorities[$entry['priority']]['name']) . ' (' . $entry['priority'] . ')</span></td>' . PHP_EOL;
+        }
+    }
+
+    // Program and Tags column
+    $entry['program'] = (empty($entry['program'])) ? '[[EMPTY]]' : $entry['program'];
+    $program_class    = get_type_class($entry['program'], 'program');
+    if ($short) {
+        $string .= '    <td class="syslog">';
+        $string .= '<span class="label label-' . $program_class . '"><strong>' . escape_html($entry['program']) . '</strong></span>';
+    } else {
+        $string .= '    <td>';
+        $string .= '<span class="label label-' . $program_class . '">' . escape_html($entry['program']) . '</span>';
+
+        /* Show tags if not short */
+        $tags = [];
+        foreach (explode(',', $entry['tag']) as $tag) {
+            if (!str_istarts($tag, $entry['program']) &&
+                !preg_match('/^(\d+\:|[\da-f]{2})$/i', $tag) &&
+                !preg_match('/^<(Emer|Aler|Crit|Err|Warn|Noti|Info|Debu)/i', $tag)) // Skip tags same as program or old numeric tags or syslog-ng 2x hex numbers
+            {
+                $tags[] = escape_html($tag);
+            }
+        }
+        if ($tags) {
+            foreach ($tags as $tag) {
+                $tag_class = get_type_class($tag, 'tag');
+                $string    .= ' <span class="label label-' . $tag_class . '">' . $tag . '</span>';
+            }
+            //$string .= '<span class="label">';
+            //$string .= implode('</span><span class="label">', $tags);
+            //$string .= '</span>';
+        }
+        /* End tags */
+    }
+    if ($list['program']) {
+        // Program in separate column (from message)
+        $string .= $short ? '</td><td class="syslog">' : '</td><td>';
+    }
+
+    // Highlight port links
+    ports_links_cache($entry);
+    $entity_links = $GLOBALS['cache']['entity_links']['ports'][$entry['device_id']];
+
+    // Highlight bgp peer links (try only when program match BGP)
+    if ($entry['program'] === 'RPD' || // RPD is program on JunOS
+        str_icontains_array($entry['program'], 'bgp') || str_icontains_array($entry['tag'], 'bgp')) {
+
+        bgp_links_cache($entry);
+        $entity_links = array_merge($entity_links, $GLOBALS['cache']['entity_links']['bgp'][$entry['device_id']]);
+    }
+
+    // Linkify entities in syslog messages
+    if (isset($entry['msg']) && !isset($entry['message'])) {
+        // Different field in syslog alerts and syslog
+        $entry['message'] = $entry['msg'];
+    }
+
+    // Restore escaped quotes (for old entries)
+    $entry['message'] = str_replace([ '\"', "\'" ], [ '"', "'" ], $entry['message']);
+
+    $string .= ' ' . html_highlight(escape_html($entry['message']), $entity_links, NULL, TRUE) . '</td>' . PHP_EOL;
+
+    // if (!$short)
+    // {
+    //   //$string .= '<td>' . escape_html($entry['log_type']) . '</td>' . PHP_EOL;
+    //   //$string .= '<td style="text-align: right">'. ($entry['notified'] == '1' ? '<span class="label label-success">YES</span>' : ($entry['notified'] == '-1' ? '<span class="label">SKIP</span>' : '<span class="label label-warning">NO</span>')) . '</td>' . PHP_EOL;
+    // }
+
+    $string .= '  </tr>' . PHP_EOL;
+
+    return $string;
 }
 
 function generate_syslog_form_values($form_filter = FALSE, $column = NULL)
 {
-  //global $cache;
+    //global $cache;
 
-  $form_items = array();
-  $filter = is_array($form_filter); // Use filer or not
+    $form_items = [];
+    $filter     = is_array($form_filter); // Use filer or not
 
-  switch ($column)
-  {
-    case 'priorities':
-    case 'priority':
-      foreach ($GLOBALS['config']['syslog']['priorities'] as $p => $priority)
-      {
-        if ($filter && !in_array($p, $form_filter)) { continue; } // Skip filtered entries
-        if ($p > 7)                                 { continue; }
+    switch ($column) {
+        case 'priorities':
+        case 'priority':
+            foreach ($GLOBALS['config']['syslog']['priorities'] as $p => $priority) {
+                if ($filter && !in_array($p, $form_filter)) {
+                    continue;
+                } // Skip filtered entries
+                if ($p > 7) {
+                    continue;
+                }
 
-        $form_items[$p] = $priority;
-        $form_items[$p]['name'] = nicecase($priority['name']);
+                $form_items[$p]         = $priority;
+                $form_items[$p]['name'] = nicecase($priority['name']);
 
-        switch ($p)
-        {
-          case 0: // Emergency
-          case 1: // Alert
-          case 2: // Critical
-          case 3: // Error
-            $form_items[$p]['class'] = "bg-danger";
+                switch ($p) {
+                    case 0: // Emergency
+                    case 1: // Alert
+                    case 2: // Critical
+                    case 3: // Error
+                        $form_items[$p]['class'] = "bg-danger";
+                        break;
+                    case 4: // Warning
+                        $form_items[$p]['class'] = "bg-warning";
+                        break;
+                    case 5: // Notification
+                        $form_items[$p]['class'] = "bg-success";
+                        break;
+                    case 6: // Informational
+                        $form_items[$p]['class'] = "bg-info";
+                        break;
+                    case 7: // Debugging
+                        $form_items[$p]['class'] = "bg-suppressed";
+                        break;
+                    default:
+                        $form_items[$p]['class'] = "bg-disabled";
+                }
+            }
+            krsort($form_items);
             break;
-          case 4: // Warning
-            $form_items[$p]['class'] = "bg-warning";
+        case 'programs':
+        case 'program':
+            // Use filter as items
+            foreach ($form_filter as $program) {
+                $name                 = ($program != '' ? $program : OBS_VAR_UNSET);
+                $form_items[$program] = $name;
+            }
             break;
-          case 5: // Notification
-            $form_items[$p]['class'] = "bg-success";
-            break;
-          case 6: // Informational
-            $form_items[$p]['class'] = "bg-info";
-            break;
-          case 7: // Debugging
-            $form_items[$p]['class'] = "bg-suppressed";
-            break;
-          default:
-            $form_items[$p]['class'] = "bg-disabled";
-        }
-      }
-      krsort($form_items);
-      break;
-    case 'programs':
-    case 'program':
-      // Use filter as items
-      foreach ($form_filter as $program)
-      {
-        $name = ($program != '' ? $program : OBS_VAR_UNSET);
-        $form_items[$program] = $name;
-      }
-      break;
-  }
-  return $form_items;
+    }
+    return $form_items;
 }
 
-function print_syslog_rules_table($vars) {
+function print_syslog_rules_table($vars)
+{
 
-  if (isset($vars['la_id'])) {
-    $las = dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_id` = ?", [ $vars['la_id'] ]);
-  } else {
-    $las = dbFetchRows("SELECT * FROM `syslog_rules` ORDER BY `la_name`");
-  }
+    if (isset($vars['la_id'])) {
+        $las = dbFetchRows("SELECT * FROM `syslog_rules` WHERE `la_id` = ?", [$vars['la_id']]);
+    } else {
+        $las = dbFetchRows("SELECT * FROM `syslog_rules` ORDER BY `la_name`");
+    }
 
-  if (safe_count($las)) {
+    if (safe_count($las)) {
 
-    $modals = '';
-    $string = generate_box_open();
-    $string .= '<table class="table table-striped table-hover table-condensed">' . PHP_EOL;
+        $modals = '';
+        $string = generate_box_open();
+        $string .= '<table class="table table-striped table-hover table-condensed">' . PHP_EOL;
 
-    $cols = array(
-      array(NULL, 'class="state-marker"'),
-      'name'         => array('Name',         'style="width: 160px;"'),
-      'descr'        => array('Description',  'style="width: 400px;"'),
-      'rule'         => 'Rule',
-      'severity'     => array('Severity',     'style="width: 60px;"'),
-      'disabled'     => array('Status',       'style="width: 60px;"'),
-      'controls'     => array('',             'style="width: 60px;"'),
-    );
+        $cols = [
+          [NULL, 'class="state-marker"'],
+          'name'     => ['Name', 'style="width: 160px;"'],
+          'descr'    => ['Description', 'style="width: 400px;"'],
+          'rule'     => 'Rule',
+          'severity' => ['Severity', 'style="width: 60px;"'],
+          'disabled' => ['Status', 'style="width: 60px;"'],
+          'controls' => ['', 'style="width: 60px;"'],
+        ];
 
-    $string .= get_table_header($cols, $vars);
+        $string .= get_table_header($cols, $vars);
 
-    foreach($las as $la) {
+        foreach ($las as $la) {
 
-      if ($la['disable'] == 0) { $la['html_row_class'] = "up"; } else { $la['html_row_class'] = "disabled"; }
+            if ($la['disable'] == 0) {
+                $la['html_row_class'] = "up";
+            } else {
+                $la['html_row_class'] = "disabled";
+            }
 
-      $string .= '<tr class="' . $la['html_row_class'] . '">';
-      $string .= '<td class="state-marker"></td>';
+            $string .= '<tr class="' . $la['html_row_class'] . '">';
+            $string .= '<td class="state-marker"></td>';
 
-      $string .= '    <td><strong><a href="'.generate_url(array('page' => 'syslog_rules', 'la_id' => $la['la_id'])).'">' . escape_html($la['la_name']) . '</a></strong></td>' . PHP_EOL;
-      $string .= '    <td><a href="'.generate_url(array('page' => 'syslog_rules', 'la_id' => $la['la_id'])).'">' . escape_html($la['la_descr']) . '</a></td>' . PHP_EOL;
-      $string .= '    <td><code>' . escape_html($la['la_rule']) . '</code></td>' . PHP_EOL;
-      $string .= '    <td>' . escape_html($la['la_severity']) . '</td>' . PHP_EOL;
-      $string .= '    <td>' . ($la['la_disable'] ? '<span class="label label-error">disabled</span>' : '<span class="label label-success">enabled</span>') . '</td>' . PHP_EOL;
-      $string .= '    <td style="text-align: right;">';
-      if ($_SESSION['userlevel'] >= 10)
-      {
-        $string .= '
+            $string .= '    <td><strong><a href="' . generate_url(['page' => 'syslog_rules', 'la_id' => $la['la_id']]) . '">' . escape_html($la['la_name']) . '</a></strong></td>' . PHP_EOL;
+            $string .= '    <td><a href="' . generate_url(['page' => 'syslog_rules', 'la_id' => $la['la_id']]) . '">' . escape_html($la['la_descr']) . '</a></td>' . PHP_EOL;
+            $string .= '    <td><code>' . escape_html($la['la_rule']) . '</code></td>' . PHP_EOL;
+            $string .= '    <td>' . escape_html($la['la_severity']) . '</td>' . PHP_EOL;
+            $string .= '    <td>' . ($la['la_disable'] ? '<span class="label label-error">disabled</span>' : '<span class="label label-success">enabled</span>') . '</td>' . PHP_EOL;
+            $string .= '    <td style="text-align: right;">';
+            if ($_SESSION['userlevel'] >= 10) {
+                $string .= '
       <div class="btn-group btn-group-xs" role="group" aria-label="Rule actions">
-        <a class="btn btn-default" role="group" title="Edit" href="#modal-edit_syslog_rule_'.$la['la_id'].'" data-toggle="modal"><i class="icon-cog text-muted"></i></a>
-        <a class="btn btn-danger"  role="group" title="Delete" href="#modal-delete_syslog_rule_'.$la['la_id'].'" data-toggle="modal"><i class="icon-trash"></i></a>
+        <a class="btn btn-default" role="group" title="Edit" href="#modal-edit_syslog_rule_' . $la['la_id'] . '" data-toggle="modal"><i class="icon-cog text-muted"></i></a>
+        <a class="btn btn-danger"  role="group" title="Delete" href="#modal-delete_syslog_rule_' . $la['la_id'] . '" data-toggle="modal"><i class="icon-trash"></i></a>
       </div>';
-      }
-      $string .= '</td>';
-      $string .= '  </tr>' . PHP_EOL;
+            }
+            $string .= '</td>';
+            $string .= '  </tr>' . PHP_EOL;
 
 
-      // Delete Rule Modal
-      $modal_args = array(
-        'id'    => 'modal-delete_syslog_rule_' . $la['la_id'],
-        'title' => 'Delete Syslog Rule "'.escape_html($la['la_descr']).'"',
-        //'hide'  => TRUE,
-        //'fade'  => TRUE,
-        //'role'  => 'dialog',
-        //'class' => 'modal-md',
-      );
+            // Delete Rule Modal
+            $modal_args = [
+              'id'    => 'modal-delete_syslog_rule_' . $la['la_id'],
+              'title' => 'Delete Syslog Rule "' . escape_html($la['la_descr']) . '"',
+              //'hide'  => TRUE,
+              //'fade'  => TRUE,
+              //'role'  => 'dialog',
+              //'class' => 'modal-md',
+            ];
 
-      $form = array('type'      => 'horizontal',
-                    'id'        => 'delete_syslog_rule_' . $la['la_id'],
-                    'userlevel'  => 10,          // Minimum user level for display form
-                    'modal_args' => $modal_args, // !!! This generate modal specific form
-                    //'help'     => 'This will completely delete the rule and all associations and history.',
-                    'class'     => '', // Clean default box class!
-                    'url'       => generate_url(array('page' => 'syslog_rules'))
-      );
-      $form['fieldset']['body']   = array('class' => 'modal-body');   // Required this class for modal body!
-      $form['fieldset']['footer'] = array('class' => 'modal-footer'); // Required this class for modal footer!
+            $form                       = ['type'       => 'horizontal',
+                                           'id'         => 'delete_syslog_rule_' . $la['la_id'],
+                                           'userlevel'  => 10,          // Minimum user level for display form
+                                           'modal_args' => $modal_args, // !!! This generate modal specific form
+                                           //'help'     => 'This will completely delete the rule and all associations and history.',
+                                           'class'      => '', // Clean default box class!
+                                           'url'        => generate_url(['page' => 'syslog_rules'])
+            ];
+            $form['fieldset']['body']   = ['class' => 'modal-body'];   // Required this class for modal body!
+            $form['fieldset']['footer'] = ['class' => 'modal-footer']; // Required this class for modal footer!
 
-      $form['row'][0]['la_id'] = array(
-        'type'        => 'hidden',
-        'fieldset'    => 'body',
-        'value'       => $la['la_id']);
-      $form['row'][0]['action']     = array(
-        'type'        => 'hidden',
-        'fieldset'    => 'body',
-        'value'       => 'delete_syslog_rule');
+            $form['row'][0]['la_id']  = [
+              'type'     => 'hidden',
+              'fieldset' => 'body',
+              'value'    => $la['la_id']];
+            $form['row'][0]['action'] = [
+              'type'     => 'hidden',
+              'fieldset' => 'body',
+              'value'    => 'delete_syslog_rule'];
 
-      $form['row'][5]['confirm'] = array(
-        'type'        => 'checkbox',
-        'fieldset'    => 'body',
-        'name'        => 'Confirm',
-        'placeholder' => 'Yes, please delete this rule.',
-        'onchange'    => "javascript: toggleAttrib('disabled', 'delete_button_".$la['la_id']."'); showDiv(!this.checked, 'warning_".$la['la_id']."_div');",
-        'value'       => 'confirm');
-      $form['row'][6]['warning_'.$la['la_id']] = array(
-        'type'        => 'html',
-        'fieldset'    => 'body',
-        'html'        => '<h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>' .
-                         ' This rule and all history will be completely deleted!',
-        'div_class'   => 'alert alert-warning',
-        'div_style'   => 'display:none;');
+            $form['row'][5]['confirm']                 = [
+              'type'        => 'checkbox',
+              'fieldset'    => 'body',
+              'name'        => 'Confirm',
+              'placeholder' => 'Yes, please delete this rule.',
+              'onchange'    => "javascript: toggleAttrib('disabled', 'delete_button_" . $la['la_id'] . "'); showDiv(!this.checked, 'warning_" . $la['la_id'] . "_div');",
+              'value'       => 'confirm'];
+            $form['row'][6]['warning_' . $la['la_id']] = [
+              'type'      => 'html',
+              'fieldset'  => 'body',
+              'html'      => '<h4 class="alert-heading"><i class="icon-warning-sign"></i> Warning!</h4>' .
+                             ' This rule and all history will be completely deleted!',
+              'div_class' => 'alert alert-warning',
+              'div_style' => 'display:none;'];
 
-      $form['row'][8]['close'] = array(
-        'type'        => 'submit',
-        'fieldset'    => 'footer',
-        'div_class'   => '', // Clean default form-action class!
-        'name'        => 'Close',
-        'icon'        => '',
-        'attribs'     => array('data-dismiss' => 'modal',
-                               'aria-hidden'  => 'true'));
-      $form['row'][9]['delete_button_'.$la['la_id']] = array(
-        'type'        => 'submit',
-        'fieldset'    => 'footer',
-        'div_class'   => '', // Clean default form-action class!
-        'name'        => 'Delete Rule',
-        'icon'        => 'icon-trash icon-white',
-        //'right'       => TRUE,
-        'class'       => 'btn-danger',
-        'disabled'    => TRUE,
-        'value'       => 'delete_syslog_rule');
+            $form['row'][8]['close']                         = [
+              'type'      => 'submit',
+              'fieldset'  => 'footer',
+              'div_class' => '', // Clean default form-action class!
+              'name'      => 'Close',
+              'icon'      => '',
+              'attribs'   => ['data-dismiss' => 'modal',
+                              'aria-hidden'  => 'true']];
+            $form['row'][9]['delete_button_' . $la['la_id']] = [
+              'type'      => 'submit',
+              'fieldset'  => 'footer',
+              'div_class' => '', // Clean default form-action class!
+              'name'      => 'Delete Rule',
+              'icon'      => 'icon-trash icon-white',
+              //'right'       => TRUE,
+              'class'     => 'btn-danger',
+              'disabled'  => TRUE,
+              'value'     => 'delete_syslog_rule'];
 
-      $modals .= generate_form_modal($form);
-      unset($form);
+            $modals .= generate_form_modal($form);
+            unset($form);
 
-      // Edit Rule Modal
+            // Edit Rule Modal
 
-      $modal_args = array(
-        'id'    => 'modal-edit_syslog_rule_' . $la['la_id'],
-        'title' => 'Edit Syslog Rule "'.escape_html($la['la_descr']).'"',
-        //'hide'  => TRUE,
-        //'fade'  => TRUE,
-        //'role'  => 'dialog',
-        'class' => 'modal-lg',
-      );
+            $modal_args = [
+              'id'    => 'modal-edit_syslog_rule_' . $la['la_id'],
+              'title' => 'Edit Syslog Rule "' . escape_html($la['la_descr']) . '"',
+              //'hide'  => TRUE,
+              //'fade'  => TRUE,
+              //'role'  => 'dialog',
+              'class' => 'modal-lg',
+            ];
 
-      $form = array('type'      => 'horizontal',
-                    'id'        => 'edit_syslog_rule_' . $la['la_id'],
-                    'userlevel'  => 10,          // Minimum user level for display form
-                    'modal_args' => $modal_args, // !!! This generate modal specific form
-                    //'help'     => 'This will completely delete the rule and all associations and history.',
-                    'class'     => '', // Clean default box class!
-                    'url'       => generate_url(array('page' => 'syslog_rules'))
-      );
-      $form['fieldset']['body']   = array('class' => 'modal-body');   // Required this class for modal body!
-      $form['fieldset']['footer'] = array('class' => 'modal-footer'); // Required this class for modal footer!
+            $form                       = ['type'       => 'horizontal',
+                                           'id'         => 'edit_syslog_rule_' . $la['la_id'],
+                                           'userlevel'  => 10,          // Minimum user level for display form
+                                           'modal_args' => $modal_args, // !!! This generate modal specific form
+                                           //'help'     => 'This will completely delete the rule and all associations and history.',
+                                           'class'      => '', // Clean default box class!
+                                           'url'        => generate_url(['page' => 'syslog_rules'])
+            ];
+            $form['fieldset']['body']   = ['class' => 'modal-body'];   // Required this class for modal body!
+            $form['fieldset']['footer'] = ['class' => 'modal-footer']; // Required this class for modal footer!
 
-      $form['row'][0]['la_id'] = array(
-        'type'        => 'hidden',
-        'fieldset'    => 'body',
-        'value'       => $la['la_id']);
+            $form['row'][0]['la_id'] = [
+              'type'     => 'hidden',
+              'fieldset' => 'body',
+              'value'    => $la['la_id']];
 
-      $form['row'][3]['la_name'] = array(
-        'type'        => 'text',
-        'fieldset'    => 'body',
-        'name'        => 'Rule Name',
-        'class'       => 'input-xlarge',
-        'value'       => $la['la_name']);
-      $form['row'][4]['la_descr'] = array(
-        'type'        => 'textarea',
-        'fieldset'    => 'body',
-        'name'        => 'Description',
-        'class'       => 'input-xxlarge',
-        //'style'       => 'margin-bottom: 10px;',
-        'value'       => $la['la_descr']);
-      $form['row'][5]['la_rule'] = array(
-        'type'        => 'textarea',
-        'fieldset'    => 'body',
-        'name'        => 'Regular Expression',
-        'class'       => 'input-xxlarge',
-        'value'       => $la['la_rule']);
-      $form['row'][6]['la_disable'] = array(
-        'type'        => 'switch-ng',
-        'fieldset'    => 'body',
-        'name'        => 'Status',
-        'on-text'     => 'Disabled',
-        'on-color'    => 'danger',
-        'off-text'    => 'Enabled',
-        'off-color'   => 'success',
-        'size'        => 'small',
-        'value'       => $la['la_disable']);
+            $form['row'][3]['la_name']    = [
+              'type'     => 'text',
+              'fieldset' => 'body',
+              'name'     => 'Rule Name',
+              'class'    => 'input-xlarge',
+              'value'    => $la['la_name']];
+            $form['row'][4]['la_descr']   = [
+              'type'     => 'textarea',
+              'fieldset' => 'body',
+              'name'     => 'Description',
+              'class'    => 'input-xxlarge',
+              //'style'       => 'margin-bottom: 10px;',
+              'value'    => $la['la_descr']];
+            $form['row'][5]['la_rule']    = [
+              'type'     => 'textarea',
+              'fieldset' => 'body',
+              'name'     => 'Regular Expression',
+              'class'    => 'input-xxlarge',
+              'value'    => $la['la_rule']];
+            $form['row'][6]['la_disable'] = [
+              'type'      => 'switch-ng',
+              'fieldset'  => 'body',
+              'name'      => 'Status',
+              'on-text'   => 'Disabled',
+              'on-color'  => 'danger',
+              'off-text'  => 'Enabled',
+              'off-color' => 'success',
+              'size'      => 'small',
+              'value'     => $la['la_disable']];
 
-      $form['row'][8]['close'] = array(
-        'type'        => 'submit',
-        'fieldset'    => 'footer',
-        'div_class'   => '', // Clean default form-action class!
-        'name'        => 'Close',
-        'icon'        => '',
-        'attribs'     => array('data-dismiss' => 'modal',
-                               'aria-hidden'  => 'true'));
-      $form['row'][9]['action'] = array(
-        'type'        => 'submit',
-        'fieldset'    => 'footer',
-        'div_class'   => '', // Clean default form-action class!
-        'name'        => 'Save Changes',
-        'icon'        => 'icon-ok icon-white',
-        //'right'       => TRUE,
-        'class'       => 'btn-primary',
-        'value'       => 'edit_syslog_rule');
+            $form['row'][8]['close']  = [
+              'type'      => 'submit',
+              'fieldset'  => 'footer',
+              'div_class' => '', // Clean default form-action class!
+              'name'      => 'Close',
+              'icon'      => '',
+              'attribs'   => ['data-dismiss' => 'modal',
+                              'aria-hidden'  => 'true']];
+            $form['row'][9]['action'] = [
+              'type'      => 'submit',
+              'fieldset'  => 'footer',
+              'div_class' => '', // Clean default form-action class!
+              'name'      => 'Save Changes',
+              'icon'      => 'icon-ok icon-white',
+              //'right'       => TRUE,
+              'class'     => 'btn-primary',
+              'value'     => 'edit_syslog_rule'];
 
-      $modals .= generate_form_modal($form);
-      unset($form);
+            $modals .= generate_form_modal($form);
+            unset($form);
+
+        }
+
+        $string .= '</table>';
+        $string .= generate_box_close();
+
+        echo $string;
+
+    } else {
+
+        print_warning("There are currently no Syslog alerting filters defined.");
 
     }
 
-    $string .= '</table>';
-    $string .= generate_box_close();
-
-    echo $string;
-
-  } else {
-
-    print_warning("There are currently no Syslog alerting filters defined.");
-
-  }
-
-  echo $modals;
+    echo $modals;
 
 }
 

@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -32,13 +32,17 @@ $scale = 1; // Start at 1 for 2 digits setting.
 $oids = snmpwalk_cache_oid($device, "digital-sen1-1", [], "ROOMALERT3E-MIB");
 
 foreach ($oids as $index => $entry) {
-  $descr = $entry['digital-sen1-label'] ?: "Internal Temperature";
-  if (count($oids) > 1) { $descr .= " " . ($index+1); }
-  $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.1.1.$index";
-  $value = $entry['digital-sen1-1'];
-  if ($value > 100) { $scale = 0.01; }
+    $descr = $entry['digital-sen1-label'] ?: "Internal Temperature";
+    if (count($oids) > 1) {
+        $descr .= " " . ($index + 1);
+    }
+    $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.1.1.$index";
+    $value = $entry['digital-sen1-1'];
+    if ($value > 100) {
+        $scale = 0.01;
+    }
 
-  //discover_sensor('temperature', $device, $oid, "digital-sen1-1.$index", 'roomalert', $descr, $scale, $value);
+    //discover_sensor('temperature', $device, $oid, "digital-sen1-1.$index", 'roomalert', $descr, $scale, $value);
 }
 
 // Digital sensors -- ARGH, why not digital-sen.1.1.0 instead of digital-sen1-1.0 !
@@ -60,72 +64,72 @@ $oids = snmpwalk_cache_oid($device, "digital", [], "ROOMALERT3E-MIB");
 $index = 0;
 
 for ($i = 1; $i <= 2; $i++) {
-  if (isset($oids[$index]["digital-sen$i-1"])) {
-    $name = $oids[$index]["digital-sen$i-label"] ?: "Channel $i";
-    // Sensor is present.
-    if (!isset($oids[$index]["digital-sen$i-3"])) {
-      // Temp sensor
-      $descr = "$name: Temperature";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.1.$index";
-      $value = $oids[$index]["digital-sen$i-1"];
-      $options = [ 'rename_rrd' => "roomalert-digital-sen$i-1.$index" ];
+    if (isset($oids[$index]["digital-sen$i-1"])) {
+        $name = $oids[$index]["digital-sen$i-label"] ?: "Channel $i";
+        // Sensor is present.
+        if (!isset($oids[$index]["digital-sen$i-3"])) {
+            // Temp sensor
+            $descr   = "$name: Temperature";
+            $oid     = ".1.3.6.1.4.1.20916.1.9.1.1.$i.1.$index";
+            $value   = $oids[$index]["digital-sen$i-1"];
+            $options = ['rename_rrd' => "roomalert-digital-sen$i-1.$index"];
 
-      discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, NULL, $descr, $scale, $value, $options);
-      //discover_sensor('temperature', $device, $oid, "digital-sen$i-1.$index", 'roomalert', $descr, $scale, $value);
-    } elseif (isset($oids[$index]["digital-sen$i-5"])) {
-      // Temp/Humidity sensor
-      $descr = "$name: Temperature";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.1.$index";
-      $value = $oids[$index]["digital-sen$i-1"];
-      $options = [ 'rename_rrd' => "roomalert-digital-sen$i-1.$index" ];
+            discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, NULL, $descr, $scale, $value, $options);
+            //discover_sensor('temperature', $device, $oid, "digital-sen$i-1.$index", 'roomalert', $descr, $scale, $value);
+        } elseif (isset($oids[$index]["digital-sen$i-5"])) {
+            // Temp/Humidity sensor
+            $descr   = "$name: Temperature";
+            $oid     = ".1.3.6.1.4.1.20916.1.9.1.1.$i.1.$index";
+            $value   = $oids[$index]["digital-sen$i-1"];
+            $options = ['rename_rrd' => "roomalert-digital-sen$i-1.$index"];
 
-      discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, NULL, $descr, $scale, $value, $options);
-      //discover_sensor('temperature', $device, $oid, "digital-sen$i-1.$index", 'roomalert', $descr, $scale, $value);
+            discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-1", $oid, $index, NULL, $descr, $scale, $value, $options);
+            //discover_sensor('temperature', $device, $oid, "digital-sen$i-1.$index", 'roomalert', $descr, $scale, $value);
 
-      $descr = "$name: Heat index";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.5.$index";
-      $value = $oids[$index]["digital-sen$i-5"];
-      $options = [ 'rename_rrd' => "roomalert-digital-sen$i-5.$index" ];
+            $descr   = "$name: Heat index";
+            $oid     = ".1.3.6.1.4.1.20916.1.9.1.1.$i.5.$index";
+            $value   = $oids[$index]["digital-sen$i-5"];
+            $options = ['rename_rrd' => "roomalert-digital-sen$i-5.$index"];
 
-      discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-5", $oid, $index, NULL, $descr, $scale, $value, $options);
-      //discover_sensor('temperature', $device, $oid, "digital-sen$i-5.$index", 'roomalert', $descr, $scale, $value);
+            discover_sensor_ng($device, 'temperature', $mib, "digital-sen$i-5", $oid, $index, NULL, $descr, $scale, $value, $options);
+            //discover_sensor('temperature', $device, $oid, "digital-sen$i-5.$index", 'roomalert', $descr, $scale, $value);
 
-      $descr = "$name: Humidity";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.3.$index";
-      $value = $oids[$index]["digital-sen$i-3"];
-      $options = [ 'rename_rrd' => "roomalert-digital-sen$i-3.$index" ];
+            $descr   = "$name: Humidity";
+            $oid     = ".1.3.6.1.4.1.20916.1.9.1.1.$i.3.$index";
+            $value   = $oids[$index]["digital-sen$i-3"];
+            $options = ['rename_rrd' => "roomalert-digital-sen$i-3.$index"];
 
-      discover_sensor_ng($device, 'humidity', $mib, "digital-sen$i-3", $oid, $index, NULL, $descr, $scale, $value, $options);
-      //discover_sensor('humidity', $device, $oid, "digital-sen$i-3.$index", 'roomalert', $descr, $scale, $value);
+            discover_sensor_ng($device, 'humidity', $mib, "digital-sen$i-3", $oid, $index, NULL, $descr, $scale, $value, $options);
+            //discover_sensor('humidity', $device, $oid, "digital-sen$i-3.$index", 'roomalert', $descr, $scale, $value);
 
-      $descr = "$name: Dew Point";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.6.$index";
-      $value = $oids[$index]["digital-sen$i-6"];
+            $descr = "$name: Dew Point";
+            $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.6.$index";
+            $value = $oids[$index]["digital-sen$i-6"];
 
-      discover_sensor_ng($device, 'dewpoint', $mib, "digital-sen$i-6", $oid, $index, NULL, $descr, $scale, $value);
-    } else {
-      // Power sensor
-      $descr = "Channel $i: Current";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.1.$index";
-      $value = $oids[$index]["digital-sen$i-1"];
-      discover_sensor('current', $device, $oid, "digital-sen$i-1.$index", 'roomalert', $descr, $scale, $value);
+            discover_sensor_ng($device, 'dewpoint', $mib, "digital-sen$i-6", $oid, $index, NULL, $descr, $scale, $value);
+        } else {
+            // Power sensor
+            $descr = "Channel $i: Current";
+            $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.1.$index";
+            $value = $oids[$index]["digital-sen$i-1"];
+            discover_sensor('current', $device, $oid, "digital-sen$i-1.$index", 'roomalert', $descr, $scale, $value);
 
-      $descr = "Channel $i: Power";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.2.$index";
-      $value = $oids[$index]["digital-sen$i-2"];
-      discover_sensor('power', $device, $oid, "digital-sen$i-2.$index", 'roomalert', $descr, $scale, $value);
+            $descr = "Channel $i: Power";
+            $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.2.$index";
+            $value = $oids[$index]["digital-sen$i-2"];
+            discover_sensor('power', $device, $oid, "digital-sen$i-2.$index", 'roomalert', $descr, $scale, $value);
 
-      $descr = "Channel $i: Voltage";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.3.$index";
-      $value = $oids[$index]["digital-sen$i-3"];
-      discover_sensor('voltage', $device, $oid, "digital-sen$i-3.$index", 'roomalert', $descr, $scale, $value);
+            $descr = "Channel $i: Voltage";
+            $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.3.$index";
+            $value = $oids[$index]["digital-sen$i-3"];
+            discover_sensor('voltage', $device, $oid, "digital-sen$i-3.$index", 'roomalert', $descr, $scale, $value);
 
-      $descr = "Channel $i: Reference voltage";
-      $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.4.$index";
-      $value = $oids[$index]["digital-sen$i-4"];
-      discover_sensor('voltage', $device, $oid, "digital-sen$i-4.$index", 'roomalert', $descr, $scale, $value);
+            $descr = "Channel $i: Reference voltage";
+            $oid   = ".1.3.6.1.4.1.20916.1.9.1.1.$i.4.$index";
+            $value = $oids[$index]["digital-sen$i-4"];
+            discover_sensor('voltage', $device, $oid, "digital-sen$i-4.$index", 'roomalert', $descr, $scale, $value);
+        }
     }
-  }
 }
 
 // EOF

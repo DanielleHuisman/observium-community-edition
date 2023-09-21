@@ -1,0 +1,1683 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- ********************************************************************
+-- $Id: fsrsvpte.mib,v 1.23 2012/11/08 11:29:25 siva Exp $
+-- ********************************************************************
+
+SUPERMICRO-MPLS-RSVP-TE-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        enterprises, MODULE-IDENTITY, OBJECT-TYPE, Integer32, Unsigned32, Counter32, IpAddress
+            FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, TimeInterval, TimeStamp, TruthValue,
+        RowStatus, StorageType
+        FROM SNMPv2-TC
+        InterfaceIndex
+            FROM IF-MIB
+        ;
+
+    fsMplsRsvpTeMIB MODULE-IDENTITY
+        LAST-UPDATED "201209050000Z"
+        ORGANIZATION "Super Micro Computer Inc."
+        CONTACT-INFO "support@Supermicro.com" 
+
+        DESCRIPTION   "All rights reserved"
+        REVISION      "201209050000Z"
+        DESCRIPTION   "The MIB is designed for RSVPTE.
+
+                       MIB contains Interface, Neighbour Table and some
+                       scalar objects for configuration of RSVPTE related
+                       elements and Refresh Overhead Reduction related
+                       elements.
+
+                       This entire mib is made part of the
+                       MPLS Enterprises MIB for easy reference.
+
+                       'Create and Go' and 'Not In Service' configuration
+                       values for RowStatus field (for all tables) are not
+                       supported.
+
+                       This MIB module contains managed object definitions
+                       MPLS Traffic Engineering (TE) as defined in: 
+
+                       1. Extensions to RSVP for LSP Tunnels, Awduche et al,
+                          RFC 3209, December 2001 
+                       2. Requirements for Traffic Engineering Over MPLS, 
+                          Awduche, D., Malcolm, J., Agogbua, J., O'Dell, M., 
+                          and J. McManus, RFC 2702, September 1999
+                       3. RSVP Refresh Overhead Reduction Extensions,
+                          L. Berger, D. Gan, G. Swallow, P. Pan, F. Tommasi,
+                          S. Molendini, RFC 2961, April 2001
+                       4. RSVP Management Information Base using SMIv2, RFC 2206"
+
+        ::=           {enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) futureMpls (13) 2}
+
+
+-- Textual Conventions.
+    MplsLsrIdentifier ::= TEXTUAL-CONVENTION
+        STATUS        current
+        DESCRIPTION
+            "The Label Switch Router (LSR) identifier
+             is the first 4 bytes or the IP Address component
+             of the Resource Resevation Protocol (RSVP-TE) identifier."
+        SYNTAX        OCTET STRING (SIZE (4))
+
+    AtmVpIdentifier ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d"
+        STATUS        current
+        DESCRIPTION
+            "The VPI value for a VPL. The value VPI=0 is not
+             used for a VPL not associated with a VCL. For ATM
+             UNIs supporting VPCs the VPI value ranges from 1
+             to 255. For ATM UNIs supporting VCCs the VPI value
+             ranges from 0 to 255.  The maximum VPI value
+             cannot exceed the value allowable by
+             atmInterfaceMaxVpiBits defined in ATM-MIB."
+        SYNTAX        Integer32 (0..4095)
+
+    AtmVcIdentifier ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d"
+        STATUS        current
+        DESCRIPTION
+            "The VCI value for a VCL. The maximum VCI value
+             cannot exceed the value allowable by
+             atmInterfaceMaxVciBits defined in ATM-MIB."
+        SYNTAX        Integer32 (0..65535)
+
+-- Top level components of this MIB.
+
+-- tables, scalars
+    fsMplsRsvpTeObjects       OBJECT IDENTIFIER ::= { fsMplsRsvpTeMIB 1 }
+    fsMplsRsvpTeGenObjects    OBJECT IDENTIFIER ::= { fsMplsRsvpTeMIB 2 }
+
+-- Start of fsMplsRsvpTeIfTable
+
+    fsMplsRsvpTeIfTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF FsMplsRsvpTeIfEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "The MPLS-specific attributes of  the  system's
+             interfaces, over which RSVP Signalling protocol
+             is used for LSP Tunnel establishments.
+
+             For Practical purposes this table augments the 
+             'rsvpIfTable' of the standard RSVP, Though 
+             a separate index is defined for this table.
+             The value of fsMplsRsvpTeIfIndex will map
+             to the ifIndex of the rsvpIfTable.
+ 
+             A row in rsvpIfTable needs to be created first.
+             Before the row status of the entry being made
+             active, the required elements associaed with 
+             the interface must be set via this table.
+ 
+             If an interface is of the ATM Type, then the 
+             label range type is per-interface and the label 
+             range value is specified within the entry
+             of this table. If an interface is of Ethernet type,
+             the label range is per-platform based and the
+             label range is the common generic label range."
+
+        ::=           { fsMplsRsvpTeObjects 1 }
+
+    fsMplsRsvpTeIfEntry OBJECT-TYPE
+        SYNTAX        FsMplsRsvpTeIfEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "The RSVP-specific attributes of a given interface."
+        INDEX         { fsMplsRsvpTeIfIndex }
+        ::=           { fsMplsRsvpTeIfTable  1 }
+
+    FsMplsRsvpTeIfEntry ::=
+        SEQUENCE {
+            fsMplsRsvpTeIfIndex            InterfaceIndex,
+            fsMplsRsvpTeIfLblSpace         INTEGER,
+            fsMplsRsvpTeIfLblType          INTEGER,
+            fsMplsRsvpTeAtmMergeCap        INTEGER,
+            fsMplsRsvpTeAtmVcDirection     INTEGER,
+            fsMplsRsvpTeAtmMinVpi          AtmVpIdentifier,
+            fsMplsRsvpTeAtmMinVci          AtmVcIdentifier,
+            fsMplsRsvpTeAtmMaxVpi          AtmVpIdentifier,
+            fsMplsRsvpTeAtmMaxVci          AtmVcIdentifier,
+            fsMplsRsvpTeIfMtu              Integer32,
+            fsMplsRsvpTeIfUdpNbrs          Counter32,
+            fsMplsRsvpTeIfIpNbrs           Counter32,
+            fsMplsRsvpTeIfNbrs             Counter32,
+            fsMplsRsvpTeIfRefreshMultiple  Integer32,
+            fsMplsRsvpTeIfTTL              Integer32,
+            fsMplsRsvpTeIfRefreshInterval  TimeInterval,
+            fsMplsRsvpTeIfRouteDelay       TimeInterval,
+            fsMplsRsvpTeIfUdpRequired      TruthValue,
+            fsMplsRsvpTeIfHelloSupported   TruthValue,
+            fsMplsRsvpTeIfLinkAttr         Integer32,
+            fsMplsRsvpTeIfStatus           RowStatus,
+            fsMplsRsvpTeIfPlrId            MplsLsrIdentifier,
+            fsMplsRsvpTeIfAvoidNodeId      MplsLsrIdentifier,
+            fsMplsRsvpTeIfStorageType      StorageType
+    }
+
+    fsMplsRsvpTeIfIndex OBJECT-TYPE
+        SYNTAX        InterfaceIndex
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "The interface index by which the row
+             in this table is identified. A row is
+             created in this table when a row is created
+             in the rsvpIfTable, and labelled traffic will
+             be handled over that interface."
+        ::=           { fsMplsRsvpTeIfEntry 1 }
+
+    fsMplsRsvpTeIfLblSpace OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                perPlatform(1),
+                                perInterface(2)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Specifies the type of the interface, as Ethernet, or 
+             ATM or FR" 
+        DEFVAL        { perPlatform }
+        ::=           { fsMplsRsvpTeIfEntry 2 }
+
+    fsMplsRsvpTeIfLblType OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                rsvpTeIfEth(1),
+                                rsvpTeIfAtm(2),
+                                rsvpTeIfFr(3)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Specifies the type of the interface, as Ethernet, or
+             ATM or FR. Iface Type as FR is not supported"
+        DEFVAL        { rsvpTeIfEth }
+        ::=           { fsMplsRsvpTeIfEntry 3 }
+
+    fsMplsRsvpTeAtmMergeCap OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                notSupported(0),
+                                vcMerge(2)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Denotes the Merge Capability of this Interface.
+             VcMerge is currently not supported"
+        DEFVAL        { notSupported }
+        ::=           { fsMplsRsvpTeIfEntry 4 }
+
+    fsMplsRsvpTeAtmVcDirection OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                 biDirectional(0),
+                                 oddUniDirectional(1),
+                                 evenUniDirectional(2)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "If the value of this object is 'biDirectional(0)',
+             a given VCI, within a given VPI, is used as a
+             label for both directions independently.
+
+             If the value of this object is 'oddUniDirectional(1)',
+             a given VCI within a VPI designates one direction and
+             the VCI's used will be of Odd type.
+
+             If the value of this object is 'evenUniDirectional(2)',
+             a given VCI within a VPI designates one direction and
+             the VCI's used will be of Even type."
+        DEFVAL        { biDirectional }
+        ::=           { fsMplsRsvpTeIfEntry 5 }
+
+    fsMplsRsvpTeAtmMinVpi OBJECT-TYPE
+        SYNTAX        AtmVpIdentifier
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The minimum VPI number configured for this range."
+        DEFVAL        { 0 } 
+        ::=           { fsMplsRsvpTeIfEntry 6 }
+
+    fsMplsRsvpTeAtmMinVci OBJECT-TYPE
+        SYNTAX        AtmVcIdentifier
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The minimum VCI number configured for this range."
+        DEFVAL        { 33 }
+        ::=           { fsMplsRsvpTeIfEntry 7 }
+
+    fsMplsRsvpTeAtmMaxVpi OBJECT-TYPE
+        SYNTAX        AtmVpIdentifier
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The maximum VPI number configured for this range."
+        DEFVAL        { 0 } 
+        ::=           { fsMplsRsvpTeIfEntry 8 }
+
+    fsMplsRsvpTeAtmMaxVci OBJECT-TYPE
+        SYNTAX        AtmVcIdentifier
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The maximum VCI number configured for this range."
+        DEFVAL        { 160 }  
+        ::=           { fsMplsRsvpTeIfEntry 9 }
+
+    fsMplsRsvpTeIfMtu OBJECT-TYPE
+        SYNTAX        Integer32(1500..4096)
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The MTU value associated with this interface ."
+        DEFVAL        { 1500 }
+        ::=           { fsMplsRsvpTeIfEntry 10 }
+
+    fsMplsRsvpTeIfUdpNbrs OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The number of neighbors perceived to be using
+             only the RSVP UDP Encapsulation."
+        ::=           { fsMplsRsvpTeIfEntry 11 }
+
+    fsMplsRsvpTeIfIpNbrs OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The number of neighbors perceived to be using
+             only the RSVP IP Encapsulation."
+        ::=           { fsMplsRsvpTeIfEntry 12 }
+
+    fsMplsRsvpTeIfNbrs OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The number of neighbors  currently  perceived;
+             this  will  exceed rsvpIfIpNbrs + rsvpIfUdpNbrs by the
+             number of neighbors using both  encapsulations."
+        ::=           { fsMplsRsvpTeIfEntry 13 }
+
+    fsMplsRsvpTeIfRefreshMultiple OBJECT-TYPE
+        SYNTAX        Integer32 (1..8)
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The value of the RSVP value 'K', which is  the
+             number  of  refresh intervals which must elapse
+             (minimum) before a PATH or RESV  message  which
+             is not being refreshed will be aged out."
+        DEFVAL        { 3 }
+        ::=           { fsMplsRsvpTeIfEntry  14 }
+
+    fsMplsRsvpTeIfTTL OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The value of SEND_TTL used on  this  interface
+             for  messages  this node originates.  If set to
+             zero, the node determines  the  TTL  via  other
+             means."
+        DEFVAL        { 64 }
+        ::=           { fsMplsRsvpTeIfEntry  15 }
+
+    fsMplsRsvpTeIfRefreshInterval OBJECT-TYPE
+        SYNTAX        TimeInterval   -- UNITS thousandths of a second
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The value of the RSVP value 'R', which is  the
+             minimum period between refresh transmissions of
+             a given PATH or RESV message on an interface."
+        DEFVAL        { 30000 }
+        ::=           { fsMplsRsvpTeIfEntry  16 }
+
+    fsMplsRsvpTeIfRouteDelay OBJECT-TYPE
+        SYNTAX        TimeInterval
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "The approximate period from the time a route
+             is changed to the time a resulting message appears on the interface."
+        DEFVAL        { 2 }
+        ::=           { fsMplsRsvpTeIfEntry  17 }
+
+    fsMplsRsvpTeIfUdpRequired OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "If TRUE, manual configuration forces  the  use
+             of  UDP  encapsulation  on  the  interface.  If
+             FALSE, UDP encapsulation is only used if fsMplsRsvpTeI-
+             fUdpNbrs is not zero."
+        DEFVAL        { false } 
+        ::=           { fsMplsRsvpTeIfEntry  18 }
+
+    fsMplsRsvpTeIfHelloSupported OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Indicates whether the interface supports Hello message or not.
+             When set to 'true' the interface is set to support Hello message.
+             The interface will not be set to support Hello message, if this
+             object has a value 'false'."
+        DEFVAL        { false }
+        ::=           { fsMplsRsvpTeIfEntry  19 }
+
+    fsMplsRsvpTeIfLinkAttr OBJECT-TYPE
+        SYNTAX        Integer32(1..65535)
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Link Attributes associated with the interface as defined in
+             section 4.7.4 of RFC 3209, Extensions to RSVP for LSP Tunnels,
+             Awduche et al, December 2001."
+        DEFVAL        { 1 }
+        ::=           { fsMplsRsvpTeIfEntry  20 }
+
+    fsMplsRsvpTeIfStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "'active' on interfaces that are configured for RSVP.
+             CreateAndGo is not supported"
+        ::=           { fsMplsRsvpTeIfEntry  21 }
+
+    fsMplsRsvpTeIfPlrId OBJECT-TYPE
+        SYNTAX        MplsLsrIdentifier
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Indicates the PLR Id to be configured for this interface
+            for supporting FRR Feature."
+        ::=           { fsMplsRsvpTeIfEntry  22 }
+
+    fsMplsRsvpTeIfAvoidNodeId OBJECT-TYPE
+        SYNTAX        MplsLsrIdentifier
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "Indicates the IP Address of the Node to be avoided while
+             protecting this interface for supporting feature. "
+        ::=           { fsMplsRsvpTeIfEntry  23 }
+
+    fsMplsRsvpTeIfStorageType OBJECT-TYPE
+        SYNTAX        StorageType
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+             "The storage type for this conceptual row in the fsMplsRsvpTeIfTable.
+             Conceptual rows having the value 'permanent' need not allow 
+             write-access to any columnar object in the row.
+             only volatile and nonVolatile are allowed for this object"
+        DEFVAL { nonVolatile }
+        ::=           { fsMplsRsvpTeIfEntry  24 }
+
+-- End of fsMplsRsvpTeIfTable
+
+-- Start of fsMplsRsvpTeIfStatsTable
+
+    fsMplsRsvpTeIfStatsTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF FsMplsRsvpTeIfStatsEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "This table contains the statistical information associated
+             with an interface."
+        ::=           { fsMplsRsvpTeObjects 2 }
+
+    fsMplsRsvpTeIfStatsEntry OBJECT-TYPE
+        SYNTAX        FsMplsRsvpTeIfStatsEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "This entry contains statistical information of an interface."
+        AUGMENTS      { fsMplsRsvpTeIfEntry }
+        ::=           { fsMplsRsvpTeIfStatsTable  1 }
+
+    FsMplsRsvpTeIfStatsEntry ::=
+        SEQUENCE {
+            fsMplsRsvpTeIfNumTnls              Counter32,
+            fsMplsRsvpTeIfNumMsgSent           Counter32,
+            fsMplsRsvpTeIfNumMsgRcvd           Counter32,
+            fsMplsRsvpTeIfNumHelloSent         Counter32,
+            fsMplsRsvpTeIfNumHelloRcvd         Counter32,
+            fsMplsRsvpTeIfNumPathErrSent       Counter32,
+            fsMplsRsvpTeIfNumPathErrRcvd       Counter32,
+            fsMplsRsvpTeIfNumPathTearSent      Counter32,
+            fsMplsRsvpTeIfNumPathTearRcvd      Counter32,
+            fsMplsRsvpTeIfNumResvErrSent       Counter32,
+            fsMplsRsvpTeIfNumResvErrRcvd       Counter32,
+            fsMplsRsvpTeIfNumResvTearSent      Counter32,
+            fsMplsRsvpTeIfNumResvTearRcvd      Counter32,
+            fsMplsRsvpTeIfNumResvConfSent      Counter32,
+            fsMplsRsvpTeIfNumResvConfRcvd      Counter32,
+            fsMplsRsvpTeIfNumBundleMsgSent     Counter32,
+            fsMplsRsvpTeIfNumBundleMsgRcvd     Counter32,
+            fsMplsRsvpTeIfNumSRefreshMsgSent   Counter32,
+            fsMplsRsvpTeIfNumSRefreshMsgRcvd   Counter32,
+            fsMplsRsvpTeIfNumPathSent          Counter32,
+            fsMplsRsvpTeIfNumPathRcvd          Counter32,
+            fsMplsRsvpTeIfNumResvSent          Counter32,
+            fsMplsRsvpTeIfNumResvRcvd          Counter32,
+            fsMplsRsvpTeIfNumNotifyMsgSent     Counter32,
+            fsMplsRsvpTeIfNumNotifyMsgRcvd     Counter32,
+            fsMplsRsvpTeIfNumRecoveryPathSent  Counter32,
+            fsMplsRsvpTeIfNumRecoveryPathRcvd  Counter32,
+            fsMplsRsvpTeIfNumPathSentWithRecoveryLbl   Counter32,
+            fsMplsRsvpTeIfNumPathRcvdWithRecoveryLbl   Counter32,
+            fsMplsRsvpTeIfNumPathSentWithSuggestedLbl  Counter32,
+            fsMplsRsvpTeIfNumPathRcvdWithSuggestedLbl  Counter32,
+            fsMplsRsvpTeIfNumHelloSentWithRestartCap   Counter32,
+            fsMplsRsvpTeIfNumHelloRcvdWithRestartCap   Counter32,
+            fsMplsRsvpTeIfNumHelloSentWithCapability   Counter32,
+            fsMplsRsvpTeIfNumHelloRcvdWithCapability   Counter32
+    }
+
+    fsMplsRsvpTeIfNumTnls OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the number of tunnels established via
+             this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 1 }
+
+    fsMplsRsvpTeIfNumMsgSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of messages sent on
+             this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 2 }
+
+    fsMplsRsvpTeIfNumMsgRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of messages received
+             on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 3 }
+
+    fsMplsRsvpTeIfNumHelloSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of hello messages plus
+             hello ack messages sent on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 4 }
+
+    fsMplsRsvpTeIfNumHelloRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of hello messages plus
+             hello ack messages received on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 5 }
+
+    fsMplsRsvpTeIfNumPathErrSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path Error messages
+             sent on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 6 }
+
+    fsMplsRsvpTeIfNumPathErrRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path Error messages
+             received on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 7 }
+
+    fsMplsRsvpTeIfNumPathTearSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path Tear messages
+             sent on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 8 }
+
+    fsMplsRsvpTeIfNumPathTearRcvd  OBJECT-TYPE
+        SYNTAX        Counter32 
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path Tear messages
+             received on this interface."
+        ::=           { fsMplsRsvpTeIfStatsEntry 9 }
+
+    fsMplsRsvpTeIfNumResvErrSent  OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv Error messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 10 }
+
+    fsMplsRsvpTeIfNumResvErrRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv Error messages
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 11 }
+
+    fsMplsRsvpTeIfNumResvTearSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv Tear messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 12 }
+
+    fsMplsRsvpTeIfNumResvTearRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv Tear messages
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 13 }
+
+    fsMplsRsvpTeIfNumResvConfSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv Conf messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 14 }
+
+    fsMplsRsvpTeIfNumResvConfRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv Conf messages
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 15 }
+
+    fsMplsRsvpTeIfNumBundleMsgSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Bundle messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 16 }
+
+    fsMplsRsvpTeIfNumBundleMsgRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Bundle messages
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 17 }
+
+    fsMplsRsvpTeIfNumSRefreshMsgSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of S-Refresh messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 18 }
+
+    fsMplsRsvpTeIfNumSRefreshMsgRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of S-Refresh messages
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 19 }
+       
+    fsMplsRsvpTeIfNumPathSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 20 }
+       
+    fsMplsRsvpTeIfNumPathRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path messages 
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 21 }
+
+    fsMplsRsvpTeIfNumResvSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv messages
+             sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 22 }
+       
+    fsMplsRsvpTeIfNumResvRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Resv messages 
+             received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 23 }
+
+    fsMplsRsvpTeIfNumNotifyMsgSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Notify messages
+             sent on this interface."
+        REFERENCE
+            "1. Section 4.3 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+       ::=            { fsMplsRsvpTeIfStatsEntry 24 }
+
+    fsMplsRsvpTeIfNumNotifyMsgRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Notify messages
+             received on this interface."
+        REFERENCE
+            "1. Section 4.3 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+       ::=            { fsMplsRsvpTeIfStatsEntry 25 }
+
+    fsMplsRsvpTeIfNumRecoveryPathSent OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of RecvoveryPath messages
+             sent on this interface."
+        REFERENCE
+            "Section 4.1 - RFC 5063, Extensions to GMPLS Resource 
+             Reservation Protocol (RSVP) Graceful Restart."
+       ::=            { fsMplsRsvpTeIfStatsEntry 26 }
+
+    fsMplsRsvpTeIfNumRecoveryPathRcvd OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of RecoveryPath messages
+             received on this interface."
+        REFERENCE
+            "Section 4.1 - RFC 5063, Extensions to GMPLS Resource
+             Reservation Protocol (RSVP) Graceful Restart."
+       ::=            { fsMplsRsvpTeIfStatsEntry 27 }
+    
+    fsMplsRsvpTeIfNumPathSentWithRecoveryLbl OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path messages with
+             Recovery label object sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 28 }
+
+    fsMplsRsvpTeIfNumPathRcvdWithRecoveryLbl OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path messages with
+             Recovery label object received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 29 }
+
+    fsMplsRsvpTeIfNumPathSentWithSuggestedLbl OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path messages with
+             Suggested label object sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 30 }
+
+    fsMplsRsvpTeIfNumPathRcvdWithSuggestedLbl OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Path messages with
+             Suggested label object received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 31 }
+
+    fsMplsRsvpTeIfNumHelloSentWithRestartCap OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Hello messages with
+             Restart_Cap object sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 32 }
+
+    fsMplsRsvpTeIfNumHelloRcvdWithRestartCap OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Hello messages with
+             Restart_Cap object received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 33 }
+
+    fsMplsRsvpTeIfNumHelloSentWithCapability OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Hello messages with
+             Capability object sent on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 34 }
+
+    fsMplsRsvpTeIfNumHelloRcvdWithCapability OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the total number of Hello messages with
+             capability object received on this interface."
+       ::=            { fsMplsRsvpTeIfStatsEntry 35 }
+
+
+ 
+-- End of fsMplsRsvpTeIfStatsTable
+
+-- Start of fsMplsRsvpTeNbrTable
+
+    fsMplsRsvpTeNbrTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF FsMplsRsvpTeNbrEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "This table contains information about RsvpTe Neighbours
+             known to this node."
+        ::=           { fsMplsRsvpTeObjects 3 }
+
+    fsMplsRsvpTeNbrEntry OBJECT-TYPE
+        SYNTAX           FsMplsRsvpTeNbrEntry
+        MAX-ACCESS       not-accessible
+        STATUS           current
+        DESCRIPTION
+            "This entry contains information about a single neighbour."
+        INDEX         { fsMplsRsvpTeIfIndex, fsMplsRsvpTeNbrIfAddr }
+        ::=           { fsMplsRsvpTeNbrTable  1 }
+
+    FsMplsRsvpTeNbrEntry ::= SEQUENCE {
+            fsMplsRsvpTeNbrIfAddr                      IpAddress,
+            fsMplsRsvpTeNbrRRCapable                   INTEGER,
+            fsMplsRsvpTeNbrRRState                     INTEGER,
+            fsMplsRsvpTeNbrRMDCapable                  INTEGER,
+            fsMplsRsvpTeNbrEncapsType                  INTEGER,
+            fsMplsRsvpTeNbrHelloSupport                INTEGER,
+            fsMplsRsvpTeNbrHelloState                  INTEGER,
+            fsMplsRsvpTeNbrHelloRelation               INTEGER,
+            fsMplsRsvpTeNbrSrcInstInfo                 Integer32,
+            fsMplsRsvpTeNbrDestInstInfo                Integer32,
+            fsMplsRsvpTeNbrCreationTime                TimeStamp,
+            fsMplsRsvpTeNbrLclRprDetectionTime         TimeStamp,
+            fsMplsRsvpTeNbrNumTunnels                  Counter32,
+            fsMplsRsvpTeNbrStatus                      RowStatus,
+            fsMplsRsvpTeNbrGrRecoveryPathCapability    BITS,
+            fsMplsRsvpTeNbrGrRestartTime               Integer32,
+            fsMplsRsvpTeNbrGrRecoveryTime              Integer32,
+            fsMplsRsvpTeNbrGrProgressStatus            Integer32,
+            fsMplsRsvpTeNbrStorageType                 StorageType
+
+    }
+
+    fsMplsRsvpTeNbrIfAddr OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the Ip address of the neighbour.
+             This can be router id of the neighbour or address of the
+             interface to which this node is connected."
+        ::=           { fsMplsRsvpTeNbrEntry 1 }
+
+    fsMplsRsvpTeNbrRRCapable OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enabled (1),
+                                disabled (2)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the RR behaviour of the node towards it's
+             neighbour.
+             Can be enabled only when fsMplsRsvpTeRRCapable is enabled. When
+             enabled it means bundling can take place for messages going
+             to the neighbour."
+        DEFVAL        { disabled }
+        ::=           { fsMplsRsvpTeNbrEntry 2 }
+
+    fsMplsRsvpTeNbrRRState OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enabled (1),
+                                disabled (2)
+                              }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the actual RR behaviour that is currently
+             being applied to the neighbour.
+             Can be enabled only when fsMplsRsvpTeNbrRRCapable is enabled.
+             Value enabled implies that, bundling/RR techniques will be used
+             for messages going to this neighbour. This value dynamically
+             changes depending on the Neighbour's RR capability, Manager
+             Configuration."
+        ::=           { fsMplsRsvpTeNbrEntry 3 }
+
+    fsMplsRsvpTeNbrRMDCapable OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enabled (1),
+                                disabled (2)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This value specifies whether Reliable Message Delivery is to
+             be performed for messages going to the neighbour.
+             Can be enabled only when fsMplsRsvpTeMsgIdCapable is enabled.
+             When enabled it means that, message id will be sent along with
+             Ack Desired flag set for all the messages (given by
+             fsMplsRsvpTeRMDPolicyObject) going to the neighbour."
+        DEFVAL        { disabled }
+        ::=           { fsMplsRsvpTeNbrEntry 4 }
+
+     fsMplsRsvpTeNbrEncapsType OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                ipencap  (1),
+                                udpencap (2),
+                                both     (3)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the Type of Encapsulation Supported by 
+             the neighbour."
+        DEFVAL        { ipencap }
+        ::=           { fsMplsRsvpTeNbrEntry 5 }
+
+    
+    fsMplsRsvpTeNbrHelloSupport OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enabled (1),
+                                disabled (2)
+                              }
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This value specifies whether Hello mechanism is supported for
+             this neighbour or not.
+             Can be enabled only when fsMplsRsvpTeHelloSupprtd is true."
+        DEFVAL        { disabled }
+        ::=           { fsMplsRsvpTeNbrEntry 6 }
+
+    fsMplsRsvpTeNbrHelloState OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                unknown (0),
+                                supported (1),
+                                notSupported (2),
+                                supportReset (3)
+                              }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the Hello State for the neighbour.
+             Is valid only when fsMplsRsvpTeNbrHelloSupport is enabled."
+        ::=           { fsMplsRsvpTeNbrEntry 7 }
+
+    fsMplsRsvpTeNbrHelloRelation OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                active (1),
+                                passive (2)
+                              }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the Hello relation between the two
+             neighbours.
+             Active implies that this node will send hello messages.
+             Passive implies that this node will wait for hello messages
+             and on receipt of it will send hello ack.
+             Is valid only when fsMplsRsvpTeNbrHelloSupport is enabled."
+        ::=           { fsMplsRsvpTeNbrEntry 8 }
+
+    fsMplsRsvpTeNbrSrcInstInfo OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the source instance value of the hello
+             being exchanged between the neighbours.
+             Is valid only when fsMplsRsvpTeNbrHelloSupport is enabled."
+        ::=           { fsMplsRsvpTeNbrEntry 9 }
+
+    fsMplsRsvpTeNbrDestInstInfo OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the destination instance value of the
+             hello being exchanged between the neighbours.
+             Is valid only when fsMplsRsvpTeNbrHelloSupport is enabled."
+        ::=           { fsMplsRsvpTeNbrEntry 10 }
+
+    fsMplsRsvpTeNbrCreationTime OBJECT-TYPE
+        SYNTAX        TimeStamp
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the time when the neighbour was created."
+        ::=           { fsMplsRsvpTeNbrEntry 11 }
+
+    fsMplsRsvpTeNbrLclRprDetectionTime OBJECT-TYPE
+        SYNTAX        TimeStamp
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the time when a local repair was detected
+             using Hello Message exchange mechanism"
+        ::=           { fsMplsRsvpTeNbrEntry 12 }
+
+    fsMplsRsvpTeNbrNumTunnels OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the number of tunnels that pass via this
+             neighbour."
+        ::=           { fsMplsRsvpTeNbrEntry 13 }
+
+    fsMplsRsvpTeNbrStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the Status of the Row. Is used to create,
+             modify and/or delete a row in this table."
+        ::=           { fsMplsRsvpTeNbrEntry 14 }
+
+    fsMplsRsvpTeNbrGrRecoveryPathCapability OBJECT-TYPE
+        SYNTAX        BITS {
+                              recoveryPathTransmit(0),
+                              recoveryPathReceive(1),
+                              recoveryPathSRefresh(2)
+                           }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            " This object indicates whether the neighbor supports
+              RecoveryPath message capability.
+              R  bit indicates that the node desire to receive the
+              RecoveryPath message. T bit indicates that the node desire to
+              send the RecoveryPath message. S bit indicates that the node
+              desire to send and receive SRefresh RecoveryPath message."
+        REFERENCE
+            "Section 4.4 - RFC 5063, Extensions to GMPLS Resource
+             Reservation Protocol (RSVP) Graceful Restart."
+        ::=           { fsMplsRsvpTeNbrEntry 15 }
+
+    fsMplsRsvpTeNbrGrRestartTime OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the he restart time interval for the Graceful
+             restart of the neighbor node in seconds"
+        REFERENCE
+            "Section 9.1 - RFC 3473, Generalized Multi-Protocol Label
+             Switching (GMPLS) Signaling Resource ReserVation
+             iProtocol-Traffic Engineering (RSVP-TE) Extensions."
+        ::=           { fsMplsRsvpTeNbrEntry 16 }
+
+    fsMplsRsvpTeNbrGrRecoveryTime OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the recovery time interval for the Graceful
+             resatart of the neighbor node, after restart in seconds."
+        REFERENCE
+            "Section 9.1 - RFC 3473, Generalized Multi-Protocol Label
+             Switching (GMPLS) Signaling Resource ReserVation
+             iProtocol-Traffic Engineering (RSVP-TE) Extensions."
+        ::=           { fsMplsRsvpTeNbrEntry 17 }
+
+fsMplsRsvpTeNbrGrProgressStatus OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION   "This object denotes the current State of the neighbor's GR Progress.
+                        Following are the different State of neighbor's GR Progress.
+                        1. Not started.
+                        2. Restart in progress.
+                        3. Aborted.
+                        4. Recovery in progress.
+                        5. Completed."
+
+         ::= { fsMplsRsvpTeNbrEntry 18 }
+
+fsMplsRsvpTeNbrStorageType OBJECT-TYPE
+         SYNTAX       StorageType
+         MAX-ACCESS   read-create
+         STATUS       current
+         DESCRIPTION  "The storage type for this conceptual row in the fsMplsRsvpTeNbrTable.
+                       Conceptual rows having the value 'permanent' need not allow 
+                       write-access to any columnar object in the row.
+                       only volatile and nonVolatile are allowed for this object"
+
+        DEFVAL { nonVolatile }
+
+         ::= { fsMplsRsvpTeNbrEntry 19 }
+
+-- End of fsMplsRsvpTeNbrTable
+
+-- Definitions of fsMplsRsvpTeGenObjects. - Start
+
+    fsMplsRsvpTeLsrID OBJECT-TYPE
+        SYNTAX        MplsLsrIdentifier
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The LSR's Identifier. This value will be filled in the
+             Extended Tunnel Id field of a Session Object."
+        ::=           { fsMplsRsvpTeGenObjects 1 }
+
+    fsMplsRsvpTeMaxTnls OBJECT-TYPE
+        SYNTAX        Integer32(1..65535)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The maximum number of TE tunnels supported."
+        ::=           { fsMplsRsvpTeGenObjects 2 }
+
+    fsMplsRsvpTeMaxErhopsPerTnl OBJECT-TYPE
+        SYNTAX        Integer32(1..65535)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The maximum number of ER-Hops that can be supported in a 
+             tunnel."
+        ::=           { fsMplsRsvpTeGenObjects 3 }
+
+    fsMplsRsvpTeMaxActRoutePerTnl OBJECT-TYPE
+        SYNTAX        Integer32(1..65535)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The maximum number of Actual Routes that can be part of a 
+             tunnel."
+        ::=           { fsMplsRsvpTeGenObjects 4 }
+
+    fsMplsRsvpTeMaxIfaces OBJECT-TYPE
+        SYNTAX        Integer32(1..65535)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The maximum number of Interfaces supported by a router."
+        ::=           { fsMplsRsvpTeGenObjects 5 }
+
+    fsMplsRsvpTeMaxNbrs OBJECT-TYPE
+        SYNTAX        Integer32(1..65535)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The maximum number of RSVP Neighbours supported by a router."
+        ::=           { fsMplsRsvpTeGenObjects 6 }
+
+    fsMplsRsvpTeSockSupprtd OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "Indicates whether Socket based support is needed for the
+             Transmission of RSVP-TE PDU's. When set to 'true' all the outgoing
+             messages will be sent via raw socket/udp sockets.
+             Socket Supprt will not be set if this MIB object has a value 
+             'false'."
+        DEFVAL        { true }
+        ::=           { fsMplsRsvpTeGenObjects 7 }
+
+    fsMplsRsvpTeHelloSupprtd OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "Indicates whether Hello messages to be transmitted from this
+             node. When set to 'true' Hello messages will be sent from this
+             node. For sending the hello messages per interface we have to
+             enable the Hello supprt in the Interface Entry. Hello Supprt
+             will not be set if this MIB object has a value 'false'."
+        DEFVAL        { false }
+        ::=           { fsMplsRsvpTeGenObjects 8 }
+
+    fsMplsRsvpTeHelloIntervalTime OBJECT-TYPE
+        SYNTAX        Integer32(10..30000)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the time interval for the hello hold
+             timer in milli-seconds."
+        DEFVAL        { 10 }
+        ::=           { fsMplsRsvpTeGenObjects 9 }
+
+    fsMplsRsvpTeRRCapable OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enabled (1),
+                                disabled (2)
+                              }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This value specifies whether the node is RR-Capable or not.
+             Value enabled means this node is RR capable and when
+             fsMplsRsvpTeOperStatus is made up, memory for structures
+             associated with bundling and S-Refresh is created. And RR-bit
+             will be set for all outgoing messages.
+             Value disabled means this node is not RR capable. So RR-bit
+             will not be set for all outgoing messages."
+        DEFVAL        { disabled }
+        ::=           { fsMplsRsvpTeGenObjects 10 }
+
+    fsMplsRsvpTeMsgIdCapable OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enabled (1),
+                                disabled (2)
+                              }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This value specifies whether the node is Capable of handling
+             and generating message ids. When fsMplsRsvpTeRRCapable is
+             enabled, by default this will be enabled.
+             Value enabled means this node is capable of handling and
+             generating message ids and when fsMplsRsvpTeOperStatus is made
+             up, memory for structures associated with message id is created.
+             Value disabled means this node is not capable of handling and
+             generating message ids."
+        DEFVAL        { disabled }
+        ::=           { fsMplsRsvpTeGenObjects 11 }
+
+    fsMplsRsvpTeRMDPolicyObject OBJECT-TYPE
+        SYNTAX        BITS {
+                             path (0),
+                             resv (1),
+                             pathErr (2),
+                             resvErr (3),
+                             pathTear (4),
+                             resvTear (5),
+                             notify (6)
+                           }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the messages for which ack desired flag
+             needs to be set. Is valid only when fsMplsRsvpTeMsgIdCapable
+             is enabled. Refresh Messages are not taken into account.
+             For setting the bits corresponding hexadecimal value should be set
+             Example: for setting all the bits corresponding hexadecimal value
+             FC should be set.For setting zero'th bit for Path, value 80 should
+             be set."
+        ::=           { fsMplsRsvpTeGenObjects 12 }
+
+    fsMplsRsvpTeGenLblSpaceMinLbl OBJECT-TYPE
+        SYNTAX        Integer32(100001..160000)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The Minimum value of the label that is associated with the
+             Generic label space."
+        ::=           { fsMplsRsvpTeGenObjects 13 }
+
+    fsMplsRsvpTeGenLblSpaceMaxLbl OBJECT-TYPE
+        SYNTAX        Integer32(100001..160000)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The Maximum value of the label that is associated with the
+             Generic label space."
+        ::=           { fsMplsRsvpTeGenObjects 14 }
+
+    fsMplsRsvpTeGenDebugFlag OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This is a 4-byte (32-bit) object with each bit enabling/
+             disabling the debug message.
+             Five most significant nibbles correspond to the routine identity
+             and the three least significant nibbles correspond to the various
+             Log Types.
+             A log of specific type in a routine is displayed when the
+             bits corresponding to the module and the log type are both
+             set to 1.
+             The various bit patterns corresponding to the routine and the log
+             type are as follows:
+
+             ROUTINE:
+             0100 0000 0000 0000 0000 - GR       - Rsvpte Graceful Restart routines
+             0010 0000 0000 0000 0000 - MAIN     - Rsvpte main routines
+             0001 0000 0000 0000 0000 - IF       - Interface with other module
+                                                   routines(IF, IPIF, PM_TCIF)
+             0000 1000 0000 0000 0000 - PVM      - Packet Validation Module
+                                                   routines
+             0000 0100 0000 0000 0000 - PB       - Packet Builder Module
+                                                   routines
+             0000 0010 0000 0000 0000 - PH       - Path Handler routines
+             0000 0001 0000 0000 0000 - RH       - Resv Handler routines
+             0000 0000 1000 0000 0000 - PE       - Path Error routines
+             0000 0000 0100 0000 0000 - RE       - Path Tear routines
+             0000 0000 0010 0000 0000 - REH      - Resv Error routines
+             0000 0000 0001 0000 0000 - RTH      - Resv Tear routines
+             0000 0000 0000 1000 0000 - RCH      - Resv Conf routines
+             0000 0000 0000 0100 0000 - HH       - Hello Handler routines
+             0000 0000 0000 0010 0000 - LLVL     - Low Level routines
+             0000 0000 0000 0001 0000 - UTL_STAT - Utl and Stat routines
+             0000 0000 0000 0000 1000 - PORT     - Porting routines
+             0000 0000 0000 0000 0100 - DIFF     - Diff Serv module routines
+             0000 0000 0000 0000 0010 - RR       - Refresh OverHead Reduction
+                                                   module routines
+             0000 0000 0000 0000 0001 - MIH_TRIE - Message Id Handler and Trie
+                                                   module routines
+             
+             LOG TYPES:
+             0000 0000 0001 - MEM   - Memory related logs
+             0000 0000 0010 - PRCS  - Process related logs
+             0000 0000 0100 - MISC  - Miscellaneous logs
+             0000 0000 1000 - ETEXT - Function Entry and Exit logs
+             0000 0001 0000 - SCSS  - Low level sucess logs
+             0000 0010 0000 - FAIL  - Low level failure logs
+             
+             The default value will be bit pattern corresponding to all logs of
+             Rsvpte main routines."
+        DEFVAL        { 0 }
+        ::=           { fsMplsRsvpTeGenObjects 15 }
+
+    fsMplsRsvpTeGenPduDumpLevel OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                none (0),
+                                min (1),
+                                max (2),
+                                hdr (4)
+                              }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This is a 4-byte (32-bit) object with each bit enabling/
+             disabling the level of Dump messages.
+             The dump messages can be enabled selectively with respective
+             to the level, the following 32-bit pattern will display the
+             min and max level of message dumps respectively
+             0000 0000 0000 0000 0000 0000 0000 0001
+             0000 0000 0000 0000 0000 0000 0000 0010
+             0000 0000 0000 0000 0000 0000 0000 0100"
+        DEFVAL        { min }
+        ::=           { fsMplsRsvpTeGenObjects 16 }
+
+    fsMplsRsvpTeGenPduDumpMsgType OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This is a 4-byte (32-bit) object with each bit enabling/
+             disabling dump of a particular type of message.
+             In the following patterns the bit set to 1 is the  
+             bit corresponding to that message. 
+             When the bit corresponding to a message is set, dump of
+             that message is enabled.
+             Only the least significant 2-bytes are given below as
+             the Most Significant 2-bytes are always set to
+             0000 0000 0000 0000
+             
+             0000 0000 0000 0001 - dumps of path message
+             0000 0000 0000 0010 - dumps of path tear message
+             0000 0000 0000 0100 - dumps of path error message
+             0000 0000 0000 1000 - dumps of resv message
+             0000 0000 0001 0000 - dumps of resv tear message
+             0000 0000 0010 0000 - dumps of resv error message
+             0000 0000 0100 0000 - dumps of resv conf message
+             0000 0000 1000 0000 - dumps of hello message
+             0000 0001 0000 0000 - dumps of bundle message
+             0000 0010 0000 0000 - dumps of ack message
+             0000 0100 0000 0000 - dumps of srefresh message
+             0000 1000 0000 0000 - dumps of notifcation message
+             0001 0000 0000 0000 - dumps of RecoveryPath message
+             0001 1111 1111 1111 - dumps of all messages"
+        ::=           { fsMplsRsvpTeGenObjects 17 }
+
+
+    fsMplsRsvpTeGenPduDumpDirection OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                none (0),
+                                in(1),
+                                out(2),
+                                inout(3)
+                              }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This is a 4-byte (32-bit) object with each bit enabling/
+             disabling a the direction of Dump messages.
+             The dump messages can be enabled selectively with respective
+             to the direction, the following 32-bit pattern will display all
+             incoming, outgoing and all message dumps respectively
+             0000 0000 0000 0000 0000 0000 0000 0001
+             0000 0000 0000 0000 0000 0000 0000 0010
+             0000 0000 0000 0000 0000 0000 0000 0011"
+        DEFVAL        { out } 
+        ::=           { fsMplsRsvpTeGenObjects 18 }
+
+    fsMplsRsvpTeOperStatus OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                up(1),
+                                down(2),
+                                testing(3),
+                                upinprgrs(4),
+                                downinprgrs(5)
+                              }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "Field indicates the status of the RSVP-TE functionality
+             When the value is set to UP, required memory will be allocated 
+             and RSVPTE functionality will be started.  When made down from
+             up condition, memories will be released and RSVPTE functionality
+             will be stopped. Only up and down are user configurabe states"
+         DEFVAL       { down }
+         ::=          { fsMplsRsvpTeGenObjects 19 }
+
+    fsMplsRsvpTeOverRideOption OBJECT-TYPE
+        SYNTAX        TruthValue 
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "When the value is set to TRUE in an LSR, The LSR interprets
+             a Path Message with out a Diff-serv object as a request for an
+             Lsp with such non-Diff-Serv Quality of Service."
+        DEFVAL        { false }
+        ::=           { fsMplsRsvpTeGenObjects 20 }
+
+    fsMplsRsvpTeMinTnlsWithMsgId OBJECT-TYPE
+        SYNTAX        Unsigned32(1..65535) 
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "Min number of Tunnels that carry a message id." 
+        ::=           { fsMplsRsvpTeGenObjects 21 }
+
+    fsMplsRsvpTeNotificationEnabled OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enable(1),
+                                disable(2)
+                               }
+
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates whether Notification on Data Plane failure
+             is enabled or not. Default Value is enable(1)."
+        REFERENCE
+            "1. Section 4.3 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { enable }
+        ::=           { fsMplsRsvpTeGenObjects 22 }
+
+    fsMplsRsvpTeNotifyMsgRetransmitIntvl OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 10..30000 )
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates the retransmission interval in milli-seconds
+             for a Notify Message."
+        REFERENCE
+            "1. Section 4.3.2 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { 10 }
+        ::=           { fsMplsRsvpTeGenObjects 23 }
+
+    fsMplsRsvpTeNotifyMsgRetransmitDecay OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates the percentage increase in the
+             retransmission interval during retransmission of Notify message 
+             when ACK is not received."
+        REFERENCE
+            "1. Section 4.3.2 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { 0 }
+        ::=           { fsMplsRsvpTeGenObjects 24 }
+
+    fsMplsRsvpTeNotifyMsgRetransmitLimit OBJECT-TYPE
+        SYNTAX        Unsigned32 ( 1..16 )
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates the maximum number of times a Notify message
+             will be retransmitted when ACK is not received."
+        REFERENCE
+            "1. Section 4.3.2 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { 3 }
+        ::=           { fsMplsRsvpTeGenObjects 25 }
+
+    fsMplsRsvpTeAdminStatusTimeIntvl OBJECT-TYPE
+        SYNTAX        Unsigned32( 1..300 )
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates the time interval in seconds for which a
+             node will wait to trigger the PathTear Message if the reflected
+             Resv Message is not received."
+        REFERENCE
+            "1. Section 7.2.2 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { 30 }
+        ::=           { fsMplsRsvpTeGenObjects 26 }
+
+    fsMplsRsvpTePathStateRemovedSupport OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enable(1),
+                                disable(2)
+                               }
+
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates whether Path State Removal feature is
+             supported or not when a PathErr is received. Value 'enable(1)'
+             indicates this feature is supported. Value 'disable(2)' indicates
+             this feature is not supported."
+        REFERENCE
+            "1. Section 4.4 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { disable }
+        ::=           { fsMplsRsvpTeGenObjects 27 }
+
+    fsMplsRsvpTeLabelSetEnabled OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                enable(1),
+                                disable(2)
+                               }
+
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates whether this node is capable of sending
+             Label Set Object in Path message. Default value is 'disable(2)'."
+        REFERENCE
+            "1. Section 2.6 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { disable }
+        ::=           { fsMplsRsvpTeGenObjects 28 }
+
+    fsMplsRsvpTeAdminStatusCapability OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                true(1),
+                                false(2)
+                               }
+
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object indicates whether this node is capable of processing
+             and sending Admin status object in Path message. Default value 
+             is 'false(2)'."
+        REFERENCE
+            "1. Section 7.2.2 - RFC 3473, Generalized Multi-Protocol Label
+                Switching (GMPLS) Signaling Resource ReserVation
+                Protocol-Traffic Engineering (RSVP-TE) Extensions,
+                L. Berger, Editor, Movaz Networks, January 2003."
+        DEFVAL        { false }
+        ::=           { fsMplsRsvpTeGenObjects 29 }
+
+    fsMplsRsvpTeGrCapability  OBJECT-TYPE
+        SYNTAX        INTEGER {
+                                        none(1),
+                                        full(2),
+                                        helper(3)
+                               }
+
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This object is used to enable or disable Graceful Restart
+             support and Helper support for RSVPTE
+             none (1)- GR is not supported (Default value)
+             full (2)- GR is fully supported
+             helper (3)- GR support is in strict helper mode"
+        DEFVAL        { none }
+        ::=           { fsMplsRsvpTeGenObjects 30 }
+
+    fsMplsRsvpTeGrRecoveryPathCapability   OBJECT-TYPE
+        SYNTAX        BITS {
+                              recoveryPathTransmit(0),
+                              recoveryPathReceive(1),
+                              recoveryPathSRefresh(2)
+                           }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            " This object is used to enable RecoveryPath message capability.
+
+              recoveryPathReceive bit indicates that the node desire to receive the 
+              RecoveryPath message. 
+
+              recoveryPathTransmit bit indicates that the node desire to send the 
+              RecoveryPath message. 
+
+              recoveryPathSRefresh bit indicates that the node desire to send and 
+              receive SRefresh RecoveryPath message."
+        REFERENCE
+            "Section 4.4 - RFC 5063, Extensions to GMPLS Resource
+             Reservation Protocol (RSVP) Graceful Restart."
+        DEFVAL        { 0 }  
+        ::=           { fsMplsRsvpTeGenObjects 31 }
+
+    fsMplsRsvpTeGrRestartTime OBJECT-TYPE
+        SYNTAX        Integer32 (60..3600)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the restart time interval for the Graceful
+             restart of RSVP-TE component in seconds. 
+             The default value is 120 seconds.
+             The acceptable range of values is 60 to 3600 seconds."
+        REFERENCE
+            "Section 9.1 - RFC 3473, Generalized Multi-Protocol Label
+             Switching (GMPLS) Signaling Resource ReserVation
+             iProtocol-Traffic Engineering (RSVP-TE) Extensions."
+        DEFVAL        { 120 }
+        ::=           { fsMplsRsvpTeGenObjects 32 }
+
+    fsMplsRsvpTeGrRecoveryTime OBJECT-TYPE
+        SYNTAX        Integer32 (60..480)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "This value specifies the recovery time interval for the Graceful
+             restart of RSVP-TE component, after restart in seconds. 
+             The default value is 120 seconds. 
+             The acceptable range of values is 60 to 480 seconds."
+        REFERENCE
+            "Section 9.1 - RFC 3473, Generalized Multi-Protocol Label
+             Switching (GMPLS) Signaling Resource ReserVation
+             iProtocol-Traffic Engineering (RSVP-TE) Extensions."
+        DEFVAL        { 120 }
+        ::=           { fsMplsRsvpTeGenObjects 33 }
+
+    fsMplsRsvpTeGrProgressStatus OBJECT-TYPE
+         SYNTAX       Integer32
+         MAX-ACCESS   read-only
+         STATUS       current
+         DESCRIPTION   "This object denotes the current State of the Node's GR Progress.
+                        Following are the different State of GR in the Node.
+                        1. Not started.
+                        2. GR shutdown in progress.
+                        3. Restart in progress.
+                        4. Aborted
+                        5. Recovery in progress.
+                        6. Completed."
+         ::= { fsMplsRsvpTeGenObjects 34 }
+
+
+-- Definitions of fsMplsRsvpTeGenObjects. - Ends
+
+-- End of MPLS-RSVP-TE-MIB
+END

@@ -5,23 +5,14 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (!is_array($vars['id'])) { $vars['id'] = array($vars['id']); }
+$is_permitted = FALSE;
+$entity_type  = "mempool";
+$entity_data  = $GLOBALS['config']['entities'][$entity_type];
 
-$auth = TRUE;
-
-foreach ($vars['id'] as $mempool_id)
-{
-  if (!$auth && !is_entity_permitted('mempool', $mempool_id))
-  $auth = FALSE;
-}
-
-$title = "Multi Memory Pool :: ";
-
-// EOF
-
+include_once($config['html_dir'] . "/includes/graphs/multi-auth-generic.inc.php");

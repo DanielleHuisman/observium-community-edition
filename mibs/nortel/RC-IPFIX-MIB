@@ -1,0 +1,819 @@
+
+RC-IPFIX-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, Integer32, Counter32, Counter64
+        FROM SNMPv2-SMI
+    DisplayString, TruthValue, MacAddress, RowStatus, TimeStamp
+        FROM SNMPv2-TC
+    InterfaceIndex, InterfaceIndexOrZero
+        FROM IF-MIB
+    InetAddressType, InetAddress, InetPortNumber
+        FROM INET-ADDRESS-MIB
+    rcIpfix, EnableValue, IdList
+        FROM RAPID-CITY;
+
+rcIpfixMib MODULE-IDENTITY
+    LAST-UPDATED     "201905190000Z"
+    ORGANIZATION     "Bay Networks, Rapid-City Group"
+    CONTACT-INFO     "Yu-Ten Lee
+                        Postal:      Bay Networks, Inc.
+                                     4655 Great America Parkway
+                                     Santa Clara, CA 95052-8185
+
+                           Tel:      408-495-2560
+                           Fax:      408-495-6680
+                        E-mail:      ylee@nortelnetworks.com"
+
+    DESCRIPTION      "Enterprise MIB for the rcIpfix"
+ 
+    REVISION "201905190000Z" -- 19 May. 2019
+    DESCRIPTION "Version 16: Add rcIpfixAgingIntervalV2.
+                             Requested by Marian Stoica (Prem)"
+ 
+    REVISION "201904040000Z" -- 04 Apr. 2019
+    DESCRIPTION "Version 15: Reversed the order of rcIpfixCollectorIdSrcPort
+			     and rcIpfixCollectorIdDestPort and also
+			     set the DEFVAL of rcIpfixCollectorIdDestPort
+			     to 2055. Based on the definition that was
+			     released. Changed from when it was originally
+			     introduced before the final release.
+                             (Prem)"
+ 
+    REVISION "201901070000Z" -- 07 Jan. 2019
+    DESCRIPTION "Version 14: Change the range of rcIpfixAgingInterval from
+			     1-1800 to 1-60 because of SDK restriction.
+                             Requested by Marian Stoica (Prem)"
+ 
+    REVISION "201812040000Z" -- 04 Dec. 2018
+    DESCRIPTION "Version 13: Added missing import clause (Unsigned32)
+                             (azmeu)"
+    
+    REVISION "201810040000Z" -- 04 Oct. 2018
+    DESCRIPTION "Version 12: Added Default value for object: 
+		             rcIpfixCollectorIdAddressType 
+	                     rcIpfixCollectorIdExporterIpType" 
+
+    REVISION "201808100000Z" -- 10 August 2018
+    DESCRIPTION "Version 11: Added rcIpfixAgingInterval,
+                                   rcIpfixCollectorIdIsReachable,
+                                   rcIpfixCollectorIdViaNextHopName,
+				   rcIpfixCollectorIdExportInterval,
+				   And rcIpfixCollectorIdInitialBurst"
+	
+    REVISION "201806130000Z" -- 13 June 2018
+    DESCRIPTION "Version 10: Change rcIpfixCollectorIdSrcPort
+			     and rcIpfixCollectorIdSrcPort from
+			     read-only to read-create.
+			     Requested by Dragos Oprea (Prem)"
+	
+    REVISION "201806100000Z" -- 10 June 2018
+    DESCRIPTION "Version 10: Add rcIpfixCollectorIdSrcPort.
+			     Requested by Dragos Oprea (Prem)" 
+	
+    REVISION "201803270000Z" -- 27 Mar 2018
+    DESCRIPTION "Version 9: Added rcIpfixObservationDomainId" 
+	
+    REVISION "201803220000Z" -- 22 Mar 2018
+    DESCRIPTION "Version 8: Removed rcIpfixCollectorIdAddressType and rcIpfixCollectorIdAddress
+			    as index to the rcIpfixCollectorIdTable and made them
+			    read-create objects.
+			    Requested by Elena Sandu (Prem)"
+
+    REVISION "201802190000Z" -- 19 Feb 2018
+    DESCRIPTION "Version 7: Change rcIpfixCollectorIdProtocol from
+			    read-create to read-only (Prem)"
+
+    REVISION "201802190000Z" -- 19 Feb 2018
+    DESCRIPTION "Version 6: Add rcIpfixCollectorIdTable
+                            Requested by Ovidiu Simion (Prem)."
+
+    REVISION "201403030000Z" -- 03 Mar 2014
+    DESCRIPTION "Version 5: Changed the range of rcIpfixConfPortSampleRate
+                            from 1..100000 to 0..100000."
+
+    REVISION "200811170000Z" -- 17 Nov 2008
+    DESCRIPTION "Version 4: Add rcIpfixRunningState."
+
+    REVISION "200512130000Z" -- 14 Sep 2005
+    DESCRIPTION "Version 3: Expand range of aging time."
+
+    REVISION "200509140000Z" -- 14 Sep 2005
+    DESCRIPTION "Version 2: Drop range on InetPortNumber"
+
+    REVISION "200504200000Z" -- 20 April 2005
+    DESCRIPTION "Version 1: Initial version for rcIpfix"
+
+    ::= { rcIpfix 1 }
+
+
+rcIpfixConfGlobal OBJECT IDENTIFIER ::= { rcIpfixMib 1 }
+rcIpfixTable      OBJECT IDENTIFIER ::= { rcIpfixMib 2 }
+
+-- ------------------------------------------
+-- rcIpfixConfGlobal Group
+-- ------------------------------------------
+
+rcIpfixConfState OBJECT-TYPE
+    SYNTAX       EnableValue
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Enables/Disables the state of ipfix on the box."
+    DEFVAL       { disable }
+    ::= { rcIpfixConfGlobal 1 }
+
+rcIpfixRunningState OBJECT-TYPE
+     SYNTAX       EnableValue
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION  "Show Enable/Disable running state of ipfix on the box."
+     DEFVAL       { disable }
+     ::= { rcIpfixConfGlobal 2 }
+
+ rcIpfixObservationDomainId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..'FFFFFFFF'h)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Id of the Observation Domain used when sending IPFIX Messages.
+        A 32-bit identifier of the Observation Domain that is locally
+        unique to the Exporting Process.
+        The special Value of 0 indicates that the Data Records sent this way
+        cannot be applied to a single Observation Domain."
+    REFERENCE
+        "RFC 5101, Specification of the IP Flow Information Export
+        (IPFIX) Protocol for the Exchange of IP Traffic Flow
+        Information, Section 3.1."
+    DEFVAL {0}
+    ::= { rcIpfixConfGlobal 3 }
+
+rcIpfixAgingInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..60)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Aging Interval is the time used to decide how long a traffic flow that
+        is no longer received is kept as a Flow. Is kept between 1 x aging - 2x aging-interval."
+    DEFVAL {40}
+    ::= { rcIpfixConfGlobal 4 }
+
+rcIpfixAgingIntervalV2 OBJECT-TYPE
+    SYNTAX        INTEGER {
+        interval100ms(1),     -- (IPFIX Aging Interval 100 miliseconds)
+        interval1s(2),        -- (IPFIX Aging Interval 1 second)
+        interval10s(3),       -- (IPFIX Aging Interval 10 second)
+        interval60s(4),       -- (IPFIX Aging Interval 60 second)
+        interval10m(5),       -- (IPFIX Aging Interval 10 minutes)
+        interval30m(6),       -- (IPFIX Aging Interval 30 minutes)
+        interval1h(7),        -- (IPFIX Aging Interval 1 hour)
+        interval10h(8),       -- (IPFIX Aging Interval 10 hour)
+        interval1d(9)        -- (IPFIX Aging Interval 24 one day)
+    }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION   "The Aging Interval is the time used to decide how 
+                   long a traffic flow that is no longer received is 
+                   kept as a Flow. Is kept between 1 x aging - 2 x 
+                   aging-interval.
+                   This MIB is used for VSP5520 platforms."
+    DEFVAL {interval60s}
+    ::= { rcIpfixConfGlobal 5 }
+
+-- ------------------------------------------
+-- IPFIX Table (per slot)
+-- ------------------------------------------
+
+rcIpfixConfSlotTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF RcIpfixConfSlotEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "A table to store the configuration details for IPFIX for each
+                  slot.  This table is indexed by slot number."
+    ::= { rcIpfixTable 1 }
+
+rcIpfixConfSlotEntry OBJECT-TYPE
+    SYNTAX       RcIpfixConfSlotEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "One Entry holding IPFIX config information on slot basis."
+    INDEX        { rcIpfixConfSlotNum }
+    ::= { rcIpfixConfSlotTable 1 }
+
+RcIpfixConfSlotEntry ::= SEQUENCE {
+    rcIpfixConfSlotNum              Integer32,
+    rcIpfixConfSlotAgingIntv        Integer32,
+    rcIpfixConfSlotActiveTimeout    Integer32,
+    rcIpfixConfSlotExportIntv       Integer32,
+    rcIpfixConfSlotExportState      EnableValue,
+    rcIpfixConfSlotTempRefIntvSec   Integer32,
+    rcIpfixConfSlotTempRefIntvPkts  Integer32
+}
+
+rcIpfixConfSlotNum OBJECT-TYPE
+    SYNTAX       Integer32 (1..10)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Slot number"
+    ::= { rcIpfixConfSlotEntry 1 }
+
+rcIpfixConfSlotAgingIntv OBJECT-TYPE
+    SYNTAX       Integer32 (0..2147400)
+    UNITS        "seconds"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Flow record aging interval (Value in seconds)."
+    DEFVAL       { 15 }
+    ::= { rcIpfixConfSlotEntry 2 }
+
+rcIpfixConfSlotActiveTimeout OBJECT-TYPE
+    SYNTAX       Integer32 (1..60)
+    UNITS        "minutes"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Flow record active timeout value (Value in mins)."
+    DEFVAL       { 30 }
+    ::= { rcIpfixConfSlotEntry 3 }
+
+rcIpfixConfSlotExportIntv OBJECT-TYPE
+    SYNTAX       Integer32 (10..3600)
+    UNITS        "seconds"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Frequency of flow export to collector (Value in sec)."
+    DEFVAL       { 50 }
+    ::= { rcIpfixConfSlotEntry 4 }
+
+rcIpfixConfSlotExportState OBJECT-TYPE
+    SYNTAX       EnableValue
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "State of exporter."
+    DEFVAL       { enable }
+    ::= { rcIpfixConfSlotEntry 5 }
+
+rcIpfixConfSlotTempRefIntvSec OBJECT-TYPE
+    SYNTAX       Integer32 (300..3600)
+    UNITS        "seconds"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Template refresh timeout. Template is sent out to the
+                  collector at least every x seconds or every y exported
+                  packets, whichever occurs first."
+    DEFVAL       { 1800 }
+    ::= { rcIpfixConfSlotEntry 6 }
+
+rcIpfixConfSlotTempRefIntvPkts OBJECT-TYPE
+    SYNTAX       Integer32 (10000..100000)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Template refresh timeout. Template is sent out to the
+                  collector at least every x seconds or every y exported
+                  packets, whichever occurs first."
+    DEFVAL       { 10000 }
+    ::= { rcIpfixConfSlotEntry 7 }
+
+-- ------------------------------------------
+-- IPFIX Collector Table (per slot)
+-- ------------------------------------------
+
+rcIpfixCollectorTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF RcIpfixCollectorEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Table to store the configuration details for IPFIX collector
+                  for each slot.  This table is indexed by slot number and ip
+                  address."
+    ::= { rcIpfixTable 2 }
+
+rcIpfixCollectorEntry OBJECT-TYPE
+    SYNTAX       RcIpfixCollectorEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "One entry holds IPFIX collector config information based on
+                  slot info and collector ip address."
+    INDEX        { rcIpfixCollectorSlotNum,
+                   rcIpfixCollectorAddressType,
+                   rcIpfixCollectorAddress }
+    ::= { rcIpfixCollectorTable 1 }
+
+RcIpfixCollectorEntry ::= SEQUENCE {
+    rcIpfixCollectorSlotNum        Integer32,
+    rcIpfixCollectorAddressType    InetAddressType,
+    rcIpfixCollectorAddress        InetAddress,
+    rcIpfixCollectorProtocol       INTEGER,
+    rcIpfixCollectorDestPort       InetPortNumber,
+    rcIpfixCollectorExporterIpType InetAddressType,
+    rcIpfixCollectorExporterIp     InetAddress,
+    rcIpfixCollectorProtoVer       INTEGER,
+    rcIpfixCollectorState          TruthValue,
+    rcIpfixCollectorRowStatus      RowStatus
+}
+
+rcIpfixCollectorSlotNum OBJECT-TYPE
+    SYNTAX       Integer32 (1..10)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Slot number. An index to the CollectorEntry."
+    ::= { rcIpfixCollectorEntry 1 }
+
+rcIpfixCollectorAddressType OBJECT-TYPE
+    SYNTAX       InetAddressType
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "IP address type of the collector.  An index to the
+                  CollectorEntry."
+    ::= { rcIpfixCollectorEntry 2 }
+
+rcIpfixCollectorAddress OBJECT-TYPE
+    SYNTAX       InetAddress
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "IP address of the collector.  An index to the CollectorEntry."
+    ::= { rcIpfixCollectorEntry 3 }
+
+rcIpfixCollectorProtocol OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            udp(1),
+                            tcp(2),
+                            sctp(3)
+                         }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Protocol for export data from exporter to collector ."
+    DEFVAL       { 1 }
+    ::= { rcIpfixCollectorEntry 4 }
+
+rcIpfixCollectorDestPort OBJECT-TYPE
+    SYNTAX       InetPortNumber
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Dest port to send the requests."
+    DEFVAL       { 9995 }
+    ::= { rcIpfixCollectorEntry 5 }
+
+rcIpfixCollectorExporterIpType OBJECT-TYPE
+    SYNTAX       InetAddressType
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Ip address type of the exporter for collector."
+    ::= { rcIpfixCollectorEntry 6 }
+
+rcIpfixCollectorExporterIp OBJECT-TYPE
+    SYNTAX       InetAddress
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Ip address of the exporter for collector."
+    ::= { rcIpfixCollectorEntry 7 }
+
+rcIpfixCollectorProtoVer OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            ipfix(1),
+                            preipfixv9(2),
+                            preipfixv5(3)
+                         }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "This specifies the protocol version for ipfix."
+    DEFVAL       { 2 }
+    ::= { rcIpfixCollectorEntry 8 }
+
+rcIpfixCollectorState OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "State of the particular collector.  Enable is true by
+                  default."
+    DEFVAL       { true }
+    ::= { rcIpfixCollectorEntry 9 }
+
+rcIpfixCollectorRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Used to create/delete entries."
+    ::= { rcIpfixCollectorEntry 10 }
+
+-- ------------------------------------------
+-- IPFIX Table (per port)
+-- ------------------------------------------
+
+rcIpfixConfPortTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF RcIpfixConfPortEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "A table to store the configuration details for IPFIX for each
+                  port.  This table is indexed by port number."
+    ::= { rcIpfixTable 3 }
+
+rcIpfixConfPortEntry OBJECT-TYPE
+    SYNTAX       RcIpfixConfPortEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Entry holding IPFIX config information per port."
+    INDEX        { rcIpfixConfPortId }
+    ::= { rcIpfixConfPortTable 1 }
+
+RcIpfixConfPortEntry ::= SEQUENCE {
+    rcIpfixConfPortId              InterfaceIndex,
+    rcIpfixConfPortSampleRate      Integer32,
+    rcIpfixConfPortHashPolyCoeffs  Integer32,
+    rcIpfixConfPortHashPolySeed    Integer32,
+    rcIpfixConfPortFlush           INTEGER,
+    rcIpfixConfPortAllTraffic      EnableValue,
+    rcIpfixConfPortHashKeyId       INTEGER,
+    rcIpfixConfPortDynamicSampRate Integer32
+}
+
+rcIpfixConfPortId OBJECT-TYPE
+    SYNTAX       InterfaceIndex
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "An index to the IpfixConfPortEntry, a unique identifier of
+                  the portId"
+    ::= { rcIpfixConfPortEntry 1 }
+
+rcIpfixConfPortSampleRate OBJECT-TYPE
+    SYNTAX       Integer32 (0..100000)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Used to configure the sampling rate. Sample one in every N
+                  packets. A value of 0 indicates no sampling"
+    DEFVAL       { 1 }
+    ::= { rcIpfixConfPortEntry 2 }
+
+rcIpfixConfPortHashPolyCoeffs OBJECT-TYPE
+    SYNTAX       Integer32 ('000401'h..'FFFFFF'h)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Command to set hash polynomial coeffs."
+    DEFVAL       { '0007CC'h }
+    ::= { rcIpfixConfPortEntry 3 }
+
+rcIpfixConfPortHashPolySeed OBJECT-TYPE
+    SYNTAX       Integer32 ('000000'h..'FFFFFF'h)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Command to set hash polynomial seed."
+    DEFVAL       { 0 }
+    ::= { rcIpfixConfPortEntry 4 }
+
+rcIpfixConfPortFlush OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            none(1),
+                            flush(2),
+                            exportAndFlush(3)
+                         }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "This is used to delete all records stored in COP, or to
+                  initiate an export of all records and delete data base after
+                  the export is finished."
+    DEFVAL       { none }
+    ::= { rcIpfixConfPortEntry 5 }
+
+rcIpfixConfPortAllTraffic OBJECT-TYPE
+    SYNTAX       EnableValue
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "This is used to enable/disable ipfix on all trafiic, for the
+                  specified port."
+    DEFVAL       { disable }
+    ::= { rcIpfixConfPortEntry 6 }
+
+rcIpfixConfPortHashKeyId OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            hashKeyOne(1),
+                            hashKeyTwo(2),
+                            hashKeyThree(3),
+                            hashKeyFour(4)
+                         }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "hash key id."
+    DEFVAL       { 1 }
+    ::= { rcIpfixConfPortEntry 7 }
+
+rcIpfixConfPortDynamicSampRate OBJECT-TYPE
+    SYNTAX       Integer32 (1..100000)
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Indicates the dynamic sampling rate."
+    ::= { rcIpfixConfPortEntry 8 }
+
+-- ------------------------------------------
+-- Hash Stats Table( per slot)
+-- ------------------------------------------
+
+rcIpfixHashStatsTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF RcIpfixHashStatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "A table of hash Statistics entries to store the statistics
+                  for each slot. This table is indexed by the slot number."
+    ::= { rcIpfixTable 4 }
+
+rcIpfixHashStatsEntry OBJECT-TYPE
+    SYNTAX       RcIpfixHashStatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Entry containing hash statistics information for a particular
+                  slot."
+    INDEX        { rcIpfixHashStatsSlotNum }
+    ::= { rcIpfixHashStatsTable 1 }
+
+RcIpfixHashStatsEntry ::= SEQUENCE {
+    rcIpfixHashStatsSlotNum        Integer32,
+    rcIpfixHashStatsHashOverflows  Counter64,
+    rcIpfixHashStatsHashDrops      Counter64,
+    rcIpfixHashStatsClear          INTEGER,
+    rcIpfixHashStatsClearTime      TimeStamp
+}
+
+rcIpfixHashStatsSlotNum OBJECT-TYPE
+    SYNTAX       Integer32 (1..10)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "A unique identifier for the table."
+    ::= { rcIpfixHashStatsEntry 1 }
+
+rcIpfixHashStatsHashOverflows OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Count of hash overflows per slot."
+    ::= { rcIpfixHashStatsEntry 2 }
+
+rcIpfixHashStatsHashDrops OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Count of hash drops per slot."
+    ::= { rcIpfixHashStatsEntry 3 }
+
+rcIpfixHashStatsClear OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            clear(1)
+                         }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Setting this object will clear hash statistics for a slot."
+    ::= { rcIpfixHashStatsEntry 4 }
+
+rcIpfixHashStatsClearTime OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "The value of sysUpTime when the hash statistics were last
+                  cleared."
+    ::= { rcIpfixHashStatsEntry 5 }
+
+-- ------------------------------------------
+-- Exporter Stats Table( per slot, per collector)
+-- ------------------------------------------
+
+rcIpfixExporterStatsTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF RcIpfixExporterStatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "A table of Exporter Statistics entries to store the statistics
+                  for each slot, each collector.  This table is indexed by the
+                  slot number and collector address."
+    ::= { rcIpfixTable 5 }
+
+rcIpfixExporterStatsEntry OBJECT-TYPE
+    SYNTAX       RcIpfixExporterStatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Entry containing Exporter statistics information for a
+                  particular slot and particular collector."
+    INDEX        { rcIpfixExporterStatsSlotNum,
+                   rcIpfixExporterStatsCollectorType, 
+                   rcIpfixExporterStatsCollector }
+    ::= { rcIpfixExporterStatsTable 1 }
+
+RcIpfixExporterStatsEntry ::= SEQUENCE {
+    rcIpfixExporterStatsSlotNum        Integer32,
+    rcIpfixExporterStatsCollectorType  InetAddressType,
+    rcIpfixExporterStatsCollector      InetAddress,
+    rcIpfixExporterStatsOutPkts        Counter64,
+    rcIpfixExporterStatsOutOctets      Counter64,
+    rcIpfixExporterStatsPktsLoss       Counter64,
+    rcIpfixExporterStatsClear          INTEGER,
+    rcIpfixExporterStatsClearTime      TimeStamp
+}
+
+rcIpfixExporterStatsSlotNum OBJECT-TYPE
+    SYNTAX       Integer32 (1..10)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Index for the table, slot number."
+    ::= { rcIpfixExporterStatsEntry 1 }
+
+rcIpfixExporterStatsCollectorType OBJECT-TYPE
+    SYNTAX       InetAddressType
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Collector IP address type.  This is an index for the table."
+    ::= { rcIpfixExporterStatsEntry 2 }
+
+rcIpfixExporterStatsCollector OBJECT-TYPE
+    SYNTAX       InetAddress
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Index for the table, collector address."
+    ::= { rcIpfixExporterStatsEntry 3 }
+
+rcIpfixExporterStatsOutPkts OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Number of Packets sent."
+    ::= { rcIpfixExporterStatsEntry 4 }
+
+rcIpfixExporterStatsOutOctets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Number of Bytes sent."
+    ::= { rcIpfixExporterStatsEntry 5 }
+
+rcIpfixExporterStatsPktsLoss OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Number of Records lost."
+    ::= { rcIpfixExporterStatsEntry 6 }
+
+rcIpfixExporterStatsClear OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            clear(1)
+                         }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "Setting this object will clear exporter statistics."
+    ::= { rcIpfixExporterStatsEntry 7 }
+
+rcIpfixExporterStatsClearTime OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "The value of sysUpTime when exporter statistics were last
+                  cleared."
+    ::= { rcIpfixExporterStatsEntry 8 }
+
+-- ------------------------------------------
+-- IPFIX Collector Id Table
+-- ------------------------------------------
+
+rcIpfixCollectorIdTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF RcIpfixCollectorIdEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "Table to store the configuration details for IPFIX collector
+                  for each ID. This table is indexed by ID"
+    ::= { rcIpfixTable 6 }
+	
+rcIpfixCollectorIdEntry OBJECT-TYPE
+    SYNTAX       RcIpfixCollectorIdEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "One entry holds IPFIX collector configuration information based on
+                  ID number."
+    INDEX        { rcIpfixCollectorIdNum }
+    ::= { rcIpfixCollectorIdTable 1 }	
+	
+RcIpfixCollectorIdEntry ::= SEQUENCE {
+    rcIpfixCollectorIdNum              Integer32,
+    rcIpfixCollectorIdAddressType      InetAddressType,
+    rcIpfixCollectorIdAddress          InetAddress,
+    rcIpfixCollectorIdProtocol         INTEGER,
+    rcIpfixCollectorIdSrcPort          InetPortNumber,
+    rcIpfixCollectorIdDestPort         InetPortNumber,
+    rcIpfixCollectorIdExporterIpType   InetAddressType,
+    rcIpfixCollectorIdExporterIp       InetAddress,
+    rcIpfixCollectorIdState            TruthValue,
+    rcIpfixCollectorIdRowStatus        RowStatus,
+    rcIpfixCollectorIdIsReachable      TruthValue,
+    rcIpfixCollectorIdViaNextHopName   DisplayString,
+    rcIpfixCollectorIdExportInterval   Integer32,
+    rcIpfixCollectorIdInitialBurst     Integer32
+}
+
+rcIpfixCollectorIdNum OBJECT-TYPE
+    SYNTAX       Integer32 (1..8)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "ID number of the collector.
+	          In this release a single collector can be configured."
+    ::= { rcIpfixCollectorIdEntry 1 }
+
+rcIpfixCollectorIdAddressType OBJECT-TYPE
+    SYNTAX       InetAddressType
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "IP address type of the collector."
+    DEFVAL       {ipv4}
+    ::= { rcIpfixCollectorIdEntry 2 }
+	
+rcIpfixCollectorIdAddress OBJECT-TYPE
+    SYNTAX       InetAddress
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "IP address of the collector."
+    ::= { rcIpfixCollectorIdEntry 3 }
+
+rcIpfixCollectorIdProtocol OBJECT-TYPE
+    SYNTAX       INTEGER {
+                            udp(1),
+                            tcp(2),
+                            sctp(3)
+                         }
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "Protocol for exporting data from the 
+		  exporter to the collector."
+    DEFVAL       { udp }
+    ::= { rcIpfixCollectorIdEntry 4 }
+
+rcIpfixCollectorIdSrcPort OBJECT-TYPE
+    SYNTAX       InetPortNumber (1..65535)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Source port sending the requests."
+    DEFVAL       { 2055 }
+    ::= { rcIpfixCollectorIdEntry 5 }
+
+rcIpfixCollectorIdDestPort OBJECT-TYPE
+    SYNTAX       InetPortNumber (1..65535)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Destination port to send the requests to."
+    DEFVAL       { 2055 }
+    ::= { rcIpfixCollectorIdEntry 6 }
+
+rcIpfixCollectorIdExporterIpType OBJECT-TYPE
+    SYNTAX       InetAddressType
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "IP address type of the exporter for collector."
+    DEFVAL       {ipv4}
+    ::= { rcIpfixCollectorIdEntry 7 }
+
+rcIpfixCollectorIdExporterIp OBJECT-TYPE
+    SYNTAX       InetAddress
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "IP address of the exporter for the collector."
+    ::= { rcIpfixCollectorIdEntry 8 }
+
+rcIpfixCollectorIdState OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "State of the particular collector.  Enable is true by
+                  default."
+    DEFVAL       { true }
+    ::= { rcIpfixCollectorIdEntry 9 }
+
+rcIpfixCollectorIdRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  "Used to create/delete entries."
+    ::= { rcIpfixCollectorIdEntry 10 }
+rcIpfixCollectorIdIsReachable   OBJECT-TYPE
+    SYNTAX              TruthValue
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION         "Indicates if the collector is reachable."
+    DEFVAL       { false }
+    ::= { rcIpfixCollectorIdEntry 11 }
+
+rcIpfixCollectorIdViaNextHopName   OBJECT-TYPE
+    SYNTAX              DisplayString
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION         "The next-hop through which the collector is reachable."
+    DEFVAL       { "-" }
+    ::= { rcIpfixCollectorIdEntry 12 }
+
+rcIpfixCollectorIdExportInterval   OBJECT-TYPE
+    SYNTAX              Integer32 (1..120)
+    UNITS               "seconds"
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION         "Frequency of flow export to collector value in sec."
+    DEFVAL       { 60 }
+    ::= { rcIpfixCollectorIdEntry 13 }
+
+rcIpfixCollectorIdInitialBurst   OBJECT-TYPE
+    SYNTAX              Integer32 (1..10)
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION         "Number of template packets sent when the collector become reachable."
+    DEFVAL       { 5 }
+    ::= { rcIpfixCollectorIdEntry 14 }
+
+END
+

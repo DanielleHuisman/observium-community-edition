@@ -1,0 +1,1478 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+--    $Id: fsnat.mib,v 1.11 2012/09/07 09:52:05 siva Exp $
+--    NAT Proprietary MIB Definition
+
+
+-- This document explains the proprietary MIB implemented for FutureNAT
+-- product.
+
+-- The FS proprietary MIB definitions, which mostly contains extra
+-- statistic objects and objects that can enable or disable certain features
+-- of a protocol or the protocol itself. The various groups that are present
+-- in the proprietary MIB are :
+--
+-- NAT
+-- This group contains all the scalar objects and tables that are need for
+-- configuring FutureNAT. All the scalar objects are listed under the table
+-- natStatInfo.
+-- Information on various tables.
+--
+-- natStatInfo: The objects natEnable, natIdleTimeOut, natTypicalNumberOfEntries
+--					and natTranslateLocalPortStart are used for configuring
+--					FutureNAT globally. The other object viz.
+--					natStatTotalNumberOfSessionsClosed,
+--					natStatTotalNumberOfTranslations,
+--					natStatDynamicAllocFailureCount,
+--					natStatTotalNumberOfActiveSessions,
+--					natStatTotalNumberOfPktsDropped are used to statistic
+--					information.
+-- natDynamicTransTable : This table gives information on the active
+--				connections like the inside host IP address and port used, the
+--					translated IP address and port used and the outside host IP
+--		address and port used.
+-- natStaticTable : This table is used for configuring the static mapping
+--					between Local IP Address and Translated Local IP Address on
+--					a particular interface.
+-- natLocalAddressTable : This table is used for listing the local IP address
+--					available in the inside network.
+--	natGlobalAddressTable : This table is used for configuring translated local
+--					IP address which is nothing but global IP address.
+-- natIfTable : This contains information on the outside interface.
+--					NAT, NAPT and TWO WAY NAT on any interface is enabled 
+--                  through	the objects of this table viz natIfNat, natIfNapt
+--                  and	natIfTwoWayNat respectively. Other statistics for the
+--	                particular is also available in this table.
+
+
+FutureNat-MIB DEFINITIONS ::= BEGIN
+
+ IMPORTS
+     MODULE-IDENTITY, OBJECT-TYPE, 
+     Integer32, Counter32, enterprises,
+     IpAddress  FROM SNMPv2-SMI
+     RowStatus, DisplayString, TimeStamp, TEXTUAL-CONVENTION FROM SNMPv2-TC;
+
+   --enterprises	      OBJECT IDENTIFIER ::= { private 1 }
+   --futuresoftware	   OBJECT IDENTIFIER ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) }
+
+ futureNatMIB MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "Super Micro Computer Inc."
+    CONTACT-INFO "support@Supermicro.com"
+    DESCRIPTION " The natMIB is placed under supermicro MIB branch."
+    REVISION "201209050000Z"	
+    DESCRIPTION " The natMIB is placed under supermicro MIB branch."
+	::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 14 }
+
+
+ nat	   OBJECT IDENTIFIER ::= { futureNatMIB 1 }
+
+--nat	GROUP
+
+-- The Status is an integer value which specificies each feature enable
+
+Status	::= TEXTUAL-CONVENTION
+   STATUS    current
+   DESCRIPTION
+      "The status of each feature of FutureNAT i.e. whether it is enabled or
+      not"
+   SYNTAX    INTEGER  {
+               enabled(1),
+		       disabled(2)
+	           }
+
+natStatInfo		OBJECT IDENTIFIER  ::= { nat 1 }
+
+
+-- SCALAR_TABLE_BEGIN natStatInfo
+
+natEnable			OBJECT-TYPE
+   SYNTAX			Status
+   MAX-ACCESS		read-write
+   STATUS			current
+   DESCRIPTION
+	  "Enables or Disables NAT globally."
+   DEFVAL  { enabled }
+   ::=	{ natStatInfo 1 }
+
+natTypicalNumberOfEntries    OBJECT-TYPE
+   SYNTAX		             Integer32
+   MAX-ACCESS		         read-write
+   STATUS		             current
+   DESCRIPTION
+	 "This gives the initial number of entries in the Dynamic Table for
+	which the memory should be alloted at initialisation time.
+	When changed dynamically, the updation will occur only at reset."
+	DEFVAL { 9000 }
+   ::=	{ natStatInfo 2 }
+
+natTranslatedLocalPortStart     OBJECT-TYPE
+   SYNTAX		                Integer32
+   MAX-ACCESS		            read-write
+   STATUS		                current
+   DESCRIPTION
+	 "Gives the start of next free translated local port to be
+	  used (in case it is set) if NAPT is enabled and a new
+	  connection arrives at the NAT Router."
+	DEFVAL { 6001 }
+   ::=	{ natStatInfo 3 }
+
+natIdleTimeOut			OBJECT-TYPE
+   SYNTAX				Integer32(60..86400)
+   MAX-ACCESS			read-write
+   STATUS			    current
+   DESCRIPTION
+	"This gives the amount of time until which a connection can stay idle,
+	after which the connection will be terminated. The time is given in
+	seconds."
+   DEFVAL { 60 }
+  ::=  { natStatInfo 4 }
+natTcpTimeOut           OBJECT-TYPE
+   SYNTAX				Integer32(300..86400)
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+	"This gives the amount of time the TCP session entry can be present in the
+	NAT session table without being used or referred, before being removed from
+	the NAT session table. Here time is in seconds."
+   DEFVAL { 3600 }
+  ::=  { natStatInfo 5 }
+
+natUdpTimeOut           OBJECT-TYPE
+   SYNTAX				Integer32(300..86400)
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+	"This gives the amount of time the UDP session entry can be present in the
+	NAT session table without being used or referred, before being removed from
+	the NAT session table. Here time is in seconds."
+   DEFVAL { 300 }
+  ::=  { natStatInfo 6 }
+
+natTrcFlag				OBJECT-TYPE
+   SYNTAX				Integer32
+   MAX-ACCESS		    read-write
+   STATUS				current
+   DESCRIPTION
+	"The value given enables the respective trace options. Each value of
+	the flag corresponds to a certain trace option.
+	    Flag Value			  Trace Option
+                0                       No Trace Flag enabled
+		1			Init/Shutdown information
+		2			Information of Management functions.
+		3			Data Flow
+		4			Control Plane
+		5			Complete packet dump
+		6			Information on Resources used
+		7			All failure conditions.
+		8			Buffer related information
+               >8                       All Trace Flags are enabled.
+	For example to enable both init/shutdown and data flow trace options
+	first enable nat trace with value 1 then enable nat trace with value 3."
+   DEFVAL { 0 }
+  ::=  { natStatInfo 7 }
+
+natStatDynamicAllocFailureCount		OBJECT-TYPE
+   SYNTAX			                Counter32
+   MAX-ACCESS				        read-only
+   STATUS			                current
+   DESCRIPTION
+	"This gives number of times dynamic allocation (malloc) has failed."
+  ::=  { natStatInfo 8 }
+
+
+natStatTotalNumberOfTranslations	OBJECT-TYPE
+   SYNTAX			                Counter32
+   MAX-ACCESS			            read-only
+   STATUS				            current
+   DESCRIPTION
+	"This gives the total number of packets that are translated by NAT
+	module on all the interfaces"
+   ::=	{ natStatInfo 9 }
+
+
+natStatTotalNumberOfActiveSessions	OBJECT-TYPE
+   SYNTAX							Counter32
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+	"This gives the total number of currently active sessions (both UDP and
+	TCP) on all interfaces "
+  ::=  { natStatInfo 10 }
+
+
+natStatTotalNumberOfPktsDropped		OBJECT-TYPE
+   SYNTAX							Counter32
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+	"Gives the total number of packets that have been dropped by the NAT
+	module due to  various causes ."
+   ::=	{ natStatInfo 11 }
+
+
+natStatTotalNumberOfSessionsClosed	  OBJECT-TYPE
+   SYNTAX							  Counter32
+   MAX-ACCESS						  read-only
+   STATUS							  current
+   DESCRIPTION
+	"Gives the total number of idle sessions that are removed from NAT
+	table."
+   ::=	{ natStatInfo 12 }
+
+natIKEPortTranslation	OBJECT-TYPE
+   SYNTAX				Status
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+   	"This is used to enable or disable IKE port translation feature ."
+   DEFVAL { disabled }
+   ::=	{ natStatInfo 13 }
+
+natIKETimeout        	OBJECT-TYPE
+   SYNTAX				Integer32
+   MAX-ACCESS	    	read-write
+   STATUS				current
+   DESCRIPTION
+	"This gives the amount of time the IKE session entry can be present in the
+	NAT IKE session table without being used or referred, before being removed from
+	the NAT session table. Here time is in seconds."
+   DEFVAL  { 28800 }
+   ::=	{ natStatInfo 14 }
+
+natIPSecTimeout	        OBJECT-TYPE
+   SYNTAX				Integer32
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+	"This gives the amount of time the IPSec session entry can be present in the
+	NAT IPSec session table without being used or referred, before being removed from
+	the NAT session table. Here time is in seconds."
+   DEFVAL { 28800 }
+   ::=	{ natStatInfo 15 }
+
+natIPSecPendingTimeout  	        OBJECT-TYPE
+   SYNTAX							Integer32
+   MAX-ACCESS						read-write
+   STATUS							current
+   DESCRIPTION
+	"This gives the amount of time the IPSec pending entry can be present in the
+	NAT IPSec Pending table without being used or referred, before being removed from the NAT session table. Here time is in seconds."
+   DEFVAL { 30 }
+   ::=	{ natStatInfo 16 }
+
+natIPSecMaxRetry         	    OBJECT-TYPE
+   SYNTAX						Integer32
+   MAX-ACCESS					read-write
+   STATUS						current
+   DESCRIPTION
+	"This  is used to set the maximum number of retries allowed for IPSec session in the pending Table."
+   DEFVAL { 3 }
+   ::=	{ natStatInfo 17 }
+
+sipAlgPort       OBJECT-TYPE
+   SYNTAX		        Integer32
+   MAX-ACCESS		  read-write
+   STATUS		        current
+   DESCRIPTION
+	 "Gives the the port to be used for sip signaling."
+   DEFVAL { 5060 }
+   ::=	{ natStatInfo 18 }
+
+natSipAlgPartialEntryTimeOut		OBJECT-TYPE
+   SYNTAX			Integer32(212..86400)
+   MAX-ACCESS		read-write
+   STATUS			current
+   DESCRIPTION
+	"This gives the amount of time until which a connection can stay idle,
+	after which the connection will be terminated. The time is given in
+	seconds."
+   DEFVAL { 300 }
+  ::=  { natStatInfo 19 }
+
+
+
+-- SCALAR_TABLE_END nat
+
+
+-- NAT Dynamic Table, also called as translation table.
+-- dynamic translation entries are created/deleted on the fly.
+-- this table is for monitoring and not for configuration.
+
+natDynamicTransTable		OBJECT-TYPE
+   SYNTAX		            SEQUENCE OF NatDynamicTransEntry
+   MAX-ACCESS		     	not-accessible
+   STATUS			        current
+   DESCRIPTION
+      "This table is a read-only table which gives the IP address and port
+      mappings present in the NAT table. This is nothing but the NAT
+      translation  table. Rows can neither be created nor be deleted using
+      the rowstatus column.  Rows are automatically created and deleted by
+      NAT module. The rowstatus will  always hold the value ACTIVE."
+   ::=	{ nat 2 }
+
+
+ natDynamicTransEntry		OBJECT-TYPE
+   SYNTAX	            	NatDynamicTransEntry
+   MAX-ACCESS		    	not-accessible
+   STATUS			        current
+   DESCRIPTION
+      "An entry in the NAT dynamic table."
+   INDEX {  
+      natDynamicTransInterfaceNum, 
+      natDynamicTransLocalIp,
+      natDynamicTransLocalPort,
+      natDynamicTransOutsideIp,
+      natDynamicTransOutsidePort 
+      }
+  ::=  {   natDynamicTransTable 1 }
+
+
+NatDynamicTransEntry  ::=
+    SEQUENCE {
+       natDynamicTransInterfaceNum          Integer32,
+       natDynamicTransLocalIp               IpAddress,
+       natDynamicTransTranslatedLocalIp     IpAddress,
+       natDynamicTransLocalPort             Integer32,
+       natDynamicTransTranslatedLocalPort   Integer32,
+       natDynamicTransOutsideIp             IpAddress,
+       natDynamicTransOutsidePort           Integer32,
+       natDynamicTransLastUseTime           Integer32
+       }
+  
+natDynamicTransInterfaceNum		OBJECT-TYPE
+   SYNTAX						Integer32(0..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the global interface number on which the session is going
+      on."
+   ::=	{ natDynamicTransEntry 1 }
+
+natDynamicTransLocalIp			OBJECT-TYPE
+   SYNTAX						IpAddress
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the actual IP address of the host connected to inside
+      network."
+   ::=	{ natDynamicTransEntry 2 }
+
+natDynamicTransTranslatedLocalIp	OBJECT-TYPE
+   SYNTAX							IpAddress
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+      "This is the address assigned to the local host by NAT. All the hosts
+      from  outside will contact the local host through this valid IP
+      Address."
+   ::=	{ natDynamicTransEntry 3 }
+
+natDynamicTransLocalPort	OBJECT-TYPE
+   SYNTAX					Integer32(1..65535)
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This is the actual source/destination port (UDP/TCP) used by the
+      local host  for communicating with the outside network."
+   ::=	{ natDynamicTransEntry 4 }
+
+natDynamicTransTranslatedLocalPort	OBJECT-TYPE
+   SYNTAX							Integer32
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+      "This is the port number assigned by NAT, when PAT is enabled.
+      Otherwise the  original port number is retained."
+   ::=	{ natDynamicTransEntry 5 }
+
+natDynamicTransOutsideIp	OBJECT-TYPE
+   SYNTAX					IpAddress
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This gives the IP address of the outside host which the above stated
+      Local host is contacting."
+   ::=	{ natDynamicTransEntry 6 }
+
+natDynamicTransOutsidePort	  OBJECT-TYPE
+   SYNTAX					  Integer32(1..65535)
+   MAX-ACCESS				  not-accessible
+   STATUS					  current
+   DESCRIPTION
+      "This is the port number of the outside host on which it is being
+      contacted."
+   ::=	{ natDynamicTransEntry 7 }
+
+natDynamicTransLastUseTime    OBJECT-TYPE
+   SYNTAX					  Integer32
+   MAX-ACCESS				  read-only
+   STATUS					  current
+   DESCRIPTION
+      "This gives the amount of time (in seconds) for which the above particular
+      connection has remained idle."
+   ::=	{ natDynamicTransEntry 8 }
+
+
+-- NAT global IP address table. To list the global IP addresses obtained
+-- from IANA.
+
+natGlobalAddressTable		OBJECT-TYPE
+   SYNTAX	        		SEQUENCE OF NatGlobalAddressEntry
+   MAX-ACCESS		     	not-accessible
+   STATUS			        current
+   DESCRIPTION
+      "This configuration table is used to list all the global IP addresses
+      obtained from InterNIC and which can be used by NAT module for
+      translation."
+   ::=	{ nat 3 }
+
+
+ natGlobalAddressEntry		OBJECT-TYPE
+   SYNTAX					NatGlobalAddressEntry
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "An entry in the NAT global IP address table."
+   INDEX { 
+      natGlobalAddressInterfaceNum,
+      natGlobalAddressTranslatedLocalIp 
+      }
+  ::=  { natGlobalAddressTable 1 }
+
+NatGlobalAddressEntry  ::=
+    SEQUENCE {
+       natGlobalAddressInterfaceNum        Integer32,
+       natGlobalAddressTranslatedLocalIp   IpAddress,
+       natGlobalAddressMask                IpAddress,
+       natGlobalAddressEntryStatus         RowStatus
+       }
+
+natGlobalAddressInterfaceNum	OBJECT-TYPE
+   SYNTAX						Integer32(0..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the interface number on which the global IP address given
+      below should be used for local IP address translation."
+   ::=	{ natGlobalAddressEntry 1 }
+
+natGlobalAddressTranslatedLocalIp	OBJECT-TYPE
+   SYNTAX							IpAddress
+   MAX-ACCESS						not-accessible
+   STATUS							current
+   DESCRIPTION
+      "This is the IP address network number obtained from the IANA which can
+      be used by NAT for translating the local IP addresses whose packets are
+      going on the corresponding interface number given by
+      natGlobalAddressInterfaceNum."
+   ::=	{ natGlobalAddressEntry 2 }
+
+natGlobalAddressMask	OBJECT-TYPE
+   SYNTAX				IpAddress
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+	"This when applied on the natGlobalAddressTranslatedLocalIp gives the 
+    range of global IP Addresses that can be used by the NAT module to 
+    translate the local IP Address whose packets are transmitted on the 
+    given interface number."
+   ::=	{ natGlobalAddressEntry 3 }
+
+natGlobalAddressEntryStatus	OBJECT-TYPE
+   SYNTAX					RowStatus
+   MAX-ACCESS				read-write
+   STATUS					current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+  ::=  { natGlobalAddressEntry 4 }
+
+
+-- NAT Local Range Table - To configure the IP addresses which need translation.
+
+natLocalAddressTable		OBJECT-TYPE
+   SYNTAX					SEQUENCE OF NatLocalAddressEntry
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This table is also a configuration table. The user has to configure
+      Interfaces, which are connected to inside network and the IP address
+      ranges, which needs address translations. All the interfaces which are
+      not given in this table are considered as GLOBAL interfaces (interfaces
+      connected to  outside network)."
+   ::=	{ nat 4 }
+
+natLocalAddressEntry		OBJECT-TYPE
+   SYNTAX					NatLocalAddressEntry
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "An entry in the NAT local IP address range specification table."
+   INDEX {
+      natLocalAddressInterfaceNumber,
+      natLocalAddressLocalIp
+      }
+  ::=  {   natLocalAddressTable 1 }
+
+
+NatLocalAddressEntry  ::=
+    SEQUENCE {
+       natLocalAddressInterfaceNumber     Integer32,
+       natLocalAddressLocalIp             IpAddress,
+       natLocalAddressMask                IpAddress,
+       natLocalAddressEntryStatus         RowStatus
+  }
+
+natLocalAddressInterfaceNumber	OBJECT-TYPE
+   SYNTAX						Integer32(0..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the interface number which is connected to inside network
+      containing the given below Local IP addresses."
+  ::=  { natLocalAddressEntry 1 }
+
+
+natLocalAddressLocalIp		OBJECT-TYPE
+   SYNTAX					IpAddress
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This gives the network number of the local host needing translation."
+   ::=	{ natLocalAddressEntry 2 }
+
+natLocalAddressMask		OBJECT-TYPE
+   SYNTAX				IpAddress
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+      "This mask when anded with the above local IP gives the range of Local
+      host that can contact outside ."
+  ::=  { natLocalAddressEntry 3 }
+
+natLocalAddressEntryStatus	OBJECT-TYPE
+   SYNTAX					RowStatus
+   MAX-ACCESS				read-write
+   STATUS					current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+  ::=  { natLocalAddressEntry 4 }
+
+
+-- NAT Static address assignment table
+
+natStaticTable			OBJECT-TYPE
+   SYNTAX		        SEQUENCE OF NatStaticEntry
+   MAX-ACCESS			not-accessible
+   STATUS			    current
+   DESCRIPTION
+     "This table is a configurable table in which the static IP address
+      mapping  between the LOCAL IP address and GLOBAL IP address is
+      configured."
+  ::= { nat 5 }
+
+natStaticEntry			OBJECT-TYPE
+   SYNTAX				NatStaticEntry
+   MAX-ACCESS			not-accessible
+   STATUS				current
+   DESCRIPTION
+      "An entry in the NAT static configuration table."
+   INDEX {
+      natStaticInterfaceNum,
+      natStaticLocalIp
+      }
+  ::= { natStaticTable 1 }
+
+
+NatStaticEntry	::=
+    SEQUENCE {
+       natStaticInterfaceNum          Integer32,
+       natStaticLocalIp 	          IpAddress,
+       natStaticTranslatedLocalIp     IpAddress,
+       natStaticEntryStatus           RowStatus
+       }
+
+natStaticInterfaceNum		OBJECT-TYPE
+   SYNTAX					Integer32(0..65535)
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "The local host listed below will use the corresponding global IP if it
+      sends packets on this interface."
+   ::= { natStaticEntry 1 }
+
+natStaticLocalIp		OBJECT-TYPE
+   SYNTAX				IpAddress
+   MAX-ACCESS			not-accessible
+   STATUS				current
+   DESCRIPTION
+      "This is the IP address of the host present in the inside network."
+   ::= { natStaticEntry 2 }
+
+
+natStaticTranslatedLocalIp		OBJECT-TYPE
+   SYNTAX						IpAddress
+   MAX-ACCESS					read-write
+   STATUS						current
+   DESCRIPTION
+      "This is the IP address that should be used in the packets going out
+      from  the given InsideLocalIp host to the outside network. In the
+      opposite direction this mapping will be used along with the NAT entry
+      to reverse translation. This global IP will not be used by any other
+		host."
+   ::= { natStaticEntry 3 }
+
+natStaticEntryStatus		OBJECT-TYPE
+   SYNTAX					RowStatus
+   MAX-ACCESS				read-write
+   STATUS					current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+  ::= { natStaticEntry 4 }
+
+
+-- NAT Static NAPT assignment table
+
+natStaticNaptTable    OBJECT-TYPE
+   SYNTAX		      SEQUENCE OF NatStaticNaptEntry
+   MAX-ACCESS	      not-accessible
+   STATUS		      current
+   DESCRIPTION
+     "This table is a configurable table in which the static IP address
+      and Port mapping  between the Local IP address, Local Port and Global
+      IP address, Global Port is configured."
+  ::= { nat 6 }
+
+natStaticNaptEntry			OBJECT-TYPE
+   SYNTAX					NatStaticNaptEntry
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "An entry in the NAT StaticNapt configuration table."
+   INDEX {
+	  natStaticNaptInterfaceNum,
+      natStaticNaptLocalIp,
+      natStaticNaptStartLocalPort,
+      natStaticNaptEndLocalPort,
+      natStaticNaptProtocolNumber
+      }
+  ::=  {   natStaticNaptTable 1 }
+
+
+NatStaticNaptEntry	::=
+    SEQUENCE {
+       natStaticNaptInterfaceNum           Integer32,
+       natStaticNaptLocalIp                IpAddress,
+       natStaticNaptStartLocalPort         Integer32,
+       natStaticNaptEndLocalPort           Integer32,
+       natStaticNaptProtocolNumber         INTEGER,
+       natStaticNaptTranslatedLocalIp      IpAddress,
+       natStaticNaptTranslatedLocalPort    Integer32,
+       natStaticNaptDescription            DisplayString,
+       natStaticNaptEntryStatus            RowStatus
+  }
+
+natStaticNaptInterfaceNum		OBJECT-TYPE
+   SYNTAX			            Integer32(0..65535)
+   MAX-ACCESS			        not-accessible
+   STATUS			            current
+   DESCRIPTION
+      "The local host with the local port listed below will use the
+       corresponding global IP and global port if it
+      sends packets on this interface."
+   ::= { natStaticNaptEntry 1 }
+
+natStaticNaptLocalIp		OBJECT-TYPE
+   SYNTAX					IpAddress
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This is the IP address of the host present in the inside network."
+   ::= { natStaticNaptEntry 2 }
+
+natStaticNaptStartLocalPort		OBJECT-TYPE
+   SYNTAX						Integer32(1..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This is the start Port of the host present in the inside network."
+   ::= { natStaticNaptEntry 3 }
+
+natStaticNaptEndLocalPort		OBJECT-TYPE
+   SYNTAX						Integer32(1..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+   "This is the End Port of the host present in the inside network."
+   ::= { natStaticNaptEntry 4 }
+
+natStaticNaptProtocolNumber	OBJECT-TYPE
+   SYNTAX					INTEGER {
+                                  tcp(6),
+                                  udp(17),
+                                  any(255)
+                                  }
+   MAX-ACCESS	            not-accessible
+   STATUS					current
+   DESCRIPTION
+   "This is protocol number which is to be allowed"
+   ::= { natStaticNaptEntry 5 }
+
+natStaticNaptTranslatedLocalIp		OBJECT-TYPE
+   SYNTAX							IpAddress
+   MAX-ACCESS						read-write
+   STATUS							current
+   DESCRIPTION
+      "This is the IP address that should be used in the packets going out
+      from  the given InsideLocalIp host to the outside network. In the
+      opposite direction this mapping will be used along with the NAT entry
+      to reverse translation."
+   ::= { natStaticNaptEntry 6 }
+
+natStaticNaptTranslatedLocalPort		OBJECT-TYPE
+   SYNTAX								Integer32(1..65535)
+   MAX-ACCESS							read-write
+   STATUS								current
+   DESCRIPTION
+      "This is the Port that should be used in the packets going out
+      from  the given InsideLocalIp host to the outside network. In the
+      opposite direction this mapping will be used along with the NAT entry
+      to reverse translation. "
+   ::= { natStaticNaptEntry 7 }
+
+natStaticNaptDescription		OBJECT-TYPE
+   SYNTAX						DisplayString(SIZE (1..20))
+   MAX-ACCESS					read-write
+   STATUS						current
+   DESCRIPTION
+      "This is the description of the entry given by the user at the time
+       of configuration"
+   ::= { natStaticNaptEntry 8 }
+
+natStaticNaptEntryStatus		OBJECT-TYPE
+   SYNTAX						RowStatus
+   MAX-ACCESS					read-write
+   STATUS						current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+  ::= { natStaticNaptEntry 9 }
+
+--nat interface table
+--defines the operation flags
+
+natIfTable			OBJECT-TYPE
+   SYNTAX			SEQUENCE OF NatIfEntry
+   MAX-ACCESS		not-accessible
+   STATUS			current
+   DESCRIPTION
+	"This tables gives the interface number on which NAT,NAPT,TWICE NAT and
+	TWO WAY NAT are enabled."
+   ::= { nat 7 }
+
+natIfEntry			OBJECT-TYPE
+   SYNTAX			NatIfEntry
+   MAX-ACCESS		not-accessible
+   STATUS			current
+   DESCRIPTION
+      "An entry in the NAT Interface table."
+   INDEX  {
+      natIfInterfaceNumber 
+      }
+  ::=  {   natIfTable 1 }
+
+NatIfEntry  ::=
+    SEQUENCE {
+       natIfInterfaceNumber      Integer32,
+       natIfNat                  Status,
+       natIfNapt                 Status,
+       natIfTwoWayNat            Status,
+       natIfEntryStatus          RowStatus
+       }
+
+natIfInterfaceNumber		OBJECT-TYPE
+   SYNTAX					Integer32(0..65535)
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This gives the global interface number on which the following features
+      can be enabled."
+   ::= { natIfEntry 1 }
+
+natIfNat			OBJECT-TYPE
+   SYNTAX			Status
+   MAX-ACCESS		read-write
+   STATUS			current
+   DESCRIPTION
+      "This enables NAT on interface number given by natIfInterfaceNumber. Only
+      the inside host can initiate connections. Translation will be done on
+      outbound packets only. This object can be enabled only after
+      natGlobalAddressTable and natLocalAddressTable are configured."
+   DEFVAL { disabled }
+  ::= { natIfEntry 2 }
+
+natIfNapt			OBJECT-TYPE
+   SYNTAX			Status
+   MAX-ACCESS		read-write
+   STATUS		   current	
+   DESCRIPTION
+      "This enables port translation on interface number given by
+      natIfInterfaceNumber. If this feature is enabled, then the same global IP
+      address is overloaded and can be used for many local host by translating
+      the port number. natIfNat gets enabled when this object is enabled and
+      natIfNat cannot be disabled when natIfNapt is enabled."
+   DEFVAL  { disabled }
+  ::=  { natIfEntry 3 }
+
+natIfTwoWayNat		OBJECT-TYPE
+   SYNTAX			Status
+   MAX-ACCESS		read-write
+   STATUS			current
+   DESCRIPTION
+	"This enables NAT on both sides. That is the connection can be initiated
+	from the inside host as well as from the outside host. Translation will
+	be done on both INBOUND and OUTBOUND packets"
+   DEFVAL { disabled }
+  ::=  { natIfEntry 4 }
+
+
+natIfEntryStatus	OBJECT-TYPE
+   SYNTAX			RowStatus
+   MAX-ACCESS		read-write
+   STATUS			current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+  ::=  { natIfEntry 5 }
+
+-- NAT IPSec Session  Table
+-- The Session translation entries are created/deleted on the fly.
+-- this table is for monitoring and not for configuration.
+
+natIPSecSessionTable		OBJECT-TYPE
+   SYNTAX		            SEQUENCE OF NatIPSecSessionEntry
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This table gives the IP address and SPI
+      mappings present in the NAT table. This is nothing but the NAT
+      translation  table for the IPSec Traffic. Rows are automatically 
+      created and deleted by  NAT module. 
+      User can also delete rows using Rowstatus field."
+   ::=	{ nat 8 }
+
+
+ natIPSecSessionEntry		OBJECT-TYPE
+   SYNTAX		            NatIPSecSessionEntry
+   MAX-ACCESS		        not-accessible
+   STATUS			        current
+   DESCRIPTION
+      "An entry in the NAT IPSec Session table."
+   INDEX {
+      natIPSecSessionInterfaceNum,
+      natIPSecSessionLocalIp,
+      natIPSecSessionOutsideIp,
+      natIPSecSessionSPIInside, 
+      natIPSecSessionSPIOutside 
+      }
+  ::=  {   natIPSecSessionTable 1 }
+
+  NatIPSecSessionEntry  ::=
+    SEQUENCE {
+       natIPSecSessionInterfaceNum   	     Integer32,
+       natIPSecSessionLocalIp       	     IpAddress,
+       natIPSecSessionTranslatedLocalIp      IpAddress,
+       natIPSecSessionOutsideIp      	     IpAddress,
+       natIPSecSessionSPIInside              Integer32,
+       natIPSecSessionSPIOutside             Integer32,
+       natIPSecSessionLastUseTime    	     Integer32,
+       natIPSecSessionEntryStatus            RowStatus
+       }
+
+natIPSecSessionInterfaceNum		OBJECT-TYPE
+   SYNTAX						Integer32 (0..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the interface number on which the session is going on."
+   ::=	{ natIPSecSessionEntry 1 }
+
+natIPSecSessionLocalIp		OBJECT-TYPE
+   SYNTAX					IpAddress
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This gives the actual IP address of the host connected to inside network."
+   ::=	{ natIPSecSessionEntry 2 }
+
+natIPSecSessionTranslatedLocalIp	OBJECT-TYPE
+   SYNTAX							IpAddress
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+      "This is the address assigned to the local host by NAT. All the hosts from outside will contact the local host through this valid IP Address."
+   ::=	{ natIPSecSessionEntry 3 }
+
+natIPSecSessionOutsideIp		OBJECT-TYPE
+   SYNTAX				        IpAddress
+   MAX-ACCESS			    	not-accessible
+   STATUS				        current
+   DESCRIPTION
+      "This gives the IP address of the outside host, which the above stated Local host is contacting."
+   ::=	{ natIPSecSessionEntry 4 }
+
+natIPSecSessionSPIInside		OBJECT-TYPE
+   SYNTAX						Integer32(0..2147483647)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the SPI of the host connected to inside network. "
+   ::=	{ natIPSecSessionEntry 5 }
+
+natIPSecSessionSPIOutside		OBJECT-TYPE
+   SYNTAX						Integer32(0..2147483647)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the SPI of the host connected to outside network."
+   ::=	{ natIPSecSessionEntry 6 }
+
+natIPSecSessionLastUseTime		OBJECT-TYPE
+   SYNTAX						Integer32
+   MAX-ACCESS					read-only
+   STATUS						current
+   DESCRIPTION
+      "This gives the last time the session was accessed"
+   ::=	{ natIPSecSessionEntry 7 }
+
+natIPSecSessionEntryStatus 		OBJECT-TYPE
+   SYNTAX						RowStatus
+   MAX-ACCESS					read-write
+   STATUS						current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2 standard."
+   ::=	{ natIPSecSessionEntry 8 }
+
+
+-- NAT IPSec Pending  Table
+-- The Pending translation entries are created/deleted on the fly.
+-- this table is for monitoring and not for configuration.
+
+natIPSecPendingTable	OBJECT-TYPE
+   SYNTAX			    SEQUENCE OF NatIPSecPendingEntry
+   MAX-ACCESS			not-accessible
+   STATUS			    current
+   DESCRIPTION
+      "This table gives the IP address and SPI mappings present in the Pending 
+       Table of NAT for IPSec Traffic. 
+       Rows are automatically created and deleted by  NAT module. User can delete using RowStatus Field "
+   ::=	{ nat 9 }
+
+   natIPSecPendingEntry		OBJECT-TYPE
+   SYNTAX					NatIPSecPendingEntry
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "An entry in the NAT IPSec Pending table."
+   INDEX {
+      natIPSecPendingInterfaceNum, 
+      natIPSecPendingLocalIp,
+      natIPSecPendingOutsideIp, 
+      natIPSecPendingSPIInside, 
+      natIPSecPendingSPIOutside 
+      }
+  ::=  { natIPSecPendingTable 1 }
+
+  NatIPSecPendingEntry  ::=
+    SEQUENCE {
+        natIPSecPendingInterfaceNum 	     Integer32,
+        natIPSecPendingLocalIp       	     IpAddress,
+        natIPSecPendingTranslatedLocalIp     IpAddress,
+        natIPSecPendingOutsideIp     	     IpAddress,
+        natIPSecPendingSPIInside             Integer32,
+        natIPSecPendingSPIOutside            Integer32,
+        natIPSecPendingLastUseTime 	         Integer32,
+        natIPSecPendingNoOfRetry    	     Integer32,
+        natIPSecPendingEntryStatus           RowStatus
+        }
+
+natIPSecPendingInterfaceNum		OBJECT-TYPE
+   SYNTAX						Integer32 (0..65535)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the interface number on which the session is going on."
+   ::=	{ natIPSecPendingEntry 1 }
+
+natIPSecPendingLocalIp	    OBJECT-TYPE
+   SYNTAX					IpAddress
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This gives the actual IP address of the host connected to inside network."
+   ::=	{ natIPSecPendingEntry 2 }
+
+natIPSecPendingTranslatedLocalIp	OBJECT-TYPE
+   SYNTAX							IpAddress
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+      "This is the address assigned to the local host by NAT. All the hosts from outside will contact the local host through this valid IP Address."
+   ::=	{ natIPSecPendingEntry 3 }
+
+natIPSecPendingOutsideIp		OBJECT-TYPE
+   SYNTAX				        IpAddress
+   MAX-ACCESS			    	not-accessible
+   STATUS			        	current
+   DESCRIPTION
+      "This gives the IP address of the outside host, which the above stated Local host is contacting."
+   ::= { natIPSecPendingEntry 4 }
+
+natIPSecPendingSPIInside		OBJECT-TYPE
+   SYNTAX						Integer32(0..2147483647)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the SPI of the host connected to inside network."
+   ::=	{ natIPSecPendingEntry 5 }
+
+natIPSecPendingSPIOutside		OBJECT-TYPE
+   SYNTAX						Integer32(0..2147483647)
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the SPI of the host connected to outside network."
+   ::=	{ natIPSecPendingEntry 6 }
+
+natIPSecPendingLastUseTime		OBJECT-TYPE
+   SYNTAX						Integer32
+   MAX-ACCESS					read-only
+   STATUS						current
+   DESCRIPTION
+      "This gives the last time the session was accessed."
+   ::=	{ natIPSecPendingEntry 7 }
+
+natIPSecPendingNoOfRetry		OBJECT-TYPE
+   SYNTAX						Integer32
+   MAX-ACCESS					read-only
+   STATUS						current
+   DESCRIPTION
+      "This gives the number of retry count"
+   ::=	{ natIPSecPendingEntry 8 }
+
+natIPSecPendingEntryStatus 		OBJECT-TYPE
+   SYNTAX						RowStatus
+   MAX-ACCESS    	 	 		read-write
+   STATUS						current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2 standard."
+   ::=	{ natIPSecPendingEntry 9 }
+
+-- NAT IKE Session  Table
+-- The IKE session translation entries are created/deleted on the fly.
+-- this table is for monitoring and not for configuration.
+-- User can delete row using RowStatus Field
+
+natIKESessionTable		OBJECT-TYPE
+   SYNTAX		    	SEQUENCE OF NatIKESessionEntry 
+   MAX-ACCESS			not-accessible
+   STATUS		    	current
+   DESCRIPTION
+      "This table gives the IP address and Cookie mappings present 
+      in the IKE session Table of NAT . Rows are automatically created 
+      and deleted by  NAT module. User can also delete row using RowStatus Field"
+   ::=	{ nat 10 }
+
+   natIKESessionEntry 		OBJECT-TYPE
+   SYNTAX		        	NatIKESessionEntry
+   MAX-ACCESS			    not-accessible
+   STATUS		        	current
+   DESCRIPTION
+      "An entry in the NAT IKE Session table."
+   INDEX {  
+      natIKESessionInterfaceNum, 
+      natIKESessionLocalIp,
+      natIKESessionOutsideIp,
+      natIKESessionInitCookie 
+      }
+  ::=  { natIKESessionTable 1 }
+
+  NatIKESessionEntry  ::=
+    SEQUENCE {
+        natIKESessionInterfaceNum 	     Integer32,
+        natIKESessionLocalIp 	         IpAddress,
+        natIKESessionTranslatedLocalIp   IpAddress,
+        natIKESessionOutsideIp           IpAddress,
+        natIKESessionInitCookie          OCTET STRING,
+        natIKESessionLastUseTime         Integer32,
+        natIKESessionEntryStatus         RowStatus
+  }
+
+natIKESessionInterfaceNum		OBJECT-TYPE
+   SYNTAX				        Integer32 (0..65535) 
+   MAX-ACCESS				    not-accessible
+   STATUS				        current
+   DESCRIPTION
+      "This gives the interface number on which the session is going on."
+   ::=	{ natIKESessionEntry 1 }
+
+natIKESessionLocalIp       		OBJECT-TYPE
+   SYNTAX				        IpAddress
+   MAX-ACCESS				    not-accessible
+   STATUS				        current
+   DESCRIPTION
+      "This gives the actual IP address of the host connected to inside network."
+   ::=	{ natIKESessionEntry 2 }
+
+natIKESessionTranslatedLocalIp		OBJECT-TYPE
+   SYNTAX							IpAddress
+   MAX-ACCESS						read-only
+   STATUS							current
+   DESCRIPTION
+      "This is the address assigned to the local host by NAT. All the hosts from outside will contact the local host through this valid IP Address."
+   ::=	{ natIKESessionEntry 3 }
+
+natIKESessionOutsideIp	    OBJECT-TYPE
+   SYNTAX					IpAddress
+   MAX-ACCESS				not-accessible
+   STATUS					current
+   DESCRIPTION
+      "This gives the IP address of the outside host, which the above stated Local host is contacting."
+   ::=	{ natIKESessionEntry 4 }
+
+natIKESessionInitCookie		    OBJECT-TYPE
+   SYNTAX						OCTET STRING (SIZE (1..100))
+   MAX-ACCESS					not-accessible
+   STATUS						current
+   DESCRIPTION
+      "This gives the Cookie information of the initiator of the session."
+   ::=	{ natIKESessionEntry 5 }
+
+natIKESessionLastUseTime		OBJECT-TYPE
+   SYNTAX						Integer32
+   MAX-ACCESS					read-only
+   STATUS						current
+   DESCRIPTION
+      "This gives the last time the session was accessed"
+   ::=	{ natIKESessionEntry 6 }
+
+natIKESessionEntryStatus 		OBJECT-TYPE
+   SYNTAX						RowStatus
+   MAX-ACCESS					read-write
+   STATUS						current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2 standard."
+   ::=	{ natIKESessionEntry 7 }
+
+-- NAT Port Trigger Table
+-- Port trigger entries are created/deleted on the fly.
+-- User can delete row using RowStatus Field
+
+natPortTrigInfoTable		    OBJECT-TYPE
+   SYNTAX			            SEQUENCE OF NatPortTrigInfoEntry
+   MAX-ACCESS		            not-accessible
+   STATUS			            current
+   DESCRIPTION
+      "This table gives the port trigger information of the nat module.
+       Rows are automatically created/deleted on the fly by the user.
+       User can also delete row using RowStatus Field"
+   ::=	{  nat 11  }
+
+   natPortTrigInfoEntry 		OBJECT-TYPE
+   SYNTAX			            NatPortTrigInfoEntry
+   MAX-ACCESS		            not-accessible
+   STATUS			            current
+   DESCRIPTION
+      "An entry in the NAT Port trigger Info Table."
+
+   INDEX  {  
+		natPortTrigInfoInBoundPortRange,
+             	natPortTrigInfoOutBoundPortRange, 
+	     	natPortTrigInfoProtocol 
+	  } 
+    ::=  {   natPortTrigInfoTable 1 }
+
+  NatPortTrigInfoEntry  ::=
+    SEQUENCE  {
+
+    natPortTrigInfoAppName              DisplayString,
+    natPortTrigInfoInBoundPortRange     DisplayString,
+    natPortTrigInfoOutBoundPortRange    DisplayString,
+    natPortTrigInfoProtocol             INTEGER,
+    natPortTrigInfoEntryStatus          RowStatus
+
+  }
+
+natPortTrigInfoAppName OBJECT-TYPE
+   SYNTAX				DisplayString(SIZE (1..64))
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+      "This gives the application name using the port trigger feature."
+   ::=	{   natPortTrigInfoEntry 1 }
+
+natPortTrigInfoInBoundPortRange OBJECT-TYPE
+   SYNTAX				DisplayString(SIZE (1..11))
+   MAX-ACCESS			not-accessible
+   STATUS				current
+   DESCRIPTION
+      "This gives the Inbound port-range through which the outside host
+        initiates the connection"
+   ::=	{   natPortTrigInfoEntry 2 }
+
+natPortTrigInfoOutBoundPortRange OBJECT-TYPE
+   SYNTAX				DisplayString(SIZE (1..11))
+   MAX-ACCESS			not-accessible
+   STATUS				current
+   DESCRIPTION
+      "This gives the Out-bound port-range through which the inside host
+        initiates the connection"
+   ::=	{   natPortTrigInfoEntry 3 }
+
+natPortTrigInfoProtocol OBJECT-TYPE
+   SYNTAX				INTEGER {
+                                  tcp(6),
+                                  udp(17),
+                                  any(255)
+                                  }
+   MAX-ACCESS			not-accessible
+   STATUS				current
+   DESCRIPTION
+      "This gives the protocol (TCP/UDP/ANY) in the port trigger feature"
+   ::=	{   natPortTrigInfoEntry 4 }
+
+natPortTrigInfoEntryStatus OBJECT-TYPE
+   SYNTAX				RowStatus
+   MAX-ACCESS			read-write
+   STATUS				current
+   DESCRIPTION
+      "The status of the entry can be used as specified in the SNMP V2
+      standard. "
+   ::=	{   natPortTrigInfoEntry 5 }
+
+-- Policy Based NAT Table
+
+natPolicyTable			OBJECT-TYPE
+   SYNTAX		        SEQUENCE OF NatPolicyEntry
+   MAX-ACCESS			not-accessible
+   STATUS			current
+   DESCRIPTION
+     "This is a configurable table in which the
+      mapping  between the nat policy filter, identifier and global IP address 
+      is configured. The filter identifies the traffic by specifying the
+      source, destination addresses and port information. 
+      Regular NAT uses source addresses and ports only for address
+      translation, whereas Policy-based NAT uses both source and destination addresses 
+      and port."
+  ::= { nat 12 }
+
+natPolicyEntry			OBJECT-TYPE
+   SYNTAX			NatPolicyEntry
+   MAX-ACCESS			not-accessible
+   STATUS			current
+   DESCRIPTION
+      "An entry in the Policy NAT configuration table."
+   INDEX {
+      natPolicyType,       
+      natPolicyId,
+      natPolicyAclName
+      }
+  ::= { natPolicyTable 1 }
+
+
+NatPolicyEntry	::=
+    SEQUENCE {
+       natPolicyType                  INTEGER,
+       natPolicyId                    Integer32,
+       natPolicyAclName 	      OCTET STRING,
+       natPolicyTranslatedIp          IpAddress,
+       natPolicyEntryStatus           RowStatus
+       }
+
+natPolicyType                   OBJECT-TYPE
+   SYNTAX                       INTEGER {
+                                static (1), 
+                                dynamic (2)
+                                }
+   MAX-ACCESS                   not-accessible
+   STATUS                       current
+   DESCRIPTION
+    "This specifies the type of Policy NAT. It can be either static Policy NAT or 
+     dynamic policy NAT. For policy static NAT the number of global IP addresses
+     should be equivalent to the number of local addresses. Dynamic policy NAT 
+     supports many to one mapping of multiple local addresses to one global address.
+     Overlapping addresses are allowed for dynamic policy NAT."
+  ::= { natPolicyEntry 1 }
+
+
+natPolicyId     		OBJECT-TYPE
+    SYNTAX		      	Integer32 (1..65535)
+    MAX-ACCESS			not-accessible
+    STATUS	   	        current
+    DESCRIPTION
+         "A unique value, greater than zero, that identifies each NAT Policy binding."
+    ::= { natPolicyEntry 2 }
+
+natPolicyAclName		OBJECT-TYPE
+   SYNTAX			OCTET STRING (SIZE(0..35))
+   MAX-ACCESS			not-accessible
+   STATUS			current
+   DESCRIPTION
+      "This is the Policy nat filter rule identifier that uniquely identifies
+       a filter in the filter table. 
+       The administrator is expected to delete the NAT policy before removing 
+       the filter from the filter database. This way no check needs to be added 
+       when filter is deleted." 
+   ::= { natPolicyEntry 3 }
+
+
+natPolicyTranslatedIp 		OBJECT-TYPE
+   SYNTAX			IpAddress
+   MAX-ACCESS			read-write
+   STATUS			current
+   DESCRIPTION
+      "This is the IP address that should be used in the packets going out
+       from  the given InsideLocalIp host to the outside network. 
+       (as defined by the Policy rule identified by the filterID). 
+       In the opposite direction this mapping will be 
+       used along with the NAT entry for reverse translation. 
+       This global IP will not be used by any other host."
+   ::= { natPolicyEntry 4 }
+
+natPolicyEntryStatus		OBJECT-TYPE
+   SYNTAX			RowStatus
+   MAX-ACCESS			read-write
+   STATUS			current
+   DESCRIPTION
+    "The status of the entry can be used as specified in the SNMP standard."
+  ::= { natPolicyEntry 5 }
+
+-- NAT Reserved Port Trigger Table
+-- Reserved Port trigger entries are created/deleted on the fly.
+
+natRsvdPortTrigInfoTable		    OBJECT-TYPE
+   SYNTAX	   		                SEQUENCE OF NatRsvdPortTrigInfoEntry
+   MAX-ACCESS		                not-accessible
+   STATUS			                current
+   DESCRIPTION
+	   "This table is a read-only table which gives the reserved port trigger
+	   information of the NAT module. Rows can neither be created nor be deleted
+	   using the rowstatus column.  Rows are automatically created and deleted
+	   by NAT module. Port triggering is an important feature in NAT in which 
+	   outbound traffic on predetermined ports ('triggering ports') causes inbound
+	   traffic on specific incoming ports to be dynamically forwarded to the
+	   initiating host. Reserved port Trigger table maintains the 
+	   active port trigger session entries."
+   ::=	{  nat 13  }
+
+   natRsvdPortTrigInfoEntry 		OBJECT-TYPE
+   SYNTAX			                NatRsvdPortTrigInfoEntry
+   MAX-ACCESS		                not-accessible
+   STATUS			                current
+   DESCRIPTION
+      "An entry in the Reserved NAT Port trigger Info Table."
+
+   INDEX  {  
+		natRsvdPortTrigInfoAppIndex
+	  } 
+    ::=  {   natRsvdPortTrigInfoTable 1 }
+
+  NatRsvdPortTrigInfoEntry  ::=
+    SEQUENCE  {
+    natRsvdPortTrigInfoAppIndex              Integer32,
+    natRsvdPortTrigInfoLocalIp               IpAddress,
+    natRsvdPortTrigInfoRemoteIp              IpAddress,
+    natRsvdPortTrigInfoStartTime             TimeStamp,
+	natRsvdPortTrigInfoAppName               DisplayString,                  
+	natRsvdPortTrigInfoInBoundPortRange      DisplayString,
+	natRsvdPortTrigInfoOutBoundPortRange     DisplayString,
+	natRsvdPortTrigInfoProtocol              INTEGER 
+
+
+  }
+
+natRsvdPortTrigInfoAppIndex OBJECT-TYPE
+   SYNTAX			  	    Integer32 (0..31)
+   MAX-ACCESS			    not-accessible
+   STATUS				    current
+   DESCRIPTION
+      "This indicates the application index that uses the port trigger feature."
+   ::=	{   natRsvdPortTrigInfoEntry 1 }
+
+natRsvdPortTrigInfoLocalIp  OBJECT-TYPE
+   SYNTAX			  	    IpAddress
+   MAX-ACCESS			    read-only
+   STATUS				    current
+   DESCRIPTION
+      "This indicates Local IP Address of the reserved port trigger session."
+   DEFVAL	{ "" }
+   ::=	{   natRsvdPortTrigInfoEntry 2 }
+
+natRsvdPortTrigInfoRemoteIp  OBJECT-TYPE
+   SYNTAX                    IpAddress
+   MAX-ACCESS                read-only
+   STATUS                    current
+   DESCRIPTION
+      "This indicates the remote IP address of the reserved port trigger session."
+   DEFVAL	{ "" }
+   ::=  {   natRsvdPortTrigInfoEntry 3 }
+
+natRsvdPortTrigInfoStartTime       OBJECT-TYPE
+   SYNTAX                     TimeStamp
+   MAX-ACCESS                 read-only
+   STATUS                     current
+   DESCRIPTION
+      "This indicates the time by which the reserved port trigger session
+	   has been established."
+   DEFVAL	{ 0 }
+   ::=  {   natRsvdPortTrigInfoEntry 4 }
+
+natRsvdPortTrigInfoAppName OBJECT-TYPE
+   SYNTAX				DisplayString(SIZE (1..64))
+   MAX-ACCESS			read-only
+   STATUS				current
+   DESCRIPTION
+      "This gives the application name using the port trigger feature."
+   DEFVAL	{ "" }
+   ::=	{   natRsvdPortTrigInfoEntry 5 }
+
+natRsvdPortTrigInfoInBoundPortRange OBJECT-TYPE
+   SYNTAX				DisplayString(SIZE (1..11))
+   MAX-ACCESS			read-only
+   STATUS				current
+   DESCRIPTION
+      "This gives the Inbound port-range through which the outside host
+        initiates the connection"
+   DEFVAL	{ "" }
+   ::=	{   natRsvdPortTrigInfoEntry 6 }
+
+natRsvdPortTrigInfoOutBoundPortRange OBJECT-TYPE
+   SYNTAX				DisplayString(SIZE (1..11))
+   MAX-ACCESS			read-only
+   STATUS				current
+   DESCRIPTION
+      "This gives the Out-bound port-range through which the inside host
+        initiates the connection"
+   DEFVAL	{ "" }
+   ::=	{   natRsvdPortTrigInfoEntry 7 }
+
+natRsvdPortTrigInfoProtocol OBJECT-TYPE
+   SYNTAX				INTEGER {
+                                  tcp(6),
+                                  udp(17),
+                                  any(255)
+                                  }
+   MAX-ACCESS			read-only
+   STATUS				current
+   DESCRIPTION
+      "This gives the protocol (TCP/UDP/ANY) in the port trigger feature"
+   DEFVAL	{ any }
+   ::=	{   natRsvdPortTrigInfoEntry 8 }
+END
+
+
+

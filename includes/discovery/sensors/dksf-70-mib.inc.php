@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -29,48 +29,45 @@ foreach ($cache_discovery['DKSF-70-MIB']['smoke'] as $index => $entry)
 }
 */
 
-$cache_discovery['DKSF-70-MIB']['loop'] = snmpwalk_cache_oid($device, 'npCurLoopTable', array(), 'DKSF-70-MIB');
-foreach ($cache_discovery['DKSF-70-MIB']['loop'] as $index => $entry)
-{
-  if ($entry['npCurLoopPower'] == 'off' || $entry['npCurLoopStatus'] == 'notPowered') { continue; }
+$cache_discovery['DKSF-70-MIB']['loop'] = snmpwalk_cache_oid($device, 'npCurLoopTable', [], 'DKSF-70-MIB');
+foreach ($cache_discovery['DKSF-70-MIB']['loop'] as $index => $entry) {
+    if ($entry['npCurLoopPower'] == 'off' || $entry['npCurLoopStatus'] == 'notPowered') {
+        continue;
+    }
 
-  $descr = 'Analog Smoke '.$index;
+    $descr = 'Analog Smoke ' . $index;
 
-  // Loop state
-  $oid   = '.1.3.6.1.4.1.25728.8300.1.1.2.'.$index;
-  $value = $entry['npCurLoopStatus'];
+    // Loop state
+    $oid   = '.1.3.6.1.4.1.25728.8300.1.1.2.' . $index;
+    $value = $entry['npCurLoopStatus'];
 
-  if ($value)
-  {
-    discover_status($device, $oid, 'npCurLoopStatus.'.$index, 'dskf-mib-loop-state', $descr, $value, array('entPhysicalClass' => 'other'));
-  }
+    if ($value) {
+        discover_status($device, $oid, 'npCurLoopStatus.' . $index, 'dskf-mib-loop-state', $descr, $value, ['entPhysicalClass' => 'other']);
+    }
 
-  // Loop current
-  $oid   = '.1.3.6.1.4.1.25728.8300.1.1.3.'.$index;
-  $value = $entry['npCurLoopI'];
+    // Loop current
+    $oid   = '.1.3.6.1.4.1.25728.8300.1.1.3.' . $index;
+    $value = $entry['npCurLoopI'];
 
-  if ($value)
-  {
-    discover_sensor('current', $device, $oid, 'npCurLoopI.'.$index, 'dskf-mib-loop', $descr, 0.001, $value);
-  }
+    if ($value) {
+        discover_sensor('current', $device, $oid, 'npCurLoopI.' . $index, 'dskf-mib-loop', $descr, 0.001, $value);
+    }
 
-  // Loop voltage
-  $oid   = '.1.3.6.1.4.1.25728.8300.1.1.4.'.$index;
-  $value = $entry['npCurLoopV'];
+    // Loop voltage
+    $oid   = '.1.3.6.1.4.1.25728.8300.1.1.4.' . $index;
+    $value = $entry['npCurLoopV'];
 
-  if ($value)
-  {
-    discover_sensor('voltage', $device, $oid, 'npCurLoopV.'.$index, 'dskf-mib-loop', $descr, 0.001, $value);
-  }
+    if ($value) {
+        discover_sensor('voltage', $device, $oid, 'npCurLoopV.' . $index, 'dskf-mib-loop', $descr, 0.001, $value);
+    }
 
-  // Loop resistance
-  $oid   = '.1.3.6.1.4.1.25728.8300.1.1.5.'.$index;
-  $value = $entry['npCurLoopR'];
+    // Loop resistance
+    $oid   = '.1.3.6.1.4.1.25728.8300.1.1.5.' . $index;
+    $value = $entry['npCurLoopR'];
 
-  if ($value && $value < 99999)
-  {
-    discover_sensor('resistance', $device, $oid, 'npCurLoopR.'.$index, 'dskf-mib-loop', $descr, 1, $value);
-  }
+    if ($value && $value < 99999) {
+        discover_sensor('resistance', $device, $oid, 'npCurLoopR.' . $index, 'dskf-mib-loop', $descr, 1, $value);
+    }
 }
 
 /* Moved to DEF
@@ -116,18 +113,19 @@ foreach ($cache_discovery['DKSF-70-MIB']['thermo'] as $index => $entry)
 }
 */
 
-$cache_discovery['DKSF-70-MIB']['io'] = snmpwalk_cache_oid($device, 'npIoTable', array(), 'DKSF-70-MIB');
-foreach ($cache_discovery['DKSF-70-MIB']['io'] as $index => $entry)
-{
-  if ($entry['npIoLevelIn'] == '0') { continue; }
+$cache_discovery['DKSF-70-MIB']['io'] = snmpwalk_cache_oid($device, 'npIoTable', [], 'DKSF-70-MIB');
+foreach ($cache_discovery['DKSF-70-MIB']['io'] as $index => $entry) {
+    if ($entry['npIoLevelIn'] == '0') {
+        continue;
+    }
 
-  $descr = ($entry['npIoMemo'] ? $entry['npIoMemo'] : 'Pulse Counter '.$index);
-  $descr .= ' (' . $entry['npIoSinglePulseDuration'] . 'ms)';
-  $oid_name = 'npIoPulseCounter';
-  $value = $entry['npIoPulseCounter'];
-  $oid = '.1.3.6.1.4.1.25728.8900.1.1.9.'.$index;
-  //discover_sensor('counter', $device, $oid, "npIoPulseCounter.$index", 'dskf-mib', $descr, 1, $value);
-  discover_counter($device, 'counter', $mib, $oid_name, $oid, $index, $descr, 1, $value);
+    $descr    = ($entry['npIoMemo'] ? $entry['npIoMemo'] : 'Pulse Counter ' . $index);
+    $descr    .= ' (' . $entry['npIoSinglePulseDuration'] . 'ms)';
+    $oid_name = 'npIoPulseCounter';
+    $value    = $entry['npIoPulseCounter'];
+    $oid      = '.1.3.6.1.4.1.25728.8900.1.1.9.' . $index;
+    //discover_sensor('counter', $device, $oid, "npIoPulseCounter.$index", 'dskf-mib', $descr, 1, $value);
+    discover_counter($device, 'counter', $mib, $oid_name, $oid, $index, $descr, 1, $value);
 }
 
 print_debug_vars($cache_discovery['DKSF-70-MIB']);

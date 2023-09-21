@@ -4,13 +4,15 @@ BAY-STACK-PETH-EXT-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE, Integer32, Gauge32
         FROM SNMPv2-SMI
+    TruthValue
+        FROM SNMPv2-TC
     ifIndex
         FROM IF-MIB
     bayStackMibs
         FROM SYNOPTICS-ROOT-MIB;
 
 bayStackPethExtMib MODULE-IDENTITY
-    LAST-UPDATED    "201603030000Z"
+    LAST-UPDATED    "202003170000Z"
     ORGANIZATION    "Avaya"
     CONTACT-INFO    "Avaya"
     DESCRIPTION
@@ -27,6 +29,31 @@ bayStackPethExtMib MODULE-IDENTITY
          This Specification is supplied 'AS IS,' and Avaya
          makes no warranty, either express or implied, as to the use,
          operation, condition, or performance of the Specification."
+
+    REVISION "202003170000Z" -- 17 March 2020
+    DESCRIPTION "v12: Requested for supporting PoE 802.3bt for VOSS X3
+                      product (Huiying Liang).
+                      Added new object:
+                      
+                      bspePethPsePortPowerClassifications (bspePethPsePortExtEntry 15)
+                      
+                      Changed the range of:
+                      
+                      bspePethPsePortExtPowerLimit (3..64) -> (3..98)
+                      bspePethPsePortExtMeasuredCurrent (0..1200) -> (0..1920)
+                      bspePethPsePortExtMeasuredPower (0..64000) -> (0..98000).
+                      (azmeu)"
+
+    REVISION "201911210000Z" -- 20 November 2019
+    DESCRIPTION "v11: Requested for Seadart Phase 2 (Alina Radu) 
+                 Import TruthValue
+                 Added bspePethPsePortFastPoeEnable (BspePethPsePortExtEntry 13)
+                 Added bspePethPsePortPerpetualPoeEnable (BspePethPsePortExtEntry 14)
+                 Added bspePethMainPseFastPoeEnable (bspePethMainPseExtEntry 4)
+                 Added bspePethMainPsePerpetualPoeEnable (bspePethMainPseExtEntry 4)
+                 Change range bspePethPsePortExtPowerLimit from 60 to 64
+		 Change range bspePethPsePortExtMeasuredPower from 60000 to 64000.
+		 (azmeu)" 
 
     REVISION "201603030000Z" -- 3 March 2016
     DESCRIPTION "v10:  Added bspePethPsePortExtLldp (BspePethPsePortExtEntry 12)"
@@ -106,7 +133,10 @@ BspePethPsePortExtEntry ::=
         bspePethPsePortExtCurrentStatusClear   INTEGER,
         bspePethPsePortExtPowerUpMode          INTEGER,
         bspePethPsePortExtPowerPairs           INTEGER,
-        bspePethPsePortExtLldp                 INTEGER
+        bspePethPsePortExtLldp                 INTEGER,
+        bspePethPsePortFastPoeEnable           TruthValue,
+        bspePethPsePortPerpetualPoeEnable      TruthValue,
+        bspePethPsePortPowerClassifications    INTEGER	 		
     }
 
 bspePethPsePortExtGroupIndex OBJECT-TYPE
@@ -128,7 +158,7 @@ bspePethPsePortExtIndex OBJECT-TYPE
     ::= { bspePethPsePortExtEntry 2 }
 
 bspePethPsePortExtPowerLimit OBJECT-TYPE
-    SYNTAX      Integer32 (3..60)
+    SYNTAX      Integer32 (3..98)
     UNITS       "watts"
     MAX-ACCESS  read-write
     STATUS      current
@@ -232,7 +262,7 @@ bspePethPsePortExtMeasuredVoltage OBJECT-TYPE
     ::= { bspePethPsePortExtEntry 5 }
 
 bspePethPsePortExtMeasuredCurrent OBJECT-TYPE
-    SYNTAX      Gauge32 (0..1200)
+    SYNTAX      Gauge32 (0..1920)
     UNITS       "milliamps"
     MAX-ACCESS  read-only
     STATUS      current
@@ -241,7 +271,7 @@ bspePethPsePortExtMeasuredCurrent OBJECT-TYPE
     ::= { bspePethPsePortExtEntry 6 }
 
 bspePethPsePortExtMeasuredPower OBJECT-TYPE
-    SYNTAX      Gauge32 (0..60000)
+    SYNTAX      Gauge32 (0..98000)
     UNITS       "milliwatts"
     MAX-ACCESS  read-only
     STATUS      current
@@ -342,6 +372,53 @@ bspePethPsePortExtLldp OBJECT-TYPE
          The value disable(2) indicates that LLDP negotation is disabled."
     ::= { bspePethPsePortExtEntry 12 }
 
+bspePethPsePortFastPoeEnable OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "true (1) An interface which can provide the Fast POE function.
+         false(2) The interface will act as it would if it had no  Fast POE function."
+    ::= { bspePethPsePortExtEntry 13 }
+
+bspePethPsePortPerpetualPoeEnable OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "true (1) An interface which can provide the Perpetual POE function.
+         false(2) The interface will act as it would if it had no Perpetual POE function."
+    ::= { bspePethPsePortExtEntry 14 }
+
+bspePethPsePortPowerClassifications OBJECT-TYPE
+    SYNTAX INTEGER {
+              class0(1),
+              class1(2),
+              class2(3),
+              class3(4),
+              class4(5),
+              class5(6),
+              class6(7),
+              class7(8),
+              class8(9)
+    }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Classification is a way to tag different terminals on the
+        Power over LAN network according to their power consumption.
+        Devices such as IP telephones, WLAN access points and others,
+        will be classified according to their power requirements.
+
+        The meaning of the classification labels is defined in the
+        IEEE specification.
+
+        This variable is valid only while a PD is being powered,
+        that is, while the attribute pethPsePortDetectionStatus
+        is reporting the enumeration deliveringPower."
+   ::= { bspePethPsePortExtEntry 15 }
+
+
 --
 -- 802.3af Main PSE Extension Table
 --
@@ -367,7 +444,9 @@ BspePethMainPseExtEntry ::=
    SEQUENCE {
         bspePethMainPseExtGroupIndex           Integer32,
         bspePethMainPseExtPowerPresent         INTEGER,
-        bspePethMainPseExtDisconnectScheme     INTEGER
+        bspePethMainPseExtDisconnectScheme     INTEGER,
+	bspePethMainPseFastPoeEnable           TruthValue,       
+        bspePethMainPsePerpetualPoeEnable      TruthValue	
     }
 
 bspePethMainPseExtGroupIndex OBJECT-TYPE
@@ -414,6 +493,20 @@ bspePethMainPseExtDisconnectScheme OBJECT-TYPE
          port; DC supply will be turned off on a port with a too low
          value of DC current."
     ::= { bspePethMainPseExtEntry 3 }
+
+bspePethMainPseFastPoeEnable OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION "Enable or disable Fast POE feature."
+     ::= { bspePethMainPseExtEntry 4 }
+       
+bspePethMainPsePerpetualPoeEnable OBJECT-TYPE
+     SYNTAX     TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION "Enable or disable Perpetual POE feature."
+     ::= { bspePethMainPseExtEntry 5 }
 
 --
 -- Scalars

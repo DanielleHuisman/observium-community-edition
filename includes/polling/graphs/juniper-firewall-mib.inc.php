@@ -1,28 +1,25 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$fws = array();
 
-$fws = snmpwalk_cache_threepart_oid($device, "jnxFWCounterPacketCount", $fws, "JUNIPER-FIREWALL-MIB");
-if (count($fws))
-{
-  $fws = snmpwalk_cache_threepart_oid($device, "jnxFWCounterByteCount", $fws, "JUNIPER-FIREWALL-MIB");
+$fws = snmpwalk_cache_threepart_oid($device, "jnxFWCounterPacketCount", [], "JUNIPER-FIREWALL-MIB");
+if (!safe_empty($fws)) {
+    $fws = snmpwalk_cache_threepart_oid($device, "jnxFWCounterByteCount", $fws, "JUNIPER-FIREWALL-MIB");
 
-  $pkts  = 'jnxFWCounterPacketCount';
-  $bytes = 'jnxFWCounterByteCount';
+    $pkts  = 'jnxFWCounterPacketCount';
+    $bytes = 'jnxFWCounterByteCount';
 }
 
-print_r($fws);
+print_debug_vars($fws);
 
 /*
 else
@@ -42,22 +39,18 @@ else
 
 echo("Juniper Firewall Counters");
 
-if (count($fws))
-{
-  foreach ($fws as $filter => $counters)
-  {
-    foreach ($counters AS $counter => $types)
-    {
-      foreach ($types as $type => $data)
-      {
-        rrdtool_update_ng($device, 'juniper-firewall', array(
-          'pkts'  => $data[$pkts],
-          'bytes' => $data[$bytes],
-        ), $filter . '-' . $counter .'-'.$type
-        );
-      }
+if (!safe_empty($fws)) {
+    foreach ($fws as $filter => $counters) {
+        foreach ($counters as $counter => $types) {
+            foreach ($types as $type => $data) {
+                rrdtool_update_ng($device, 'juniper-firewall', [
+                  'pkts'  => $data[$pkts],
+                  'bytes' => $data[$bytes],
+                ],                $filter . '-' . $counter . '-' . $type
+                );
+            }
+        }
     }
-  }
 }
 
 echo("\n");

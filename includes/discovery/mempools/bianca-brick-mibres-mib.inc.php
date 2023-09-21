@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -41,14 +41,15 @@ BIANCA-BRICK-MIBRES-MIB::memoryNFails.dram.1 = Wrong Type (should be Gauge32 or 
 BIANCA-BRICK-MIBRES-MIB::memoryNFails.dpool.2 = Wrong Type (should be Gauge32 or Unsigned32): INTEGER: 0
 */
 
-$mempool_array = snmpwalk_cache_oid($device, 'memoryTable', array(), 'BIANCA-BRICK-MIBRES-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$mempool_array = snmpwalk_cache_oid($device, 'memoryTable', [], 'BIANCA-BRICK-MIBRES-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 
-foreach ($mempool_array as $index => $entry)
-{
-  if ($entry['memoryType'] == 'dpool') { continue; }
-  $entry['memoryDescr'] = snmp_hexstring($entry['memoryDescr']);
+foreach ($mempool_array as $index => $entry) {
+    if ($entry['memoryType'] == 'dpool') {
+        continue;
+    }
+    $entry['memoryDescr'] = snmp_hexstring($entry['memoryDescr']);
 
-  discover_mempool($valid['mempool'], $device, $index, 'BIANCA-BRICK-MIBRES-MIB', $entry['memoryDescr'], 1, $entry['memoryTotal'], $entry['memoryInuse']);
+    discover_mempool($valid['mempool'], $device, $index, 'BIANCA-BRICK-MIBRES-MIB', $entry['memoryDescr'], 1, $entry['memoryTotal'], $entry['memoryInuse']);
 }
 
 unset ($mempool_array);

@@ -1,12 +1,12 @@
 TROPIC-PSD-MIB DEFINITIONS ::= BEGIN
 
--- (c) Copyright 2019 Nokia Networks. All rights reserved.
+-- (c) Copyright 2021 Nokia Networks. All rights reserved.
 -- This software is the confidential and proprietary property of
 -- Nokia and may only be used in accordance with the terms of the
 -- license agreement provided with this software.
 
 IMPORTS
-    OBJECT-TYPE, MODULE-IDENTITY,
+    OBJECT-TYPE, MODULE-IDENTITY, Counter32,
     Integer32, Unsigned32, NOTIFICATION-TYPE    FROM SNMPv2-SMI
     TEXTUAL-CONVENTION, DateAndTime,
     RowStatus, TruthValue, MacAddress           FROM SNMPv2-TC
@@ -26,7 +26,7 @@ IMPORTS
     Dot1agCfmMepIdOrZero                        FROM IEEE8021-CFM-MIB
     tnShelfIndex                                FROM TROPIC-SHELF-MIB
     tnSlotIndex                                 FROM TROPIC-SLOT-MIB
-    TnSfpType, TnCondition,
+    TnSfpType, TnCondition, TnCommand,
     AluWdmTypeOfNetIfOperation                  FROM TROPIC-TC
     AluWdmPmonPolicyType                        FROM TN-PMON-MIB
     TmnxEnabledDisabled, TnSwitchID             FROM TN-TC-MIB
@@ -47,10 +47,11 @@ IMPORTS
     tnGenericTrapDateAndTime,
     tnGenericTrapConfigurationChangeCounter     FROM TROPIC-GENERIC-NOTIFICATION-MIB
     tnOthIfIndex, tnOthIfIndexLo                FROM TROPIC-OTH-MIB
+    tnStatsInterval                             FROM TROPIC-STATISTICS-MIB
     tnPsdMIB, tnPsdModules                      FROM TROPIC-GLOBAL-REG;
 
 tnPsdMibModule MODULE-IDENTITY
-    LAST-UPDATED    "201804301200Z"
+    LAST-UPDATED    "202108110000Z"
     ORGANIZATION    "Nokia"
     CONTACT-INFO    "Nokia
                      Attn: Jeff Donnelly
@@ -61,6 +62,35 @@ tnPsdMibModule MODULE-IDENTITY
                      Email: jeff.donnelly@nokia.com"
 
     DESCRIPTION "The Photonic Service Demarcation MIB."
+
+    REVISION    "202108110000Z"
+    DESCRIPTION "Enhanced tnPsdNetIfTable with IPv6 objects :
+                  - tnPsdNetIfIp6AddrType
+                  - tnPsdNetIfIp6Addr
+                  - tnPsdNetIfIp6PrefixLen
+                  - tnPsdNetIfRemoteIp6AddrType
+                  - tnPsdNetIfRemoteIp6Addr
+                  - tnPsdNetIfMonitoring6"
+
+    REVISION    "202106100000Z"
+    DESCRIPTION "Added tnPsdEthStatsPortConfigTable, tnPsdEthStatsPortConfigChangeNotif,
+                 tnPsdPmEthStatsGroup and tnPsdPmEthStatsConfigChangeNotifGroup."
+
+    REVISION    "202009291200Z"
+    DESCRIPTION "Added following new system mode to TropicPsdSystemMode:
+                  - otnNid1GbEor10GbEClientOtu2OduFlexNetworkMode(10)
+                 Added tnPsdSnmpTrapDestSnmpVersion and tnPsdSnmpTrapDestUserName
+                 to the tnPsdSnmpTrapDestTable."
+
+    REVISION    "202002251200Z"
+    DESCRIPTION "Added tnPsdOdukTtpPrbsTable, tnPsdOdukTtpPrbsConfigChangeNotif,
+                 tnPsdOdukTtpPrbsTestResultTable, tnPsdOtn3Group and
+                 tnPsdOtnConfigChangeNotif3Group.
+                 Enhanced description of tnPsdSystemAbnormalState with PRBS
+                 enabling conditions.
+                 Added tnPsdProxyArpTable, tnPsdProxyArpConfigChangeNotif,
+                 tnPsdIp3Group and tnPsdIpConfigChangeNotif3Group.
+                 Added tnPsdR200Compliance."
 
     REVISION    "201804301200Z"
     DESCRIPTION "Added tnPsdSfpInfoTuningOkNotif.
@@ -637,7 +667,8 @@ TropicPsdSystemMode ::= TEXTUAL-CONVENTION
                         otnNidOtu1ClientOtu1NetworkMode(6),
                         otnNidOtu2ClientOtu2NetworkMode(7),
                         otnNidOtu2eClientOtu2eNetworkMode(8),
-                        ethNid1GbEor10GbEClient10GbENetworkMode(9)
+                        ethNid1GbEor10GbEClient10GbENetworkMode(9),
+                        otnNid1GbEor10GbEClientOtu2OduFlexNetworkMode(10)
                     }
 
 TropicPsdTransportIdentifier ::= TEXTUAL-CONVENTION
@@ -691,6 +722,7 @@ tnPsdSystemAbnormalState OBJECT-TYPE
                     The system enters the abnormal state when
                     one of the following conditions exist:
                     - Terminal loopback also known as diagnostic loopback.
+                    - ODUk PRBS generator or monitor enabled.
                     - Internal system temperature too high."
     ::= { tnPsdSystemObjects 3 }
 
@@ -1574,13 +1606,15 @@ tnPsdSnmpTrapDestEntry OBJECT-TYPE
 
 TnPsdSnmpTrapDestEntry ::=
     SEQUENCE {
-        tnPsdSnmpTrapDestServerId    OCTET STRING,
-        tnPsdSnmpTrapDestAddrType    InetAddressType,
-        tnPsdSnmpTrapDestAddr        InetAddress,
-        tnPsdSnmpTrapDestPort        TropicPsdSnmpPortNumberType,
-        tnPsdSnmpTrapDestCommunity   OCTET STRING,
-        tnPsdSnmpTrapDestDyingGasp   TruthValue,
-        tnPsdSnmpTrapDestRowStatus   RowStatus
+        tnPsdSnmpTrapDestServerId     OCTET STRING,
+        tnPsdSnmpTrapDestAddrType     InetAddressType,
+        tnPsdSnmpTrapDestAddr         InetAddress,
+        tnPsdSnmpTrapDestPort         TropicPsdSnmpPortNumberType,
+        tnPsdSnmpTrapDestCommunity    OCTET STRING,
+        tnPsdSnmpTrapDestDyingGasp    TruthValue,
+        tnPsdSnmpTrapDestRowStatus    RowStatus,
+        tnPsdSnmpTrapDestSnmpVersion  INTEGER,
+        tnPsdSnmpTrapDestUserName     SnmpAdminString
         }
 
 tnPsdSnmpTrapDestServerId OBJECT-TYPE
@@ -1617,8 +1651,8 @@ tnPsdSnmpTrapDestPort OBJECT-TYPE
     SYNTAX         TropicPsdSnmpPortNumberType
     MAX-ACCESS     read-create
     STATUS         current
-    DESCRIPTION    "The UDP port number that is used to send SNMP trap
-                    notification messages to this trap destination server."
+    DESCRIPTION    "The UDP port number that is used to send SNMP traps
+                    to this trap destination server."
     DEFVAL         { 162 }
     ::= { tnPsdSnmpTrapDestEntry 4 }
 
@@ -1626,8 +1660,9 @@ tnPsdSnmpTrapDestCommunity OBJECT-TYPE
     SYNTAX         OCTET STRING (SIZE(0..32))
     MAX-ACCESS     read-create
     STATUS         current
-    DESCRIPTION    "The SNMPv2c community name string that is used to send SNMP
-                    notification messages to this trap destination server."
+    DESCRIPTION    "The SNMPv2c community name string that is used to send
+                    SNMPv2c traps to this trap destination server.
+                    Only applicable for SNMPv2c trap destinations."
     DEFVAL         { "alarm" }
     ::= { tnPsdSnmpTrapDestEntry 5 }
 
@@ -1637,7 +1672,8 @@ tnPsdSnmpTrapDestDyingGasp OBJECT-TYPE
     STATUS         current
     DESCRIPTION    "Just before an envisioned power outage the PSD sends at
                     least once a dying gasp trap to this trap destination
-                    server."
+                    server.
+                    Only applicable for SNMPv2c trap destinations."
     DEFVAL         { false }
     ::= { tnPsdSnmpTrapDestEntry 6 }
 
@@ -1648,6 +1684,29 @@ tnPsdSnmpTrapDestRowStatus OBJECT-TYPE
     DESCRIPTION    "A RowStatus object for creation, deletion, activation
                     and deactivation of entries in this table."
     ::= { tnPsdSnmpTrapDestEntry 7 }
+
+tnPsdSnmpTrapDestSnmpVersion OBJECT-TYPE
+    SYNTAX         INTEGER {
+                       snmpv2c(2),
+                       snmpv3(3)
+                   }
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "The SNMP version used when formatting the traps."
+    ::= { tnPsdSnmpTrapDestEntry 8 }
+
+tnPsdSnmpTrapDestUserName OBJECT-TYPE
+    SYNTAX         SnmpAdminString (SIZE(0..32))
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "A human readable string representing the name of the
+                    SNMPv3 user on whose behalf SNMPv3 traps are generated.
+                    Only applicable for SNMPv3 trap destinations.
+
+                    Important:
+                    The syntax of this object is identical to that of
+                    object usmUserName in the SNMP-USER-BASED-SM-MIB."
+    ::= { tnPsdSnmpTrapDestEntry 9 }
 
 tnPsdSnmpTrapDestConfigChangeNotif NOTIFICATION-TYPE
     OBJECTS {
@@ -2771,14 +2830,20 @@ TnPsdNetIfEntry ::=
         tnPsdNetIfOperStatus           INTEGER,
         tnPsdNetIfRemoteIpAddrType     InetAddressType,
         tnPsdNetIfRemoteIpAddr         InetAddress,
-        tnPsdNetIfMonitoring           INTEGER
+        tnPsdNetIfMonitoring           INTEGER,
+        tnPsdNetIfIp6AddrType          InetAddressType,
+        tnPsdNetIfIp6Addr              InetAddress,
+        tnPsdNetIfIp6PrefixLen         InetAddressPrefixLength,
+        tnPsdNetIfRemoteIp6AddrType    InetAddressType,
+        tnPsdNetIfRemoteIp6Addr        InetAddress,
+        tnPsdNetIfMonitoring6          INTEGER
         }
 
 tnPsdNetIfIpAddrType OBJECT-TYPE
     SYNTAX         InetAddressType
     MAX-ACCESS     read-create
     STATUS         current
-    DESCRIPTION    "Type of tnPsdNetIfIpAddr IP address.
+    DESCRIPTION    "Type of tnPsdNetIfIpAddr IPv4 address.
                     This object must always be included in an SNMP SET PDU
                     together with tnPsdNetIfIpAddr and tnPsdNetIfIpPrefixLen."
     DEFVAL         { ipv4 }
@@ -2788,7 +2853,7 @@ tnPsdNetIfIpAddr OBJECT-TYPE
     SYNTAX         InetAddress
     MAX-ACCESS     read-create
     STATUS         current
-    DESCRIPTION    "The IP address of the network interface.
+    DESCRIPTION    "The IPv4 address of the network interface.
                     This object must always be included in an SNMP SET PDU
                     together with tnPsdNetIfIpAddrType and
                     tnPsdNetIfIpPrefixLen."
@@ -2799,7 +2864,7 @@ tnPsdNetIfIpPrefixLen OBJECT-TYPE
     SYNTAX         InetAddressPrefixLength
     MAX-ACCESS     read-create
     STATUS         current
-    DESCRIPTION    "IP address prefix length of the network interface.
+    DESCRIPTION    "IPv4 address prefix length of the network interface.
                     This object must always be included in an SNMP SET PDU
                     together with tnPsdNetIfIpAddrType and tnPsdNetIfIpAddr."
     DEFVAL         { 32 }
@@ -2820,14 +2885,14 @@ tnPsdNetIfRemoteIpAddrType OBJECT-TYPE
     SYNTAX         InetAddressType
     MAX-ACCESS     read-only
     STATUS         current
-    DESCRIPTION    "Type of tnPsdNetIfRemoteIpAddr IP address."
+    DESCRIPTION    "Type of tnPsdNetIfRemoteIpAddr IPv4 address."
     ::= { tnPsdNetIfEntry 5 }
 
 tnPsdNetIfRemoteIpAddr OBJECT-TYPE
     SYNTAX         InetAddress
     MAX-ACCESS     read-only
     STATUS         current
-    DESCRIPTION    "The IP address of the link neighbor."
+    DESCRIPTION    "The IPv4 address of the link neighbor."
     ::= { tnPsdNetIfEntry 6 }
 
 tnPsdNetIfMonitoring OBJECT-TYPE
@@ -2837,9 +2902,65 @@ tnPsdNetIfMonitoring OBJECT-TYPE
                    }
     MAX-ACCESS     read-create
     STATUS         current
-    DESCRIPTION    "Enable monitoring of the link neighbor."
+    DESCRIPTION    "Enable ICMP (IPv4) monitoring of the link neighbor."
     DEFVAL         { disabled }
     ::= { tnPsdNetIfEntry 7 }
+
+tnPsdNetIfIp6AddrType OBJECT-TYPE
+    SYNTAX         InetAddressType
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "Type of tnPsdNetIfIpAddr IPv6 address.
+                    This object must always be included in an SNMP SET PDU
+                    together with tnPsdNetIfIp6Addr and tnPsdNetIfIp6PrefixLen."
+    DEFVAL         { ipv6 }
+    ::= { tnPsdNetIfEntry 8 }
+
+tnPsdNetIfIp6Addr OBJECT-TYPE
+    SYNTAX         InetAddress
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "The IPv6 address of the network interface.
+                    This object must always be included in an SNMP SET PDU
+                    together with tnPsdNetIfIp6AddrType and
+                    tnPsdNetIfIp6PrefixLen."
+    DEFVAL         { '00000000000000000000000000000000'h }
+    ::= { tnPsdNetIfEntry 9 }
+
+tnPsdNetIfIp6PrefixLen OBJECT-TYPE
+    SYNTAX         InetAddressPrefixLength
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "IPv6 address prefix length of the network interface.
+                    This object must always be included in an SNMP SET PDU
+                    together with tnPsdNetIfIp6AddrType and tnPsdNetIfIp6Addr."
+    DEFVAL         { 128 }
+    ::= { tnPsdNetIfEntry 10 }
+
+tnPsdNetIfRemoteIp6AddrType OBJECT-TYPE
+    SYNTAX         InetAddressType
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    "Type of tnPsdNetIfRemoteIp6Addr IPv6 address."
+    ::= { tnPsdNetIfEntry 11 }
+
+tnPsdNetIfRemoteIp6Addr OBJECT-TYPE
+    SYNTAX         InetAddress
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    "The IPv6 address of the link neighbor."
+    ::= { tnPsdNetIfEntry 12 }
+
+tnPsdNetIfMonitoring6 OBJECT-TYPE
+    SYNTAX         INTEGER {
+                       enabled(1),
+                       disabled(2)
+                   }
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION    "Enable ICMP (IPv6) monitoring of the link neighbor."
+    DEFVAL         { disabled }
+    ::= { tnPsdNetIfEntry 13 }
 
 tnPsdNetIfOperStatusChangeNotif NOTIFICATION-TYPE
     OBJECTS {
@@ -3016,6 +3137,62 @@ tnPsdNetIfEthFacilityDeletionNotif NOTIFICATION-TYPE
     DESCRIPTION "PSD Network interface ethernet facility (TROPIC-PSD-MIB,
                  tnPsdNetIfEthFacilityTable) deletion notification."
 ::= { tnPsdIpNotifs 11 }
+
+-------------------------------------------------------------------------------
+-- PSD Proxy ARP Table
+-------------------------------------------------------------------------------
+
+tnPsdProxyArpTable OBJECT-TYPE
+    SYNTAX         SEQUENCE OF TnPsdProxyArpEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "PSD Proxy ARP table."
+    ::= { tnPsdIpObjects 11 }
+
+tnPsdProxyArpEntry OBJECT-TYPE
+    SYNTAX         TnPsdProxyArpEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "Entry in tnPsdProxyArpTable."
+    INDEX { ifIndex }
+    ::= { tnPsdProxyArpTable 1 }
+
+TnPsdProxyArpEntry ::=
+    SEQUENCE {
+        tnPsdProxyArp  TmnxEnabledDisabled
+        }
+
+tnPsdProxyArp OBJECT-TYPE
+    SYNTAX         TmnxEnabledDisabled
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Enable or disable Proxy ARP for the interface."
+    DEFVAL         { disabled }
+    ::= { tnPsdProxyArpEntry 1 }
+
+tnPsdProxyArpConfigChangeNotif NOTIFICATION-TYPE
+    OBJECTS {
+        tnGenericTrapSeqNumber,
+        tnGenericTrapObject,
+        tnGenericTrapObjectInstance,
+        tnGenericTrapTime,
+        tnGenericTrapCategory,
+        tnGenericTrapObjectValueType,
+        tnGenericTrapObjectCounter32Val,
+        tnGenericTrapObjectUnsigned32Val,
+        tnGenericTrapObjectTimeTicksVal,
+        tnGenericTrapObjectInteger32Val,
+        tnGenericTrapObjectOctetStringVal,
+        tnGenericTrapObjectIpAddressVal,
+        tnGenericTrapObjectOidVal,
+        tnGenericTrapObjectCounter64Val,
+        tnGenericTrapDateAndTime,
+        tnGenericTrapConfigurationChangeCounter
+    }
+    STATUS      current
+    DESCRIPTION "PSD Proxy ARP (TROPIC-PSD-MIB, tnPsdProxyArpTable)
+                 configuration change notification."
+::= { tnPsdIpNotifs 12 }
 
 -------------------------------------------------------------------------------
 -- PSD ASAP Table
@@ -3793,6 +3970,171 @@ tnPsdOdukTtpDmOnDemandResultRoundTrip OBJECT-TYPE
     ::= { tnPsdOdukTtpDmOnDemandResultEntry 2 }
 
 -------------------------------------------------------------------------------
+-- PSD ODUk TTP PRBS Table
+-------------------------------------------------------------------------------
+
+tnPsdOdukTtpPrbsTable OBJECT-TYPE
+    SYNTAX         SEQUENCE OF TnPsdOdukTtpPrbsEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "PSD ODUk TTP PRBS table."
+    ::= { tnPsdOtnObjects 7 }
+
+tnPsdOdukTtpPrbsEntry OBJECT-TYPE
+    SYNTAX         TnPsdOdukTtpPrbsEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "Entry in tnPsdOdukTtpPrbsTable"
+    INDEX { tnOthIfIndex, tnOthIfIndexLo }
+    ::= { tnPsdOdukTtpPrbsTable 1 }
+
+TnPsdOdukTtpPrbsEntry ::=
+    SEQUENCE {
+        tnPsdOdukTtpPrbsGenerator         TmnxEnabledDisabled,
+        tnPsdOdukTtpPrbsGeneratorInvert   TruthValue,
+        tnPsdOdukTtpPrbsMonitor           TmnxEnabledDisabled,
+        tnPsdOdukTtpPrbsMonitorInvert     TruthValue,
+        tnPsdOdukTtpPrbsErrorPropagation  TruthValue
+        }
+
+tnPsdOdukTtpPrbsGenerator OBJECT-TYPE
+    SYNTAX         TmnxEnabledDisabled
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Enable or disable the PRBS generator.
+
+                    When writing, this object must always be included
+                    in an SNMP SET PDU together with object
+                    tnPsdOdukTtpPrbsGeneratorInvert belonging to the
+                    same table entry."
+    DEFVAL         { disabled }
+    ::= { tnPsdOdukTtpPrbsEntry 1 }
+
+tnPsdOdukTtpPrbsGeneratorInvert OBJECT-TYPE
+    SYNTAX         TruthValue
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Configure whether the PRBS generator inserts
+                    an inverted PRBS signal or not.
+
+                    When writing, this object must always be included
+                    in an SNMP SET PDU together with object
+                    tnPsdOdukTtpPrbsGenerator belonging to the same
+                    table entry."
+    DEFVAL         { false }
+    ::= { tnPsdOdukTtpPrbsEntry 2 }
+
+tnPsdOdukTtpPrbsMonitor OBJECT-TYPE
+    SYNTAX         TmnxEnabledDisabled
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Enable or disable the PRBS monitor.
+
+                    When writing, this object must always be included
+                    in an SNMP SET PDU together with object
+                    tnPsdOdukTtpPrbsMonitorInvert belonging to the
+                    same table entry."
+    DEFVAL         { disabled }
+    ::= { tnPsdOdukTtpPrbsEntry 3 }
+
+tnPsdOdukTtpPrbsMonitorInvert OBJECT-TYPE
+    SYNTAX         TruthValue
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Configure whether the PRBS monitor expects
+                    an inverted PRBS signal or not.
+
+                    When writing, this object must always be included
+                    in an SNMP SET PDU together with object
+                    tnPsdOdukTtpPrbsMonitor belonging to the same
+                    table entry."
+    DEFVAL         { false }
+    ::= { tnPsdOdukTtpPrbsEntry 4 }
+
+tnPsdOdukTtpPrbsErrorPropagation OBJECT-TYPE
+    SYNTAX         TruthValue
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Configure whether the PRBS monitor propagates
+                    errors to the PRBS generator or not."
+    DEFVAL         { false }
+    ::= { tnPsdOdukTtpPrbsEntry 5 }
+
+tnPsdOdukTtpPrbsConfigChangeNotif NOTIFICATION-TYPE
+    OBJECTS {
+        tnGenericTrapSeqNumber,
+        tnGenericTrapObject,
+        tnGenericTrapObjectInstance,
+        tnGenericTrapTime,
+        tnGenericTrapCategory,
+        tnGenericTrapObjectValueType,
+        tnGenericTrapObjectCounter32Val,
+        tnGenericTrapObjectUnsigned32Val,
+        tnGenericTrapObjectTimeTicksVal,
+        tnGenericTrapObjectInteger32Val,
+        tnGenericTrapObjectOctetStringVal,
+        tnGenericTrapObjectIpAddressVal,
+        tnGenericTrapObjectOidVal,
+        tnGenericTrapObjectCounter64Val,
+        tnGenericTrapDateAndTime,
+        tnGenericTrapConfigurationChangeCounter
+    }
+    STATUS      current
+    DESCRIPTION "PSD ODUk TTP PRBS measurement (TROPIC-PSD-MIB,
+                 tnPsdOdukTtpPrbsTable) configuration change notification."
+::= { tnPsdOtnNotifs 6 }
+
+-------------------------------------------------------------------------------
+-- PSD ODUk TTP PRBS result Table
+-------------------------------------------------------------------------------
+
+tnPsdOdukTtpPrbsTestResultTable OBJECT-TYPE
+    SYNTAX         SEQUENCE OF TnPsdOdukTtpPrbsTestResultEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "PSD ODUk TTP PRBS test result table."
+    ::= { tnPsdOtnObjects 8 }
+
+tnPsdOdukTtpPrbsTestResultEntry OBJECT-TYPE
+    SYNTAX         TnPsdOdukTtpPrbsTestResultEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "Entry in tnPsdOdukTtpPrbsTestResultTable"
+    INDEX { tnOthIfIndex, tnOthIfIndexLo }
+    ::= { tnPsdOdukTtpPrbsTestResultTable 1 }
+
+TnPsdOdukTtpPrbsTestResultEntry ::=
+    SEQUENCE {
+        tnPsdOdukTtpPrbsLockTime      Unsigned32,
+        tnPsdOdukTtpPrbsTSE           Counter32,
+        tnPsdOdukTtpPrbsBitErrorRate  SnmpAdminString
+        }
+
+tnPsdOdukTtpPrbsLockTime OBJECT-TYPE
+    SYNTAX         Unsigned32
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    "The time, in seconds, since the PRBS monitor
+                    is locked."
+    ::= { tnPsdOdukTtpPrbsTestResultEntry 1 }
+
+tnPsdOdukTtpPrbsTSE OBJECT-TYPE
+    SYNTAX         Counter32
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    "The number of measured test sequence errors
+                    (bit errors)."
+    ::= { tnPsdOdukTtpPrbsTestResultEntry 2 }
+
+tnPsdOdukTtpPrbsBitErrorRate OBJECT-TYPE
+    SYNTAX         SnmpAdminString (SIZE(0..7))
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION    "The test bit error rate.
+                    Format: #.#E-##"
+    ::= { tnPsdOdukTtpPrbsTestResultEntry 3 }
+
+-------------------------------------------------------------------------------
 -- PSD Connectivity Fault Management Scalars
 -------------------------------------------------------------------------------
 
@@ -4216,6 +4558,66 @@ tnPsdPmTcaReportingMethod OBJECT-TYPE
     ::= { tnPsdPmObjects 1 }
 
 -------------------------------------------------------------------------------
+-- PSD Ethernet Statistics Port Configuration Table
+-------------------------------------------------------------------------------
+
+tnPsdEthStatsPortConfigTable OBJECT-TYPE
+    SYNTAX         SEQUENCE OF TnPsdEthStatsPortConfigEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "PSD Port Ethernet PM configuration table."
+    ::= { tnPsdPmObjects 2 }
+
+tnPsdEthStatsPortConfigEntry OBJECT-TYPE
+    SYNTAX         TnPsdEthStatsPortConfigEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION    "Entry in tnPsdEthStatsPortConfigTable."
+    INDEX { ifIndex, tnStatsInterval }
+    ::= { tnPsdEthStatsPortConfigTable 1 }
+
+TnPsdEthStatsPortConfigEntry ::=
+    SEQUENCE {
+        tnPsdEthStatsPortClear TnCommand
+    }
+
+tnPsdEthStatsPortClear OBJECT-TYPE
+    SYNTAX         TnCommand
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION    "Setting this object to value execute(2) clears the
+                    current bin with Ethernet statistics for the specific
+                    interface and interval.
+                    Setting this object to value noCmd(1) has no effect.
+                    A read of this object always returns noCmd(1)."
+    ::= { tnPsdEthStatsPortConfigEntry 1 }
+
+tnPsdEthStatsPortConfigChangeNotif NOTIFICATION-TYPE
+    OBJECTS {
+        tnGenericTrapSeqNumber,
+        tnGenericTrapObject,
+        tnGenericTrapObjectInstance,
+        tnGenericTrapTime,
+        tnGenericTrapCategory,
+        tnGenericTrapObjectValueType,
+        tnGenericTrapObjectCounter32Val,
+        tnGenericTrapObjectUnsigned32Val,
+        tnGenericTrapObjectTimeTicksVal,
+        tnGenericTrapObjectInteger32Val,
+        tnGenericTrapObjectOctetStringVal,
+        tnGenericTrapObjectIpAddressVal,
+        tnGenericTrapObjectOidVal,
+        tnGenericTrapObjectCounter64Val,
+        tnGenericTrapDateAndTime,
+        tnGenericTrapConfigurationChangeCounter
+    }
+    STATUS      current
+    DESCRIPTION "PSD Port Ethernet PM (TROPIC-PSD-MIB,
+                 tnPsdEthStatsPortConfigTable) configuration
+                 change notification."
+::= { tnPsdPmNotifs 1 }
+
+-------------------------------------------------------------------------------
 -- Conformance Group Definitions
 -------------------------------------------------------------------------------
 
@@ -4408,6 +4810,22 @@ tnPsdSnmpCreDelNotifGroup NOTIFICATION-GROUP
                     notifications group."
     ::= { tnPsdSnmpGroups 3 }
 
+tnPsdSnmpTrapDest2Group OBJECT-GROUP
+    OBJECTS {
+        tnPsdSnmpTrapDestAddrType,
+        tnPsdSnmpTrapDestAddr,
+        tnPsdSnmpTrapDestPort,
+        tnPsdSnmpTrapDestCommunity,
+        tnPsdSnmpTrapDestDyingGasp,
+        tnPsdSnmpTrapDestRowStatus,
+        tnPsdSnmpTrapDestSnmpVersion,
+        tnPsdSnmpTrapDestUserName
+    }
+    STATUS         current
+    DESCRIPTION    "PSD SNMP trap destination server conformance
+                    group 2."
+    ::= { tnPsdSnmpGroups 4 }
+
 tnPsdDatabaseGroup OBJECT-GROUP
     OBJECTS {
         tnPsdDatabaseBackupAndRestoreRemoteHostAddrType,
@@ -4489,7 +4907,12 @@ tnPsdIpGroup OBJECT-GROUP
         tnPsdNetIfIpPrefixLen,
         tnPsdNetIfOperStatus,
         tnPsdNetIfRemoteIpAddrType,
-        tnPsdNetIfRemoteIpAddr
+        tnPsdNetIfRemoteIpAddr,
+        tnPsdNetIfIp6AddrType,
+        tnPsdNetIfIp6Addr,
+        tnPsdNetIfIp6PrefixLen,
+        tnPsdNetIfRemoteIp6AddrType,
+        tnPsdNetIfRemoteIp6Addr
     }
     STATUS         current
     DESCRIPTION    "PSD IP conformance group."
@@ -4528,6 +4951,7 @@ tnPsdIpStateChangeNotifGroup NOTIFICATION-GROUP
 tnPsdIp2Group OBJECT-GROUP
     OBJECTS {
         tnPsdNetIfMonitoring,
+        tnPsdNetIfMonitoring6,
         tnPsdNetIfEthFacilityTypeOfOperation,
         tnPsdNetIfEthFacilityPriorityEgress,
         tnPsdNetIfEthFacilityDropEligibleEgress
@@ -4555,6 +4979,23 @@ tnPsdIpCreDelNotif2Group NOTIFICATION-GROUP
     DESCRIPTION    "PSD IP (TROPIC-PSD-MIB) creation and deletion
                     notifications group 2."
     ::= { tnPsdIpGroups 7 }
+
+tnPsdIp3Group OBJECT-GROUP
+    OBJECTS {
+        tnPsdProxyArp
+    }
+    STATUS         current
+    DESCRIPTION    "PSD IP conformance group 3."
+    ::= { tnPsdIpGroups 8 }
+
+tnPsdIpConfigChangeNotif3Group NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tnPsdProxyArpConfigChangeNotif
+    }
+    STATUS         current
+    DESCRIPTION    "PSD IP (TROPIC-PSD-MIB) configuration change notifications
+                    group 3."
+    ::= { tnPsdIpGroups 9 }
 
 tnPsdFaultGroup OBJECT-GROUP
     OBJECTS {
@@ -4652,6 +5093,30 @@ tnPsdOtnConfigChangeNotif2Group NOTIFICATION-GROUP
                     notifications group 2."
     ::= { tnPsdOtnGroups 4 }
 
+tnPsdOtn3Group OBJECT-GROUP
+    OBJECTS {
+        tnPsdOdukTtpPrbsGenerator,
+        tnPsdOdukTtpPrbsGeneratorInvert,
+        tnPsdOdukTtpPrbsMonitor,
+        tnPsdOdukTtpPrbsMonitorInvert,
+        tnPsdOdukTtpPrbsErrorPropagation,
+        tnPsdOdukTtpPrbsLockTime,
+        tnPsdOdukTtpPrbsTSE,
+        tnPsdOdukTtpPrbsBitErrorRate
+    }
+    STATUS         current
+    DESCRIPTION    "PSD OTN conformance group 3."
+    ::= { tnPsdOtnGroups 5 }
+
+tnPsdOtnConfigChangeNotif3Group NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tnPsdOdukTtpPrbsConfigChangeNotif
+    }
+    STATUS         current
+    DESCRIPTION    "PSD OTN (TROPIC-PSD-MIB) configuration change
+                    notifications group 3."
+    ::= { tnPsdOtnGroups 6 }
+
 tnPsdCfmGroup OBJECT-GROUP
     OBJECTS {
         tnPsdCfmTransportIdentifier,
@@ -4687,6 +5152,24 @@ tnPsdPmGroup OBJECT-GROUP
     STATUS         current
     DESCRIPTION    "PSD Performance Monitoring conformance group."
     ::= { tnPsdPmGroups 1 }
+
+tnPsdPmEthStatsGroup OBJECT-GROUP
+    OBJECTS {
+        tnPsdEthStatsPortClear
+    }
+    STATUS         current
+    DESCRIPTION    "PSD Performance Monitoring Ethernet Statistics
+                    conformance group."
+    ::= { tnPsdPmGroups 2 }
+
+tnPsdPmEthStatsConfigChangeNotifGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+         tnPsdEthStatsPortConfigChangeNotif
+    }
+    STATUS         current
+    DESCRIPTION    "PSD Performance Monitoring Ethernet Statistics
+                    configuration change notifications group."
+    ::= { tnPsdPmGroups 3 }
 
 -------------------------------------------------------------------------------
 -- Compliance Statements
@@ -4771,4 +5254,155 @@ tnPsdR110Compliance MODULE-COMPLIANCE
     }
     ::= { tnPsdMIBCompliance 2 }
 
+tnPsdR200Compliance MODULE-COMPLIANCE
+    STATUS         current
+    DESCRIPTION    "PSD Release 2.0.0 compliance."
+    MODULE
+    MANDATORY-GROUPS {
+        tnPsdSystemGroup,
+        tnPsdShelfGroup,
+        tnPsdSlotGroup,
+        tnPsdCardGroup,
+        tnPsdEquipmentEventGroup,
+        tnPsdEquipmentChangeGroup,
+        tnPsdSfpGroup,
+        tnPsdSfp2Group,
+        tnPsdDdmDataGroup,
+        tnPsdInterfaceConfigChangeNotifGroup,
+        tnPsdInterfaceStateChangeNotifGroup,
+        tnPsdInterfaceEventNotifGroup,
+        tnPsdLagGroup,
+        tnPsdSnmpTrapDestGroup,
+        tnPsdSnmpConfigChangeNotifGroup,
+        tnPsdSnmpCreDelNotifGroup,
+        tnPsdDatabaseGroup,
+        tnPsdSoftwareGroup,
+        tnPsdSoftwareEventGroup,
+        tnPsdTimeGroup,
+        tnPsdTimeConfigChangeNotifGroup,
+        tnPsdIpGroup,
+        tnPsdIp2Group,
+        tnPsdIp3Group,
+        tnPsdIpConfigChangeNotifGroup,
+        tnPsdIpConfigChangeNotif2Group,
+        tnPsdIpConfigChangeNotif3Group,
+        tnPsdIpCreDelNotifGroup,
+        tnPsdIpCreDelNotif2Group,
+        tnPsdIpStateChangeNotifGroup,
+        tnPsdFaultGroup,
+        tnPsdFaultChangeNotifGroup,
+        tnPsdSysDiscoveryGroup,
+        tnPsdOtnGroup,
+        tnPsdOtn2Group,
+        tnPsdOtn3Group,
+        tnPsdOtnConfigChangeNotifGroup,
+        tnPsdOtnConfigChangeNotif2Group,
+        tnPsdOtnConfigChangeNotif3Group,
+        tnPsdCfmGroup,
+        tnPsdCfmConfigChangeNotifGroup,
+        tnPsdPmGroup
+    }
+    ::= { tnPsdMIBCompliance 3 }
+
+tnPsdR300Compliance MODULE-COMPLIANCE
+    STATUS         current
+    DESCRIPTION    "PSD Release 3.0.0 compliance."
+    MODULE
+    MANDATORY-GROUPS {
+        tnPsdSystemGroup,
+        tnPsdShelfGroup,
+        tnPsdSlotGroup,
+        tnPsdCardGroup,
+        tnPsdEquipmentEventGroup,
+        tnPsdEquipmentChangeGroup,
+        tnPsdSfpGroup,
+        tnPsdSfp2Group,
+        tnPsdDdmDataGroup,
+        tnPsdInterfaceConfigChangeNotifGroup,
+        tnPsdInterfaceStateChangeNotifGroup,
+        tnPsdInterfaceEventNotifGroup,
+        tnPsdLagGroup,
+        tnPsdSnmpTrapDest2Group,
+        tnPsdSnmpConfigChangeNotifGroup,
+        tnPsdSnmpCreDelNotifGroup,
+        tnPsdDatabaseGroup,
+        tnPsdSoftwareGroup,
+        tnPsdSoftwareEventGroup,
+        tnPsdTimeGroup,
+        tnPsdTimeConfigChangeNotifGroup,
+        tnPsdIpGroup,
+        tnPsdIp2Group,
+        tnPsdIp3Group,
+        tnPsdIpConfigChangeNotifGroup,
+        tnPsdIpConfigChangeNotif2Group,
+        tnPsdIpConfigChangeNotif3Group,
+        tnPsdIpCreDelNotifGroup,
+        tnPsdIpCreDelNotif2Group,
+        tnPsdIpStateChangeNotifGroup,
+        tnPsdFaultGroup,
+        tnPsdFaultChangeNotifGroup,
+        tnPsdSysDiscoveryGroup,
+        tnPsdOtnGroup,
+        tnPsdOtn2Group,
+        tnPsdOtn3Group,
+        tnPsdOtnConfigChangeNotifGroup,
+        tnPsdOtnConfigChangeNotif2Group,
+        tnPsdOtnConfigChangeNotif3Group,
+        tnPsdCfmGroup,
+        tnPsdCfmConfigChangeNotifGroup,
+        tnPsdPmGroup
+    }
+    ::= { tnPsdMIBCompliance 4 }
+
+tnPsdR400Compliance MODULE-COMPLIANCE
+    STATUS         current
+    DESCRIPTION    "PSD Release 4.0.0 compliance."
+    MODULE
+    MANDATORY-GROUPS {
+        tnPsdSystemGroup,
+        tnPsdShelfGroup,
+        tnPsdSlotGroup,
+        tnPsdCardGroup,
+        tnPsdEquipmentEventGroup,
+        tnPsdEquipmentChangeGroup,
+        tnPsdSfpGroup,
+        tnPsdSfp2Group,
+        tnPsdDdmDataGroup,
+        tnPsdInterfaceConfigChangeNotifGroup,
+        tnPsdInterfaceStateChangeNotifGroup,
+        tnPsdInterfaceEventNotifGroup,
+        tnPsdLagGroup,
+        tnPsdSnmpTrapDest2Group,
+        tnPsdSnmpConfigChangeNotifGroup,
+        tnPsdSnmpCreDelNotifGroup,
+        tnPsdDatabaseGroup,
+        tnPsdSoftwareGroup,
+        tnPsdSoftwareEventGroup,
+        tnPsdTimeGroup,
+        tnPsdTimeConfigChangeNotifGroup,
+        tnPsdIpGroup,
+        tnPsdIp2Group,
+        tnPsdIp3Group,
+        tnPsdIpConfigChangeNotifGroup,
+        tnPsdIpConfigChangeNotif2Group,
+        tnPsdIpConfigChangeNotif3Group,
+        tnPsdIpCreDelNotifGroup,
+        tnPsdIpCreDelNotif2Group,
+        tnPsdIpStateChangeNotifGroup,
+        tnPsdFaultGroup,
+        tnPsdFaultChangeNotifGroup,
+        tnPsdSysDiscoveryGroup,
+        tnPsdOtnGroup,
+        tnPsdOtn2Group,
+        tnPsdOtn3Group,
+        tnPsdOtnConfigChangeNotifGroup,
+        tnPsdOtnConfigChangeNotif2Group,
+        tnPsdOtnConfigChangeNotif3Group,
+        tnPsdCfmGroup,
+        tnPsdCfmConfigChangeNotifGroup,
+        tnPsdPmGroup,
+        tnPsdPmEthStatsGroup,
+        tnPsdPmEthStatsConfigChangeNotifGroup
+    }
+    ::= { tnPsdMIBCompliance 5 }
 END

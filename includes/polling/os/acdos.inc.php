@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -17,11 +17,10 @@
 //ACD-DESC-MIB::acdDescFirmwareVersion.0 = STRING: AMO_10GE_5.3.1.1_23046
 //ACD-DESC-MIB::acdDescHardwareVersion.0 = STRING: 500-018-03:9:16
 
-$data = snmp_get_multi_oid($device, 'acdDescFirmwareVersion.0', array(), 'ACD-DESC-MIB');
-$version    = $data[0]['acdDescFirmwareVersion'];
-if (preg_match('/^(\w[^_\W]+_)*(?<version>[\d\.\-]+)/', $version, $matches))
-{
-  $version = $matches['version'];
+$data    = snmp_get_multi_oid($device, 'acdDescFirmwareVersion.0', [], 'ACD-DESC-MIB');
+$version = $data[0]['acdDescFirmwareVersion'];
+if (preg_match('/^(\w[^_\W]+_)*(?<version>[\d\.\-]+)/', $version, $matches)) {
+    $version = $matches['version'];
 }
 
 // EOF

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -28,35 +28,34 @@ DPS-MIB-V38::thresholds.1 = noAlarms
 DPS-MIB-V38::thresholds.5 = noAlarms
 DPS-MIB-V38::thresholds.17 = noAlarms
  */
-$oids = snmpwalk_cache_oid($device, "analogChannels", array(), "DPS-MIB-V38");
+$oids = snmpwalk_cache_oid($device, "analogChannels", [], "DPS-MIB-V38");
 
-foreach ($oids as $index => $entry)
-{
+foreach ($oids as $index => $entry) {
 
-  if ($entry['enabled'] == "disabled") { continue; }
-
-  $descr    = $entry['description'];
-  $oid_name = 'value';
-  $oid_num  = '.1.3.6.1.4.1.2682.1.2.6.1.4.'.$index;
-  $type     = $mib . '-' . $oid_name;
-
-  // Detect class by description
-  foreach (array('temperature', 'humidity', 'voltage', 'current', 'power') as $class)
-  {
-    if (str_icontains_array($descr, $class))
-    {
-      discover_sensor($class, $device, $oid_num, $index, $type, $descr, 1, $value);
-      break; // stop foreach
+    if ($entry['enabled'] == "disabled") {
+        continue;
     }
-  }
 
-  // Statuses
-  $oid_name = 'thresholds';
-  $oid_num  = '.1.3.6.1.4.1.2682.1.2.6.1.5.'.$index;
-  $type     = 'dpsThresholds';
-  $value    = $entry[$oid_name];
+    $descr    = $entry['description'];
+    $oid_name = 'value';
+    $oid_num  = '.1.3.6.1.4.1.2682.1.2.6.1.4.' . $index;
+    $type     = $mib . '-' . $oid_name;
 
-  discover_status_ng($device, $mib, 'thresholds', $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'other'));
+    // Detect class by description
+    foreach (['temperature', 'humidity', 'voltage', 'current', 'power'] as $class) {
+        if (str_icontains_array($descr, $class)) {
+            discover_sensor($class, $device, $oid_num, $index, $type, $descr, 1, $value);
+            break; // stop foreach
+        }
+    }
+
+    // Statuses
+    $oid_name = 'thresholds';
+    $oid_num  = '.1.3.6.1.4.1.2682.1.2.6.1.5.' . $index;
+    $type     = 'dpsThresholds';
+    $value    = $entry[$oid_name];
+
+    discover_status_ng($device, $mib, 'thresholds', $oid_num, $index, $type, $descr, $value, ['entPhysicalClass' => 'other']);
 
 }
 

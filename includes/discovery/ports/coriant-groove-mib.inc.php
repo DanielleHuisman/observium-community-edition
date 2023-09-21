@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -78,52 +78,52 @@ CORIANT-GROOVE-MIB::eth100gStatisticsEntryOutPackets256to511octets.1.1.0.6.0 = S
 CORIANT-GROOVE-MIB::eth100gStatisticsEntryOutPackets512to1023octets.1.1.0.6.0 = STRING: "0"
 CORIANT-GROOVE-MIB::eth100gStatisticsEntryOutPackets1024to1518octets.1.1.0.6.0 = STRING: "0"
 
-*/ 
+*/
 
 $mib = 'CORIANT-GROOVE-MIB';
 
-  // this is eth100g only, note that fc8gTable, fc16gTable, eth10gTable, eth40gTable, eth400gtable all exist too! 
+// this is eth100g only, note that fc8gTable, fc16gTable, eth10gTable, eth40gTable, eth400gtable all exist too!
 
-  //eth100gTable
-  $entries = [];
-  $entries = snmpwalk_cache_oid($device, 'eth100gTable',            $entries, $mib);
+//eth100gTable
+$entries = [];
+$entries = snmpwalk_cache_oid($device, 'eth100gTable', $entries, $mib);
 
-  print_debug_vars($entries);
-  
-  foreach ($entries as $port_oid_suffix => $port) {
+print_debug_vars($entries);
+
+foreach ($entries as $port_oid_suffix => $port) {
     $ifIndex = $port_oid_suffix;
 
     // basics
-    $port_stats[$ifIndex]['ifDescr']		= $port['eth100gAliasName'];
-    $port_stats[$ifIndex]['ifName']		= $port['eth100gAliasName'];
-    $port_stats[$ifIndex]['ifAlias']		= $port['eth100gServiceLabel'];
-    $port_stats[$ifIndex]['ifOperStatus']	= $port['eth100gOperStatus'];
-    $port_stats[$ifIndex]['ifAdminStatus']	= $port['eth100gAdminStatus'];
-    $port_stats[$ifIndex]['ifType']		= 'ethernetCsmacd';		// can we do better than hard coding?
+    $port_stats[$ifIndex]['ifDescr']       = $port['eth100gAliasName'];
+    $port_stats[$ifIndex]['ifName']        = $port['eth100gAliasName'];
+    $port_stats[$ifIndex]['ifAlias']       = $port['eth100gServiceLabel'];
+    $port_stats[$ifIndex]['ifOperStatus']  = $port['eth100gOperStatus'];
+    $port_stats[$ifIndex]['ifAdminStatus'] = $port['eth100gAdminStatus'];
+    $port_stats[$ifIndex]['ifType']        = 'ethernetCsmacd';        // can we do better than hard coding?
 
-  }
+}
 
-  // eth400gtable
-  $entries = [];
-  $entries = snmpwalk_cache_oid($device, 'eth400gTable',            $entries, $mib);
+// eth400gtable
+$entries = [];
+$entries = snmpwalk_cache_oid($device, 'eth400gTable', $entries, $mib);
 
-  print_debug_vars($entries);
-  
-  foreach ($entries as $port_oid_suffix => $port) {
+print_debug_vars($entries);
+
+foreach ($entries as $port_oid_suffix => $port) {
     $ifIndex = $port_oid_suffix;
 
     // basics
-    $port_stats[$ifIndex]['ifDescr']		= $port['eth400gAliasName'];
-    $port_stats[$ifIndex]['ifName']		= $port['eth400gAliasName'];
-    $port_stats[$ifIndex]['ifAlias']		= $port['eth400gServiceLabel'];
-    $port_stats[$ifIndex]['ifOperStatus']	= $port['eth400gOperStatus'];
-    $port_stats[$ifIndex]['ifAdminStatus']	= $port['eth400gAdminStatus'];
-    $port_stats[$ifIndex]['ifType']		= 'ethernetCsmacd';		// can we do better than hard coding?
+    $port_stats[$ifIndex]['ifDescr']       = $port['eth400gAliasName'];
+    $port_stats[$ifIndex]['ifName']        = $port['eth400gAliasName'];
+    $port_stats[$ifIndex]['ifAlias']       = $port['eth400gServiceLabel'];
+    $port_stats[$ifIndex]['ifOperStatus']  = $port['eth400gOperStatus'];
+    $port_stats[$ifIndex]['ifAdminStatus'] = $port['eth400gAdminStatus'];
+    $port_stats[$ifIndex]['ifType']        = 'ethernetCsmacd';        // can we do better than hard coding?
 
-  }
+}
 
 
-  print_debug_vars($port_stats);
+print_debug_vars($port_stats);
 
 
 // EOF

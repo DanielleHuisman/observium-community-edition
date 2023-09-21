@@ -5,29 +5,27 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $colours      = "mixed";
-$nototal      = (($width<224) ? 1 : 0);
+$nototal      = (($width < 224) ? 1 : 0);
 $unit_text    = "Open file descriptors";
 $rrd_filename = get_rrd_path($device, "app-zimbra-fd.rrd");
 
-$array = array(
-                'fdSystem' => array('descr' => 'System Total'),
-                'fdMailboxd' => array('descr' => 'MailboxD'),
-               );
-$i = 0;
+$array = [
+  'fdSystem'   => ['descr' => 'System Total'],
+  'fdMailboxd' => ['descr' => 'MailboxD'],
+];
+$i     = 0;
 
-if (rrd_is_file($rrd_filename))
-{
-    foreach ($array as $ds => $data)
-    {
+if (rrd_is_file($rrd_filename)) {
+    foreach ($array as $ds => $data) {
         $rrd_list[$i]['filename'] = $rrd_filename;
         $rrd_list[$i]['descr']    = $data['descr'];
         $rrd_list[$i]['ds']       = $ds;
@@ -38,6 +36,6 @@ if (rrd_is_file($rrd_filename))
     echo("file missing: $rrd_filename");
 }
 
-include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi_line.inc.php");
 
 // EOF

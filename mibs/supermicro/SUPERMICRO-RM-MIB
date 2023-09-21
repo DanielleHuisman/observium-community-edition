@@ -1,0 +1,759 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsrm.mib,v 1.21 2013/03/22 11:00:33 siva Exp $
+-- RM Proprietary MIB Definition
+
+-- This MIB explains the propreitery information implemented 
+-- for RM product.
+
+SUPERMICRO-RM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    Integer32, enterprises, Unsigned32       FROM SNMPv2-SMI
+    DisplayString, TEXTUAL-CONVENTION, MacAddress, 
+    TruthValue                               FROM SNMPv2-TC
+    ZeroBasedCounter32                       FROM RMON2-MIB
+    InetAddressIPv6                  FROM INET-ADDRESS-MIB;
+
+---   futuresoftware OBJECT IDENTIFIER ::= { enterprises 2076 }
+                                                                                
+fsRmMIB MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z"
+    ORGANIZATION "Super Micro Computer Inc."
+    CONTACT-INFO "support@Supermicro.com"
+    DESCRIPTION
+        "The proprietary MIB module for RM. This MIB supports 1:1 
+         Redundancy. "
+    REVISION "201209050000Z"
+    DESCRIPTION
+        "The proprietary MIB module for RM. This MIB supports 1:1 
+         Redundancy. "
+    ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) 99 }
+
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+                                                                                
+FsRmState ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+            "The State of the node."
+    SYNTAX INTEGER {
+                 init(0),   -- Node state is INIT 
+                 active(1), -- Node state is ACTIVE
+                 standby(2) -- Node state is STANDBY
+                 }
+
+-- Groups
+fsRmNotifications   OBJECT IDENTIFIER ::= { fsRmMIB 0 }
+fsRm                OBJECT IDENTIFIER ::= { fsRmMIB 1 }
+fsRmTrap            OBJECT IDENTIFIER ::= { fsRmMIB 2 }
+fsRmStatistics      OBJECT IDENTIFIER ::= { fsRmMIB 3 }
+fsRmTest	    OBJECT IDENTIFIER ::= { fsRmMIB 4 }
+-- Scalar objects
+
+fsRmSelfNodeId OBJECT-TYPE
+    SYNTAX     InetAddressIPv6 (SIZE (16)) 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+               "The NodeId of this node"
+    ::= {fsRm 1} 
+
+fsRmPeerNodeId OBJECT-TYPE
+    SYNTAX     InetAddressIPv6 (SIZE (16))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+               "The NodeId of the Peer. Currently one peer is supported. "
+    ::= {fsRm 2}
+ 
+fsRmActiveNodeId OBJECT-TYPE
+    SYNTAX     InetAddressIPv6 (SIZE (16))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+               "The NodeId of the active node. Active node is elected by
+                discovering the peer node Ip address and then selecting
+                the node with greater Ip address. "
+    ::= {fsRm 3}
+
+fsRmNodeState OBJECT-TYPE
+    SYNTAX     FsRmState
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+               "State of the node. The state of the node is decided after 
+                election. Election is based on the NodeId." 
+    ::= {fsRm 4} 
+
+fsRmHbInterval OBJECT-TYPE
+    SYNTAX     Integer32 (10..5000)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "The time interval in milli-seconds, between the Heart 
+                Beat messages. This value should be 4 times lesser than
+                that of PeerDead Interval. This value must be same for 
+                all the nodes in the network. Default value is 500msec. 
+                Allowed range of value is from 10 msec to 5 secs."
+    DEFVAL { 500 }
+    ::= {fsRm 5} 
+
+fsRmPeerDeadInterval OBJECT-TYPE
+    SYNTAX     Integer32 (40..20000)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "The number of milli-seconds that a node's Heart Beat 
+                messages have not seen before declaring peer down. This 
+                value should be 4 times greater than that of the Heart 
+                Beat Interval. This value must be same for all nodes 
+                in the network. Default value is 2 secs. Allowed range of
+                value is from 40 msec to 20 secs.
+                
+                Note: This object is maintained only for backward 
+                compatibility.
+
+                Peer dead interval multiplier(fsRmPeerDeadIntMultiplier) 
+                must be used for configuring peer dead interval.
+                ie,Peer Dead Interval=fsRmHbInterval * fsRmPeerDeadIntMultiplier
+                Since peer dead interval has dependency with both heart beat 
+                interval and peer dead interval multiplier, Peer dead interval
+                is changed whenever heart beat or peer dead interval multiplier
+                is changed."
+    DEFVAL { 2000 }
+    ::= {fsRm 6} 
+
+fsRmTrcLevel OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+             "Level of trace required for RM. 
+              The levels are defined as follows:
+              0x00000001 -- Init-Shut Trace.
+              0x00000002 -- Management Trace.
+              0x00000004 -- Data path Trace.
+              0x00000008 -- Control path Trace.
+              0x00000010 -- Packet dump Trace.
+              0x00000020 -- OS resource Trace.
+              0x00000040 -- All failure Trace.
+              0x00000080 -- Buffer Trace.
+
+              0x00010000 -- Critical Trace.
+              0x00020000 -- Peer Discovery state machine Trace.
+              0x00040000 -- Timer Trace.
+              0x00080000 -- Socket APIs Trace.
+              0x00100000 -- File Transfer Trace.
+              0x00200000 -- SNMP Trace.
+              0x00400000 -- Notification Trace.
+              0x00800000 -- Sync-up Trace.
+              0x01000000 -- Event Trace.
+              0x02000000 -- Switchover Trace.
+              0x04000000 -- Socket critical trace
+              0x08000000 -- Sync events trace
+              0x10000000 -- Sync message trace
+              0x1FFFFFFF -- All Trace.
+
+              By default critical trace and socket critical are enabled."
+
+    DEFVAL { '04010000'H }
+    ::= {fsRm 7}
+
+fsRmForceSwitchoverFlag OBJECT-TYPE
+    SYNTAX    INTEGER  {
+        enable (1),
+      	disable (2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+             "To force-switchover the ACTIVE node to become STANDBY, 
+              this flag can be enabled. 
+              This object is not saved and restored during mib 
+              save-restore operation
+              1. enable - Used to trigger the force-switchover
+              2. disable - This state is set when the force-switchover 
+              is completed and this value can only be read and 
+              cannot be written.
+              Configurations are blocked at ACTIVE once the 
+              force-switchover is triggered and allowed only 
+              after this operation is completed."
+    DEFVAL { disable }  
+    ::= {fsRm 8}
+
+fsRmPeerDeadIntMultiplier OBJECT-TYPE
+    SYNTAX     Integer32 (4..10)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "The peer dead interval is expressed as a multiple of 
+                heart beat interval. This object is used to store the
+                multiplier value by which the heart beat interval 
+                is multiplied to get the peer dead interval.
+                ie,Peer Dead Interval=fsRmHbInterval * fsRmPeerDeadIntMultiplier
+
+                Default value is 4. Allowed range of value is from 4 to 10.
+                
+                During Mib save restore operation the following mib objects are
+                restored in the same order as mentioned below,
+                 - fsRmHbInterval
+                 - fsRmPeerDeadInterval
+                 - fsRmPeerDeadIntMultiplier
+                
+                Because of this the value of fsRmPeerDeadInterval is 
+                overwritten while restoring fsRmPeerDeadIntMultiplier based on
+                the heart beat interval(fsRmHbInterval) and 
+                peer dead interval multiplier(fsRmPeerDeadIntMultiplier)."
+    DEFVAL { 4 }
+    ::= {fsRm 9} 
+
+fsRmSwitchId OBJECT-TYPE
+    SYNTAX     Integer32(0..128)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "Slot Number of a Switch in a Stacked environment.
+                This object is applicable only for Coldstandby case."
+    ::= {fsRm 10} 
+
+fsRmConfiguredState OBJECT-TYPE
+    SYNTAX     INTEGER {
+               preferredmaster (1),
+               backupmaster (2),
+               preferredslave (3)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "The value represents the configured/desired state
+                of the switch in a Stacked environment
+                  1 - Preferred Master
+                  2 - Backup Master
+                  3 - Preferred Slave
+                
+                This object is applicable only for Coldstandby case."
+    ::= {fsRm 11} 
+
+fsRmStackMacAddr OBJECT-TYPE
+    SYNTAX     MacAddress 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+               "Stack Mac Address of the switch in a Stacked environment.
+                This object is applicable only for Coldstandby case." 
+    ::= {fsRm 12} 
+
+fsRmPeerTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsRmPeerTableEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+               "RM Peer Table consists of Peer infomation in a Stacked environment.
+                This table is applicable only for Coldstandby case."
+    ::= { fsRm 13 }
+
+fsRmPeerTableEntry OBJECT-TYPE
+    SYNTAX       FsRmPeerTableEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+               "An entry in the table represents a peer infomation
+                in a stacked environment."
+    INDEX { fsRmPeerSwitchId }
+    
+    ::= { fsRmPeerTable 1 }
+
+FsRmPeerTableEntry ::=
+    SEQUENCE {
+        fsRmPeerSwitchId 
+             Integer32,
+        fsRmPeerStackIpAddr
+             IpAddress,
+        fsRmPeerStackMacAddr
+            MacAddress,
+        fsRmPeerSwitchBaseMacAddr    
+            MacAddress
+    }
+
+fsRmPeerSwitchId OBJECT-TYPE
+    SYNTAX       Integer32(0..128)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+               "Switch identifier of a peer."
+    ::= { fsRmPeerTableEntry 1 }
+
+fsRmPeerStackIpAddr OBJECT-TYPE
+    SYNTAX       IpAddress
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "Stacking IP address of peer switch.
+                Link local address will be used as
+                stack IP address."
+    ::= { fsRmPeerTableEntry 2 }
+
+fsRmPeerStackMacAddr OBJECT-TYPE
+    SYNTAX       MacAddress
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "Stack MAC address of peer switch."
+    ::= { fsRmPeerTableEntry 3 }
+
+fsRmPeerSwitchBaseMacAddr OBJECT-TYPE
+    SYNTAX       MacAddress
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "Ethernet address (Base MAC address) of peer."
+    ::= { fsRmPeerTableEntry 4 }
+
+fsRmStackPortCount  OBJECT-TYPE
+    SYNTAX      Integer32(1..4)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+               "The object defines the number of stack ports configured
+                in a device for the purpose of stacking. 
+                BY default the stack port count will be zero.
+                If the stack port count is zero, all higig
+                ports will be used for switching/routing.
+                This object is applicable only for Coldstandby case."
+    ::= { fsRm 14 }
+
+fsRmColdStandby OBJECT-TYPE
+    SYNTAX    INTEGER  {
+              enable (1),
+              disable (2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "The object is for  enabling or disabling the
+                coldstandby stacking support in a stacked environment.
+                By default it will be disabled."
+    DEFVAL { disable }
+    ::= {fsRm 15}
+
+fsRmModuleTrc OBJECT-TYPE
+    SYNTAX     Unsigned32 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+             "This object is used to enable the High Availability 
+              enabled module trace. 
+              Currently defined modules as follows:
+              0x00000001 -- VCM module trace
+              0x00000002 -- MBSM module trace
+              0x00000004 -- MSR module trace
+              0x00000008 -- CFA module trace
+              0x00000010 -- EOAM module trace
+              0x00000020 -- PNAC module trace
+              0x00000040 -- LA module trace
+              0x00000080 -- RSTPMSTP module trace
+              0x00000100 -- VLANGARP module trace
+              0x00000200 -- MRP module trace
+              0x00000400 -- PBB module trace
+              0x00000800 -- ECFM module trace
+              0x00001000 -- ELPS module trace
+              0x00002000 -- PBBTE module trace
+              0x00004000 -- ELMI module trace
+              0x00008000 -- SNOOP module trace
+              0x00010000 -- MPLS module trace
+              0x00020000 -- SNMP module trace
+              0x00040000 -- LLDP module trace
+              0x00080000 -- CLI module trace
+              0x00100000 -- NPAPI module trace
+              0x00200000 -- STATIC_CONF module trace
+              0x00400000 -- RM module trace
+              0x007FFFFF -- All Module traces
+
+              By default all module traces are enabled."
+    
+    DEFVAL  { '007FFFFF'h }
+    ::= {fsRm 16}
+
+fsRmProtocolRestartFlag OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "This object is used for enabling or disabling the restart
+                of all the protocols registered with the RM, in the standby
+                state, when the ISS node reaches an unpredictable state
+                like configurations abort or buffer allocation failure.
+                The default state is not to restart all the protocols 
+                in the ISS node."
+    DEFVAL { false }
+    ::= {fsRm 17}
+
+fsRmProtocolRestartRetryCnt OBJECT-TYPE
+    SYNTAX     Unsigned32(0..10)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "This object is used to specify the maximum number of times
+                the protocols in the ISS switch can be restarted 
+                when the ISS node reaches an unpredictable state.
+                The protocols will be restarted for the configured number 
+                of times only when the fsRmProtocolRestartFlag is set as true.
+                When the fsRmProtocolRestartFlag is set as true and the 
+                fsRmProtocolRestartRetryCnt is configured as zero,
+                the protocols will be always restarted whenever the ISS
+                reaches an unpredictable state."
+    DEFVAL { 3 }
+    ::= {fsRm 18}
+
+fsRmHitlessRestartFlag OBJECT-TYPE
+    SYNTAX     INTEGER {
+               disable(0),
+               store(1),
+               restore (2)
+               }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+               "This object is used for hitless restart feature. Initially
+                this object is set as disable (value = 0). User is allowed to
+	        	configure only the value store (value = 1). When this object
+                is set to store (value = 1), all the dynamic entries from
+                RM supporting modules are stored and steady state packets from
+                RM supporting modules are received in RM. After that, this 
+                object is set to restore (value = 2) implicitly. It is 
+                necessary to do the write start up configuration. This is 
+                because when the ISS node restarts in hitless restart mode, 
+                the restoration should happen via this object. As write start-
+                up is done earlier, the restore (value = 2) persists during the 
+                ISS node reboots. After restoring the dynamic configurations
+		        again, this object is set to disable state (value = 0)"
+    DEFVAL {disable}
+    ::= {fsRm 19}
+
+-- ********************************************************************************************
+--	Test Objects for Switch over time
+-- ********************************************************************************************
+
+fsRmSwitchoverTimeTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsRmSwitchoverTimeEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+               "RM Switch over Table consists of the switch over time taken by every module."
+    ::= { fsRmTest 1 }
+
+fsRmSwitchoverTimeEntry OBJECT-TYPE
+    SYNTAX       FsRmSwitchoverTimeEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+               "An entry in the table represents the time taken 
+		by a particular module for switch over
+                in a stacked environment."
+    INDEX { fsRmAppId }
+    
+    ::= { fsRmSwitchoverTimeTable 1 }
+
+FsRmSwitchoverTimeEntry ::=
+    SEQUENCE {
+        fsRmAppId 
+             Integer32,
+        fsRmAppName
+             DisplayString,
+        fsRmEntryTime
+             TimeTicks,
+        fsRmExitTime    
+             TimeTicks,
+        fsRmSwitchoverTime    
+             TimeTicks
+    }
+
+fsRmAppId OBJECT-TYPE
+    SYNTAX       Integer32(0..128)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+               "Application identifier for a module."
+    ::= { fsRmSwitchoverTimeEntry 1 }
+
+fsRmAppName OBJECT-TYPE
+    SYNTAX       DisplayString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "Application name for a module."
+    ::= { fsRmSwitchoverTimeEntry 2 }
+
+fsRmEntryTime OBJECT-TYPE
+    SYNTAX       TimeTicks
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "The entry time in milli seconds when RM has given the GO_ACTIVE 
+		event to the particular module"
+    ::= { fsRmSwitchoverTimeEntry 3 }
+
+fsRmExitTime OBJECT-TYPE
+    SYNTAX       TimeTicks
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "The exit time in milliseconds when RM has completed the GO_ACTIVE 
+		event processing and returned ACK to RM"
+    ::= { fsRmSwitchoverTimeEntry 4 }
+
+fsRmSwitchoverTime OBJECT-TYPE
+    SYNTAX       TimeTicks
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+               "The time taken for a particular module in milli seconds to
+		complete the switch over ie. Active to Standby transition"
+    ::= { fsRmSwitchoverTimeEntry 5 }
+
+fsRmIpAddress OBJECT-TYPE
+    SYNTAX            IpAddress
+    MAX-ACCESS        read-write 
+    STATUS            current
+    DESCRIPTION
+              "This object is used only if the Rm stacking interface type is
+               Inband.This object is used to specify the IP Address to be used 
+               for RM TCP /IP communication .
+
+               If RM stacking interface type is Inband,a dedicated IP
+               Interface will be created for RM communication and this IP 
+               Address will be assigned to the Interface. 
+
+               This value is read from NodeId File.If it is not available,
+               Default Value will be added  with the switch ID plus one to 
+               calculate the IP Address .A link local IP Address 169.254.1.1 
+               is used as the Default IP Address.
+          
+               Configuring this object  will result in updation to nodeid file.
+               The configured value will take effect in ISS on next reboot."
+    DEFVAL  {'A9FE0101'h}
+    ::= {fsRm 20}
+      
+
+fsRmSubnetMask OBJECT-TYPE
+    SYNTAX            IpAddress
+    MAX-ACCESS        read-write 
+    STATUS            current
+    DESCRIPTION
+              "This object is used only if the Rm stacking interface type is
+               Inband.This object is used to specify the Subnet Mask to be 
+               associated withIP Address to be used for RM TCP /IP 
+               communication.
+
+               If RM stacking interface type is Inband,a dedicated IP
+               Interface will be created for RM communication and this Subnet
+               Mask will be associated to the Interface. 
+
+               Configuring this object  will result in updation to nodeid file.
+               The configured value will take effect in ISS on next reboot."
+    DEFVAL  {'FF000000'h}
+    ::= {fsRm 21}
+
+fsRmStackInterface OBJECT-TYPE
+   SYNTAX            DisplayString  
+   MAX-ACCESS        read-write
+   STATUS            current
+   DESCRIPTION
+             "This object is used only if the Rm stacking interface type is                                    Inband.This object is used to specify the Stacking port to be used 
+              for RM TCP/IP Communication .In Total 8 stacking ports are supported
+              and one of the 8 ports can be used for RM TCP / IP communication.
+              This value is read from NodeId File. If the value is specified as
+              STK0 in the file, it is interpreted as first stacking port to be 
+              used.
+
+              Configuring this object  will result in updation to nodeid file.
+              The configured value will take effect in ISS on next reboot."
+    ::= {fsRm 22}
+
+-- *******************************************************************
+--   Trap Definitions
+-- *******************************************************************
+
+ fsRmTrapModuleId OBJECT-TYPE
+     SYNTAX       DisplayString (SIZE(1..20))
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+        "This object specifies the module identifier which generates the trap." 
+     ::= { fsRmTrap 1 }
+ 
+ fsRmTrapOperation OBJECT-TYPE
+     SYNTAX       INTEGER {
+                  syncUp(1),
+                  switchOver(2),
+                  peerAttach(3),
+                  peerDetach(4),
+                  hrStart(5),
+                  hrStop(6)
+                  }
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+         "Operations performed by the modules specified in fsRmTrapModuleId. 
+          syncUp     - Synchronization operation performed by modules running
+                       on standby node. 
+                       i.e., standby node initiates the synchronization process
+                       to keep its database to be in sync with active node.
+          switchOver - Node state transition. i.e., standby to active or 
+                       active to standby.
+          peerAttach - When Peer switch attached with Master, Master
+                       will send trap with peer information. This operation is 
+                       applicable only for Coldstandby case.
+          peerDetach - When Peer switch detached from Master, Master
+                       will send trap with peer information. This operation is
+                       applicable only for Coldstandby case.
+          hrStart    - When Hitless Restart is enabled in the active node.
+          hrStop     - When Hitless Restart is disabled in the active node."
+     ::= { fsRmTrap 2 }
+ 
+ fsRmTrapOperationStatus OBJECT-TYPE
+     SYNTAX        INTEGER {
+                  started(1),
+                  completed(2),
+                  failed(3)
+     }
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+         "The status of operation specified by object fsRmTrapOperation."
+     ::= { fsRmTrap 3 }
+ 
+ fsRmTrapError OBJECT-TYPE
+     SYNTAX        INTEGER {
+                  none(1),
+                  memAllocFailed(2),
+                  sendFailed(3),
+                  processFailed(4)
+     }
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+         "The reason for the failure of particular fsRmTrapOperation. 
+         The value of this object is valid only when fsRmTrapOperationStatus 
+         is set to failure(3), in all other cases the value is none(1). "
+     ::= { fsRmTrap 4 }
+ 
+ fsRmTrapEventTime OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE(24))
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+        "This object specifies the date and time at which fsRmTrapOperation
+         was performed."
+     ::= { fsRmTrap 5 }
+
+ fsRmTrapErrorStr OBJECT-TYPE
+     SYNTAX       DisplayString(SIZE(0..80))
+     MAX-ACCESS   accessible-for-notify
+     STATUS       current
+     DESCRIPTION
+        "This object specifies the details of the error information in string
+         format. This object is set only when fsRmTrapOperationStatus is 
+         failed(3).. Contains NULL string otherwise."
+     ::= { fsRmTrap 6 }
+
+fsRmTrapSwitchId OBJECT-TYPE
+     SYNTAX       Integer32(0..128)
+     MAX-ACCESS   read-only
+     STATUS       current
+     DESCRIPTION
+         "Slot number of the switch which sends trap message.
+          This objects is applicable only for Coldstandby case."
+     ::= { fsRmTrap 7 }
+
+ fsRmTrapEvent NOTIFICATION-TYPE
+     OBJECTS      { 
+                    fsRmSelfNodeId, 
+                    fsRmNodeState, 
+                    fsRmTrapModuleId,
+                    fsRmTrapOperation,
+                    fsRmTrapOperationStatus,
+                    fsRmTrapError,
+                    fsRmTrapEventTime,
+                    fsRmTrapErrorStr,
+                    fsRmTrapSwitchId 
+                  }
+     STATUS       current
+     DESCRIPTION
+         "This trap signifies the status of various operations 
+          performed in a system with Redundancy capability.
+          Standby node cannot send external traps. It forwards the 
+          notification to the active node for trap generation."
+     ::= { fsRmNotifications 1 }
+
+-- *******************************************************************
+--   Statistics Counters
+-- *******************************************************************
+
+--
+-- TX Statistics
+--
+
+fsRmStatsSyncMsgTxCount  OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Total number of synchronization messages successfully sent
+          from ACTIVE node."
+    ::= {fsRmStatistics 1}
+
+fsRmStatsSyncMsgTxFailedCount  OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Total number of sync-up messages failed while sending."
+    ::= {fsRmStatistics 2}
+
+--
+-- RX Statistics
+--
+
+fsRmStatsSyncMsgRxCount  OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Total number of sync-up messages received at STANDBY node."
+    ::= {fsRmStatistics 3}
+
+fsRmStatsSyncMsgProcCount OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Total number of sync-up messages received and processed at STANDBY 
+          node."
+    ::= {fsRmStatistics 4}
+
+fsRmStatsSyncMsgMissedCount OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "RM module at standby  receives and processes the synchronization 
+          messages with the help of the sequence number in the message.
+          In some failure cases, when the message with a particular 
+          sequence number is lost, this counter is incremented."
+    ::= {fsRmStatistics 5}
+
+fsRmStatsConfSyncMsgFailCount OBJECT-TYPE
+    SYNTAX      ZeroBasedCounter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Total number of static configuration sync-up messages that have
+          been failed. This counter will be incremented only if the failure
+          happens after the completion of the bulk update process."
+    ::= {fsRmStatistics 6}
+
+END    

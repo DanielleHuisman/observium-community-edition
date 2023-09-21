@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -25,15 +25,15 @@
 $mempool_array = snmpwalk_cache_oid($device, 'agentDRAMutilizationEntry', [], $mib);
 
 foreach ($mempool_array as $index => $entry) {
-  if (is_numeric($entry['agentDRAMutilizationUsedDRAM'])) {
-    $descr     = ($index === 0 ? 'Memory' : 'Unit ' . $index);
-    $used      = $entry['agentDRAMutilizationUsedDRAM'];
-    $total     = $entry['agentDRAMutilizationTotalDRAM'];
-    $precision = (strlen($total) > 7 ? 1 : 1024); // Stacking switches uses wrong units
-    //$used     *= $precision;
-    //$total    *= $precision;
-    discover_mempool($valid['mempool'], $device, $index, 'AGENT-GENERAL-MIB', $descr, $precision, $total, $used);
-  }
+    if (is_numeric($entry['agentDRAMutilizationUsedDRAM'])) {
+        $descr     = ($index === 0 ? 'Memory' : 'Unit ' . $index);
+        $used      = $entry['agentDRAMutilizationUsedDRAM'];
+        $total     = $entry['agentDRAMutilizationTotalDRAM'];
+        $precision = (strlen($total) > 7 ? 1 : 1024); // Stacking switches uses wrong units
+        //$used     *= $precision;
+        //$total    *= $precision;
+        discover_mempool($valid['mempool'], $device, $index, 'AGENT-GENERAL-MIB', $descr, $precision, $total, $used);
+    }
 }
 
 unset($mempool_array, $index, $descr, $precision, $total, $used);

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -63,40 +63,36 @@
 //BLADE-MIB::chassisNoOfSMIsInstalled.0 = ""
 //BLADE-MIB::chassisNoOfMTsInstalled.0 = STRING: "1"
 
-$data = snmp_get_multi_oid($device, 'bladeCenterVpdMachineType.0 bladeCenterVpdMachineModel.0 bladeCenterSerialNumber.0 chassisFlags.0 chassisType.0 chassisSubtype.0', array(), 'BLADE-MIB');
+$data = snmp_get_multi_oid($device, 'bladeCenterVpdMachineType.0 bladeCenterVpdMachineModel.0 bladeCenterSerialNumber.0 chassisFlags.0 chassisType.0 chassisSubtype.0', [], 'BLADE-MIB');
 
-if ($data[0]['chassisFlags'] == 'serverBlade')
-{
-  $type = 'blade';
+if ($data[0]['chassisFlags'] == 'serverBlade') {
+    $type = 'blade';
 }
 $serial = $data[0]['bladeCenterSerialNumber'];
 
-switch ($data[0]['chassisSubtype'])
-{
-  case 'bladeCenterS':
-  case 'bladeCenterE':
-  case 'bladeCenterH':
-  case 'bladeCenterT':
-    $hardware = ucfirst($data[0]['chassisSubtype']);
-    break;
-  case 'bladeCenterHOrBladeCenterHT':
-    if ($data[0]['chassisType'] == 'bladeCenterOrBladeCenterH')
-    {
-      $hardware = 'BladeCenterH';
-    } else {
-      $hardware = 'BladeCenterHT';
-    }
-    break;
-  case 'bladeCenterOrBladeCenterT':
-    if ($data[0]['chassisType'] == 'bladeCenterTOrBladeCenterHT')
-    {
-      $hardware = 'BladeCenterT';
-    } else {
-      $hardware = 'BladeCenter';
-    }
-    break;
-  default:
-    $hardware = 'BladeCenter';
+switch ($data[0]['chassisSubtype']) {
+    case 'bladeCenterS':
+    case 'bladeCenterE':
+    case 'bladeCenterH':
+    case 'bladeCenterT':
+        $hardware = ucfirst($data[0]['chassisSubtype']);
+        break;
+    case 'bladeCenterHOrBladeCenterHT':
+        if ($data[0]['chassisType'] == 'bladeCenterOrBladeCenterH') {
+            $hardware = 'BladeCenterH';
+        } else {
+            $hardware = 'BladeCenterHT';
+        }
+        break;
+    case 'bladeCenterOrBladeCenterT':
+        if ($data[0]['chassisType'] == 'bladeCenterTOrBladeCenterHT') {
+            $hardware = 'BladeCenterT';
+        } else {
+            $hardware = 'BladeCenter';
+        }
+        break;
+    default:
+        $hardware = 'BladeCenter';
 }
 $hardware .= ' ' . $data[0]['bladeCenterVpdMachineType'] . '-' . $data[0]['bladeCenterVpdMachineModel'];
 

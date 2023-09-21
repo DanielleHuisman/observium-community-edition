@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -29,54 +29,54 @@
 
 $mib = 'OMNITRON-POE-MIB';
 
-$oids = snmpwalk_cache_oid($device, 'ostPoePortCfgEntry', array(), $mib);
+$oids = snmpwalk_cache_oid($device, 'ostPoePortCfgEntry', [], $mib);
 print_debug_vars($oids);
 
-foreach ($oids as $index => $entry)
-{
-  if ($entry['ostPoePortPseEnable'] == 'pseDisabled') { continue; }
+foreach ($oids as $index => $entry) {
+    if ($entry['ostPoePortPseEnable'] == 'pseDisabled') {
+        continue;
+    }
 
-  $options = array('entPhysicalIndex' => $index, 'entPhysicalClass' => 'port');
-  $port    = get_port_by_ifIndex($device['device_id'], $index);
-  // print_vars($port);
+    $options = ['entPhysicalIndex' => $index, 'entPhysicalClass' => 'port'];
+    $port    = get_port_by_ifIndex($device['device_id'], $index);
+    // print_vars($port);
 
-  if (is_array($port))
-  {
-    $entry['ifDescr']           = $port['port_label'];
-    $options['measured_class']  = 'port';
-    $options['measured_entity'] = $port['port_id'];
-    $options['entPhysicalIndex_measured'] = $port['ifIndex'];
-  } else {
-    $entry['ifDescr'] = "Port $index";
-  }
+    if (is_array($port)) {
+        $entry['ifDescr']                     = $port['port_label'];
+        $options['measured_class']            = 'port';
+        $options['measured_entity']           = $port['port_id'];
+        $options['entPhysicalIndex_measured'] = $port['ifIndex'];
+    } else {
+        $entry['ifDescr'] = "Port $index";
+    }
 
-  // Current Supplied
-  $descr    = $entry['ifDescr'] . ' PoE Current';
-  $scale    = 0.001;
-  $oid_name = 'ostPoePortPseCurrentSupplied';
-  $oid_num  = '.1.3.6.1.4.1.7342.15.2.1.6.'.$index;
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
+    // Current Supplied
+    $descr    = $entry['ifDescr'] . ' PoE Current';
+    $scale    = 0.001;
+    $oid_name = 'ostPoePortPseCurrentSupplied';
+    $oid_num  = '.1.3.6.1.4.1.7342.15.2.1.6.' . $index;
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
 
-  discover_sensor('current', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    discover_sensor('current', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 
-  // Voltage Supplied
-  $descr    = $entry['ifDescr'] . ' PoE Voltage';
-  $scale    = 1;
-  $oid_name = 'ostPoePortPseVoltageSupplied';
-  $oid_num  = '.1.3.6.1.4.1.7342.15.2.1.5.'.$index;
-  $type     = $mib . '-' . $oid_name;
-  $value    = $entry[$oid_name];
+    // Voltage Supplied
+    $descr    = $entry['ifDescr'] . ' PoE Voltage';
+    $scale    = 1;
+    $oid_name = 'ostPoePortPseVoltageSupplied';
+    $oid_num  = '.1.3.6.1.4.1.7342.15.2.1.5.' . $index;
+    $type     = $mib . '-' . $oid_name;
+    $value    = $entry[$oid_name];
 
-  discover_sensor('voltage', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
+    discover_sensor('voltage', $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
 
-  $descr    = $entry['ifDescr'] . ' PoE Status';
-  $oid_name = 'ostPoePortPseStatus';
-  $oid_num  = '.1.3.6.1.4.1.7342.15.2.1.7.'.$index;
-  $type     = 'ostPoePortPseStatus';
-  $value    = $entry[$oid_name];
+    $descr    = $entry['ifDescr'] . ' PoE Status';
+    $oid_name = 'ostPoePortPseStatus';
+    $oid_num  = '.1.3.6.1.4.1.7342.15.2.1.7.' . $index;
+    $type     = 'ostPoePortPseStatus';
+    $value    = $entry[$oid_name];
 
-  discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, $options);
+    discover_status($device, $oid_num, $oid_name . '.' . $index, $type, $descr, $value, $options);
 }
 
 // EOF

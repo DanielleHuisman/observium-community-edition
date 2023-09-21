@@ -4,116 +4,131 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-include($config['html_dir']."/includes/graphs/common.inc.php");
+include($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-if ($width > "1000")
-{
-  $descr_len = 36;
-}
-else if ($width > "500")
-{
-  $descr_len = 24;
+if ($width > "1000") {
+    $descr_len = 36;
+} elseif ($width > "500") {
+    $descr_len = 24;
 } else {
-  $descr_len = 12;
-  $descr_len += round(($width - 250) / 8);
+    $descr_len = 12;
+    $descr_len += round(($width - 250) / 8);
 }
 
-if ($nototal) { $descrlen += "2"; $unitlen += "2";}
+if ($nototal) {
+    $descrlen += "2";
+    $unitlen  += "2";
+}
 
-if ($width > "500")
-{
-  if (!$noheader)
-  {
-    $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+5),0,$descr_len+5)."  Now     Min      Max     Avg'";
-    if (!$nototal) { $rrd_options .= " COMMENT:'Total      '"; }
-    $rrd_options .= " COMMENT:'\l'";
-  }
+if ($width > "500") {
+    if (!$noheader) {
+        $rrd_options .= " COMMENT:'" . substr(str_pad($unit_text, $descr_len + 5), 0, $descr_len + 5) . "  Now     Min      Max     Avg'";
+        if (!$nototal) {
+            $rrd_options .= " COMMENT:'Total      '";
+        }
+        $rrd_options .= " COMMENT:'\l'";
+    }
 } else {
-  if (!$noheader)
-  {
-    $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+5),0,$descr_len+5)."  Now     Min      Max     Avg\l'";
-  }
-  $nototal = 1;
+    if (!$noheader) {
+        $rrd_options .= " COMMENT:'" . substr(str_pad($unit_text, $descr_len + 5), 0, $descr_len + 5) . "  Now     Min      Max     Avg\l'";
+    }
+    $nototal = 1;
 }
 
 $colour_iter = 0;
-$rrd_multi = array();
-$i = 1;
+$rrd_multi   = [];
+$i           = 1;
+
+if (isset($colour_scheme)) {
+    $scheme_colours = generate_palette(safe_count($groups), $colour_scheme);
+}
+
+foreach ($groups as $id => $group) {
+
+    foreach ($group['list'] as $rrd_id => $rrd) {
+
+        $i++;
+
+        $ds      = $rrd['ds'] . "_" . $i;
+        $orig_ds = $ds;
+
+        $rrd_options .= " DEF:" . $ds . "=" . rrdtool_escape($rrd['filename']) . ":" . $rrd['ds'] . ":AVERAGE ";
+
+        # if we've been passed a multiplier we must make a CDEF based on it!
+        if (is_numeric($multiplier) || is_numeric($divider) || is_numeric($divisor)) {
+
+            if (is_numeric($divider)) {
+                $multiplier = float_div(1, $divisor);
+            }
+            if (is_numeric($divisor)) {
+                $multiplier = float_div(1, $divider);
+            }
+
+            $rrd_options .= " CDEF:c_" . $ds . "=" . $ds . "," . $multiplier . ",*";
+
+            //$rrd_options .= " CDEF:c_" . $ds . "min=" . $ds . "min," . $multiplier . ",*";
+            //$rrd_options .= " CDEF:c_" . $ds . "max=" . $ds . "max," . $multiplier . ",*";
+
+            $ds = "c_" . $ds;
+        }
+
+        // Create Aggreage
+        $group['aggregate'][] = $ds;
+        $group['ds_list'][]   = $ds;
+    }
+
+    $group_ds = $id;
 
 
-foreach($groups as $id => $group)
-{
+    if ($rrd['colour']) {
+        $colour = $rrd['colour'];
+    } elseif (isset($scheme_colours[$id])) {
+        if (is_array($scheme_colours[$id]) && isset($scheme_colours[$id][$rrd_id])) {
+            $colour = ltrim($scheme_colours[$id][$rrd_id], '#');
+        } else {
+            $colour = ltrim($scheme_colours[$id], '#');
+        }
+    } else {
+        if (!$config['graph_colours'][$colours][$colour_iter]) {
+            $colour_iter = 0;
+        }
+        $colour = $config['graph_colours'][$colours][$colour_iter];
+        $colour_iter++;
+    }
 
- foreach ($group['list'] as $rrd)
- {
+    if (!is_array($group['ds_list'])) {
+        continue;
+    }
 
-  $i++;
-
-  $ds = $rrd['ds']."_".$i;
-  $orig_ds = $ds;
-
-  $rrd_options .= " DEF:".$ds."=".rrdtool_escape($rrd['filename']).":".$rrd['ds'].":AVERAGE ";
-
-  # if we've been passed a multiplier we must make a CDEF based on it!
-  if (is_numeric($multiplier) || is_numeric($divider) || is_numeric($divisor))
-  {
-
-    if(is_numeric($divider)) { $multiplier = 1 / $divisor; }
-    if(is_numeric($divisor)) { $multiplier = 1 / $divider; }
-
-    $rrd_options .= " CDEF:c_" . $ds . "=" . $ds . "," . $multiplier . ",*";
-    //$rrd_options .= " CDEF:c_" . $ds . "min=" . $ds . "min," . $multiplier . ",*";
-    //$rrd_options .= " CDEF:c_" . $ds . "max=" . $ds . "max," . $multiplier . ",*";
-
-    $ds = "c_".$ds;
-
-  }
-
-  // Create Aggreage
-  $group['aggregate'][]  = $ds;
-  $group['ds_list'][] = $ds;
-
- }
-
- $group_ds     = $id;
-
-  if ($rrd['colour'])
-  {
-    $colour = $rrd['colour'];
-  } else {
-    if (!$config['graph_colours'][$colours][$colour_iter]) { $colour_iter = 0; }
-    $colour = $config['graph_colours'][$colours][$colour_iter];
-    $colour_iter++;
-  }
-
-  if (!is_array($group['ds_list'])) { continue; }
-
-  $rrd_options .= " CDEF:" . $group_ds . "=" . rrd_aggregate_dses($group['ds_list']);
+    $rrd_options .= " CDEF:" . $group_ds . "=" . rrd_aggregate_dses($group['ds_list']);
 
 
- if ($rrd['invert'])
- {
-   $rrd_options .= " CDEF:".$group_ds."i=".$group_ds.",-1,*";
-   $rrd_optionsc .= " AREA:".$group_ds."i#".$colour.":'".rrdtool_escape($group['descr'], $descr_len)."'".$cstack;
-   $rrd_optionsc .= " GPRINT:".$group_ds.":LAST:%5.1lf%s GPRINT:".$group_ds.":MIN:%5.1lf%s";
-   $rrd_optionsc .= " GPRINT:".$group_ds.":MAX:%5.1lf%s GPRINT:".$group_ds.":AVERAGE:%5.1lf%s";
-   $cstack = ":STACK";
-   if (!$nototal) { $rrd_optionsc .= " GPRINT:tot".$group_ds.":%5.2lf%s".rrdtool_escape($total_units).""; }
-   $rrd_optionsc .= "'\\n' COMMENT:'\\n'";
- } else {
-   $rrd_optionsb .= " AREA:".$group_ds."#".$colour.":'".rrdtool_escape($group['descr'], $descr_len)."'".$bstack;
-   $rrd_optionsb .= " GPRINT:".$group_ds.":LAST:%5.1lf%s GPRINT:".$group_ds.":MIN:%5.1lf%s";
-   $rrd_optionsb .= " GPRINT:".$group_ds.":MAX:%5.1lf%s GPRINT:".$group_ds.":AVERAGE:%5.1lf%s";
-   $bstack = ":STACK";
-   if (!$nototal) { $rrd_optionsb .= " GPRINT:tot".$group_ds.":%5.2lf%s".rrdtool_escape($total_units).""; }
-   $rrd_optionsb .= "'\\n' COMMENT:'\\n'";
- }
+    if ($rrd['invert']) {
+        $rrd_options  .= " CDEF:" . $group_ds . "i=" . $group_ds . ",-1,*";
+        $rrd_optionsc .= " AREA:" . $group_ds . "i#" . $colour . ":'" . rrdtool_escape($group['descr'], $descr_len) . "'" . $cstack;
+        $rrd_optionsc .= " GPRINT:" . $group_ds . ":LAST:%5.1lf%s GPRINT:" . $group_ds . ":MIN:%5.1lf%s";
+        $rrd_optionsc .= " GPRINT:" . $group_ds . ":MAX:%5.1lf%s GPRINT:" . $group_ds . ":AVERAGE:%5.1lf%s";
+        $cstack       = ":STACK";
+        if (!$nototal) {
+            $rrd_optionsc .= " GPRINT:tot" . $group_ds . ":%5.2lf%s" . rrdtool_escape($total_units) . "";
+        }
+        $rrd_optionsc .= "'\\n' COMMENT:'\\n'";
+    } else {
+        $rrd_optionsb .= " AREA:" . $group_ds . "#" . $colour . ":'" . rrdtool_escape($group['descr'], $descr_len) . "'" . $bstack;
+        $rrd_optionsb .= " GPRINT:" . $group_ds . ":LAST:%5.1lf%s GPRINT:" . $group_ds . ":MIN:%5.1lf%s";
+        $rrd_optionsb .= " GPRINT:" . $group_ds . ":MAX:%5.1lf%s GPRINT:" . $group_ds . ":AVERAGE:%5.1lf%s";
+        $bstack       = ":STACK";
+        if (!$nototal) {
+            $rrd_optionsb .= " GPRINT:tot" . $group_ds . ":%5.2lf%s" . rrdtool_escape($total_units) . "";
+        }
+        $rrd_optionsb .= "'\\n' COMMENT:'\\n'";
+    }
 }
 
 /*

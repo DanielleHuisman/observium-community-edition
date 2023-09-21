@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -24,8 +24,8 @@ $ua = detect_browser();
 if ($ua['browser'] === 'MSIE' ||
     ($ua['browser'] === 'Firefox' && version_compare($ua['version'], '61', '<'))) // Also for FF ESR60 and older
 {
-  register_html_resource('js', 'js/compat/bluebird.min.js');
-  register_html_resource('js', 'js/compat/fetch.js');
+    register_html_resource('js', 'js/compat/bluebird.min.js');
+    register_html_resource('js', 'js/compat/fetch.js');
 }
 register_html_resource('js', 'leaflet-realtime.js');
 
@@ -34,115 +34,110 @@ register_html_resource('js', 'ResizeSensor.js');
 
 include_dir($config['html_dir'] . '/includes/widgets/');
 
-if($_SESSION['userlevel'] >= 7 && $vars['reset_dashboard'] == "yes")
-{
-  dbDelete('dashboards', '1');
-  dbDelete('dash_widgets', '1');
+if ($_SESSION['userlevel'] >= 7 && $vars['reset_dashboard'] == "yes") {
+    dbDelete('dashboards', '1');
+    dbDelete('dash_widgets', '1');
 }
 
 $grid_cell_height = 20;
 $grid_h_margin    = 100;
 $grid_v_margin    = 15;
 
-if (!isset($vars['dash']))
-{
-  $vars['dash'] = '1';
+if (!isset($vars['dash'])) {
+    $vars['dash'] = '1';
 
-  $dashboard = dbFetchRow("SELECT * FROM `dashboards` WHERE `dash_id` = ?", array($vars['dash']));
+    $dashboard = dbFetchRow("SELECT * FROM `dashboards` WHERE `dash_id` = ?", [$vars['dash']]);
 
-  if (!$dashboard) {
-      //No dashboard, so generate a standard one
-      include("includes/dashboard-generate.inc.php");
-  }
+    if (!$dashboard) {
+        //No dashboard, so generate a standard one
+        include("includes/dashboard-generate.inc.php");
+    }
 }
 
 
-if (isset($vars['edit']) && $_SESSION['userlevel'] > 7)
-{
-  $is_editing = TRUE;
+if (isset($vars['edit']) && $_SESSION['userlevel'] > 7) {
+    $is_editing = TRUE;
 }
 
-$dashboard = dbFetchRow("SELECT * FROM `dashboards` WHERE `dash_id` = ?", array($vars['dash']));
+$dashboard = dbFetchRow("SELECT * FROM `dashboards` WHERE `dash_id` = ?", [$vars['dash']]);
 
-if (is_array($dashboard))
-{
+if (is_array($dashboard)) {
 
-    if ($is_editing === TRUE)
-    {
-      $form_items = ['types' => array(
-                     'map'                 => 'Map',
-                     'alert_table'         => 'Alert Table',
-                     'alert_boxes'         => "Alert Boxes",
-                     'alertlog'            => 'Alert Log',
-                     //'graph'               => 'Graph', // Doesn't work adding here
-                     'port_percent'        => 'Traffic Composition',
-                     'status_summary'      => "Status Summary",
-                     'old_status_table'    => "Status Table (Old)",
-                     'old_status_boxes'    => "Status Boxes (Old)",
-                     //'status_donuts'  => "Status Donuts",  // broke
-                     'syslog'              => 'Syslog',
-                     'syslog_alerts'       => 'Syslog Alerts',
-                     //'weathermap'          => 'Network Weathermap',
-                     'eventlog'            => 'Eventlog')];
+    if ($is_editing === TRUE) {
+        $form_items = ['types' => [
+          'map'              => 'Map',
+          'alert_table'      => 'Alert Table',
+          'alert_boxes'      => "Alert Boxes",
+          'alertlog'         => 'Alert Log',
+          //'graph'               => 'Graph', // Doesn't work adding here
+          'port_percent'     => 'Traffic Composition',
+          'status_summary'   => "Status Summary",
+          'old_status_table' => "Status Table (Old)",
+          'old_status_boxes' => "Status Boxes (Old)",
+          //'status_donuts'  => "Status Donuts",  // broke
+          'syslog'           => 'Syslog',
+          'syslog_alerts'    => 'Syslog Alerts',
+          //'weathermap'          => 'Network Weathermap',
+          'eventlog'         => 'Eventlog']];
 
-      $form = array('id' => 'add_widget',
-                    'type'  => 'rows',
-                    'space' => '5px');
+        $form = ['id'    => 'add_widget',
+                 'type'  => 'rows',
+                 'space' => '5px'];
 
-      $form['row'][0]['dash_id'] = array(
-        'type'        => 'hidden',
-        'name'        => 'Dashboard Name',
-        'value'       => $dashboard['dash_id'],
-        'grid'        => 0
-      );
-      $form['row'][0]['widget_type'] = array(
-        'type'        => 'select',
-        'name'        => 'Widget',
-        'width'       => '100%', //'180px',
-        'grid'        => 2,
-        //'value'       => $vars['widget_type'],
-        'values'      => $form_items['types']);
-      $form['row'][0]['add'] = array(
-        'type'        => 'submit',
-        'class'       => 'btn-success',
-        'name'        => 'Add Widget',
-        'width'       => '100%', //'180px',
-        'value'       => 'Add Widget',
-        'icon'        => '',
-        'grid'        => 1
-      );
-      $form['row'][0]['dash_name'] = array(
-        'type'        => 'text',
-        'width'       => '100%', //'180px',
-        'placeholder' => 'Dashboard Name',
-        'value'       => $dashboard['dash_name'],
-        'grid'        => 3
-      );
-      $form['row'][0]['dash_delete'] = array(
-        'type'        => 'submit',
-        'class'       => 'btn-danger',
-        'name'        => 'Delete Dashboard',
-        'value'       => 'Delete Dashboard',
-        'icon'        => '',
-        'grid'        => 6,
-        'right'       => TRUE,
-        'onclick'     => 'dashDelete();',
-        // confirmation dialog
-        'attribs'     => array('data-toggle'            => 'confirm', // Enable confirmation dialog
-                               'data-confirm-placement' => 'bottom',
-                               'data-confirm-content'   => 'Are you sure?',
-        ),
-      );
-      print_form($form);
+        $form['row'][0]['dash_id']     = [
+          'type'  => 'hidden',
+          'name'  => 'Dashboard Name',
+          'value' => $dashboard['dash_id'],
+          'grid'  => 0
+        ];
+        $form['row'][0]['widget_type'] = [
+          'type'   => 'select',
+          'name'   => 'Widget',
+          'width'  => '100%', //'180px',
+          'grid'   => 2,
+          //'value'       => $vars['widget_type'],
+          'values' => $form_items['types']];
+        $form['row'][0]['add']         = [
+          'type'  => 'submit',
+          'class' => 'btn-success',
+          'name'  => 'Add Widget',
+          'width' => '100%', //'180px',
+          'value' => 'Add Widget',
+          'icon'  => '',
+          'grid'  => 1
+        ];
+        $form['row'][0]['dash_name']   = [
+          'type'        => 'text',
+          'width'       => '100%', //'180px',
+          'placeholder' => 'Dashboard Name',
+          'value'       => $dashboard['dash_name'],
+          'grid'        => 3
+        ];
+        $form['row'][0]['dash_delete'] = [
+          'type'    => 'submit',
+          'class'   => 'btn-danger',
+          'name'    => 'Delete Dashboard',
+          'value'   => 'Delete Dashboard',
+          'icon'    => '',
+          'grid'    => 6,
+          'right'   => TRUE,
+          'onclick' => 'dashDelete();',
+          // confirmation dialog
+          'attribs' => ['data-toggle'            => 'confirm', // Enable confirmation dialog
+                        'data-confirm-placement' => 'bottom',
+                        'data-confirm-content'   => 'Are you sure?',
+          ],
+        ];
+        print_form($form);
 
-}
+    }
 
-  echo '<div class="row">';
-  echo '<div class="grid-stack" id="grid">';
-  echo '</div>';
-  echo '</div>';
+    echo '<div class="row">';
+    echo '<div class="grid-stack" id="grid">';
+    echo '</div>';
+    echo '</div>';
 
-  ?>
+    ?>
 
     <!--- <textarea id="saved-data" cols="100" rows="20" readonly="readonly"></textarea> -->
 
@@ -150,9 +145,9 @@ if (is_array($dashboard))
 
         var dash_id = <?php echo $dashboard['dash_id']; ?>;
 
-            function isNumber(n) {
-                return !isNaN(parseFloat(n)) && isFinite(n);
-            }
+        function isNumber(n) {
+            return !isNaN(parseFloat(n)) && isFinite(n);
+        }
 
         $(function () {
             var options = {
@@ -161,7 +156,11 @@ if (is_array($dashboard))
                 verticalMargin: <?php echo $grid_v_margin; ?>,
                 resizable: {
                     autoHide: true,
-                    handles: <?php if ($is_editing === TRUE) echo "'se, sw'"; else echo "'none'"; ?>
+                    handles: <?php if ($is_editing === TRUE) {
+                        echo "'se, sw'";
+                    } else {
+                        echo "'none'";
+                    } ?>
                 },
                 draggable: {
                     handle: '.drag-handle',
@@ -171,21 +170,20 @@ if (is_array($dashboard))
 
             var initial_grid = [
 
-              <?php
+                <?php
 
-              $data = array();
-              $widgets = dbFetchRows("SELECT * FROM `dash_widgets` WHERE `dash_id` = ? ORDER BY `y`,`x`", array($dashboard['dash_id']));
-              foreach ($widgets AS $widget)
-              {
-                $data[] = '{' .
-                          (is_numeric($widget['x']) ? '"x": ' . $widget['x'] . ',' : '') .
-                          (is_numeric($widget['y']) ? '"y": ' . $widget['y'] . ',' : '') .
-                          '"width": ' . $widget['width'] . ', "height": ' . $widget['height'] . ', "id": "' . $widget['widget_id'] . '"}';
-              }
+                $data = [];
+                $widgets = dbFetchRows("SELECT * FROM `dash_widgets` WHERE `dash_id` = ? ORDER BY `y`,`x`", [$dashboard['dash_id']]);
+                foreach ($widgets as $widget) {
+                    $data[] = '{' .
+                              (is_numeric($widget['x']) ? '"x": ' . $widget['x'] . ',' : '') .
+                              (is_numeric($widget['y']) ? '"y": ' . $widget['y'] . ',' : '') .
+                              '"width": ' . $widget['width'] . ', "height": ' . $widget['height'] . ', "id": "' . $widget['widget_id'] . '"}';
+                }
 
-              echo implode(",", $data);
+                echo implode(",", $data);
 
-              ?>
+                ?>
 
             ];
 
@@ -255,14 +253,14 @@ if (is_array($dashboard))
             this.drawWidget = function (node) {
                 this.grid.addWidget($('<div><div id="widget-' + node.id + '" class="grid-stack-item-content"></div>' +
                     <?php if($is_editing == TRUE) { ?>
-                    '<div class="hover-show" style="z-index: 1000; position: absolute; top:0px; right: 10px; padding: 2px 10px; padding-right: 0px; border-bottom-left-radius: 4px; border: 1px solid #e5e5e5; border-right: none; border-top: none; background: white;">' +
-                    '  <i style="cursor: pointer; margin: 7px;" class="sprite-refresh" onclick="refreshWidget(' + node.id + ')"></i>' +
-                    '  <i style="cursor: pointer; margin: 7px;" class="sprite-tools" onclick="configWidget(' + node.id + ')"></i></i>' +
-                    '  <i style="cursor: no-drop; margin: 7px;" class="sprite-cancel" onclick="deleteWidget(' + node.id + ')"></i>' +
-                    '  <i style="cursor: move; margin: 7px; margin-right: 20px" class="sprite-move drag-handle"></i>' +
-                    '</div>' +
+                        '<div class="hover-show" style="z-index: 1000; position: absolute; top:0px; right: 10px; padding: 2px 10px; padding-right: 0px; border-bottom-left-radius: 4px; border: 1px solid #e5e5e5; border-right: none; border-top: none; background: white;">' +
+                        '  <i style="cursor: pointer; margin: 7px;" class="sprite-refresh" onclick="refreshWidget(' + node.id + ')"></i>' +
+                        '  <i style="cursor: pointer; margin: 7px;" class="sprite-tools" onclick="configWidget(' + node.id + ')"></i></i>' +
+                        '  <i style="cursor: no-drop; margin: 7px;" class="sprite-cancel" onclick="deleteWidget(' + node.id + ')"></i>' +
+                        '  <i style="cursor: move; margin: 7px; margin-right: 20px" class="sprite-move drag-handle"></i>' +
+                        '</div>' +
                     <?php } ?>
-                    '</div>'),
+                        '</div>'),
                     node.x, node.y, node.width, node.height, node.autoposition, null, null, null, null, node.id);
             };
 
@@ -436,7 +434,7 @@ if (is_array($dashboard))
 
                 request.success(function (json) {
                     if (json.status === 'ok') {
-                        window.setTimeout(window.location.href = '<?php echo generate_url(array('page' => 'dashboard')); ?>', 5000);
+                        window.setTimeout(window.location.href = '<?php echo generate_url(['page' => 'dashboard']); ?>', 5000);
                     }
                 });
             };
@@ -543,7 +541,7 @@ if (is_array($dashboard))
         });
 
 
-        new ResizeSensor(jQuery('#main_container'), function(){
+        new ResizeSensor(jQuery('#main_container'), function () {
             //refreshAllUpdatableImages();
             //refreshAllUpdatableWidgets();
             refreshAllWidgets();
@@ -551,9 +549,9 @@ if (is_array($dashboard))
 
     </script>
 
-  <?php
+    <?php
 // print_vars($widgets);
-  ?>
+    ?>
 
     <style>
 
@@ -584,34 +582,36 @@ if (is_array($dashboard))
         }
 
         .grid-stack tr {
-            white-space: nowrap; overflow: hidden; text-overflow:ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* Fix Z-index breaking dropdowns inside widgets*/
-        .grid-stack > .grid-stack-item > .grid-stack-item-content
-        {
-            z-index: unset!important;
-        }
-/*
-        .box-content::-webkit-scrollbar-track
-        {
-            background-color: #F5F5F5;
+        .grid-stack > .grid-stack-item > .grid-stack-item-content {
+            z-index: unset !important;
         }
 
-        .box-content::-webkit-scrollbar
-        {
-            width: 10px;
-            height: 10px;
-            background-color: #c5c5c5;
-        }
+        /*
+                .box-content::-webkit-scrollbar-track
+                {
+                    background-color: #F5F5F5;
+                }
 
-        .box-content::-webkit-scrollbar-thumb
-        {
-            border-radius: 10px;
-            background-color: #d5d5d5;
-            border: 2px solid #F5F5F5;
-        }
-*/
+                .box-content::-webkit-scrollbar
+                {
+                    width: 10px;
+                    height: 10px;
+                    background-color: #c5c5c5;
+                }
+
+                .box-content::-webkit-scrollbar-thumb
+                {
+                    border-radius: 10px;
+                    background-color: #d5d5d5;
+                    border: 2px solid #F5F5F5;
+                }
+        */
 
 
     </style>
@@ -640,25 +640,24 @@ if (is_array($dashboard))
     </div>
     <!-- /.modal -->
 
-  <?php
+    <?php
 
-  if ($_SESSION['userlevel'] > 7) {
-    if (isset($vars['edit'])) {
-      $url = generate_url($vars, array('edit' => NULL));
-      $text = "Enable Editing Mode";
-    } else {
-      $url = generate_url($vars, array('edit' => 'yes'));
-      $text = "Disable Editing Mode";
+    if ($_SESSION['userlevel'] > 7) {
+        if (isset($vars['edit'])) {
+            $url  = generate_url($vars, ['edit' => NULL]);
+            $text = "Enable Editing Mode";
+        } else {
+            $url  = generate_url($vars, ['edit' => 'yes']);
+            $text = "Disable Editing Mode";
+        }
+
+        $footer_entry     = '<li><a href="' . $url . '"><i class="sprite-sliders"></i></a></li>';
+        $footer_entries[] = $footer_entry;
     }
-
-    $footer_entry = '<li><a href="' .$url. '"><i class="sprite-sliders"></i></a></li>';
-    $footer_entries[] = $footer_entry;
-  }
-
 
 
 } else {
-  print_error('Dashboard does not exist!');
+    print_error('Dashboard does not exist!');
 }
 
 // EOF

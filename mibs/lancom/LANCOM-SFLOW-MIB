@@ -1,0 +1,313 @@
+LANCOM-SFLOW-MIB DEFINITIONS ::= BEGIN
+
+-- Broadcom FastPath SFLOW MIB
+-- Copyright 2016-2020 Broadcom.
+-- This SNMP Management Information Specification
+-- embodies Broadcom's confidential and proprietary
+-- intellectual property. Broadcom retains all title
+-- and ownership in the Specification including any revisions.
+
+-- This Specification is supplied "AS IS", Broadcom 
+-- makes no warranty, either expressed or implied,
+-- as to the use, operation, condition, or performance of the
+-- Specification.
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Integer32                           FROM SNMPv2-SMI
+    fastPath                            FROM LANCOM-REF-MIB
+    TEXTUAL-CONVENTION                  FROM SNMPv2-TC
+    SnmpAdminString                     FROM SNMP-FRAMEWORK-MIB
+    InetAddressType, InetAddress        FROM INET-ADDRESS-MIB
+    InterfaceIndexOrZero                FROM IF-MIB
+    MODULE-COMPLIANCE, OBJECT-GROUP     FROM SNMPv2-CONF
+    SFlowDataSource                     FROM SFLOW-MIB
+    SFlowInstance                       FROM SFLOW-MIB;
+
+    fastPathSflow                MODULE-IDENTITY
+        LAST-UPDATED "201201120000Z" -- 12 Jan 2012 12:00:00 GMT
+        ORGANIZATION "Broadcom "
+        CONTACT-INFO
+          "                      Customer Support
+          Postal:                Broadcom 
+                                 1030 Swabia Court
+                                 Suite 400
+                                 Durham, NC 27703
+          Tel:                   +1 919 865 2700"
+        DESCRIPTION
+          "The Broadcom Private MIB for FastPath SFLOW"
+
+        -- Revision history.  
+        REVISION
+          "201708110000Z" -- 11 Aug 2017 12:00:00 GMT
+        DESCRIPTION
+          "Added new object agentSflowRemoteAgentSourceInterface."
+
+    ::= { fastPath 59 }
+
+    --***********************************************************************
+    -- MIB Objects
+    --***********************************************************************
+
+
+    agentFastPathSflowObjects  OBJECT IDENTIFIER  ::= { fastPathSflow 1 }
+
+      AgentSflowRemoteAgentReceiver ::= TEXTUAL-CONVENTION
+              STATUS       current
+              DESCRIPTION
+                "Identify the sFlow receiver associated with this resource.
+
+                 A value of zero indicates that this resource is available.
+                 If non-zero the value must correspond to a valid, active
+                 sFlowRcvrIndex.
+
+                 If the value is currently zero it may be set to any
+                 active entry in the sFlowRcvrTable. If the value is
+                 not zero then a set to anything other than zero or
+                 its current value will result in an SNMP error (bad value)."
+              SYNTAX       Integer32
+
+
+
+    --**************************************************************************************
+    --
+    -- agentSflowSourceInterface
+    --
+    --**************************************************************************************
+  agentSflowSourceInterface OBJECT-TYPE
+         SYNTAX      InterfaceIndexOrZero
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+              "A source-interface selection on an Interface Index (like vlan based
+              routing interface, port based routing interface, loopback interface,
+              tunnel interface). A non-zero value indicates ifIndex for the
+              corresponding interface entry in the ifTable is selected.
+              A zero value indicates source-interface is un-configured."
+         ::= { agentFastPathSflowObjects 1 }
+
+   agentSflowServicePortSrcInterface OBJECT-TYPE
+       SYNTAX  INTEGER { servicePortEnable(1),
+                         servicePortDisable(2) }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "To select Service Port as a source-interface."
+       ::= { agentFastPathSflowObjects 2 }
+
+    --**************************************************************************************
+    --
+    -- Remote Agent Table
+    --
+    --**************************************************************************************
+
+    agentSflowRemoteAgentTable OBJECT-TYPE
+            SYNTAX      SEQUENCE OF AgentSflowRemoteAgentEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "A table of the receivers of sFlow information."
+            ::= { agentFastPathSflowObjects 3 }
+
+    agentSflowRemoteAgentEntry OBJECT-TYPE
+            SYNTAX      AgentSflowRemoteAgentEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "Attributes of an sFlow Remote Agent Receiver."
+            INDEX { agentSflowRemoteAgentIndex }
+              ::= { agentSflowRemoteAgentTable 1 }
+
+    AgentSflowRemoteAgentEntry ::= SEQUENCE {
+            agentSflowRemoteAgentIndex                    Integer32,
+            agentSflowRemoteAgentMonitorSession           Integer32,
+            agentSflowRemoteAgentMonitorSessionDestPort   InterfaceIndexOrZero,
+            agentSflowRemoteAgentAddressType              InetAddressType,
+            agentSflowRemoteAgentAddress                  InetAddress,
+            agentSflowRemoteAgentUdpPort                  Integer32
+    }
+
+    agentSflowRemoteAgentIndex OBJECT-TYPE
+            SYNTAX      Integer32 (1..65535)
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "Index into agentSflowRemoteAgentTable."
+            ::= { agentSflowRemoteAgentEntry 1 }
+
+    agentSflowRemoteAgentMonitorSession OBJECT-TYPE
+            SYNTAX      Integer32 (0..65535)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+             "The destination port for sFlow encapsulated datagrams sent to Remote Agent."
+            DEFVAL { 0 }
+            ::= { agentSflowRemoteAgentEntry 2 }
+
+    agentSflowRemoteAgentMonitorSessionDestPort OBJECT-TYPE
+            SYNTAX      InterfaceIndexOrZero 
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+             "The destination port for sFlow encapsulated datagrams sent to Remote Agent."
+            ::= { agentSflowRemoteAgentEntry 3 }
+
+    agentSflowRemoteAgentAddressType OBJECT-TYPE
+            SYNTAX      InetAddressType
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "The type of agentSflowRemoteAgentAddress. Currently ipv4 only suported."
+            DEFVAL { ipv4 }
+            ::= { agentSflowRemoteAgentEntry 4 }
+
+    agentSflowRemoteAgentAddress OBJECT-TYPE
+            SYNTAX      InetAddress
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "The IPv4 address of the sFlow Remote Agent.
+               If set to 0.0.0.0,  no sFlow datagrams will be sent to Remote Agent."
+            DEFVAL { '00000000'h }  -- 0.0.0.0
+            ::= { agentSflowRemoteAgentEntry 5 }
+
+    agentSflowRemoteAgentUdpPort OBJECT-TYPE
+            SYNTAX      Integer32
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+             "The destination port for sFlow encapsulated datagrams sent to Remote Agent."
+            DEFVAL { 16343 }
+            ::= { agentSflowRemoteAgentEntry 6 }
+
+    --**************************************************************************************
+    --
+    -- Flow Remote Agent Sampling Table 
+    --
+    --**************************************************************************************
+
+    agentSflowFsRemoteAgentTable OBJECT-TYPE
+            SYNTAX      SEQUENCE OF AgentSflowFsRemoteAgentEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "A table of the flow samplers within a device."
+            ::= { agentFastPathSflowObjects 4 }
+
+    agentSflowFsRemoteAgentEntry OBJECT-TYPE
+            SYNTAX      AgentSflowFsRemoteAgentEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "Attributes of a Remote Agent flow sampler."
+            INDEX { agentSflowFsRemoteAgentDataSource, agentSflowFsRemoteAgentInstance }
+            ::= { agentSflowFsRemoteAgentTable 1 }
+
+    AgentSflowFsRemoteAgentEntry ::= SEQUENCE {
+            agentSflowFsRemoteAgentDataSource                     SFlowDataSource,
+            agentSflowFsRemoteAgentInstance                       SFlowInstance,
+            agentSflowFsRemoteAgentReceiver                       AgentSflowRemoteAgentReceiver,
+            agentSflowFsRemoteAgentPacketIngressSamplingRate      Integer32,
+            agentSflowFsRemoteAgentPacketEgressSamplingRate       Integer32,
+            agentSflowFsRemoteAgentPacketFlowBasedSamplingRate    Integer32
+    }
+
+    agentSflowFsRemoteAgentDataSource OBJECT-TYPE
+            SYNTAX      SFlowDataSource
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "sFlowDataSource for this hardware flow sampler."
+            ::= { agentSflowFsRemoteAgentEntry 1 }
+
+    agentSflowFsRemoteAgentInstance OBJECT-TYPE
+            SYNTAX      SFlowInstance
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION
+              "The sFlow instance for this hardware flow sampler."
+            ::= { agentSflowFsRemoteAgentEntry 2 }
+
+    agentSflowFsRemoteAgentReceiver OBJECT-TYPE
+            SYNTAX      AgentSflowRemoteAgentReceiver
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "The SFlowRemoteAgentReceiver for this hardware flow sampler."
+            DEFVAL { 0 }
+            ::= { agentSflowFsRemoteAgentEntry 3 }
+
+    agentSflowFsRemoteAgentPacketIngressSamplingRate OBJECT-TYPE
+            SYNTAX      Integer32
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "The statistical sampling rate for packet sampling from this
+               source.
+
+               Set to N to sample 1/Nth of the packets in the monitored flows.
+               An agent should choose its own algorithm to introduce variance
+               into the sampling so that exactly every Nth packet is not
+               counted. A sampling rate of 1 counts all packets. A sampling
+               rate of 0 disables sampling.
+
+               The agent is permitted to have minimum and maximum allowable
+               values for the sampling rate. A minimum rate lets the agent
+               designer set an upper bound on the overhead associated with
+               sampling, and a maximum rate may be the result of hardware
+               restrictions (such as counter size). In addition not all values
+               between the maximum and minimum may be realizable as the
+               sampling rate (again because of implementation considerations).
+
+               When the sampling rate is set the agent is free to adjust the
+               value so that it lies between the maximum and minimum values
+               and has the closest achievable value.
+
+               When read, the agent must return the actual sampling rate it
+               will be using (after the adjustments previously described). The
+               sampling algorithm must converge so that over time the number
+               of packets sampled approaches 1/Nth of the total number of
+               packets in the monitored flows."
+            DEFVAL { 0 }
+            ::= { agentSflowFsRemoteAgentEntry 4 }
+
+    agentSflowFsRemoteAgentPacketEgressSamplingRate OBJECT-TYPE
+            SYNTAX      Integer32
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "The statistical Egress sampling rate for packet sampling from this
+               source."
+
+            DEFVAL { 0 }
+            ::= { agentSflowFsRemoteAgentEntry 5 }
+
+    agentSflowFsRemoteAgentPacketFlowBasedSamplingRate OBJECT-TYPE
+            SYNTAX      Integer32
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "The statistical Flow based sampling rate for packet sampling from this
+               source."
+
+            DEFVAL { 0 }
+            ::= { agentSflowFsRemoteAgentEntry 6 }
+
+    --**************************************************************************************
+    --
+    -- agentSflowRemoteAgentSourceInterface
+    --
+    --**************************************************************************************
+  agentSflowRemoteAgentSourceInterface OBJECT-TYPE
+         SYNTAX      InterfaceIndexOrZero
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+              "A sFlow remote agent source-interface selection on an Interface Index
+               (like vlan based routing interface, port based routing interface, 
+               loopback interface, tunnel interface). A non-zero value indicates 
+               ifIndex for the corresponding interface entry in the ifTable is selected.
+               A zero value indicates source-interface is un-configured."
+         ::= { agentFastPathSflowObjects 5 }
+
+END

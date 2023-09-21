@@ -241,7 +241,9 @@ TLagConfigEntry                  ::= SEQUENCE
     tLagAccessBandwidthHigh          Unsigned32,
     tLagHashWeightThreshold          Integer32,
     tLagHashWeightThresholdAction    INTEGER,
-    tLagHashWeightThresholdStaticCst Unsigned32
+    tLagHashWeightThresholdStaticCst Unsigned32,
+    tLagAdaptiveLb                   TruthValue,
+    tLagAdaptiveLbTolerance          Unsigned32
 }
 
 tLagIndex                        OBJECT-TYPE
@@ -1058,6 +1060,28 @@ tLagHashWeightThresholdStaticCst OBJECT-TYPE
     DEFVAL      { 0 }
     ::= { tLagConfigEntry 48 }
 
+tLagAdaptiveLb                   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tLagAdaptiveLb specifies if the system applies
+         adaptive load balancing to the member ports of this LAG."
+    DEFVAL      { false }
+    ::= { tLagConfigEntry 49 }
+
+tLagAdaptiveLbTolerance          OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tLagAdaptiveLbTolerance specifies the allowed difference
+         between the highest member port load and the lowest. The value is only
+         relevant while tLagAdaptiveLb is equal to 'true'."
+    DEFVAL      { 20 }
+    ::= { tLagConfigEntry 50 }
+
 tLagOperationTable               OBJECT-TYPE
     SYNTAX      SEQUENCE OF TLagOperationEntry
     MAX-ACCESS  not-accessible
@@ -1087,7 +1111,9 @@ TLagOperationEntry               ::= SEQUENCE
     tLagSelectedSubGroup             Integer32,
     tLagCandidateSubGroup            Integer32,
     tLagRemainingHoldTime            Unsigned32,
-    tLagPortWeightUp                 Gauge32
+    tLagPortWeightUp                 Gauge32,
+    tLagAdaptiveLbVariation          Unsigned32,
+    tLagAdaptiveLbChanged            Counter32
 }
 
 tLagIfIndex                      OBJECT-TYPE
@@ -1220,6 +1246,27 @@ tLagPortWeightUp                 OBJECT-TYPE
          configured weight or hash-weight threshold."
     ::= { tLagOperationEntry 10 }
 
+tLagAdaptiveLbVariation          OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tLagAdaptiveLbVariation indicates the actual difference
+         between the highest member port load and the lowest. The value is only
+         relevant while tLagAdaptiveLb is equal to 'true'."
+    ::= { tLagOperationEntry 11 }
+
+tLagAdaptiveLbChanged            OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tLagAdaptiveLbChanged indicates the number of times a
+         load balancing change event tLagAdaptiveLoadbalancingChanged occurred
+         for this LAG."
+    ::= { tLagOperationEntry 12 }
+
 tLagNotificationObjects          OBJECT IDENTIFIER ::= { tLagObjects 4 }
 
 tLagNotifyPortAddFailReason      OBJECT-TYPE
@@ -1350,7 +1397,8 @@ TLagPortEntry                    ::= SEQUENCE
     tLagPortActiveStdby              INTEGER,
     tLagPortHashWeight               Integer32,
     tLagPortOperHashWeight           Integer32,
-    tLagPortFlowShare                Unsigned32
+    tLagPortFlowShare                Unsigned32,
+    tLagPortAdaptiveLbEgressRate     Counter64
 }
 
 tLagPortSubgroup                 OBJECT-TYPE
@@ -1415,6 +1463,20 @@ tLagPortFlowShare                OBJECT-TYPE
          tLagPortOperHashWeight and  TIMETRA-PORT-MIB::tmnxPortState of all
          ports in the LAG."
     ::= { tLagPortEntry 5 }
+
+tLagPortAdaptiveLbEgressRate     OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "kilobps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tLagPortAdaptiveLbEgressRate indicates the egress traffic
+         rate on this LAG port when adaptive load balancing is enabled on the
+         LAG.
+
+         When adaptive load balancing is disabled on the LAG, the value has no
+         meaning."
+    ::= { tLagPortEntry 6 }
 
 tLagLinkMapProfileTableLastChgd  OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -2425,7 +2487,9 @@ tmnxLagV20v0Compliance           MODULE-COMPLIANCE
             tmnxLagV13v0Group,
             tmnxLagAccessV14v0Group,
             tmnxLagV16v0Group,
-            tmnxLagV19v0Group
+            tmnxLagV19v0Group,
+            tmnxLagV20v0Group,
+            tmnxLagV20v0NotifGroup
         }
     ::= { tmnxLagCompliances 20 }
 
@@ -2893,6 +2957,30 @@ tmnxLagV19v0Group                OBJECT-GROUP
          on Nokia SROS series systems added in release 19.0."
     ::= { tmnxLagGroups 31 }
 
+tmnxLagV20v0Group                OBJECT-GROUP
+    OBJECTS     {
+        tLagAdaptiveLb,
+        tLagAdaptiveLbTolerance,
+        tLagAdaptiveLbVariation,
+        tLagAdaptiveLbChanged,
+        tLagPortAdaptiveLbEgressRate
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of Link Aggregation (LAG)
+         on Nokia SROS series systems added in release 20."
+    ::= { tmnxLagGroups 32 }
+
+tmnxLagV20v0NotifGroup           NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        tLagAdaptiveLoadbalancingChanged
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications added in release 20 of Nokia SROS series
+         systems."
+    ::= { tmnxLagGroups 33 }
+
 tmnxLagDCCompliances             OBJECT IDENTIFIER ::= { tmnxLagConformance 3 }
 
 tmnxLagDCGroups                  OBJECT IDENTIFIER ::= { tmnxLagConformance 4 }
@@ -3001,5 +3089,22 @@ tmnxLagBfdMemStateChanged        NOTIFICATION-TYPE
          [RECOVERY] The recovery action will depend on the actual cause as
          specified in the tLagNotifyAdditionalInfo."
     ::= { tLagNotifications 8 }
+
+tLagAdaptiveLoadbalancingChanged NOTIFICATION-TYPE
+    OBJECTS     {
+        tLagRowStatus,
+        tLagNotifyAdditionalInfo
+    }
+    STATUS      current
+    DESCRIPTION
+        "[CAUSE] The tLagAdaptiveLoadbalancingChanged is sent when the
+         re-balancing algorithm modifies the LAG hash bucket allocation.
+
+         [EFFECT] A better loadbalancing of the egress traffic on the active
+         lag members.
+
+
+         [RECOVERY] No special recovery action is necessary."
+    ::= { tLagNotifications 9 }
 
 END

@@ -9,6 +9,10 @@ $config['install_dir'] = $base_dir;
 // Base observium includes
 include(__DIR__ . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
+include(__DIR__ . "/../includes/polyfill.inc.php");
+include(__DIR__ . "/../includes/autoloader.inc.php");
+include(__DIR__ . "/../includes/debugging.inc.php");
+require_once(__DIR__ ."/../includes/constants.inc.php");
 include(__DIR__ . '/../includes/common.inc.php');
 include(__DIR__ . '/../includes/definitions.inc.php');
 include(__DIR__ . '/data/test_definitions.inc.php'); // Fake definitions for testing
@@ -60,7 +64,7 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
 
   public function providerRewriteEntityNameCsv()
   {
-    return new CsvFileIterator(dirname(__FILE__) . '/data/providerRewriteEntityName.csv');
+    return new CsvFileIterator(__DIR__ . '/data/providerRewriteEntityName.csv');
   }
 
   /**
@@ -215,6 +219,7 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('rus',                'Russian Federation'),
       array('Russian Federation', 'Russian Federation'),
       array('russia',             'Russian Federation'),
+      array('South Korea',        'South Korea'),
     );
   }
 
@@ -222,10 +227,10 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerRewriteDefinitionHardware
    * @group hardware
    */
-  public function testRewriteDefinitionHardware($os, $id, $result)
+  public function testGetModelParam($os, $id, $result)
   {
     $device = array('os' => $os, 'sysObjectID' => $id);
-    $this->assertEquals($result, rewrite_definition_hardware($device));
+    $this->assertEquals($result, get_model_param($device, 'hardware'));
   }
 
   public function providerRewriteDefinitionHardware()
@@ -557,6 +562,11 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
       array('vrp',          array('ifDescr' => 'XGigabitEthernet5/0/14', 'ifName' => 'XGigabitEthernet5/0/14', 'ifAlias' => ''),
                             array('port_label' => 'XGigabitEthernet5/0/14', 'port_label_num' => '5/0/14', 'port_label_base' => 'XGigabitEthernet', 'port_label_short' => 'XGi5/0/14')),
 
+      array('hh3c',         array('ifDescr' => 'Ten-GigabitEthernet2/0/25', 'ifName' => 'Ten-GigabitEthernet2/0/25', 'ifAlias' => 'Ten-GigabitEthernet2/0/25 Interface'),
+                            array('port_label' => 'Ten-GigabitEthernet2/0/25', 'port_label_num' => '2/0/25', 'port_label_base' => 'Ten-GigabitEthernet', 'port_label_short' => 'Te2/0/25')),
+      array('hh3c',         array('ifDescr' => 'Vlan-interface1504', 'ifName' => 'Vlan-interface1504', 'ifAlias' => ''),
+                            array('port_label' => 'Vlan-interface1504', 'port_label_num' => '1504', 'port_label_base' => 'Vlan-interface', 'port_label_short' => 'Vlan1504')),
+
       array('routeros',     array('ifDescr' => 'Core: sfp-sfpplus1- Trunk to 6509', 'ifName' => 'Core: sfp-sfpplus1- Trunk to 6509', 'ifAlias' => ''),
                             array('port_label' => 'Core: sfp-sfpplus1- Trunk to 6509', 'port_label_num' => '', 'port_label_base' => 'Core: sfp-sfpplus1- Trunk to 6509', 'port_label_short' => 'Core: sfp-sfpplus1- Trunk to 6509')),
 
@@ -566,6 +576,15 @@ class IncludesRewritesTest extends \PHPUnit\Framework\TestCase
                             array('port_label' => 'eth0', 'port_label_num' => '0', 'port_label_base' => 'eth', 'port_label_short' => 'eth0')),
       array('linux',        array('ifDescr' => 'eth0.101', 'ifName' => 'eth0.101', 'ifAlias' => ''),
                             array('port_label' => 'eth0.101', 'port_label_num' => '0.101', 'port_label_base' => 'eth', 'port_label_short' => 'eth0.101')),
+
+      [ 'pve',              [ 'ifDescr' => 'veth101i0', 'ifName' => 'veth101i0', 'ifAlias' => '' ],
+                            [ 'port_label' => 'veth101i0', 'port_label_num' => '101i0', 'port_label_base' => 'veth', 'port_label_short' => 'veth101i0' ] ],
+      [ 'openbsd',          [ 'ifDescr' => 'vether1', 'ifName' => 'vether1', 'ifAlias' => '' ],
+                            [ 'port_label' => 'vether1', 'port_label_num' => '1', 'port_label_base' => 'vether', 'port_label_short' => 'vether1' ] ],
+      [ 'generic',          [ 'ifDescr' => 'veth1bbfdc5', 'ifName' => 'veth1bbfdc5', 'ifAlias' => '' ],
+                            [ 'port_label' => 'veth1bbfdc5', 'port_label_num' => '1bbfdc5', 'port_label_base' => 'veth', 'port_label_short' => 'veth1bbfdc5' ] ],
+      [ 'generic',          [ 'ifDescr' => 'vethfd3fe3c0', 'ifName' => 'vethfd3fe3c0', 'ifAlias' => '' ],
+                            [ 'port_label' => 'vethfd3fe3c0', 'port_label_num' => 'fd3fe3c0', 'port_label_base' => 'veth', 'port_label_short' => 'vethfd3fe3c0' ] ],
 
       // port_label os definitions
       array('vmware',       array('ifDescr' => 'Device vmnic7 at 08:00.1 bnx2', 'ifName' => '', 'ifAlias' => ''),

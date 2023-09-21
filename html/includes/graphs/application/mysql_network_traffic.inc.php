@@ -5,26 +5,25 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$mysql_rrd = get_rrd_path($device, "app-mysql-".$app['app_id'].".rrd");
+$mysql_rrd = get_rrd_path($device, "app-mysql-" . $app['app_id'] . ".rrd");
 
-if (rrd_is_file($mysql_rrd))
-{
-  $rrd_filename = $mysql_rrd;
+if (rrd_is_file($mysql_rrd)) {
+    $rrd_filename = $mysql_rrd;
 }
 
 $multiplier = 8;
 
-$ds_in = "BRd";
+$ds_in  = "BRd";
 $ds_out = "BSt";
 
-include($config['html_dir']."/includes/graphs/generic_data.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_data.inc.php");
 
 // EOF

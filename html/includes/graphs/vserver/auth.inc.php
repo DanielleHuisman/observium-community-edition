@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,25 +6,25 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (is_numeric($vars['id']))
-{
-#  $auth= TRUE;
-  $vserver = dbFetchRow("SELECT * FROM `lb_slb_vsvrs` AS WHERE `classmap_id` = ?", array($vars['id']));
+if (!is_intnum($vars['id'])) {
+    return;
+}
 
-  if (is_numeric($vserver['device_id']) && ($auth || device_permitted($vserver['device_id'])))
-  {
+$vserver = dbFetchRow("SELECT * FROM `lb_slb_vsvrs` AS WHERE `classmap_id` = ?", [$vars['id']]);
+
+if (is_numeric($vserver['device_id']) && ($auth || device_permitted($vserver['device_id']))) {
     $device = device_by_id_cache($vserver['device_id']);
 
-    $rrd_filename = get_rrd_path($device, "vserver-".$vserver['classmap_index'].".rrd");
+    $rrd_filename = get_rrd_path($device, "vserver-" . $vserver['classmap_index'] . ".rrd");
 
-    $title  = generate_device_link($device);
-    $title .= " :: Serverfarm :: " . escape_html($vserver['classmap']);
-    $auth = TRUE;
-  }
+    $auth  = TRUE;
+
+    $graph_title   = device_name($device, TRUE);
+    $graph_title   .= " :: Serverfarm :: " . $vserver['classmap'];
 }
 
 // EOF

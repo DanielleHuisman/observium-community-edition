@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -43,28 +43,26 @@
 #CISCO-REMOTE-ACCESS-MONITOR-MIB::crasWebvpnPeakConcurrentSessions.0 = Gauge32: 9 Sessions
 
 // FIXME. Candidate for migrate to graphs module with table_collect()
-if (is_device_mib($device, 'CISCO-REMOTE-ACCESS-MONITOR-MIB'))
-{
-  $oid_list = "crasEmailNumSessions.0 crasIPSecNumSessions.0 crasL2LNumSessions.0 crasLBNumSessions.0 crasSVCNumSessions.0 crasWebvpnNumSessions.0";
-  $data = snmp_get_multi_oid($device, $oid_list, array(), "CISCO-REMOTE-ACCESS-MONITOR-MIB");
-  $data = $data[0];
+if (is_device_mib($device, 'CISCO-REMOTE-ACCESS-MONITOR-MIB')) {
+    $oid_list = "crasEmailNumSessions.0 crasIPSecNumSessions.0 crasL2LNumSessions.0 crasLBNumSessions.0 crasSVCNumSessions.0 crasWebvpnNumSessions.0";
+    $data     = snmp_get_multi_oid($device, $oid_list, [], "CISCO-REMOTE-ACCESS-MONITOR-MIB");
+    $data     = $data[0];
 
-  if ($data['crasEmailNumSessions'] || $data['crasIPSecNumSessions'] || $data['crasL2LNumSessions'] || $data['crasLBNumSessions'] || $data['crasSVCNumSessions'] || $data['crasWebvpnSessions'])
-  {
-    rrdtool_update_ng($device, 'cisco-cras-sessions', array(
-      'email'  => $data['crasEmailNumSessions'],
-      'ipsec'  => $data['crasIPSecNumSessions'],
-      'l2l'    => $data['crasL2LNumSessions'],
-      'lb'     => $data['crasLBNumSessions'],
-      'svc'    => $data['crasSVCNumSessions'],
-      'webvpn' => $data['crasWebvpnNumSessions'],
-    ));
-    
-    $graphs['cras_sessions'] = TRUE;
-    echo(" CRAS Sessions");
-  }
+    if ($data['crasEmailNumSessions'] || $data['crasIPSecNumSessions'] || $data['crasL2LNumSessions'] || $data['crasLBNumSessions'] || $data['crasSVCNumSessions'] || $data['crasWebvpnSessions']) {
+        rrdtool_update_ng($device, 'cisco-cras-sessions', [
+          'email'  => $data['crasEmailNumSessions'],
+          'ipsec'  => $data['crasIPSecNumSessions'],
+          'l2l'    => $data['crasL2LNumSessions'],
+          'lb'     => $data['crasLBNumSessions'],
+          'svc'    => $data['crasSVCNumSessions'],
+          'webvpn' => $data['crasWebvpnNumSessions'],
+        ]);
 
-  unset($data);
+        $graphs['cras_sessions'] = TRUE;
+        echo(" CRAS Sessions");
+    }
+
+    unset($data);
 }
 
 // EOF

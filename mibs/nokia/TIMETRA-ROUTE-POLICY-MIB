@@ -212,6 +212,7 @@ TCommunityMember                 ::= TEXTUAL-CONVENTION
             - ext:[4300]:[0..2]
             - flowspec-set:[0..4294967295]:[0..16383]
             - flowspec-set-trans:[0..4294967295]:[0..16383]
+            - ipv6-redirect:<ipv6-addr>
             - color:<co-bits>:<color-value>
                 co-bits - 00, 01, 10 or 11
                 color-value - [0..4294967295]
@@ -393,7 +394,10 @@ TRoutePolicyProtocol             ::= TEXTUAL-CONVENTION
         directInterface (32),
         arpNd           (33),
         ribApi          (34),
-        reserved36      (36)
+        ndRa            (35),
+        reserved36      (36),
+        evpnIfl         (37),
+        evpnIff         (38)
     }
 
 TRoutePolicyProtocolBits         ::= TEXTUAL-CONVENTION
@@ -437,7 +441,10 @@ TRoutePolicyProtocolBits         ::= TEXTUAL-CONVENTION
         directInterface (32),
         arpNd           (33),
         ribApi          (34),
-        reserved35      (35)
+        ndRa            (35),
+        reserved36      (36),
+        evpnIfl         (37),
+        evpnIff         (38)
     }
 
 TOspfRouteType                   ::= TEXTUAL-CONVENTION
@@ -651,7 +658,11 @@ TPolicyEntryCriteriaEvpnType     ::= TEXTUAL-CONVENTION
 
          ipPrefix(5) - IP Prefix
 
-         selectiveMulticast(6) - Selective Multicast Ethernet Tag (SMET)."
+         selectiveMulticast(6) - Selective Multicast Ethernet Tag (SMET)
+
+         multicastJoinSync(7) - Multicast Join Sync
+
+         multicastLeaveSync(8) - Multicast Leave Sync"
     SYNTAX      INTEGER {
         none                  (0),
         ethernetAutoDiscovery (1),
@@ -659,7 +670,9 @@ TPolicyEntryCriteriaEvpnType     ::= TEXTUAL-CONVENTION
         inclusiveMulticast    (3),
         ethernetSegment       (4),
         ipPrefix              (5),
-        selectiveMulticast    (6)
+        selectiveMulticast    (6),
+        multicastJoinSync     (7),
+        multicastLeaveSync    (8)
     }
 
 TPolicyVariableName              ::= TEXTUAL-CONVENTION
@@ -815,8 +828,11 @@ TPolicyAddPathSendLimit          ::= TEXTUAL-CONVENTION
     STATUS      current
     DESCRIPTION
         "TPolicyAddPathSendLimit specifies the maximum number of paths that can
-         be advertised to ADD-PATH peers per prefix."
-    SYNTAX      Integer32 (0..16)
+         be advertised to ADD-PATH peers per prefix.
+
+         The value -1 indicates that BGP must send exactly the number of best
+         multipaths it has for each NLRI."
+    SYNTAX      Integer32 (-1 | 0..16)
 
 TPolicyAdminTagPolicyOrVarName   ::= TEXTUAL-CONVENTION
     STATUS      current
@@ -1271,10 +1287,12 @@ tRPOperPrefixListRowStatus       OBJECT-TYPE
 
 tRPOperPrefixListType            OBJECT-TYPE
     SYNTAX      INTEGER {
-        exact   (1),
-        longer  (2),
-        through (3),
-        range   (4)
+        exact       (1),
+        longer      (2),
+        through     (3),
+        range       (4),
+        to          (5),
+        addressMask (6)
     }
     MAX-ACCESS  not-accessible
     STATUS      current
@@ -1297,7 +1315,17 @@ tRPOperPrefixListType            OBJECT-TYPE
          have a length that is greater than or equal to the length defined by
          tRPOperPrefixListBeginLength and less than or equal to the length
          defined by tRPOperPrefixListThroughLength in order for an entry to be
-         considered a match."
+         considered a match.
+
+         to (5) - a route's prefix/length must match the condition  from a
+         start prefix/length to an end prefix/length. The  end prefix/length is
+         indicated in the corresponding entry in  the tRPOperPfxListToTable.
+
+         addressMask (6) - a route's prefix/length must match the prefix length
+         of the prefix-list entry and the bitwise logical AND of the route
+         address and the mask must match the bitwise  logical AND from the
+         prefix-list address and the mask. The  address mask must be specified
+         in a corresponding entry in the tRPOperPfxListAddressMaskTable."
     ::= { tRPOperPrefixListEntry 5 }
 
 tRPOperPrefixListThroughLength   OBJECT-TYPE
@@ -3372,10 +3400,12 @@ tRPOperInetPrefixListPrefixLen   OBJECT-TYPE
 
 tRPOperInetPrefixListType        OBJECT-TYPE
     SYNTAX      INTEGER {
-        exact   (1),
-        longer  (2),
-        through (3),
-        range   (4)
+        exact       (1),
+        longer      (2),
+        through     (3),
+        range       (4),
+        to          (5),
+        addressMask (6)
     }
     MAX-ACCESS  not-accessible
     STATUS      current
@@ -3399,7 +3429,17 @@ tRPOperInetPrefixListType        OBJECT-TYPE
          have a length that is greater than or equal to the length defined by
          tRPOperInetPrefixListBeginLen and less than or equal to the length
          defined by tRPOperInetPrefixListThroughLen in order for an entry to be
-         considered a match."
+         considered a match.
+
+         to (5) - a route's prefix/length must match the condition  from a
+         start prefix/length to an end prefix/length. The  end prefix/length is
+         indicated in the corresponding entry in  the tRPOperPfxListToTable.
+
+         addressMask (6) - a route's prefix/length must match the prefix length
+         of the prefix-list entry and the bitwise logical AND of the route
+         address and the mask must match the bitwise  logical AND from the
+         prefix-list address and the mask. The  address mask must be specified
+         in a corresponding entry in the tRPOperPfxListAddressMaskTable."
     ::= { tRPOperInetPrefixListEntry 5 }
 
 tRPOperInetPrefixListRowStatus   OBJECT-TYPE
@@ -5677,7 +5717,12 @@ TRPOperPSFromCriteriaExtEntry    ::= SEQUENCE
     tRPOperPSFromCritNextHopAddrTyp  InetAddressType,
     tRPOperPSFromCritNextHopAddr     InetAddress,
     tRPOperPSFromCritNextHopPfxList  TPrefixListName,
-    tRPOperPSFromCritExtEvpnType     TPolicyEntryCriteriaEvpnType
+    tRPOperPSFromCritExtEvpnType     TPolicyEntryCriteriaEvpnType,
+    tRPOperPSFromCrAggrContributor   TruthValue,
+    tRPOperPSFromCrEndpointAddrTyp   InetAddressType,
+    tRPOperPSFromCrEndpointAddr      InetAddress,
+    tRPOperPSFromCritColor           TNamedItemOrEmpty,
+    tRPOperPSFromCritDistinguisher   TNamedItemOrEmpty
 }
 
 tRPOperPSFromCritExtMvpnType     OBJECT-TYPE
@@ -6069,6 +6114,68 @@ tRPOperPSFromCritExtEvpnType     OBJECT-TYPE
          type to match on."
     ::= { tRPOperPSFromCriteriaExtEntry 37 }
 
+tRPOperPSFromCrAggrContributor   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSFromCrAggrContributor indicates whether
+         aggregate contributor routes should be matched on.
+
+         When the value is 'true', only the more-specific prefixes that are
+         actually contributors are matched."
+    ::= { tRPOperPSFromCriteriaExtEntry 38 }
+
+tRPOperPSFromCrEndpointAddrTyp   OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSFromCrEndpointAddrTyp indicates the address type
+         of tRPOperPSFromCrEndpointAddr."
+    ::= { tRPOperPSFromCriteriaExtEntry 39 }
+
+tRPOperPSFromCrEndpointAddr      OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSFromCrEndpointAddr indicates the SR policy
+         endpoint IP address to match the route on.
+
+         This match criterion is only used in import policies."
+    ::= { tRPOperPSFromCriteriaExtEntry 40 }
+
+tRPOperPSFromCritColor           OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSFromCritColor indicates the SR policy color ID
+         to match the route on.
+
+         The value of this object can be a string containing the SR policy
+         color ID value in the range [0..4294967295]. An empty string means
+         that it is disabled.
+
+         This match criterion is only used in import policies."
+    ::= { tRPOperPSFromCriteriaExtEntry 41 }
+
+tRPOperPSFromCritDistinguisher   OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSFromCritDistinguisher indicates the SR policy
+         distinguisher to match the route on.
+
+         The value of this object can be a string containing the SR policy
+         distinguisher value in the range [0..4294967295]. An empty string
+         means that it is disabled.
+
+         This match criterion is only used in import policies."
+    ::= { tRPOperPSFromCriteriaExtEntry 42 }
+
 tRPOperPSPolicyVariableTable     OBJECT-TYPE
     SYNTAX      SEQUENCE OF TRPOperPSPolicyVariableEntry
     MAX-ACCESS  not-accessible
@@ -6265,7 +6372,14 @@ TRPOperPSAcptActParamsExtEntry   ::= SEQUENCE
     tRPOperPSAcptActDisableRtInstall TruthValue,
     tRPOperPSAcptActSrLabelIndex     TPolicyValueOrVarNameOrEmpty,
     tRPOperPSAcptActSrLblIndPrefIgp  TruthValue,
-    tRPOperPSAcptActNextHopPeerAddr  TruthValue
+    tRPOperPSAcptActNextHopPeerAddr  TruthValue,
+    tRPOperPSAcptActBgpHighPriority  TruthValue,
+    tRPOperPSAcptActFlexAlgo         TPolicyValueOrVarNameOrEmpty,
+    tRPOperPSAcptActBgpTunnelMetric  TPolicyValueOrVarNameOrEmpty,
+    tRPOperPSAcptActBgpTMetPrefAigp  TruthValue,
+    tRPOperPSAcptActEgressStats      TruthValue,
+    tRPOperPSAcptActIngressStats     TruthValue,
+    tRPOperPSAcptActSrMaintPolicy    TNamedItemOrEmpty
 }
 
 tRPOperPSAcptActStickyEcmp       OBJECT-TYPE
@@ -6823,6 +6937,101 @@ tRPOperPSAcptActNextHopPeerAddr  OBJECT-TYPE
          are disabled."
     ::= { tRPOperPSAcptActParamsExtEntry 38 }
 
+tRPOperPSAcptActBgpHighPriority  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActBgpHighPriority indicates whether the
+         corresponding prefix must be marked in BGP as needing high priority
+         treatment."
+    ::= { tRPOperPSAcptActParamsExtEntry 39 }
+
+tRPOperPSAcptActFlexAlgo         OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActFlexAlgo indicates the identifier of the
+         Flexible Algorithm.
+
+         The value of this object can be a string containing the Flex Algo Id
+         value in the range [128..255] or a variable name that needs to be
+         resolved to get the Flex Algo Id."
+    ::= { tRPOperPSAcptActParamsExtEntry 40 }
+
+tRPOperPSAcptActBgpTunnelMetric  OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActBgpTunnelMetric indicates the the BGP
+         Tunnel Metric value.
+
+         The value of this object can be a string containing the BGP Tunnel
+         Metric value in the range [0..4294967295] or a  variable name that
+         needs to be resolved to get the  BGP Tunnel Metric."
+    ::= { tRPOperPSAcptActParamsExtEntry 41 }
+
+tRPOperPSAcptActBgpTMetPrefAigp  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActBgpTMetPrefAigp indicates whether it is
+         preferred to use the value of the received AIGP attribute as BGP
+         Tunnel Metric.
+
+         If the value is 'true', the TTM metric is set to the value of the AIGP
+         attribute if attached.  If an AIGP metric is not attached or if the
+         value is 'false', the tRPOperPSAcptActBgpTunnelMetric is set as TTM
+         metric.
+
+         The value of this object is ignored if the object
+         tRPOperPSAcptActBgpTunnelMetric is empty."
+    ::= { tRPOperPSAcptActParamsExtEntry 42 }
+
+tRPOperPSAcptActEgressStats      OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActEgressStats indicates whether to collect
+         egress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    ::= { tRPOperPSAcptActParamsExtEntry 43 }
+
+tRPOperPSAcptActIngressStats     OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActIngressStats indicates whether to collect
+         ingress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    ::= { tRPOperPSAcptActParamsExtEntry 44 }
+
+tRPOperPSAcptActSrMaintPolicy    OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSAcptActSrMaintPolicy indicates the named segment
+         routing (SR) maintenance policy for SR policy routes.
+
+         The maintenance policy must exist in
+         TIMETRA-SR-POLICY-MIB::vRtrSrMainPlcyTable.
+
+         The value of this object can be a string containing the
+         maintenance policy or a variable name that needs to be
+         resolved to get the maintenance policy. An empty string
+         means that is disabled."
+    ::= { tRPOperPSAcptActParamsExtEntry 45 }
+
 tRPOperPSDefActParamsExtTable    OBJECT-TYPE
     SYNTAX      SEQUENCE OF TRPOperPSDefActParamsExtEntry
     MAX-ACCESS  not-accessible
@@ -6879,7 +7088,14 @@ TRPOperPSDefActParamsExtEntry    ::= SEQUENCE
     tRPOperPSDefActDisableRtInstall  TruthValue,
     tRPOperPSDefActSrLabelIndex      TPolicyValueOrVarNameOrEmpty,
     tRPOperPSDefActSrLblIndPrefIgp   TruthValue,
-    tRPOperPSDefActNextHopPeerAddr   TruthValue
+    tRPOperPSDefActNextHopPeerAddr   TruthValue,
+    tRPOperPSDefActBgpHighPriority   TruthValue,
+    tRPOperPSDefActFlexAlgo          TPolicyValueOrVarNameOrEmpty,
+    tRPOperPSDefActBgpTunnelMetric   TPolicyValueOrVarNameOrEmpty,
+    tRPOperPSDefActBgpTMetPrefAigp   TruthValue,
+    tRPOperPSDefActEgressStats       TruthValue,
+    tRPOperPSDefActIngressStats      TruthValue,
+    tRPOperPSDefActSrMaintPolicy     TNamedItemOrEmpty
 }
 
 tRPOperPSDefActStickyEcmp        OBJECT-TYPE
@@ -7439,6 +7655,101 @@ tRPOperPSDefActNextHopPeerAddr   OBJECT-TYPE
          tRPOperPSDefActNextHopSource and tRPOperPSDefActNextHopParam objects
          are disabled."
     ::= { tRPOperPSDefActParamsExtEntry 38 }
+
+tRPOperPSDefActBgpHighPriority   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActBgpHighPriority indicates whether the
+         corresponding prefix must be marked in BGP as needing high priority
+         treatment."
+    ::= { tRPOperPSDefActParamsExtEntry 39 }
+
+tRPOperPSDefActFlexAlgo          OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActFlexAlgo indicates the identifier of the
+         Flexible Algorithm.
+
+         The value of this object can be a string containing the Flex Algo Id
+         value in the range [128..255] or a variable name that needs to be
+         resolved to get the Flex Algo Id."
+    ::= { tRPOperPSDefActParamsExtEntry 40 }
+
+tRPOperPSDefActBgpTunnelMetric   OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActBgpTunnelMetric indicates the the BGP
+         Tunnel Metric value.
+
+         The value of this object can be a string containing the BGP Tunnel
+         Metric value in the range [0..4294967295] or a  variable name that
+         needs to be resolved to get the  BGP Tunnel Metric."
+    ::= { tRPOperPSDefActParamsExtEntry 41 }
+
+tRPOperPSDefActBgpTMetPrefAigp   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActBgpTMetPrefAigp indicates whether it is
+         preferred to use the value of the received AIGP attribute as BGP
+         Tunnel Metric.
+
+         If the value is 'true', the TTM metric is set to the value of the AIGP
+         attribute if attached.  If an AIGP metric is not attached or if the
+         value is 'false', the tRPOperPSDefActBgpTunnelMetric is set as TTM
+         metric.
+
+         The value of this object is ignored if the object
+         tRPOperPSDefActBgpTunnelMetric is empty."
+    ::= { tRPOperPSDefActParamsExtEntry 42 }
+
+tRPOperPSDefActEgressStats       OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActEgressStats indicates whether to collect
+         egress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    ::= { tRPOperPSDefActParamsExtEntry 43 }
+
+tRPOperPSDefActIngressStats      OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActIngressStats indicates whether to collect
+         ingress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    ::= { tRPOperPSDefActParamsExtEntry 44 }
+
+tRPOperPSDefActSrMaintPolicy     OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPSDefActSrMaintPolicy indicates the named segment
+         routing (SR) maintenance policy for SR policy routes.
+
+         The maintenance policy must exist in
+         TIMETRA-SR-POLICY-MIB::vRtrSrMainPlcyTable.
+
+         The value of this object can be a string containing the
+         maintenance policy or a variable name that needs to be
+         resolved to get the maintenance policy. An empty string
+         means that is disabled."
+    ::= { tRPOperPSDefActParamsExtEntry 45 }
 
 tRPOperPfxListNameTable          OBJECT-TYPE
     SYNTAX      SEQUENCE OF TRPOperPfxListNameEntry
@@ -8486,6 +8797,185 @@ tRPOperPSFromCritPrefixList28    OBJECT-TYPE
          disables this prefix list as a match criteria."
     ::= { tRPOperPSFromCritPfxListEntry 28 }
 
+tRPOperPfxListToTable            OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TRPOperPfxListToEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table of IPv4 and IPv6 admin prefix lists specifying a match
+         condition from a start prefix/length to an end prefix/length."
+    ::= { tRPOperValueObjects 45 }
+
+tRPOperPfxListToEntry            OBJECT-TYPE
+    SYNTAX      TRPOperPfxListToEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry in the tRPOperPfxListToEntry represents information
+         about a particular prefix list to prefix.
+
+         A route's prefix/length is considered a match if all of the
+         following are true:
+         - the start prefix-length most-significant bits of the route
+           matches the start prefix
+         - the end prefix-length most-significant bits of the route
+           matches the end prefix
+         - the prefix-length of the route is between start prefix-length and
+           end prefix-length (inclusive).
+
+         Entries are created and deleted by the user via
+         tRPAdminPfxListToTable."
+    INDEX       {
+        tRPOperPfxListName,
+        tRPOperInetPrefixListPrefixType,
+        tRPOperInetPrefixListPrefix,
+        tRPOperInetPrefixListPrefixLen,
+        tRPOperPfxListToEndPrefixType,
+        tRPOperPfxListToEndPrefix,
+        tRPOperPfxListToEndPrefixLen
+    }
+    ::= { tRPOperPfxListToTable 1 }
+
+TRPOperPfxListToEntry            ::= SEQUENCE
+{
+    tRPOperPfxListToEndPrefixType    TmnxAddressAndPrefixType,
+    tRPOperPfxListToEndPrefix        TmnxAddressAndPrefixAddress,
+    tRPOperPfxListToEndPrefixLen     TmnxAddressAndPrefixPrefix,
+    tRPOperPfxListToRowStatus        RowStatus,
+    tRPOperPfxListToCrOrigin         TmnxCreateOrigin
+}
+
+tRPOperPfxListToEndPrefixType    OBJECT-TYPE
+    SYNTAX      TmnxAddressAndPrefixType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPfxListToEndPrefixType specifies the address type
+         of tRPOperPfxListToEndPrefix."
+    ::= { tRPOperPfxListToEntry 1 }
+
+tRPOperPfxListToEndPrefix        OBJECT-TYPE
+    SYNTAX      TmnxAddressAndPrefixAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPfxListToEndPrefix specifies the end IP prefix of
+         the prefix list entry."
+    ::= { tRPOperPfxListToEntry 2 }
+
+tRPOperPfxListToEndPrefixLen     OBJECT-TYPE
+    SYNTAX      TmnxAddressAndPrefixPrefix
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPfxListToEndPrefixLen specifies the end IP prefix
+         length of the prefix list entry."
+    ::= { tRPOperPfxListToEntry 3 }
+
+tRPOperPfxListToRowStatus        OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPOperPfxListToRowStatus indicates the
+         RowStatus for this row.
+
+         To create or destroy entries in this table, use the
+         tRPAdminPfxListToTable."
+    ::= { tRPOperPfxListToEntry 4 }
+
+tRPOperPfxListToCrOrigin         OBJECT-TYPE
+    SYNTAX      TmnxCreateOrigin
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPOperPfxListToCrOrigin indicates the
+         mechanism used to create this entry."
+    ::= { tRPOperPfxListToEntry 5 }
+
+tRPOperPfxListAddressMaskTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TRPOperPfxListAddressMaskEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table of admin prefix lists specifying a match condition that does
+         not require contiguous network mask bits."
+    ::= { tRPOperValueObjects 46 }
+
+tRPOperPfxListAddressMaskEntry   OBJECT-TYPE
+    SYNTAX      TRPOperPfxListAddressMaskEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry in the tRPOperPfxListAddressMaskEntry represents
+         information about a particular prefix list address mask.
+
+         A route's prefix/length is considered a match if all of the
+         following are true:
+         - the bitwise logical AND of the prefix-list address and the mask
+           equals the bitwise logical AND of the route address and the mask
+         - the prefix length of the route matches the prefix length of
+           the prefix-list entry
+
+         Entries are created and deleted by the user via
+         tRPAdminPfxListAddressMaskTable."
+    INDEX       {
+        tRPOperPfxListName,
+        tRPOperInetPrefixListPrefixType,
+        tRPOperInetPrefixListPrefix,
+        tRPOperInetPrefixListPrefixLen,
+        tRPOperPfxListAddressMaskType,
+        tRPOperPfxListAddressMask
+    }
+    ::= { tRPOperPfxListAddressMaskTable 1 }
+
+TRPOperPfxListAddressMaskEntry   ::= SEQUENCE
+{
+    tRPOperPfxListAddressMaskType    InetAddressType,
+    tRPOperPfxListAddressMask        InetAddress,
+    tRPOperPfxListAddrMaskRowStatus  RowStatus,
+    tRPOperPfxListAddrMaskCrOrigin   TmnxCreateOrigin
+}
+
+tRPOperPfxListAddressMaskType    OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPfxListAddressMaskType specifies the address type
+         of tRPOperPfxListAddressMask."
+    ::= { tRPOperPfxListAddressMaskEntry 1 }
+
+tRPOperPfxListAddressMask        OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPOperPfxListAddressMask specifies the address mask of
+         the prefix list entry."
+    ::= { tRPOperPfxListAddressMaskEntry 2 }
+
+tRPOperPfxListAddrMaskRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPOperPfxListAddrMaskRowStatus indicates the
+         RowStatus for this row.
+
+         To create or destroy entries in this table, use the
+         tRPAdminPfxListAddressMaskTable."
+    ::= { tRPOperPfxListAddressMaskEntry 3 }
+
+tRPOperPfxListAddrMaskCrOrigin   OBJECT-TYPE
+    SYNTAX      TmnxCreateOrigin
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPOperPfxListAddrMaskCrOrigin indicates the
+         mechanism used to create this entry."
+    ::= { tRPOperPfxListAddressMaskEntry 4 }
+
 tRPAdminObjects                  OBJECT IDENTIFIER ::= { tRoutePolicyObjects 2 }
 
 tRPAdminControlObjects           OBJECT IDENTIFIER ::= { tRPAdminObjects 1 }
@@ -8938,10 +9428,12 @@ tRPAdminPrefixListRowStatus      OBJECT-TYPE
 
 tRPAdminPrefixListType           OBJECT-TYPE
     SYNTAX      INTEGER {
-        exact   (1),
-        longer  (2),
-        through (3),
-        range   (4)
+        exact       (1),
+        longer      (2),
+        through     (3),
+        range       (4),
+        to          (5),
+        addressMask (6)
     }
     MAX-ACCESS  not-accessible
     STATUS      current
@@ -8964,7 +9456,17 @@ tRPAdminPrefixListType           OBJECT-TYPE
          have a length that is greater than or equal to the length defined by
          tRPAdminPrefixListBeginLength and less than or equal to the length
          defined by tRPAdminPrefixListThroughLength in order for an entry to be
-         considered a match."
+         considered a match.
+
+         to (5) - a route's prefix/length must match the condition  from a
+         start prefix/length to an end prefix/length. The  end prefix/length is
+         indicated in the corresponding entry in  the tRPAdminPfxListToTable.
+
+         addressMask (6) - a route's prefix/length must match the prefix length
+         of the prefix-list entry and the bitwise logical AND of the route
+         address and the mask must match the bitwise  logical AND from the
+         prefix-list address and the mask. The  address mask must be specified
+         in a corresponding entry in the tRPAdminPfxListAddressMaskTable."
     ::= { tRPAdminPrefixListEntry 5 }
 
 tRPAdminPrefixListThroughLength  OBJECT-TYPE
@@ -11000,10 +11502,12 @@ tRPAdminInetPrefixListPrefixLen  OBJECT-TYPE
 
 tRPAdminInetPrefixListType       OBJECT-TYPE
     SYNTAX      INTEGER {
-        exact   (1),
-        longer  (2),
-        through (3),
-        range   (4)
+        exact       (1),
+        longer      (2),
+        through     (3),
+        range       (4),
+        to          (5),
+        addressMask (6)
     }
     MAX-ACCESS  not-accessible
     STATUS      current
@@ -11027,7 +11531,18 @@ tRPAdminInetPrefixListType       OBJECT-TYPE
          have a length that is greater than or equal to the length defined by
          tRPAdminInetPrefixListBeginLen and less than or equal to the length
          defined by tRPAdminInetPrefixListThroughLen in order for an entry to
-         be considered a match."
+         be considered a match.
+
+         to (5) - a route's prefix/length must match the condition  from a
+         start prefix/length to an end prefix/length. The  end prefix/length
+         must be specified in a corresponding entry  in the
+         tRPAdminPfxListToTable.
+
+         addressMask (6) - a route's prefix/length must match the prefix length
+         of the prefix-list entry and the bitwise logical AND of the route
+         address and the mask must match the bitwise  logical AND from the
+         prefix-list address and the mask. The  address mask must be specified
+         in a corresponding entry in the tRPAdminPfxListAddressMaskTable."
     ::= { tRPAdminInetPrefixListEntry 5 }
 
 tRPAdminInetPrefixListRowStatus  OBJECT-TYPE
@@ -13532,7 +14047,12 @@ TRPAdminPSFromCriteriaExtEntry   ::= SEQUENCE
     tRPAdminPSFromCritNextHopAddrTyp InetAddressType,
     tRPAdminPSFromCritNextHopAddr    InetAddress,
     tRPAdminPSFromCritNextHopPfxList TPrefixListName,
-    tRPAdminPSFromCritExtEvpnType    TPolicyEntryCriteriaEvpnType
+    tRPAdminPSFromCritExtEvpnType    TPolicyEntryCriteriaEvpnType,
+    tRPAdminPSFromCrAggrContributor  TruthValue,
+    tRPAdminPSFromCrEndpointAddrTyp  InetAddressType,
+    tRPAdminPSFromCrEndpointAddr     InetAddress,
+    tRPAdminPSFromCritColor          TNamedItemOrEmpty,
+    tRPAdminPSFromCritDistinguisher  TNamedItemOrEmpty
 }
 
 tRPAdminPSFromCritExtMvpnType    OBJECT-TYPE
@@ -13963,6 +14483,73 @@ tRPAdminPSFromCritExtEvpnType    OBJECT-TYPE
     DEFVAL      { none }
     ::= { tRPAdminPSFromCriteriaExtEntry 37 }
 
+tRPAdminPSFromCrAggrContributor  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSFromCrAggrContributor specifies whether
+         aggregate contributor routes should be matched on.
+
+         When the value is 'true', only the more-specific prefixes that are
+         actually contributors are matched."
+    DEFVAL      { false }
+    ::= { tRPAdminPSFromCriteriaExtEntry 38 }
+
+tRPAdminPSFromCrEndpointAddrTyp  OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSFromCrEndpointAddrTyp specifies the address
+         type of tRPAdminPSFromCrEndpointAddr."
+    DEFVAL      { unknown }
+    ::= { tRPAdminPSFromCriteriaExtEntry 39 }
+
+tRPAdminPSFromCrEndpointAddr     OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (0|4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSFromCrEndpointAddr specifies the SR policy
+         endpoint IP address to match the route on.
+
+         This match criterion is only used in import policies."
+    DEFVAL      { ''H }
+    ::= { tRPAdminPSFromCriteriaExtEntry 40 }
+
+tRPAdminPSFromCritColor          OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSFromCritColor specifies the SR policy color ID
+         to match the route on.
+
+         The value of this object can be a string containing the SR policy
+         color ID value in the range [0..4294967295]. An empty string means
+         that it is disabled.
+
+         This match criterion is only used in import policies."
+    DEFVAL      { "" }
+    ::= { tRPAdminPSFromCriteriaExtEntry 41 }
+
+tRPAdminPSFromCritDistinguisher  OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSFromCritDistinguisher specifies the SR policy
+         distinguisher to match the route on.
+
+         The value of this object can be a string containing the SR policy
+         distinguisher value in the range [0..4294967295]. An empty string
+         means that it is disabled.
+
+         This match criterion is only used in import policies."
+    DEFVAL      { "" }
+    ::= { tRPAdminPSFromCriteriaExtEntry 42 }
+
 tRPAdminPSPolicyVariableTable    OBJECT-TYPE
     SYNTAX      SEQUENCE OF TRPAdminPSPolicyVariableEntry
     MAX-ACCESS  not-accessible
@@ -14165,7 +14752,14 @@ TRPAdminPSAcptActParamsExtEntry  ::= SEQUENCE
     tRPAdminPSAcptActDisableRtInst   TruthValue,
     tRPAdminPSAcptActSrLabelIndex    TPolicyValueOrVarNameOrEmpty,
     tRPAdminPSAcptActSrLblIndPrefIgp TruthValue,
-    tRPAdminPSAcptActNextHopPeerAddr TruthValue
+    tRPAdminPSAcptActNextHopPeerAddr TruthValue,
+    tRPAdminPSAcptActBgpHighPriority TruthValue,
+    tRPAdminPSAcptActFlexAlgo        TPolicyValueOrVarNameOrEmpty,
+    tRPAdminPSAcptActBgpTunnelMetric TPolicyValueOrVarNameOrEmpty,
+    tRPAdminPSAcptActBgpTMetPrefAigp TruthValue,
+    tRPAdminPSAcptActEgressStats     TruthValue,
+    tRPAdminPSAcptActIngressStats    TruthValue,
+    tRPAdminPSAcptActSrMaintPolicy   TNamedItemOrEmpty
 }
 
 tRPAdminPSAcptActStickyEcmp      OBJECT-TYPE
@@ -14761,6 +15355,108 @@ tRPAdminPSAcptActNextHopPeerAddr OBJECT-TYPE
     DEFVAL      { false }
     ::= { tRPAdminPSAcptActParamsExtEntry 38 }
 
+tRPAdminPSAcptActBgpHighPriority OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActBgpHighPriority specifies whether the
+         corresponding prefix must be marked in BGP as needing high priority
+         treatment."
+    DEFVAL      { false }
+    ::= { tRPAdminPSAcptActParamsExtEntry 39 }
+
+tRPAdminPSAcptActFlexAlgo        OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActFlexAlgo specifies the identifier of the
+         Flexible Algorithm.
+
+         The value of this object can be a string containing the Flex Algo Id
+         value in the range [128..255] or a variable name that needs to be
+         resolved to get the Flex Algo Id."
+    DEFVAL      { "" }
+    ::= { tRPAdminPSAcptActParamsExtEntry 40 }
+
+tRPAdminPSAcptActBgpTunnelMetric OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActBgpTunnelMetric specifies the the BGP
+         Tunnel Metric value.
+
+         The value of this object can be a string containing the BGP Tunnel
+         Metric value in the range [0..4294967295] or a  variable name that
+         needs to be resolved to get the  BGP Tunnel Metric."
+    DEFVAL      { "" }
+    ::= { tRPAdminPSAcptActParamsExtEntry 41 }
+
+tRPAdminPSAcptActBgpTMetPrefAigp OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActBgpTMetPrefAigp specifies whether it is
+         preferred to use the value of the received AIGP attribute as BGP
+         Tunnel Metric.
+
+         If the value is 'true', the TTM metric is set to the value of the AIGP
+         attribute if attached.  If an AIGP metric is not attached or if the
+         value is 'false', the tRPAdminPSAcptActBgpTunnelMetric is set as TTM
+         metric.
+
+         The value of this object is ignored if the object
+         tRPAdminPSAcptActBgpTunnelMetric is empty."
+    DEFVAL      { false }
+    ::= { tRPAdminPSAcptActParamsExtEntry 42 }
+
+tRPAdminPSAcptActEgressStats     OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActEgressStats specifies whether to collect
+         egress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    DEFVAL      { false }
+    ::= { tRPAdminPSAcptActParamsExtEntry 43 }
+
+tRPAdminPSAcptActIngressStats    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActIngressStats specifies whether to
+         collect ingress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    DEFVAL      { false }
+    ::= { tRPAdminPSAcptActParamsExtEntry 44 }
+
+tRPAdminPSAcptActSrMaintPolicy   OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSAcptActSrMaintPolicy specifies the named
+         segment routing (SR) maintenance policy for SR policy routes.
+
+         The maintenance policy must exist in
+         TIMETRA-SR-POLICY-MIB::vRtrSrMainPlcyTable.
+
+         The value of this object can be a string containing the
+         maintenance policy or a variable name that needs to be
+         resolved to get the maintenance policy. An empty string
+         means that is disabled."
+    DEFVAL      { ''H }
+    ::= { tRPAdminPSAcptActParamsExtEntry 45 }
+
 tRPAdminPSDefActParamsExtTable   OBJECT-TYPE
     SYNTAX      SEQUENCE OF TRPAdminPSDefActParamsExtEntry
     MAX-ACCESS  not-accessible
@@ -14817,7 +15513,14 @@ TRPAdminPSDefActParamsExtEntry   ::= SEQUENCE
     tRPAdminPSDefActDisableRtInstall TruthValue,
     tRPAdminPSDefActSrLabelIndex     TPolicyValueOrVarNameOrEmpty,
     tRPAdminPSDefActSrLblIndPrefIgp  TruthValue,
-    tRPAdminPSDefActNextHopPeerAddr  TruthValue
+    tRPAdminPSDefActNextHopPeerAddr  TruthValue,
+    tRPAdminPSDefActBgpHighPriority  TruthValue,
+    tRPAdminPSDefActFlexAlgo         TPolicyValueOrVarNameOrEmpty,
+    tRPAdminPSDefActBgpTunnelMetric  TPolicyValueOrVarNameOrEmpty,
+    tRPAdminPSDefActBgpTMetPrefAigp  TruthValue,
+    tRPAdminPSDefActEgressStats      TruthValue,
+    tRPAdminPSDefActIngressStats     TruthValue,
+    tRPAdminPSDefActSrMaintPolicy    TNamedItemOrEmpty
 }
 
 tRPAdminPSDefActStickyEcmp       OBJECT-TYPE
@@ -15410,6 +16113,108 @@ tRPAdminPSDefActNextHopPeerAddr  OBJECT-TYPE
          are reset."
     DEFVAL      { false }
     ::= { tRPAdminPSDefActParamsExtEntry 38 }
+
+tRPAdminPSDefActBgpHighPriority  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActBgpHighPriority specifies whether the
+         corresponding prefix must be marked in BGP as needing high priority
+         treatment."
+    DEFVAL      { false }
+    ::= { tRPAdminPSDefActParamsExtEntry 39 }
+
+tRPAdminPSDefActFlexAlgo         OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActFlexAlgo specifies the identifier of the
+         Flexible Algorithm.
+
+         The value of this object can be a string containing the Flex Algo Id
+         value in the range [128..255] or a variable name that needs to be
+         resolved to get the Flex Algo Id."
+    DEFVAL      { "" }
+    ::= { tRPAdminPSDefActParamsExtEntry 40 }
+
+tRPAdminPSDefActBgpTunnelMetric  OBJECT-TYPE
+    SYNTAX      TPolicyValueOrVarNameOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActBgpTunnelMetric specifies the the BGP
+         Tunnel Metric value.
+
+         The value of this object can be a string containing the BGP Tunnel
+         Metric value in the range [0..4294967295] or a  variable name that
+         needs to be resolved to get the  BGP Tunnel Metric."
+    DEFVAL      { "" }
+    ::= { tRPAdminPSDefActParamsExtEntry 41 }
+
+tRPAdminPSDefActBgpTMetPrefAigp  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActBgpTMetPrefAigp specifies whether it is
+         preferred to use the value of the received AIGP attribute as BGP
+         Tunnel Metric.
+
+         If the value is 'true', the TTM metric is set to the value of the AIGP
+         attribute if attached.  If an AIGP metric is not attached or if the
+         value is 'false', the tRPAdminPSDefActBgpTunnelMetric is set as TTM
+         metric.
+
+         The value of this object is ignored if the object
+         tRPAdminPSDefActBgpTunnelMetric is empty."
+    DEFVAL      { false }
+    ::= { tRPAdminPSDefActParamsExtEntry 42 }
+
+tRPAdminPSDefActEgressStats      OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActEgressStats specifies whether to collect
+         egress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    DEFVAL      { false }
+    ::= { tRPAdminPSDefActParamsExtEntry 43 }
+
+tRPAdminPSDefActIngressStats     OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActIngressStats specifies whether to collect
+         ingress statistics for BGP Labeled Unicast routes.
+
+         If the value is 'true', the system is instructed to allocate a
+         statistical index."
+    DEFVAL      { false }
+    ::= { tRPAdminPSDefActParamsExtEntry 44 }
+
+tRPAdminPSDefActSrMaintPolicy    OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPSDefActSrMaintPolicy specifies the named segment
+         routing (SR) maintenance policy for SR policy routes.
+
+         The maintenance policy must exist in
+         TIMETRA-SR-POLICY-MIB::vRtrSrMainPlcyTable.
+
+         The value of this object can be a string containing the
+         maintenance policy or a variable name that needs to be
+         resolved to get the maintenance policy. An empty string
+         means that is disabled."
+    DEFVAL      { ''H }
+    ::= { tRPAdminPSDefActParamsExtEntry 45 }
 
 tRPAdminPfxListNameTable         OBJECT-TYPE
     SYNTAX      SEQUENCE OF TRPAdminPfxListNameEntry
@@ -16548,6 +17353,195 @@ tRPAdminPSFromCritPrefixList28   OBJECT-TYPE
          disables this prefix list as a match criteria."
     DEFVAL      { "" }
     ::= { tRPAdminPSFromCritPfxListEntry 28 }
+
+tRPAdminPfxListToTable           OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TRPAdminPfxListToEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table of IPv4 and IPv6 admin prefix lists specifying a match
+         condition from a start prefix/length to an end prefix/length."
+    ::= { tRPAdminValueObjects 45 }
+
+tRPAdminPfxListToEntry           OBJECT-TYPE
+    SYNTAX      TRPAdminPfxListToEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry in the tRPAdminPfxListToEntry represents information
+         about a particular prefix list to prefix.
+
+         A route's prefix/length is considered a match if all of the
+         following are true:
+         - the begin prefix-length most-significant bits of the route
+           matches the begin prefix
+         - the end prefix-length most-significant bits of the route
+           matches the end prefix
+         - the prefix-length of the route is between begin prefix-length and
+           end prefix-length (inclusive).
+
+         Entries are created and deleted by the user."
+    INDEX       {
+        tRPAdminPfxListName,
+        tRPAdminInetPrefixListPrefixType,
+        tRPAdminInetPrefixListPrefix,
+        tRPAdminInetPrefixListPrefixLen,
+        tRPAdminPfxListToEndPrefixType,
+        tRPAdminPfxListToEndPrefix,
+        tRPAdminPfxListToEndPrefixLen
+    }
+    ::= { tRPAdminPfxListToTable 1 }
+
+TRPAdminPfxListToEntry           ::= SEQUENCE
+{
+    tRPAdminPfxListToEndPrefixType   TmnxAddressAndPrefixType,
+    tRPAdminPfxListToEndPrefix       TmnxAddressAndPrefixAddress,
+    tRPAdminPfxListToEndPrefixLen    TmnxAddressAndPrefixPrefix,
+    tRPAdminPfxListToRowStatus       RowStatus,
+    tRPAdminPfxListToCrOrigin        TmnxCreateOrigin
+}
+
+tRPAdminPfxListToEndPrefixType   OBJECT-TYPE
+    SYNTAX      TmnxAddressAndPrefixType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPfxListToEndPrefixType indicates the address type
+         of tRPAdminPfxListToEndPrefix."
+    ::= { tRPAdminPfxListToEntry 1 }
+
+tRPAdminPfxListToEndPrefix       OBJECT-TYPE
+    SYNTAX      TmnxAddressAndPrefixAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPfxListToEndPrefix indicates the end IP prefix of
+         the prefix list entry."
+    ::= { tRPAdminPfxListToEntry 2 }
+
+tRPAdminPfxListToEndPrefixLen    OBJECT-TYPE
+    SYNTAX      TmnxAddressAndPrefixPrefix
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPfxListToEndPrefixLen indicates the end IP prefix
+         length of the prefix list entry."
+    ::= { tRPAdminPfxListToEntry 3 }
+
+tRPAdminPfxListToRowStatus       OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPfxListToRowStatus specifies the RowStatus for
+         this row.
+
+         To create a row, set this object to createAndGo or createAndWait. When
+         tRPAdminControlApply is set to commit(3), the row will actually be
+         created in the tRPOperPfxListToTable.
+
+         To destroy a row, set this object to destroy(6). When
+         tRPAdminControlApply is set to commit(3) the row will actually be
+         removed from the tRPOperPfxListToTable."
+    ::= { tRPAdminPfxListToEntry 4 }
+
+tRPAdminPfxListToCrOrigin        OBJECT-TYPE
+    SYNTAX      TmnxCreateOrigin
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPAdminPfxListToCrOrigin indicates the
+         mechanism used to create this entry."
+    ::= { tRPAdminPfxListToEntry 5 }
+
+tRPAdminPfxListAddressMaskTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TRPAdminPfxListAddressMaskEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table of admin prefix lists specifying a match condition that does
+         not require contiguous network mask bits."
+    ::= { tRPAdminValueObjects 46 }
+
+tRPAdminPfxListAddressMaskEntry  OBJECT-TYPE
+    SYNTAX      TRPAdminPfxListAddressMaskEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry in the tRPAdminPfxListAddressMaskEntry represents
+         information about a particular prefix list address mask.
+
+         A route's prefix/length is considered a match if all of the
+         following are true:
+         - the bitwise logical AND of the prefix-list address and the mask
+           equals the bitwise logical AND of the route address and the mask
+         - the prefix length of the route matches the prefix length of
+           the prefix-list entry
+
+         Entries are created and deleted by the user."
+    INDEX       {
+        tRPAdminPfxListName,
+        tRPAdminInetPrefixListPrefixType,
+        tRPAdminInetPrefixListPrefix,
+        tRPAdminInetPrefixListPrefixLen,
+        tRPAdminPfxListAddressMaskType,
+        tRPAdminPfxListAddressMask
+    }
+    ::= { tRPAdminPfxListAddressMaskTable 1 }
+
+TRPAdminPfxListAddressMaskEntry  ::= SEQUENCE
+{
+    tRPAdminPfxListAddressMaskType   InetAddressType,
+    tRPAdminPfxListAddressMask       InetAddress,
+    tRPAdminPfxListAddrMaskRowStatus RowStatus,
+    tRPAdminPfxListAddrMaskCrOrigin  TmnxCreateOrigin
+}
+
+tRPAdminPfxListAddressMaskType   OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPfxListAddressMaskType specifies the address type
+         of tRPAdminPfxListAddressMask."
+    ::= { tRPAdminPfxListAddressMaskEntry 1 }
+
+tRPAdminPfxListAddressMask       OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE (4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of tRPAdminPfxListAddressMask specifies the address mask of
+         the prefix list entry.
+
+         The address type is specified by tRPAdminInetPrefixListPrefixType."
+    ::= { tRPAdminPfxListAddressMaskEntry 2 }
+
+tRPAdminPfxListAddrMaskRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPAdminPfxListAddrMaskRowStatus  specifies
+         the RowStatus for this row.
+
+         To create a row, set this object to createAndGo or createAndWait. When
+         tRPAdminControlApply is set to commit(3), the row will actually be
+         created in the tRPOperPfxListAddressMaskTable.
+
+         To destroy a row, set this object to destroy(6). When
+         tRPAdminControlApply is set to commit(3) the row will actually be
+         removed from the tRPOperPfxListAddressMaskTable."
+    ::= { tRPAdminPfxListAddressMaskEntry 3 }
+
+tRPAdminPfxListAddrMaskCrOrigin  OBJECT-TYPE
+    SYNTAX      TmnxCreateOrigin
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object tRPAdminPfxListAddrMaskCrOrigin  indicates the
+         mechanism used to create this entry."
+    ::= { tRPAdminPfxListAddressMaskEntry 4 }
 
 tmnxRoutePolicyConformance       OBJECT IDENTIFIER ::= { tmnxSRConfs 17 }
 
@@ -19369,7 +20363,53 @@ tmnxRPPolicyV20v0Group           OBJECT-GROUP
         tRPOperPSDefActNextHopPeerAddr,
         tRPOperPSAcptActNextHopPeerAddr,
         tRPAdminPSDefActNextHopPeerAddr,
-        tRPAdminPSAcptActNextHopPeerAddr
+        tRPAdminPSAcptActNextHopPeerAddr,
+        tRPOperPSDefActBgpHighPriority,
+        tRPOperPSAcptActBgpHighPriority,
+        tRPAdminPSDefActBgpHighPriority,
+        tRPAdminPSAcptActBgpHighPriority,
+        tRPOperPSFromCrAggrContributor,
+        tRPAdminPSFromCrAggrContributor,
+        tRPOperPSDefActFlexAlgo,
+        tRPOperPSAcptActFlexAlgo,
+        tRPAdminPSDefActFlexAlgo,
+        tRPAdminPSAcptActFlexAlgo,
+        tRPOperPSDefActBgpTunnelMetric,
+        tRPOperPSDefActBgpTMetPrefAigp,
+        tRPOperPSAcptActBgpTunnelMetric,
+        tRPOperPSAcptActBgpTMetPrefAigp,
+        tRPAdminPSDefActBgpTunnelMetric,
+        tRPAdminPSDefActBgpTMetPrefAigp,
+        tRPAdminPSAcptActBgpTunnelMetric,
+        tRPAdminPSAcptActBgpTMetPrefAigp,
+        tRPOperPfxListToCrOrigin,
+        tRPOperPfxListToRowStatus,
+        tRPAdminPfxListToCrOrigin,
+        tRPAdminPfxListToRowStatus,
+        tRPOperPfxListAddrMaskRowStatus,
+        tRPOperPfxListAddrMaskCrOrigin,
+        tRPAdminPfxListAddrMaskRowStatus,
+        tRPAdminPfxListAddrMaskCrOrigin,
+        tRPOperPSDefActEgressStats,
+        tRPOperPSDefActIngressStats,
+        tRPOperPSAcptActEgressStats,
+        tRPOperPSAcptActIngressStats,
+        tRPAdminPSDefActEgressStats,
+        tRPAdminPSDefActIngressStats,
+        tRPAdminPSAcptActEgressStats,
+        tRPAdminPSAcptActIngressStats,
+        tRPOperPSDefActSrMaintPolicy,
+        tRPOperPSAcptActSrMaintPolicy,
+        tRPAdminPSDefActSrMaintPolicy,
+        tRPAdminPSAcptActSrMaintPolicy,
+        tRPOperPSFromCrEndpointAddrTyp,
+        tRPOperPSFromCrEndpointAddr,
+        tRPOperPSFromCritColor,
+        tRPOperPSFromCritDistinguisher,
+        tRPAdminPSFromCrEndpointAddrTyp,
+        tRPAdminPSFromCrEndpointAddr,
+        tRPAdminPSFromCritColor,
+        tRPAdminPSFromCritDistinguisher
     }
     STATUS      current
     DESCRIPTION

@@ -5,47 +5,44 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $colours      = "mixed";
-$nototal      = (($width<224) ? 1 : 0);
+$nototal      = (($width < 224) ? 1 : 0);
 $unit_text    = "Entries";
-$rrd_filename = get_rrd_path($device, "app-bind-".$app['app_id']."-cache-default.rrd");
+$rrd_filename = get_rrd_path($device, "app-bind-" . $app['app_id'] . "-cache-default.rrd");
 
 #$rrtypes = array('SOA', 'A', 'AAAA', 'NS', 'MX', 'CNAME', 'TXT', 'PTR', 'DNSKEY', 'RRSIG');
-$rrtypes = array('SOA', 'A', 'AAAA', 'NS', 'MX', 'CNAME', 'DNAME', 'TXT', 'SPF', 'SRV', 'SSHFP', 'TLSA', 'IPSECKEY', 'PTR', 'DNSKEY', 'RRSIG', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'DS', 'DLV');
-$array = array();
-foreach ($rrtypes as $rrtype)
-{
-  // Consistent random colours, offset picked for funny colours :-)
-  $colour = substr(md5($rrtype), 1, 6);
-  $array[$rrtype] = array('descr' => $rrtype, 'colour' => $colour, 'invert' => False);
-  $array['NEG_'.$rrtype] = array('descr' => '!'.$rrtype, 'colour' => $colour, 'invert' => True);
+$rrtypes = ['SOA', 'A', 'AAAA', 'NS', 'MX', 'CNAME', 'DNAME', 'TXT', 'SPF', 'SRV', 'SSHFP', 'TLSA', 'IPSECKEY', 'PTR', 'DNSKEY', 'RRSIG', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'DS', 'DLV'];
+$array   = [];
+foreach ($rrtypes as $rrtype) {
+    // Consistent random colours, offset picked for funny colours :-)
+    $colour                  = substr(md5($rrtype), 1, 6);
+    $array[$rrtype]          = ['descr' => $rrtype, 'colour' => $colour, 'invert' => FALSE];
+    $array['NEG_' . $rrtype] = ['descr' => '!' . $rrtype, 'colour' => $colour, 'invert' => TRUE];
 }
 $i = 0;
 
-if (rrd_is_file($rrd_filename))
-{
-  foreach ($array as $ds => $data)
-  {
-    $rrd_list[$i]['filename'] = $rrd_filename;
-    $rrd_list[$i]['descr']    = $data['descr'];
-    $rrd_list[$i]['ds']       = $ds;
-    $rrd_list[$i]['colour']   = $data['colour'];
-    $rrd_list[$i]['invert']   = $data['invert'];
-    $i++;
-  }
+if (rrd_is_file($rrd_filename)) {
+    foreach ($array as $ds => $data) {
+        $rrd_list[$i]['filename'] = $rrd_filename;
+        $rrd_list[$i]['descr']    = $data['descr'];
+        $rrd_list[$i]['ds']       = $ds;
+        $rrd_list[$i]['colour']   = $data['colour'];
+        $rrd_list[$i]['invert']   = $data['invert'];
+        $i++;
+    }
 } else {
-  echo("file missing: $rrd_filename");
+    echo("file missing: $rrd_filename");
 }
 
 #include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
-include($config['html_dir']."/includes/graphs/generic_multi.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi.inc.php");
 
 // EOF

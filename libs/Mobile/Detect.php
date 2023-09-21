@@ -772,7 +772,7 @@ class Mobile_Detect
         'Bot'         => 'Googlebot|facebookexternalhit|Google-AMPHTML|s~amp-validator|AdsBot-Google|Google Keyword Suggestion|Facebot|YandexBot|YandexMobileBot|bingbot|ia_archiver|AhrefsBot|Ezooms|GSLFbot|WBSearchBot|Twitterbot|TweetmemeBot|Twikle|PaperLiBot|Wotbox|UnwindFetchor|Exabot|MJ12bot|YandexImages|TurnitinBot|Pingdom|contentkingapp|AspiegelBot',
         'MobileBot'   => 'Googlebot-Mobile|AdsBot-Google-Mobile|YahooSeeker/M1A1-R2D2',
         'DesktopMode' => 'WPDesktop',
-        'TV'          => 'SonyDTV|HbbTV', // experimental
+        'TV'          => 'SonyDTV|HbbTV|SMART\-TV|Smart\ TV|BRAVIA\ 4K', // experimental
         'WebKit'      => '(webkit)[ /]([\w.]+)',
         // @todo: Include JXD consoles.
         'Console'     => '\b(Nintendo|Nintendo WiiU|Nintendo 3DS|Nintendo Switch|PLAYSTATION|Xbox)\b',

@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -33,26 +33,26 @@
 
  */
 
-$table_defs['AETHRA-MIB']['xdsl'] = array (
+$table_defs['AETHRA-MIB']['xdsl'] = [
   'table'         => 'xdsl',
   'numeric'       => '.1.3.6.1.4.1.7745.5.3.1.1.1',
   'call_function' => 'snmp_walk',
   'mib'           => 'AETHRA-MIB',
   'descr'         => 'Aethra xDSL Statistics',
-  'graphs'        => array('xdsl_attenuation', 'xdsl_noisemargin', 'xdsl_rate', 'xdsl_bits', 'xdsl_errors'),
-  'ds_rename'     => array('xdsl' => ''),
+  'graphs'        => ['xdsl_attenuation', 'xdsl_noisemargin', 'xdsl_rate', 'xdsl_bits', 'xdsl_errors'],
+  'ds_rename'     => ['xdsl' => ''],
   'index'         => '1',
-  'oids'          => array(
-    'xdslUsAttenuation'    =>  array('numeric' => '4',  'multiplier' => '0.1',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslDsAttenuation'    =>  array('numeric' => '5',  'multiplier' => '0.1',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslUsNoiseMargin'    =>  array('numeric' => '6',  'multiplier' => '0.1',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslDsNoiseMargin'    =>  array('numeric' => '7',  'multiplier' => '0.1',  'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslUsCurrRate'       =>  array('numeric' => '8',  'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslDsCurrRate'       =>  array('numeric' => '9',  'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslUsMaxTheorRate'   =>  array('numeric' => '11', 'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslDsMaxTheorRate'   =>  array('numeric' => '12', 'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'),
-    'xdslUsTotBytes'       =>  array('numeric' => '13', 'descr' => '', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-    'xdslDsTotBytes'       =>  array('numeric' => '14', 'descr' => '', 'ds_type' => 'COUNTER', 'ds_min' => '0'),
-    'xdslNeTotCrcErr'      =>  array('numeric' => '15', 'descr' => '', 'ds_type' => 'COUNTER', 'ds_min' => '0')
-  )
-);
+  'oids'          => [
+    'xdslUsAttenuation'  => ['numeric' => '4', 'multiplier' => '0.1', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslDsAttenuation'  => ['numeric' => '5', 'multiplier' => '0.1', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslUsNoiseMargin'  => ['numeric' => '6', 'multiplier' => '0.1', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslDsNoiseMargin'  => ['numeric' => '7', 'multiplier' => '0.1', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslUsCurrRate'     => ['numeric' => '8', 'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslDsCurrRate'     => ['numeric' => '9', 'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslUsMaxTheorRate' => ['numeric' => '11', 'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslDsMaxTheorRate' => ['numeric' => '12', 'multiplier' => '1000', 'descr' => '', 'ds_type' => 'GAUGE', 'ds_min' => '0'],
+    'xdslUsTotBytes'     => ['numeric' => '13', 'descr' => '', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'xdslDsTotBytes'     => ['numeric' => '14', 'descr' => '', 'ds_type' => 'COUNTER', 'ds_min' => '0'],
+    'xdslNeTotCrcErr'    => ['numeric' => '15', 'descr' => '', 'ds_type' => 'COUNTER', 'ds_min' => '0']
+  ]
+];

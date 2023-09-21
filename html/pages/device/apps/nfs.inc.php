@@ -5,14 +5,14 @@
  *
  *   This files is part of Observium.
  *
- * @package    observium
- * @subpackage applications
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     applications
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$app_graphs['default'] = array('nfs_nfs2' => 'NFS2',
-                'nfs_nfs3' => 'NFS3',
-                'nfs_nfs4'  => 'NFS4');
+$app_graphs['default'] = ['nfs_nfs2' => 'NFS2',
+                          'nfs_nfs3' => 'NFS3',
+                          'nfs_nfs4' => 'NFS4'];
 
 // EOF

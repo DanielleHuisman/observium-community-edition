@@ -1,0 +1,2034 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+
+-- *************************************************************
+-- * LSP PING Management Information Base for MPLS and MPLS-TP
+-- * $Id: fslspp.mib,v 1.8 2012/09/07 09:52:05 siva Exp $
+-- *************************************************************
+
+  SUPERMICRO-LSP-PING-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+       MODULE-IDENTITY, OBJECT-TYPE, 
+       NOTIFICATION-TYPE,
+       enterprises, Unsigned32,Integer32, 
+       Counter32 FROM SNMPv2-SMI
+
+       TEXTUAL-CONVENTION, RowStatus, DisplayString,
+       RowPointer, TruthValue FROM SNMPv2-TC;
+
+
+    -- MODULE IDENTITY
+
+    fsLspp MODULE-IDENTITY
+        LAST-UPDATED "201209050000Z" 
+        ORGANIZATION "Super Micro Computer Inc."
+        CONTACT-INFO "support@Supermicro.com"
+
+       DESCRIPTION  
+               "This Proprietary MIB for LSP Ping is to detect data 
+               plane failures in MPLS and MPLS-TP Label Switched Paths."
+       REVISION "201209050000Z"
+       DESCRIPTION "Initial version"
+       
+        ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) futureMpls(13) 11 }
+
+    -- Textual conventions
+
+    FsLsppTimeUnit ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION     
+            "A value that represents the different units of time which has to 
+             be manipulated with the given timer values. The currently 
+             supported units are milliseconds, seconds and minutes. 
+             Each definition of an object with this textual convention
+             must be accompanied by atleast one corresponding object that 
+             defines the timer values."
+        SYNTAX      INTEGER
+                    {
+                      milliseconds(1), 
+                      seconds(2),
+                      minutes(3)
+                      -- other values are reserved for future extensions
+                    }
+
+    FsLsppAddressType ::= TEXTUAL-CONVENTION
+        STATUS      current
+        DESCRIPTION
+            "A value that represents the different type of addresses.
+             notapplicable(0)  - An unknown address type. This must be used 
+                                 in a Non-IP environment.
+             ipv4Numbered(1)   - Represents an IPV4 numbered interface.
+             ipv4UnNumbered(2) - Represents an IPV4 unnumbered interface.
+             ipv6Numbered(3)   - Represents an IPV6 numbered interface.
+             ipv6UnNumbered(4) - Represents an IPV6 unnumbered interface.
+
+             Each definition of an object with this textual convention
+             must be accompanied by atleast one corresponding object that 
+             defines the Address values."
+        SYNTAX      INTEGER 
+                    {
+                      notApplicable(0),
+                      ipv4Numbered(1),
+                      ipv4UnNumbered(2),
+                      ipv6Numbered(3),
+                      ipv6UnNumbered(4)
+                     }
+        
+
+    -- Top level components of this MIB module.
+
+    -- Global Configuration and Statistics table.
+    fsLsppGlobals        OBJECT IDENTIFIER ::= { fsLspp 1 }
+    -- LSP ping and traceroute table
+    fsLsppPingTrace      OBJECT IDENTIFIER ::= { fsLspp 2 }
+    --traps
+    fsLsppNotifications  OBJECT IDENTIFIER ::= { fsLspp 3 }
+
+
+    -- ------------------------------------------------------------
+    -- Global configuration Table
+    -- ------------------------------------------------------------
+
+    fsLsppGlobalConfigTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FsLsppGlobalConfigTableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION 
+            "This table contains all the global configurations of LSP ping 
+             per virtual context of the router."
+        ::= {  fsLsppGlobals 1 }
+
+    fsLsppGlobalConfigTableEntry OBJECT-TYPE
+        SYNTAX      FsLsppGlobalConfigTableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This represents per virtual context LSP Ping Global parameters.
+             An entry in this table is created as an when a virtual context 
+             is created."
+        INDEX { fsLsppContextId }
+        ::= { fsLsppGlobalConfigTable 1 }
+
+    FsLsppGlobalConfigTableEntry ::= SEQUENCE {
+        fsLsppContextId               Unsigned32,
+        fsLsppSystemControl           INTEGER,
+        fsLsppTrapStatus              Integer32,
+        fsLsppTraceLevel              Integer32,
+        fsLsppAgeOutTime              Unsigned32,
+        fsLsppAgeOutTmrUnit           FsLsppTimeUnit,
+        fsLsppClearEchoStats          TruthValue,
+        fsLsppBfdBtStrapRespReq       TruthValue,
+        fsLsppBfdBtStrapAgeOutTime    Unsigned32,
+        fsLsppBfdBtStrapAgeOutTmrUnit FsLsppTimeUnit 
+    }
+
+    fsLsppContextId OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION    
+            "The unique identifier to identify the virtual router context.
+             Currently, the implementation supports only a single virtual 
+             instance of the router."
+        ::= { fsLsppGlobalConfigTableEntry 1 }
+
+    fsLsppSystemControl OBJECT-TYPE
+        SYNTAX         INTEGER 
+                       {
+                         start (1),
+                         shutdown (2)
+                       }
+        MAX-ACCESS     read-write
+        STATUS         current
+        DESCRIPTION     
+            "This object specifies the administrative system control status 
+            for LSP ping. The value start(1) indicates that LSP ping should 
+            be active in the virtual context. All the required databases for 
+            this context will be created. 
+            The value shutdown(2) indicates that LSP ping should be
+            shutdown in the virtual context. All used memory will be released 
+            back to the memory pools."
+        DEFVAL { start }
+        ::= { fsLsppGlobalConfigTableEntry 2 }
+
+    fsLsppTrapStatus OBJECT-TYPE
+        SYNTAX       Integer32(0..7) 
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION  
+            "This object is used to enable or disable LSP Ping traps. 
+
+             Trap Types: 
+             TrapPingCompletion       : Generated when ping operation
+                                        gets completed and contains the
+                                        result for that ping request. 
+             
+             TrapTraceRouteCompletion : Generated when trace route
+                                        operation gets completed and
+                                        contains result and hopcount.
+
+             TrapBFDBootstrapReqRcvd  : Generated when LSP ping 
+                                        receives a request from BFD to 
+                                        bootstrap.
+
+             For enabling various traps, the corresponding bits 
+             must be set as shown below. 
+             
+             0x0001  - trap will be sent after completion of ping operation 
+             0x0002  - trap will be sent after completion of traceroute 
+                      operation
+	         0x0004  - trap will be sent after completion of ping triggerd by 
+             BFD bootstrap. 
+         
+             A value of 0 indicates that traps are disabled and a value with
+             all bits set to 1 indicates that all traps are enabled. 
+             By default all traps are disabled."    
+        DEFVAL { 0 }
+        ::= { fsLsppGlobalConfigTableEntry 3 }
+  
+    fsLsppTraceLevel OBJECT-TYPE
+        SYNTAX       Integer32(0..8191) 
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            "This object is to enable or disable traces and to specify 
+             different trace levels.  
+                       
+             The bit positions to enable different traces are:
+             
+             0x0001 : init-shut	
+             0x0002 : mgmt	
+             0x0004 : data
+             0x0008 : ctrl
+             0x0010 : pkt-dump
+             0x0020 : resource
+             0x0040 : all-fail
+             0x0080 : buf
+
+             0x0100 : tlv             - displays echo packet type, length, 
+                                      values(TLVs) information
+             0x0200 : error           - displays error conditions encountered
+                                     during echo request and echo reply
+             0x0400 : event          - displays MPLS echo request and reply 
+                                      send and receive event information
+             0x0800 : packet-error   - displays packet errors for MPLS echo 
+                                      request and reply
+             0x1000 : path-discovery - displays information regarding 
+                                      traceroute path dicovery operations
+             
+             A value of zero(0) indicates that traces are disabled and a 
+             value with all bits set to 1 indicates that all traces are 
+             enabled. By default all traces are disabled."
+        DEFVAL { 0 }
+        ::= { fsLsppGlobalConfigTableEntry 4 }
+
+    fsLsppAgeOutTime OBJECT-TYPE
+        SYNTAX       Unsigned32(0..1000)
+        MAX-ACCESS   read-write 
+        STATUS       current
+        DESCRIPTION
+            "This object specifies the amount of time after which a 
+             ping or traceroute entry should get deleted, after the operation 
+             is completed. The actual time duration after which the entry
+             will get deleted will be determined by this object along with
+             the time units as specified by the fsLsppAgeOutTmrUnit object. 
+ 
+             By default this value will be set as 1 causing the entry to get 
+             deleted after 1 time units after the completion of the ping or 
+             traceroute operation." 
+        DEFVAL { 1 }
+        ::= { fsLsppGlobalConfigTableEntry 5 }
+
+    fsLsppAgeOutTmrUnit OBJECT-TYPE
+        SYNTAX            FsLsppTimeUnit
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "This object indicates the time unit for the age out timer as 
+             defined by the fsLsppAgeOutTime object."
+        DEFVAL { minutes }
+        ::= { fsLsppGlobalConfigTableEntry 6 }
+  
+     fsLsppClearEchoStats OBJECT-TYPE
+         SYNTAX           TruthValue
+         MAX-ACCESS       read-write
+         STATUS           current
+         DESCRIPTION
+             "This object is to clear all the global statistics parameters.
+              Setting this object to TRUE will cause all the statistics to be
+              reset and setting this object to FALSE will have no effect.
+              A Get operation on this object will always return a value 
+              of FALSE."
+         DEFVAL { false }
+         ::= { fsLsppGlobalConfigTableEntry 7 }
+
+     fsLsppBfdBtStrapRespReq OBJECT-TYPE
+         SYNTAX           TruthValue
+         MAX-ACCESS       read-write
+         STATUS           current
+         DESCRIPTION
+             "This object is used to indicate the responder whether the echo 
+              reply is required for bfd bootstrapped echo request. By default 
+              this object will be TRUE which specifies that the responder 
+              should reply for the bootstrapped request. 
+
+              Setting this object to FALSE specifies that the initiator should
+              send a bfd bootstrapped echo request with reply mode as 'noReply'
+              and the responder should not send reply for that echo request."
+         DEFVAL { true }
+         ::= { fsLsppGlobalConfigTableEntry 8 }
+
+     fsLsppBfdBtStrapAgeOutTime OBJECT-TYPE
+        SYNTAX       Unsigned32(0..1000)
+        MAX-ACCESS   read-write 
+        STATUS       current
+        DESCRIPTION
+            "This object specifies the amount of time after which a 
+            ping entry that is created on receiving a Bfd boostrap, 
+            should get deleted. The actual time duration after which the entry 
+            will get deleted will be determined by this object along with 
+            the time units as specified by the fsLsppBfdBtStrapAgeOutTmrUnit 
+            object. If fsLsppBfdBtStrapRespReq object is set to true, 
+            then this timer starts after the completion of ping operation and 
+            incase fsLsppBfdBtStrapRespReq object is set to false, 
+            this timer will start after trasmitting the echo request.
+ 
+            By default this value will be set as 0 causing the entry to get 
+            deleted after the completion of the boostrap operation."         
+        DEFVAL { 0 }
+        ::= { fsLsppGlobalConfigTableEntry 9 }
+
+    fsLsppBfdBtStrapAgeOutTmrUnit OBJECT-TYPE
+        SYNTAX            FsLsppTimeUnit
+        MAX-ACCESS        read-write
+        STATUS            current
+        DESCRIPTION
+            "This object indicates the time unit for the Bfd boostrap age out 
+            timer as defined by the fsLsppBfdBtStrapAgeOutTime object."
+        DEFVAL { minutes }
+        ::= { fsLsppGlobalConfigTableEntry 10 }
+
+-- ------------------------------------------------------------
+-- End of Global Configuration Table
+-- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- Global Statistics Table
+-- ------------------------------------------------------------
+
+  fsLsppGlobalStatsTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF FsLsppGlobalStatsTableEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION    
+         "This table contains statistics information for LSP Ping module."
+     ::= {  fsLsppGlobals 2 }
+
+  fsLsppGlobalStatsTableEntry OBJECT-TYPE
+     SYNTAX         FsLsppGlobalStatsTableEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION    
+         "LSP Ping Statistics table entry. This table will have an entry per 
+          virtual context"
+     INDEX { fsLsppContextId }
+     ::= { fsLsppGlobalStatsTable 1 }
+
+
+  FsLsppGlobalStatsTableEntry ::= SEQUENCE {
+      fsLsppGlbStatReqTx                  Counter32,
+      fsLsppGlbStatReqRx                  Counter32,
+      fsLsppGlbStatReqTimedOut            Counter32,
+      fsLsppGlbStatReqUnSent              Counter32,
+      fsLsppGlbStatReplyTx                Counter32,
+      fsLsppGlbStatReplyRx                Counter32,
+      fsLsppGlbStatReplyDropped           Counter32,
+      fsLsppGlbStatReplyUnSent            Counter32,
+      fsLsppGlbStatReplyFromEgr           Counter32,
+      fsLsppGlbStatUnLbldOutIf            Counter32,
+      fsLsppGlbStatDsMapMismatch          Counter32,
+      fsLsppGlbStatFecLblMismatch         Counter32,
+      fsLsppGlbStatNoFecMapping           Counter32,
+      fsLsppGlbStatUnKUpstreamIf          Counter32,
+      fsLsppGlbStatReqLblSwitched         Counter32,
+      fsLsppGlbStatReqUnSupptdTlv         Counter32,
+      fsLsppGlbStatMalformedReq           Counter32,
+      fsLsppGlbStatNoLblEntry             Counter32,
+      fsLsppGlbStatPreTermReq             Counter32,
+      fsLsppGlbStatProtMismatch           Counter32,
+      fsLsppGlbStatRsvdRetCode            Counter32,
+      fsLsppGlbStatNoRetCode              Counter32,
+      fsLsppGlbStatUndefRetCode           Counter32,
+      fsLsppGlbStatInvalidPktDropped      Counter32
+  }                           
+
+  fsLsppGlbStatReqTx  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of times echo request packets that 
+          have been sent by this system"
+     ::= { fsLsppGlobalStatsTableEntry 1 }
+
+  fsLsppGlbStatReqRx  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the total number of echo request packets that 
+          have been received by this system."
+     ::= { fsLsppGlobalStatsTableEntry 2 }
+
+  fsLsppGlbStatReqTimedOut  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo requests that do not receive 
+          any reply within the timeout interval"
+     ::= { fsLsppGlobalStatsTableEntry 3 }
+
+  fsLsppGlbStatReqUnSent  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the total number of echo request packets that 
+          were unable to be sent out of this system.                     
+          Eg: This object will get incremented if the ping or traceroute 
+          operation is triggered and the request cannot be sent due to some 
+          issues or errors in framing the request."
+     ::= { fsLsppGlobalStatsTableEntry 4 }
+
+  fsLsppGlbStatReplyTx  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of times echo reply packets that 
+          have been sent by this system"
+     ::= { fsLsppGlobalStatsTableEntry 5 }
+
+
+  fsLsppGlbStatReplyRx  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the total number of echo reply packets that 
+          have been received by this system."
+     ::= { fsLsppGlobalStatsTableEntry 6 }
+
+
+  fsLsppGlbStatReplyDropped  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the total number of received echo replies that
+          were dropped due to errors."
+     ::= { fsLsppGlobalStatsTableEntry 7 }
+
+
+  fsLsppGlbStatReplyUnSent    OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the total number of echo reply packets that 
+          were unable to be sent out of this system.
+          Eg: This object will get incremented when the reply cannot be 
+          sent due to some issues in identifying the return path or errors 
+          in framing the request."
+     ::= { fsLsppGlobalStatsTableEntry 8 }
+
+
+  fsLsppGlbStatReplyFromEgr  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies received successfully
+         within the timeout interval for the sent echo requests."
+     ::= { fsLsppGlobalStatsTableEntry 9 }
+
+
+  fsLsppGlbStatUnLbldOutIf  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 9, which indicates no MPLS
+         forwarding after the replying router."
+     ::= { fsLsppGlobalStatsTableEntry 10 }
+
+
+  fsLsppGlbStatDsMapMismatch  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 5, which indicates the 
+         mismatch during Downstream Mapping validation."
+     ::= { fsLsppGlobalStatsTableEntry 11 }
+
+
+  fsLsppGlbStatFecLblMismatch  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 10, which indicates the
+         mismatch between the label and the FEC in the Target FEC Stack TLV 
+         of the request."
+     ::= { fsLsppGlobalStatsTableEntry 12 }
+
+  fsLsppGlbStatNoFecMapping  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 4, when the replying 
+         router has no mapping for FEC."
+     ::= { fsLsppGlobalStatsTableEntry 13 }
+
+
+  fsLsppGlbStatUnKUpstreamIf  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 6, when the replying router 
+         does not know the upstream interface index."
+     ::= { fsLsppGlobalStatsTableEntry 14 }
+
+
+  fsLsppGlbStatReqLblSwitched  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 8, which indicates that the
+         request will be label switched at the replying node."
+     ::= { fsLsppGlobalStatsTableEntry 15 }
+
+
+  fsLsppGlbStatReqUnSupptdTlv  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 2, indicates one or more 
+         TLV present in the request were not understood"
+     ::= { fsLsppGlobalStatsTableEntry 16 }
+
+
+  fsLsppGlbStatMalformedReq  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 1, indicates that the request
+         sent was malformed"
+     ::= { fsLsppGlobalStatsTableEntry 17 }
+
+
+  fsLsppGlbStatNoLblEntry  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 11, which indicates that,
+         there is no corresponding label entry in the database for the label in
+         the received request"
+     ::= { fsLsppGlobalStatsTableEntry 18 }
+
+
+  fsLsppGlbStatPreTermReq  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 13, indicates the Premature 
+         termination of ping due to label stack shrinking to a single label"
+     ::= { fsLsppGlobalStatsTableEntry 19 }
+
+
+  fsLsppGlbStatProtMismatch  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 12, indicates that the 
+         Protocol not associated with the received interface for the FEC in the
+         Target FEC Stack TLV"
+     ::= { fsLsppGlobalStatsTableEntry 20 }
+
+
+  fsLsppGlbStatRsvdRetCode  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 7, which is a reserved 
+         return code"
+     ::= { fsLsppGlobalStatsTableEntry 21 }
+
+
+  fsLsppGlbStatNoRetCode  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code 0. i.e no return code"
+     ::= { fsLsppGlobalStatsTableEntry 22 }
+
+  fsLsppGlbStatUndefRetCode  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of echo replies that have been 
+         received by this system with return code greater than 13 which is 
+         a undefined return code"
+     ::= { fsLsppGlobalStatsTableEntry 23 }
+
+
+  fsLsppGlbStatInvalidPktDropped  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object records the number of received packets dropped by LSPP
+         module when any of the following condition occurs.
+         1. Packet is received in invalid context.
+         2. Module is shutdown in the received context.
+         3. CC and CV verification failed.
+         4. ACH TLVs validation failed.
+         5. IP/UDP validation failed.
+         6. Received echo message type is invalid."
+     ::= { fsLsppGlobalStatsTableEntry 24 }
+
+
+-- --------------------------------------------------------------------------
+-- * End of Global Statistics Table
+-- --------------------------------------------------------------------------
+
+
+-- --------------------------------------------------------------------------
+-- * Ping and Trace route Table
+-- --------------------------------------------------------------------------
+
+  fsLsppPingTraceTable OBJECT-TYPE
+     SYNTAX         SEQUENCE OF FsLsppPingTraceTableEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION    
+         "Lsp Ping Instance table. 
+          Each row in this table represent a ping or traceroute entry." 
+     ::= { fsLsppPingTrace 1 }
+
+  fsLsppPingTraceTableEntry    OBJECT-TYPE
+     SYNTAX         FsLsppPingTraceTableEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION    
+         "Ping or Traceroute Entry. "
+     INDEX  { fsLsppContextId, fsLsppSenderHandle }
+     ::= { fsLsppPingTraceTable 1 }
+    
+  FsLsppPingTraceTableEntry ::= SEQUENCE {
+      fsLsppSenderHandle           Unsigned32,
+      fsLsppRequestType            INTEGER,
+      fsLsppRequestOwner           INTEGER,            
+      fsLsppPathType               INTEGER,
+      fsLsppPathPointer            RowPointer,
+      fsLsppTgtMipGlobalId         Unsigned32,
+      fsLsppTgtMipNodeId           Unsigned32,
+      fsLsppTgtMipIfNum            Unsigned32,
+      fsLsppReplyMode              INTEGER,
+      fsLsppRepeatCount            Unsigned32,
+      fsLsppPacketSize             Unsigned32,
+      fsLsppPadPattern             OCTET STRING,
+      fsLsppTTLValue               Unsigned32,
+      fsLsppWFRInterval            Unsigned32,
+      fsLsppWFRTmrUnit             FsLsppTimeUnit,
+      fsLsppWTSInterval            Unsigned32,
+      fsLsppWTSTmrUnit             FsLsppTimeUnit,     
+      fsLsppReplyDscpValue         Unsigned32,
+      fsLsppSweepOption            TruthValue,
+      fsLsppSweepMinimum           Unsigned32,
+      fsLsppSweepMaximum           Unsigned32,
+      fsLsppSweepIncrement         Unsigned32,
+      fsLsppBurstOption            TruthValue,
+      fsLsppBurstSize              Unsigned32,
+      fsLsppEXPValue               Unsigned32,
+      fsLsppDsMap                  TruthValue,
+      fsLsppFecValidate            TruthValue,
+      fsLsppReplyPadTlv            TruthValue,
+      fsLsppForceExplicitNull      TruthValue,
+      fsLsppInterfaceLabelTlv      TruthValue,
+      fsLsppSameSeqNumOption       TruthValue,
+      fsLsppVerbose                TruthValue,
+      fsLsppReversePathVerify      TruthValue,
+      fsLsppEncapType              INTEGER,
+      fsLsppStatus                 INTEGER,   
+      fsLsppActualHopCount         Unsigned32,
+      fsLsppResponderAddrType      FsLsppAddressType,
+      fsLsppResponderAddr          OCTET STRING,
+      fsLsppResponderGlobalId      Unsigned32,
+      fsLsppResponderId            Unsigned32,
+      fsLsppMaxRtt                 Unsigned32,
+      fsLsppMinRtt                 Unsigned32,
+      fsLsppAverageRtt             Unsigned32,
+      fsLsppPktsTx                 Counter32,
+      fsLsppPktsRx                 Counter32,
+      fsLsppPktsUnSent             Counter32,
+      fsLsppRowStatus              RowStatus,
+      fsLsppStatusPathDirection  INTEGER,
+      fsLsppResponderIcc           OCTET STRING,
+      fsLsppResponderUMC           OCTET STRING,
+      fsLsppResponderMepIndex      Unsigned32
+  }
+
+  fsLsppSenderHandle    OBJECT-TYPE
+     SYNTAX         Unsigned32(1..65535)
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION    
+         "Unique handle that identifies a LSP ping or traceroute request." 
+     REFERENCE
+     "RFC 4379, Section 3"
+     ::= { fsLsppPingTraceTableEntry 1 }
+
+  fsLsppRequestType    OBJECT-TYPE
+     SYNTAX         INTEGER { 
+                              ping (1), 
+                              traceRoute (2) 
+                            }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates whether the request is ping or traceroute."
+     ::= { fsLsppPingTraceTableEntry 2 }
+
+  fsLsppRequestOwner    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                              management(1),
+                              bfd(2)
+                              --other values are reserved for future extensions
+                            }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies the initiator of this ping or traceroute 
+          request. 
+             
+          management  - indicates that the request is initiated from 
+                        SNMP/CLI/WEB.
+          bfd         - inidicates that the request is initiated by BFD module 
+                        to bootstrap the session discriminator."  
+     ::= { fsLsppPingTraceTableEntry 3 }
+  
+  fsLsppPathType    OBJECT-TYPE
+     SYNTAX         INTEGER { 
+                               ldpIpv4(1), 
+                               ldpIpv6(2), 
+                               rsvpIpv4(3),
+                               rsvpIpv6(4),
+                               fec128Pw(5),
+                               fec129Pw(6),
+                               mep(7)  
+                            }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object identifies the type of path being monitored. 
+  
+          ldpipv4 or ldpipv6   - indicates that the path pointer is pointing 
+                                 to a row in FTN table
+          rsvpipv4 or rsvpipv6 - indicates that the path pointer is pointing 
+                                 to a row in Tunnel table
+          fec128pw or fec129pw - indicates that the path pointer is pointing 
+                                 to a row in PW table
+                                 Trace route operation is not valid for 
+                                 pseudowires.
+          mep                  - indicates that the path pointer is pointing
+                                 to a MEP in the MEP table pertaining to a 
+                                 MEG monitoring an MPLS-TP path."
+     REFERENCE
+          "1. RFC 4379, Section 3.2
+           2. IETF draft'draft-nitinb-mpls-tp-lsp-ping-extensions-01',
+           Section 2.4"
+     ::= { fsLsppPingTraceTableEntry 4 }
+
+  fsLsppPathPointer    OBJECT-TYPE
+     SYNTAX         RowPointer 
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object should be interpreted along with the object 
+          fsLsppPathType. This object points to the correponding path details.
+
+          If fsLsppPathType is ldpipv4(1) or ldpipv6(2), then this object MUST 
+          contain zeroDotZero or point to an instance of the mplsFTNEntry 
+          indicating the LDP-based LSP associated with this ping or traceroute 
+          operation.
+
+          If fsLsppPathType is rsvpipv4(3) or rsvpipv6(4), then this object 
+          MUST contain zeroDotZero or point to an instance of the 
+          mplsTunnelEntry indicating the RSVP-based MPLS TE tunnel associated 
+          with this ping or traceroute operation.
+
+          If fsLsppPathType is fec128pw(5) or fwc129pw(6), then this object 
+          MUST contain zeroDotZero or point to an instance of the pwEntry 
+          indicating the FEC128 or FWC 129 based Pseudowire associated with 
+          this ping or traceroute operation.
+
+          If fsLsppPathType is mep(6), then this object MUST contain 
+          zeroDotZero or point to an instance identifying the MEP entity 
+          configured for monitoring the MPLS-TP path associated with this ping 
+          or traceroute operation.
+
+          If this object points to a conceptual row instance in a table 
+          consistent with fsLsppPathType but this instance does not 
+          currently exist then no valid path is associated with this ping or 
+          traceroute entry.
+
+          If this object contains zeroDotZero then no valid path is associated 
+          with this ping or traceroute entry till it is populated with a valid 
+          pointer consistent with the value of fsLsppPathType as explained 
+          above."
+     ::= { fsLsppPingTraceTableEntry 5 }
+
+  fsLsppTgtMipGlobalId OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies the Global Id of the Target for which ping
+          has to be initiated. This must be configured in conjunction with 
+          the fsLsppPathType object being set to MEP and the
+          fsLsppPathPointer pointing to a Source MEP entry. 
+          
+          This object must be set only to perform connectivity verification
+          to an Intermediate node of an MPLS-TP LSP.
+          
+          This object is not applicable for traceroute operations." 
+          ::= { fsLsppPingTraceTableEntry 6 }
+  
+  fsLsppTgtMipNodeId OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies the Node Id of the Target for which ping has to
+          be initiated. This must be interpreted in conjunction with the 
+          fsLsppTgtMipGlobalId object. 
+
+          This object must be set only on performing connectivity
+          verification to Intermediate node of an MPLS-TP LSP.
+
+          This object is not applicable for traceroute operations." 
+          ::= { fsLsppPingTraceTableEntry 7 }
+  
+  fsLsppTgtMipIfNum OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies the Interface Number of the Target for 
+          which ping has to be initiated. This must be interpreted in 
+          conjunction with the fsLsppTgtMipGlobalId and the fsLsppTgtMipNodeId
+          objects. 
+
+          This object must be set only on performing connectivity
+          verification to Intermediate node of an MPLS-TP LSP.
+
+          This object is not applicable for traceroute operations." 
+          ::= { fsLsppPingTraceTableEntry 8 }
+
+  
+  fsLsppReplyMode    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                                noReply (1),
+                                ip (2),             -- IPv4 or IPv6
+                                ipRouterAlert (3),
+                                controlChannel (4)
+                            }
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION     
+         "This object species the reply mode for this particular echo request.
+               1 - do not reply
+               2 - reply via an IPv4/IPv6 UDP packet
+               3 - reply via an IPv4/IPv6 UDP packet with Router Alert
+               4 - reply via application level control channel"
+     REFERENCE
+     "RFC 4379, Section 3" 
+     ::= { fsLsppPingTraceTableEntry 9 }
+
+  fsLsppRepeatCount OBJECT-TYPE
+     SYNTAX         Unsigned32(1..2147483647)
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "This object represents the number of request packets that has to be 
+          sent in a single ping operation. When the fsLsppRequestOwner is set 
+          to 'bfd', the repeat count will be implicitly considered as one. 
+           
+          If the Burst option is set, then this object represents the number of
+          bursts of packets that has to be sent in a single ping operation.  
+          
+          If the Sweep option is enabled, each packet of the repeat count 
+          will be of different sizes, ranging from the sweep start size to 
+          the sweep end size. When the Request type is set to trace route, 
+          then this is not applicable" 
+     DEFVAL { 5 }
+     ::= { fsLsppPingTraceTableEntry 10 }
+
+  fsLsppPacketSize    OBJECT-TYPE
+     SYNTAX           Unsigned32(40..18024)
+     MAX-ACCESS       read-write 
+     STATUS           current
+     DESCRIPTION      
+         "This object specifies the size of the LSP Ping packet along with 
+          the MPLS label stack imposed that is to be sent. Depending on the 
+          value to which the packet size is set, the PAD TLV will be added 
+          to achieve the specified size."
+    DEFVAL { 200 }
+    ::= { fsLsppPingTraceTableEntry 11 }
+
+  fsLsppPadPattern    OBJECT-TYPE
+     SYNTAX           OCTET STRING (SIZE (1..16))
+     MAX-ACCESS       read-write 
+     STATUS           current
+     DESCRIPTION      
+         "This object specifies the pattern to be used in PAD TLV.
+          This pattern may be repeated in the PAD TLV depending upon the 
+          length of the pattern and the length of the PAD TLV. 
+          This configuration is optional.
+		       
+     	  This object must be given as a hexadecimal value."
+     DEFVAL { 'ABCD'h }
+     ::= { fsLsppPingTraceTableEntry 12 }
+
+  fsLsppTTLValue    OBJECT-TYPE
+     SYNTAX           Unsigned32(1..255)
+     MAX-ACCESS       read-write 
+     STATUS           current
+     DESCRIPTION      
+         "This object specifies a time to live value.
+          In case of ping, by default TTL value will be 255.  
+
+          If the user sets a particular value, then that TTL will be set and 
+          carried in the echo packets.  
+            
+          When performing connectivity verification to an  intermediate node, 
+          this object must be set to an appropriate TTL value needed to reach 
+          the intermediate node.
+		
+          In case of traceroute, the TTL value will be incrementally 
+          incremented by 1 in its echo requests (TTL=1,2,3,4..) to discover 
+          the downstream mapping of each successive hop until it reaches the 
+          configured maximum hop count. By default the maximum hop count is 30."
+     ::= { fsLsppPingTraceTableEntry 13 }
+
+  fsLsppWFRInterval OBJECT-TYPE
+     SYNTAX           Unsigned32(1..1000)
+     MAX-ACCESS       read-write 
+     STATUS           current
+     DESCRIPTION      
+         "Specifies the amount of time to wait to receive a response for a 
+          transmitted MPLS echo request packet before timing out the request."
+     DEFVAL { 2 }
+     ::= { fsLsppPingTraceTableEntry 14 }
+
+  fsLsppWFRTmrUnit   OBJECT-TYPE
+     SYNTAX         FsLsppTimeUnit
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates the time unit for the wait-for-reply timer."
+     DEFVAL { seconds }
+     ::= { fsLsppPingTraceTableEntry 15 }
+
+  fsLsppWTSInterval  OBJECT-TYPE
+    SYNTAX            Unsigned32(0..1000)
+    MAX-ACCESS        read-write 
+    STATUS            current 
+    DESCRIPTION       
+        "This object specifies the time between two successive MPLS echo 
+         requests transmitted. This allows the user to pace the transmission 
+         of packets so that the receiving router does not drop packets.
+
+         This object is not applicable and should not be set while performing 
+         a trace route operation."
+    DEFVAL  { 1 }
+    ::= { fsLsppPingTraceTableEntry 16 }
+
+  fsLsppWTSTmrUnit      OBJECT-TYPE
+     SYNTAX         FsLsppTimeUnit
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates the time unit for the wait-to-send timer."
+     DEFVAL { seconds }
+     ::= { fsLsppPingTraceTableEntry 17 }
+
+  fsLsppReplyDscpValue     OBJECT-TYPE
+     SYNTAX         Unsigned32(0..63)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object is to insist on the replying router to provide a 
+          specific class of service (CoS) in an echo reply.
+
+          In IP/MPLS and MPLS-TP environments where IP forwarding is possible, 
+          this value can be set.
+
+          In non-IP forwarding based MPLS-TP environments, this object is not 
+          applicable and should not be set."
+     REFERENCE
+     "RFC 4379, Section 3.8"
+     DEFVAL { 0 }
+     ::= { fsLsppPingTraceTableEntry 18 }
+
+  fsLsppSweepOption OBJECT-TYPE
+    SYNTAX         TruthValue
+    MAX-ACCESS     read-write 
+    STATUS         current
+    DESCRIPTION    
+        "This object specifies if a number of packets of different sizes, 
+         ranging from a start size to an end size are to be sent. 
+         Setting this object to TRUE enables the sweep option. 
+             
+         This object alone does not have any significance. This object, 
+         along with the fsLsppSweepMinimum, fsLsppSweepIncrement and 
+         fsLsppSweepMaximum objects, cause a number of packets of different 
+         sizes to be sent.
+
+         If this object is set to TRUE then the value in fsLsppPacketSize 
+         object is ignored and packet size is determined by the sweep minimum, 
+         increment and maximum sizes. 
+         This object is not applicable and should not be set while performing 
+         traceroute operations.
+
+         This object should not be set to true when the burst option or 
+         same sequence number option is enabled."
+    DEFVAL { false }
+    ::= { fsLsppPingTraceTableEntry 19 }
+
+  fsLsppSweepMinimum     OBJECT-TYPE
+    SYNTAX         Unsigned32
+    MAX-ACCESS     read-write 
+    STATUS         current
+    DESCRIPTION    
+        "This object specifies the minimum or start size of the echo request 
+         packet with which the initiator should send the requests. 
+             
+         The value set in this object will be used when the fsLsppSweepOption 
+         object is set to True.
+
+         This object alone does not have any significance. This object, along 
+         with the fsLsppSweepIncrement and fsLsppSweepMaximum objects, cause 
+         a number of packets of different sizes to be sent, ranging from a 
+         start size as specified by this object to an end size as specified by
+         the fsLsppSweepMaximum object. 
+
+         The actual minimum size of the packet will vary depending on the LSP 
+         type. If the configured value cannot be supported by the actual 
+         packet, then the packet will not be transmitted and the 
+         fsLsppTotalPktsUnsent object will get incremented."         
+
+    DEFVAL { 100 }
+    ::= { fsLsppPingTraceTableEntry 20 }
+
+  fsLsppSweepMaximum     OBJECT-TYPE
+     SYNTAX        Unsigned32
+     MAX-ACCESS    read-write 
+     STATUS        current
+     DESCRIPTION   
+         "This object specifies the end size of the echo request packet. 
+              
+          The value set in this object will be used when the fsLsppSweepOption 
+          object is set to True.
+
+          This object alone does not have any significance. This object, 
+          along with the fsLsppSweepIncrement and fsLsppSweepMinimum objects, 
+          cause a number of packets of different sizes to be sent, 
+          ranging from a start size as specified by the fsLsppSweepMinimum 
+          object to an end size as specified by this object.
+
+          The actual maximum size of the packet will vary depending on the 
+          Maximum Transmission Unit (MTU) of the underlying media. If the 
+          configured value cannot be supported by the actual packet, then 
+          the packet will not be transmitted and the fsLsppTotalPktsUnsent 
+          object will get incremented."
+     DEFVAL { 17986 }
+     ::= { fsLsppPingTraceTableEntry 21 }
+
+  fsLsppSweepIncrement     OBJECT-TYPE
+     SYNTAX         Unsigned32(10..1000)
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "This option specifies size by which echo packet size should be 
+          incremented compared to previous echo request.
+              
+          The value set in this object will be used when the fsLsppSweepOption 
+          object is set to True.
+
+          This object alone does not have any significance. This object, 
+          along with the fsLsppSweepMinimum and fsLsppSweepMaximum objects, 
+          cause a number of packets of different sizes to be sent, ranging 
+          from a start size as specified by the fsLsppSweepMinimum object 
+          to an end size as specified by the fsLsppSweepMaximum object."
+     DEFVAL { 100 }
+     ::= { fsLsppPingTraceTableEntry 22 }
+
+  fsLsppBurstOption    OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object provides an option to send a burst of echo request 
+          packets of the specified burst size.
+          Setting this value to True causes the burst option to be enabled. 
+          This object is not applicable and should not be set for traceroute 
+          operations.
+
+          This object should not be set to true when the sweep option or 
+          same sequence number option is enabled."
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 23 }
+
+  fsLsppBurstSize    OBJECT-TYPE
+     SYNTAX         Unsigned32(1..1000)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies the number of echo packets that needs to be 
+          sent in a burst. 
+              
+          This object is applicable only if the fsLsppBurstOption object is 
+          set to true. "
+     DEFVAL { 3 }
+     ::= { fsLsppPingTraceTableEntry 24 }
+
+  fsLsppEXPValue    OBJECT-TYPE
+     SYNTAX         Unsigned32(0..7)
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies the MPLS experimental field (traffic class 
+          field) value that should be set in the MPLS header for the MPLS 
+          echo packets."
+     DEFVAL { 0 }
+     ::= { fsLsppPingTraceTableEntry 25 }
+
+  fsLsppDsMap       OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "This option is to interrogate a transit router for downstream 
+          mapping (DSMAP) information.
+          In case of ping, this option is False by default. 
+          For Traceroute this object is implicitly set to True and setting 
+          this object to False will cause the improper tracing of the path."
+     REFERENCE
+     "RFC 4379, Section 3.3"
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 26 }
+
+  fsLsppFecValidate OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "Setting this object makes the Forward Equivalence Class (FEC) 
+          validation, or in other words, the control versus data plane 
+          verification, to be performed at the responder." 
+     REFERENCE
+     "RFC 4379, Section 3"
+     DEFVAL { true }
+     ::= { fsLsppPingTraceTableEntry 27 }
+
+  fsLsppReplyPadTlv    OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "If this object is true, this gives an indication to the responder 
+          to copy the pad tlv in the reply packet. 
+        
+          By default it is set to false.
+              
+          PAD TLV will be added in the reply only if the request contains 
+          the PAD TLV"
+     REFERENCE
+     "RFC 4379, Section 3.4"
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 28 }
+
+  fsLsppForceExplicitNull    OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "If this object is set to true, EXPLICIT NULL label will be added 
+          at the bottom of the MPLS Label Stack.
+
+          This addition of Explicit NULL in the Label Stack allows LSP ping 
+          to be used to detect breakages on untagged interfaces at the 
+          penultimate hop. 
+ 
+          By default this is set to false."
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 29 }
+
+  fsLsppInterfaceLabelTlv    OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "If this object is set to true, this gives an indication to the 
+          responder to add the Interface and Label Stack TLV in the echo 
+          reply packet.
+
+          This can be set to true only when fsLsppDsMap is set to true."
+     REFERENCE
+     "RFC 4379, Section 3.3"
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 30 }
+  
+  fsLsppSameSeqNumOption OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "If this object is set to true, all the echo request packets as as 
+          indicated by the repeat count, are sent with the same sequence 
+          number. 
+          This object is not applicable for traceroute operation.
+          
+          This object should not be set to true when the sweep option or 
+          burst option is enabled"
+     REFERENCE
+     "RFC 4379, Section 4.3"
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 31 }
+
+  fsLsppVerbose    OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "If this object is set, the originator of the echo request displays 
+          the MPLS echo reply sender address,sequence number, return codes 
+          and return sub-code for every packet in that ping instance as 
+          received from the responder of the echo requests.
+                     
+          The details of the sender's address can be obtained by a Get 
+          operation on the fsLsppResponderAddrType and the 
+          fsLsppResponderAddr objects.
+          The details of the sequence numbers, return codes and return 
+          sub-codes can be obtained by a Walk operation on the 
+          fsLsppEchoSequenceTable entries corresponding to the Sender's 
+          Handle of this echo request."
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 32 }
+
+  fsLsppReversePathVerify    OBJECT-TYPE
+     SYNTAX         TruthValue
+     MAX-ACCESS     read-write 
+     STATUS         current
+     DESCRIPTION    
+         "If this object is set to true, the reverse path of an LSP
+          on which the echo reply is sent, will also be verified.
+              
+          This should be set only when monitoring MPLS-TP bidirectional paths."
+
+     REFERENCE
+     "IETF draft'draft-nitinb-mpls-tp-lsp-ping-extensions-01',Section 3.3"
+     DEFVAL { false }
+     ::= { fsLsppPingTraceTableEntry 33 }
+
+  fsLsppEncapType    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                               mplsIp (1),
+                               mplsAch (2),
+                               mplsAchIp (3),
+                               vccvNegotiated(4)
+                            }
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+         "This object specifies the encapsulation type of the LSP Ping packets.
+          In case of MPLS LSP/Tunnel, the encapsulation type should be set to 
+          mplsIp. For MPLS-TP LSP/Tunnel any one of the following types: 
+          mplsIp, mplsAch or mplsAchIp is applicable, mplsAch being the default.
+
+          For MPLS or MPLS-TP PW, the encapsulation type should be set
+          to vccvNegotiated."
+
+     ::= { fsLsppPingTraceTableEntry 34}
+
+
+  fsLsppStatus    OBJECT-TYPE
+     SYNTAX         INTEGER { 
+                               inProgress (1), 
+                               success (2), 
+                               failure (3) 
+                            }
+     MAX-ACCESS     read-only 
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates the current status of the Ping operation.
+
+               inprogress(1)  -  Operation in progess. 
+               success(2)     -  Echo reply received successfully
+                                 for all the echo packets of this request
+               failure(3)     -  Echo reply is not received for one or
+                                 more of the echo packets OR Echo reply is 
+                                 received with invalid return code" 
+     ::= { fsLsppPingTraceTableEntry 35 }
+
+  fsLsppActualHopCount     OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only 
+     STATUS         current
+     DESCRIPTION    
+         "If this entry corresponds to a trace route operation and if it is 
+          successful, this object indicates the hopcount to reach to egress 
+          node.
+          If the trace route operation has failed, then this count indicates 
+          the node till which the connectivity exists correctly. 
+          This object is not applicable for ping operations."
+     ::= { fsLsppPingTraceTableEntry 36 }
+
+  fsLsppResponderAddrType    OBJECT-TYPE
+     SYNTAX         FsLsppAddressType
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object specifies whether the address of the sender of the 
+          echo reply packets. This object contains the IPv4 or IPv6 address 
+          type of the replying router in IP/MPLS and MPLS-TP networks when IP 
+          addressing is supported.
+          It will specify the type as 'Not applicable' in non-IP based MPLS-TP 
+          environment."
+     ::= { fsLsppPingTraceTableEntry 37 }
+  
+  fsLsppResponderAddr OBJECT-TYPE
+     SYNTAX         OCTET STRING (SIZE (1..16))
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object contains the IP address of the replying router in 
+          IP/MPLS and MPLS-TP networks when IP addressing is supported. 
+          This object will contain the Node ID of the responder in case of 
+          a non-IP based MPLS-TP environment."
+     ::= { fsLsppPingTraceTableEntry 38 }
+
+  fsLsppResponderGlobalId   OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object contains the Global ID of the replying router in 
+          MPLS-TP environments." 
+     ::= { fsLsppPingTraceTableEntry 39 }
+
+  fsLsppResponderId    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only 
+     STATUS         current
+     DESCRIPTION
+         "This object contains the Node ID of the replying router in the 
+          MPLS-TP environment."
+     ::= { fsLsppPingTraceTableEntry 40 }
+
+  fsLsppMaxRtt    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only 
+     STATUS         current
+     DESCRIPTION
+         "This object contains the maximum round-trip time taken for a 
+          successful echo reply for this ping instance."
+     ::= { fsLsppPingTraceTableEntry 41 }
+
+  fsLsppMinRtt  OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only 
+     STATUS         current
+     DESCRIPTION
+         "This object contains the minimum round-trip time taken for a 
+          successful echo reply for this ping instance."
+     ::= { fsLsppPingTraceTableEntry 42 }
+
+  fsLsppAverageRtt  OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+         "This object contains the average round-trip time taken for a 
+          successful echo reply for this ping instance." 
+     ::= { fsLsppPingTraceTableEntry 43 }
+
+  fsLsppPktsTx  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+         "This object indicates the total number of echo requests that has 
+          been transmitted for this ping or trace route instance."
+     ::= { fsLsppPingTraceTableEntry 44 }
+
+  fsLsppPktsRx  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates the total number of echo replies that has been 
+          recieved for this ping or trace route instance."
+     ::= { fsLsppPingTraceTableEntry 45 }
+
+  fsLsppPktsUnSent  OBJECT-TYPE
+     SYNTAX         Counter32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates the total number of echo packets that has been 
+          unsent due to some issues or errors in framing the packet."
+     ::= { fsLsppPingTraceTableEntry 46 }
+
+  fsLsppRowStatus    OBJECT-TYPE
+     SYNTAX         RowStatus
+     MAX-ACCESS     read-create
+     STATUS         current
+     DESCRIPTION    
+         "This object provides control over the status of this entry. 
+          Setting this object to 'createAndGo' or to 'notInService' is 
+          disallowed.
+          Setting this object to 'destroy' is valid only if this entry is no 
+          longer referenced by the fsLsppEchoSequenceTable entries and the 
+          fsLsppHopTable entries."
+          ::= { fsLsppPingTraceTableEntry 47 }
+
+   fsLsppStatusPathDirection    OBJECT-TYPE
+     SYNTAX         INTEGER {
+                               forward(1),
+                               reverse(2),
+                               both (3)
+                             }
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+         " This object specifies the direction for which the echo status 
+           is applicable. This object should be interpreted in conjunction 
+           with fsLsppStatus object.
+           
+           When fsLsppReversePathVerify Object is not set, this object will 
+           always display 'forward' as the direction, for fsLsppStatus value 
+           'success' or 'failure'.
+           
+           When fsLsppReversePathVerify Object is set and fsLsppStatus is 
+           failure, this object will display 'reverse' or 'forward'. 
+           depending on the direction in which validation has failed.
+           
+           When fsLsppReversePathVerify Object is set and fsLsppStatus is 
+           success, this object will always display 'both'."
+     
+     REFERENCE
+         "IETF draft'draft-nitinb-mpls-tp-lsp-ping-extensions-01',Section 3.3"
+     DEFVAL { forward }
+     ::= { fsLsppPingTraceTableEntry 48 }
+
+  fsLsppResponderIcc    OBJECT-TYPE
+     SYNTAX         OCTET STRING (SIZE (1..6))
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION
+         "This object contains the ICC (ITU Carrier Code) of the replying 
+          router in an ICC based MPLS-TP network. This object is not applicable 
+          for IP based MPLS-TP networks"
+     ::= { fsLsppPingTraceTableEntry 49 }
+
+  fsLsppResponderUMC    OBJECT-TYPE
+    SYNTAX         OCTET STRING (SIZE (1..7))
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+        " This object contains the UMC(Unique MEG code) of the replying 
+        router in an ICC based MPLS-TP network. This object is not applicable 
+        for IP based MPLS-TP networks."
+    ::= { fsLsppPingTraceTableEntry 50 }
+  
+  fsLsppResponderMepIndex    OBJECT-TYPE
+    SYNTAX         Unsigned32
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+        " This object contains the administratively assigned Mep Index
+          of the replying router in ICC based MPLS-TP network.
+          This object is not applicable for IP based MPLS-TP network."
+    ::= { fsLsppPingTraceTableEntry 51 }
+
+
+  -- End of Ping and Trace route Table
+
+  -- Echo Sequence table
+
+  fsLsppEchoSequenceTable  OBJECT-TYPE
+     SYNTAX         SEQUENCE OF FsLsppEchoSequenceTableEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+         "This table contains detailed information about each 
+          response received for every request sent."     
+     ::= { fsLsppPingTrace 2 }
+
+  fsLsppEchoSequenceTableEntry OBJECT-TYPE
+     SYNTAX         FsLsppEchoSequenceTableEntry
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION
+         "An entry in this table represents an echo request sent with a 
+          particular sequence number. 
+          
+          For every Sender's Handle fsLsppSenderHandle in the 
+          fsLsppPingTraceTable, there will be one entry for each of the 
+          request packets in this table. The number of entries for each 
+          Sender's Handle is determined by the value of the fsLsppRepeatCount 
+          object."
+     INDEX           { 
+                         fsLsppContextId, 
+                         fsLsppSenderHandle, 
+                         fsLsppSequenceNumber 
+                     }
+     ::= { fsLsppEchoSequenceTable 1 }
+
+  FsLsppEchoSequenceTableEntry ::= SEQUENCE {
+      fsLsppSequenceNumber    Unsigned32,
+      fsLsppReturnCode        Unsigned32,
+      fsLsppReturnSubCode     Unsigned32,
+      fsLsppReturnCodeStr     OCTET STRING
+  }
+
+  fsLsppSequenceNumber    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     not-accessible
+     STATUS         current
+     DESCRIPTION    
+         "For each echo request belonging to a single ping or trace route 
+          instance as indicated by the Sender's Handle fsLsppSenderHandle in 
+          the fsLsppPingTraceTable, this object denotes the Sequence number 
+          of the request packet."
+     REFERENCE
+     "RFC 4379, Section 3.1"
+     ::= { fsLsppEchoSequenceTableEntry 1 }
+
+  fsLsppReturnCode    OBJECT-TYPE
+     SYNTAX           Unsigned32
+     MAX-ACCESS       read-only
+     STATUS           current
+     DESCRIPTION      
+         "This object indicates the return code received in the response 
+          packet with this sequence number.
+                       Return code can have a value ranging from 0 to 13." 
+     REFERENCE
+     "RFC 4379, Section 3.1"
+     ::= { fsLsppEchoSequenceTableEntry 2 }
+
+  fsLsppReturnSubCode    OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object indicates the return sub code received in the response 
+          packet with this sequence number." 
+     REFERENCE
+     "RFC 4379, Section 3.1"
+     ::= { fsLsppEchoSequenceTableEntry 3 }
+
+  fsLsppReturnCodeStr       OBJECT-TYPE
+     SYNTAX         OCTET STRING (SIZE (1..128))
+     MAX-ACCESS     read-only
+     STATUS         current
+     DESCRIPTION    
+         "This object contains a string which mentions the meaning for the 
+          return code along with the return subcode
+
+                       Return code   Meaning
+                       ------ ----   -------
+                          0     No return code
+                          1     Malformed echo request received
+                          2     One or more of the TLVs was not understood
+                          3     Replying router is an egress for the 
+                                FEC at stackdepth <RSC>
+                          4     Replying router has no mapping for the 
+                          5     Downstream Mapping Mismatch 
+                          6     Upstream Interface Index Unknown
+                          7     Reserved
+                          8     Label switched at stack-depth <RSC>
+                          9     Label switched but no MPLS forwarding at 
+                                stack-depth <RSC>
+                         10     Mapping for this FEC is not the given label 
+                                at stackdepth<RSC>
+                         11     No label entry at stack-depth <RSC>
+                         12     Protocol not associated with interface 
+                                at FEC stackdepth <RSC>
+                         13     Premature termination of ping due to label 
+                                stack shrinking to a single label FEC at 
+                                stackdepth <RSC> "
+     REFERENCE
+     "RFC 4379, Section 3.1"
+
+     ::= { fsLsppEchoSequenceTableEntry 4 }
+
+   -- End of sequence number table
+
+
+   -- Hop Info Table
+
+    fsLsppHopTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FsLsppHopTableEntry
+        MAX-ACCESS	not-accessible
+        STATUS	current
+        DESCRIPTION 
+            "This table contains information about the transit nodes in the
+             path on which the echo request is sent. This table is populated
+             for both ping and trace route operations."
+   ::= { fsLsppPingTrace 3 }
+
+    fsLsppHopTableEntry OBJECT-TYPE
+        SYNTAX      FsLsppHopTableEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+             "An entry in this table contains information about a Transit node 
+              and its Downstream node's information.
+              For every Sender's Handle fsLsppSenderHandle in the
+              fsLsppPingTraceTable pertaining to a trace route operation, 
+              there will be one entry in this table for each transit node as 
+              determined by the trace route operation. The number of entries
+              for each Sender's Handle is determined by the value of the
+              fsLsppActualHopCount object."
+        INDEX {
+            fsLsppContextId,
+            fsLsppSenderHandle,
+            fsLsppHopIndex
+           }
+        ::= { fsLsppHopTable 1 }
+
+    FsLsppHopTableEntry ::= SEQUENCE {
+        fsLsppHopIndex               Unsigned32,
+        fsLsppHopAddrType            FsLsppAddressType,
+        fsLsppHopAddr                OCTET STRING,
+        fsLsppHopGlobalId            Unsigned32,
+        fsLsppHopId                  Unsigned32,
+        fsLsppHopIfNum               Unsigned32,
+        fsLsppHopReturnCode          Unsigned32,
+        fsLsppHopReturnSubCode       Unsigned32,
+        fsLsppHopReturnCodeStr       OCTET STRING,
+        fsLsppHopRxAddrType          FsLsppAddressType,
+        fsLsppHopRxIPAddr            OCTET STRING,
+        fsLsppHopRxIfAddr            OCTET STRING,
+        fsLsppHopRxIfNum             Unsigned32,
+        fsLsppHopRxLabelStack        OCTET STRING,
+        fsLsppHopRxLabelExp          OCTET STRING,
+        fsLsppHopRtt                 Unsigned32,
+        fsLsppHopDsMtu               Unsigned32,
+        fsLsppHopDsAddrType          FsLsppAddressType,
+        fsLsppHopDsIPAddr            OCTET STRING,
+        fsLsppHopDsIfAddr            OCTET STRING,
+        fsLsppHopDsIfNum             Unsigned32,
+        fsLsppHopDsLabelStack        OCTET STRING,
+        fsLsppHopDsLabelExp          OCTET STRING,
+        fsLsppHopIcc               OCTET STRING,
+        fsLsppHopUMC               OCTET STRING,
+        fsLsppHopMepIndex            Unsigned32
+    }
+
+    fsLsppHopIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The Hop Index contains the index to uniquely identify each
+             transit node in a traced path."
+        ::= { fsLsppHopTableEntry 1 }
+
+    fsLsppHopAddrType OBJECT-TYPE
+        SYNTAX      FsLsppAddressType
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the type of address of the replying 
+             transit router. 
+             
+             In IP/MPLS environments, the value of this object
+             can be either 'ipv4 numbered' or 'ipv6 numbered'. In MPLS-TP 
+             environments, it can be 'ipv4 numbered' or 'ipv6 numbered' when 
+             IP addressing is supported and 'notapplicable' when IP 
+             addressing is not in use."
+        REFERENCE
+          "RFC 4379, Section 3.3"
+        ::= { fsLsppHopTableEntry 2 }
+
+    fsLsppHopAddr   OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..16))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the address of the replying transit router
+             as per the type specified by the fsLsppHopAddrType object.
+             
+             This object will contain ipv4 or ipv6 address in IP/MPLS 
+             environment. In MPLS-TP environment, this object will not be 
+             appicable."
+        ::= { fsLsppHopTableEntry 3 }
+
+    fsLsppHopGlobalId OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the Global ID of the transit replying node
+             in MPLS-TP networks."
+        ::= { fsLsppHopTableEntry 4 }
+
+    fsLsppHopId OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the Node ID of the transit replying node
+             in MPLS-TP networks. The Node ID can be IPv4 loopback address or
+             a 32-bit unsigned integer value when IP addressing is not
+             supported."
+        ::= { fsLsppHopTableEntry 5 }
+
+    fsLsppHopIfNum  OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the Interface number of the transit replying
+             node in MPLS-TP network. "
+        ::= { fsLsppHopTableEntry 6 }
+
+    fsLsppHopReturnCode OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the return code received in the response 
+             packet from this transit node.
+             Return code can have a value ranging from 0 to 13." 
+        ::= { fsLsppHopTableEntry 7 }
+
+    fsLsppHopReturnSubCode OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the return sub code received in the response
+             packet from this transit node." 
+        ::= { fsLsppHopTableEntry 8 }
+
+    fsLsppHopReturnCodeStr OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..128))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The object contains a string which provides the meaning for the 
+             return code along with the return subcode. The list of strings 
+             are the same as those supported by the fsLsppReturnCodeStr
+             object."
+	    ::= { fsLsppHopTableEntry 9 }
+
+    fsLsppHopRxAddrType OBJECT-TYPE
+        SYNTAX      FsLsppAddressType
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the type of the address of the interface
+             receiving the trace route request packet on the transit node."
+	    ::= { fsLsppHopTableEntry 10 }
+
+    fsLsppHopRxIPAddr OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..16))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the router address of the transit node or
+             the interface address on which the echo request was received by 
+             the transit router. The type of address will be based on the 
+             value in the fsLsppHopRxAddrType object."
+        REFERENCE
+        "RFC 4379, Section 3.6"
+        ::= { fsLsppHopTableEntry 11 }
+
+    fsLsppHopRxIfAddr OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..16))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the interface address on which the echo 
+             request received by the replying router. The type of address will 
+             be based on the value in fsLsppHopRxAddrType.
+             This object is not applicable for Un-Numbered Interfaces."
+        REFERENCE
+        "RFC 4379, Section 3.6"
+        ::= { fsLsppHopTableEntry 12 }
+
+
+    fsLsppHopRxIfNum  OBJECT-TYPE
+        SYNTAX	  	Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the interface Index of the replying
+             router on which the echo request was received.
+             
+             This object is applicable in case of Un-Numbered Interfaces.
+             This object takes the value 0 on interfaces with IP Addresses,
+             and the corresponding value of ifIndex for interfaces having
+             no IP Address."
+        ::= { fsLsppHopTableEntry 13 }
+
+    fsLsppHopRxLabelStack OBJECT-TYPE
+        SYNTAX      OCTET STRING
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the label stack that was on the echo request 
+             packet when it was received by the replying transit router. The 
+             labels in the stack will be delimited by slash('/').
+             For example, 20/10/25"
+        REFERENCE
+        "RFC 4379, Section 3.6"
+        ::= { fsLsppHopTableEntry 14 }
+
+    fsLsppHopRxLabelExp OBJECT-TYPE
+        SYNTAX      OCTET STRING
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the EXP values of the labels in the received 
+             Interface and Label Stack TLV, which are the EXP values in the 
+             labels with which the transit router received the echo request.
+             The EXP values in the stack will be delimited by slash ('/').
+             For example, 2/1/2 "
+        REFERENCE
+        "RFC 4379, Section 3.6"
+        ::= { fsLsppHopTableEntry 15 }
+
+    fsLsppHopRtt    OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the round-trip time taken to this hop,
+             which is the total time taken for the request packet to be sent
+             to this transit node and the reply packet to be received from it."
+        ::= { fsLsppHopTableEntry 16 }
+
+    fsLsppHopDsMtu  OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS read-only
+        STATUS       current
+        DESCRIPTION
+            "This object specifies the maximum transmission unit on the
+             Downstream interface of this trasnit node."
+        REFERENCE
+        "RFC 4379, Section 3.3"
+        ::= { fsLsppHopTableEntry 17 }
+
+    fsLsppHopDsAddrType OBJECT-TYPE
+        SYNTAX       FsLsppAddressType
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+             "This object specifies the type of the address of the Downstream 
+              Node for this transit node."
+         REFERENCE
+         "RFC 4379, Section 3.3"
+         ::= { fsLsppHopTableEntry 18 }
+
+    fsLsppHopDsIPAddr OBJECT-TYPE
+        SYNTAX       OCTET STRING (SIZE (1..16))
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+            "This object contains the IP address of the Downstream Node for 
+             this transit router based on the value of fsLsppHopDsAddrType. 
+             This object will not contain any value when IP addressing is not
+             used in MPLS-TP environments."
+        REFERENCE
+        "RFC 4379, Section 3.3"
+        ::= { fsLsppHopTableEntry 19 }
+
+    fsLsppHopDsIfAddr OBJECT-TYPE
+        SYNTAX       OCTET STRING (SIZE (1..16))
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+            "This object specifies the interface address of the Downstream
+             Node of this transit router, over which the echo request packet 
+             would be forwarded for by this transit router for the path being
+             traced.
+             This object is not applicable for Un-Numbered Interfaces."
+        REFERENCE
+        "RFC 4379, Section 3.3"
+        ::= { fsLsppHopTableEntry 20 }
+
+    fsLsppHopDsIfNum   OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object contains the interface Index of the Downstream
+             Node of this transit router, over which the echo request packet
+             would be forwarded for by this transit router for the path being
+             traced.
+             This object is applicable for Un-Numbered Interfaces only.
+             This object takes the value 0 on interfaces with IP Addresses,
+             and the corresponding value of ifIndex for interfaces having 
+             no IP Address."
+        ::= { fsLsppHopTableEntry 21 }
+
+    fsLsppHopDsLabelStack OBJECT-TYPE
+        SYNTAX      OCTET STRING
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION 
+            "This object contains the set of labels in the label stack as it 
+             would have appeared if this transit router were forwarding the 
+             packet through the interface to its Downstream router. The labels
+             in the stack will be delimited by slash('/').
+             For example, 20/10/25"
+        REFERENCE
+        "RFC 4379, Section 3.3"
+        ::= { fsLsppHopTableEntry 22 }
+
+    fsLsppHopDsLabelExp OBJECT-TYPE
+        SYNTAX       OCTET STRING
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION  
+            "This object contains the EXP values of the labels in the received 
+             label stack in Downstream Mapping TLV, which are the EXP values
+             this transit router would use if it were forwarding the packet
+             through the interface to its Downstream router. 
+             The EXP values in the stack will be delimited by slash ('/').
+             For example, 2/1/2 "
+        REFERENCE
+        "RFC 4379, Section 3.3"
+        ::= { fsLsppHopTableEntry 23 }
+    
+    fsLsppHopIcc OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..6))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the ICC(ITU Carrier Code) of the 
+            transit replying node in ICC based MPLS-TP network.
+            This is not applicable in IP based MPLS-TP network."
+        ::= { fsLsppHopTableEntry 24 }
+ 
+   fsLsppHopUMC OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..7))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the UMC(Unique MEG code) of the 
+            transit replying node in ICC based MPLS-TP network. 
+            This is not applicable in IP based MPLS-TP network."
+        ::= { fsLsppHopTableEntry 25 }
+   
+   fsLsppHopMepIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "This object specifies the administratively assigned Mep Index 
+            of the transit replying node in ICC based MPLS-TP network. 
+            This is not applicable in IP based MPLS-TP network."
+        ::= { fsLsppHopTableEntry 26 }
+
+    -- End of Path Info Table
+
+
+
+    -- Notification Group
+
+    fsLsppTraps OBJECT IDENTIFIER ::= { fsLsppNotifications 0 }
+  
+    fsLsppTrapContextName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE (1..32))
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+            "The name given to the virtual context."
+    ::= { fsLsppNotifications 1 }
+
+    fsLsppPingCompletionTrap NOTIFICATION-TYPE
+        OBJECTS { 
+                   fsLsppTrapContextName,
+                   fsLsppStatus 
+                }
+        STATUS    current
+        DESCRIPTION
+            "This notification is sent at the completion of ping request either
+             when the request is completed successfully or timed out for the 
+             response. This will be sent only when this trap is enabled."
+        ::= { fsLsppTraps 1 }
+
+    fsLsppTraceRouteTrap NOTIFICATION-TYPE
+        OBJECTS { 
+                   fsLsppTrapContextName,
+                   fsLsppStatus, 
+                   fsLsppActualHopCount 
+                }
+        STATUS   current
+        DESCRIPTION
+            "This notification is sent at the completion of traceroute request 
+             either when the path trace is completed successfully or timed out 
+             for the response. This will be sent only when this trap is 
+             enabled."
+        ::= { fsLsppTraps 2 }
+
+    fsLsppBFDBootstrapReqRcvdTrap NOTIFICATION-TYPE
+        OBJECTS {
+                   fsLsppTrapContextName,
+                   fsLsppRequestOwner 
+                }
+        STATUS   current
+        DESCRIPTION
+            "This notification is sent when BFD triggers LSP ping to 
+             bootstrap BFD session establishment."
+        ::= { fsLsppTraps 3 }
+
+
+  -- End Notification Group
+
+END

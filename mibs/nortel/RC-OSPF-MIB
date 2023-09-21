@@ -8,12 +8,14 @@ IMPORTS
         FROM SNMPv2-TC
     InterfaceIndexOrZero
         FROM IF-MIB
-    rcOspf, rcStat, rcIpConf, EnableValue
-        FROM RAPID-CITY;
+    rcOspf, rcStat, EnableValue
+        FROM RAPID-CITY
+    rcIpConf
+        FROM RC-IP-MIB;
 
 
 rcOspfMib MODULE-IDENTITY
-       LAST-UPDATED     "201205140000Z"       
+       LAST-UPDATED     "202101130000Z"       
        ORGANIZATION     "Bay Networks, Rapid-City Group"
        CONTACT-INFO     "Yu-Ten Lee
                          Postal:        Nortel Networks
@@ -24,6 +26,65 @@ rcOspfMib MODULE-IDENTITY
                          Fax:           408-495-6690
                          E-mail:        ylee@nortel.com"
        DESCRIPTION      "Enterprise MIB for the Accelar product family."
+
+       REVISION "202101130000Z"  -- 13 Jan 2021
+       DESCRIPTION "Version 26:  Added rcStatOspfIfClearStats"
+
+
+       REVISION "201703130000Z"  -- 13 March 2017
+       DESCRIPTION "Version 25:  Added rcIpConfOspfDefaultMetric2500MegPort"
+
+       REVISION "201701200000Z"  -- 20 Jan 2017
+       DESCRIPTION "Version 24:  Removed rcIpConfOspfIfTable because it had a mib object
+	   			 (rcIpConfOspfIfType) that conflicts with the same named
+				 object in rcIpConfTable.
+				 rcIpConfOspfIfTable was added here because of a request
+				 to fix an issue that was found out in VOSS product Trials.
+				 But, the mib table was never implemented in VOSS code."
+
+       REVISION "201612050000Z"  -- 05 Dec 2016
+       DESCRIPTION "Version 23:  Added rcStatOspfReset"
+	   
+       REVISION "201611010000Z"  -- 01 Nov 2016
+       DESCRIPTION "Version 22:  Added rcIpConfOspfDefaultMetric25000MegPort"
+	   
+       REVISION "201603040000Z"  -- 4 March 2016
+       DESCRIPTION "Version 21:  Changed rcIpConfOspfDefaultMetricVlan from
+	   			 INTEGER to Integer32."
+	   
+       REVISION "201602250000Z"  -- 25 February 2016
+       DESCRIPTION "Version 20:  Added rcIpConfOspfDefaultMetricVlan.
+	                         Requested by Doru Tonciu, submit# 27311 (Prem)"
+	   
+       REVISION "201508110000Z"  -- 11 August 2015
+       DESCRIPTION "Version 19:  Added rcStatOspfBadLsReqs,
+	   			 rcStatOspfSeqMismatches,
+				 rcStatOspfNumAllocDDP and
+				 rcStatOspfNumFreeDDP.
+	                         Requested by Pam LeBlanc, submit# 25192 (Prem)"
+
+       REVISION "201503120000Z" -- 12 Mar 2015
+       DESCRIPTION "Version 18: Added rcIpConfOspfHelperModeDisable.
+	   			Requested by Pam LeBlanc on 03/12/2015 (Prem)"
+
+       REVISION "201409240000Z" -- 24 Sep 2014
+       DESCRIPTION "Version 17: Added sha1 and sha2 under rcIpConfOspfAuthType. 
+				Request from Hariprasad Rajendran for VSP federal project 
+				- Submit 20907 (Prem)"
+
+       REVISION "201409230000Z" -- 23 Sep 2014
+       DESCRIPTION "Version 16: Added rcIpConfOspfIfTable. Added textual conventions for
+	   			AreaID, Status, DesignatedRouterPriority, UpToMaxAge and
+				PositiveInteger.
+				Request from Priyanka Gupta for WI01179839 VSP8200 4.0.1 
+				Trials: OSPF Interfaces cannot be chaned to passive mode 
+				using EDM. (Prem)"
+
+       REVISION "201405300000Z" -- 30 May 2014
+       DESCRIPTION "Version 15: Added DEFVAL for rcIpConfOspfDefaultMetric40000MegPort"
+
+       REVISION "201402190000Z" -- 19 Feb 2014
+       DESCRIPTION "Version 14: Added rcStatOspfNbrs"
 
        REVISION "201205140000Z" -- 14 May 2012
        DESCRIPTION "Version 13: Added rcIpConfOspfDefaultMetric40000MegPort in rcIpConfOspfDefaultMetric."
@@ -60,6 +121,32 @@ rcOspfMib MODULE-IDENTITY
        DESCRIPTION "Version 3: Added version info"  
 
        ::= { rcOspf 1 }
+
+--  The Area ID, in OSPF, has the same format as an IP Address,
+--  but has the function of defining a summarization point for
+--  Link State Advertisements
+AreaID ::= IpAddress
+
+--  Status Values
+--  The status of an interface: 'enabled' indicates that
+--  it is willing to communicate with other OSPF Routers,
+--  while 'disabled' indicates that it is not."
+Status ::= INTEGER { enabled (1), disabled (2) }
+
+
+--  Potential Priorities for the Designated Router Election
+--  "The values defined for the priority of a system for 
+--  becoming the designated router."
+DesignatedRouterPriority ::= Integer32 (0..'FF'h)
+
+-- "The values that one might find or configure for
+-- variables bounded by the maximum age of an LSA."
+UpToMaxAge ::= Integer32 (0..3600)
+
+--  Time Durations measured in seconds
+--  "A positive integer. Values in excess are precluded as
+--  unnecessary and prone to interoperability issues."
+PositiveInteger ::= Integer32 (0..'7FFFFFFF'h)
 
 -- Ospf Configuration Table
  
@@ -199,7 +286,9 @@ rcIpConfOspfAuthType OBJECT-TYPE
          SYNTAX        INTEGER {
                            none (0),
                            simplePassword (1),
-                           md5 (2)
+                           md5 (2),
+                           sha1 (3),
+                           sha2 (4)
                        }
         MAX-ACCESS     read-write
         STATUS         current
@@ -278,8 +367,45 @@ rcIpConfOspfDefaultMetric40000MegPort OBJECT-TYPE
         STATUS        current
         DESCRIPTION   "Used to indicate the cost associated with
                       40000Meg Interface(Port)."
+        DEFVAL        { 1 }           
         ::= { rcIpConfOspfDefaultMetric 5 }
 
+rcIpConfOspfDefaultMetricVlan OBJECT-TYPE
+        SYNTAX        Integer32 (1..'FFFF'h)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Used to indicate the cost associated with
+                       Vlan Interface"
+	DEFVAL        { 10 }	      
+	::= { rcIpConfOspfDefaultMetric 6 }
+    
+rcIpConfOspfDefaultMetric100000MegPort OBJECT-TYPE
+        SYNTAX        INTEGER (1..'FFFF'h)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Used to indicate the cost associated with
+                      100000Meg Interface(Port)."
+	DEFVAL        { 1 }	      
+	::= { rcIpConfOspfDefaultMetric 7 }
+    
+rcIpConfOspfDefaultMetric25000MegPort OBJECT-TYPE
+        SYNTAX        INTEGER (1..'FFFF'h)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Used to indicate the cost associated with
+                      25000Meg Interface(Port)."
+        DEFVAL        { 1 }
+        ::= { rcIpConfOspfDefaultMetric 8 }
+
+rcIpConfOspfDefaultMetric2500MegPort OBJECT-TYPE
+        SYNTAX        INTEGER (1..'FFFF'h)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Used to indicate the cost associated with
+                      2500Meg Interface(Port)."
+        DEFVAL        { 1 }
+        ::= { rcIpConfOspfDefaultMetric 9 }
+    
 rcIpConfOspf   OBJECT IDENTIFIER       ::= { rcIpConf 4 }
 
  
@@ -339,6 +465,15 @@ rcIpConfOspfRfc1583Compatibility OBJECT-TYPE
                        been originated from different areas."
         DEFVAL        { false }
         ::= { rcIpConfOspf 5 }
+
+rcIpConfOspfHelperModeDisable OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Disables Graceful Restart Helper Mode feature.
+                       The feature is enabled by default."
+        DEFVAL        { false }
+        ::= { rcIpConfOspf 6 }
 
 
 -- Ospf Area Table
@@ -786,7 +921,53 @@ rcStatOspfAreas OBJECT-TYPE
         STATUS        current
         DESCRIPTION   "Used to indicate the number of areas configured"
         ::= { rcStatOspf 15 }
- 
+
+rcStatOspfNbrs OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Used to indicate the number of ospf neighbors"
+        ::= { rcStatOspf 16 }
+
+rcStatOspfBadLsReqs OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Used to indicate the number of bad ls requests."
+        ::= { rcStatOspf 17 }
+
+rcStatOspfSeqMismatches OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Used to indicate the number of sequence
+                       mismatched packets."
+        ::= { rcStatOspf 18 }
+
+rcStatOspfNumAllocDDP OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Used to indicate the number of DD packet buffers
+                      allocated for OSPF."
+        ::= { rcStatOspf 19 }
+
+rcStatOspfNumFreeDDP OBJECT-TYPE
+        SYNTAX        Counter32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Used to indicate the number of DD packet buffers
+                      that are freed by the OSPF."
+        ::= { rcStatOspf 20 }
+
+rcStatOspfReset OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "reset Ospf global stats"
+        DEFVAL          { false }
+        ::= { rcStatOspf 21 } 
+    
 rcStatOspfIfTable OBJECT-TYPE
         SYNTAX        SEQUENCE OF RcStatOspfIfEntry
         MAX-ACCESS    not-accessible
@@ -822,7 +1003,8 @@ RcStatOspfIfEntry ::= SEQUENCE {
                 rcStatOspfIfNetMaskMismatches       Counter32,
                 rcStatOspfIfHelloIntervalMismatches Counter32,
                 rcStatOspfIfDeadIntervalMismatches  Counter32,
-                rcStatOspfIfOptionMismatches        Counter32
+                rcStatOspfIfOptionMismatches        Counter32,
+                rcStatOspfIfClearStats              TruthValue
         }
 
 rcStatOspfIfIndex OBJECT-TYPE
@@ -976,6 +1158,15 @@ rcStatOspfIfOptionMismatches OBJECT-TYPE
         DESCRIPTION   "Used to indicate the number options
                       mismatches received by this interface."
         ::= { rcStatOspfIfEntry 19 }
+
+rcStatOspfIfClearStats OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Used to clear the OSPF interface statistics.
+                        If set is done for IfIndex 0, will clear all table entries"
+        DEFVAL          { false }
+        ::= { rcStatOspfIfEntry 20 }
 
 -- Stat Ospf Ip Interface Table
 -- replaces Stat Ospf Interface Table
@@ -1177,7 +1368,5 @@ rcStatOspfIfV2OptionMismatches OBJECT-TYPE
         DESCRIPTION   "Used to indicate the number options
                       mismatches received by this interface."
         ::= { rcStatOspfIfV2Entry 20 }
-
-
 
 END

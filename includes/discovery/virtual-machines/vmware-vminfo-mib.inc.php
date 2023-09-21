@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,14 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 // Try to discover any Virtual Machines.
 
 // Variable to hold the discovered Virtual Machines.
-$vmw_vmlist = array();
+$vmw_vmlist = [];
 
 /*
  * Fetch the Virtual Machine information.
@@ -33,13 +32,18 @@ $vmw_vmlist = array();
  *  VMWARE-VMINFO-MIB::vmwVmCpus.416 = INTEGER: 2
  */
 
-$oids = snmpwalk_cache_oid($device, 'vmwVmTable', array(), 'VMWARE-VMINFO-MIB');
+$oids = snmpwalk_cache_oid($device, 'vmwVmTable', [], 'VMWARE-VMINFO-MIB');
 
-foreach ($oids as $index => $entry)
-{
-  // Call VM discovery
-  discover_virtual_machine($valid, $device, array('id' => $entry['vmwVmUUID'], 'name' => $entry['vmwVmDisplayName'], 'cpucount' => $entry['vmwVmCpus'],
-    'memory' => $entry['vmwVmMemSize'] * 1024 * 1024, 'status' => $entry['vmwVmState'], 'os' => $entry['vmwVmGuestOS'],'type' => 'vmware', 'source' => 'vmware-snmp'));
+foreach ($oids as $index => $entry) {
+    // Call VM discovery
+    discover_virtual_machine($valid, $device, [ 'id'       => $entry['vmwVmUUID'],
+                                                'name'     => $entry['vmwVmDisplayName'],
+                                                'cpucount' => $entry['vmwVmCpus'],
+                                                'memory'   => $entry['vmwVmMemSize'] * 1024 * 1024,
+                                                'status'   => $entry['vmwVmState'],
+                                                'os'       => $entry['vmwVmGuestOS'],
+                                                'type'     => 'vmware',
+                                                'source'   => 'vmware-snmp' ]);
 }
 
 // Clean up removed VMs (our type - vmware-snmp - only, so we don't clean up other modules' VMs)

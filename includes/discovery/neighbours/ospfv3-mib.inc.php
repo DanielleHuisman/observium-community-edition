@@ -4,15 +4,15 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 if (!$config['autodiscovery']['ospf']) {
-  print_debug("Autodiscovery for OSPF disabled.");
-  return;
+    print_debug("Autodiscovery for OSPF disabled.");
+    return;
 }
 
 // OSPFV3-MIB::ospfv3NbrAddressType.4.0.3110374402 = INTEGER: ipv6(2)
@@ -36,24 +36,26 @@ if (!$config['autodiscovery']['ospf']) {
 
 $ospf_array = snmpwalk_cache_oid($device, 'ospfv3NbrAddress', [], 'OSPFV3-MIB', NULL, OBS_SNMP_ALL_HEX);
 if (snmp_status()) {
-  $ospf_array = snmpwalk_cache_oid($device, 'ospfv3NbrIfId', $ospf_array, 'OSPFV3-MIB');
-  print_debug_vars($ospf_array);
+    $ospf_array = snmpwalk_cache_oid($device, 'ospfv3NbrIfId', $ospf_array, 'OSPFV3-MIB');
+    print_debug_vars($ospf_array);
 
-  foreach ($ospf_array as $index => $entry) {
-    $ip = hex2ip($entry['ospfv3NbrAddress']);
-    $ip_compressed = ip_compress($ip);
-    if ($ip_compressed === '::') { continue; }
+    foreach ($ospf_array as $index => $entry) {
+        $ip            = hex2ip($entry['ospfv3NbrAddress']);
+        $ip_compressed = ip_compress($ip);
+        if ($ip_compressed === '::') {
+            continue;
+        }
 
-    // Try find remote device and check if already cached
-    $remote_device_id = get_autodiscovery_device_id($device, $ip);
-    if (is_null($remote_device_id) && // NULL - never cached in other rounds
-        check_autodiscovery($ip)) {   // Check all previous autodiscovery rounds
+        // Try find remote device and check if already cached
+        $remote_device_id = get_autodiscovery_device_id($device, $ip);
+        if (is_null($remote_device_id) && // NULL - never cached in other rounds
+            check_autodiscovery($ip)) {   // Check all previous autodiscovery rounds
 
-      // Neighbour never checked, try autodiscovery
-      $port = get_port_by_index_cache($device, $entry['ospfv3NbrIfId']);
-      $remote_device_id = autodiscovery_device($ip, NULL, 'OSPF', NULL, $device, $port);
+            // Neighbour never checked, try autodiscovery
+            $port             = get_port_by_index_cache($device, $entry['ospfv3NbrIfId']);
+            $remote_device_id = autodiscovery_device($ip, NULL, 'OSPF', NULL, $device, $port);
+        }
     }
-  }
 }
 
 // EOF

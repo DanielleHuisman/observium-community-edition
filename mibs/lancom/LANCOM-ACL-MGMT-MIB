@@ -1,0 +1,291 @@
+LANCOM-ACL-MGMT-MIB DEFINITIONS ::= BEGIN
+
+-- Broadcom Fastpath Management ACL MIB
+-- Copyright 2016 Broadcom.
+-- This SNMP Management Information Specification
+-- embodies Broadcom's confidential and proprietary
+-- intellectual property.  Broadcom retains all title
+-- and ownership in the Specification including any revisions.
+
+-- This Specification is supplied "AS IS", Broadcom 
+-- makes no warranty, either expressed or implied,
+-- as to the use, operation, condition, or performance of the
+-- Specification.
+
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, 
+    IpAddress, Integer32, Unsigned32     FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, RowStatus, TruthValue
+                                         FROM SNMPv2-TC
+    DisplayString                        FROM RFC1213-MIB
+    fastPath                             FROM LANCOM-REF-MIB;
+
+    aclMgmtGroup MODULE-IDENTITY
+        LAST-UPDATED "201512110000Z" -- 11 December 2015 12:00:00 GMT
+        ORGANIZATION "Broadcom "
+        CONTACT-INFO
+                                 "Customer Support
+          Postal:                Broadcom 
+                                 1030 Swabia Court
+                                 Suite 400
+                                 Durham, NC 27703
+          Tel:                   +1 919 865 2700"
+        DESCRIPTION
+          "The MIB definitions for Management ACL component."
+
+        -- Revision history.  
+        REVISION
+          "201512110000Z" -- 11 Dec 2015 12:00:00 GMT
+        DESCRIPTION
+          "Added ACL management support."
+
+    ::= { fastPath 62 }
+
+--*********************** Management ACLs ***********************
+
+    -- This group defines the set of objects required to define the
+    -- access control for the various management interfaces supported
+    -- by the switch. This includes control for the SNMP, CLI(via telnet/ssh),
+    -- and Web based (http/https) management interfaces.
+    -- Additionally control over tftp and sntp  is supported.
+    --
+    -- In order to enable management ACL, the user must configure access list and
+    -- set it as active. A set of rules can be created within access list to be checked 
+    -- when granting access to the management interface of the system.
+    -- The user may define multiple management ACL rule set, but only one may be
+    -- active at any given point. There is a limit to the number of ACL rules
+    -- and rule set which may be specified. This limit is per switch type so 
+    -- that the system will fail to create new rules or rule set when the system
+    -- limit is reached.
+    -- In order to permit switch management only via console, "console-only" option
+    -- is used for aclMgmtActiveListName.
+    -- Each rule set is given a name and rules within the rule set are given
+    -- priorities. Priority 1 is the highest priority. Rules
+    -- are checked from highest priority so that:
+    -- * the first rule to deny permission to the system will result in denied
+    --   access with no further checking.
+    -- * only if all the rules permitted access to the system would success the
+    --   management request will be granted.
+    ---------------------------------------------------------------------------
+
+    AclMgmtServiceType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+                "Management ACL Service type to be configured."
+    SYNTAX      INTEGER {
+                        allType(0),
+                        telnet(1),
+                        http(2),
+                        https(3),
+                        snmp(4),
+                        ssh(5),
+                        tftp(6),
+                        sntp(7)
+                    }
+
+    AclMgmtActionType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+                "Management ACL Action definition."
+    SYNTAX      INTEGER {
+                        permit(0),
+                        deny(1)
+                    }
+
+    aclMgmtEnable OBJECT-TYPE
+        SYNTAX      TruthValue
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+                    "The variable specifies if Management ACL functionality is enabled.
+                    This parameter value is TRUE, which means that management
+                    ACL is checked when granting access to the system."
+        ::= { aclMgmtGroup 1 }
+
+    aclMgmtActiveListName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(0..32))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION 
+                    "Activate a particular management ACL rule-set.
+                    If no management ACL rule-set is specified (by setting this parameter
+                    to a NULL string) then the system assumes that management ACL is disabled.
+
+                    If the user attempts to set this parameter to the name of an
+                    invalid or non-existing ACL rule-set, the configuration will fail.
+
+                    If the user deletes a management ACL rule-set to which this 
+                    parameter references, the parameter will be set to a NULL 
+                    string and the system will assume that management ACL checking 
+                    has been disabled.
+
+                    'console-only' access list is used to permit switch management only via console and 
+                    deny management via network. Note that this action will immediately block SNMP access."
+        ::= { aclMgmtGroup 2 }
+
+    aclMgmtListTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF AclMgmtListEntry
+        MAX-ACCESS         not-accessible
+        STATUS             current
+        DESCRIPTION
+                           "This table defines all management ACL rule-set as well as the rules
+                           within the rule-set. To activate a specific ACL rule-set, please
+                           refer to the 'aclMgmtActiveListName' parameter above."
+        ::= { aclMgmtGroup 3 }
+
+    aclMgmtListEntry  OBJECT-TYPE
+        SYNTAX      AclMgmtListEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+                    "Each entry in the table is a single rule within a given rule-set.
+                    The rules within a rule-set are grouped together via a common
+                    name 'aclMgmtListName'. Each rule has a specific priority
+                    within the rule-set given by 'aclMgmtListPriority', where
+                    priority 1 is the highest priority of the given set.
+
+                    Each rule may be applied to a specific interface within the switch
+                    or to all interfaces (specified by setting the ifIndex to 0)."
+        INDEX  { aclMgmtListName, aclMgmtListPriority }
+        ::= { aclMgmtListTable 1 }
+
+    AclMgmtListEntry ::= SEQUENCE {
+        aclMgmtListName            DisplayString,
+        aclMgmtListPriority        Unsigned32,
+        aclMgmtListIfIndex         Unsigned32,
+        aclMgmtListIpAddr          IpAddress,
+        aclMgmtListIpNetMask       IpAddress,
+        aclMgmtListService         AclMgmtServiceType,
+        aclMgmtListAction          AclMgmtActionType,
+        aclMgmtListRowStatus       RowStatus,
+        aclMgmtListVlanId          Unsigned32,
+        aclRuleIsConflict          TruthValue
+    }
+
+    aclMgmtListName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..32))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+                    "The name of a given rule-set." 
+        ::= { aclMgmtListEntry 1 }
+
+    aclMgmtListPriority OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..64)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+                    "The priority value of a given rule within the rule-set."
+        ::= { aclMgmtListEntry 2 }
+
+    aclMgmtListIfIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "The IfIndex to which this rule applies. By setting this to a
+                    specific ifIndex, the rule will only apply if the management
+                    access is coming over the given interface. If the ifIndex is
+                    set to 0, then this rule applies to all interfaces."
+        ::= { aclMgmtListEntry 3 }
+
+    aclMgmtListIpAddr OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "The IP address associated with this entry. The IP address may be set 
+                    to 0, which means that the rule applies to all IP addresses.
+                    Otherwise, the rule applies to all management requests which come
+                    from a given IP address."
+        ::= { aclMgmtListEntry 4 }
+
+    aclMgmtListIpNetMask OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "The subnet mask associated with the IP address of this entry. The 
+                    value of the mask is an IP address with all the network bits set 
+                    to 1 and all the hosts bits set to 0. Using this in conjunction
+                    with the ipAddress given above, it is possible to make the rule
+                    applies to a subnet instead of a specific address (to force the
+                    rule to apply to a single address, use a netmask with all bits
+                    set to 1 (i.e. 255.255.255.255 netmask)."
+        ::= { aclMgmtListEntry 5 }
+
+    aclMgmtListService  OBJECT-TYPE
+        SYNTAX      AclMgmtServiceType
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "The type of services that this rule applies to. By setting this
+                    to a specific service type, the rule will only apply if the 
+                    request is coming to the switch using the particular protocol
+                    type specified. The Service type address can be configured to 
+                    be 0, which means any of the supported protocols or services
+                    are applicable."
+        ::= { aclMgmtListEntry 6 }
+
+    aclMgmtListAction  OBJECT-TYPE
+        SYNTAX      AclMgmtActionType
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "The action to apply to the given traffic matching the rule. The
+                    action may be to permit or deny the requested management access."
+        ::= { aclMgmtListEntry 7 }
+
+    aclMgmtListRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+                    "The row status variable, used according to row creation and
+                    deletion conventions.
+                    active(1)      - Management ACL instance is active
+                    createAndGo(4) - set to this value to create an instance
+                    destroy(6)     - set to this value to delete an instance
+                    "
+        ::= { aclMgmtListEntry 8 }
+
+    aclMgmtListVlanId OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                    "The VLAN ID which can be applied to this rule. Valid VLAN ID range is 1-4093.
+                    By setting this to a specific VLAN ID, the rule will only applies if the management
+                    access is coming over the given interface."
+        ::= { aclMgmtListEntry 9 }
+
+    aclRuleIsConflict OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Read-only object, which indicates whether the specified ACL rule conflicts with any other rule.
+                     If the rule conflicts then it is recommended to remove it."
+         ::= { aclMgmtListEntry 10 }
+
+    aclMgmtTrapInfo NOTIFICATION-TYPE
+        OBJECTS { aclMgmtTrapReason }
+        STATUS      current
+        DESCRIPTION
+                    "Specifies protocol type that was blocked by Management ACL feature.
+                    The aclMgmtTrapInfo should indicate which management interface
+                    is violated and the source IP address of the request."
+        ::= { aclMgmtGroup 4 }
+
+     aclMgmtTrapReason OBJECT-TYPE
+        SYNTAX        DisplayString
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+                    "This text string may be used to provide additional information
+                    regarding the trap being sent."
+    ::= { aclMgmtGroup 5 }
+
+--**************************************************************************************
+END

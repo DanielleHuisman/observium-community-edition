@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -79,11 +79,10 @@ array(
  */
 $os = preg_replace("/(\(R\)|®|«|Â)/u", '', $wmi['os']['Caption']);
 $os = str_replace('Microsoft Windows ', '', $os);
-if ($wmi['os']['CSDVersion'])
-{
-  $os .= ' '. str_replace('Service Pack ', 'SP', $wmi['os']['CSDVersion']);
+if ($wmi['os']['CSDVersion']) {
+    $os .= ' ' . str_replace('Service Pack ', 'SP', $wmi['os']['CSDVersion']);
 }
-$os .= ' ('.$wmi['os']['Version'].')';
+$os .= ' (' . $wmi['os']['Version'] . ')';
 
 $version = $os;
 

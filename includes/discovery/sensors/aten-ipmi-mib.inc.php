@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -81,79 +81,89 @@
 // ATEN-IPMI-MIB::sensorIDString.38 = STRING: "AOC_SAS Temp"
 // ATEN-IPMI-MIB::sensorIDString.39 = STRING: "HDD Temp"
 // ATEN-IPMI-MIB::sensorIDString.40 = STRING: "HDD Status"
-$oids = snmpwalk_cache_oid($device, "sensorTable", array(), "ATEN-IPMI-MIB", NULL, OBS_SNMP_ALL_ASCII);
+$oids = snmpwalk_cache_oid($device, "sensorTable", [], "ATEN-IPMI-MIB", NULL, OBS_SNMP_ALL_ASCII);
 print_debug_vars($oids);
 
-$limits = [ 'limit_low'  => 'lcThreshold', 'limit_low_warn'  => 'lncThreshold',
-            'limit_high' => 'ucThreshold', 'limit_high_warn' => 'uncThreshold' ];
+$limits = ['limit_low'  => 'lcThreshold', 'limit_low_warn' => 'lncThreshold',
+           'limit_high' => 'ucThreshold', 'limit_high_warn' => 'uncThreshold'];
 
 foreach ($oids as $index => $entry) {
-  // skip empty sensors
-  if ($entry['sensorNumber'] == 0 || $entry['sensorIDString'] === '') { continue; }
-
-  $descr    = trim($entry['sensorIDString'], ' .');
-
-  $oid_name = 'sensorReading';
-  $oid_num  = '.1.3.6.1.4.1.21317.1.3.1.2.'.$index;
-  $scale    = 1;
-  $value    = $entry[$oid_name];
-
-  // Limits
-  //              [lncThreshold]             => string(6) "10.000"
-  //              [lcThreshold]              => string(5) "5.000"
-  //              [lnrThreshold]             => string(5) "5.000"
-  //              [uncThreshold]             => string(7) "100.000"
-  //              [ucThreshold]              => string(7) "105.000"
-  //              [unrThreshold]             => string(7) "110.000"
-
-  //              [lncThreshold]             => string(7) "700.000"
-  //              [lcThreshold]              => string(7) "500.000"
-  //              [lnrThreshold]             => string(7) "300.000"
-  //              [uncThreshold]             => string(9) "25300.000"
-  //              [ucThreshold]              => string(9) "25400.000"
-  //              [unrThreshold]             => string(9) "25500.000"
-  $options = [];
-  foreach ($limits as $limit => $limit_oid) {
-    if (isset($entry[$limit_oid]) && $entry[$limit_oid] != 0) {
-      $options[$limit] = $entry[$limit_oid];
+    // skip empty sensors
+    if ($entry['sensorNumber'] == 0 || $entry['sensorIDString'] === '') {
+        continue;
     }
-  }
-  $limits_count = count($options);
 
-  // Detect class based on descr anv value (this is derp, table not have other data for detect class
-  if (str_iends($descr, ' Temp')) {
-    if ($value == 0 && !$limits_count) { continue; }
-    $descr = str_replace(' Temp', '', $descr);
-    $class = 'temperature';
-  } elseif (str_icontains_array($descr, 'Fan')) {
-    if ($value == 0 && !$limits_count) { continue; }
-    if ($value > 100 || $value == 0) {
-      $class = 'fanspeed';
-    } elseif ($value > 0) {
-      $class = 'load';
-      $options = [];
+    $descr = trim($entry['sensorIDString'], ' .');
+
+    $oid_name = 'sensorReading';
+    $oid_num  = '.1.3.6.1.4.1.21317.1.3.1.2.' . $index;
+    $scale    = 1;
+    $value    = $entry[$oid_name];
+
+    // Limits
+    //              [lncThreshold]             => string(6) "10.000"
+    //              [lcThreshold]              => string(5) "5.000"
+    //              [lnrThreshold]             => string(5) "5.000"
+    //              [uncThreshold]             => string(7) "100.000"
+    //              [ucThreshold]              => string(7) "105.000"
+    //              [unrThreshold]             => string(7) "110.000"
+
+    //              [lncThreshold]             => string(7) "700.000"
+    //              [lcThreshold]              => string(7) "500.000"
+    //              [lnrThreshold]             => string(7) "300.000"
+    //              [uncThreshold]             => string(9) "25300.000"
+    //              [ucThreshold]              => string(9) "25400.000"
+    //              [unrThreshold]             => string(9) "25500.000"
+    $options = [];
+    foreach ($limits as $limit => $limit_oid) {
+        if (isset($entry[$limit_oid]) && $entry[$limit_oid] != 0) {
+            $options[$limit] = $entry[$limit_oid];
+        }
     }
-  } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) || preg_match('/^\d+(\.\d+)?V/', $descr) ||
-            str_icontains_array($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN' ])) {
-    if ($value == 0) { continue; }
-    $class = 'voltage';
-  } elseif (str_icontains_array($descr, [ 'Status', 'Intru' ])) {
-    $physical_class = str_istarts($descr, 'PS') ? 'powersupply' : 'other';
-    $options = [ 'entPhysicalClass' => $physical_class ];
+    $limits_count = count($options);
 
-    // if (str_starts($value, '0x')) {
-    //   $options['status_unit'] = 'hex';
-    // }
-    $type = str_icontains_array($descr, 'Intru') ? 'aten-state-invert' : 'aten-state';
-    discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, $options);
-    continue;
-  } else {
-    // FIXME, not always?
-    if ($value == 0 && !$limits_count) { continue; }
-    $class = 'temperature';
-  }
+    // Detect class based on descr anv value (this is derp, table not have other data for detect class
+    if (str_iends($descr, [' Temp', ' Temperature'])) {
+        if ($value == 0 && !$limits_count) {
+            continue;
+        }
+        $descr = str_replace([' Temp', ' Temperature'], '', $descr);
+        $class = 'temperature';
+    } elseif (str_icontains_array($descr, 'Fan')) {
+        if ($value == 0 && !$limits_count) {
+            continue;
+        }
+        if ($value > 100 || $value == 0) {
+            $class = 'fanspeed';
+        } elseif ($value > 0) {
+            $class   = 'load';
+            $options = [];
+        }
+    } elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) || preg_match('/^\d+(\.\d+)?V/', $descr) ||
+              str_icontains_array($descr, ['VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht', 'VDimm', 'Vcpu', 'PVNN'])) {
+        if ($value == 0) {
+            continue;
+        }
+        $class = 'voltage';
+    } elseif (str_icontains_array($descr, ['Status', 'Intru'])) {
+        $physical_class = str_istarts($descr, 'PS') ? 'powersupply' : 'other';
+        $options        = ['entPhysicalClass' => $physical_class];
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
+        // if (str_starts($value, '0x')) {
+        //   $options['status_unit'] = 'hex';
+        // }
+        $type = str_icontains_array($descr, 'Intru') ? 'aten-state-invert' : 'aten-state';
+        discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, $options);
+        continue;
+    } else {
+        // FIXME, not always?
+        if ($value == 0 && !$limits_count) {
+            continue;
+        }
+        $class = 'temperature';
+    }
+
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, $options);
 }
 
 // EOF

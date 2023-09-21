@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -29,11 +29,11 @@
 $mempool_array = snmpwalk_cache_oid($device, 'hpLocal', [], $mib);
 
 foreach ($mempool_array as $index => $entry) {
-  if (is_numeric($index) && is_numeric($entry['hpLocalMemTotalBytes'])) {
-    $total = $entry['hpLocalMemTotalBytes'];
-    $used  = $entry['hpLocalMemAllocBytes'];
-    discover_mempool($valid['mempool'], $device, $index, 'NETSWITCH-MIB', "Memory $index", 1, $total, $used);
-  }
+    if (is_numeric($index) && is_numeric($entry['hpLocalMemTotalBytes'])) {
+        $total = $entry['hpLocalMemTotalBytes'];
+        $used  = $entry['hpLocalMemAllocBytes'];
+        discover_mempool($valid['mempool'], $device, $index, 'NETSWITCH-MIB', "Memory $index", 1, $total, $used);
+    }
 }
 
 unset($mempool_array, $index, $total, $used);

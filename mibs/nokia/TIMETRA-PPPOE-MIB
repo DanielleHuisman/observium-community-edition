@@ -26,6 +26,7 @@ IMPORTS
     timetraSRMIBModules, tmnxSRConfs,
     tmnxSRNotifyPrefix, tmnxSRObjs
                                                          FROM TIMETRA-GLOBAL-MIB
+    tmnxNatEsaNum, tmnxNatEsaVappNum,
     tmnxNatIsaGrpId
                                                          FROM TIMETRA-NAT-MIB
     sapEncapValue, sapPortId
@@ -211,7 +212,9 @@ TmnxPppoePlcyEntry               ::= SEQUENCE
     tmnxPppoePlcyReestablishSession  INTEGER,
     tmnxPppoePlcyDefaultUserName     TmnxPppoeUserNameOrEmpty,
     tmnxPppoePlcyDefaultPapPassword  TmnxAuthPassword,
-    tmnxPppoePlcySidAllocation       INTEGER
+    tmnxPppoePlcySidAllocation       INTEGER,
+    tmnxPppoePlcyMaxSessionsPerCid   Unsigned32,
+    tmnxPppoePlcyAllowSessionsWoCid  TruthValue
 }
 
 tmnxPppoePlcyName                OBJECT-TYPE
@@ -579,6 +582,31 @@ tmnxPppoePlcySidAllocation       OBJECT-TYPE
          will be assigned sequentially or randomly"
     DEFVAL      { sequential }
     ::= { tmnxPppoePlcyEntry 36 }
+
+tmnxPppoePlcyMaxSessionsPerCid   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..8190)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value tmnxPppoePlcyMaxSessionsPerCid specifies the maximum number
+         of PPPoE sessions that can be created per CID."
+    DEFVAL      { 0 }
+    ::= { tmnxPppoePlcyEntry 37 }
+
+tmnxPppoePlcyAllowSessionsWoCid  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoePlcyAllowSessionsWoCid specifies whether it is
+         allowed to have PPPoE sessions without a CID.
+
+         When set to 'true', the PPPoE session...
+
+         The value of tmnxPppoePlcyAllowSessionsWoCid is only relevant while
+         the value of tmnxPppoePlcyMaxSessionsPerCid is not equal to one."
+    DEFVAL      { false }
+    ::= { tmnxPppoePlcyEntry 38 }
 
 tmnxPppoePlcyPppOptionTblLstChg  OBJECT-TYPE
     SYNTAX      TimeStamp
@@ -3707,7 +3735,7 @@ tmnxPppoeClntMdaStatsEntry       OBJECT-TYPE
 
          The system creates conceptual rows only for an MDA associated with a
          NAT ISA Group that is referred to by an E-Pipe service by means of a
-         row  in the TIMETRA-SERV-MIB::svcEpipeNatOutsideTable."
+         row in the TIMETRA-SERV-MIB::svcEpipeNatOutsideTable."
     INDEX       {
         tmnxNatIsaGrpId,
         tmnxChassisIndex,
@@ -3820,6 +3848,145 @@ tmnxPppoeClntMdaTxEchoReply      OBJECT-TYPE
         "The value of tmnxPppoeClntMdaTxEchoReply indicates the number of LCP
          Echo-Reply packets transmitted."
     ::= { tmnxPppoeClntMdaStatsEntry 11 }
+
+tmnxPppoeClntVappStatsTable      OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TmnxPppoeClntVappStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The tmnxPppoeClntVappStatsTable contains status and statistics
+         information about PPPoE Client traffic processing in a NAT Virtual
+         Machine within an Extended Service Appliance."
+    ::= { tmnxPppoeObjects 21 }
+
+tmnxPppoeClntVappStatsEntry      OBJECT-TYPE
+    SYNTAX      TmnxPppoeClntVappStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each conceptual row contains contains status and statistics
+         information about PPPoE Client traffic processing in a particular NAT
+         Virtual Machine within an Extended Service Appliance.
+
+         Conceptual rows in this table are created and removed automatically by
+         the system.
+
+         The system creates conceptual rows only for a Virtual Machine within
+         an Extended Service Appliance associated with a NAT ISA Group that is
+         referred to by an E-Pipe service by means of a row in the
+         TIMETRA-SERV-MIB::svcEpipeNatOutsideTable."
+    INDEX       {
+        tmnxNatIsaGrpId,
+        tmnxNatEsaNum,
+        tmnxNatEsaVappNum
+    }
+    ::= { tmnxPppoeClntVappStatsTable 1 }
+
+TmnxPppoeClntVappStatsEntry      ::= SEQUENCE
+{
+    tmnxPppoeClntVappRxErr           Counter64,
+    tmnxPppoeClntVappRxErrNotPppoe   Counter64,
+    tmnxPppoeClntVappRxErrEchoMagic  Counter64,
+    tmnxPppoeClntVappRxErrNoSession  Counter64,
+    tmnxPppoeClntVappRxDiscovery     Counter64,
+    tmnxPppoeClntVappRxPppControl    Counter64,
+    tmnxPppoeClntVappRxEchoRequest   Counter64,
+    tmnxPppoeClntVappRxEchoReply     Counter64,
+    tmnxPppoeClntVappTxEchoRequest   Counter64,
+    tmnxPppoeClntVappTxEchoReply     Counter64
+}
+
+tmnxPppoeClntVappRxErr           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxErr indicates the number of PPPoE
+         Client traffic receive errors on this NAT Virtual Machine within an
+         Extended Service Appliance."
+    ::= { tmnxPppoeClntVappStatsEntry 1 }
+
+tmnxPppoeClntVappRxErrNotPppoe   OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxErrNotPppoe indicates the number of
+         non-PPPoE packets received."
+    ::= { tmnxPppoeClntVappStatsEntry 2 }
+
+tmnxPppoeClntVappRxErrEchoMagic  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxErrEchoMagic indicates the number of
+         PPPoE Echo-Reply or Echo-Request packets received  with an unexpected
+         PPP LCP Magic Number."
+    ::= { tmnxPppoeClntVappStatsEntry 4 }
+
+tmnxPppoeClntVappRxErrNoSession  OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxErrNoSession indicates the number of
+         PPPoE Echo or data packets received without an associated session."
+    ::= { tmnxPppoeClntVappStatsEntry 5 }
+
+tmnxPppoeClntVappRxDiscovery     OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxDiscovery indicates the number of
+         PPPoE Discovery packets received."
+    ::= { tmnxPppoeClntVappStatsEntry 6 }
+
+tmnxPppoeClntVappRxPppControl    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxPppControl indicates the number of PPP
+         control packets received."
+    ::= { tmnxPppoeClntVappStatsEntry 7 }
+
+tmnxPppoeClntVappRxEchoRequest   OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxEchoRequest indicates the number of
+         LCP Echo-Request packets received."
+    ::= { tmnxPppoeClntVappStatsEntry 8 }
+
+tmnxPppoeClntVappRxEchoReply     OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappRxEchoReply indicates the number of LCP
+         Echo-Reply packets received."
+    ::= { tmnxPppoeClntVappStatsEntry 9 }
+
+tmnxPppoeClntVappTxEchoRequest   OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappTxEchoRequest indicates the number of
+         LCP Echo-Request packets transmitted."
+    ::= { tmnxPppoeClntVappStatsEntry 10 }
+
+tmnxPppoeClntVappTxEchoReply     OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxPppoeClntVappTxEchoReply indicates the number of LCP
+         Echo-Reply packets transmitted."
+    ::= { tmnxPppoeClntVappStatsEntry 11 }
 
 tmnxPppoeNotificationObjs        OBJECT IDENTIFIER ::= { tmnxPppoe 2 }
 
@@ -4612,7 +4779,7 @@ tmnxPPPoEV15v0MIBCompliance      MODULE-COMPLIANCE
     ::= { tmnxPppoeCompliances 10 }
 
 tmnxPPPoEV19v0MIBCompliance      MODULE-COMPLIANCE
-    STATUS      current
+    STATUS      obsolete
     DESCRIPTION
         "The compliance statement for TIMETRA-PPPOE-MIB on Nokia SROS release
          19.0."
@@ -4625,6 +4792,21 @@ tmnxPPPoEV19v0MIBCompliance      MODULE-COMPLIANCE
             tmnxPPPoEV15v0NotifyGroup
         }
     ::= { tmnxPppoeCompliances 11 }
+
+tmnxPPPoEV20v0MIBCompliance      MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for TIMETRA-PPPOE-MIB on Nokia SROS release
+         20.0."
+    MODULE
+        MANDATORY-GROUPS {
+            tmnxPPPoEV20v0Group,
+            tmnxPPPoEV10v0NotifyGroup,
+            tmnxPPPoEV6v0BsxGroup,
+            tmnxPPPMlpppGroup,
+            tmnxPPPoEV15v0NotifyGroup
+        }
+    ::= { tmnxPppoeCompliances 12 }
 
 tmnxPppoeGroups                  OBJECT IDENTIFIER ::= { tmnxPppoeConformance 2 }
 
@@ -5816,13 +5998,307 @@ tmnxPPPoEV19v0Group              OBJECT-GROUP
         tmnxPppoeClntMdaRxEchoReply,
         tmnxPppoeClntMdaTxEchoRequest,
         tmnxPppoeClntMdaTxEchoReply,
-        tmnxPppoeIesIfDhcpcInclClientId
+        tmnxPppoeIesIfDhcpcInclClientId,
+        tmnxPppoeClntVappRxErr,
+        tmnxPppoeClntVappRxErrNotPppoe,
+        tmnxPppoeClntVappRxErrEchoMagic,
+        tmnxPppoeClntVappRxErrNoSession,
+        tmnxPppoeClntVappRxDiscovery,
+        tmnxPppoeClntVappRxPppControl,
+        tmnxPppoeClntVappRxEchoRequest,
+        tmnxPppoeClntVappRxEchoReply,
+        tmnxPppoeClntVappTxEchoRequest,
+        tmnxPppoeClntVappTxEchoReply
     }
-    STATUS      current
+    STATUS      obsolete
     DESCRIPTION
         "The group of objects supporting PPPoE on Nokia SROS series systems
          19.0 release."
     ::= { tmnxPppoeGroups 36 }
+
+tmnxPPPoEV20v0Group              OBJECT-GROUP
+    OBJECTS     {
+        tmnxPppoePlcyTableLastChanged,
+        tmnxPppoePlcyRowStatus,
+        tmnxPppoePlcyLastMgmtChange,
+        tmnxPppoePlcyDescription,
+        tmnxPppoePlcyPppMtu,
+        tmnxPppoePlcyLcpKaInterval,
+        tmnxPppoePlcyLcpKaHoldUpMplier,
+        tmnxPppoePlcyDisableAcCookies,
+        tmnxPppoePlcyPadoDelay,
+        tmnxPppoePlcyMaxSessionsPerMac,
+        tmnxPppoePlcyReplyOnPadt,
+        tmnxPppoePlcyPppAuthentication,
+        tmnxPppoePlcyPppInitialDelay,
+        tmnxPppoePlcyPppMinChapChallenge,
+        tmnxPppoePlcyPppMaxChapChallenge,
+        tmnxPppoePlcyPppOptionTblLstChg,
+        tmnxPppoePlcyOptionRowStatus,
+        tmnxPppoePlcyOptionLstMgmtChange,
+        tmnxPppoePlcyOptionType,
+        tmnxPppoePlcyOptionValue,
+        tmnxPppoeIesIfInfoTableLastChg,
+        tmnxPppoeIesIfLastChg,
+        tmnxPppoeIesIfDescription,
+        tmnxPppoeIesIfAdminState,
+        tmnxPppoeIesIfPolicy,
+        tmnxPppoeIesIfSessionLimit,
+        tmnxPppoeIesIfSapSessionLimit,
+        tmnxPppoeIesIfUserDb,
+        tmnxPppoeIesIfAntiSpoofing,
+        tmnxPppoeSapRxPadi,
+        tmnxPppoeSapRxPadr,
+        tmnxPppoeSapRxPadt,
+        tmnxPppoeSapRxSession,
+        tmnxPppoeSapRxInvalidVersion,
+        tmnxPppoeSapRxInvalidType,
+        tmnxPppoeSapRxInvalidCode,
+        tmnxPppoeSapRxInvalidSession,
+        tmnxPppoeSapRxInvalidLen,
+        tmnxPppoeSapRxInvalidTags,
+        tmnxPppoeSapRxInvalidAcCookie,
+        tmnxPppoeSapRxDropped,
+        tmnxPppoeSapTxPado,
+        tmnxPppoeSapTxPads,
+        tmnxPppoeSapTxPadt,
+        tmnxPppoeSapTxSession,
+        tmnxPppoeSessionUpTime,
+        tmnxPppoeSessionLcpState,
+        tmnxPppoeSessionIpcpState,
+        tmnxPppoeSessionPppMtu,
+        tmnxPppoeSessionPppAuthProtocol,
+        tmnxPppoeSessionPppUserName,
+        tmnxPppoeSessionSubIdent,
+        tmnxPppoeSessionOriginSubIdent,
+        tmnxPppoeSessionSubProfString,
+        tmnxPppoeSessionSlaProfString,
+        tmnxPppoeSessionAncpString,
+        tmnxPppoeSessionInterDestId,
+        tmnxPppoeSessionOriginStrings,
+        tmnxPppoeSessionSessionTimeout,
+        tmnxPppoeSessionIpAddrType,
+        tmnxPppoeSessionIpAddr,
+        tmnxPppoeSessionPrimaryDnsType,
+        tmnxPppoeSessionPrimaryDns,
+        tmnxPppoeSessionSecondryDnsType,
+        tmnxPppoeSessionSecondryDns,
+        tmnxPppoeSessionPrimaryNbnsType,
+        tmnxPppoeSessionPrimaryNbns,
+        tmnxPppoeSessionSecondryNbnsType,
+        tmnxPppoeSessionSecondryNbns,
+        tmnxPppoeSessionOriginIpcpInfo,
+        tmnxPppoeSessionCircuitId,
+        tmnxPppoeSessionRemoteId,
+        tmnxPppoeSessionAddressPool,
+        tmnxPppoeSessionType,
+        tmnxPppoeSessionRetailerSvcId,
+        tmnxPppoeSessionRetailerIf,
+        tmnxPppoeSessionL2tpVrtrId,
+        tmnxPppoeSessionL2tpConnectionId,
+        tmnxPppoeSessionServiceName,
+        tmnxPppoeSessionCategoryMapName,
+        tmnxPppoeSessionRadiusClassAttr,
+        tmnxPppoeSessionRadiusUserName,
+        tmnxPppoeSessionIpv6cpState,
+        tmnxPppoeSessionInterfaceId,
+        tmnxPppoeSessionOriginIpv6cpInfo,
+        tmnxPppoeSessionIpv6DnsType,
+        tmnxPppoeSessionIpv6Dns1,
+        tmnxPppoeSessionIpv6Dns2,
+        tmnxPppoeSessionIpv6DelPfxType,
+        tmnxPppoeSessionIpv6DelPfxLen,
+        tmnxPppoeSessionIpv6DelPfx,
+        tmnxPppoeSessionIpv6PrefixType,
+        tmnxPppoeSessionIpv6PrefixLen,
+        tmnxPppoeSessionIpv6Prefix,
+        tmnxPppoeSessionModSubIdent,
+        tmnxPppoeSessionModSubProfStr,
+        tmnxPppoeSessionModSlaProfStr,
+        tmnxPppoeSessionModAncpStr,
+        tmnxPppoeSessionModInterDestId,
+        tmnxPppoeSessionEvaluateState,
+        tmnxPppoeSessionRxUnknownProto,
+        tmnxPppoeSessionRxLcpConfReq,
+        tmnxPppoeSessionRxLcpConfAck,
+        tmnxPppoeSessionRxLcpConfNak,
+        tmnxPppoeSessionRxLcpConfRej,
+        tmnxPppoeSessionRxLcpTermReq,
+        tmnxPppoeSessionRxLcpTermAck,
+        tmnxPppoeSessionRxLcpCodeRej,
+        tmnxPppoeSessionRxLcpEchoReq,
+        tmnxPppoeSessionRxLcpEchoRep,
+        tmnxPppoeSessionRxLcpProtRej,
+        tmnxPppoeSessionRxLcpDiscReq,
+        tmnxPppoeSessionTxLcpConfReq,
+        tmnxPppoeSessionTxLcpConfAck,
+        tmnxPppoeSessionTxLcpConfNak,
+        tmnxPppoeSessionTxLcpConfRej,
+        tmnxPppoeSessionTxLcpTermReq,
+        tmnxPppoeSessionTxLcpTermAck,
+        tmnxPppoeSessionTxLcpCodeRej,
+        tmnxPppoeSessionTxLcpEchoReq,
+        tmnxPppoeSessionTxLcpEchoRep,
+        tmnxPppoeSessionTxLcpProtRej,
+        tmnxPppoeSessionTxLcpDiscReq,
+        tmnxPppoeSessionRxPapAuthReq,
+        tmnxPppoeSessionTxPapAuthAck,
+        tmnxPppoeSessionTxPapAuthNak,
+        tmnxPppoeSessionRxChapResponse,
+        tmnxPppoeSessionTxChapChallenge,
+        tmnxPppoeSessionTxChapSuccess,
+        tmnxPppoeSessionTxChapFailure,
+        tmnxPppoeSessionRxIpcpConfReq,
+        tmnxPppoeSessionRxIpcpConfAck,
+        tmnxPppoeSessionRxIpcpConfNak,
+        tmnxPppoeSessionRxIpcpConfRej,
+        tmnxPppoeSessionRxIpcpTermReq,
+        tmnxPppoeSessionRxIpcpTermAck,
+        tmnxPppoeSessionRxIpcpCodeRej,
+        tmnxPppoeSessionTxIpcpConfReq,
+        tmnxPppoeSessionTxIpcpConfAck,
+        tmnxPppoeSessionTxIpcpConfNak,
+        tmnxPppoeSessionTxIpcpConfRej,
+        tmnxPppoeSessionTxIpcpTermReq,
+        tmnxPppoeSessionTxIpcpTermAck,
+        tmnxPppoeSessionTxIpcpCodeRej,
+        tmnxPppoeSessionRxIpv6cpConfReq,
+        tmnxPppoeSessionRxIpv6cpConfAck,
+        tmnxPppoeSessionRxIpv6cpConfNak,
+        tmnxPppoeSessionRxIpv6cpConfRej,
+        tmnxPppoeSessionRxIpv6cpTermReq,
+        tmnxPppoeSessionRxIpv6cpTermAck,
+        tmnxPppoeSessionRxIpv6cpCodeRej,
+        tmnxPppoeSessionTxIpv6cpConfReq,
+        tmnxPppoeSessionTxIpv6cpConfAck,
+        tmnxPppoeSessionTxIpv6cpConfNak,
+        tmnxPppoeSessionTxIpv6cpConfRej,
+        tmnxPppoeSessionTxIpv6cpTermReq,
+        tmnxPppoeSessionTxIpv6cpTermAck,
+        tmnxPppoeSessionTxIpv6cpCodeRej,
+        tmnxPppoeSessionOvrPIR,
+        tmnxPppoeSessionOvrCIR,
+        tmnxPppoeSessionOvrCBS,
+        tmnxPppoeSessionOvrMBS,
+        tmnxPppoeSessionAleDatalink,
+        tmnxPppoeSessionAleEncaps1,
+        tmnxPppoeSessionAleEncaps2,
+        tmnxPppoePlcyPppIpcpSubnetNeg,
+        tmnxPppoePlcyPadoAcName,
+        tmnxPppoePlcyPppMtuForceGt1492,
+        tmnxPppoePlcyUniqueSessIdsPerSap,
+        tmnxPppoePlcySidAllocation,
+        tmnxPppIesIfTableLastChg,
+        tmnxPppIesIfLastChg,
+        tmnxPppIesIfDescription,
+        tmnxPppIesIfAdminState,
+        tmnxPppIesIfPolicy,
+        tmnxPppIesIfSessionLimit,
+        tmnxPppIesIfUserDb,
+        tmnxPppoeSessionSubPppIndex,
+        tmnxPppoePlcyRejectDisabledNcp,
+        tmnxPppoePlcyLcpIgnoreMagic,
+        tmnxPppoePlcyAllowSameCidForDhcp,
+        tmnxPppoeSapRxInvalidMac,
+        tmnxPppoePlcySessionTimeout,
+        tmnxPppoeIesIfDhcpcInclOptString,
+        tmnxPppoePlcyReestablishSession,
+        tmnxPppoePlcyDefaultUserName,
+        tmnxPppoePlcyDefaultPapPassword,
+        tmnxPppoeIesIfPythonPolicy,
+        tmnxPppoeClntPlcyTableLastChg,
+        tmnxPppoeClntPlcyRowStatus,
+        tmnxPppoeClntPlcyLastMgmtChg,
+        tmnxPppoeClntPlcyDescription,
+        tmnxPppoeClntPlcyKaInterval,
+        tmnxPppoeClntPlcyKaHoldUpM,
+        tmnxPppoeClntPlcyMru,
+        tmnxPppoeClntPlcyMtu,
+        tmnxPppoeClntPlcyStack,
+        tmnxPppoeClntPlcyRestartInit,
+        tmnxPppoeClntPlcyRestartMax,
+        tmnxPppoeClntPlcyPythonPlcy,
+        tmnxPppoeClntSvcId,
+        tmnxPppoeClntMac,
+        tmnxPppoeClntUpTime,
+        tmnxPppoeClntPolicy,
+        tmnxPppoeClntServiceName,
+        tmnxPppoeClntSessionId,
+        tmnxPppoeClntAcMac,
+        tmnxPppoeClntAcName,
+        tmnxPppoeClntLcpState,
+        tmnxPppoeClntIpcpState,
+        tmnxPppoeClntIpv6cpState,
+        tmnxPppoeClntLocalMagicNum,
+        tmnxPppoeClntRemoteMagicNum,
+        tmnxPppoeClntRemoteMru,
+        tmnxPppoeClntPppUserName,
+        tmnxPppoeClntPppAuthProtocol,
+        tmnxPppoeClntIpcpIpAddrType,
+        tmnxPppoeClntIpcpIpAddr,
+        tmnxPppoeClntIpcpPriDnsType,
+        tmnxPppoeClntIpcpPriDns,
+        tmnxPppoeClntIpcpSecDnsType,
+        tmnxPppoeClntIpcpSecDns,
+        tmnxPppoeClntIpcpPriNbnsType,
+        tmnxPppoeClntIpcpPriNbns,
+        tmnxPppoeClntIpcpSecNbnsType,
+        tmnxPppoeClntIpcpSecNbns,
+        tmnxPppoeClntIpv6cpInterfaceId,
+        tmnxPppoeClntSlaacPrefixType,
+        tmnxPppoeClntSlaacPrefix,
+        tmnxPppoeClntSlaacPrefixLen,
+        tmnxPppoeClntSlaacPrefixTimeout,
+        tmnxPppoeClntSlaacPriDnsType,
+        tmnxPppoeClntSlaacPriDns,
+        tmnxPppoeClntSlaacSecDnsType,
+        tmnxPppoeClntSlaacSecDns,
+        tmnxPppoeClntTxPadi,
+        tmnxPppoeClntTxPadr,
+        tmnxPppoeClntTxPadt,
+        tmnxPppoeClntTxSession,
+        tmnxPppoeClntTxLcpEchoReq,
+        tmnxPppoeClntTxLcpEchoRep,
+        tmnxPppoeClntTxV6Rs,
+        tmnxPppoeClntTxV6DhcpInfo,
+        tmnxPppoeClntRxPado,
+        tmnxPppoeClntRxPads,
+        tmnxPppoeClntRxPadt,
+        tmnxPppoeClntRxSession,
+        tmnxPppoeClntRxLcpEchoReq,
+        tmnxPppoeClntRxLcpEchoRep,
+        tmnxPppoeClntRxV6Ra,
+        tmnxPppoeClntRxV6DhcpReply,
+        tmnxPppoeClntRxDropped,
+        tmnxPppoeClntMdaRxErr,
+        tmnxPppoeClntMdaRxErrNotPppoe,
+        tmnxPppoeClntMdaRxErrEchoMagic,
+        tmnxPppoeClntMdaRxErrNoSession,
+        tmnxPppoeClntMdaRxDiscovery,
+        tmnxPppoeClntMdaRxPppControl,
+        tmnxPppoeClntMdaRxEchoRequest,
+        tmnxPppoeClntMdaRxEchoReply,
+        tmnxPppoeClntMdaTxEchoRequest,
+        tmnxPppoeClntMdaTxEchoReply,
+        tmnxPppoeIesIfDhcpcInclClientId,
+        tmnxPppoeClntVappRxErr,
+        tmnxPppoeClntVappRxErrNotPppoe,
+        tmnxPppoeClntVappRxErrEchoMagic,
+        tmnxPppoeClntVappRxErrNoSession,
+        tmnxPppoeClntVappRxDiscovery,
+        tmnxPppoeClntVappRxPppControl,
+        tmnxPppoeClntVappRxEchoRequest,
+        tmnxPppoeClntVappRxEchoReply,
+        tmnxPppoeClntVappTxEchoRequest,
+        tmnxPppoeClntVappTxEchoReply,
+        tmnxPppoePlcyMaxSessionsPerCid,
+        tmnxPppoePlcyAllowSessionsWoCid
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting PPPoE on Nokia SROS series systems
+         20.0 release."
+    ::= { tmnxPppoeGroups 37 }
 
 tmnxPPPoEObsoletedGroup          OBJECT-GROUP
     OBJECTS     {

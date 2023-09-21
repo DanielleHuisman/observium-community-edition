@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -33,22 +33,23 @@
 //$entry = $cache_storage['cisco-flash-mib'][$storage['storage_index']];
 
 $storage['units'] = 1;
-if ($storage['storage_hc'])
-{
-  $oids = array('ciscoFlashPartitionSizeExtended.' . $storage['storage_index'], 'ciscoFlashPartitionFreeSpaceExtended.' . $storage['storage_index']);
-  $entry = snmp_get_multi_oid($device, $oids, array(), "CISCO-FLASH-MIB");
-  $entry = array_shift($entry);
-  $storage['size']  = $entry['ciscoFlashPartitionSizeExtended'];
-  $storage['free']  = $entry['ciscoFlashPartitionFreeSpaceExtended'];
+if ($storage['storage_hc']) {
+    $oids            = ['ciscoFlashPartitionSizeExtended.' . $storage['storage_index'], 'ciscoFlashPartitionFreeSpaceExtended.' . $storage['storage_index']];
+    $entry           = snmp_get_multi_oid($device, $oids, [], "CISCO-FLASH-MIB");
+    $entry           = array_shift($entry);
+    $storage['size'] = $entry['ciscoFlashPartitionSizeExtended'];
+    $storage['free'] = $entry['ciscoFlashPartitionFreeSpaceExtended'];
 } else {
-  $oids = array('ciscoFlashPartitionSize.' . $storage['storage_index'], 'ciscoFlashPartitionFreeSpace.' . $storage['storage_index']);
-  $entry = snmp_get_multi_oid($device, $oids, array(), "CISCO-FLASH-MIB");
-  $entry = array_shift($entry);
-  $storage['size']  = $entry['ciscoFlashPartitionSize'];
-  $storage['free']  = $entry['ciscoFlashPartitionFreeSpace'];
+    $oids            = ['ciscoFlashPartitionSize.' . $storage['storage_index'], 'ciscoFlashPartitionFreeSpace.' . $storage['storage_index']];
+    $entry           = snmp_get_multi_oid($device, $oids, [], "CISCO-FLASH-MIB");
+    $entry           = array_shift($entry);
+    $storage['size'] = $entry['ciscoFlashPartitionSize'];
+    $storage['free'] = $entry['ciscoFlashPartitionFreeSpace'];
 }
-if (OBS_DEBUG > 1 && count($entry)) { print_vars($entry); }
+if (OBS_DEBUG > 1 && count($entry)) {
+    print_vars($entry);
+}
 
-$storage['used']  = $storage['size'] - $storage['free'];
+$storage['used'] = $storage['size'] - $storage['free'];
 
 // EOF

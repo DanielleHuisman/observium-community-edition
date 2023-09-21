@@ -6,7 +6,7 @@
 #
 # Simple os icons checker script
 #
-# @copyright (C) 2006-2013 Adam Armstrong, (C) 2013-2016 Observium Limited 
+# @copyright (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
 # @author    Mike Stupalov <mike@observium.org>
 #
 

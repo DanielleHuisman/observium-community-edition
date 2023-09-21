@@ -1,0 +1,2808 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsptp.mib,v 1.3 2012/09/07 09:52:05 siva Exp $
+
+--    PTP Proprietary MIB Definition
+
+--    This file explains the proprietary MIB implemented
+--    for PTP (Precision Time Protocol) that conforms to IEEE 1588 
+
+SUPERMICRO-PTP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, 
+    Unsigned32, enterprises, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, TruthValue , RowStatus,  TimeStamp,
+    DisplayString
+        FROM SNMPv2-TC;
+
+fsPtpMIB MODULE-IDENTITY
+    LAST-UPDATED "201209050000Z" 
+    ORGANIZATION "Super Micro Computer Inc."
+    CONTACT-INFO "support@Supermicro.com" 
+    DESCRIPTION
+       "This file is proprietary MIB for PTP (Precision Time Protocol)
+       implementation that confirms to specification IEEE 1588."
+    REVISION "201209050000Z"
+    DESCRIPTION
+       "This file is proprietary MIB for PTP (Precision Time Protocol)
+       implementation that confirms to specification IEEE 1588."
+
+   ::= { enterprises supermicro-computer-inc(10876) super-switch(101) extended(2) 45 }
+
+fsPtpObjects			  OBJECT IDENTIFIER ::= { fsPtpMIB 1 }
+fsPtpNotifications		  OBJECT IDENTIFIER ::= { fsPtpMIB 2 }
+
+--
+-- FS PTP MIB Objects
+--
+
+fsPtpGeneralGroup                  OBJECT IDENTIFIER ::= { fsPtpObjects 1 }
+fsPtpDomainDataSet                 OBJECT IDENTIFIER ::= { fsPtpObjects 2 }
+fsPtpDefaultDataSet                OBJECT IDENTIFIER ::= { fsPtpObjects 3 }
+fsPtpCurrentDataSet                OBJECT IDENTIFIER ::= { fsPtpObjects 4 }
+fsPtpParentDataSet                 OBJECT IDENTIFIER ::= { fsPtpObjects 5 }
+fsPtpGlobalTimeProportiesDataSet   OBJECT IDENTIFIER ::= { fsPtpObjects 6 }
+fsPtpPortConfigurationDataSet      OBJECT IDENTIFIER ::= { fsPtpObjects 7 }
+fsPtpForeignMasterDataSet          OBJECT IDENTIFIER ::= { fsPtpObjects 8 }
+fsPtpTransparentDataSet            OBJECT IDENTIFIER ::= { fsPtpObjects 9 }
+fsPtpTransparentPortDataSet        OBJECT IDENTIFIER ::= { fsPtpObjects 10 }
+fsPtpGrandMasterClusterDataSet     OBJECT IDENTIFIER ::= { fsPtpObjects 11 }
+fsPtpUnicastMasterDataSet          OBJECT IDENTIFIER ::= { fsPtpObjects 12 }
+fsPtpAccMasterDataSet              OBJECT IDENTIFIER ::= { fsPtpObjects 13 }
+fsPtpSecKeyDataSet                 OBJECT IDENTIFIER ::= { fsPtpObjects 14 }
+fsPtpSADataSet                     OBJECT IDENTIFIER ::= { fsPtpObjects 15 }
+fsPtpAltTimeScaleDataSet     	   OBJECT IDENTIFIER ::= { fsPtpObjects 16 }
+
+-- 
+-- Textual Conventions
+-- 
+
+FsPtpPortNumber ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS     current
+    DESCRIPTION
+            "Unique identifier of the PTP port in the PTP device.
+             it is not related to the interface index object of the
+             Interface MIB, IETF RFC 2863 "
+    SYNTAX   Integer32
+
+-- Scalar objects
+
+fsPtpGlobalSysCtrl OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        start(1),
+                        shutdown(2)
+                      }
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object is used to initialise/de-initialise the module"
+   DEFVAL  { shutdown }
+   ::= { fsPtpGeneralGroup 1 }
+
+fsPtpGblTraceOption OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object stores the trace option string input given by the user.
+       Based on the input to this object, trace statements corresponding
+       to the given options are displayed.
+       To enable particular trace the user has to enter the corresponding
+       string(given below) assigned for that. For enabling more than one
+       traces the user has to enter the corresponding strings with SPACE
+       (delimiter) between each string.
+             For example,
+             To enable the below traces:
+                 - Start and Shutdown traces
+                 - Management traces
+                 - Sync traces and
+                 - Packet Dump traces
+
+             The input should be fed as follows:
+             enable init-shut mgmt ctrl pkt-dump
+
+             To disable the below traces:
+                 - Start and Shutdown traces
+                 - Sync traces
+
+             The input should be,
+             disable init-shut sync
+
+             The entered input string is parsed to get the trace options.
+
+      enable / disable trace-types1 trace-types2 ...
+
+      TRACE-TYPES - TRACE-DESCRIPTION 
+      
+      init-shut - Start and Shutdown traces
+      mgmt      - Management Traces
+      datapath  - Data packet path
+      ctrl      - Control Plane path 
+      pkt-dump  - Packet Dump Traces
+      resource  - Resourece failure traces
+      all-fail  - All Failure traces
+      buffer    - Buffer Traces
+      critical  - PTP Critical Traces
+
+       This object is used in places where context is not visible.
+       Any change in this object affects fsPtpTraceOption in all
+       contexts i.e. if a trace is set for fsPtpGblTraceOption, then
+       the same trace will be set for fsPtpTraceOption in all context.
+       Similarly if a trace is reset for fsPtpGblTraceOption, then
+       the same trace will be reset for fsPtpTraceOption in all context."
+   DEFVAL  { "critical" }
+   ::= { fsPtpGeneralGroup 2 }
+
+fsPtpPrimaryContext OBJECT-TYPE
+   SYNTAX      Integer32 (0..255)
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the primary context. This is the context
+       which can configure the system clock. By default, this will be
+       configured to default context id (0). The administrator should
+       explicitly configure this object.If the primary context is deleted,
+       the user has to explicitly configure a new primary context"
+   DEFVAL  { 0 }
+   ::= { fsPtpGeneralGroup 3 }
+
+
+--      PTP Table
+--      contains information regarding various instances
+--      of the router/switch
+
+fsPtpTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF FsPtpEntry
+        MAX-ACCESS         not-accessible
+        STATUS             current
+        DESCRIPTION
+           "Information describing the parameters of the switch/router
+	   instances."
+      ::= { fsPtpGeneralGroup 4 }
+
+fsPtpEntry OBJECT-TYPE
+        SYNTAX       FsPtpEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "Information describing the parameters of the switch/router per
+           virtual instance. The entry in this table is created using the
+           fsPtpContextRowStatus object only if the virtual context is 
+           existing in the system. The entry is deleted in this table using the
+           fsPtpContextRowStatus or when the virtual context is deleted in the
+           system"
+        INDEX { fsPtpContextId }
+      ::= { fsPtpTable 1 }
+
+FsPtpEntry ::=
+    SEQUENCE {
+    fsPtpContextId 
+	    Integer32,
+	fsPtpAdminStatus 
+	    INTEGER,
+	fsPtpTraceOption
+	    DisplayString,
+	fsPtpContextType
+	    INTEGER,
+    fsPtpPrimaryDomain
+        Integer32,
+	fsPtpContextRowStatus
+        RowStatus
+    }
+
+fsPtpContextId OBJECT-TYPE
+        SYNTAX       Integer32 (0..255)
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+           "A 32-bit unique context identifier for each entry. Each virtual 
+	   context will be able to run PTP protocol individually and this 
+	   distinguishes mutiple virtual contexts present in the switch/router."
+	::= { fsPtpEntry 1 }
+
+fsPtpAdminStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+	            enabled(1),
+                disabled(2)
+		    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Enable or disable the Precision Time Protocol on this virtual context. 
+       The default value is disabled. 
+       In disabled state, the PTP protocol will be non operational in the 
+       virtual context. The resources alone will be reserved for the 
+       functioning of the Precision Time Protocol."
+    DEFVAL     { disabled }
+    ::= { fsPtpEntry 2 }
+
+
+fsPtpTraceOption OBJECT-TYPE
+   SYNTAX      DisplayString
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object takes the same value as fsPtpGblTraceOption.
+       This object accepts the trace values directly from the user.
+       Alternatively, this object will also be affected if the global
+       trace object is modified" 
+      DEFVAL  { "critical" }
+   ::= { fsPtpEntry 3 }
+
+fsPtpContextType OBJECT-TYPE
+   SYNTAX      INTEGER {
+                        l2Context(1),
+                        l3Context(2),
+                        l2Andl3Context(3)
+                      }
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+       "Displays the type of context"
+   ::= { fsPtpEntry 4 }
+
+fsPtpPrimaryDomain OBJECT-TYPE
+   SYNTAX      Integer32 (0..255)
+   MAX-ACCESS  read-write
+   STATUS      current
+   DESCRIPTION
+      "This object specifies the primary domain. This is the domain
+       which can configure the system clock. By default, this will be
+       configured to default domain id (0). The administrator should
+       explicitly configure this object.If the primary domain is deleted,
+       the user has to explicitly configure a new primary domain"
+      
+   DEFVAL  { 0 }
+   ::= { fsPtpEntry 5 }
+
+fsPtpContextRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"RowStatus for creating/deleting the entries into this table"
+    ::= { fsPtpEntry 6 }
+
+--  Ptp domain table   
+
+fsPtpDomainDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpDomainDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table Contains domains information of the node" 
+    ::= { fsPtpDomainDataSet 1 }
+
+fsPtpDomainDataSetEntry   OBJECT-TYPE
+    SYNTAX       FsPtpDomainDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains domains information of the node"
+    INDEX  { fsPtpContextId,
+             fsPtpDomainNumber }
+    ::= { fsPtpDomainDataSetTable 1 }
+
+FsPtpDomainDataSetEntry ::= SEQUENCE {
+      	 fsPtpDomainNumber 	    
+	     Integer32,
+         fsPtpDomainClockMode       
+	     INTEGER,
+         fsPtpDomainClockIdentity   
+	     OCTET STRING,
+         fsPtpDomainGMClusterQueryInterval
+	     Integer32,
+         fsPtpDomainRowStatus
+	     RowStatus
+        }
+ 
+fsPtpDomainNumber OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This is the unique identifier of the domain. This domain id defines
+    the scope of the PTP message communication, state, operations, data 
+    sets and timescale.
+    The domain identifier 0 corresponds to default domain id.
+    Domain identifiers 1 to 3 corresponds to Alternate domains.
+    Domain identifiers 128 to 255 are reserved."
+    ::= { fsPtpDomainDataSetEntry 1 }
+
+fsPtpDomainClockMode OBJECT-TYPE
+   SYNTAX     INTEGER {
+		boundary (1),
+		ordinary (2),
+		transparent (3),
+		forward (4),
+		management (5)
+	       }
+   MAX-ACCESS	read-write
+   STATUS	current
+   DESCRIPTION
+    "This indicates the operating mode of the clock in this domain.
+     boundary - specifies it is boundary clock. 
+     ordinary - specifies it is ordinary clock.
+     transparent - specifies it is 
+     end-to-end/peer-to-peer transparent clock.
+     forward - specifies it is in forward mode which will not 
+     do any PTP processing just forward the PTP messages on other ports
+     in the domain
+     management - specifies the PTP management Node
+     If the clock mode is changed, PTP will be initialized."
+    DEFVAL { forward }   
+    ::= { fsPtpDomainDataSetEntry 2 }
+
+fsPtpDomainClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This is the unique identity of the local clock or management node 
+    associated with this domain. The clock identity values shall be taken
+    from either the IEEE EUI-64 individual assigned numbers as specified
+    in 7.5.2.2.2, or from the value set specified in 7.5.2.2.3. Reference
+    IEEE 1588."
+    ::= {fsPtpDomainDataSetEntry  3 }
+
+
+fsPtpDomainGMClusterQueryInterval OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This is the log to the base 2 of mean interval in seconds 
+    between unicast announce messages from grand master 
+    cluster member, it will be used.If a request is not granted 
+    by a port, the request shall be repeated after the delay 
+    indicated by fsPtpDomainGMClusterQueryInterval."  
+    ::= { fsPtpDomainDataSetEntry 4 }
+
+fsPtpDomainRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"RowStatus for creating the entries into this table. "
+    ::= { fsPtpDomainDataSetEntry 5 }
+
+--  Ptp Default Data Set characterizes the clock 
+--  of the system
+
+fsPtpClockDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpClockDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table Contains information of the clock on particular domain.
+             entry will be created in this table with defalut values
+             once the entry is created in the fsPtpDomainDataSetTable with 
+             fsPtpDomainClockMode as boundary or an ordinary clock. If the clock 
+             mode is changed to other than boundary or an ordinary the corresponding 
+             entry in this table will be deleted" 
+    ::= { fsPtpDefaultDataSet 1 }
+
+fsPtpClockDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpClockDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains the information of the clock on a particular doamin. This
+            table will be initialised with default values if the clock is 
+            operating as a boundary or ordinary clock in the domain."
+    AUGMENTS { fsPtpDomainDataSetEntry }
+    ::= { fsPtpClockDataSetTable 1 }
+
+FsPtpClockDataSetEntry ::= SEQUENCE {
+         fsPtpClockIdentity         
+             OCTET STRING,
+         fsPtpClockTwoStepFlag      
+             TruthValue,
+         fsPtpClockNumberPorts      
+             Integer32,
+         fsPtpClockClass            
+             Integer32,
+         fsPtpClockAccuracy         
+             Integer32,
+         fsPtpClockOffsetScaledLogVariance 
+             Integer32,
+         fsPtpClockPriority1        
+             Integer32,
+         fsPtpClockPriority2        
+             Integer32,
+         fsPtpClockSlaveOnly        
+             TruthValue,
+         fsPtpClockPathTraceOption       
+             TruthValue,
+         fsPtpClockAccMasterMaxSize      
+             Integer32, 
+         fsPtpClockSecurityEnabled       
+             TruthValue,
+         fsPtpClockNumOfSA               
+             Unsigned32
+}
+
+fsPtpClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This is the unique identity of the local clock or management node.
+     This should be the fsptpDomainClockIdentity of the domain indicated 
+     by the fsPtpDomainNumber. Configuration of this value will take effect
+     only when the PTP module is enabled." 
+    ::= {fsPtpClockDataSetEntry  1 }
+
+fsPtpClockTwoStepFlag OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This value is TRUE if the clock is two step clock, otherwise it is
+    FALSE.
+    If this value is configured as TRUE, then PTP will transmit the 
+    originTimeStamp only through follow-up messages.
+    Configuring this value will make the PTP to move all the ports 
+    associated with this domain identifier to move to INITIALIZING state.
+    Default value is FALSE. This value can be configured if 
+        fsPtpDomainRowStatus is not in service"
+    DEFVAL { false }   
+    ::= { fsPtpClockDataSetEntry 2 }
+
+fsPtpClockNumberPorts OBJECT-TYPE
+    SYNTAX      Integer32(1..128)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This indicates the number of PTP ports on the device. For an ordinary
+         clock this value should be 1. This value can be configured if 
+         fsPtpDomainRowStatus is not in service "
+    DEFVAL { 1 }
+    ::= { fsPtpClockDataSetEntry 3 }
+
+fsPtpClockClass OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "It denotes the traceability of the time or frequency distributed by 
+    the grandmaster clock. This value is used by the BMC algorithm to 
+    select the best master clock. 
+    This should be initialized after initializing ptpClockSlaveOnly. If 
+    ptpClockSlaveOnly is TRUE, then this value should be 255. 
+    For clock class 6 or 13 it should represent the clock class of the 
+    clock UPON exiting the Initialializing state."
+    DEFVAL {248}  
+    ::= { fsPtpClockDataSetEntry 4 }
+
+fsPtpClockAccuracy OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This indicates the accuracy of the clock. This should be initialized
+     after ptpClockClass. This initialization value depends on the accuracy
+     of the clock during initialization. This value depends on ptpClockClass
+     and ptpTimeTimeSource. This value is used by the BMC algorithm to 
+     select the best master clock."
+    DEFVAL {254}
+    ::= { fsPtpClockDataSetEntry 5 }
+
+fsPtpClockOffsetScaledLogVariance OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This value is an estimate of the variations of the local clock 
+     from a linear timescale when it is not synchronized to another
+     clock using the protocol. The initialization value depends on the 
+     inherent characteristics of the clock during initialization. This 
+     value is used by the BMC algorithm to select the best master clock"
+    DEFVAL { 0 }
+    ::= { fsPtpClockDataSetEntry 6 }
+
+fsPtpClockPriority1 OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This value is used by BMC algorithm to select the best master 
+     clock. Lower values take precedence."
+    DEFVAL { 128 }
+    ::= { fsPtpClockDataSetEntry 7 }
+
+fsPtpClockPriority2 OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This value is used by BMC algorithm to select the best master clock. 
+    This is used as a tiebreaker when the BMC failes to order the clock 
+    using  ptpClockPriority1, ptpClockClass, ptpClockAccuracy and 
+    ptpClockOffsetScaledLogVariance.
+    Lower values take precedence"
+    DEFVAL { 128 }
+    ::= { fsPtpClockDataSetEntry 8 }
+
+fsPtpClockSlaveOnly OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "Configuring this value as true will make the clock to behave as slave
+    clock.
+    A boundary clock can not be a slave only clock."
+    DEFVAL { false }
+    ::= { fsPtpClockDataSetEntry 9 }
+
+fsPtpClockPathTraceOption OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This is the path trace enable/disable option. Configuring this value 
+    as true will make the path trace mechanism operational."
+    DEFVAL { false }
+    ::= { fsPtpClockDataSetEntry 10 }
+
+fsPtpClockAccMasterMaxSize OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This is the Maximum number of acceptable master table Entries configured 
+    in the domain in this context."
+    DEFVAL { 0 }
+    ::= { fsPtpClockDataSetEntry 11 }
+
+fsPtpClockSecurityEnabled OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This is used to  enable/disable of security protocol. Configuring this
+    as TRUE, makes all the PTP communication to use Security Protocol 
+    extension.  Default value is false."
+    DEFVAL { false }
+    ::= { fsPtpClockDataSetEntry 12 }
+
+fsPtpClockNumOfSA OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This represents the maximum number of security associations 
+     supported by the clock, including all incoming and outgoing 
+     SAs as well as both static and dynamic SAs."
+    DEFVAL {128}
+    ::= { fsPtpClockDataSetEntry 13 }
+
+
+-- Ptp current Data set. This contains the synchronization 
+-- information of the clock
+
+fsPtpCurrentDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpCurrentDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Table Contains synchronization information on a particular
+     domain. entry will be created in this table with defalut 
+     values once the entry is created in the fsPtpDomainDataSetTable
+     with fsPtpDomainClockMode as boundary or an ordinary clock. 
+     If the clock mode is changed to other than boundary or an 
+     ordinary the corresponding entry in this table will be deleted."    
+::= { fsPtpCurrentDataSet 1 }
+
+fsPtpCurrentDataSetEntry   OBJECT-TYPE
+    SYNTAX       FsPtpCurrentDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            " Contains synchronization information on a particular domain."
+    AUGMENTS { fsPtpDomainDataSetEntry }
+    ::= { fsPtpCurrentDataSetTable 1 }
+
+FsPtpCurrentDataSetEntry ::= SEQUENCE {
+         fsPtpCurrentStepsRemoved  
+         Integer32,
+         fsPtpCurrentOffsetFromMaster 
+         DisplayString,
+         fsPtpCurrentMeanPathDelay    
+         DisplayString,
+         fsPtpCurrentMasterToSlaveDelay
+         DisplayString,
+         fsPtpCurrentSlaveToMasterDelay
+         DisplayString 
+}
+
+fsPtpCurrentStepsRemoved OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This is the number of communication path traversed between local 
+    clock and the grandmaster clock. Slave clock will update this field 
+    once port is selected as slave."
+    ::= { fsPtpCurrentDataSetEntry 1 }
+
+fsPtpCurrentOffsetFromMaster OBJECT-TYPE
+    SYNTAX      DisplayString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the current value of the time difference scalednanoseconds 
+     between a master and a slave as computed by the slave.
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    ::= { fsPtpCurrentDataSetEntry 2 }
+
+fsPtpCurrentMeanPathDelay OBJECT-TYPE
+    SYNTAX      DisplayString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the current value of the mean propagation time scalenanoseconds 
+     between a master and a slave as computed by the slave.
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    ::= { fsPtpCurrentDataSetEntry 3 }
+
+fsPtpCurrentMasterToSlaveDelay OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This attribute is the propagation time for a sync message
+     travelling between master to slave clocks
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    ::= {fsPtpCurrentDataSetEntry 4 }
+
+
+fsPtpCurrentSlaveToMasterDelay OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This attribute is the propagation time for a sync message
+     travelling between slave to master clocks
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    ::= {fsPtpCurrentDataSetEntry 5 }
+
+--  Ptp Parent Data set. Contains the information about the
+--  parent clcok. 
+
+fsPtpParentDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpParentDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table Contains parent clock information on a particular domain.
+             entry will be created in this table with defalut 
+             values once the entry is created in the fsPtpDomainDataSetTable
+             with fsPtpDomainClockMode as boundary or an ordinary clock. 
+             If the clock mode is changed to other than boundary or an 
+             ordinary the corresponding entry in this table will be deleted."    
+    ::= { fsPtpParentDataSet 1 }
+
+fsPtpParentDataSetEntry   OBJECT-TYPE
+    SYNTAX       FsPtpParentDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains parent clock information on a particular domain. "
+    AUGMENTS { fsPtpDomainDataSetEntry }
+    ::= { fsPtpParentDataSetTable 1 }
+
+FsPtpParentDataSetEntry ::= SEQUENCE {
+         fsPtpParentClockIdentity 
+	     OCTET STRING,
+         fsPtpParentPortNumber    
+	     FsPtpPortNumber, 
+         fsPtpParentStats         
+	     TruthValue, 
+         fsPtpParentObservedOffsetScaledLogVariance 
+	     Integer32,
+	     fsPtpParentObservedClockPhaseChangeRate  
+	     Integer32,
+     	 fsPtpParentGMClockIdentity  
+	     OCTET STRING ,
+         fsPtpParentGMClockClass   
+	     Integer32,
+         fsPtpParentGMClockAccuracy  
+	     Integer32,
+         fsPtpParentGMClockOffsetScaledLogVariance  
+	     Integer32,
+         fsPtpParentGMPriority1  
+	     Integer32,
+         fsPtpParentGMPriority2  
+	     Integer32,
+         fsPtpParentClockObservedDrift
+	     Integer32
+}
+
+fsPtpParentClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the clock identity of the port on the master that issues 
+         sync messages used in synchronizing this clock. The initial value 
+         of this field is the value of ptpClockIdentity"
+    ::= { fsPtpParentDataSetEntry 1 }
+
+fsPtpParentPortNumber OBJECT-TYPE
+    SYNTAX      FsPtpPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the port number identity of the port on the master that issues 
+	sync message used in synchronizing this clock. Combination of 
+	ptpParentClockIdentity and ptpParentPortNumber gives the port identity
+	of the parent clock."
+    ::= { fsPtpParentDataSetEntry 2 }
+
+fsPtpParentStats OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"TRUE value of this field indicates that the clock has a slave port 
+         and computed statistically valid estimate of 
+         observedParentOffsetScaledLogVariance and 
+         observedParentClockPhaseChangeRate. The initial value of this field is
+         FALSE."
+    DEFVAL { false }
+    ::= { fsPtpParentDataSetEntry 3 }
+
+fsPtpParentObservedOffsetScaledLogVariance OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is an estimate of the parent clock's PTP variance as observed by
+	the slave clock. Computation of this value is optional one. If this is 
+	not computed then ptpParentStats will be set false. The initial value 
+	is 0xFFFF."
+    ::= { fsPtpParentDataSetEntry 4 }
+
+fsPtpParentObservedClockPhaseChangeRate OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is an estimate of the parent clock's phase change rate as 
+	observed by the slave clock. Computation of this value is optional one.
+	If this is not computed then ptpParentStats will be set false. 
+	The initial value is 0x7FFF FFFF."
+    ::= { fsPtpParentDataSetEntry 5 }
+
+fsPtpParentGMClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the clock identity attribute of the grand master clock. 
+         The initial value is ptpClockIdentity."
+    ::= { fsPtpParentDataSetEntry 6 }
+
+fsPtpParentGMClockClass OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the clock class of the grandmaster. The 
+         initialization value of this variable is ptpClockClass."
+    ::= { fsPtpParentDataSetEntry 7 }
+
+fsPtpParentGMClockAccuracy OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the clock accuracy of the grandmaster. The
+         initialization value of this variable is ptpClockAccuracy"
+    ::= { fsPtpParentDataSetEntry 8 }
+
+fsPtpParentGMClockOffsetScaledLogVariance OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the offset scaled log variance of the grandmaster. The 
+       initialization value of this variable is 
+       ptpClockOffsetScaledLogVariance"
+    ::= { fsPtpParentDataSetEntry 9 }
+
+fsPtpParentGMPriority1 OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the priority1 of the grandmaster clock. The
+         initialization value of this variable is ptpClockPriority1"
+    ::= { fsPtpParentDataSetEntry 10 }
+
+fsPtpParentGMPriority2 OBJECT-TYPE
+    SYNTAX      Integer32 (0..255) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the priority2 of the grandmaster clock. The 
+         initialization value of this variable is ptpClockPriority2"
+    ::= { fsPtpParentDataSetEntry 11 }
+
+fsPtpParentClockObservedDrift OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This is attribute of the parent dataset represents the observed drift
+     of the master clock to which a slave clock is synchronizing"
+    ::= { fsPtpParentDataSetEntry 12 }
+
+--  Ptp Global Time Properties Data Set. Contains gloabl time properties
+--  of the clock
+
+fsPtpTimeDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpTimeDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table Contains parent Time properties information of the
+             clock on a particular domain. entry will be created in 
+             this table with defalut values once the entry is created 
+             in the fsPtpDomainDataSetTable with fsPtpDomainClockMode as
+             boundary or an ordinary clock. If the clock mode is changed 
+             to other than boundary or an ordinary the corresponding 
+             entry in this table will be deleted."    
+    ::= { fsPtpGlobalTimeProportiesDataSet 1 }
+
+fsPtpTimeDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpTimeDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains parent Time properties information of the
+             clock on a particular domain "
+    AUGMENTS { fsPtpDomainDataSetEntry }
+    ::= { fsPtpTimeDataSetTable 1 }
+
+FsPtpTimeDataSetEntry ::= SEQUENCE {
+         fsPtpTimeCurrentUTCOffset 
+	     Integer32,
+         fsPtpTimeCurrentUTCOffsetValid  
+	     TruthValue,
+         fsPtpTimeLeap59  
+	     TruthValue,
+         fsPtpTimeLeap61  
+	     TruthValue,
+         fsPtpTimeTimeTraceable 
+	     TruthValue,
+         fsPtpTimeFrequencyTraceable 
+	     TruthValue,
+         fsPtpTimeTimeSource  
+	     INTEGER
+}
+
+fsPtpTimeCurrentUTCOffset OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"If systems epoch is the PTP epoch then this value indicates the offset
+	in seconds between TAI and UTC."
+    ::= { fsPtpTimeDataSetEntry 1 }
+
+fsPtpTimeCurrentUTCOffsetValid OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"Value of this variable is TRUE if the fsPtpTimeCurrentUTCOffset is 
+	known to be correct."
+    ::= { fsPtpTimeDataSetEntry 2 }
+
+fsPtpTimeLeap59 OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"If the systems epoch is PTP epoch then TRUE value of this variable
+	indicates that the last minute of the current UTC day contains 59 
+	seconds."
+    ::= { fsPtpTimeDataSetEntry 3 }
+
+fsPtpTimeLeap61 OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"If the systems epoch is PTP epoch then TRUE value of this variable 
+	indicates that the last minute of the current UTC day contains 61 
+	seconds."
+    ::= { fsPtpTimeDataSetEntry 4 }
+
+fsPtpTimeTimeTraceable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This variable is TRUE if the timescale and value of 
+	fsPtpTimeCurrentUTCOffset are traceable to a primary reference 
+	otherwise, the value shall be FALSE."
+    ::= { fsPtpTimeDataSetEntry 5 }
+
+fsPtpTimeFrequencyTraceable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This variable is TRUE if the frequecy determining the timescale is 
+	traceable to a primary reference otherwise, the value shall be FALSE."
+    ::= { fsPtpTimeDataSetEntry 6 }
+
+fsPtpTimeTimeSource OBJECT-TYPE
+    SYNTAX   INTEGER {
+                         atomicclock (16),
+                         gps(32),
+                         terrestrialradio(48),
+                         ptp(64),
+                         ntp(80),
+                         handset(96),
+                         other(144),
+                         internaloscillator(160),
+                         --alternateptp(240..254),
+                         reserved(255) 
+                       }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the source of time used by the grandmaster clock. If the time
+	source is known at the time of initialization then the value will be set 
+	to that otherwise the initial value is INTERNAL_OSCILLATOR(160)."
+    ::= { fsPtpTimeDataSetEntry 7 }
+
+--  Ptp Port configuration data set. Contains configuration information 
+--  of a particular PTP port.
+
+fsPtpPortConfigDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpPortConfigDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table Contains PTP configuration information
+             for a particular port of boundary or an ordinary clock"
+    ::= { fsPtpPortConfigurationDataSet 1 }
+
+fsPtpPortConfigDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpPortConfigDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains PTP configuration information for a particular port.
+             valid fsPtpPortInterfaceType and fsPtpPortIfaceNumber need to be given to 
+             make this entry active"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpPortIndex
+            }
+    ::= { fsPtpPortConfigDataSetTable 1 }
+
+FsPtpPortConfigDataSetEntry ::= SEQUENCE {
+        fsPtpPortIndex           
+        FsPtpPortNumber,
+        fsPtpPortClockIdentity            
+        OCTET STRING,
+        fsPtpPortInterfaceType
+        INTEGER,
+        fsPtpPortIfaceNumber
+        Integer32,
+        fsPtpPortState          
+        INTEGER,
+        fsPtpPortMinDelayReqInterval    
+        Integer32,
+        fsPtpPortPeerMeanPathDelay
+        DisplayString,
+        fsPtpPortAnnounceInterval       
+        Integer32,
+        fsPtpPortAnnounceReceiptTimeout
+        Integer32,
+        fsPtpPortSyncInterval
+        Integer32,
+        fsPtpPortSynclimit
+        DisplayString,
+        fsPtpPortDelayMechanism
+        INTEGER,
+        fsPtpPortMinPdelayReqInterval
+        Integer32,
+        fsPtpPortVersionNumber
+        Integer32,
+        fsPtpPortUnicastNegOption       
+        TruthValue, 
+        fsPtpPortUnicastMasterMaxSize   
+        Integer32,
+        fsPtpPortAccMasterEnabled       
+        TruthValue,
+        fsPtpPortNumOfAltMaster         
+        Integer32,
+        fsPtpPortAltMulcastSync         
+        TruthValue,
+        fsPtpPortAltMulcastSyncInterval 
+        Integer32,
+        fsPtpPortPtpStatus
+        TruthValue,
+        fsPtpPortRcvdAnnounceMsgCnt
+        Unsigned32,
+        fsPtpPortRcvdSyncMsgCnt
+        Unsigned32,
+        fsPtpPortRcvdDelayReqMsgCnt
+        Unsigned32,
+        fsPtpPortRcvdDelayRespMsgCnt
+        Unsigned32,
+        fsPtpPortTransDelayReqMsgCnt
+        Unsigned32,
+        fsPtpPortDiscardedMsgCnt
+        Unsigned32,
+        fsPtpPortRowStatus
+        RowStatus
+}
+    
+fsPtpPortIndex    OBJECT-TYPE
+    SYNTAX      FsPtpPortNumber (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The index value used to identify the port component on the device. 
+    The value of this object is used as a port index to the 
+    fsPtpPortConfigDataSetTable.Since ifindex will not be created in CFA 
+    for vlan interfaces. Free running index will be maintained locally in PTP
+    the interface will be identified using  fsPtpPortInterfaceType and
+    fsPtpPortIfaceNumber during transmit and receive "
+    ::= { fsPtpPortConfigDataSetEntry 1 }
+
+fsPtpPortClockIdentity   OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8)) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+              "This is the clock Identity of the port"
+    ::= { fsPtpPortConfigDataSetEntry 2 }
+
+fsPtpPortInterfaceType   OBJECT-TYPE
+    SYNTAX     INTEGER {
+	          udpipv4 (1),
+                  udpipv6 (2),
+                  ieee8023 (3),
+                  devicenet (4),
+                  controlnet (5),
+                  profitnet (6),
+                  ieee8021 (7),
+                  unknown (65534)
+    }
+    MAX-ACCESS read-write
+    STATUS     current 
+    DESCRIPTION
+        "This denotes the type of the interface. PTP port bears a seperate 
+         meaning than the one that are normally defined in interface mibs.
+         PTP can run over physical interfaces, VLAN identifiers or IVR
+         interfaces. Hence this object needs to be configured before making
+         this particular row as ACTIVE.
+         Only values UDP/IPv4, UDP/IPv6, IEEE802.3 are supported. IEEE8021 
+         corresponds to layer 2 Vlan."
+    ::= { fsPtpPortConfigDataSetEntry 3 }
+
+fsPtpPortIfaceNumber OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current 
+    DESCRIPTION
+        "This denotes the interface number assigned in the interface manager
+         of the system. PTP assigned interface numbers are different from the
+         the values assigned in interface mib. This object denotes the value
+         assigned in the interface mib.                                     
+         The interface type can be derived from the object . Following provides
+	 the means to decode this object.
+	 
+	 fsPtpPortInterfaceType          fsPtpPortIfaceNumber Decoded value
+	 ------------------          ------------------------------
+	 IEEE8023                    Interface index
+	 IEEE8021                    VLAN identifier
+         UDP/IPv4                    IVR interface
+	 UDP/IPv6                    IVR interface.
+	 "
+    ::= { fsPtpPortConfigDataSetEntry 4 }
+
+fsPtpPortState OBJECT-TYPE
+    SYNTAX	INTEGER {
+			faulty (0),
+			disabled (1),
+			initializing (2),
+			listening (3),
+			uncalibrated (4),
+			slave (5),
+			premaster (6),
+			master (7),
+			passive (8)
+		}
+    MAX-ACCESS 		read-only
+    STATUS 	 	current
+    DESCRIPTION
+       "This denotes the PTP State of the PTP port as computed by the PTP State
+       event machine. 
+       
+       initializing:
+       While a port is in the INITIALIZING state, the port initializes its data 
+       sets, hardware, and communication facilities. No port of the clock shall 
+       place any PTP messages on its communication path. If one port of a 
+       boundary clock is in the INITIALIZING state, then all ports shall be in 
+       the INITIALIZING state.
+       
+       faulty:
+       The fault state of the protocol. A port in this state shall not place any 
+       PTP messages except for management messages that are a required response 
+       to another management message on its communication path.
+
+       disabled:
+       The port shall not place any messages on its communication path. In a 
+       boundary clock, no activity at the port shall be allowed to affect the 
+       activity at any other port of the boundary clock. A port in this state 
+       shall discard all PTP received messages except for management messages.
+
+       listening:
+       The port is waiting for the announceReceiptTimeout to expire or to 
+       receive an Announce message from a master. The purpose of this state is 
+       to allow orderly addition of clocks to a domain. A port in this state 
+       shall not place any PTP messages on its communication path except for 
+       Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up, or signaling messages, 
+       or management messages that are a required response to another 
+       management message.
+
+       premaster:
+       The port shall behave in all respects as though it were in the MASTER 
+       state except that it shall not place any messages on its communication 
+       path except for Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up, signaling
+       or management messages.
+
+       master:
+       The port is behaving as a master port. It will periodically send announce
+       and sync messages.
+                        
+       passive:
+       The port shall not place any messages on its communication path except 
+       for Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up, or signaling messages
+       or management messages that are a required response to another management
+       message.
+
+       uncalibrated: 
+       This is a transient state to allow initialization of synchronization 
+       servos, updating of data sets when a new master port has been selected,
+       and other implementation-specific activity.
+
+       slave:
+       The port is synchronizing to the selected master port."
+       
+    ::= { fsPtpPortConfigDataSetEntry 5 }
+
+fsPtpPortMinDelayReqInterval OBJECT-TYPE
+    SYNTAX	Integer32 (0..5)
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+ 	"This is the log to the base 2 of the delay request interval 
+    in seconds. This speifies the time to the members devices to 
+    send delay request messages when the port is in the master.
+    specify the minimum permitted mean time interval between
+    successive Delay_Req messages, min delay request interval value is
+    a compromise between the fluctuation in link delay and startup time
+    and the communication and computation load imposed by transmission
+    of these messages."
+   DEFVAL { 0 }
+    ::= { fsPtpPortConfigDataSetEntry 6 }
+
+fsPtpPortPeerMeanPathDelay OBJECT-TYPE
+    SYNTAX	DisplayString
+    MAX-ACCESS	read-only
+    STATUS  	current
+    DESCRIPTION
+    "This is an estimate of the current one-way propagation delay in 
+     scalednanoseconds on the link attached to this port, calculated 
+     using the peer delay mechanism. If the value of the 
+     fsPtpPortDelayMechanism is end-to-end (E2E), this value will be 
+     zero.
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    ::= { fsPtpPortConfigDataSetEntry 7 }
+
+fsPtpPortAnnounceInterval OBJECT-TYPE
+    SYNTAX	Integer32 (0..4) 	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+      "This is the log to the base 2 of the mean Announce message intervali
+       in seconds." 
+   DEFVAL { 1 }
+    ::= { fsPtpPortConfigDataSetEntry 8 }
+
+fsPtpPortAnnounceReceiptTimeout OBJECT-TYPE
+    SYNTAX	Integer32 (2..10)	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+  	  "This is the Announce receipt time out value.
+           This should be an integral multiple of announce interval
+           in seconds"     
+    DEFVAL { 3 }
+    ::= { fsPtpPortConfigDataSetEntry 9 }
+
+fsPtpPortSyncInterval OBJECT-TYPE
+    SYNTAX	Integer32(-1..1)	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+	"This is the logarithm to the base 2 of the sync message interval 
+         in seconds"
+    DEFVAL { 0 }
+    ::= { fsPtpPortConfigDataSetEntry 10 }
+
+fsPtpPortSynclimit OBJECT-TYPE
+    SYNTAX	DisplayString	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+	"This specifies the maximum clock offset value before 
+     PTP attempts to resynchronize.The range of this object 
+     should be 50 .. 1000000000 nanoseconds
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    DEFVAL { "1000000000" }
+    ::= { fsPtpPortConfigDataSetEntry 11 }
+
+fsPtpPortDelayMechanism OBJECT-TYPE
+    SYNTAX	INTEGER {
+                         endtoend (1),
+                         peertopeer (2),
+                         disabled (255)
+                        } 
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+      "This indicates the propagation delay measuring option used by the port
+      in computing meanpathDelay."
+    DEFVAL { 1 }
+    ::= { fsPtpPortConfigDataSetEntry 12 }
+
+fsPtpPortMinPdelayReqInterval OBJECT-TYPE
+    SYNTAX	Integer32 (0..5)	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+       "This is the value of Pdelay_Req interval in seconds. This value will be 
+       specified in terms of logarithm to the base 2."
+    DEFVAL { 0 }
+    ::= { fsPtpPortConfigDataSetEntry 13 }
+
+fsPtpPortVersionNumber OBJECT-TYPE
+    SYNTAX	Integer32 (1..2)
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+       "This indicates the PTP version in use on the port."
+    DEFVAL { 2 } 
+    ::= { fsPtpPortConfigDataSetEntry 14 }
+
+fsPtpPortUnicastNegOption OBJECT-TYPE
+    SYNTAX	TruthValue	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+       "This indicates the unicast negotiation enable/disable option."
+    DEFVAL { false }
+    ::= { fsPtpPortConfigDataSetEntry 15 }
+
+fsPtpPortUnicastMasterMaxSize OBJECT-TYPE
+    SYNTAX	Integer32 (0..65535)	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+      "This indicates the maximum size of the Unicast
+       master table in this port."
+    DEFVAL { 0 } 
+    ::= { fsPtpPortConfigDataSetEntry 16 }
+
+fsPtpPortAccMasterEnabled OBJECT-TYPE
+    SYNTAX	TruthValue	
+    MAX-ACCESS	read-write
+    STATUS  	current
+    DESCRIPTION
+      "This is the enable/disable option for Acceptable master table in this 
+      Port."
+    DEFVAL { false }
+    ::= { fsPtpPortConfigDataSetEntry 17 }
+
+fsPtpPortNumOfAltMaster OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+          "A port, port-A not in the MASTER state, shall transmit multicast
+             Announce messages when the number of other ports that:
+                > Are currently transmitting qualified (see 9.3.2.5)
+                  Announce messages with flagField.alternateMasterFlag
+                  TRUE that are being received by port-A
+               > Would be chosen using the best master algorithm as
+                 best master in preference to port-A
+            is less than <numberOfAlternateMasters>. "
+    DEFVAL { 0 }
+    ::= { fsPtpPortConfigDataSetEntry 18 }
+
+fsPtpPortAltMulcastSync OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This is TRUE and if the port is transmitting multicast
+         announce message with alternate master flag true then the slave
+         port can also transmit multicast sync messages with alternate
+         master flag as true"
+    DEFVAL { false }
+    ::= { fsPtpPortConfigDataSetEntry 19 }
+
+fsPtpPortAltMulcastSyncInterval OBJECT-TYPE
+    SYNTAX   Integer32(0..255) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This is interval in seconds between the sync messages 
+         transmitted with alternate master flag as true"
+    DEFVAL { 0 } 
+    ::= { fsPtpPortConfigDataSetEntry 20 }
+
+fsPtpPortPtpStatus  OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "The effective Operational state of the port in PTP. PTP will be
+	  operational over this interface only when the value of this object
+	  is set to true. Otherwise PTP will be non-operational over this
+	  interface."
+      DEFVAL { false }
+    ::= { fsPtpPortConfigDataSetEntry 21 }
+
+fsPtpPortRcvdAnnounceMsgCnt   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+              "This is the count of Announce messages received on the port"
+    ::= { fsPtpPortConfigDataSetEntry 22 }
+
+fsPtpPortRcvdSyncMsgCnt   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+              "This is the count of sync messages received on the port"
+    ::= { fsPtpPortConfigDataSetEntry 23 }
+
+fsPtpPortRcvdDelayReqMsgCnt   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+              "This is the count of delay request messages received on the port"
+    ::= { fsPtpPortConfigDataSetEntry 24 }
+
+fsPtpPortRcvdDelayRespMsgCnt   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+              "This is the count of delay response messages received on the port"
+    ::= { fsPtpPortConfigDataSetEntry 25 }
+
+fsPtpPortTransDelayReqMsgCnt    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This is the count of delay request messages transmitted on the port"
+
+    ::= { fsPtpPortConfigDataSetEntry 26 }
+fsPtpPortDiscardedMsgCnt    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+              "This is the discarded ptp message count on the port"
+    ::= { fsPtpPortConfigDataSetEntry 27 }
+
+fsPtpPortRowStatus OBJECT-TYPE 
+    SYNTAX	RowStatus	
+    MAX-ACCESS	read-create
+    STATUS  	current
+    DESCRIPTION
+      " RowStatus for creating the entries into this table."
+    ::= { fsPtpPortConfigDataSetEntry  28 }
+
+--  Ptp foreign master data set, This contains information 
+--  about the foreign master
+
+fsPtpForeignMasterDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF  FsPtpForeignMasterDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains information about the foreign 
+             master "
+    ::= { fsPtpForeignMasterDataSet 1 }
+
+fsPtpForeignMasterDataSetEntry   OBJECT-TYPE
+    SYNTAX     FsPtpForeignMasterDataSetEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains information about the foreign master"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpForeignMasterClockIdentity,
+              fsPtpForeignMasterPortIndex,
+	      fsPtpPortIndex }
+    ::= { fsPtpForeignMasterDataSetTable 1 }
+
+FsPtpForeignMasterDataSetEntry ::= SEQUENCE {
+	fsPtpForeignMasterClockIdentity   
+	    OCTET STRING,
+	fsPtpForeignMasterPortIndex	
+	    FsPtpPortNumber,
+	fsPtpForeignMasterAnnounceMsgs	
+	    Integer32
+	}
+
+fsPtpForeignMasterClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))	
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"Source Clock identity on which the announce message is
+         received from foreign master"
+    ::= { fsPtpForeignMasterDataSetEntry 1 }
+
+fsPtpForeignMasterPortIndex OBJECT-TYPE
+    SYNTAX      FsPtpPortNumber (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"Source port index on which the announce message is
+         received from foreign master"
+    ::= { fsPtpForeignMasterDataSetEntry 2 }
+
+fsPtpForeignMasterAnnounceMsgs OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This indicates the number of Announce messages from the 
+         foreign master"
+    ::= { fsPtpForeignMasterDataSetEntry 3 }
+
+
+--   Ptp Transparent clock default data set
+-- 
+
+fsPtpTransparentDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpTransparentDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table Contains Transparent clock information on a 
+             particular domain. entry will be created in 
+             this table with defalut values once the entry is created 
+             in the fsPtpDomainDataSetTable with fsPtpDomainClockMode as
+             e2etransparent or p2ptransparent. If the clock mode is changed 
+             to other than e2etransparent or p2ptransparent the corresponding 
+             entry in this table will be deleted."    
+    ::= { fsPtpTransparentDataSet 1 }
+
+fsPtpTransparentDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpTransparentDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains Transparent clock information on a particular domain. 
+	    An entry will be created in this table with default values, only
+	    if the clock is operating as a transparent clock in this domain."
+    AUGMENTS { fsPtpDomainDataSetEntry }
+    ::= { fsPtpTransparentDataSetTable 1 }
+
+FsPtpTransparentDataSetEntry ::= SEQUENCE {
+         fsPtpTransparentClockIdentity  
+             OCTET STRING,
+         fsPtpTransparentClockTwoStepFlag
+             TruthValue,
+         fsPtpTransparentClockNumberPorts  
+             Integer32,
+         fsPtpTransparentClockDelaymechanism  
+             INTEGER,
+         fsPtpTransparentClockPrimaryDomain
+             Integer32
+}
+
+fsPtpTransparentClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the unique identity of the local clock"
+    ::= { fsPtpTransparentDataSetEntry 1 }
+
+fsPtpTransparentClockTwoStepFlag OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This value is TRUE if the clock is two step clock, otherwise it is
+	FALSE.  Configuring this value will make the PTP to move all the ports 
+	associated with this domain identifier to move to INITIALIZING state.
+	Default value is FALSE. This value can be configured if 
+        fsPtpDomainRowStatus is not in service"
+    DEFVAL { false }   
+    ::= {  fsPtpTransparentDataSetEntry 2 }
+
+fsPtpTransparentClockNumberPorts OBJECT-TYPE
+    SYNTAX      Integer32(0..128)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This indicates the number of ports in PTP device used by the 
+         transparent clock.  This value can be configured if 
+         fsPtpDomainRowStatus is not in service "
+    DEFVAL { 0 }   
+    ::= { fsPtpTransparentDataSetEntry 3 }
+
+fsPtpTransparentClockDelaymechanism OBJECT-TYPE
+    SYNTAX       INTEGER {
+                         endtoend(1),
+                         peertopeer(2) 
+		         }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"If the transparent clock is end-to-end then value of this variable 
+        is 01, if the transparent clock is peer-to-peer then value of this 
+        variable is 02"
+    DEFVAL { 1 }
+    ::= { fsPtpTransparentDataSetEntry 4 }
+
+fsPtpTransparentClockPrimaryDomain OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This is the domain number of the primary syntonization domain"
+    ::= { fsPtpTransparentDataSetEntry 5 }
+
+--  Ptp transparent clock port data set   
+--  fsptpTransparentPortDataSetTable: PTP configuration/info on a per port 
+--  basis for transparent clock 
+
+fsPtpTransparentPortDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpTransparentPortDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains the port configuration of the particular
+             port of the transparent clock"
+    ::= { fsPtpTransparentPortDataSet 1 }
+
+fsPtpTransparentPortDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpTransparentPortDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "PTP configuration information for a particular port for the 
+             transparent clock. Valid fsPtpTransparentPortInterfaceType 
+             and fsPtpTransparentPortIfaceNumber should be given to 
+             create the entry in this table otherwise entry will not be created"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpTransparentPortIndex }
+    ::= { fsPtpTransparentPortDataSetTable 1 }
+
+FsPtpTransparentPortDataSetEntry ::= SEQUENCE {
+      	fsPtpTransparentPortIndex   	  
+	    FsPtpPortNumber,
+        fsPtpTransparentPortInterfaceType
+        INTEGER,
+        fsPtpTransparentPortIfaceNumber
+        Integer32,
+        fsPtpTransparentPortClockIdentity   
+	    OCTET STRING ,
+        fsPtpTransparentPortMinPdelayReqInterval	
+	    Integer32,
+        fsPtpTransparentPortFaultyFlag	
+	    TruthValue,
+        fsPtpTransparentPortPeerMeanPathDelay	        
+	    DisplayString,
+        fsPtpTransparentPortPtpStatus
+        TruthValue,
+        fsPtpTransparentPortRowStatus	        
+	    RowStatus
+}
+		
+fsPtpTransparentPortIndex    OBJECT-TYPE
+    SYNTAX      FsPtpPortNumber (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The index value used to identify the port component on 
+	the transparent clock. The value of this object is used 
+	as a port index to the ptpTransparentPortDataSetTable."
+    ::= {  fsPtpTransparentPortDataSetEntry 1 }
+
+fsPtpTransparentPortInterfaceType   OBJECT-TYPE
+    SYNTAX     INTEGER {
+	          udpipv4 (1),
+                  udpipv6 (2),
+                  ieee8023 (3),
+                  devicenet (4),
+                  controlnet (5),
+                  profitnet (6),
+                  ieee8021 (7),
+                  unknown (65534)
+    }
+    MAX-ACCESS read-write
+    STATUS     current 
+    DESCRIPTION
+        "This denotes the type of the interface. PTP port bears a seperate 
+         meaning than the one that are normally defined in interface mibs.
+         PTP can run over physical interfaces, VLAN identifiers or IVR
+         interfaces. Hence this object needs to be configured before making
+         this particular row as ACTIVE.
+         Only values UDP/IPv4, UDP/IPv6, IEEE802.3 are supported. IEEE8021 
+         corresponds to layer 2 Vlan."
+    ::= { fsPtpTransparentPortDataSetEntry 2 }
+
+fsPtpTransparentPortIfaceNumber OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-write
+    STATUS     current 
+    DESCRIPTION
+        "This denotes the interface number assigned in the interface manager
+         of the system. PTP assigned interface numbers are different from the
+         the values assigned in interface mib. This object denotes the value
+         assigned in the interface mib.                                     
+         The interface type can be derived from the object . Following provides
+	 the means to decode this object.
+	 
+	 fsPtpPortInterfaceType      fsPtpPortIfaceNumber Decoded value
+	 ----------------------      ----------------------------------
+	 IEEE8023                    Interface index
+	 IEEE8021                    VLAN identifier
+         UDP/IPv4                    IVR interface
+	 UDP/IPv6                    IVR interface.
+	 "
+    ::= { fsPtpTransparentPortDataSetEntry 3 }
+fsPtpTransparentPortClockIdentity   OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8)) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This is the clock identity of the transparent clock. This is the
+        index to the ptpPortConfigDataSetTable."
+    ::= { fsPtpTransparentPortDataSetEntry 4 }
+
+fsPtpTransparentPortMinPdelayReqInterval   OBJECT-TYPE
+    SYNTAX      Integer32 (0..5) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "This is the Pdelay_Req interval. This is used if the
+       transparent clock is Peer-to-Peer." 
+    DEFVAL { 1 }
+    ::= { fsPtpTransparentPortDataSetEntry 5 }
+
+fsPtpTransparentPortFaultyFlag    OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This is the faulty status of the port. This value will be made TRUE
+       if the port enters into Faulty state."
+    DEFVAL { false } 
+    ::= { fsPtpTransparentPortDataSetEntry 6 }
+
+fsPtpTransparentPortPeerMeanPathDelay    OBJECT-TYPE
+    SYNTAX      DisplayString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "If the ptpTransparentClockDelaymechanism is P2P then this 
+     indicates the mean propagation delay of the ingress link 
+     connected to this port
+
+     The time interval field represents the values in scalednanoseconds.
+     The scalednanoseconds member is the time interval expressed in
+     units of nanoseconds and multiplied by 2^16.
+     Positive or negative time intervals outside the maximum range of
+     this data type shall be encoded as the largest positive and
+     negative values of this data type, respectively. For example, 2.5 
+     nanoseconds, will be expressed as 2.5 * 2^16 and the value
+     converted to hexadecimal that will obviously evolve to
+     0000 0000 0002 8000 base 16."
+    ::= { fsPtpTransparentPortDataSetEntry 7 }
+
+fsPtpTransparentPortPtpStatus  OBJECT-TYPE
+      SYNTAX      TruthValue
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+          "The effective Operational state of the port in PTP. PTP will be
+	  operational over this interface only when the value of this object
+	  is set to true. Otherwise PTP will be non-operational over this
+	  interface."
+      DEFVAL { false }
+    ::= { fsPtpTransparentPortDataSetEntry 8 }
+
+fsPtpTransparentPortRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      " RowStatus for creating the entries into this table." 
+    ::= { fsPtpTransparentPortDataSetEntry 9 }
+
+--   Ptp grand master cluster data set    
+
+fsPtpGrandMasterClusterDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpGrandMasterClusterDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains grand master cluster members. Max
+             number of entries in this table should not be more
+             than 5.
+
+             Currently this table is not supported.
+             This table will be supported in the future"
+    ::= { fsPtpGrandMasterClusterDataSet 1 }
+
+fsPtpGrandMasterClusterDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpGrandMasterClusterDataSetEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains grand master cluster members"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpGrandMasterClusterNetworkProtocol,
+              fsPtpGrandMasterClusterAddLength,
+              fsPtpGrandMasterClusterAddr  }
+    ::= { fsPtpGrandMasterClusterDataSetTable 1 }
+
+FsPtpGrandMasterClusterDataSetEntry ::= SEQUENCE {
+	fsPtpGrandMasterClusterNetworkProtocol	
+	    Integer32,
+	fsPtpGrandMasterClusterAddLength      
+	    Integer32,
+	fsPtpGrandMasterClusterAddr      
+	    OCTET STRING,
+	fsPtpGrandMasterClusterRowStatus
+	    RowStatus
+}
+
+fsPtpGrandMasterClusterNetworkProtocol OBJECT-TYPE
+    SYNTAX  	Integer32 (0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current 
+    DESCRIPTION
+	"This indicates the network protocol of the port of the 
+	grand master cluster"
+    ::= { fsPtpGrandMasterClusterDataSetEntry  1 }
+
+fsPtpGrandMasterClusterAddLength OBJECT-TYPE
+    SYNTAX      Integer32 (1..16)	
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This indicates the length of the fsptpGrandMasterClusterAddr"
+    ::= { fsPtpGrandMasterClusterDataSetEntry 2 }
+
+fsPtpGrandMasterClusterAddr OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1..16)) 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This indicates the protocol address of the port of the
+         grand master cluster member "
+    ::= { fsPtpGrandMasterClusterDataSetEntry 3 }
+
+fsPtpGrandMasterClusterRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This indicates the status of this entry, is valid or not."
+    ::= { fsPtpGrandMasterClusterDataSetEntry 4 }
+
+--   Ptp Unicast Master table data set    
+
+fsPtpUnicastMasterDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpUnicastMasterDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains unicast masters on the port
+
+             Currently this table is not supported.
+             This table will be supported in the future"
+    ::= { fsPtpUnicastMasterDataSet 1 }
+
+fsPtpUnicastMasterDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpUnicastMasterDataSetEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains unicast masters on the port"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpPortIndex,
+              fsPtpUnicastMasterNetworkProtocol,
+              fsPtpUnicastMasterAddLength,
+              fsPtpUnicastMasterAddr  }
+    ::= { fsPtpUnicastMasterDataSetTable 1 }
+
+FsPtpUnicastMasterDataSetEntry ::= SEQUENCE {
+	fsPtpUnicastMasterNetworkProtocol	
+	    Integer32,
+	fsPtpUnicastMasterAddLength      
+	    Integer32,
+	fsPtpUnicastMasterAddr      
+	    OCTET STRING,
+	fsPtpUnicastMasterRowStatus
+	    RowStatus
+}
+
+fsPtpUnicastMasterNetworkProtocol OBJECT-TYPE
+    SYNTAX  	Integer32 (0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	" This indicates the network protocol of the port of
+           the unicast master on this port"
+    ::= { fsPtpUnicastMasterDataSetEntry 1 }
+
+fsPtpUnicastMasterAddLength OBJECT-TYPE
+    SYNTAX  Integer32(1..16)	
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	" This indicates the length of fsptpUnicastMasterAddr"
+    ::= { fsPtpUnicastMasterDataSetEntry 2 }
+
+fsPtpUnicastMasterAddr OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE (1..16)) 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	" This indicates the protocol address of the port
+          of the unicast master on this port"
+    ::= { fsPtpUnicastMasterDataSetEntry 3 }
+
+fsPtpUnicastMasterRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This indicates the status of this entry, is valid or not."
+    ::= { fsPtpUnicastMasterDataSetEntry 4 }
+
+--   Ptp Acceptable master table data set    
+
+fsPtpAccMasterDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpAccMasterDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains acceptable masters for the clock"
+    ::= { fsPtpAccMasterDataSet 1 }
+
+fsPtpAccMasterDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpAccMasterDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains acceptable masters for the clock"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpAccMasterNetworkProtocol,
+              fsPtpAccMasterAddLength,
+              fsPtpAccMasterAddr  }
+    ::= { fsPtpAccMasterDataSetTable 1 }
+
+FsPtpAccMasterDataSetEntry ::= SEQUENCE {
+	fsPtpAccMasterNetworkProtocol	
+	    Integer32,
+	fsPtpAccMasterAddLength         
+	    Integer32,
+	fsPtpAccMasterAddr 
+	    OCTET STRING,
+        fsPtpAccMasterAlternatePriority   
+	    Integer32,
+	fsPtpAccMasterRowStatus
+	    RowStatus
+}
+
+fsPtpAccMasterNetworkProtocol OBJECT-TYPE
+    SYNTAX  	Integer32(0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This indicates the network protocol of the port of
+         the acceptable master of the clock "
+    ::= { fsPtpAccMasterDataSetEntry 1 }
+
+fsPtpAccMasterAddLength OBJECT-TYPE
+    SYNTAX      Integer32(1..16)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This indicates the length of fsptpAccMasterAddr"
+    ::= { fsPtpAccMasterDataSetEntry 2 }
+
+fsPtpAccMasterAddr OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1..16))	
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This indicates the protocol address of the port of 
+         the acceptable master of the clock "
+    ::= { fsPtpAccMasterDataSetEntry 3 }
+
+fsPtpAccMasterAlternatePriority OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"If this value is non zero then priority1 of the clock set will be
+	replaced by this priority for the best master algorithm."
+    ::= { fsPtpAccMasterDataSetEntry 4 }
+
+fsPtpAccMasterRowStatus  OBJECT-TYPE
+    SYNTAX        RowStatus 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+	"This indicates the status of this entry, is valid or not."
+	::= { fsPtpAccMasterDataSetEntry 5 }
+
+--   Ptp Security protocol Key List data set
+
+fsPtpSecKeyDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpSecKeyDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains list of security keys
+
+             Currently this table is not supported.
+             This table will be supported in the future"
+    ::= { fsPtpSecKeyDataSet 1 }
+
+fsPtpSecKeyDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpSecKeyDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "contains list of security keys"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpSecKeyId }
+    ::= {  fsPtpSecKeyDataSetTable 1 }
+
+FsPtpSecKeyDataSetEntry ::= SEQUENCE {
+        fsPtpSecKeyId	
+	    Integer32,
+        fsPtpSecKeyAlgorithmId  
+	    INTEGER,
+        fsPtpSecKeyLength    
+	    Integer32,
+        fsPtpSecKey 
+	    OCTET STRING,
+        fsPtpSecKeyStartTime 
+	    TimeStamp, 
+        fsPtpSecKeyExpirationTime  
+	    TimeStamp,
+        fsPtpSecKeyValid   
+	    TruthValue,
+        fsPtpSecKeyRowStatus  
+	    RowStatus
+	}
+
+fsPtpSecKeyId OBJECT-TYPE
+    SYNTAX  	Integer32(0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       " This is the unique identifier of the security key"
+    ::= { fsPtpSecKeyDataSetEntry 1 }
+
+fsPtpSecKeyAlgorithmId OBJECT-TYPE
+    SYNTAX  	INTEGER {
+                hmacSha196 (1),
+                hmacSha256128 (2)
+                }  
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the algorithm to be used with the
+          security key"
+    DEFVAL { 1 }
+    ::= { fsPtpSecKeyDataSetEntry 2 }
+
+fsPtpSecKeyLength OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the length of fsptpSecKey"
+    ::= { fsPtpSecKeyDataSetEntry 3 }
+
+fsPtpSecKey OBJECT-TYPE
+    SYNTAX      OCTET STRING	
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This field holds the security key"
+    ::= { fsPtpSecKeyDataSetEntry 4 }
+
+fsPtpSecKeyStartTime OBJECT-TYPE
+    SYNTAX  	TimeStamp
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates validity start time of the key in secs. 
+          This key will be activated by setting the 
+          fsptpSecKeyValid to TRUE"
+    ::= { fsPtpSecKeyDataSetEntry 5 }
+
+fsPtpSecKeyExpirationTime OBJECT-TYPE
+    SYNTAX  	TimeStamp
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates expiry time of the key in seconds. 
+          Once the key expires then the fsptpSecKeyValid is 
+          set to FALSE"
+    ::= { fsPtpSecKeyDataSetEntry 6 }
+
+fsPtpSecKeyValid OBJECT-TYPE
+    SYNTAX  	TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates whether the security key is 
+          valid or not"
+    DEFVAL { false }
+    ::= { fsPtpSecKeyDataSetEntry 7 }
+
+fsPtpSecKeyRowStatus OBJECT-TYPE
+    SYNTAX  	RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	" This indicates whether the security key is 
+          valid or not"
+    ::= { fsPtpSecKeyDataSetEntry 8 }
+
+--   Ptp Security protocol Security Associtation Data set  
+
+fsPtpSADataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpSADataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains list of incoming and outgoing SAs,
+             The value of the objects can not be modified if it
+             is dynamically learned SAs though the object is read-write
+
+             Currently this table is not supported.
+             This table will be supported in the future"
+    ::= { fsPtpSADataSet 1 }
+
+fsPtpSADataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpSADataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Contains list of incoming and outgoing SAs"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpSAId 
+            }
+    ::= { fsPtpSADataSetTable  1 }
+
+FsPtpSADataSetEntry ::= SEQUENCE {
+    fsPtpSAId                    
+        Integer32,
+    fsPtpSASrcPortNumber         
+        FsPtpPortNumber,
+    fsPtpSASrcAddrLength         
+        Integer32,
+    fsPtpSASrcAddr               
+        OCTET STRING,
+    fsPtpSADstPortNumber         
+        FsPtpPortNumber,
+    fsPtpSADstAddrLength         
+        Integer32,
+    fsPtpSADstAddr 
+        OCTET STRING, 
+    fsPtpSASrcClockIdentity  
+        OCTET STRING,
+    fsPtpSADstClockIdentity  
+        OCTET STRING,
+    fsPtpSAReplayCounter	
+        Integer32,
+    fsPtpSALifeTimeId  
+        Integer32,
+    fsPtpSAKeyId    
+        Integer32,
+    fsPtpSANextLifeTimeId 
+        Integer32,
+    fsPtpSANextKeyId 
+        Integer32, 
+    fsPtpSATrustState 
+        INTEGER,
+    fsPtpSATrustTimer
+        Integer32,
+    fsPtpSATrustTimeout
+        Integer32,
+    fsPtpSAChallengeState
+        INTEGER,
+    fsPtpSAChallengeTimer
+        Integer32,
+    fsPtpSAChallengeTimeOut 
+        Integer32,
+    fsPtpSARequestNonce
+        Integer32,
+    fsPtpSAResponseNonce 
+        Integer32,
+    fsPtpSAChallengeRequired 
+        TruthValue,
+    fsPtpSAResponseRequired  
+        TruthValue,
+    fsPtpSATypeField  
+        Integer32,
+    fsPtpSADirection  
+        INTEGER,
+    fsPtpSARowStatus  
+        RowStatus   
+}
+
+fsPtpSAId OBJECT-TYPE
+    SYNTAX      Integer32(0..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	" This is the unique ID of SA."
+    ::= { fsPtpSADataSetEntry 1 }
+
+fsPtpSASrcPortNumber OBJECT-TYPE
+    SYNTAX      FsPtpPortNumber
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the port Number of the source 
+          port Identity of the SA. The fsPtpSARowStatus should be in
+          not in service if it has to be modified. For outgoing SA this can be set 
+          to all-ones indicates that the SA is used for all ports of the clock.
+          for incoming SA this should not be set to all-ones"
+    ::= { fsPtpSADataSetEntry 2 }
+
+fsPtpSASrcAddrLength OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the length of fsptpSASrcAddr.
+          The fsPtpSARowStatus should be in
+          not in service if it has to be modified."
+    ::= { fsPtpSADataSetEntry 3 }
+
+fsPtpSASrcAddr OBJECT-TYPE
+    SYNTAX      OCTET STRING	
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the protocol address of the source port of the SA.
+          The fsPtpSARowStatus should be in
+          not in service if it has to be modified.for outgoing SA this can be 
+          set to all-ones indicates the SA matches all addresses. For 
+          incoming SA this should not be all-ones"
+    ::= { fsPtpSADataSetEntry 4 }
+
+fsPtpSADstPortNumber OBJECT-TYPE
+    SYNTAX  FsPtpPortNumber
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the port number of the 
+          destination port of the SA.
+          The fsPtpSARowStatus should be in
+          not in service if it has to be modified. For outgoing
+          SA this value can be set to all-ones indicating that 
+          the SA is for all the ports in destination clock "
+    ::= { fsPtpSADataSetEntry 5 }
+
+fsPtpSADstAddrLength OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the length of the fsptpSADstAddr.
+          The fsPtpSARowStatus should be in
+          not in service if it has to be modified."
+    ::= { fsPtpSADataSetEntry 6 }
+
+fsPtpSADstAddr OBJECT-TYPE
+    SYNTAX  OCTET STRING	
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the protocol address of the destination port of the SA.
+          The fsPtpSARowStatus should be in
+          not in service if it has to be modified. For outgoing SA this can be
+          set to all-ones indicating that the SA is for all addresses "
+    ::= { fsPtpSADataSetEntry 7 }
+
+fsPtpSASrcClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))	
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the clock identity of the source 
+          port of the SA The fsPtpSARowStatus should be in
+          not in service if it has to be modified.For outgoing SA this can be set 
+          to all-ones indicates that the SA is used for all ports of the clock.
+          for incoming SA this should not be set to all-ones"
+    ::= { fsPtpSADataSetEntry 8 }
+
+fsPtpSADstClockIdentity OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8))	
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the clock identity of the destination port of the SA.
+          The fsPtpSARowStatus should be in
+          not in service if it has to be modified. For outgoing SA this 
+          can be set to all-ones indicating that the SA is for all clocks"
+    ::= { fsPtpSADataSetEntry 9 }
+
+fsPtpSAReplayCounter OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the replay counter. This value is used in the replay 
+	protection mechanism. "
+    ::= { fsPtpSADataSetEntry 10 }
+
+fsPtpSALifeTimeId OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This is the life time Id, This value is used in the replay
+         protection mechanism. "
+    ::= { fsPtpSADataSetEntry 11 }
+
+fsPtpSAKeyId OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates which key is used for computation of the
+          ICV . The value can not be assigned to this variable
+         if it is a incoming SA"
+    ::= { fsPtpSADataSetEntry 12 }
+
+fsPtpSANextLifeTimeId OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This is the next life time Id used in replay protection
+          mechanism. when fsptpSAReplayCounter rolls over the value
+          of fsptpSANextLifeTimeId is copied to fsptpSALifeTimeId." 
+    ::= { fsPtpSADataSetEntry 13 }
+
+fsPtpSANextKeyId OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the key that is going to be used after this
+          key expires. The value can not be assigned to this variable
+         if it is a incoming SA "
+    ::= { fsPtpSADataSetEntry 14 }
+
+fsPtpSATrustState OBJECT-TYPE
+    SYNTAX  	INTEGER {
+                           untrusted (0),
+                           trusted  (1)
+                          } 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This indicates the trust state of the incoming SA.
+          For out going SA this is not used. "
+    ::= { fsPtpSADataSetEntry 15 }
+
+fsPtpSATrustTimer OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This indicates the trust timer of incoming SA. when it
+          receives successfully authenticated message this value
+          is set to fsptpSATrustTimeout. This is decremented by 
+          one by each security event task, when it reaches zero 
+          the fsptpSATrustState of the incoming SA is set 
+          to UNTRUSTED. For outgoing SA this is set to 0 "
+    ::= { fsPtpSADataSetEntry 16 }
+
+fsPtpSATrustTimeout OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This indicates the time out period for the authenticated          
+	messages in SA. If it is not recieved successfully authenticated
+	message within this period the incoming SA will be timed out. For 
+	outgoing SA this is set to 0"
+    ::= { fsPtpSADataSetEntry 17 }
+
+fsPtpSAChallengeState OBJECT-TYPE
+    SYNTAX  	INTEGER {
+                           idle (0),
+                           challenging (1)
+                          }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This indicates whether the SA is waiting for a reply
+          for a challenge request"
+    ::= { fsPtpSADataSetEntry 18 }
+
+fsPtpSAChallengeTimer OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"This indicates the challenge timer of incoming SA this value is 
+	set to fsptpSAChallengeTimeOut once a challenge-request or 
+	challenge-response-request is sent by the SA. This timer is 
+	decremented by one by  each security event task, when this value
+	reaches 0 the challenge state is set to IDLE. For outgoing SA
+	this is set to zero "
+    ::= { fsPtpSADataSetEntry 19 }
+
+fsPtpSAChallengeTimeOut OBJECT-TYPE
+    SYNTAX  	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"This is the time out period for the challenge-request, or 
+	challenge-response-request message. if challenge-request or
+	challenge-response-request is not received within this period
+	then the fsptpSAChallengeState is set to IDLE. For outgoing SA 
+	this is set to zero."
+    ::= { fsPtpSADataSetEntry 20 }
+
+fsPtpSARequestNonce OBJECT-TYPE
+    SYNTAX  	 Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This is the request nonce used in challenge-response mechanism "
+    ::= { fsPtpSADataSetEntry 21 }
+
+fsPtpSAResponseNonce OBJECT-TYPE
+    SYNTAX  	 Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This is the request nonce received in the challenge
+          request and maintained in the SA "
+    ::= { fsPtpSADataSetEntry 22 }
+
+fsPtpSAChallengeRequired OBJECT-TYPE
+    SYNTAX   TruthValue	
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This value is set to TRUE when a challenge request 
+          needs to be sent to update incoming security association"
+    ::= { fsPtpSADataSetEntry 23 }
+
+fsPtpSAResponseRequired OBJECT-TYPE
+    SYNTAX  	TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This value is set to TRUE when a challenge response needs
+          to be sent "
+    ::= { fsPtpSADataSetEntry 24 }
+
+fsPtpSATypeField OBJECT-TYPE
+    SYNTAX  	Integer32(0..1)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	" This indicates whether the SA is static or dynamic"
+    ::= { fsPtpSADataSetEntry 25 }
+
+fsPtpSADirection OBJECT-TYPE
+    SYNTAX  	INTEGER{
+                          in(0),
+                          out(1)
+                         }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	" This indicates the SA's direction, whether incoming SA 
+          or outgoing SA"
+    ::= { fsPtpSADataSetEntry 26 }
+
+fsPtpSARowStatus OBJECT-TYPE
+    SYNTAX      RowStatus	
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"RowStatus for creating the entries into this table. "
+    ::= { fsPtpSADataSetEntry 27 }
+
+--   Ptp Alternate TimeScale data set for the Clock
+
+fsPtpAltTimeScaleDataSetTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF FsPtpAltTimeScaleDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Table contains list of Alternate timescal keyId and it's parameters. 
+             It is applicabel for Grandmaster Clock."
+    ::= { fsPtpAltTimeScaleDataSet 1 }
+
+fsPtpAltTimeScaleDataSetEntry   OBJECT-TYPE
+    SYNTAX      FsPtpAltTimeScaleDataSetEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+              "contains list of Alternate timescal Entries"
+     INDEX  { fsPtpContextId,
+              fsPtpDomainNumber,
+              fsPtpAltTimeScaleKeyId }
+    ::= {  fsPtpAltTimeScaleDataSetTable 1 }
+
+FsPtpAltTimeScaleDataSetEntry ::= SEQUENCE {
+        fsPtpAltTimeScaleKeyId          
+	    Integer32,
+	fsPtpAltTimeScalecurrentOffset  
+	    Integer32,
+	fsPtpAltTimeScalejumpSeconds    
+	    Integer32,
+	fsPtpAltTimeScaletimeOfNextJump 
+	    OCTET STRING,
+	fsPtpAltTimeScaledisplayName    
+	    OCTET STRING,
+	fsPtpAltTimeScaleRowStatus      
+	    RowStatus
+}
+
+fsPtpAltTimeScaleKeyId OBJECT-TYPE
+    SYNTAX      Integer32(1 .. 254)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       " This is the unique identifier of the Alternate Timescale KeyId"
+    ::= { fsPtpAltTimeScaleDataSetEntry 1 }
+
+fsPtpAltTimeScalecurrentOffset   OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+   "The value of currentOffset shall be the offset of the alternate time,
+    in seconds, from the node's time. The alternate time is the sum 
+    of this value and the node's time."
+    ::= { fsPtpAltTimeScaleDataSetEntry 2 }
+
+fsPtpAltTimeScalejumpSeconds OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+    "The value of jumpSeconds shall be the size of the next discontinuity, 
+     in seconds, of the alternate time. A value of zero indicates that no 
+     discontinuity is expected. A positive value indicates that the 
+     discontinuity will cause the currentOffset of the alternate time to 
+     increase."
+    ::= { fsPtpAltTimeScaleDataSetEntry 3 }
+
+fsPtpAltTimeScaletimeOfNextJump OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(6))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+    "The value of timeOfNextJump shall be the value of the seconds 
+    portion of the transmitting node's time at the time that the next 
+    discontinuity will occur. The discontinuity occurs at the start of the 
+    second indicated by the value of timeOfNextJump. This is type of 
+    UInteger48."
+    ::= { fsPtpAltTimeScaleDataSetEntry 4 }
+
+fsPtpAltTimeScaledisplayName OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1..10))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+     "The value of displayName shall be the text name of the alternate 
+     timescale. Commonly used acronyms should be used, e.g., NTP, PT,PST,
+     PDT for Network Time Protocol, Pacific Time, Pacific Standard Time,
+     and Pacific Daylight Savings Time, respectively.  The maximum number 
+     of symbols shall be 10." 
+    ::= { fsPtpAltTimeScaleDataSetEntry 5 }
+
+fsPtpAltTimeScaleRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION 
+    " This indicates whether the security key is valid or not"
+    ::= { fsPtpAltTimeScaleDataSetEntry 6 }
+
+-- fsPtpNotifications Sub Tree
+
+fsPtpTrap OBJECT IDENTIFIER ::= { fsPtpNotifications 0 }
+
+fsPtpTrapContextName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..32))
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The name given to the virtual context."
+    ::= { fsPtpNotifications 1 }
+
+fsPtpTrapDomainNumber OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the domain number that will be used for
+	generating traps."
+    ::= { fsPtpNotifications 2 }
+
+fsPtpGlobalErrTrapType OBJECT-TYPE
+       SYNTAX       INTEGER   {
+                        none (0),
+                        memfail (1),
+                        bufffail (2),
+                        syncfault (3),
+                        accmasterfault (4),
+                        gmfault (5) 
+                    }
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+           "This refers to the type of error that has been occured recently.
+            This object will be used in Notification PDUs.
+            none - none of the below values
+            memfail - memory allocation failure
+            bufffail - buffer allocation failure"
+   ::= { fsPtpNotifications 3 }
+
+fsPtpNotification OBJECT-TYPE
+       SYNTAX       OCTET STRING
+       MAX-ACCESS   read-write
+       STATUS       current
+       DESCRIPTION
+           "This refers to the traps that are enabled in PTP module.
+            Each bit in this object corresponds to a particular trap
+            If the corresponding bit is set, then the particular
+            trap is enabled in PTP. The following traps are supported
+
+            BYTE   BIT                     Notification
+
+            0      1                       Global error
+            0      2                       System control change
+            0      3                       System admin status change
+            0      4                       Port state change
+            0      5                       Port admin status change
+            0      6                       Sync fault
+            0      7                       GM fault
+            0      8                       Acceptable master fault
+            1      1                       Unicast admin status change"
+   ::= { fsPtpNotifications 4 }
+
+fsPtpPortStateChangeTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpPortState
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever a state change occurs for
+	     the PTP port. The generated trap will be carrying the following
+	     information, Context Name in which the trap occured and the
+	     newly selected port state. The context identifier, domain name
+	     and PTP Port index trio form the index for the object 
+	     fsPtpPortState and hence will be embedded along with this object."
+    ::= { fsPtpTrap 1 }
+
+fsPtpGlobalErrorTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpGlobalErrTrapType
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever any of the error events like 
+	     memory allocation failure or buffer allocation failure occurs in 
+	     PTP. The generated trap will be carrying the information about
+	     the type of the resource allocation failure (memory allocation 
+	     or buffer allocation) failure."
+    ::= { fsPtpTrap 2 }
+
+fsPtpAdminChangeTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpAdminStatus
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP is enabled or disabled
+	      in the context. The generated trap will carry the information of
+              the virtual context in which the PTP status is changed along with
+              the Admin status {Enabled/Disabled}."
+    ::= { fsPtpTrap 3 }
+
+
+fsPtpSysCtrlChangeTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpContextRowStatus
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP is shutdown or started
+	      in the context. The generated trap will carry the information of
+              the virtual context in which the PTP status is changed along with
+              the system control {Start/Shutdown}."
+    ::= { fsPtpTrap 4 }
+
+
+fsPtpUnicastOptionTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpPortUnicastNegOption
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP unicast Option is enabled or 
+              disabled in the context. The generated trap will be having the 
+              information about the context name of the port bound where the 
+              unicast negotiation option is changed. The context identifier 
+              and domain identifier along with the port will be embedded as 
+              indices of the object fsPtpPortUnicastNegOption."
+    ::= { fsPtpTrap 5 }
+
+fsPtpPortPtpStatusTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpPortPtpStatus 
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP is enabled or disabled in a 
+              Port. The generated trap will be having information about the
+              context name of the port bound where the Ptp Status is changed.
+              The context identifier and domain identifier along with the port
+              will be embedded as indices of the object fsPtpPortPtpStatus."
+    ::= { fsPtpTrap 6 }
+
+fsPtpSyncFaultTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpTrapDomainNumber,
+	     fsPtpGlobalErrTrapType 
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP synchronization Fault 
+              occurs in the system. The generated trap will be having the
+              virtual context name, domain number along with the port where
+              the fault occured."
+    ::= { fsPtpTrap 7 }
+
+fsPtpAccMasterFaultTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpTrapDomainNumber,
+	     fsPtpGlobalErrTrapType 
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP Acceptable master Fault 
+	     occurs in the system. The generated trap will be having the
+	     virtual context name, domain number along with the port where 
+	     the fault occured."
+    ::= { fsPtpTrap 8 }
+
+fsPtpGrandMasterFaultTrap NOTIFICATION-TYPE
+         OBJECTS {
+	     fsPtpTrapContextName,
+	     fsPtpTrapDomainNumber,
+	     fsPtpGlobalErrTrapType
+	 }
+	 STATUS   current
+	 DESCRIPTION 
+	     "This trap is generated whenever PTP Grand master Fault occurs 
+	      in the system The generated trap will be having the virtual 
+              context name, domain number along with the port where the fault 
+              occured."
+    ::= { fsPtpTrap 9 }
+
+END

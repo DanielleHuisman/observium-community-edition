@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,21 +6,18 @@
  *
  * @package        observium
  * @subpackage     poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-if (is_device_mib($device, 'CAMBIUM-PTP800-MIB'))
-{
-  $version  = snmp_get($device, 'softwareVersion.0', '-OQv', 'CAMBIUM-PTP800-MIB');
-  $hardware = snmp_get($device, 'productName.0',     '-OQv', 'CAMBIUM-PTP800-MIB');
-}
-else if (is_device_mib($device, 'MOTOROLA-PTP-MIB'))
-{
-  $version  = snmp_get($device, 'softwareVersion.0', '-OQv', 'MOTOROLA-PTP-MIB');
-  $hardware = snmp_get($device, 'productName.0',     '-OQv', 'MOTOROLA-PTP-MIB');
+if (is_device_mib($device, 'CAMBIUM-PTP800-MIB')) {
+    $version  = snmp_get_oid($device, 'softwareVersion.0', 'CAMBIUM-PTP800-MIB');
+    $hardware = snmp_get_oid($device, 'productName.0', 'CAMBIUM-PTP800-MIB');
+} elseif (is_device_mib($device, 'MOTOROLA-PTP-MIB')) {
+    $version  = snmp_get_oid($device, 'softwareVersion.0', 'MOTOROLA-PTP-MIB');
+    $hardware = snmp_get_oid($device, 'productName.0', 'MOTOROLA-PTP-MIB');
 } else {
-  $hardware = rewrite_definition_hardware($device, $poll_device['sysObjectID']);
+    $hardware = get_model_param($device, 'hardware', $poll_device['sysObjectID']);
 }
 
 // EOF

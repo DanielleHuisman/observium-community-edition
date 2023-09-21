@@ -1,0 +1,1091 @@
+RC-MLD-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32
+        FROM SNMPv2-SMI
+    TruthValue, DisplayString
+        FROM SNMPv2-TC
+    Ipv6Address
+        FROM IPV6-TC
+    InterfaceIndex
+        FROM IF-MIB
+    PortSet, rcMld, EnableValue
+        FROM RAPID-CITY;
+
+rcMldMib  MODULE-IDENTITY
+       LAST-UPDATED "201702100000Z"
+       ORGANIZATION "Avaya"
+       CONTACT-INFO "Prem Palarapu
+             Postal:  Avaya
+                      600 Technology Park
+                      Billerica, MA 01821
+              email:  prempa@avaya.com
+                      " 
+       DESCRIPTION    "Enterprise MIB for the MLD mibs."
+
+       REVISION "201702100000Z" -- 10 Feb 2017
+       DESCRIPTION "Version 4: Corrected MIB compiler errors."
+	   
+       REVISION "201510080000Z" -- 08 October 2015
+       DESCRIPTION "Version 3: Commented out the following objects, because
+	   		       they are not supported in the first release
+			       (but will be supported in the future, and 
+			       PLM want to retain the OIDs to be in sync with
+			       Ipv4) -
+			          rcMldNewGroupUserId
+				  rcMldNewGroupMemberState
+				  rcMldNewGroupSessionTime
+				  rcMldInterfaceExtnSnoopMRouterPorts
+				  rcMldInterfaceExtnSnoopActiveMRouterPorts
+				  rcMldInterfaceExtnSnoopMRouterExpiration
+				  rcMldv2CacheEntryModeExpiryTimer
+				  rcPimIpv6CandidateRPTable
+			       Changed the following objects from read-write to
+			       read-only -
+			       	  rcMldSsmGlobalRangeGroup
+				  rcMldSsmGlobalRangeMask
+			       Removed rcMldv2CacheEntryVersion2HostTimer as
+			       it is not needed anymore
+	                       Requested by Cristea Oana, submit 25501 (prempa)"
+	   
+       REVISION "201507220000Z" -- 22 July 2015
+       DESCRIPTION "Version 2: Added rcMldSerderTable.
+	                       Requested by Stefan Dinescu (malok)"
+	   
+       REVISION "201504060000Z" -- 06 Apr 2015
+       DESCRIPTION "Version 1: Created the file"
+       ::= { rcMld 0 }
+ 
+rcMldObjects            OBJECT IDENTIFIER ::= { rcMld 1 }
+rcMldNotification       OBJECT IDENTIFIER ::= { rcMld 2 }
+
+--New MLD Group Table.
+
+rcMldNewGroupTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF RcMldNewGroupEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The (conceptual) table listing the multicast
+                         groups configured in the device."
+	::= { rcMldObjects 1 }
+
+rcMldNewGroupEntry OBJECT-TYPE
+        SYNTAX     	RcMldNewGroupEntry
+        MAX-ACCESS 	not-accessible
+        STATUS     	current
+        DESCRIPTION 	"An entry (conceptual row) representing an
+	    		 Mld group."
+        INDEX      	{ rcMldNewGroupIpv6Address, 
+			  rcMldNewGroupMembers, 
+			  rcMldNewGroupInPort }
+        ::= { rcMldNewGroupTable 1 }
+
+RcMldNewGroupEntry ::= SEQUENCE {
+        rcMldNewGroupIpv6Address       Ipv6Address,
+        rcMldNewGroupMembers           Ipv6Address,
+        rcMldNewGroupInPort            InterfaceIndex,
+        rcMldNewGroupExpiration        Integer32,
+        rcMldNewGroupIfIndex           InterfaceIndex
+--      rcMldNewGroupUserId            DisplayString,
+--      rcMldNewGroupMemberState       INTEGER,
+--      rcMldNewGroupSessionTime       Integer32
+}
+
+rcMldNewGroupIpv6Address OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      not-accessible 
+        STATUS          current
+        DESCRIPTION     "Multicast Group Address that others 
+                         want to join to. A group address can be the same
+                         for many incoming ports."
+        ::= { rcMldNewGroupEntry 1 }
+
+rcMldNewGroupMembers OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "IP Address of a source that has sent group
+                         report wishing to join this group."
+        ::= { rcMldNewGroupEntry 2 }
+
+rcMldNewGroupInPort OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "An unique value to identify a physical
+                        interface or a logical interface (VLAN),
+                        which has received Group reports from various
+                        sources."
+        ::= { rcMldNewGroupEntry 3 }
+
+rcMldNewGroupExpiration OBJECT-TYPE
+         SYNTAX     	Integer32
+         MAX-ACCESS 	read-only
+         STATUS     	current
+         DESCRIPTION 	"Time left before the group report expired on this
+	     		 port. Only one of this variable port. This
+			 variable is updated upon receiving a group report."
+         ::= { rcMldNewGroupEntry 4 }
+         
+rcMldNewGroupIfIndex OBJECT-TYPE
+         SYNTAX     	InterfaceIndex
+         MAX-ACCESS 	read-only
+         STATUS     	current
+         DESCRIPTION    "An unique value to identify a physical
+	     		 interface or a logical interface (VLAN),
+			 which has received Group reports from various
+			 sources."
+         ::= { rcMldNewGroupEntry 5 }
+
+-- rcMldNewGroupUserId OBJECT-TYPE
+--         SYNTAX     	DisplayString (SIZE(0..32))
+--         MAX-ACCESS 	read-only
+--         STATUS     	current
+--         DESCRIPTION 	"User-id sending this group"
+--         ::= { rcMldNewGroupEntry 6 }
+
+-- rcMldNewGroupMemberState OBJECT-TYPE
+--         SYNTAX     	INTEGER {
+--	 			noState(1),
+--				auth(2),
+--				accStart(3),
+--				authAndAcctStart(4),
+--				authAndAcctDisabled(5)
+--			}
+--         MAX-ACCESS 	read-only
+--         STATUS     	current
+--         DESCRIPTION 	"Used for IGAP, to indicated member state."
+--         ::= { rcMldNewGroupEntry 7 }
+
+--rcMldNewGroupSessionTime OBJECT-TYPE
+--         SYNTAX     	Integer32
+--         MAX-ACCESS 	read-only
+--         STATUS     	current
+--         DESCRIPTION 	"Used for IGAP, to indicated the session time
+--	     		 in seconds for the member. Session time is
+--			 started after traffic is available to member.
+--			 It can be also called AccountingTime since its
+--			 values correspondes to the accounting duration of
+--			 IGAP user session."
+--         ::= { rcMldNewGroupEntry 8 }
+
+
+-- MLD
+
+rcMldInterfaceExtnTable OBJECT-TYPE
+        SYNTAX        	SEQUENCE OF RcMldInterfaceExtnEntry
+        MAX-ACCESS    	not-accessible
+        STATUS        	current
+        DESCRIPTION   	""
+        ::= { rcMldObjects 2 }
+
+rcMldInterfaceExtnEntry OBJECT-TYPE
+        SYNTAX        	RcMldInterfaceExtnEntry
+        MAX-ACCESS    	not-accessible
+        STATUS        	current
+        DESCRIPTION   	""
+        INDEX         	{ rcMldInterfaceExtnIfIndex }
+        ::= { rcMldInterfaceExtnTable 1 }
+
+--added elements corresponding to IPv4 IGMP MIB
+--unsupported elements are commented
+RcMldInterfaceExtnEntry ::=
+        SEQUENCE {
+            rcMldInterfaceExtnIfIndex               	  InterfaceIndex,
+	    rcMldInterfaceExtnSnoopEnable           	  TruthValue,
+--          rcMldInterfaceExtnProxySnoopEnable            TruthValue,
+--          rcMldInterfaceExtnMaxAdvertiseInterval  	  INTEGER,
+--          rcMldInterfaceExtnMinAdvertiseInterval  	  INTEGER,
+--          rcMldInterfaceExtnMaxInitialAdvertiseInterval Integer32,
+--          rcMldInterfaceExtnMaxInitialAdvertments 	  Integer32,
+--          rcMldInterfaceExtnNeighborDeadInterval  	  Integer32,
+--          rcMldInterfaceExtnFastLeaveEnable       	  TruthValue,
+--          rcMldInterfaceExtnFastLeavePortMembers  	  PortSet,
+--          rcMldInterfaceExtnMrdiscEnable          	  TruthValue,
+--          rcMldInterfaceExtnDiscoveredRouterPorts 	  PortSet,
+--	    rcMldInterfaceExtnSnoopMRouterPorts     	  PortSet,
+--	    rcMldInterfaceExtnSnoopActiveMRouterPorts	  PortSet,
+--	    rcMldInterfaceExtnSnoopMRouterExpiration 	  Integer32,
+	    rcMldInterfaceExtnFlushAction            	  INTEGER,
+--          rcMldInterfaceExtnRouterAlertEnable      	  EnableValue,
+	    rcMldInterfaceExtnSsmEnable              	  TruthValue,
+--          rcMldInterfaceExtnIgapEnable             	  EnableValue,
+--          rcMldInterfaceExtnAccntEnable            	  EnableValue,
+--          rcMldInterfaceExtnAuthEnable             	  EnableValue,
+--          rcMldInterfaceExtnStreamLimitEnable      	  EnableValue,
+--          rcMldInterfaceExtnMaxStreams             	  Integer32,
+--          rcMldInterfaceExtnNumStreams             	  Integer32,
+	    rcMldInterfaceExtnNewQuerier             	  Ipv6Address,
+--          rcMldInterfaceExtnSnoopQuerierEnable     	  TruthValue,
+--          rcMldInterfaceExtnSnoopQuerierAddr       	  Ipv6Address,
+--          rcMldInterfaceExtnMvrEnable              	  TruthValue,
+--          rcMldInterfaceExtnMvrProxyEnable         	  TruthValue,
+	    rcMldInterfaceExtnDynamicDowngradeEnable  	  TruthValue,
+--          rcMldInterfaceExtnCompatibilityModeEnable  	  TruthValue,
+	    rcMldInterfaceExtnOperVersion             	  INTEGER,
+--          rcMldInterfaceExtnExplicitHostTrackingEnable  TruthValue,
+	    rcMldInterfaceExtnMcastMode              	  INTEGER
+	}
+        
+rcMldInterfaceExtnIfIndex OBJECT-TYPE
+    	SYNTAX          InterfaceIndex
+	MAX-ACCESS  	not-accessible
+	STATUS          current
+	DESCRIPTION 	"An unique value to identify a physical
+                         interface or a logical interface (VLAN)"
+	::= { rcMldInterfaceExtnEntry 1 }
+    
+rcMldInterfaceExtnSnoopEnable OBJECT-TYPE
+    	SYNTAX		TruthValue
+	MAX-ACCESS  	read-write
+	STATUS          current
+	DESCRIPTION 	"Enable snoop on interface"
+	::= { rcMldInterfaceExtnEntry 2 }
+
+-- rcMldInterfaceExtnProxySnoopEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable proxy snoop."
+--      ::= { rcMldInterfaceExtnEntry 3 }
+        
+--rcMldInterfaceExtnMaxAdvertiseInterval OBJECT-TYPE
+--      SYNTAX          INTEGER(2..180)
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     ""
+--      DEFVAL          { 20 }
+--      ::= { rcMldInterfaceExtnEntry 4 }
+        
+-- rcMldInterfaceExtnMinAdvertiseInterval OBJECT-TYPE
+--      SYNTAX          INTEGER(3..180)
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     ""
+--      DEFVAL          { 15 }
+--      ::= { rcMldInterfaceExtnEntry 5 }
+
+-- rcMldInterfaceExtnMaxInitialAdvertiseInterval OBJECT-TYPE
+--      SYNTAX          Integer32
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     ""
+--      DEFVAL          { 2 }
+--      ::= { rcMldInterfaceExtnEntry 6 }
+
+-- rcMldInterfaceExtnMaxInitialAdvertments OBJECT-TYPE
+--      SYNTAX          Integer32
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     ""
+--      DEFVAL          { 3 }
+--      ::= { rcMldInterfaceExtnEntry 7 }
+
+-- rcMldInterfaceExtnNeighborDeadInterval OBJECT-TYPE
+--      SYNTAX          Integer32
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     ""
+--      DEFVAL          { 60 }
+--      ::= { rcMldInterfaceExtnEntry 8 }
+
+--rcMldInterfaceExtnFastLeaveEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Enable fast leave on this interface."
+--      DEFVAL          { false }
+--      ::= { rcMldInterfaceExtnEntry 9 }
+
+--rcMldInterfaceExtnFastLeavePortMembers OBJECT-TYPE
+--      SYNTAX          PortSet
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "The set of ports that are enabled for fast leave."
+--      ::= { rcMldInterfaceExtnEntry 10 }
+
+--rcMldInterfaceExtnMrdiscEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Enable/disable multicast router discovery."
+--      ::= { rcMldInterfaceExtnEntry 11 }
+
+--rcMldInterfaceExtnDiscoveredRouterPorts OBJECT-TYPE
+--      SYNTAX          PortSet
+--      MAX-ACCESS      read-only
+--      STATUS          current
+--      DESCRIPTION     "list of ports that discovered by
+--                       MLD Multicast router discovery
+--                       (MRDISC) protocol."
+--      ::= { rcMldInterfaceExtnEntry 12 }    
+
+-- rcMldInterfaceExtnSnoopMRouterPorts OBJECT-TYPE
+--    	SYNTAX          PortSet
+--	MAX-ACCESS  	read-write
+--	STATUS          current
+--	DESCRIPTION 	"The set of ports in this interface that provide 
+--            		 connectivity to the IPv6 Multicast router."
+--        ::= { rcMldInterfaceExtnEntry 13 }
+    
+-- rcMldInterfaceExtnSnoopActiveMRouterPorts OBJECT-TYPE
+--    	SYNTAX          PortSet
+--	MAX-ACCESS  	read-only
+--	STATUS          current
+--	DESCRIPTION 	"Active ports."
+--	::= { rcMldInterfaceExtnEntry 14 }
+    
+-- rcMldInterfaceExtnSnoopMRouterExpiration OBJECT-TYPE
+--    	SYNTAX          Integer32
+--	MAX-ACCESS  	read-only
+--	STATUS          current
+--	DESCRIPTION 	"Multicast querier router aging time out."
+--        ::= { rcMldInterfaceExtnEntry 15 }
+    
+rcMldInterfaceExtnFlushAction OBJECT-TYPE
+    	SYNTAX          INTEGER {
+				none(1),
+				flushGrpMember(2),
+				flushMrouter(3),
+				flushSender(4)
+			}
+	MAX-ACCESS  	read-write
+	STATUS          current
+	DESCRIPTION 	"MLD flush action"
+        ::= { rcMldInterfaceExtnEntry 16 }
+
+--rcMldInterfaceExtnRouterAlertEnable OBJECT-TYPE
+--      SYNTAX          EnableValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Enable Router Alert Check."
+--      ::= { rcMldInterfaceExtnEntry 17 }
+    
+rcMldInterfaceExtnSsmEnable OBJECT-TYPE
+    	SYNTAX          TruthValue
+	MAX-ACCESS  	read-write
+	STATUS          current
+	DESCRIPTION 	"Enable SSM."
+        ::= { rcMldInterfaceExtnEntry 18 }
+
+--rcMldInterfaceExtnIgapEnable OBJECT-TYPE
+--      SYNTAX          EnableValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable/disable IGAP."
+--      DEFVAL          { enable }
+--      ::= { rcMldInterfaceExtnEntry 19 }
+
+--rcMldInterfaceExtnAccntEnable OBJECT-TYPE
+--      SYNTAX          EnableValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable/disable accounting."
+--      DEFVAL          { enable }
+--      ::= { rcMldInterfaceExtnEntry 20 }
+
+--rcMldInterfaceExtnAuthEnable OBJECT-TYPE
+--      SYNTAX          EnableValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable/disable authentication."
+--      DEFVAL          { enable }
+--      ::= { rcMldInterfaceExtnEntry 21 }
+
+--rcMldInterfaceExtnStreamLimitEnable OBJECT-TYPE
+--      SYNTAX          EnableValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Stream Limitation enable/disable."
+--      DEFVAL          { enable }
+--      ::= { rcMldInterfaceExtnEntry 22 }
+
+--rcMldInterfaceExtnMaxStreams OBJECT-TYPE
+--      SYNTAX          Integer32
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Maximum number of stream."
+--      DEFVAL          { 4 }
+--      ::= { rcMldInterfaceExtnEntry 23 }
+
+-- rcMldInterfaceExtnNumStreams OBJECT-TYPE
+--      SYNTAX          Integer32
+--      MAX-ACCESS      read-only
+--      STATUS          current
+--      DESCRIPTION     "Current number of streams."
+--      ::= { rcMldInterfaceExtnEntry 24 }
+    
+rcMldInterfaceExtnNewQuerier OBJECT-TYPE
+    	SYNTAX          Ipv6Address
+	MAX-ACCESS  	read-only
+	STATUS          current
+	DESCRIPTION 	"The address of the new MLD querier."
+        ::= { rcMldInterfaceExtnEntry 25 }
+
+--rcMldInterfaceExtnSnoopQuerierEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable snoop querier."
+--      ::= { rcMldInterfaceExtnEntry 26 }
+
+--rcMldInterfaceExtnSnoopQuerierAddr OBJECT-TYPE
+--      SYNTAX          Ipv6Address
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "The pseudo address of the MLD Snoop Querier."
+--      ::= { rcMldInterfaceExtnEntry 27 }
+
+--rcMldInterfaceExtnMvrEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Enable or disable mcast-vlan-registration on a vlan, it
+--                       is used to specified a vlan works as a mcast-vlan,
+--                       maximum 16 mcast-vlan is supported."
+--      ::= { rcMldInterfaceExtnEntry 28 }
+
+--rcMldInterfaceExtnMvrProxyEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable or disable mcast-vlan-registration proxy on a vlan,
+--                       you must enable mcast-vlan-registration at first."
+--      ::= { rcMldInterfaceExtnEntry 29 }
+
+rcMldInterfaceExtnDynamicDowngradeEnable    OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "enable dynamic downgrade the MLD version when older 
+	                 version query message was received."
+        DEFVAL          { true }
+        ::= { rcMldInterfaceExtnEntry 30 }
+
+--rcMldInterfaceExtnCompatibilityModeEnable    OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "enable v1 v2 compatible mode, which will handle 
+--                       the MLD v1 message in v2 interface"
+--      DEFVAL          { false }
+--      ::= { rcMldInterfaceExtnEntry 31 }
+    
+rcMldInterfaceExtnOperVersion OBJECT-TYPE
+    	SYNTAX          INTEGER {
+                            version1(1),
+                            version2(2) }
+	MAX-ACCESS  	read-only
+	STATUS          current
+	DESCRIPTION 	"The operational version of MLD which is running 
+	    		 on this interface."
+        ::= { rcMldInterfaceExtnEntry 32 }
+
+--rcMldInterfaceExtnExplicitHostTrackingEnable OBJECT-TYPE
+--      SYNTAX          TruthValue
+--      MAX-ACCESS      read-write
+--      STATUS          current
+--      DESCRIPTION     "Enable the Mld protocol running in version 2 to 
+--                       track hosts per channels/groups."
+--      DEFVAL          { false }
+--      ::= { rcMldInterfaceExtnEntry 33 }
+    
+rcMldInterfaceExtnMcastMode OBJECT-TYPE
+    	SYNTAX          INTEGER {
+			    snoop(1),
+			    pim(2),
+			    snoopSpb(3),
+			    routerSpb(4),
+			    dvmrp(5),
+			    none(6) }
+        MAX-ACCESS  	read-only
+	STATUS          current
+	DESCRIPTION 	"MLD interface mode."
+        ::= { rcMldInterfaceExtnEntry 34 }
+
+
+-- MLD SSM
+
+rcMldSsmGlobal OBJECT IDENTIFIER ::= { rcMldObjects 3 }
+
+
+rcMldSsmGlobalRangeGroup OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "If multicast group address & RangeMask == RangeGroup,
+                         then RangeGroup is in Ssm Range. Else it is not in
+                         the range."
+        ::= { rcMldSsmGlobal 1 }
+
+rcMldSsmGlobalRangeMask OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "Used with RangeGroup."
+        ::= { rcMldSsmGlobal 2 }
+
+
+-- rcMldSnoopTrace
+
+rcMldSnoopTraceTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF RcMldSnoopTraceEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The table listing the multicast groups
+                         traversing the snoop enabled router"
+        ::= { rcMldObjects 4 }
+
+rcMldSnoopTraceEntry OBJECT-TYPE
+        SYNTAX          RcMldSnoopTraceEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "The entry listing the multicast groups
+                         traversing the snoop enabled router"
+        INDEX           { rcMldSnoopGrpAddr, 
+			  rcMldSnoopSrcAddr, 
+			  rcMldSnoopOutVlan }
+        ::= { rcMldSnoopTraceTable 1 }
+
+RcMldSnoopTraceEntry ::=
+        SEQUENCE {
+                rcMldSnoopGrpAddr         Ipv6Address,
+                rcMldSnoopSrcAddr         Ipv6Address,
+                rcMldSnoopOutVlan         InterfaceIndex,
+                rcMldSnoopInPort          InterfaceIndex,
+                rcMldSnoopInVlan          InterfaceIndex,
+                rcMldSnoopOutPort         PortSet,
+                rcMldSnoopType            INTEGER
+        }
+
+rcMldSnoopGrpAddr  OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "Ip multicast address of group traversing the router"
+        ::= { rcMldSnoopTraceEntry 1 }
+
+rcMldSnoopSrcAddr  OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "Ip source address of the multicast group address"
+        ::= { rcMldSnoopTraceEntry 2 }
+
+rcMldSnoopOutVlan OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "Egress vlan id for the multicast group"
+        ::= { rcMldSnoopTraceEntry 3 }
+
+rcMldSnoopInPort OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "Ingress port for the multicast group"
+        ::= { rcMldSnoopTraceEntry 4 }
+
+rcMldSnoopInVlan OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "Ingress vlan id for the multicast source"
+        ::= { rcMldSnoopTraceEntry 5 }
+
+rcMldSnoopOutPort OBJECT-TYPE
+        SYNTAX          PortSet
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "Egress port of the multicast group"
+        ::= { rcMldSnoopTraceEntry 6 }
+
+rcMldSnoopType OBJECT-TYPE
+        SYNTAX          INTEGER
+			{ 
+			    network(1), 
+			    access(2)
+			}
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "The port type on which the snoop entry is learnt"
+        ::= { rcMldSnoopTraceEntry 7}
+
+
+--The MLDv2 Router Cache Table   
+
+rcMldv2CacheTable OBJECT-TYPE
+         SYNTAX         SEQUENCE OF RcMldv2CacheEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "The (conceptual) table listing the MLDv2 specific data
+                        corresponding to each interface, port  and multicast group pair on
+                        a Router."
+         ::= { rcMldObjects 5 }
+
+rcMldv2CacheEntry OBJECT-TYPE
+         SYNTAX         RcMldv2CacheEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "An entry (conceptual row) representing an Mldv2 Group."
+         INDEX          { rcMldv2CacheEntryGroupAddress,
+                          rcMldv2CacheEntryIfIndex,
+                          rcMldv2CacheEntryInPort
+                        }
+         ::= { rcMldv2CacheTable 1 }
+
+RcMldv2CacheEntry ::= SEQUENCE {
+         rcMldv2CacheEntryGroupAddress              Ipv6Address,
+         rcMldv2CacheEntryIfIndex                   InterfaceIndex,
+         rcMldv2CacheEntryInPort                    InterfaceIndex,
+--       rcMldv2CacheEntryModeExpiryTimer           Integer32,
+         rcMldv2CacheEntryVersion1HostTimer         Integer32,
+         rcMldv2CacheEntrySourceFilterMode          INTEGER
+}
+
+rcMldv2CacheEntryGroupAddress OBJECT-TYPE
+         SYNTAX         Ipv6Address
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "Multicast group Address that others
+                         want to join. A group address can be the same
+                         for many incoming ports."
+         ::= { rcMldv2CacheEntry 1 }
+
+rcMldv2CacheEntryIfIndex OBJECT-TYPE
+         SYNTAX         InterfaceIndex
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "An unique value to identify a physical
+                         interface or a logical interface (VLAN),
+                         which has received Group reports from various
+                         sources."
+         ::= { rcMldv2CacheEntry 2 }
+
+rcMldv2CacheEntryInPort OBJECT-TYPE
+         SYNTAX         InterfaceIndex
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "An unique value to identify a physical
+                         interface or a logical interface (VLAN),
+                         which has received Group reports from various
+                         sources."
+        ::= { rcMldv2CacheEntry 3 }
+
+-- rcMldv2CacheEntryModeExpiryTimer OBJECT-TYPE
+--         SYNTAX         Integer32
+--         MAX-ACCESS     read-only
+--         STATUS         current
+--         DESCRIPTION    "This value is applicable only to MLDv2-compatible nodes
+--                         and represents the time remaining before the interface
+--                         EXCLUDE state expires and the interface state transitions
+--                         to INCLUDE mode.  This value can never be greater than
+--                         rcMldNewGroupExpiration."
+--         ::= { rcMldv2CacheEntry 4 }
+
+rcMldv2CacheEntryVersion1HostTimer OBJECT-TYPE
+         SYNTAX         Integer32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION    "The time remaining until the local router will assume that
+                         there are no longer any MLD version 1 members on the IP
+                         subnet attached to this interface.  This entry only applies
+                         to MLDv1 hosts. Upon hearing any MLDv1 Report, this
+                         value is reset to the group membership timer.  While this
+                         time remaining is non-zero, the local router ignores any
+                         MLDv2 Leave messages for this group that it  receives
+                         on this interface."
+         ::= { rcMldv2CacheEntry 5 }
+
+rcMldv2CacheEntrySourceFilterMode OBJECT-TYPE
+         SYNTAX         INTEGER {
+                              include (1),
+                              exclude (2)
+                        }
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION    "The current group state, applicable to MLDv2-compatible
+                         nodes. The value indicates whether the state is INCLUDE or
+                         EXCLUDE."
+         ::= { rcMldv2CacheEntry 6 }
+
+
+
+--The MLDv2 Router Source list Table
+
+--
+-- This information helps to interpret the content of the rcMldRouterSrcListTable.
+-- 1. rcMldRouterSrcListHostAddress is not zero; rcMldRouterSrcListMemberAddress is zero.
+--    This is the case when we have a source in the include list and no receiver asked it
+--    explicitly (conflict source).
+--    Ex: Two receivers present; one receiver is in EXLCUDE{S1} and the other one is in
+--    EXLCUDE{S2}. The group state is EXCLUDE("S2","NULL").
+-- 2. rcMldRouterSrcListHostAddress is not zero, rcMldRouterSrcListMemberAddress is not zero.
+--    This is the case when a receiver asked to receive traffic for a specific source.
+--    Ex: One receiver present in INCLUDE{S1}
+-- 3. rcMldRouterSrcListHostAddress is not zero, rcMldRouterSrcListMemberAddress is zero.
+--    This represent a source that needs to be blocked.
+-- 4. rcMldRouterSrcListHostAddres is zero  rcMldRouterSrcListMemberAddress is not zero.
+--    The source zero is used to track the members that are in exclude mode
+--    Ex: One receiver R1 in EXCLUDE(S1). Two entries are present in this table.
+--    4.1. rcMldRouterSrcListHostAddres = S1, rcMldRouterSrcListMemberAddress = 0 - blocked source.
+--    4.2. rcMldRouterSrcListHostAddres = 0, rcMldRouterSrcListMemberAddress = R1 - tracked member in exlcude mode.
+--
+-- If the explicit host tracking is not enabled the only the last reporter for a specific source or group
+-- will be present in this table.
+--
+
+rcMldRouterSrcListTable OBJECT-TYPE
+         SYNTAX         SEQUENCE OF RcMldRouterSrcListEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "The (conceptual) table listing the Source List entries
+                         corresponding to each interface and multicast group pair on
+                         a Router."
+         ::= { rcMldObjects 6 }
+
+rcMldRouterSrcListEntry OBJECT-TYPE
+         SYNTAX         RcMldRouterSrcListEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "An entry (conceptual row) representing an
+                         Mld Source."
+         INDEX          { rcMldRouterSrcListGroupAddress,
+                          rcMldRouterSrcListIfIndex,
+                          rcMldRouterSrcListInPort,
+                          rcMldRouterSrcListHostAddress,
+                          rcMldRouterSrcListMemberAddress
+                        }
+         ::= { rcMldRouterSrcListTable 1 }
+
+RcMldRouterSrcListEntry ::= SEQUENCE {
+         rcMldRouterSrcListGroupAddress   Ipv6Address,
+         rcMldRouterSrcListIfIndex        InterfaceIndex,
+         rcMldRouterSrcListInPort         InterfaceIndex,
+         rcMldRouterSrcListHostAddress    Ipv6Address,
+         rcMldRouterSrcListMemberAddress  Ipv6Address,
+         rcMldRouterSrcListExpire         Integer32,
+         rcMldRouterSrcListMode           INTEGER,
+         rcMldRouterSrcListMemberExpire   Integer32
+}
+
+rcMldRouterSrcListGroupAddress OBJECT-TYPE
+         SYNTAX         Ipv6Address
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "The IPv6 multicast group address for which this entry
+                         contains information."
+         ::= { rcMldRouterSrcListEntry 1 }
+
+rcMldRouterSrcListIfIndex OBJECT-TYPE
+         SYNTAX         InterfaceIndex
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "The interface for which this entry contains information
+                         for an IP multicast group address."
+         ::= { rcMldRouterSrcListEntry 2 }
+
+rcMldRouterSrcListInPort OBJECT-TYPE
+         SYNTAX         InterfaceIndex
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "An unique value to identify a physical
+                        interface or a logical interface (VLAN),
+                        which has received Group reports for this
+                        source."
+         ::= { rcMldRouterSrcListEntry 3 }
+
+rcMldRouterSrcListHostAddress OBJECT-TYPE
+         SYNTAX         Ipv6Address
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "The host address to which this entry corresponds."
+         ::= { rcMldRouterSrcListEntry 4 }
+         
+rcMldRouterSrcListMemberAddress OBJECT-TYPE
+         SYNTAX         Ipv6Address
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    "IPv6 Address of a member that has sent source specific
+                         report wishing to join this source."
+         ::= { rcMldRouterSrcListEntry 5 }
+
+rcMldRouterSrcListExpire OBJECT-TYPE
+         SYNTAX         Integer32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION    "This value indicates the relevance of the SrcList entry,
+                         whereby a non-zero value indicates this is an INCLUDE state
+                         value, and a zero value indicates this to be an EXCLUDE
+                         state value."
+         ::= { rcMldRouterSrcListEntry 6 }
+
+rcMldRouterSrcListMode OBJECT-TYPE
+         SYNTAX         INTEGER {
+                              include (1),
+                              exclude (2)
+                        }
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION    "The current member state, applicable to MLDv2-compatible
+                         nodes. The value indicates whether the state is INCLUDE or
+                         EXCLUDE."
+         ::= { rcMldRouterSrcListEntry 7 }
+
+rcMldRouterSrcListMemberExpire OBJECT-TYPE
+         SYNTAX         Integer32
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION    "This value indicates the time until the member for this source
+                         will expire"
+         ::= { rcMldRouterSrcListEntry 8 }
+
+
+-- MLD Globals
+rcMldGlobalGroup        OBJECT IDENTIFIER ::= { rcMld 3 }
+
+rcMldGenerateTrap OBJECT-TYPE
+        SYNTAX          EnableValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Enabling the MLD to generate trap."
+        DEFVAL          { disable }
+        ::= { rcMldGlobalGroup 1 }
+
+rcMldGenerateLog OBJECT-TYPE
+        SYNTAX          EnableValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION     "Enabling the MLD to generate log."
+        DEFVAL          { disable }
+        ::= { rcMldGlobalGroup 2 }
+
+
+-- Elements used in traps
+
+rcMldNotificationInterfaceIfIndex OBJECT-TYPE
+    	SYNTAX          InterfaceIndex
+	MAX-ACCESS 	accessible-for-notify
+	STATUS     	current
+	DESCRIPTION     "The internetwork-layer interface value of the interface
+            		 for which MLD is enabled."
+        ::= { rcMldNotification 1 }
+
+rcMldNotificationNewGroupIpv6Address OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      accessible-for-notify
+        STATUS          current
+        DESCRIPTION     "Multicast Group Address that others
+                         want to join to. A group address can be the same
+                         for many incoming ports."
+        ::= { rcMldNotification 2 }
+
+rcMldNotificationNewGroupMembers OBJECT-TYPE
+        SYNTAX          Ipv6Address
+        MAX-ACCESS      accessible-for-notify
+        STATUS          current
+        DESCRIPTION     "IP Address of a source that has sent group
+                         report wishing to join this group."
+        ::= { rcMldNotification 3 }
+
+rcMldNotificationNewGroupInPort OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      accessible-for-notify
+        STATUS          current
+        DESCRIPTION     "An unique value to identify a physical
+                        interface or a logical interface (VLAN),
+                        which has received Group reports from various
+                        sources."
+        ::= { rcMldNotification 4 }
+
+-- MLD sender table
+    
+rcMldSenderTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF RcMldSenderEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "The (conceptual) table listing the multicast
+        		senders."
+        ::= { rcMldObjects 7 }
+
+rcMldSenderEntry OBJECT-TYPE
+        SYNTAX        RcMldSenderEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "An entry (conceptual row) representing an
+        		MLD senser."
+        INDEX         { rcMldSenderGrpAddr, rcMldSenderIfIndex,
+                        rcMldSenderMemberAddr }
+        ::= { rcMldSenderTable 1 }
+
+RcMldSenderEntry ::=  SEQUENCE {
+                rcMldSenderGrpAddr     Ipv6Address,
+                rcMldSenderIfIndex     InterfaceIndex,
+                rcMldSenderMemberAddr  Ipv6Address,
+                rcMldSenderAction      INTEGER,
+                rcMldSenderPort        InterfaceIndex
+        }
+
+rcMldSenderGrpAddr OBJECT-TYPE
+        SYNTAX        Ipv6Address
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "IPv6 multicast group address."
+        ::= { rcMldSenderEntry 1 }
+        
+rcMldSenderIfIndex OBJECT-TYPE
+        SYNTAX        InterfaceIndex
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Interface index of the sender."
+        ::= { rcMldSenderEntry 2 }
+
+rcMldSenderMemberAddr OBJECT-TYPE
+        SYNTAX        Ipv6Address
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Ipv6 Host Address."
+        ::= { rcMldSenderEntry 3 }
+
+rcMldSenderAction OBJECT-TYPE
+        SYNTAX        INTEGER {
+                          none(1),
+                          flushEntry(2),
+                          flushGrp(3)
+                      }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "none(1), flushEntry(2), flushGrp(3)."
+        ::= { rcMldSenderEntry 4 }
+
+rcMldSenderPort OBJECT-TYPE
+        SYNTAX        InterfaceIndex
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "Mld Sender port."
+        ::= { rcMldSenderEntry 5 }
+        
+    
+
+-- Table rcIpv6MulticastTimedPruneTable and rcIpv6MulticastSoftwareForwarding are not supported 
+-- in first release but are defined as placeholders
+
+--rcIpv6MulticastTimedPruneTable OBJECT-TYPE
+--        SYNTAX          SEQUENCE OF RcIpv6MulticastTimedPruneEntry
+--        MAX-ACCESS      not-accessible
+--        STATUS          current
+--        DESCRIPTION     "This feature provides the ability for the user to
+--                         create (S,G)  Forwarding Entries that would not be
+--                         pruned until a configurable timer expires. Currently
+--                         the timer value is set to 0."
+--        ::= { rcIp XXX }
+--
+--rcIpv6MulticastTimedPruneEntry OBJECT-TYPE
+--        SYNTAX          RcIpv6MulticastTimedPruneEntry
+--        MAX-ACCESS      not-accessible
+--        STATUS          current
+--        DESCRIPTION     "An entry of IPv6 Multicast Timed Prune Table."
+--        INDEX           { rcIpv6MulticastTimedPruneGroupAddress,
+--                          rcIpv6MulticastTimedPruneSourceAddress,
+--                          rcIpv6MulticastTimedPruneSrcSubnetMask }
+--        ::= { rcIpv6MulticastTimedPruneTable 1 }
+--
+--RcIpv6MulticastTimedPruneEntry ::=
+--        SEQUENCE {
+--                rcIpv6MulticastTimedPruneGroupAddress    Ipv6Address,
+--                rcIpv6MulticastTimedPruneSourceAddress   Ipv6Address,
+--                rcIpv6MulticastTimedPruneSrcSubnetMask  Ipv6Address,
+--                rcIpv6MulticastTimedPruneAgingTimer     Integer32,
+--                rcIpv6MulticastTimedPruneTimeLeft       Integer32,
+--                rcIpv6MulticastTimedPruneLastActivity   TimeTicks,
+--                rcIpv6MulticastTimedPruneRowStatus      RowStatus
+--        }
+--        
+--rcIpv6MulticastTimedPruneGroupAddress OBJECT-TYPE
+--        SYNTAX          Ipv6Address
+--        MAX-ACCESS      not-accessible
+--        STATUS          current
+--        DESCRIPTION     "This field indicates the IPv6 Multicast Group
+--                         Address associated with the IPv6 multicast stream."
+--        ::= { rcIpv6MulticastTimedPruneEntry 1 }
+--
+--rcIpv6MulticastTimedPruneSourceAddress OBJECT-TYPE
+--        SYNTAX          Ipv6Address
+--        MAX-ACCESS      not-accessible
+--        STATUS          current
+--        DESCRIPTION     "This is the Source Subnet IPv6 address of the
+--                         sender of the IPv6 multicast stream."
+--        ::= { rcIpv6MulticastTimedPruneEntry 2 }
+--
+--rcIpv6MulticastTimedPruneSrcSubnetMask OBJECT-TYPE
+--        SYNTAX          Ipv6Address
+--        MAX-ACCESS      not-accessible
+--        STATUS          current
+--        DESCRIPTION     "This is the Source Subnet Mask IPv6 address of
+--                         the sender of the IPv6 multicast stream."
+--        ::= { rcIpv6MulticastTimedPruneEntry 3 }
+--
+--rcIpv6MulticastTimedPruneAgingTimer OBJECT-TYPE
+--        SYNTAX          Integer32
+--        MAX-ACCESS      read-write
+--        STATUS          current
+--        DESCRIPTION     "This field represents the amount of time
+--                         (in minutes) this timed prune entry will be
+--                         kept in the forwarding table when there are no
+--                         more receivers. After this timer expires, this
+--                         timed prune entry would be treated as a normal
+--                         DVMRP/PIM forwarding entry. Aging Timer value of
+--                         0 (infinite time) indicates this timed prune entry
+--                         will not be deleted even when there are no
+--                         more receivers."
+--        DEFVAL          { 5 }
+--        ::= { rcIpv6MulticastTimedPruneEntry 4 }
+--
+--rcIpv6MulticastTimedPruneTimeLeft OBJECT-TYPE
+--        SYNTAX          Integer32
+--        MAX-ACCESS      read-only
+--        STATUS          current
+--        DESCRIPTION     "This read-only field represents the remaining time
+--                         for which this timed prune entry will be kept in
+--                         the forwarding table. After this timer expires,
+--                         this timed prune entry would be treated as a normal
+--                         DVMRP/PIM forwarding entry. 0 in this field indicates
+--                         that this entry would not be aged out."
+--        ::= { rcIpv6MulticastTimedPruneEntry 5 }
+--
+--rcIpv6MulticastTimedPruneLastActivity OBJECT-TYPE
+--        SYNTAX          TimeTicks
+--        MAX-ACCESS      read-only
+--        STATUS          current
+--        DESCRIPTION     "This read-only field represents the actual time since
+--                         the traffic has come from this Source, Group pair."
+--        ::= { rcIpv6MulticastTimedPruneEntry 6 }
+--
+--rcIpv6MulticastTimedPruneRowStatus OBJECT-TYPE
+--        SYNTAX          RowStatus
+--        MAX-ACCESS      read-write
+--        STATUS          current
+--        DESCRIPTION     "row status"
+--        ::= { rcIpv6MulticastTimedPruneEntry 7 }
+--
+--
+--
+--rcIpv6MulticastSoftwareForwarding OBJECT IDENTIFIER ::= { rcIp 113 }
+--
+--rcIpv6MulticastSoftwareForwardingEnable OBJECT-TYPE
+--        SYNTAX          TruthValue
+--        MAX-ACCESS      read-write
+--        STATUS          current
+--        DESCRIPTION     "Enable/Disable multicast software forwarding."
+--        DEFVAL          { false }
+--        ::= { rcIpv6MulticastSoftwareForwarding 1 }
+--
+--rcIpv6MulticastSoftwareForwardingThreshold OBJECT-TYPE
+--        SYNTAX          Integer32(1..65535)
+--        MAX-ACCESS      read-write
+--        STATUS          current
+--        DESCRIPTION     "Threshold to switch from software forwarding to 
+--                         hardware forwarding. Unit = pkt per second"
+--        DEFVAL          { 5 }
+--        ::= { rcIpv6MulticastSoftwareForwarding 2 }
+END

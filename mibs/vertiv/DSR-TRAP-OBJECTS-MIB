@@ -1,0 +1,635 @@
+--------------------------------------------------------------------------------
+--                            Avocent DSR TRAP OBJECTS MIB
+--
+--                         Copyright 2006 Avocent Corporation
+--
+--                                  Revision: 4.0.1
+--
+--                           Last Modified: April 13, 2007
+--
+--------------------------------------------------------------------------------
+
+DSR-TRAP-OBJECTS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+   Gauge,enterprises,TimeTicks,IpAddress,Counter,NetworkAddress
+      FROM RFC1155-SMI
+   OBJECT-TYPE
+      FROM RFC-1212
+   DisplayString,PhysAddress
+      FROM RFC1213-MIB
+   TRAP-TYPE
+      FROM RFC-1215;
+
+--------------------------------------------------------------------------------
+-- Object Groupings
+--------------------------------------------------------------------------------
+
+avocent                 OBJECT IDENTIFIER ::= { enterprises 10418 }
+dsr                     OBJECT IDENTIFIER ::= { avocent 7 }
+dsrProducts             OBJECT IDENTIFIER ::= { dsr 1 }
+dsrManagement           OBJECT IDENTIFIER ::= { dsr 2 }
+dsrTrapObject           OBJECT IDENTIFIER ::= { dsrManagement 6 } -- 10418.7.2.6
+
+--
+-- A UTF8String represents a series of UTF-8 encoded characters. UTF-8 encoding
+-- provides the ability to encode all characters defined in the Universal
+-- Multiple-Octet Coded Character Set (UCS) and all characters defined in the
+-- Unicode Standard. UCS is defined in international standard ISO 10646. Unicode
+-- encompasses a subset of UCS. See http://www.unicode.org for more information
+-- on Unicode. See RFC2279 for more information on UTF-8 encoding.
+--
+
+UTF8String ::= OCTET STRING
+
+--
+-- An enumeration of image file upgrade results.
+--
+
+ImageFileUpgradeResultsEnum ::= INTEGER
+{
+   imageUpgradeTftpNoSocket(1),         -- TFTP No Socket
+   imageUpgradeTftpConnectFailure(2),   -- TFTP server TFTP connect failed
+   imageUpgradeTftpRequestDenied(3),    -- TFTP server request denied
+   imageUpgradeTftpBadPacket(4),        -- TFTP err - non-data packet received
+   imageUpgradeTftpOOS(5),              -- TFTP err - too many packets out
+                                        --  of sequence
+   imageUpgradeTftpTooBig(6),           -- TFTP err - transferred data exceeds
+                                        --  file size
+   imageUpgradeTftpTimeout(7),          -- TFTP err - timeout during transfer,
+                                        --  retries exceeded
+   imageUpgradeAlreadyInProgress(8),    -- Update already in progress
+   imageUpgradeCannotStart(9),         -- Update thread did not start
+   imageUpgradeMemoryError(10),         -- Update memory allocation error
+   imageUpgradeTftpProtocolError(11),   -- TFTP protocol error occurred could
+                                        --  not complete transfer
+   imageUpgradeBadType(12),             -- The Image type does not match the
+                                        --  region (BOOT or APP) to update
+   imageUpgradeInvalidAppDowngrade(13), -- Invalid downgrade version
+   imageUpgradeChecksumError(14),       -- Checksum Error
+   imageUpgradeFlashError(15),          -- Flash Error
+   imageUpgradeInternalError(16),       -- Internal error
+   imageUpgradeFileNotFound(17),        -- File not found
+   imageUpgradeBadHeader(18),           -- Invalid image header
+   imageUpgradeIncompatibleHeader(19),  -- Header is not compatible
+   imageUpgradeTftpXferFail(20),        -- TFTP transfer failed
+   imageUpgradeTftpSvrNoResponse(21),   -- No response from TFTP server
+   imageUpgradeNetworkUnreachable(22),  -- Network unreachable
+   imageUpgradeSuccess(9999)            -- Success
+}
+
+--@ Note: we use the term IQ Adaptor in this MIB to generically
+--@ refer to either a DSRIQ or an AVRIQ
+
+--
+-- An enumeration of IQ Adaptor upgrade results.
+--
+
+IqAdaptorUpgradeResultsEnum ::= INTEGER
+{
+   iqaUpgradeNoFirmwareImage(1),   -- No firmware image present
+   iqaUpgradeLostContact(2),       -- Lost communication with the IQ Adaptor
+   iqaUpgradeFailedRestart(3),     -- The IQ Adaptor did not restart after
+                                   -- upgrade
+   iqaUpgradeSuccess(9999)         -- Success
+}
+
+--------------------------------------------------------------------------------
+-- Trap Object Group (dsrTrapObject)              10418.7.2.6
+--
+-- The following objects are implemented only for the generation of
+-- TRAPs. The objects are sent in traps and are not accessible in
+-- any other way.
+--------------------------------------------------------------------------------
+
+avctDsrTrapObjectUserName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the name of the user
+         for which the trap condition occured.
+         "
+      ::= { dsrTrapObject 1 }
+
+avctDsrTrapObjectTargetUserName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the name of the target
+         user for which a trap condition occurred.
+         "
+      ::= { dsrTrapObject 2 }
+
+--@ Note: to maintain consistency with trap MIBs for other appliances,
+--@ dsrTrapObject.3 is skipped and should never be used.
+
+avctDsrTrapObjectImageNewVersion OBJECT-TYPE
+      SYNTAX DisplayString ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the new software image
+         version the appliance or IQ Adaptor is being upgraded to.
+         "
+      ::= { dsrTrapObject 4 }
+
+avctDsrTrapObjectImageCurrentVersion OBJECT-TYPE
+      SYNTAX DisplayString ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the software image
+         version the appliance or IQ Adaptor is currently running.
+         "
+      ::= { dsrTrapObject 5 }
+
+--@ Note: avctDsrTrapObjectServerName use to be named
+--@ avctDsrTrapObjectSessionIdentifier.
+
+avctDsrTrapObjectServerName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the name of the server
+         for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 6 }
+
+avctDsrTrapObjectIqAdaptorId OBJECT-TYPE
+      SYNTAX DisplayString ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the ID of the IQ Adaptor for
+         which the trap condition occurred. The value will be the
+         same as the EID label attached to the IQ Adaptor.
+         "
+      ::= { dsrTrapObject 7 }
+
+--@ Note: avctDsrTrapObjectFirmwareCondition has been removed therefore
+--@ dsrTrapObject.8 is skipped and should never be used again.
+
+avctDsrTrapObjectIpAddress OBJECT-TYPE
+      SYNTAX DisplayString( SIZE (0..255) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the IP address for
+         which a trap condition occurred.
+         "
+      ::= { dsrTrapObject 9 }
+
+avctDsrTrapObjectPreviousScreenResolution OBJECT-TYPE
+      SYNTAX DisplayString ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the previous screen
+         resolution of the target server.
+         "
+      ::= { dsrTrapObject 10 }
+
+avctDsrTrapObjectCurrentScreenResolution OBJECT-TYPE
+      SYNTAX DisplayString ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the current screen
+         resolution of the target server.
+         "
+      ::= { dsrTrapObject 11 }
+
+avctDsrTrapObjectAggregatedServerStatusChanged OBJECT-TYPE
+      SYNTAX OCTET STRING ( SIZE (12..5122) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to report server status changes. This
+         object will report the status change of multiple servers (connection
+         paths) in an aggregated encoding format as indicated below.
+
+         Note that on bootup the appliance will send this object in the
+         avctDsrServerStatusChangedTrap containing the status of all
+         connection paths in the appliance. Thereafter the appliance will
+         send this object in the avctDsrServerStatusChangedTrap containing
+         only the connection paths whose status has changed.
+
+         This object is composed of two sections, which are the header section
+         and the connection path section.  The header section provides version
+         information and is the first 2 bytes of this object.  The connection
+         path section provides information on each of the connection paths and
+         is defined in the bytes following the header.
+
+         Header Section
+         --------------
+
+         Byte 1      = Start indicator for the header section.  The value of the
+                       start indicator is always zero.  The value of the start
+                       indicator provides means for management applications to
+                       determine that this object has a header section.  All
+                       previous implementations of this object have a non-zero
+                       value in the first byte.
+
+         Byte 2      = Version of the aggregate object.  The version provides
+                       means to identify the format/structure of this aggregate
+                       object.  The format of the aggregate object, as described
+                       here, is identified with a value of 3 for the version.
+
+
+         Connection Path Section
+         -----------------------
+
+         The connection path section is composed of 1 or more connection paths.
+         The information for each connection path is packed into 10 bytes as
+         follows:
+
+         Byte 1      = The appliance input port number associated with this
+                       connection path. The input port defined for
+                       dsrAggregateServerStatus is an ARI port that interfaces
+                       the data traffic coming from or going directly or
+                       indirectly to a target device or a power device.
+
+                       Note that a power device will report the port number as
+                       100 + the power device port number
+                       (dsrSpcDeviceTablePortNumber). For the first power device
+                       port, Byte 1 will report 101 for the power device.
+                       This will avoid potential port conflicts for ARI and
+                       power device ports. In the event that additional power
+                       device ports are available, the number will reflect the
+                       power device port number (i.e. 101, 102, etc.)
+
+         Byte 2      = The cascade switch channel number associated with this
+                       connection path. The value will be 0 if a switch channel
+                       is not associated with this connection path.
+
+                       For power devices, this Byte will represent the power
+                       device number (dsrSpcDeviceTableSpcNumber). Byte 3 will
+                       contain the socket number for this connection path.
+
+         Byte 3 ~ 8  = The EID of the RIP associated with this connection path.
+                       Each byte in this field will encode two digits of the
+                       RIP's EID number. For example, if the actual EID number
+                       on the label attached to a RIP is 520255-0346DC then
+                       bytes 3 through 8 would contain the following hex values:
+
+                          Byte 3 = 0x52
+                          Byte 4 = 0x02
+                          Byte 5 = 0x55
+                          Byte 6 = 0x03
+                          Byte 7 = 0x46
+                          Byte 8 = 0xDC
+
+                       Note that the dash character is not represented in
+                       the encoded value.
+
+                       For a power device, the first byte (Byte 3) will
+                       represent the socket number and the remaining 5 bytes
+                       (Byte 4-8) will be 0.
+
+         Byte 9 ~ the left most 4 bits
+
+                     = The left most four bits of the 9th byte shall be used
+                       to encode / decode the following integer value to
+                       represent the power status of a connected server or the
+                       power status of a power device socket.
+
+                       One of the following values can be reported:
+
+                       1 = Off    - The connection path does not have power,
+                                    which could be the result of the following
+                                    situation: the RIP is unplugged or the RIP
+                                    is plugged in but receives no power from
+                                    the target device.
+
+                       2 = On     - The connection path has power.
+
+
+         Byte 9 ~ the right most 4 bits
+
+                     = The right most four bits of the 9th byte shall be used
+                       to encode / decode the following integer value to
+                       represent the viewer session status of a connection path.
+                       For a power device or power device socket, this value is
+                       always 1 since viewer sessions are not supported.
+
+                       One of the following values can be reported:
+
+                       1 = Idle     - There is not a viewer session active on
+                                      this connection path.
+
+                       2 = Active   - There is an active viewer session on this
+                                      connection path.
+
+                       3 = Blocked  - The connection path is blocked meaning a
+                                      viewer session cannot be established to
+                                      this connection path because of another
+                                      viewer session is currently using a
+                                      resource required by this connection path
+                                      in order to establish a connection path.
+                                      A viewer session cannot be blocked by
+                                      a virtual media session.
+
+         Byte 10 ~ the left most 4 bits
+
+                     = The left most four bits of the 10th byte shall be used
+                       to encode / decode the following integer value to
+                       represent the virtual media session status of a
+                       connection path. For a power device or power device
+                       socket, this value is always 1 since virtual media
+                       sessions are not supported.
+
+                       One of the following values can be reported:
+
+                       1 = Idle     - There is not a virtual media session
+                                      active on this connection path.
+
+                       2 = Active   - There is a virtual media session on this
+                                      connection path.
+
+                       3 = Blocked  - The connection path is blocked meaning a
+                                      virtual media session cannot be
+                                      established to this connection path
+                                      because of another virtual media session
+                                      is currently using a resource required by
+                                      this connection path in order to establish
+                                      a connection path. A virtual media session
+                                      cannot be blocked by a viewer session.
+
+         Byte 10 ~ the right most 4 bits
+                     = The right most four bits of the 10th byte shall be used
+                       for future use and they will have a value of 0.
+
+         Every connection path will be packed into this object in 10 byte
+         increments one after the other. The connection paths do not have to be
+         packed in any specific order. Note that the size of this object could
+         conceivably be as large as shown in the following calculation with
+         these assumptions.
+            - 24 channel switch connected to each port of the appliance
+            - 4 power devices connected to appliance, each having 32 outlets
+
+         (((16 ports X 24 channels) + (4 power devices X 32 power device sockets))
+            X 10 bytes) + (2 byte Header) = 5122.
+         "
+      ::= { dsrTrapObject 12 }
+
+avctDsrTrapObjectImageFileUpgradeResult OBJECT-TYPE
+      SYNTAX ImageFileUpgradeResultsEnum
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to report the result of an
+         image file upgrade. The result is for the main image file that
+         contains all of the software components for the entire appliance.
+         "
+      ::= { dsrTrapObject 13 }
+
+avctDsrTrapObjectIqAdaptorImageUpgradeResult OBJECT-TYPE
+      SYNTAX IqAdaptorUpgradeResultsEnum
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to report the result of an IQ Adaptor
+         image upgrade.
+         "
+      ::= { dsrTrapObject 14 }
+
+avctDsrTrapObjectTypeOfImage OBJECT-TYPE
+      SYNTAX INTEGER {
+                        boot(1),
+                        app(2)
+                     }
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to report the type of software
+         image for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 15 }
+
+avctDsrTrapObjectInputPort OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the appliance input port
+         number for which the trap condition occurred. An input port is defined
+         here as an ARI port that interfaces the data traffic coming from
+         or going directly or indirectly to a target device. The values range
+         from 1 to the maximum number of ARI ports.
+         "
+      ::= { dsrTrapObject 16 }
+
+avctDsrTrapObjectSwitchChannel OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the cascade switch channel
+         number for which the trap condition occurred. The object can contain
+         a value of 0 which means no switch channel is associated with the
+         trap condition.
+         "
+      ::= { dsrTrapObject 17 }
+
+avctDsrTrapObjectFileName OBJECT-TYPE
+      SYNTAX DisplayString ( SIZE (0..12) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the name of a file
+         for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 18 }
+
+avctDsrTrapObjectActiveSessions OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the current number of
+         active sessions associated with the connection for which the
+         trap condition occurred.  This count should include viewer and virtual
+         media sessions, and it should not include any stealth connections.
+         "
+      ::= { dsrTrapObject 19 }
+
+avctDsrTrapObjectCascadeSwitchName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the cascade switch
+         for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 20 }
+
+avctDsrTrapObjectOldCascadeSwitchName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the old name of a
+         cascade switch whose name was changed.
+         "
+      ::= { dsrTrapObject 21 }
+
+avctDsrTrapObjectOldServerName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the old name of
+         a server whose name was changed.
+         "
+      ::= { dsrTrapObject 22 }
+
+avctDsrTrapObjectSpcDeviceLocation OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the power device
+         location for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 23 }
+
+avctDsrTrapObjectSpcDevicePort OBJECT-TYPE
+      SYNTAX INTEGER (1..2)
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the appliance port
+         that the power device is attached to for which the trap condition
+         occurred.
+         "
+      ::= { dsrTrapObject 24 }
+
+avctDsrTrapObjectSpcDeviceLogin OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..32) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the Login Name
+         for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 25 }
+
+avctDsrTrapObjectSpcSocket OBJECT-TYPE
+      SYNTAX INTEGER (1..16)
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the power device socket
+         number for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 26 }
+
+avctDsrTrapObjectOldName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the old name of a port
+         or power device socket for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 27 }
+
+avctDsrTrapObjectItemName OBJECT-TYPE
+      SYNTAX UTF8String ( SIZE (0..64) )
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the name of a port
+         or power device socket for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 28 }
+
+avctDsrTrapObjectSpcDeviceInlet OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the inlet of a power device
+         for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 29 }
+
+avctDsrTrapObjectSpcDeviceNumber OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the power device number
+         that is attached to an appliance port for which the trap
+         condition occurred.
+         "
+      ::= { dsrTrapObject 30 }
+
+avctDsrTrapObjectOldInputPort OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the old appliance input port
+         number for which the trap condition occurred. An input port is defined
+         here as an ARI port that interfaces the data traffic coming from
+         or going directly or indirectly to a target device. The values range
+         from 1 to the maximum number of ARI ports.
+         "
+      ::= { dsrTrapObject 31 }
+
+avctDsrTrapObjectPowerSupply OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the power supply which failed
+         or lost power.
+         "
+      ::= { dsrTrapObject 32 }
+
+avctDsrTrapObjectSpcDeviceCircuit OBJECT-TYPE
+      SYNTAX INTEGER
+      ACCESS not-accessible
+      STATUS mandatory
+  --% AVAILABILITY public
+      DESCRIPTION
+         "This object is sent in a trap to identify the circuit of a power device
+         for which the trap condition occurred.
+         "
+      ::= { dsrTrapObject 33 }
+
+END

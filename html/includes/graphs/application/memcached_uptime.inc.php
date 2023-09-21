@@ -5,18 +5,18 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
 $scale_min = "0";
 
 include("memcached.inc.php");
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:uptime=".$rrd_filename_escape.":uptime:AVERAGE";
+$rrd_options .= " DEF:uptime=" . $rrd_filename_escape . ":uptime:AVERAGE";
 $rrd_options .= " CDEF:cuptime=uptime,86400,/";
 $rrd_options .= " 'COMMENT:Days      Current  Minimum  Maximum  Average\\n'";
 $rrd_options .= " AREA:cuptime#EEEEEE:Uptime";

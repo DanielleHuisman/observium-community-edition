@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -38,24 +38,22 @@ MSERIES-ENVMON-MIB::smartEnvMonTemperatureValue.43 = INTEGER: 32 degrees Celsius
 MSERIES-ENVMON-MIB::smartEnvMonTemperatureValue.44 = INTEGER: 32 degrees Celsius
 */
 
-$oids = array();
-$todo = array('smartEnvMonTemperatureDescr', 'smartEnvMonTemperatureValue');
-foreach ($todo as $table)
-{
-  $oids = snmpwalk_cache_oid($device, $table, $oids, 'MSERIES-ENVMON-MIB');
+$oids = [];
+$todo = ['smartEnvMonTemperatureDescr', 'smartEnvMonTemperatureValue'];
+foreach ($todo as $table) {
+    $oids = snmpwalk_cache_oid($device, $table, $oids, 'MSERIES-ENVMON-MIB');
 }
 
-foreach ($oids as $index => $entry)
-{
-  $descr   = $entry['smartEnvMonTemperatureDescr'];
-  $oid     = ".1.3.6.1.4.1.30826.1.4.1.1.1.3.$index";
-  $current = $entry['smartEnvMonTemperatureValue'];
-  $limits  = array('limit_high'      => 55,
-                   'limit_low'       => 0.01,
-                   'limit_high_warn' => 50,
-                   'limit_low_warn'  => 5);
+foreach ($oids as $index => $entry) {
+    $descr   = $entry['smartEnvMonTemperatureDescr'];
+    $oid     = ".1.3.6.1.4.1.30826.1.4.1.1.1.3.$index";
+    $current = $entry['smartEnvMonTemperatureValue'];
+    $limits  = ['limit_high'      => 55,
+                'limit_low'       => 0.01,
+                'limit_high_warn' => 50,
+                'limit_low_warn'  => 5];
 
-  discover_sensor('temperature', $device, $oid, $index, 'mseries-envmon', $descr, 1, $current, $limits);
+    discover_sensor('temperature', $device, $oid, $index, 'mseries-envmon', $descr, 1, $current, $limits);
 }
 
 // EOF

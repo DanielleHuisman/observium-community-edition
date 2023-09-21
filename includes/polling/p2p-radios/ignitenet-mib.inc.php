@@ -5,19 +5,19 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
-$infomcs[0] = 'auto';
-$infomcs[4] = 'mcs-6m(4)';
-$infomcs[5] = 'mcs-9M(5)';
-$infomcs[6] = 'mcs-12M(6)';
-$infomcs[7] = 'mcs-18M(7)';
-$infomcs[8] = 'mcs-24M(8)';
-$infomcs[9] = 'mcs-36M(9)';
+$infomcs[0]  = 'auto';
+$infomcs[4]  = 'mcs-6m(4)';
+$infomcs[5]  = 'mcs-9M(5)';
+$infomcs[6]  = 'mcs-12M(6)';
+$infomcs[7]  = 'mcs-18M(7)';
+$infomcs[8]  = 'mcs-24M(8)';
+$infomcs[9]  = 'mcs-36M(9)';
 $infomcs[10] = 'mcs-48M(10)';
 $infomcs[11] = 'mcs-54M(11)';
 $infomcs[12] = 'mcs0(12)';
@@ -56,38 +56,37 @@ $infomcs[45] = 'nss2-mcs6(45)';
 echo(" IGNITENET-MIB P2P-MIB ");
 
 // Get radio data
-$data_info = snmpwalk_cache_oid($device, '1.3.6.1.4.1.47307.1.4.2', array(), "IGNITENET-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
+$data_info = snmpwalk_cache_oid($device, '1.3.6.1.4.1.47307.1.4.2', [], "IGNITENET-MIB", NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
 
-$i=0;
+$i = 0;
 // Goes through the SNMP radio data
-foreach ($data_info as $key=>$value) 
-{
-  if ( $data_info[$key]['mlRadioInfoEnabled'] == 'enabled') {  
-    $radio['radio_name']       = $data_info[$key]['mlRadioInfoFrequency']/1000 . "GHz";
-    $radio['radio_status']     = $data_info[$key]['mlRadioInfoEnabled'];
-    $radio['radio_loopback']       = array('NULL');
-    $radio['radio_tx_mute']        = array('NULL');
-    $radio['radio_tx_freq']    = $data_info[$key]['mlRadioInfoFrequency']*1000;
-    $radio['radio_rx_freq']    = $data_info[$key]['mlRadioInfoFrequency']*1000;
-    $radio['radio_tx_power']     = $data_info[$key]['mlRadioInfoTxPower'];
-    $radio['radio_rx_level']     = $data_info[$key]['mlRadioInfoRSSILocal'];
-    $radio['radio_e1t1_channels']  = array('NULL');
-    $radio['radio_bandwidth']      = array('NULL');
-    $radio['radio_modulation']   = $infomcs[$data_info[$key]['mlRadioInfoMCS']];
-    $radio['radio_total_capacity'] = array('NULL');
-    $radio['radio_eth_capacity']   = array('NULL');
-    $radio['radio_rmse']           = array('NULL');       // Convert to units
-    $radio['radio_gain_text']      = array('NULL');
-    $radio['radio_carrier_offset'] = array('NULL');
-    $radio['radio_sym_rate_tx']    = array('NULL');
-    $radio['radio_sym_rate_rx']    = array('NULL');
-    $radio['radio_standard']       = array('NULL');
-    $radio['radio_cur_capacity']   = array('NULL');
+foreach ($data_info as $key => $value) {
+    if ($data_info[$key]['mlRadioInfoEnabled'] == 'enabled') {
+        $radio['radio_name']           = $data_info[$key]['mlRadioInfoFrequency'] / 1000 . "GHz";
+        $radio['radio_status']         = $data_info[$key]['mlRadioInfoEnabled'];
+        $radio['radio_loopback']       = ['NULL'];
+        $radio['radio_tx_mute']        = ['NULL'];
+        $radio['radio_tx_freq']        = $data_info[$key]['mlRadioInfoFrequency'] * 1000;
+        $radio['radio_rx_freq']        = $data_info[$key]['mlRadioInfoFrequency'] * 1000;
+        $radio['radio_tx_power']       = $data_info[$key]['mlRadioInfoTxPower'];
+        $radio['radio_rx_level']       = $data_info[$key]['mlRadioInfoRSSILocal'];
+        $radio['radio_e1t1_channels']  = ['NULL'];
+        $radio['radio_bandwidth']      = ['NULL'];
+        $radio['radio_modulation']     = $infomcs[$data_info[$key]['mlRadioInfoMCS']];
+        $radio['radio_total_capacity'] = ['NULL'];
+        $radio['radio_eth_capacity']   = ['NULL'];
+        $radio['radio_rmse']           = ['NULL'];       // Convert to units
+        $radio['radio_gain_text']      = ['NULL'];
+        $radio['radio_carrier_offset'] = ['NULL'];
+        $radio['radio_sym_rate_tx']    = ['NULL'];
+        $radio['radio_sym_rate_rx']    = ['NULL'];
+        $radio['radio_standard']       = ['NULL'];
+        $radio['radio_cur_capacity']   = ['NULL'];
 
 
-    print_debug_vars($radio);
+        print_debug_vars($radio);
 
-    poll_p2p_radio($device, 'IGNITENET-MIB', $key, $radio);
-  }
+        poll_p2p_radio($device, 'IGNITENET-MIB', $key, $radio);
+    }
 }
 

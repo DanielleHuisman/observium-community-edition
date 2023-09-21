@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -75,40 +75,39 @@ IP-MIB::ipIfStatsOutFragCreates.ipv6.49 = Counter32: 40124
 
 $port_module = 'ipifstats';
 
-if ($ports_modules[$port_module])
-{
-  echo("IP-MIB ipIfStats ");
+if ($ports_modules[$port_module]) {
+    echo("IP-MIB ipIfStats ");
 
-  $oids = array('ipIfStatsHCInOctets', 'ipIfStatsHCOutOctets'); // Bits
+    $oids = ['ipIfStatsHCInOctets', 'ipIfStatsHCOutOctets']; // Bits
 
-  if(FALSE) { $oids = array_merge($oids, array('ipIfStatsHCOutTransmits', 'ipIfStatsHCInReceives')); } // Pkts
+    if (FALSE) {
+        $oids = array_merge($oids, ['ipIfStatsHCOutTransmits', 'ipIfStatsHCInReceives']);
+    } // Pkts
 
-  if(FALSE) { $oids = array_merge($oids, array('ipIfStatsHCInMcastPkts', 'ipIfStatsHCInMcastOctets', 'ipIfStatsHCOutMcastPkts', 'ipIfStatsHCOutMcastOctets', 'ipIfStatsHCInBcastPkts',
-                 'ipIfStatsHCOutBcastPkts', 'ipIfStatsHCInForwDatagrams', 'ipIfStatsHCInDelivers', 'ipIfStatsHCOutRequests',
-                 'ipIfStatsHCOutForwDatagrams' )); } // Stats
+    if (FALSE) {
+        $oids = array_merge($oids, ['ipIfStatsHCInMcastPkts', 'ipIfStatsHCInMcastOctets', 'ipIfStatsHCOutMcastPkts', 'ipIfStatsHCOutMcastOctets', 'ipIfStatsHCInBcastPkts',
+                                    'ipIfStatsHCOutBcastPkts', 'ipIfStatsHCInForwDatagrams', 'ipIfStatsHCInDelivers', 'ipIfStatsHCOutRequests',
+                                    'ipIfStatsHCOutForwDatagrams']);
+    } // Stats
 
-  $ipIfStats = array();
+    $ipIfStats = [];
 
-  foreach($oids as $oid)
-  {
-    $ipIfStats = snmpwalk_cache_twopart_oid($device, $oid, $ipIfStats, "IP-MIB", NULL, OBS_SNMP_ALL_TABLE);
-    if ($oid == 'ipIfStatsHCInOctets' && !snmp_status())
-    {
-      break;
+    foreach ($oids as $oid) {
+        $ipIfStats = snmpwalk_cache_twopart_oid($device, $oid, $ipIfStats, "IP-MIB", NULL, OBS_SNMP_ALL_TABLE);
+        if ($oid == 'ipIfStatsHCInOctets' && !snmp_status()) {
+            break;
+        }
     }
-  }
 
-  foreach ($ipIfStats as $af => $af_ports)
-  {
-    foreach($af_ports as $af_port_id => $af_port)
-    {
-      $port_stats[$af_port_id]['ipIfStats'][$af] = $af_port;
+    foreach ($ipIfStats as $af => $af_ports) {
+        foreach ($af_ports as $af_port_id => $af_port) {
+            $port_stats[$af_port_id]['ipIfStats'][$af] = $af_port;
+        }
     }
-  }
 
-  //print_r($port_stats);
+    //print_r($port_stats);
 
-  $process_port_functions[$port_module] = snmp_status();
+    $process_port_functions[$port_module] = snmp_status();
 }
 
 

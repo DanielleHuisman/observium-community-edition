@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2022 Observium Limited
+ * @package        observium
+ * @subpackage     discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -79,7 +79,9 @@ DDM-MGMT-MIB::swDdmPortShutdown.1 = INTEGER: none(3)
 $oids = snmpwalk_cache_oid($device, 'swDdmStatusTable', [], $mib);
 print_debug_vars($oids);
 
-if (!snmp_status()) { return; }
+if (!snmp_status()) {
+    return;
+}
 
 // oid exists on D-Link
 //// -- DGS-3627G 1A1G with firmware 3.03.B04
@@ -94,122 +96,134 @@ if (!snmp_status()) { return; }
 //DDM-MGMT-MIB::swDdmPowerUnit.0 = INTEGER: dbm(2)
 $power_unit = snmp_get_oid($device, 'swDdmPowerUnit.0', $mib);
 
-if (!snmp_status()) { $power_unit = 'mw'; }
+if (!snmp_status()) {
+    $power_unit = 'mw';
+}
 
 $oids_limit = snmpwalk_cache_twopart_oid($device, 'swDdmThresholdMgmtEntry', [], $mib);
 print_debug_vars($oids_limit);
 
 foreach ($oids as $index => $entry) {
-  $entry['index']   = $index;
-  $match = [ 'measured_match' => [ 'entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%index%' ] ];
-  $options = entity_measured_match_definition($device, $match, $entry);
+    $entry['index'] = $index;
+    $match          = ['measured_match' => ['entity_type' => 'port', 'field' => 'ifIndex', 'match' => '%index%']];
+    $options        = entity_measured_match_definition($device, $match, $entry);
 
-  $name = $options['port_label'];
+    $name = $options['port_label'];
 
-  // Temperature
-  $descr     = $name . ' Temperature';
-  $class     = 'temperature';
-  $oid_name  = 'swDdmTemperature';
-  $oid_num   = '.1.3.6.1.4.1.171.12.72.2.1.1.1.2.'.$index;
-  $scale     = 1;
-  $value     = $entry[$oid_name];
+    // Temperature
+    $descr    = $name . ' Temperature';
+    $class    = 'temperature';
+    $oid_name = 'swDdmTemperature';
+    $oid_num  = '.1.3.6.1.4.1.171.12.72.2.1.1.1.2.' . $index;
+    $scale    = 1;
+    $value    = $entry[$oid_name];
 
-  $limits      = [];
-  $limit_type  = 'temperature';
-  $limits_oids = [ 'limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
-                   'limit_low'  => 'swDdmLowAlarm',  'limit_low_warn'  => 'swDdmLowWarning' ];
-  foreach ($limits_oids as $limit => $limit_oid) {
-    // Prevent php8 fatal errors
-    if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) { continue; }
+    $limits      = [];
+    $limit_type  = 'temperature';
+    $limits_oids = ['limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
+                    'limit_low'  => 'swDdmLowAlarm', 'limit_low_warn' => 'swDdmLowWarning'];
+    foreach ($limits_oids as $limit => $limit_oid) {
+        // Prevent php8 fatal errors
+        if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) {
+            continue;
+        }
 
-    $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
-  }
+        $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
+    }
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 
-  // Voltage
-  $descr     = $name . ' Voltage';
-  $class     = 'voltage';
-  $oid_name  = 'swDdmVoltage';
-  $oid_num   = '.1.3.6.1.4.1.171.12.72.2.1.1.1.3.'.$index;
-  $scale     = 1;
-  $value     = $entry[$oid_name];
+    // Voltage
+    $descr    = $name . ' Voltage';
+    $class    = 'voltage';
+    $oid_name = 'swDdmVoltage';
+    $oid_num  = '.1.3.6.1.4.1.171.12.72.2.1.1.1.3.' . $index;
+    $scale    = 1;
+    $value    = $entry[$oid_name];
 
-  $limits      = [];
-  $limit_type  = 'voltage';
-  $limits_oids = [ 'limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
-                   'limit_low'  => 'swDdmLowAlarm',  'limit_low_warn'  => 'swDdmLowWarning' ];
-  foreach ($limits_oids as $limit => $limit_oid) {
-    // Prevent php8 fatal errors
-    if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) { continue; }
+    $limits      = [];
+    $limit_type  = 'voltage';
+    $limits_oids = ['limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
+                    'limit_low'  => 'swDdmLowAlarm', 'limit_low_warn' => 'swDdmLowWarning'];
+    foreach ($limits_oids as $limit => $limit_oid) {
+        // Prevent php8 fatal errors
+        if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) {
+            continue;
+        }
 
-    $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
-  }
+        $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
+    }
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 
-  // Tx Bias
-  $descr     = $name . ' Tx Bias';
-  $class     = 'current';
-  $oid_name  = 'swDdmBiasCurrent';
-  $oid_num   = '.1.3.6.1.4.1.171.12.72.2.1.1.1.4.'.$index;
-  $scale     = 0.001;
-  $value     = $entry[$oid_name];
+    // Tx Bias
+    $descr    = $name . ' Tx Bias';
+    $class    = 'current';
+    $oid_name = 'swDdmBiasCurrent';
+    $oid_num  = '.1.3.6.1.4.1.171.12.72.2.1.1.1.4.' . $index;
+    $scale    = 0.001;
+    $value    = $entry[$oid_name];
 
-  $limits      = [];
-  $limit_type  = 'bias';
-  $limits_oids = [ 'limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
-                   'limit_low'  => 'swDdmLowAlarm',  'limit_low_warn'  => 'swDdmLowWarning' ];
-  foreach ($limits_oids as $limit => $limit_oid) {
-    // Prevent php8 fatal errors
-    if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) { continue; }
+    $limits      = [];
+    $limit_type  = 'bias';
+    $limits_oids = ['limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
+                    'limit_low'  => 'swDdmLowAlarm', 'limit_low_warn' => 'swDdmLowWarning'];
+    foreach ($limits_oids as $limit => $limit_oid) {
+        // Prevent php8 fatal errors
+        if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) {
+            continue;
+        }
 
-    $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
-  }
+        $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
+    }
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 
-  // Tx Power
-  $descr     = $name . ' Tx Power';
-  $class     = $power_unit === 'mw' ? 'power' : 'dbm';
-  $oid_name  = 'swDdmTxPower';
-  $oid_num   = '.1.3.6.1.4.1.171.12.72.2.1.1.1.5.'.$index;
-  $scale     = $power_unit === 'mw' ? 0.001 : 1;
-  $value     = $entry[$oid_name];
+    // Tx Power
+    $descr    = $name . ' Tx Power';
+    $class    = $power_unit === 'mw' ? 'power' : 'dbm';
+    $oid_name = 'swDdmTxPower';
+    $oid_num  = '.1.3.6.1.4.1.171.12.72.2.1.1.1.5.' . $index;
+    $scale    = $power_unit === 'mw' ? 0.001 : 1;
+    $value    = $entry[$oid_name];
 
-  $limits      = [];
-  $limit_type  = 'txPower';
-  $limits_oids = [ 'limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
-                   'limit_low'  => 'swDdmLowAlarm',  'limit_low_warn'  => 'swDdmLowWarning' ];
-  foreach ($limits_oids as $limit => $limit_oid) {
-    // Prevent php8 fatal errors
-    if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) { continue; }
+    $limits      = [];
+    $limit_type  = 'txPower';
+    $limits_oids = ['limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
+                    'limit_low'  => 'swDdmLowAlarm', 'limit_low_warn' => 'swDdmLowWarning'];
+    foreach ($limits_oids as $limit => $limit_oid) {
+        // Prevent php8 fatal errors
+        if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) {
+            continue;
+        }
 
-    $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
-  }
+        $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
+    }
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 
-  // Rx Power
-  $descr     = $name . ' Rx Power';
-  $class     = $power_unit === 'mw' ? 'power' : 'dbm';
-  $oid_name  = 'swDdmRxPower';
-  $oid_num   = '.1.3.6.1.4.1.171.12.72.2.1.1.1.6.'.$index;
-  $scale     = $power_unit === 'mw' ? 0.001 : 1;
-  $value     = $entry[$oid_name];
+    // Rx Power
+    $descr    = $name . ' Rx Power';
+    $class    = $power_unit === 'mw' ? 'power' : 'dbm';
+    $oid_name = 'swDdmRxPower';
+    $oid_num  = '.1.3.6.1.4.1.171.12.72.2.1.1.1.6.' . $index;
+    $scale    = $power_unit === 'mw' ? 0.001 : 1;
+    $value    = $entry[$oid_name];
 
-  $limits      = [];
-  $limit_type  = 'rxPower';
-  $limits_oids = [ 'limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
-                   'limit_low'  => 'swDdmLowAlarm',  'limit_low_warn'  => 'swDdmLowWarning' ];
-  foreach ($limits_oids as $limit => $limit_oid) {
-    // Prevent php8 fatal errors
-    if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) { continue; }
+    $limits      = [];
+    $limit_type  = 'rxPower';
+    $limits_oids = ['limit_high' => 'swDdmHighAlarm', 'limit_high_warn' => 'swDdmHighWarning',
+                    'limit_low'  => 'swDdmLowAlarm', 'limit_low_warn' => 'swDdmLowWarning'];
+    foreach ($limits_oids as $limit => $limit_oid) {
+        // Prevent php8 fatal errors
+        if (!is_numeric($oids_limit[$index][$limit_type][$limit_oid])) {
+            continue;
+        }
 
-    $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
-  }
+        $limits[$limit] = $oids_limit[$index][$limit_type][$limit_oid] * $scale;
+    }
 
-  discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
+    discover_sensor_ng($device, $class, $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value, array_merge($options, $limits));
 }
 
 // EOF

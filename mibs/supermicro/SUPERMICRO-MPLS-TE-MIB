@@ -1,0 +1,993 @@
+-- Copyright (C) 2008-2014 Super Micro Computer Inc. All Rights Reserved
+
+-- $Id: fsmpte.mib,v 1.11 2012/09/07 09:52:05 siva Exp $
+SUPERMICRO-MPLS-TE-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+       MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+       enterprises, Integer32,
+       Unsigned32, zeroDotZero
+           FROM SNMPv2-SMI                                         -- [RFC2578]
+       RowStatus, RowPointer, TruthValue 
+           FROM SNMPv2-TC                                          -- [RFC2579]
+       MplsTunnelIndex, MplsTunnelInstanceIndex,
+       MplsExtendedTunnelId
+           FROM MPLS-TC-STD-MIB                                    -- [RFC3811]
+       mplsTunnelEntry, mplsTunnelIndex, mplsTunnelInstance,
+       mplsTunnelIngressLSRId, mplsTunnelEgressLSRId,
+       mplsTunnelHopEntry
+           FROM MPLS-TE-STD-MIB                                    -- [RFC3812]
+       SnmpAdminString                                             
+           FROM SNMP-FRAMEWORK-MIB                                 -- [RFC2571]
+       gmplsTunnelErrorReporterType, gmplsTunnelErrorReporter,
+       gmplsTunnelErrorCode, gmplsTunnelErrorSubcode,
+       gmplsTunnelAdminStatusFlags
+           FROM GMPLS-TE-STD-MIB                                   -- [RFC4802]
+       InterfaceIndexOrZero
+           FROM IF-MIB                                             -- [RFC2863]
+       ;        
+
+    fsMplsTeMIB MODULE-IDENTITY
+       LAST-UPDATED "201209050000Z"           
+       ORGANIZATION "Super Micro Computer Inc."
+       CONTACT-INFO "support@Supermicro.com"
+       DESCRIPTION  "The Proprietary MIB for MPLS-TE module"
+
+       REVISION     "201209050000Z" 
+       DESCRIPTION  "MIB objects added for Attribute List, GMPLS Features and
+                     GMPLS Tunnel Notification traps."
+       ::= { enterprises supermicro-computer-inc(10876) super-switch(101) basic(1) futureMpls (13) 12}
+
+    -- Notifications
+    fsMplsTeNotifications OBJECT IDENTIFIER  ::= { fsMplsTeMIB 0 }
+    -- MPLS tunnel objects
+    fsMplsTeObjects        OBJECT IDENTIFIER ::= { fsMplsTeMIB 1 }
+    -- conformance
+    fsMplsTeConformance    OBJECT IDENTIFIER ::= { fsMplsTeMIB 2 }
+    -- MPLS tunnel scalar object
+    fsMplsTeScalarObjects OBJECT IDENTIFIER ::= { fsMplsTeObjects 1 }
+    
+-- Start of fsMplsTunnelTable
+
+fsMplsTunnelTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF FsMplsTunnelEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+            "The fsMplsTunnelTable is extension of mplsTunnelTable."
+    ::= { fsMplsTeObjects 2}
+
+fsMplsTunnelEntry OBJECT-TYPE
+    SYNTAX FsMplsTunnelEntry 
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+            "The fsMplsTunnelTable is extension of mplsTunnelTable."
+    AUGMENTS { mplsTunnelEntry}
+    ::= { fsMplsTunnelTable 1 }
+
+FsMplsTunnelEntry ::= SEQUENCE {
+         fsMplsTunnelType                  BITS,
+         fsMplsTunnelLSRIdMapInfo          BITS,
+         fsMplsTunnelMode                  INTEGER,
+         fsMplsTunnelProactiveSessIndex    Unsigned32,
+         fsMplsTunnelMBBStatus             INTEGER,
+         fsMplsTunnelDisJointType          INTEGER,
+         fsMplsTunnelAttPointer            RowPointer,
+         fsMplsTunnelEndToEndProtection    BITS,
+         fsMplsTunnelPrConfigOperType      INTEGER,
+         fsMplsTunnelSrlgType              INTEGER,
+         fsMplsTunnelIfIndex               InterfaceIndexOrZero,
+         fsMplsTunnelInitReOptimize        TruthValue,
+         fsMplsTunnelIsProtectingLsp       TruthValue,
+         fsMplsLspTunnelMapIndex           MplsTunnelIndex,
+         fsMplsLspTunnelMapInstance        MplsTunnelInstanceIndex,
+         fsMplsLspTunnelMapIngressLSRId    MplsExtendedTunnelId,
+         fsMplsLspTunnelMapEgressLSRId     MplsExtendedTunnelId,
+         fsMplsTunnelSynchronizationStatus Integer32,
+         fsMplsTunnelOutPathMsgId          Integer32
+    }
+
+fsMplsTunnelType OBJECT-TYPE
+    SYNTAX     BITS {
+               mpls (0),
+               mplstp (1),
+               gmpls (2),
+               hlsp (3),
+               p2mp (4)
+               }
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "This object allows the administrator to the tunnel type of a MPLS
+        tunnel.
+
+        The value of bit 0 (mpls) if set indicates that this is a normal
+        MPLS Tunnel.
+ 
+        The value of bit 1 (mplstp) if set indicates that this is MPLS-TP
+        Tunnel.
+
+        The value of bit 2 (gmpls) if set indicates that this is generic
+        mpls tunnel.
+
+        The value of bit 3 (hlsp) if set indicates that this is 
+        hierarchial LSP tunnel.
+
+        The value of bit 4 (p2mp) if set indicates that this is a 
+        point-to-multipoint tunnel."
+    DEFVAL { {mpls} }
+    ::= { fsMplsTunnelEntry 1 }
+
+fsMplsTunnelLSRIdMapInfo OBJECT-TYPE
+    SYNTAX     BITS {
+               ingressId (0),
+               egressId (1)
+               }
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "This object indicates whether the Ingress and Egress LSR 
+        ID objects of the tunnel entry to be treated as LSR IDs
+        or should be treated as an index to the fsMplsTpNodeMapTable.
+
+        The value of bit 0 (ingressId) if set indicates mplsTunnelIngressLSRId
+        is not the actual value, fsMplsTpNodeMapTable table should be 
+        referred to get the actual tunnel ingressId.
+
+        The value of bit 0 (ingressId) if not set indicates
+        mplsTunnelIngressLSRId is the actual value.
+
+        The value of bit 1 (egressId) if set for P2MP tunnels, indicates
+        mplsTunnelEgressLSRId refers to P2MP identifier. In case of P2MP
+        tunnels, fsMplsTpNodeMapTable table should not be referred to get
+        the actual tunnel egressId.
+
+        The value of bit 1 (egressId) if set for non-P2MP tunnels, indicates
+        mplsTunnelEgressLSRId is not the actual value, fsMplsTpNodeMapTable
+        table should be referred to get the actual tunnel egressId.
+
+        The value of bit 1 (egressId) if not set indicates
+        mplsTunnelEgressLSRId is the actual value."
+    ::= { fsMplsTunnelEntry 2 }
+
+fsMplsTunnelMode  OBJECT-TYPE
+   SYNTAX        INTEGER {
+                   unidirectional (0),
+                   coroutedBidirectional (1),
+                   associatedBidirectional (2)
+                 }
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+       "This object allows the administrator to configure the mode of
+        tunnel. 
+
+        The value unidirectional (0) indicates that the direction of the
+        tunnel is only single direction. 
+
+        The value coroutedBidirectional (1) indicates a bidirectional LSP
+        between LSR's A and B which consists of two unidirectional LSPs,
+        one from A to B (forward LSP) and the other from B to A (reverse LSP).
+        Both these LSP's are regarded as a pair providing a single logical
+        bidirectional transport path. The forward and reverse LSP passes
+        through same set of nodes (or LSR's). A single entry in mplsTunnelTable
+        is enough to represent this type of tunnel which contains label binding
+        association for both forward and reverse LSP. i.e., mplsTunnelTable
+        points to a single entry in mplsXCTable which inturn contains both 
+        forward and reverse label bindings.
+
+        The value associatedBidirectional (2) indicates a bidirectional LSP
+        between LSR's A and B which consists of two unidirectional LSPs,
+        one from A to B (forward LSP) and the other from B to A (reverse LSP).
+        Both these LSP's are regarded as a pair providing a single logical
+        bidirectional transport path. The forward and reverse LSP need not 
+        pass through same set of nodes (or LSR's). 2 entries should be created
+        mplsTunnelTable to represent this type of tunnel which contains 
+        individual label binding association for forward and reverse LSP's.
+        Association between forward and reverse LSP is achieved by configuring
+        the objects fsMplsTpTunnelDestTunnelIndex and
+        fsMplsTpTunnelDestTunnelLspNum in fsMplsTpTunnelTable."
+   DEFVAL { unidirectional }
+   ::= { fsMplsTunnelEntry 3 }
+
+fsMplsTunnelProactiveSessIndex  OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+       "This object indicates the proactive session index for this tunnel.
+        When a proactive session to monitor this tunnel is established,
+        the application updates this object with the session index."
+   ::= { fsMplsTunnelEntry 4 }
+
+fsMplsTunnelMBBStatus  OBJECT-TYPE
+    SYNTAX      INTEGER  { enabled(1), disabled(2) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The administrative Make-Before-Break status for Tunnel.
+     The value 'enabled' (1) indicates that Tunnel supports 
+     Make-Before-Break capablity.The value 'disabled' (2) 
+     indicates that Tunnel does not support 
+     Make-Before-Break capablity."
+    DEFVAL        {disabled}
+    ::= { fsMplsTunnelEntry 5 }  
+    
+fsMplsTunnelDisJointType  OBJECT-TYPE
+   SYNTAX   INTEGER {  srlgDisjoint(1),nodeDisjoint(2),linkDisjoint(3) }
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+       "This object indicates the disjoint type of the protection tunnel
+        with respect to the working tunnel. It is applicable only for
+        protection tunnel."
+   DEFVAL        {srlgDisjoint}
+   ::= { fsMplsTunnelEntry 6 }
+
+fsMplsTunnelAttPointer     OBJECT-TYPE
+    SYNTAX        RowPointer
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+         "This variable points to a row in the fsTunnelAttributeTable .
+          This table identifies the attribute of LSP. A value of zeroDotZero
+          indicates that no Attribute has been associated with this
+          tunnel yet."
+   DEFVAL        { zeroDotZero }
+    ::= { fsMplsTunnelEntry 7 }
+
+fsMplsTunnelEndToEndProtection OBJECT-TYPE
+  SYNTAX  BITS {
+    unprotected(0),
+    fullReroute(1),
+    rerouteWithoutExtraTraffic(2),
+    dedicatedOneToOne(3),
+    dedicatedUniOnePlusOne(4),
+    dedicatedBiOnePlusOne(5)
+  }
+  MAX-ACCESS read-create
+  STATUS  current
+  DESCRIPTION
+    "This bitmask indicates the level of end to end protection required.  A
+     value of zero (no bits set) indicates that any protection may be
+     used.  The following describes these bitfields:
+
+     unprotected
+       This flag is set to indicate that the LSP should not use any
+        protection.
+
+     fullReroute
+       This flag is set to indicate that the protecting LSP creation
+       only when protected (primary) LSP fails.
+
+     rerouteWitoutExtraTraffic
+       This flag is set to indicate that protecting LSP shall not
+       carry traffic other than that of Primary LSP. In this case
+       protecting LSP is usually not configured in the data plane
+       before protected LSP failure.
+
+     dedicatedOneToOne
+       This flag is set to indicate that a dedicated LSP
+       protection scheme, i.e., 1:1 protection, should be used to
+       support the LSP.
+
+     dedicatedUniOnePlusOne
+       This flag is set to indicate that a dedicated LSP
+       protection scheme, i.e., 1+1 protection, should be used to
+       support the LSP. It is used for protecting uni-directional
+       tunnel and No additional signalling is required for switching
+       from one LSP to another in case of failure and recovery
+
+     dedicatedBiOnePlusOne
+       This flag is set to indicate that a dedicated LSP
+       protection scheme, i.e., 1+1 protection, should be used to
+       support the LSP. It is used for protecting bi-directional
+       tunnel and additional signalling is required for switching
+       from one LSP to another in case of failure and recovery."
+
+  REFERENCE
+     "Section 1, RFC 4872, RSVP-TE Extensions in Support of End-to-End
+      Generalized Multi-Protocol Label Switching (GMPLS) Recovery,
+      J.P. Lang, Ed.Sonos, Y.Rekhter, Ed.Juniper, D.Papadimitriou, Ed.Alcatel,
+      May 2007."
+  DEFVAL  { {unprotected} }
+::= { fsMplsTunnelEntry 8 }
+
+fsMplsTunnelPrConfigOperType OBJECT-TYPE
+  SYNTAX      INTEGER {
+                 revertive(1),
+                 nonRevertive(2)
+               }
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+        "This object is used to indicate the operation type/mode of the tunnel. 
+         If the value is set to 'revertive(1)', the normal traffic shall be 
+         returned to the working LSP has recoverd from the failure. (i.e) 
+         after the establishment of protection LSP during Fully Re-Route 
+         operation ingress will not initiate path tear message for working LSP.
+         If the value is set to 'nonRevertive(2)', the normal traffic shall
+         not be returned to the working LSP has recovered from the failure.(i.e)
+         after the establishment of protection LSP during Fully Re-Route   
+         operation ingress will initiate path tear message for working LSP."
+   REFERENCE
+       "Section 12, RFC 4872, RSVP-TE Extensions in Support of End-to-End
+        Generalized Multi-Protocol Label Switching (GMPLS) Recovery,J.P. Lang,
+        Ed.Sonos, Y.Rekhter, Ed.Juniper, D.Papadimitriou, Ed.Alcatel,May 2007"
+   DEFVAL  { nonRevertive }
+::= { fsMplsTunnelEntry 9 }
+
+fsMplsTunnelSrlgType     OBJECT-TYPE
+   SYNTAX   INTEGER {  includeAny(1),includeAll(2),excludeAny(3) }
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+       "This object indicates shared risk link group value for this tunnel."
+   ::= { fsMplsTunnelEntry 10 }
+
+fsMplsTunnelIfIndex       OBJECT-TYPE
+   SYNTAX      InterfaceIndexOrZero
+   MAX-ACCESS  read-create
+   STATUS      current
+   DESCRIPTION
+      "If mplsTunnelIsIf is set to true, then this value
+       contains the LSR-assigned ifIndex which corresponds
+       to an entry in the interfaces table.  Otherwise
+       this variable should contain the value of zero
+       indicating that a valid ifIndex was not assigned to
+       this tunnel interface."
+   REFERENCE
+       "RFC 2863 - The Interfaces Group MIB, McCloghrie, K.,
+        and F. Kastenholtz, June 2000"
+   DEFVAL { 0 }
+   ::=  { fsMplsTunnelEntry 11 }
+
+fsMplsTunnelInitReOptimize     OBJECT-TYPE
+  SYNTAX   TruthValue
+  MAX-ACCESS  read-create
+  STATUS      current
+  DESCRIPTION
+      "This object is used to indicate the Reoptimization of the tunnel. When
+       this object is set true then user has initiated reoptimization. Default
+       value of this object is FALSE.
+       A tunnel is defined as being reoptimized when some change occurs to
+       the tunnel to make it perform  more optimally, and this change does
+       not disrupt the tunnel's traffic flow. This implies that any path
+       changes are performed using the make before break algorithm,which
+       specifies that the new path should be signaled before the old path is
+       decommissioned and traffic moved onto the new one."
+  DEFVAL { false }
+    ::= { fsMplsTunnelEntry 12 }
+
+fsMplsTunnelIsProtectingLsp OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-write
+  STATUS      current
+  DESCRIPTION
+     "This object specifies whether this LSP is working LSP or protection
+      LSP. If this object is set to true, it means the LSP is protection LSP.
+      If this object is set to false, it means the LSP is working LSP."
+  DEFVAL { false }
+
+    ::= { fsMplsTunnelEntry 13 }
+
+fsMplsLspTunnelMapIndex OBJECT-TYPE
+  SYNTAX      MplsTunnelIndex
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+     "This object is used to indicate the tunnel index of FA LSP to which the
+      tunnel is stacked. This object is applicable only in the node on which
+      stacking of FA LSP and E2E LSP occurs"
+
+    ::= { fsMplsTunnelEntry 14 }
+
+fsMplsLspTunnelMapInstance OBJECT-TYPE
+  SYNTAX      MplsTunnelInstanceIndex
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+     "This object is used to indicate the tunnel instance of FA LSP to which the
+      tunnel is stacked. This object is applicable only in the node on which
+      stacking of FA LSP and E2E LSP occurs"
+
+    ::= { fsMplsTunnelEntry 15 }
+
+fsMplsLspTunnelMapIngressLSRId OBJECT-TYPE
+  SYNTAX      MplsExtendedTunnelId
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+     "This object is used to indicate the identity of the Ingress LSR of FA LSP
+      to which the tunnel is stacked. This object is applicable only in the
+      node on which stacking of FA LSP and E2E LSP occurs"
+
+    ::= { fsMplsTunnelEntry 16 }
+
+fsMplsLspTunnelMapEgressLSRId OBJECT-TYPE
+  SYNTAX      MplsExtendedTunnelId
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+     "This object is used to indicate the identity of the Egress LSR of FA LSP
+      to which the tunnel is stacked. This object is applicable only in the
+      node on which stacking of FA LSP and E2E LSP occurs"
+
+    ::= { fsMplsTunnelEntry 17 }
+
+fsMplsTunnelSynchronizationStatus OBJECT-TYPE
+    SYNTAX          Integer32 
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the Synchronization status of the tunnel upon RSVP-TE Graceful
+         Restart. This object is applicable only for RSVP-TE signalled tunnels.
+         Following values are possible.
+         0. Not synchronized.
+         1. Downstream Synchronized.
+         2. Upstream Synchronized.
+         3. Fully Synchronized.
+
+         Fully Synchronized refers that the tunnel is fully recovered its state. 
+         Both upstream and downstream nodes has helped the restarting node to recover its 
+         state.
+
+         Downstream Synchronized refers that only downstream node has helped the 
+         restarting node by sending RecoveryPath message. In this case, node saves the 
+         RecoveryPath message and starts the recovery process after getting help from 
+         upstream node also.
+
+         Upstream Synchronized refers that only uptream node has helped the 
+         restarting node by sending Path message with recovery label object. 
+         In this case, node saves the Path message and starts the recovery process 
+         after getting help from downstream node also.
+         
+         Not Synchronized state refers that both upstream node and downstream node has 
+         not helped in recovering this tunnel."
+
+    REFERENCE
+        "Section 4.5.2.1 - RFC 5063 Extensions to GMPLS Resource Reservation 
+         Protocol (RSVP) Graceful Restart"
+
+    ::= { fsMplsTunnelEntry 18 }
+
+fsMplsTunnelOutPathMsgId OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Denotes the message id generated for the PATH message which is sent from the
+         node. 
+         This is used for recovering the state when the node receives  
+         SRefresh RecoveryPath message from the helper. 
+         This is applicable only for RSVP-TE signalled tunnels currently."
+    
+    REFERENCE
+         "Section 5 - RFC 5063 Extensions to GMPLS Resource Reservation
+          Protocol (RSVP) Graceful Restart"
+
+     ::= { fsMplsTunnelEntry 19 }
+
+-- End of fsMplsTunnelTable
+
+   -- Start of MPLS-TP Tunnel table
+
+fsMplsTpTunnelTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF FsMplsTpTunnelEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION
+     "This table represents MPLS-TP specific extensions to
+      mplsTunnelTable.
+     
+      As per MPLS-TP Identifiers draft,  LSP_ID is 
+     
+      Src-Global_Node_ID::Src-Tunnel_Num::Dst-Global_Node_ID::
+      Dst-Tunnel_Num::LSP_Num 
+
+      mplsTunnelTable is reused for forming the LSP_ID as follows,
+
+      Source Tunnel_Num is mapped with mplsTunnelIndex,
+      Source node identifier is mapped with mplsTunnelIngressLSRId,
+      Destination node identifier is mapped with mplsTunnelEgressLSRId
+      LSP_Num is mapped with mplsTunnelInstance.
+      
+      Source Global identifier and Destination Global identifier are
+      maintained in the fsMplsTpNodeMapTable and 
+
+      fsMplsTpNodeMapLocalNum is used to create an entry in
+      mplsTunnelTable."
+  REFERENCE
+        "MPLS-TP Identifiers draft version 02, section 5.2" 
+  ::= { fsMplsTeObjects 3 }
+
+fsMplsTpTunnelEntry OBJECT-TYPE
+ SYNTAX        FsMplsTpTunnelEntry
+ MAX-ACCESS    not-accessible
+ STATUS        current
+ DESCRIPTION
+       "An entry in this table represents MPLS-TP 
+       specific tunnel configurations."
+ AUGMENTS { mplsTunnelEntry}
+  ::= { fsMplsTpTunnelTable 1 }
+
+ FsMplsTpTunnelEntry ::= SEQUENCE {
+      fsMplsTpTunnelDestTunnelIndex   MplsTunnelIndex,
+      fsMplsTpTunnelDestTunnelLspNum  MplsTunnelInstanceIndex
+}
+
+fsMplsTpTunnelDestTunnelIndex  OBJECT-TYPE
+   SYNTAX        MplsTunnelIndex
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+     "This object allows the administrator to configure the tunnel index of
+      the reverse tunnel. 
+
+      For co-routed bidirectional tunnel, this object will have the value
+      same as the object mplsTunnelIndex.          
+       
+      This object helps to associate a forward tunnel with the reverse
+      tunnel in case of associated bidirectional tunnel."
+   ::= { fsMplsTpTunnelEntry 1 }
+
+fsMplsTpTunnelDestTunnelLspNum  OBJECT-TYPE
+   SYNTAX        MplsTunnelInstanceIndex
+   MAX-ACCESS    read-create
+   STATUS        current
+   DESCRIPTION
+     "This object allows the administrator to configure the tunnel lsp
+      number of the reverse tunnel for a associated bidirectional tunnel.
+
+      This object helps to associate a forward tunnel with the reverse
+      tunnel in case of associated bidirectional tunnel.
+
+      For co-routed bidirectional tunnel, this object will have the value
+      same as the object mplsTunnelInstance.
+
+      By default, this object will have the value same as the object 
+      mplsTunnelInstance."
+   ::= { fsMplsTpTunnelEntry 2 }
+
+-- End of MPLS-TP Tunnel table
+
+--LSP Attribute Table
+
+fsTunnelAttributeIndexNext OBJECT-TYPE
+   SYNTAX        Unsigned32 (0..65535)
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION
+     "This object contains the next appropriate value to
+      be used for fsTunnelAttributeIndex when creating
+      entries in the fsTunnelAttributeTable.If the
+      number of unassigned entries is exhausted, a
+      retrieval operation will return a value of 0.  
+        
+      When the SET is performed to create a row in the
+      fsTunnelAttributeTable, the Command Responder
+      (agent) must determine whether the value is indeed
+      still unused; Two Network Management Applications
+      may attempt to create a row (configuration entry)
+      simultaneously and use the same value. If it is
+      currently unused, the SET succeeds and the Command
+      Responder (agent) changes the value of this object,
+      according to an implementation-specific algorithm.
+      If the value is in use, however, the SET fails.  The
+      Network Management Application must then re-read
+      this variable to obtain a new usable value."
+    ::= { fsMplsTeObjects 4 }
+
+fsTunnelAttributeTable OBJECT-TYPE
+   SYNTAX       SEQUENCE OF FsTunnelAttributeEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+      "The fsTunnelAttributeTable allows allows configuration 
+       of LSP attribute parameters."
+   ::= { fsMplsTeObjects 5}
+
+fsTunnelAttributeEntry  OBJECT-TYPE
+    SYNTAX         FsTunnelAttributeEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "An entry in this table represents attribute parameters
+        to be associated with a LSP. "
+     INDEX { fsTunnelAttributeIndex }
+       ::= { fsTunnelAttributeTable 1 }
+
+FsTunnelAttributeEntry ::= SEQUENCE {
+     fsTunnelAttributeIndex                Unsigned32,
+     fsTunnelAttributeName                 SnmpAdminString,
+     fsTunnelAttributeSetupPrio            Integer32,
+     fsTunnelAttributeHoldingPrio          Integer32,
+     fsTunnelAttributeIncludeAnyAffinity   Unsigned32,
+     fsTunnelAttributeIncludeAllAffinity   Unsigned32,
+     fsTunnelAttributeExcludeAnyAffinity   Unsigned32,
+     fsTunnelAttributeSessionAttributes    BITS,
+     fsTunnelAttributeBandwidth            Unsigned32,
+     fsTunnelAttributeTeClassType          Integer32,
+     fsTunnelAttributeSrlgType             INTEGER,
+     fsTunnelAttributeRowStatus            RowStatus,
+     fsTunnelAttributeMask                 BITS
+   }
+
+fsTunnelAttributeIndex OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..65535)
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+      "Unique value that identifies a row in this table."
+    ::= { fsTunnelAttributeEntry 1 }
+
+fsTunnelAttributeName OBJECT-TYPE
+    SYNTAX         SnmpAdminString
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+      " The canonical name assigned to the LSP attribute entry. This uniquely
+        identifies the attribute entry."
+    DEFVAL { "" }
+    ::= { fsTunnelAttributeEntry 2 }
+
+fsTunnelAttributeSetupPrio OBJECT-TYPE
+    SYNTAX        Integer32 (0..7)  
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "This object indicates the setup priority attribute. There is no default
+       value for this object. If this object is not configured, then LSP takes
+       this attribute from mplsTunnelTable."
+    ::= { fsTunnelAttributeEntry 3 }
+
+fsTunnelAttributeHoldingPrio OBJECT-TYPE
+    SYNTAX        Integer32 (0..7) 
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "This object indicates the holding priority attribute. There is no default
+       value for this object. If this object is not configured, then LSP takes
+       this attribute from mplsTunnelTable."
+    ::= { fsTunnelAttributeEntry 4 }
+
+fsTunnelAttributeIncludeAnyAffinity OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "A link satisfies the include-any constraint if and only if the constraint
+       is zero, or the link and the constraint have a resource class in common.
+       Valid range is Integer(0..4294967295). There is no default value for this
+       object. If this object is not configured, then LSP takes this attribute
+       from mplsTunnelTable."
+    ::= { fsTunnelAttributeEntry 5 }
+
+fsTunnelAttributeIncludeAllAffinity OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "A link satisfies the include-all constraint if and only if the link
+       contains all of the administrative groups specified in the constraint.
+       Valid range is Integer(0..4294967295). There is no default value for this
+       object. If this object is not configured, then LSP takes this attribute
+       from mplsTunnelTable."
+    ::= { fsTunnelAttributeEntry 6 }
+
+fsTunnelAttributeExcludeAnyAffinity OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "A link satisfies the exclude-any constraint if and only if the link
+       contains none of the administrative groups specified in the constraint.
+       Valid range is Integer(0..4294967295). There is no default value for this
+       object. If this object is not configured, then LSP takes this attribute
+       from mplsTunnelTable."
+    ::= { fsTunnelAttributeEntry 7 }
+
+fsTunnelAttributeSessionAttributes OBJECT-TYPE
+     SYNTAX      BITS {
+                        fastReroute (0),
+                        mergingPermitted (1),
+                        isPersistent (2),
+                        isPinned (3),
+                        recordRoute (4)
+                     }
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+       "This bit mask indicates optional session values for
+        this LSP. The following describes these bit
+        fields:
+   
+        fastReroute This flag indicates that the any lsp hop may
+        choose to reroute this LSP.This flag permits transit routers to use
+        a local repair mechanism which may result in violation of the explicit
+        routing of this LSP.When a fault is detected on an adjacent
+        downstream link or node, a transit router can re-route traffic
+        for fast service restoration.
+
+        mergingPermitted This flag permits transit routers
+        to merge this session with other RSVP sessions for
+        the purpose of reducing resource overhead on
+        downstream transit routers, thereby providing
+        better network scaling.
+ 
+        isPersistent Indicates whether this LSP should
+        be restored automatically after a failure occurs.
+ 
+        isPinned  This flag indicates whether the loose-
+        routed hops of this LSP  are to be pinned.
+
+        recordRoute This flag indicates whether or not the signalling
+        protocol should remember the LSP path after it has been signaled.
+       
+        If no bits are set, it means session attributes value is not
+        configured."
+    ::= { fsTunnelAttributeEntry 8 }
+
+fsTunnelAttributeBandwidth OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "This object indicates the bandwidth attribute. There is no default 
+        value for this object. If this object is not configured, then 
+        LSP takes this attribute from mplsTunnelTable."
+    ::= { fsTunnelAttributeEntry 9 }  
+ 
+fsTunnelAttributeTeClassType OBJECT-TYPE
+    SYNTAX        Integer32(0..4) 
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "This object represents the Class-Type attribute. There is no default
+        value for this object. If this object is not configured, then 
+        LSP takes this attribute from the tunnel configuration."
+    ::= { fsTunnelAttributeEntry 10 }
+    
+fsTunnelAttributeSrlgType     OBJECT-TYPE
+    SYNTAX      INTEGER {  includeAny(1),includeAll(2),excludeAny(3) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This object represents Shared Risk Link Group Value attribute.
+        There is no default value for this object. 
+        If this object is not configured, then LSP takes this attribute from the
+        tunnel configuration."
+   ::= { fsTunnelAttributeEntry  11 }
+
+fsTunnelAttributeRowStatus OBJECT-TYPE
+    SYNTAX        RowStatus
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "This object is used to create, modify, and/or delete a row in this
+      table."
+    ::= { fsTunnelAttributeEntry 12 }
+
+fsTunnelAttributeMask     OBJECT-TYPE   
+    SYNTAX        BITS {
+                         setupPriority (0),
+                         holdingPriority (1),
+                         sessionAttribute (2),
+                         includeAnyAffinity (3),
+                         includeAllAffinity (4),
+                         excludeAllAffinity (5),
+                         bandwidth (6),
+                         classType (7),
+                         srlg (8)
+                       }
+
+
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+      "This object is used to find the number of Attribute parameters
+       considered while setting up the path.
+       If no bits are set, it means no Attribute parameters are 
+       configured"
+    ::= { fsTunnelAttributeEntry 13 }
+
+ --LSP Attribute Table END
+
+ --Start of MPLS Srlg Table
+
+fsMplsTunnelSrlgTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsMplsTunnelSrlgEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+      "The fsMplsTunnelSrlgTable allows the administrator to configure
+       Shared Risk Link Group Values for tunnels."
+   ::= { fsMplsTeObjects 6 }
+
+fsMplsTunnelSrlgEntry  OBJECT-TYPE
+    SYNTAX         FsMplsTunnelSrlgEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "An entry in this table represents Shared Risk Link Group Values values
+       associated with a Tunnel. "
+    INDEX { mplsTunnelIndex,
+            mplsTunnelInstance, 
+            mplsTunnelIngressLSRId, 
+            mplsTunnelEgressLSRId, 
+            fsMplsTunnelSrlgNo
+          }
+    ::= { fsMplsTunnelSrlgTable 1 }
+
+FsMplsTunnelSrlgEntry ::= SEQUENCE {
+     fsMplsTunnelSrlgNo                    Unsigned32,
+     fsMplsTunnelSrlgRowStatus             RowStatus
+      }
+fsMplsTunnelSrlgNo OBJECT-TYPE
+    SYNTAX         Unsigned32 (0..4294967295)
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "This object identifies an SRLG constraint associated with Tunnel.  
+        An SRLG is identified with a 32-bit number that is unique within an IGP
+        domain.  Zero is a valid SRLG number."
+    ::= { fsMplsTunnelSrlgEntry 1 }
+
+fsMplsTunnelSrlgRowStatus OBJECT-TYPE
+    SYNTAX        RowStatus
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "This variable is used to create, modify, and/or delete a row in this
+        table."
+    ::= { fsMplsTunnelSrlgEntry 2 }
+ --Tunnel Srlg Table END
+
+-- Start of fsTunnelAttributeSrlgTable
+
+fsTunnelAttributeSrlgTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF FsTunnelAttributeSrlgEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+       "The fsTunnelAttributeSrlgTable allows the administrator to configure
+        Shared Risk Link Group Values for each Attribute List to be 
+        associated with the Tunnel."
+   ::= { fsMplsTeObjects 7}
+
+fsTunnelAttributeSrlgEntry  OBJECT-TYPE
+    SYNTAX         FsTunnelAttributeSrlgEntry
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "An entry in this table represents Shared Risk Link Group Values
+        associated with a attribute list."
+    INDEX { fsTunnelAttributeIndex, 
+            fsTunnelAttributeSrlgNo
+          }
+    ::= { fsTunnelAttributeSrlgTable 1 }
+
+FsTunnelAttributeSrlgEntry ::= SEQUENCE {
+         fsTunnelAttributeSrlgNo              Unsigned32,
+         fsTunnelAttributeSrlgRowStatus       RowStatus
+    }
+
+fsTunnelAttributeSrlgNo OBJECT-TYPE
+    SYNTAX         Unsigned32 (0..4294967295)
+    MAX-ACCESS     not-accessible
+    STATUS         current
+    DESCRIPTION
+       "This object identifies an SRLG constraint associated with a Attribute
+        list. An SRLG is identified with a 32-bit number that is unique within
+        an IGP domain.  Zero is a valid SRLG number."
+    ::= { fsTunnelAttributeSrlgEntry 1}
+
+fsTunnelAttributeSrlgRowStatus OBJECT-TYPE
+    SYNTAX        RowStatus
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "This variable is used to create, modify, and/or delete a row in this
+        table."
+    ::= { fsTunnelAttributeSrlgEntry 2}
+
+-- End of fsTunnelAttributeSrlgTable
+
+-- Start of fsMplsTunnelHopTable
+fsMplsTunnelHopTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF FsMplsTunnelHopEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+       "The fsMplsTunnelHopTable extends the mplsTunnelHopTable of 
+        MPLS-TE-STD-MIB. This table has the additional Constraint that needs
+        to be considered when calculating the path to reach the 
+        destination."
+    ::= { fsMplsTeObjects 8}
+
+fsMplsTunnelHopEntry OBJECT-TYPE
+    SYNTAX      FsMplsTunnelHopEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "An entry in this table represents additions to a tunnel hop defined 
+        in mplsTunnelHopEntry. This entry is valid only at the Ingress of the
+        tunnel and this table is configured only by the network Administrator."
+    AUGMENTS { mplsTunnelHopEntry}
+    ::= { fsMplsTunnelHopTable 1 }
+
+
+FsMplsTunnelHopEntry ::= SEQUENCE {
+         fsMplsTunnelHopIncludeAny       TruthValue
+    }
+
+fsMplsTunnelHopIncludeAny OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+       "If this value is set to true, then this indicates that this hop is 
+        configured as an include any node. 
+        If a hop in the table is 
+        configured as include any, then it overrides the configuration of
+        mplsTunnelHopInclude object.
+        If a hop in the table is configured as include any, then
+        none of the hops should be configured with mplsTunnelHopType object.
+        Conversely, If any of the hop in the table is configured with 
+        mplsTunnelHopType object, fsMplsTunnelHopIncludeAny object should not
+        be configured.
+        The default value of this object is 'false'."
+    DEFVAL { false }
+    ::= { fsMplsTunnelHopEntry 1 }
+
+-- End of fsMplsTunnelHopTable
+
+-- Notify Message Traps START
+
+fsGmplsTunnelNotifyErrorTrapEnable OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+       "If this object is true, then it enables the generation of traps
+        when a Notify Message is received, otherwise these traps are not
+        emitted."
+    DEFVAL { false }
+    ::= { fsMplsTeScalarObjects 1 }
+
+fsGmplsTunnelNotifyErrorTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        gmplsTunnelErrorReporterType,
+        gmplsTunnelErrorReporter,
+        gmplsTunnelErrorCode,
+        gmplsTunnelErrorSubcode
+    }
+    STATUS      current
+    DESCRIPTION
+       "This trap is generated when a Notify Message is received
+        indicating that an error has happened on one of the nodes.
+
+        The objects in this trap provide additional error
+        information that indicates the reason for which the Notify
+        Message has been received.
+
+        The generation of this trap is subject to the control of
+        fsGmplsTunnelNotifyErrorTrapEnable. When this object is set
+        to false(2), then the notification must not be issued."
+
+    ::= { fsMplsTeNotifications 1 }
+
+fsGmplsTunnelAdminStatusFlagsTrap NOTIFICATION-TYPE
+    OBJECTS  {
+        gmplsTunnelAdminStatusFlags
+    }
+    STATUS      current
+    DESCRIPTION
+       "This trap is being generated for the Admin Status Flags
+        indicating that the Admin Status is changed on the node."
+
+    ::= { fsMplsTeNotifications 2 }
+--Notify Message Traps END
+
+END

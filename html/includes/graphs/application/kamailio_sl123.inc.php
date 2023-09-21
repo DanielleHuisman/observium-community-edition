@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -22,34 +22,34 @@
   DS:sl3xxreplies:COUNTER:600:0:125000000000 \
 */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
-$rrd_filename = get_rrd_path($device, "app-kamailio-".$app['app_id'].".rrd");
+$rrd_filename = get_rrd_path($device, "app-kamailio-" . $app['app_id'] . ".rrd");
 
-$array = array('sl1xxreplies'  => array('descr' => '1XX Replies'),
-               'sl200replies'  => array('descr' => '200 Replies'),
-               'sl202replies'  => array('descr' => '202 Replies'),
-               'sl2xxreplies'  => array('descr' => '2XX Replies'),
-               'sl300replies'  => array('descr' => '300 Replies'),
-               'sl301replies'  => array('descr' => '301 Replies'),
-               'sl302replies'  => array('descr' => '302 Replies'),
-               'sl3xxreplies'  => array('descr' => '3XX Replies'),
-              );
+$array = ['sl1xxreplies' => ['descr' => '1XX Replies'],
+          'sl200replies' => ['descr' => '200 Replies'],
+          'sl202replies' => ['descr' => '202 Replies'],
+          'sl2xxreplies' => ['descr' => '2XX Replies'],
+          'sl300replies' => ['descr' => '300 Replies'],
+          'sl301replies' => ['descr' => '301 Replies'],
+          'sl302replies' => ['descr' => '302 Replies'],
+          'sl3xxreplies' => ['descr' => '3XX Replies'],
+];
 
 $i = 0;
-if (rrd_is_file($rrd_filename))
-{
-  foreach ($array as $ds => $data)
-  {
-    $rrd_list[$i]['filename'] = $rrd_filename;
-    $rrd_list[$i]['descr'] = $data['descr'];
-    $rrd_list[$i]['ds'] = $ds;
-    $i++;
-  }
-} else { echo("file missing: $rrd_filename");  }
+if (rrd_is_file($rrd_filename)) {
+    foreach ($array as $ds => $data) {
+        $rrd_list[$i]['filename'] = $rrd_filename;
+        $rrd_list[$i]['descr']    = $data['descr'];
+        $rrd_list[$i]['ds']       = $ds;
+        $i++;
+    }
+} else {
+    echo("file missing: $rrd_filename");
+}
 
-$colours   = "mixed";
+$colours = "mixed";
 
-include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_multi_line.inc.php");
 
 // EOF

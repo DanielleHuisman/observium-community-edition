@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -31,20 +31,18 @@ echo "connectionss:$connectionss"
 echo "connectionsS:$connectionsS"
 */
 
-if (!empty($agent_data['app']['lighttpd']))
-{
-  $app_id = discover_app($device, 'lighttpd');
+if (!empty($agent_data['app']['lighttpd'])) {
+    $app_id = discover_app($device, 'lighttpd');
 
-  foreach (explode("\n", $agent_data['app']['lighttpd']) as $line)
-  {
-    list($key, $val) = explode(":", $line);
-    $data[trim($key)] = intval(trim($val));
-  }
+    foreach (explode("\n", $agent_data['app']['lighttpd']) as $line) {
+        [$key, $val] = explode(":", $line);
+        $data[trim($key)] = intval(trim($val));
+    }
 
-  update_application($app_id, $data);
-  rrdtool_update_ng($device, 'lighttpd', $data, $app_id);
+    update_application($app_id, $data);
+    rrdtool_update_ng($device, 'lighttpd', $data, $app_id);
 
-  unset($app_id, $line, $data);
+    unset($app_id, $line, $data);
 }
 
 // EOF

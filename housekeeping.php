@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage cli
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     cli
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,61 +15,83 @@ chdir(dirname($argv[0]));
 
 $options = getopt("A:VyaselurpdbiT");
 
-include("includes/sql-config.inc.php");
+include("includes/observium.inc.php");
 
 $cli = is_cli();
 
 if (isset($options['V'])) {
-  print_message(OBSERVIUM_PRODUCT." ".OBSERVIUM_VERSION);
-  if (is_array($options['V'])) { print_versions(); }
-  exit;
+    print_message(OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION);
+    if (is_array($options['V'])) {
+        print_versions();
+    }
+    exit;
 }
 
-/* Prevent run housekeeping on remote pollers (that not needed)
+// Prevent running housekeeping on remote pollers (not needed, won't work properly, potential data loss vector)
 if ($config['poller_id'] !== 0) {
-  print_message("%yHouseKeeping only needs to be run on the main node.%n\n", 'color');
-  exit;
+    print_message("%yHousekeeping only needs to be run on the main node. Do not run housekeeping on partitioned pollers.%n\n", 'color');
+    exit;
 }
-*/
-print_message("%g".OBSERVIUM_PRODUCT." ".OBSERVIUM_VERSION."\n%WHouseKeeping%n\n", 'color');
-if (OBS_DEBUG) { print_versions(); }
+
+print_message("%g" . OBSERVIUM_PRODUCT . " " . OBSERVIUM_VERSION . "\n%WHouseKeeping%n\n", 'color');
+if (OBS_DEBUG) {
+    print_versions();
+}
 
 // For interactive prompt/answer checks
 // if it is started from crontab - prompt disabled and answer always 'yes'
 if (is_cron()) {
-  $prompt = FALSE;
+    $prompt = FALSE;
 } else {
-  $prompt = !isset($options['y']);
+    $prompt = !isset($options['y']);
 }
 $answer = TRUE;
 
-$modules = array();
+$modules = [];
 
-if (isset($options['a']) || isset($options['s'])) { $modules[] = 'syslog'; }
-if (isset($options['a']) || isset($options['e'])) { $modules[] = 'eventlog'; }
-if (isset($options['a']) || isset($options['l'])) { $modules[] = 'alertlog'; }
-if (isset($options['a']) || isset($options['u'])) { $modules[] = 'authlog'; }
-if (isset($options['a']) || isset($options['p'])) { $modules[] = 'ports'; }
-if (isset($options['a']) || isset($options['b'])) { $modules[] = 'staledb'; }
-if (isset($options['a']) || isset($options['i'])) { $modules[] = 'inventory'; }
-if (isset($options['a']) || isset($options['r'])) { $modules[] = 'rrd'; }
+if (isset($options['a']) || isset($options['s'])) {
+    $modules[] = 'syslog';
+}
+if (isset($options['a']) || isset($options['e'])) {
+    $modules[] = 'eventlog';
+}
+if (isset($options['a']) || isset($options['l'])) {
+    $modules[] = 'alertlog';
+}
+if (isset($options['a']) || isset($options['u'])) {
+    $modules[] = 'authlog';
+}
+if (isset($options['a']) || isset($options['p'])) {
+    $modules[] = 'ports';
+}
+if (isset($options['a']) || isset($options['b'])) {
+    $modules[] = 'staledb';
+}
+if (isset($options['a']) || isset($options['i'])) {
+    $modules[] = 'inventory';
+}
+if (isset($options['a']) || isset($options['r'])) {
+    $modules[] = 'rrd';
+}
 
 // Get age from command line
 if (isset($options['A'])) {
-  $age = age_to_seconds($options['A']);
-  if ($age) {
-    foreach ($modules as $module) {
-      if ($module === 'ports') { $module = 'deleted_ports'; }
-      $config['housekeeping'][$module]['age'] = $age;
+    $age = age_to_seconds($options['A']);
+    if ($age) {
+        foreach ($modules as $module) {
+            if ($module === 'ports') {
+                $module = 'deleted_ports';
+            }
+            $config['housekeeping'][$module]['age'] = $age;
+        }
+    } else {
+        print_debug("Invalid age specified '" . $options['A'] . "', skipped.");
     }
-  } else {
-    print_debug("Invalid age specified '" . $options['A'] . "', skipped.");
-  }
-  unset($age, $module);
+    unset($age, $module);
 }
 
 if (!count($modules)) {
-  print_message("%n
+    print_message("%n
 USAGE:
 $scriptname [-Vyaselrptdbu] [-A <age>]
 
@@ -102,18 +124,22 @@ EXAMPLES:
   $scriptname -ya                       Clean up by all modules without prompts
 
 %rInvalid arguments!%n", 'color', FALSE);
-  exit;
+    exit;
 }
 
 $test = isset($options['T']);
 foreach ($modules as $module) {
-  if (is_file($config['install_dir'] . "/includes/housekeeping/$module.inc.php")) {
-    include($config['install_dir'] . "/includes/housekeeping/$module.inc.php");
-    if (!$test) { set_obs_attrib("housekeeping_lastrun_$module", time()); }
-  } else {
-    print_warning("Housekeeping module not found: $module");
-  }
+    if (is_file($config['install_dir'] . "/includes/housekeeping/$module.inc.php")) {
+        include($config['install_dir'] . "/includes/housekeeping/$module.inc.php");
+        if (!$test) {
+            set_obs_attrib("housekeeping_lastrun_$module", time());
+        }
+    } else {
+        print_warning("Housekeeping module not found: $module");
+    }
 }
-if (!$test) { set_obs_attrib("housekeeping_lastrun", time()); }
+if (!$test) {
+    set_obs_attrib("housekeeping_lastrun", time());
+}
 
 // EOF

@@ -14,7 +14,9 @@ IMPORTS
     tmnxSRObjs
                                                          FROM TIMETRA-GLOBAL-MIB
     TLNamedItem, TLNamedItemOrEmpty,
-    TmnxAdminState, TmnxMplsLabelOrZero
+    TNamedItem, TNamedItemOrEmpty,
+    TmnxAdminState, TmnxEnabledDisabled,
+    TmnxMplsLabelOrZero
                                                          FROM TIMETRA-TC-MIB
     vRtrID
                                                          FROM TIMETRA-VRTR-MIB
@@ -105,6 +107,15 @@ vRtrSrStPlcySegTblLstChg         OBJECT-TYPE
         "The value of vRtrSrStPlcySegTblLstChg indicates the sysUpTime at the
          time of the last modification of an entry in the vRtrSrStPlcySegTable."
     ::= { vRtrSrPlcyConfigTimeStamps 5 }
+
+vRtrSrMainPlcyTblLstChg          OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrSrMainPlcyTblLstChg indicates the sysUpTime at the
+         time of the last modification of an entry in the vRtrSrMainPlcyTable."
+    ::= { vRtrSrPlcyConfigTimeStamps 6 }
 
 vRtrSrPlcyConfigurations         OBJECT IDENTIFIER ::= { vRtrSrPolicyObjs 2 }
 
@@ -278,7 +289,8 @@ VRtrSrStaticPlcyEntry            ::= SEQUENCE
     vRtrSrStaticPlcyPreference       Unsigned32,
     vRtrSrStaticPlcyBindSid          TmnxMplsLabelOrZero,
     vRtrSrStaticPlcyDistinguisher    Unsigned32,
-    vRtrSrStaticPlcyColorSet         TruthValue
+    vRtrSrStaticPlcyColorSet         TruthValue,
+    vRtrSrStaticPlcyMainPlcyName     TNamedItemOrEmpty
 }
 
 vRtrSrStaticPlcyName             OBJECT-TYPE
@@ -422,6 +434,17 @@ vRtrSrStaticPlcyColorSet         OBJECT-TYPE
          that vRtrSrStaticPlcyColor has been configured"
     DEFVAL      { false }
     ::= { vRtrSrStaticPlcyEntry 13 }
+
+vRtrSrStaticPlcyMainPlcyName     OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrStaticPlcyMainPlcyName is a named maintenance policy to the
+         static SR policy path. The maintenance policy must exist in
+         vRtrSrMainPlcyTable."
+    DEFVAL      { "" }
+    ::= { vRtrSrStaticPlcyEntry 14 }
 
 vRtrSrStPlcySegListTable         OBJECT-TYPE
     SYNTAX      SEQUENCE OF VRtrSrStPlcySegListEntry
@@ -729,7 +752,8 @@ VRtrSrPlcyPathEntry              ::= SEQUENCE
     vRtrSrPlcyPathBindSid            TmnxMplsLabelOrZero,
     vRtrSrPlcyPathOriginAddrType     InetAddressType,
     vRtrSrPlcyPathOriginAddr         InetAddress,
-    vRtrSrPlcyPathOriginASN          Unsigned32
+    vRtrSrPlcyPathOriginASN          Unsigned32,
+    vRtrSrPlcyPathMainPlcy           TNamedItemOrEmpty
 }
 
 vRtrSrPlcyPathHeadEndAddrType    OBJECT-TYPE
@@ -927,6 +951,15 @@ vRtrSrPlcyPathOriginASN          OBJECT-TYPE
          session to the headend."
     ::= { vRtrSrPlcyPathEntry 19 }
 
+vRtrSrPlcyPathMainPlcy           OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrSrPlcyPathMainPlcy specifies the maintenance policy
+         for a specified path."
+    ::= { vRtrSrPlcyPathEntry 20 }
+
 vRtrSrPlcyPathSegListTable       OBJECT-TYPE
     SYNTAX      SEQUENCE OF VRtrSrPlcyPathSegListEntry
     MAX-ACCESS  not-accessible
@@ -995,7 +1028,9 @@ VRtrSrPlcyPathSegListEntry       ::= SEQUENCE
     vRtrSrPlcyPathSLSeg10Label       Unsigned32,
     vRtrSrPlcyPathSLSeg10State       INTEGER,
     vRtrSrPlcyPathSLSeg11Label       Unsigned32,
-    vRtrSrPlcyPathSLSeg11State       INTEGER
+    vRtrSrPlcyPathSLSeg11State       INTEGER,
+    vRtrSrPlcyPathSLSBfdState        INTEGER,
+    vRtrSrPlcyPathSLSBfdTransitions  Unsigned32
 }
 
 vRtrSrPlcyPathSLHeadEndAddrType  OBJECT-TYPE
@@ -1364,6 +1399,27 @@ vRtrSrPlcyPathSLSeg11State       OBJECT-TYPE
          path is 'resolvedUp' or 'resolvedDown'. A value of 'none' indicates segment is not present."
     ::= { vRtrSrPlcyPathSegListEntry 34 }
 
+vRtrSrPlcyPathSLSBfdState        OBJECT-TYPE
+    SYNTAX      INTEGER {
+        down (0),
+        up   (1)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of leaf vRtrSrPlcyPathSLSBfdState indicates the S-BFD state
+         for the segment list."
+    ::= { vRtrSrPlcyPathSegListEntry 35 }
+
+vRtrSrPlcyPathSLSBfdTransitions  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of leaf vRtrSrPlcyPathSLSBfdTransitions indicates the S-BFD
+         number of transitions for the segment list."
+    ::= { vRtrSrPlcyPathSegListEntry 36 }
+
 vRtrSrPlcyIngrStatsTable         OBJECT-TYPE
     SYNTAX      SEQUENCE OF VRtrSrPlcyIngrStatsEntry
     MAX-ACCESS  not-accessible
@@ -1585,6 +1641,155 @@ vRtrSrPlcyEgrStatsByteCnt        OBJECT-TYPE
          aggregate of  all forwarding policies."
     ::= { vRtrSrPlcyEgrStatsEntry 9 }
 
+vRtrSrMainPlcyTable              OBJECT-TYPE
+    SYNTAX      SEQUENCE OF VRtrSrMainPlcyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The vRtrSrMainPlcyTable has an entry for each segment routing
+         maintenance policy configured for a virtual router in the system."
+    ::= { vRtrSrPlcyConfigurations 11 }
+
+vRtrSrMainPlcyEntry              OBJECT-TYPE
+    SYNTAX      VRtrSrMainPlcyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents a configuration of a maintenance Policy in
+         the segment routing for a virtual router in the system.
+
+         Entries can be created and deleted via SNMP SET operations."
+    INDEX       {
+        vRtrID,
+        vRtrSrMainPlcyName
+    }
+    ::= { vRtrSrMainPlcyTable 1 }
+
+VRtrSrMainPlcyEntry              ::= SEQUENCE
+{
+    vRtrSrMainPlcyName               TNamedItem,
+    vRtrSrMainPlcyRowStatus          RowStatus,
+    vRtrSrMainPlcyLastChanged        TimeStamp,
+    vRtrSrMainPlcyAdminState         TmnxAdminState,
+    vRtrSrMainPlcyBfdLiveness        TmnxEnabledDisabled,
+    vRtrSrMainPlcyBfdTemplate        TNamedItemOrEmpty,
+    vRtrSrMainPlcyMode               INTEGER,
+    vRtrSrMainPlcyThreshold          Unsigned32,
+    vRtrSrMainPlcyHoldDownTimer      Unsigned32,
+    vRtrSrMainPlcyRevertTimer        Unsigned32
+}
+
+vRtrSrMainPlcyName               OBJECT-TYPE
+    SYNTAX      TNamedItem
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrSrMainPlcyName specifies the name for the segment
+         routing maintenance policy."
+    ::= { vRtrSrMainPlcyEntry 1 }
+
+vRtrSrMainPlcyRowStatus          OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrSrMainPlcyRowStatus controls the creation and
+         deletion of rows in the table."
+    ::= { vRtrSrMainPlcyEntry 2 }
+
+vRtrSrMainPlcyLastChanged        OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrSrMainPlcyLastChanged indicates the sysUpTime when
+         this row was last modified."
+    ::= { vRtrSrMainPlcyEntry 3 }
+
+vRtrSrMainPlcyAdminState         OBJECT-TYPE
+    SYNTAX      TmnxAdminState
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of vRtrSrMainPlcyAdminState specifies the administrative
+         state of the segment routing maintenance policy instance."
+    DEFVAL      { outOfService }
+    ::= { vRtrSrMainPlcyEntry 4 }
+
+vRtrSrMainPlcyBfdLiveness        OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrMainPlcyBfdLiveness enables seamless BFD of every segment list
+         of an SR policy candidate  path to which the maintenance policy is
+         applied. BFD session parameters are taken  from the bfd-template
+         configured for the maintenance policy."
+    DEFVAL      { disabled }
+    ::= { vRtrSrMainPlcyEntry 5 }
+
+vRtrSrMainPlcyBfdTemplate        OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrMainPlcyBfdTemplate references a named BFD template to be used
+         by LSP BFD."
+    DEFVAL      { "" }
+    ::= { vRtrSrMainPlcyEntry 6 }
+
+vRtrSrMainPlcyMode               OBJECT-TYPE
+    SYNTAX      INTEGER {
+        none           (0),
+        ecmp-protected (1),
+        linear         (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrMainPlcyMode specifies the data path programming and protection
+         mechanism  for SR policy candidate paths to which the
+         maintenance-policy is applied."
+    DEFVAL      { none }
+    ::= { vRtrSrMainPlcyEntry 7 }
+
+vRtrSrMainPlcyThreshold          OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..32)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrMainPlcyThreshold configures the minimum number of S-BFD
+         sessions that must be UP to consider the SR policy candidate path to
+         which  the maintenance template is bound to be UP."
+    DEFVAL      { 1 }
+    ::= { vRtrSrMainPlcyEntry 8 }
+
+vRtrSrMainPlcyHoldDownTimer      OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..5000)
+    UNITS       "deciseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrMainPlcyHoldDownTimer is intended to prevent bouncing of the
+         sr-policy  path state if one or more S-BFD sessions associated with
+         segment lists  flap so causing the threshold to be repeatedly crossed
+         in a short period of time"
+    DEFVAL      { 0 }
+    ::= { vRtrSrMainPlcyEntry 9 }
+
+vRtrSrMainPlcyRevertTimer        OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4320)
+    UNITS       "minutes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "vRtrSrMainPlcyRevertTimer for SR Policy candidate paths is started when the primary path
+         (i.e. the best preference programmed candidate path) recovers
+         (i.e. after the number of SBFD sessions that are up is  >= threshold
+         and the hold-down-time has expired) and switch back when the timer expires."
+    DEFVAL      { 0 }
+    ::= { vRtrSrMainPlcyEntry 10 }
+
 vRtrSrPolicyConformance          OBJECT IDENTIFIER ::= { tmnxSRConfs 120 }
 
 vRtrSrPolicyCompliances          OBJECT IDENTIFIER ::= { vRtrSrPolicyConformance 1 }
@@ -1605,7 +1810,8 @@ vRtrSrPolicyCompliance           MODULE-COMPLIANCE
             vRtrSrPlcyPathGroup,
             vRtrSrPlcyPathSegListGroup,
             vRtrSrPlcyIngrStatsGroup,
-            vRtrSrPlcyEgrStatsGroup
+            vRtrSrPlcyEgrStatsGroup,
+            vRtrSrMainPlcyGroup
         }
     ::= { vRtrSrPolicyCompliances 1 }
 
@@ -1782,5 +1988,28 @@ vRtrSrPlcyEgrStatsGroup          OBJECT-GROUP
         "The group of objects in segment routing supporting Policy system on
          Nokia SROS series systems 19.0 release."
     ::= { vRtrSrPolicyGroups 10 }
+
+vRtrSrMainPlcyGroup              OBJECT-GROUP
+    OBJECTS     {
+        vRtrSrMainPlcyTblLstChg,
+        vRtrSrMainPlcyRowStatus,
+        vRtrSrMainPlcyLastChanged,
+        vRtrSrMainPlcyAdminState,
+        vRtrSrMainPlcyBfdLiveness,
+        vRtrSrMainPlcyBfdTemplate,
+        vRtrSrMainPlcyMode,
+        vRtrSrMainPlcyThreshold,
+        vRtrSrMainPlcyHoldDownTimer,
+        vRtrSrMainPlcyRevertTimer,
+        vRtrSrStaticPlcyMainPlcyName,
+        vRtrSrPlcyPathSLSBfdState,
+        vRtrSrPlcyPathSLSBfdTransitions,
+        vRtrSrPlcyPathMainPlcy
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects in segment routing maintenance Policy system on
+         Nokia SROS series systems 20.0 release."
+    ::= { vRtrSrPolicyGroups 11 }
 
 END

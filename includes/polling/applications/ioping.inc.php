@@ -7,15 +7,13 @@
 *
 * @package    observium
 * @subpackage poller
-* @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+* @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
 *
 */
 
-if (!empty($agent_data['app']['ioping']))
-{
+if (!empty($agent_data['app']['ioping'])) {
 
-    foreach (explode("\n", $agent_data['app']['ioping']) AS $data)
-    {
+    foreach (explode("\n", $agent_data['app']['ioping']) as $data) {
 
         $data = preg_split('/\s+/', $data);
 

@@ -4,7 +4,7 @@
 define('OBS_QUIET', TRUE); // Disable any additional output from tests
 ini_set('opcache.enable', 0);
 
-include(__DIR__ . '/../includes/sql-config.inc.php');
+include(__DIR__ . '/../includes/observium.inc.php');
 //include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php');
 //include(dirname(__FILE__) . '/../includes/definitions.inc.php');
@@ -275,14 +275,61 @@ class SnmpDataTest extends \PHPUnit\Framework\TestCase
       if ($result)
       {
         // good response - int greater than 0
-        $this->assertGreaterThan(0, isSNMPable($device));
+        $this->assertGreaterThan(0, is_snmpable($device));
       } else {
         // bad response return 0
         $device['snmp_timeout'] = 1;
-        $this->assertSame(0, isSNMPable($device));
+        $this->assertSame(0, is_snmpable($device));
       }
     }
   }
+
+    /**
+     * @dataProvider providerIsSNMPable
+     * @group snmperrors
+     */
+    public function testIsSNMPableError($os, $test_os, $status, $error = OBS_SNMP_ERROR_OK)
+    {
+        global $snmpsimd_ip, $snmpsimd_port;
+
+        $GLOBALS['config']['snmp']['errors'] = FALSE; // force disable log to db
+
+        foreach ([ 'v2c', 'v3' ] as $snmp_version)
+            //foreach (array('v3') as $snmp_version)
+        {
+            switch ($snmp_version)
+            {
+                case 'v2c':
+                    $community = $os . '-1';
+                    $device = build_initial_device_array($snmpsimd_ip, $community, $snmp_version, $snmpsimd_port, 'udp');
+                    break;
+                case 'v3':
+                    $snmp_version = 'v3';
+                    $snmp_v3 = [ 'authlevel'  => 'authPriv',
+                                 'authname'   => 'simulator',
+                                 'authpass'   => 'auctoritas',
+                                 'authalgo'   => 'MD5',
+                                 'cryptopass' => 'privatus',
+                                 'cryptoalgo' => 'DES' ];
+                    $device = build_initial_device_array($snmpsimd_ip, NULL, $snmp_version, $snmpsimd_port, 'udp', $snmp_v3);
+                    $device['snmp_context'] = $os . '-1';
+                    break;
+            }
+            $device['snmp_timeout'] = 2;
+            $device['snmp_retries'] = 1;
+            //var_dump($device);
+            if ($test_os)
+            {
+                $device['os'] = $test_os;
+            }
+            if (!$status) {
+                // bad response return 0
+                $device['snmp_timeout'] = 1;
+            }
+            is_snmpable($device);
+            $this->assertSame($error, snmp_error_code());
+        }
+    }
 
   public function providerIsSNMPable()
   {
@@ -308,9 +355,9 @@ class SnmpDataTest extends \PHPUnit\Framework\TestCase
       array('hikvision-cam', '8734hr7hf3f38', TRUE), // simulate os name changed
 
       // Simulate not snmpable device
-      array('hikvision-XXX',            NULL, FALSE), // os not known
-      array('hikvision-XXX', 'hikvision-cam', FALSE), // known os
-      array('hikvision-XXX', '8734hr7hf3f38', FALSE), // simulate os name changed
+      array('hikvision-XXX',            NULL, FALSE, OBS_SNMP_ERROR_REQUEST_TIMEOUT), // os not known
+      array('hikvision-XXX', 'hikvision-cam', FALSE, OBS_SNMP_ERROR_ISSNMPABLE), // known os
+      array('hikvision-XXX', '8734hr7hf3f38', FALSE, OBS_SNMP_ERROR_REQUEST_TIMEOUT), // simulate os name changed
     );
   }
 }

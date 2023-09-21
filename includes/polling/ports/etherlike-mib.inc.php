@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2021 Observium Limited
+ * @package        observium
+ * @subpackage     poller
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,14 +15,14 @@
 $port_module = 'etherlike';
 // If etherlike extended error statistics are enabled, walk dot3StatsEntry else only dot3StatsDuplexStatus.
 if ($ports_modules[$port_module]) {
-  echo("dot3Stats ");
+    echo("dot3Stats ");
 
-  $port_stats = snmpwalk_cache_oid($device, "dot3StatsEntry", $port_stats, "EtherLike-MIB");
-  $process_port_functions[$port_module] = snmp_status();
+    $port_stats                           = snmpwalk_cache_oid($device, "dot3StatsEntry", $port_stats, "EtherLike-MIB");
+    $process_port_functions[$port_module] = snmp_status();
 } elseif ($has_ifEntry) {
-  echo("dot3StatsDuplexStatus ");
-  $port_stats = snmpwalk_cache_oid($device, "dot3StatsDuplexStatus", $port_stats, "EtherLike-MIB");
-  $process_port_functions[$port_module] = snmp_status();
+    echo("dot3StatsDuplexStatus ");
+    $port_stats                           = snmpwalk_cache_oid($device, "dot3StatsDuplexStatus", $port_stats, "EtherLike-MIB");
+    $process_port_functions[$port_module] = snmp_status();
 }
 
 // Additional db fields for update

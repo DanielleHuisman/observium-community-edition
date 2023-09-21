@@ -2,7 +2,7 @@
 
 $scale_min = 0;
 
-include($config['html_dir']."/includes/graphs/common.inc.php");
+include($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 include("lvs_stats_common.inc.php");
 
@@ -17,6 +17,6 @@ $graph_max = 1;
 
 $unit_text = "bytes/sec";
 
-include($config['html_dir']."/includes/graphs/generic_simplex.inc.php");
+include($config['html_dir'] . "/includes/graphs/generic_simplex.inc.php");
 
 ?>

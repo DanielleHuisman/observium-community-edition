@@ -5,9 +5,9 @@
  *
  *   This file is part of Observium.
  *
- * @package    observium
- * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package        observium
+ * @subpackage     graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2023 Observium Limited
  *
  */
 
@@ -15,12 +15,12 @@ $scale_min = "0";
 $scale_max = "1";
 $step      = TRUE;
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include_once($config['html_dir'] . "/includes/graphs/common.inc.php");
 
 $rrd_options .= " COMMENT:'                       Min     Last    Max\\n'";
 
-$rrd_options .= " DEF:status=".$rrd_filename_escape.":status:AVERAGE";
-$rrd_options .= " DEF:code=".$rrd_filename_escape.":code:AVERAGE";
+$rrd_options .= " DEF:status=" . $rrd_filename_escape . ":status:AVERAGE";
+$rrd_options .= " DEF:code=" . $rrd_filename_escape . ":code:AVERAGE";
 
 $rrd_options .= " CDEF:percent=status,UN,UNKN,status,IF,100,* ";
 
