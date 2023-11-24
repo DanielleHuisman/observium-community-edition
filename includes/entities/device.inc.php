@@ -806,7 +806,7 @@ function check_device_duplicated($device)
                     if ($compare) {
                         // This devices really same, with same sysName, snmpEngineID and entPhysicalSerialNum
                         print_error("Already got device with SNMP-read sysName ($sysName), 'snmpEngineID' = $snmpEngineID and 'entPhysicalSerialNum' = $serial (" . $test['hostname'] . ").");
-                        return TRUE;
+                        return false;
                     }
                 } else {
                     // For not FQDN sysname check all (other) possible system Oids:
